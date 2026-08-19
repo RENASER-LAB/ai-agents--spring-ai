@@ -41,6 +41,27 @@ ORIGENES = [
 ]
 
 
+def leer_traza():
+    """Lee el recorrido de peticiones que dejó TrazaHttp, si se corrió con -Dtraza=si."""
+    carpeta = RAIZ / "target" / "traza-pruebas"
+    if not carpeta.is_dir():
+        return {}
+
+    import json
+    por_clase = {}
+    for archivo in sorted(carpeta.glob("*.jsonl")):
+        llamadas = []
+        for linea in archivo.read_text(encoding="utf-8").splitlines():
+            if linea.strip():
+                try:
+                    llamadas.append(json.loads(linea))
+                except json.JSONDecodeError:
+                    continue
+        if llamadas:
+            por_clase[archivo.stem] = llamadas
+    return por_clase
+
+
 def leer(carpeta):
     """Saca de los XML de una carpeta la lista de clases con sus pruebas."""
     clases = []
@@ -125,10 +146,35 @@ li .tiempo { margin-left: auto; color: var(--tenue); font-size: .8rem; white-spa
 .marca { font-weight: 700; width: 1rem; flex: none; }
 footer { margin-top: 3rem; color: var(--tenue); font-size: .85rem; border-top: 1px solid var(--linea); padding-top: 1rem; }
 code { background: var(--tarjeta); padding: .1rem .35rem; border-radius: .25rem; font-size: .85em; }
+
+/* El recorrido detallado de peticiones */
+.aviso {
+  background: var(--tarjeta); border: 1px solid var(--linea); border-left: 3px solid var(--saltada);
+  border-radius: .4rem; padding: .8rem 1rem; margin-bottom: 1.2rem; font-size: .9rem; color: var(--tenue);
+}
+.paso { border-top: 1px solid var(--linea); padding: .7rem 1rem; }
+.paso:first-child { border-top: none; }
+.cabecera { display: flex; align-items: baseline; gap: .6rem; flex-wrap: wrap; font-size: .9rem; }
+.verbo {
+  font-family: ui-monospace, monospace; font-weight: 700; font-size: .78rem;
+  padding: .1rem .45rem; border-radius: .25rem; background: var(--fondo); border: 1px solid var(--linea);
+}
+.ruta { font-family: ui-monospace, monospace; word-break: break-all; }
+.codigo { margin-left: auto; font-weight: 700; font-family: ui-monospace, monospace; }
+.c2 { color: var(--bien); } .c4 { color: var(--saltada); } .c5 { color: var(--fallo); }
+.cuerpos { display: grid; gap: .5rem; margin-top: .5rem; }
+@media (min-width: 46rem) { .cuerpos.dos { grid-template-columns: 1fr 1fr; } }
+.cuerpo { background: var(--fondo); border: 1px solid var(--linea); border-radius: .4rem; padding: .5rem .7rem; }
+.cuerpo h4 { margin: 0 0 .3rem; font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; color: var(--tenue); }
+.cuerpo pre {
+  margin: 0; font-size: .78rem; line-height: 1.45; white-space: pre-wrap;
+  word-break: break-word; max-height: 15rem; overflow: auto;
+}
+.candado { font-size: .75rem; color: var(--tenue); }
 """
 
 
-def escribir(grupos):
+def escribir(grupos, traza, nombres):
     e = html.escape
     total = bien = fallo = saltada = 0
     segundos = 0.0
@@ -179,6 +225,52 @@ def escribir(grupos):
                     f"<span class='tiempo'>{p['segundos']:.1f}s</span></li>")
             partes.append("</ul></details>")
 
+    # El recorrido paso a paso, si se pidió con -Dtraza=si
+    if traza:
+        partes.append(
+            "<h2>El recorrido, paso a paso</h2>"
+            "<p class='explicacion'>Cada petición que la prueba le hizo al sistema y lo que "
+            "el sistema contestó, en orden. Es para mirarlo a mano y comprobar que hace lo "
+            "que se cree que hace.</p>"
+            "<div class='aviso'>Los tokens salen recortados a propósito, y los archivos "
+            "subidos —un currículum en PDF— se anotan pero no se vuelcan. Los cuerpos muy "
+            "largos se cortan a 4 KB.</div>")
+
+        for clase, llamadas in sorted(traza.items()):
+            # Se agrupa por la prueba que provocó cada llamada, conservando el orden
+            por_prueba = {}
+            for ll in llamadas:
+                por_prueba.setdefault(ll.get("prueba", "?"), []).append(ll)
+
+            partes.append(f"<h3 style='margin:2rem 0 .8rem'>{e(clase)}</h3>")
+            for prueba, pasos in por_prueba.items():
+                partes.append(
+                    f"<details><summary><span class='marca bien'>›</span>{e(nombres.get(prueba, prueba))}"
+                    f"<span class='cuenta'>{len(pasos)} llamadas</span></summary><div>")
+                for p in pasos:
+                    estado = p.get("estado", 0)
+                    clase_codigo = "c5" if estado >= 500 else "c4" if estado >= 400 else "c2"
+                    partes.append(
+                        f"<div class='paso'><div class='cabecera'>"
+                        f"<span class='verbo'>{e(p.get('metodo', '?'))}</span>"
+                        f"<span class='ruta'>{e(p.get('uri', ''))}</span>"
+                        + ("<span class='candado'>🔒 con token</span>" if p.get("autorizada") else "")
+                        + f"<span class='codigo {clase_codigo}'>{estado}</span></div>")
+
+                    pide, vuelve = p.get("peticion", ""), p.get("respuesta", "")
+                    if pide or vuelve:
+                        dos = " dos" if pide and vuelve else ""
+                        partes.append(f"<div class='cuerpos{dos}'>")
+                        if pide:
+                            partes.append(
+                                f"<div class='cuerpo'><h4>Lo que se manda</h4><pre>{e(pide)}</pre></div>")
+                        if vuelve:
+                            partes.append(
+                                f"<div class='cuerpo'><h4>Lo que contesta</h4><pre>{e(vuelve)}</pre></div>")
+                        partes.append("</div>")
+                    partes.append("</div>")
+                partes.append("</div></details>")
+
     partes.append(
         "<footer>Sale de los XML que deja Maven en <code>target/*-reports</code>. "
         "Para regenerarlo: <code>./mvnw verify</code> y luego "
@@ -196,8 +288,22 @@ def main():
     if not any(clases for _, _, clases in grupos):
         print("No hay resultados que leer. Corre primero:  ./mvnw verify", file=sys.stderr)
         return 1
-    total, fallo = escribir(grupos)
-    print(f"{SALIDA}  ·  {total} comprobaciones" + (f", {fallo} fallando" if fallo else ""))
+
+    traza = leer_traza()
+    # Para enseñar «El equipo prepara y publica una vacante» en vez del nombre del método.
+    # El XML ya trae las frases; aquí solo se relacionan por posición dentro de su clase.
+    nombres = {}
+    for _, _, clases in grupos:
+        for c in clases:
+            corto = c["archivo"].split(".")[-1]
+            if corto in traza:
+                vistos = list(dict.fromkeys(ll.get("prueba") for ll in traza[corto]))
+                for metodo, prueba in zip(vistos, c["pruebas"]):
+                    nombres[metodo] = prueba["nombre"]
+
+    total, fallo = escribir(grupos, traza, nombres)
+    extra = f", {len(traza)} flujo(s) con recorrido detallado" if traza else ""
+    print(f"{SALIDA}  ·  {total} comprobaciones{extra}" + (f", {fallo} fallando" if fallo else ""))
     return 0
 
 

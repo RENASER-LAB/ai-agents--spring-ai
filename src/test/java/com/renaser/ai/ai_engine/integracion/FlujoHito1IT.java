@@ -11,7 +11,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import com.renaser.ai.ai_engine.integracion.soporte.TrazaHttp;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.context.annotation.Import;
 import org.springframework.core.io.FileSystemResource;
 
 import org.springframework.http.HttpStatusCode;
@@ -45,6 +47,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 // Con puerto real (además de MockMvc) porque el tope de subida solo lo aplica el contenedor.
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AutoConfigureMockMvc
+// Apunta cada peticion y respuesta cuando se corre con -Dtraza=si
+@Import(TrazaHttp.class)
 @Testcontainers
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @DisplayName("Hito 1 · De la vacante a la postulación")
