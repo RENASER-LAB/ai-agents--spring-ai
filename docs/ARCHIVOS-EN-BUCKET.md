@@ -64,7 +64,7 @@ comprobara el permiso y la otra no, la que no lo comprueba sería la puerta de a
 ## Flujo de Implementación
 
 1. **Crea el bucket.** En el dashboard de Supabase → **Storage** → **New bucket**:
-   - Nombre: `curriculums`
+   - Nombre: `Documentos-cv` (es el que ya existe; si usas otro, cambialo en `application.yaml`)
    - **Public bucket: apagado.** Es lo más importante de este paso. Con el bucket público,
      cualquiera con la ruta se baja el currículum de cualquiera, y las rutas acaban en
      registros y en capturas de pantalla.
@@ -76,19 +76,22 @@ comprobara el permiso y la otra no, la que no lo comprueba sería la puerta de a
      archivos:
        tipo: supabase
        supabase:
-         url: https://TU-REFERENCIA.supabase.co
          clave: TU_SERVICE_ROLE_KEY
    ```
 
-   ⚠️ La `url` es la del proyecto **de la base de datos del backend**, no la del Supabase de
-   los agentes de IA. Son dos proyectos distintos y confundirlos manda los currículums a la
-   cuenta equivocada, sin ningún error que lo avise.
+   Solo la clave. **La url del proyecto y el nombre del bucket ya están en
+   `application.yaml`**, porque no son secretos: la url aparece en cualquier frontend que
+   hable con Supabase, y el nombre del bucket no abre nada por sí solo. La clave sí lo es.
+
+   ⚠️ Es la `service_role` del proyecto **de la base de datos del backend**, no la del
+   Supabase de los agentes de IA. Son dos proyectos distintos y confundirlos manda los
+   currículums a la cuenta equivocada, sin ningún error que lo avise.
 
 3. **Arranca.** Si falta algo de esa configuración, la aplicación **no arranca** y dice qué
    falta. Es a propósito: descubrirlo cuando un candidato ya pulsó «enviar» significa perder su
    currículum y su tiempo.
 
-4. **Comprueba.** Sube un currículum desde el portal y míralo en Storage → `curriculums`.
+4. **Comprueba.** Sube un currículum desde el portal y míralo en Storage → `Documentos-cv`.
    Tiene que aparecer como `{organización}/{uuid}.pdf`.
 
 5. **Para volver al disco**, borra el bloque `app.archivos` de tu archivo de claves.

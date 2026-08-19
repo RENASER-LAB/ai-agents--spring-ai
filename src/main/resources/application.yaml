@@ -147,11 +147,17 @@ app:
     # Solo para «disco»: la carpeta raíz.
     ruta: ${ARCHIVOS_RUTA:./almacen-archivos}
 
-    # Solo para «supabase». La url y la clave NO van aquí: viven en
-    # application-secrets.yaml, que no se versiona. La clave es la service_role, y quien la
-    # tenga lee el bucket entero, así que nunca puede llegar al navegador.
+    # Solo para «supabase».
+    #
+    # La url y el nombre del bucket SÍ pueden vivir aquí: no son secretos. La url del
+    # proyecto aparece en cualquier frontend que hable con Supabase, y el nombre del bucket
+    # no abre nada por sí solo. Lo que no puede estar aquí es la clave: es la service_role,
+    # se salta todas las reglas de acceso, y quien la tenga lee el bucket entero. Esa vive
+    # en application-secrets.yaml, que no se versiona.
     supabase:
-      bucket: ${ARCHIVOS_BUCKET:curriculums}
+      # El proyecto de la base de datos del backend, NO el de los agentes de IA.
+      url: ${SUPABASE_URL:https://jcmjaiwwnbbhflguydnq.supabase.co}
+      bucket: ${ARCHIVOS_BUCKET:Documentos-cv}
       # Lo que dura un enlace de descarga. Corto a propósito: el enlace no vuelve a
       # preguntar quién eres, así que es tan secreto como el currículum que abre.
       minutos-enlace: 5
