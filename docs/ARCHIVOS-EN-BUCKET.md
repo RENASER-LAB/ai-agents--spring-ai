@@ -65,9 +65,20 @@ comprobara el permiso y la otra no, la que no lo comprueba sería la puerta de a
 
 1. **Crea el bucket.** En el dashboard de Supabase → **Storage** → **New bucket**:
    - Nombre: `Documentos-cv` (es el que ya existe; si usas otro, cambialo en `application.yaml`)
-   - **Public bucket: apagado.** Es lo más importante de este paso. Con el bucket público,
-     cualquiera con la ruta se baja el currículum de cualquiera, y las rutas acaban en
-     registros y en capturas de pantalla.
+   - **Public bucket: apagado.** Es lo más importante de este paso, y ya se olvidó una vez.
+     Con el bucket público, la caducidad del enlace firmado **no protege nada**: el enlace
+     enseña la ruta en la barra de direcciones, y esa ruta sigue funcionando para siempre y
+     para cualquiera. Se descubrió bajando un currículum real sin token, sin clave y sin
+     firma.
+   - **Tamaño máximo: 10 MB**, el mismo que acepta el portal. Y los tipos permitidos, solo
+     PDF y Word. Son dos comprobaciones que ya hace el backend; tenerlas también en el bucket
+     significa que siguen valiendo el día que algo suba por otro camino.
+
+   Comprobar que quedó bien no es mirar la pantalla, es esto:
+
+   000
+
+   Tiene que dar **400**. Si da **200**, el bucket sigue abierto.
 
 2. **Añade la configuración** a `application-secrets.yaml`, que no se versiona:
 
