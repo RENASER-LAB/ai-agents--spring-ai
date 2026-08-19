@@ -19,7 +19,16 @@ spring:
   datasource:
     # Supabase crea una sola base y se llama "postgres"; no deja crear otras.
     # sslmode=require porque Supabase rechaza las conexiones sin cifrar.
-    url: jdbc:postgresql://${renaser.supabase.db.host}:${renaser.supabase.db.port:5432}/postgres?sslmode=require
+    #
+    # Se puede pegar la cadena entera tal como la da el dashboard, en vez de armarla por
+    # piezas: basta poner `renaser.supabase.db.url` en application-secrets.yaml y esta
+    # linea la respeta. Es lo comodo cuando alguien te pasa la conexion ya hecha.
+    #
+    # Ojo con dos cosas si la pegas entera. La cadena del dashboard lleva la contrasena
+    # dentro, y esa URL sale escrita en el registro al arrancar. Y no trae sslmode: el
+    # driver intenta cifrar por su cuenta, pero si no puede se conecta en claro sin
+    # avisar, asi que conviene anadirle `&sslmode=require` al final.
+    url: ${renaser.supabase.db.url:jdbc:postgresql://${renaser.supabase.db.host}:${renaser.supabase.db.port:5432}/postgres?sslmode=require}
     username: ${renaser.supabase.db.user}
     password: ${renaser.supabase.db.password}
     hikari:
