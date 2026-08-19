@@ -32,4 +32,15 @@ public final class DtosPostulacion {
     public record ConfirmarAvance(@NotBlank String motivo) {}
 
     public record ConteoEmbudo(Map<String, Long> porEstado) {}
+
+    /**
+     * Por donde bajarse un archivo sin pasar por el backend.
+     *
+     * @param url      enlace firmado: sirve para este archivo y nada mas
+     * @param expiraEn a partir de aqui deja de funcionar. Es corto a proposito: el enlace
+     *                 no vuelve a preguntar quien eres, asi que es tan secreto como el
+     *                 propio curriculum
+     * @param nombre   como llamarlo al guardarlo
+     */
+    public record EnlaceArchivo(String url, Instant expiraEn, String nombre) {}
 }
