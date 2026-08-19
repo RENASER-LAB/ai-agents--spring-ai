@@ -38,11 +38,22 @@
 		<archunit.version>1.4.1</archunit.version>
 		<!-- 0.8.13+ es la primera que entiende los .class de Java 25 -->
 		<jacoco.version>0.8.13</jacoco.version>
+		<sonar-maven-plugin.version>5.7.0.6970</sonar-maven-plugin.version>
 		<!-- SonarCloud mira la cobertura solo del código NUEVO de cada PR (Clean as You
-		     Code). La clave del proyecto la asigna SonarCloud al importar el repositorio:
-		     si no coincide con estas dos propiedades, se corrigen aquí. -->
-		<sonar.organization>ricardoismael</sonar.organization>
-		<sonar.projectKey>ricardoIsmael_ai-agents--spring-ai</sonar.projectKey>
+		     Code).
+
+		     Ojo con estos dos, que se confunden con facilidad: la organización se
+		     escribe SIEMPRE en minúsculas («RENASER-LAB» es el nombre que se ve en
+		     pantalla, no la clave), y lleva el «-1» porque en SonarCloud hay dos
+		     organizaciones con ese mismo nombre —`renaser-lab` y `renaser-lab-1`— y el
+		     proyecto está en la segunda. La clave del proyecto, en cambio, sí conserva
+		     las mayúsculas.
+
+		     Comprobados contra la API de SonarCloud, no copiados de memoria:
+		       curl -s "https://sonarcloud.io/api/components/search_projects?organization=renaser-lab-1"
+		-->
+		<sonar.organization>renaser-lab-1</sonar.organization>
+		<sonar.projectKey>RENASER-LAB_ai-agents--spring-ai</sonar.projectKey>
 		<sonar.host.url>https://sonarcloud.io</sonar.host.url>
 		<sonar.coverage.jacoco.xmlReportPaths>${project.build.directory}/site/jacoco/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
 	</properties>
@@ -239,6 +250,22 @@
 				</configuration>
 			</plugin>
 			<plugin>
+				<!-- Sin esta declaración, `mvn sonar:sonar` ni siquiera arranca: Maven
+				     resuelve el prefijo «sonar» mirando los plugins del proyecto, no lo
+				     adivina, y falla con «No plugin found for prefix 'sonar'» en un
+				     segundo y medio, antes de tocar la red.
+
+				     Se declara aquí y no con la coordenada larga en el workflow para que
+				     Dependabot mantenga la versión: una versión escrita dentro de un
+				     `run:` de GitHub Actions no la vigila nadie y envejece sola.
+
+				     Sin <executions> a propósito: así no se engancha a ninguna fase y
+				     `mvn verify` sigue haciendo exactamente lo mismo que antes. -->
+				<groupId>org.sonarsource.scanner.maven</groupId>
+				<artifactId>sonar-maven-plugin</artifactId>
+				<version>${sonar-maven-plugin.version}</version>
+			</plugin>
+			<plugin>
 				<!-- Mide qué líneas ejecutan los tests y deja el XML que SonarCloud lee.
 				     No impone umbral: la puerta la pone SonarCloud, y solo sobre lo nuevo. -->
 				<groupId>org.jacoco</groupId>
@@ -333,12 +360,11 @@
 		     test se ponga rojo. Mide si los tests protegen, no cuánto código pisan — la
 		     cobertura alta con tests huecos pasa JaCoCo pero no pasa esto.
 
-		     ⚠️ Hoy NO corre: pitest 1.19.1 (la última publicada, 19/08/2026) no lee
-		     bytecode de Java 25 («Unsupported class file major version 69»). La
-		     configuración se queda lista a propósito: cuando salga la versión que lo
-		     soporte, se sube el número de abajo y se prueba con
+		     Corre en el workflow nocturno, y a mano con:
 		       ./mvnw -B -Ppit test-compile pitest:mutationCoverage
-		     El workflow nocturno lo intenta solo si se le pide (interruptor manual).
+
+		     La versión importa: hasta la 1.19.1 no leía bytecode de Java 25
+		     («Unsupported class file major version 69»). La 1.25.9 sí. No bajar de ahí.
 
 		     No corre en cada PR: es lento a propósito. Solo apunta a los paquetes de
 		     reglas cerradas, donde un mutante vivo es un hueco real. Meter aquí
@@ -350,12 +376,12 @@
 					<plugin>
 						<groupId>org.pitest</groupId>
 						<artifactId>pitest-maven</artifactId>
-						<version>1.19.1</version>
+						<version>1.25.9</version>
 						<dependencies>
 							<dependency>
 								<groupId>org.pitest</groupId>
 								<artifactId>pitest-junit5-plugin</artifactId>
-								<version>1.2.2</version>
+								<version>1.2.3</version>
 							</dependency>
 						</dependencies>
 						<configuration>
@@ -370,8 +396,11 @@
 							<targetTests>
 								<param>com.renaser.ai.ai_engine.*Test</param>
 							</targetTests>
-							<!-- Guarda lo ya analizado: la segunda corrida solo mira lo que cambió -->
-							<withHistory>true</withHistory>
+							<!-- Sin historia entre corridas: desde pitest 1.20 esa función vive
+							     en el plugin comercial arcmutate, y sin él la ejecución aborta
+							     («History has been enabled but no history plugin»). Da igual
+							     aquí: el nocturno no tiene prisa y analiza cuatro paquetes,
+							     no el proyecto entero. -->
 							<timestampedReports>false</timestampedReports>
 						</configuration>
 					</plugin>

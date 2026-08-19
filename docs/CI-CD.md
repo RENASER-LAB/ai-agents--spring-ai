@@ -36,7 +36,7 @@ con cada push, lo haría también con la tubería en rojo, y todo esto no servir
 | Trabajo | Qué hace |
 |---|---|
 | Fuzzing | Schemathesis lee el contrato OpenAPI y bombardea los endpoints con entradas raras. Un 500 es un bug: a la basura se contesta 400. Corre contra una aplicación local del runner con la IA apagada y claves de mentira — nunca contra Render |
-| PIT | Mutation testing: mete fallos a propósito y comprueba que los tests los cacen. **Hoy está en pausa**: pitest aún no lee bytecode de Java 25. La configuración queda lista en el perfil `pit` del `pom.xml`; cuando salga la versión compatible, se sube el número y se enciende |
+| PIT | Mutation testing: mete fallos a propósito en los cuatro paquetes de reglas (`postulacion`, `perfilintegral`, `pesos`, `seguridad`) y comprueba que algún test los cace. Tarda ~40 segundos. El reporte queda como artefacto de la corrida |
 
 Si el nocturno sale rojo, alguien lo revisa por la mañana. No bloquea PRs.
 
@@ -68,8 +68,20 @@ Si el nocturno sale rojo, alguien lo revisa por la mañana. No bloquea PRs.
 
 1. **SonarCloud**: entrar a sonarcloud.io con la cuenta de GitHub, importar el
    repositorio, apagar «Automatic Analysis» (el análisis lo manda el CI), generar un
-   token y guardarlo como secreto `SONAR_TOKEN`. Si la organización o la clave del
-   proyecto no coinciden con las propiedades `sonar.*` del `pom.xml`, se corrigen ahí.
+   token y guardarlo como secreto `SONAR_TOKEN`. La organización y la clave del
+   proyecto ya están en el `pom.xml`, y **son dos cosas distintas que se confunden
+   muy fácil**:
+
+   | Propiedad | Valor | Ojo |
+   |---|---|---|
+   | `sonar.organization` | `renaser-lab-1` | En minúsculas. «RENASER-LAB» es el nombre que se ve en pantalla, no la clave. Lleva `-1` porque existen dos organizaciones con ese nombre y el proyecto está en la segunda |
+   | `sonar.projectKey` | `RENASER-LAB_ai-agents--spring-ai` | Esta sí conserva las mayúsculas |
+
+   Si algún día hay que confirmarlos, se preguntan a SonarCloud en vez de adivinarlos:
+
+   ```bash
+   curl -s "https://sonarcloud.io/api/components/search_projects?organization=renaser-lab-1"
+   ```
 2. **Supabase** (el proyecto de Pruebas ya existe): en el SQL Editor, ejecutar
    `create extension if not exists vector;`. Copiar la cadena de conexión directa.
 3. **CloudAMQP**: crear una instancia gratuita y copiar host, vhost, usuario y contraseña.
