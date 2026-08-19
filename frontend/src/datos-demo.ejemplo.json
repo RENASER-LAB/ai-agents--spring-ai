@@ -1,0 +1,17 @@
+{
+  "_lea_esto": [
+    "Este archivo es solo la FORMA de los datos, para que el proyecto compile recien",
+    "clonado. No lleva a nadie real.",
+    "",
+    "Para ver resultados de verdad:",
+    "  1. cp src/datos-demo.ejemplo.json src/datos-demo.json",
+    "  2. python scripts/exportar-para-demo.py   (desde el backend, con la base levantada)",
+    "",
+    "datos-demo.json esta en .gitignore y NO se sube: lleva nombres, cargos y juicios de",
+    "la IA sobre candidatos reales."
+  ],
+  "vacantes": [],
+  "rankings": {},
+  "perfiles": {},
+  "embudos": {}
+}

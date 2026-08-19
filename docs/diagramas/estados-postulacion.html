@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Estados de la postulación</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --color-paper:   #f5f5f3;
+      --color-ink:     #0d0d0d;
+      --color-muted:   #70706b;
+      --color-accent:  #a43b36;
+      --font-sans:     'Geist', system-ui, sans-serif;
+      --font-serif:    'Instrument Serif', serif;
+      --font-mono:     'Geist Mono', ui-monospace, monospace;
+    }
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-paper);
+      color: var(--color-ink);
+      min-height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+      padding: 3rem 2rem;
+    }
+    .frame { max-width: 1200px; width: 100%; }
+    .eyebrow {
+      font-family: var(--font-mono); font-size: 0.66rem; font-weight: 500;
+      letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--color-muted); margin-bottom: 0.5rem;
+    }
+    h1 {
+      font-family: var(--font-serif);
+      font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem);
+      font-weight: 400; letter-spacing: -0.02em; line-height: 1.15;
+      color: var(--color-ink); margin-bottom: 0.5rem;
+    }
+    .sub {
+      font-size: 0.9rem; color: var(--color-muted);
+      margin-bottom: 1.5rem; max-width: 78ch; line-height: 1.5;
+    }
+    svg { width: 100%; min-width: 900px; display: block; }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Estados de la postulación · Sistema de selección RENASER · v2.0</p>
+    <h1>Cinco etapas por cuatro momentos</h1>
+    <p class="sub">Cada estado se llama <strong>ETAPA_MOMENTO</strong> y responde una sola pregunta: de quién se está esperando algo. Por eso el estado siguiente <strong>se calcula</strong> —el momento siguiente de esta etapa, o el primero de la que sigue— en vez de buscarse en una tabla de transiciones. Si ya empezó, cuánto le queda o si asistió no es un estado: eso vive en la tabla de esa etapa, con su fecha.</p>
+
+    <svg viewBox="0 0 1200 888" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="estados-title estados-desc">
+      <title id="estados-title">Los dieciocho estados de la postulación</title>
+      <desc id="estados-desc">Rejilla de cinco etapas por cuatro momentos. Las filas son la entrada y las cinco etapas: Perfil Integral, prueba del puesto, simulación de trabajo, validación práctica y decisión. Las columnas son los cuatro momentos: por habilitar, turno del candidato, calificando y por confirmar. Cada celda ocupada es un estado, y su color dice a quién espera: al candidato, al sistema, al equipo de Talento o al responsable del área. Las celdas con un guion son momentos que esa etapa no usa. El recorrido normal va de izquierda a derecha dentro de una etapa y luego baja a la siguiente. Hay dos sitios donde se retrocede: la simulación, que se mueve sola en las dos direcciones según haya sesiones con cupo, y la decisión, que vuelve al candidato cuando sale ámbar. Abajo, las tres salidas: contratado, no continúa y cerrada.</desc>
+
+      <defs>
+        <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#70706b"/></marker>
+        <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#a43b36"/></marker>
+      </defs>
+
+      <rect width="100%" height="100%" fill="#f5f5f3"/>
+
+      <!-- ============================ ENCABEZADOS DE COLUMNA (momentos) ============================ -->
+      <text x="36" y="92" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em">MOMENTO — EL ORDEN DENTRO DE UNA ETAPA</text>
+
+      <text x="308"  y="136" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle">POR_HABILITAR</text>
+      <text x="308"  y="150" fill="#70706b" font-size="8"  font-family="'Geist', sans-serif" text-anchor="middle">Renaser abre la puerta</text>
+
+      <text x="432"  y="140" fill="rgba(13,13,13,0.22)" font-size="14" font-family="'Geist', sans-serif" text-anchor="middle">›</text>
+
+      <text x="556"  y="136" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle">TURNO_CANDIDATO</text>
+      <text x="556"  y="150" fill="#70706b" font-size="8"  font-family="'Geist', sans-serif" text-anchor="middle">le toca a él</text>
+
+      <text x="680"  y="140" fill="rgba(13,13,13,0.22)" font-size="14" font-family="'Geist', sans-serif" text-anchor="middle">›</text>
+
+      <text x="804"  y="136" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle">CALIFICANDO</text>
+      <text x="804"  y="150" fill="#70706b" font-size="8"  font-family="'Geist', sans-serif" text-anchor="middle">la IA trabaja</text>
+
+      <text x="928"  y="140" fill="rgba(13,13,13,0.22)" font-size="14" font-family="'Geist', sans-serif" text-anchor="middle">›</text>
+
+      <text x="1052" y="136" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle">POR_CONFIRMAR</text>
+      <text x="1052" y="150" fill="#70706b" font-size="8"  font-family="'Geist', sans-serif" text-anchor="middle">decide una persona</text>
+
+      <line x1="36" y1="160" x2="1164" y2="160" stroke="rgba(13,13,13,0.14)" stroke-width="0.8"/>
+
+      <!-- ============================ CONECTORES (antes que las cajas) ============================ -->
+
+      <!-- Entrada: POSTULADA -> PERFIL_TURNO_CANDIDATO -->
+      <path d="M 804 224 V 232 Q 804 240, 796 240 H 564 Q 556 240, 556 248 V 256" fill="none" stroke="#70706b" stroke-width="1" marker-end="url(#arrow)"/>
+
+      <!-- Simulación: POR_HABILITAR -> TURNO_CANDIDATO (arco arriba) -->
+      <path d="M 308 432 V 424 Q 308 416, 316 416 H 548 Q 556 416, 556 424 V 432" fill="none" stroke="#a43b36" stroke-width="1.2" marker-end="url(#arrow-accent)"/>
+      <rect x="312" y="394" width="104" height="12" rx="2" fill="#f5f5f3"/>
+      <text x="364" y="403" fill="#a43b36" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">HAY SESIÓN CON CUPO</text>
+
+      <!-- Simulación: TURNO_CANDIDATO -> POR_HABILITAR (arco abajo) -->
+      <path d="M 556 488 V 496 Q 556 504, 548 504 H 316 Q 308 504, 308 496 V 488" fill="none" stroke="#a43b36" stroke-width="1.2" marker-end="url(#arrow-accent)"/>
+      <rect x="288" y="512" width="152" height="12" rx="2" fill="#f5f5f3"/>
+      <text x="364" y="521" fill="#a43b36" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">FALTÓ · SE LLENÓ · SE CANCELÓ</text>
+
+      <!-- Decisión: TURNO_CANDIDATO -> POR_CONFIRMAR (arco arriba) -->
+      <path d="M 556 632 V 624 Q 556 616, 564 616 H 1044 Q 1052 616, 1052 624 V 632" fill="none" stroke="#70706b" stroke-width="1" marker-end="url(#arrow)"/>
+      <rect x="748" y="594" width="112" height="12" rx="2" fill="#f5f5f3"/>
+      <text x="804" y="603" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">ENTREGA EVIDENCIA</text>
+
+      <!-- Decisión: POR_CONFIRMAR -> TURNO_CANDIDATO (arco abajo, ámbar) -->
+      <path d="M 1052 688 V 696 Q 1052 704, 1044 704 H 564 Q 556 704, 556 696 V 688" fill="none" stroke="#70706b" stroke-width="1" stroke-dasharray="5,4" marker-end="url(#arrow)"/>
+      <rect x="748" y="712" width="112" height="12" rx="2" fill="#f5f5f3"/>
+      <text x="804" y="721" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">SALIÓ ÁMBAR</text>
+
+      <!-- ============================ ETIQUETAS DE FILA (etapas) ============================ -->
+      <text x="36" y="192" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif">Entrada</text>
+      <text x="36" y="206" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.08em">SIN PESO</text>
+
+      <text x="36" y="280" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif">Perfil Integral</text>
+      <text x="36" y="294" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.08em">40 % · CON PLAZO</text>
+
+      <text x="36" y="368" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif">Prueba del puesto</text>
+      <text x="36" y="382" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.08em">30 % · CRONOMETRADA</text>
+
+      <text x="36" y="456" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif">Simulación</text>
+      <text x="36" y="470" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.08em">15 % · EN SALA</text>
+
+      <text x="36" y="568" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif">Validación</text>
+      <text x="36" y="582" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.08em">15 % · DÍAS DE TRABAJO</text>
+
+      <text x="36" y="656" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif">Decisión</text>
+      <text x="36" y="670" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.08em">LA TOMA UNA PERSONA</text>
+
+      <!-- Chevrones: el orden de las etapas -->
+      <text x="168" y="244" fill="rgba(13,13,13,0.22)" font-size="12" font-family="'Geist', sans-serif" text-anchor="middle">▾</text>
+      <text x="168" y="332" fill="rgba(13,13,13,0.22)" font-size="12" font-family="'Geist', sans-serif" text-anchor="middle">▾</text>
+      <text x="168" y="420" fill="rgba(13,13,13,0.22)" font-size="12" font-family="'Geist', sans-serif" text-anchor="middle">▾</text>
+      <text x="168" y="520" fill="rgba(13,13,13,0.22)" font-size="12" font-family="'Geist', sans-serif" text-anchor="middle">▾</text>
+      <text x="168" y="620" fill="rgba(13,13,13,0.22)" font-size="12" font-family="'Geist', sans-serif" text-anchor="middle">▾</text>
+
+      <!-- ============================ CELDAS QUE ESA ETAPA NO USA ============================ -->
+      <text x="308"  y="200" fill="rgba(13,13,13,0.18)" font-size="12" font-family="'Geist Mono', monospace" text-anchor="middle">—</text>
+      <text x="556"  y="200" fill="rgba(13,13,13,0.18)" font-size="12" font-family="'Geist Mono', monospace" text-anchor="middle">—</text>
+      <text x="1052" y="200" fill="rgba(13,13,13,0.18)" font-size="12" font-family="'Geist Mono', monospace" text-anchor="middle">—</text>
+      <text x="308"  y="288" fill="rgba(13,13,13,0.18)" font-size="12" font-family="'Geist Mono', monospace" text-anchor="middle">—</text>
+      <text x="308"  y="376" fill="rgba(13,13,13,0.18)" font-size="12" font-family="'Geist Mono', monospace" text-anchor="middle">—</text>
+      <text x="804"  y="464" fill="rgba(13,13,13,0.18)" font-size="12" font-family="'Geist Mono', monospace" text-anchor="middle">—</text>
+      <text x="804"  y="576" fill="rgba(13,13,13,0.18)" font-size="12" font-family="'Geist Mono', monospace" text-anchor="middle">—</text>
+      <text x="308"  y="664" fill="rgba(13,13,13,0.18)" font-size="12" font-family="'Geist Mono', monospace" text-anchor="middle">—</text>
+      <text x="804"  y="664" fill="rgba(13,13,13,0.18)" font-size="12" font-family="'Geist Mono', monospace" text-anchor="middle">—</text>
+
+      <!-- ============================ CELDAS · ENTRADA ============================ -->
+      <rect x="692" y="168" width="224" height="56" rx="6" fill="#f5f5f3"/>
+      <rect x="692" y="168" width="224" height="56" rx="6" fill="rgba(110,100,121,0.06)" stroke="rgba(110,100,121,0.35)" stroke-width="1"/>
+      <rect x="692" y="168" width="4" height="56" fill="rgba(110,100,121,0.55)"/>
+      <text x="804" y="194" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle">POSTULADA</text>
+      <text x="804" y="210" fill="#6e6479" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.10em">SISTEMA · SOLO REQUISITOS OBJETIVOS</text>
+
+      <!-- ============================ CELDAS · PERFIL INTEGRAL ============================ -->
+      <rect x="444" y="256" width="224" height="56" rx="6" fill="#f5f5f3"/>
+      <rect x="444" y="256" width="224" height="56" rx="6" fill="rgba(94,122,155,0.06)" stroke="rgba(94,122,155,0.35)" stroke-width="1"/>
+      <rect x="444" y="256" width="4" height="56" fill="rgba(94,122,155,0.55)"/>
+      <text x="556" y="282" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle">PERFIL_TURNO_CANDIDATO</text>
+      <text x="556" y="298" fill="#4c6683" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.10em">CANDIDATO</text>
+
+      <rect x="692" y="256" width="224" height="56" rx="6" fill="#f5f5f3"/>
+      <rect x="692" y="256" width="224" height="56" rx="6" fill="rgba(110,100,121,0.06)" stroke="rgba(110,100,121,0.35)" stroke-width="1"/>
+      <rect x="692" y="256" width="4" height="56" fill="rgba(110,100,121,0.55)"/>
+      <text x="804" y="282" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle">PERFIL_CALIFICANDO</text>
+      <text x="804" y="298" fill="#6e6479" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.10em">SISTEMA</text>
+
+      <rect x="940" y="256" width="224" height="56" rx="6" fill="#f5f5f3"/>
+      <rect x="940" y="256" width="224" height="56" rx="6" fill="rgba(184,145,90,0.06)" stroke="rgba(184,145,90,0.35)" stroke-width="1"/>
+      <rect x="940" y="256" width="4" height="56" fill="rgba(184,145,90,0.55)"/>
+      <text x="1052" y="282" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle">PERFIL_POR_CONFIRMAR</text>
+      <text x="1052" y="298" fill="#8a6a34" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.10em">TALENTO · SE PUEDE POR LOTE</text>
+
+      <!-- ============================ CELDAS · PRUEBA ============================ -->
+      <rect x="444" y="344" width="224" height="56" rx="6" fill="#f5f5f3"/>
+      <rect x="444" y="344" width="224" height="56" rx="6" fill="rgba(94,122,155,0.06)" stroke="rgba(94,122,155,0.35)" stroke-width="1"/>
+      <rect x="444" y="344" width="4" height="56" fill="rgba(94,122,155,0.55)"/>
+      <text x="556" y="370" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle">PRUEBA_TURNO_CANDIDATO</text>
+      <text x="556" y="386" fill="#4c6683" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.10em">CANDIDATO · EL RELOJ VIVE EN EL INTENTO</text>
+
+      <rect x="692" y="344" width="224" height="56" rx="6" fill="#f5f5f3"/>
+      <rect x="692" y="344" width="224" height="56" rx="6" fill="rgba(110,100,121,0.06)" stroke="rgba(110,100,121,0.35)" stroke-width="1"/>
+      <rect x="692" y="344" width="4" height="56" fill="rgba(110,100,121,0.55)"/>
+      <text x="804" y="370" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle">PRUEBA_CALIFICANDO</text>
+      <text x="804" y="386" fill="#6e6479" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.10em">SISTEMA</text>
+
+      <rect x="940" y="344" width="224" height="56" rx="6" fill="#f5f5f3"/>
+      <rect x="940" y="344" width="224" height="56" rx="6" fill="rgba(184,145,90,0.06)" stroke="rgba(184,145,90,0.35)" stroke-width="1"/>
+      <rect x="940" y="344" width="4" height="56" fill="rgba(184,145,90,0.55)"/>
+      <text x="1052" y="370" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle">PRUEBA_POR_CONFIRMAR</text>
+      <text x="1052" y="386" fill="#8a6a34" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.10em">TALENTO</text>
+
+      <!-- ============================ CELDAS · SIMULACIÓN ============================ -->
+      <rect x="196" y="432" width="224" height="56" rx="6" fill="#f5f5f3"/>
+      <rect x="196" y="432" width="224" height="56" rx="6" fill="rgba(184,145,90,0.06)" stroke="rgba(184,145,90,0.35)" stroke-width="1"/>
+      <rect x="196" y="432" width="4" height="56" fill="rgba(184,145,90,0.55)"/>
+      <text x="308" y="458" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle">SIMULACION_POR_HABILITAR</text>
+      <text x="308" y="474" fill="#8a6a34" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.10em">TALENTO · SIN SESIÓN, O FALTÓ A LA SUYA</text>
+
+      <rect x="444" y="432" width="224" height="56" rx="6" fill="#f5f5f3"/>
+      <rect x="444" y="432" width="224" height="56" rx="6" fill="rgba(94,122,155,0.06)" stroke="rgba(94,122,155,0.35)" stroke-width="1"/>
+      <rect x="444" y="432" width="4" height="56" fill="rgba(94,122,155,0.55)"/>
+      <text x="556" y="458" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle">SIMULACION_TURNO_CANDIDATO</text>
+      <text x="556" y="474" fill="#4c6683" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.10em">CANDIDATO · ELIGE, ESPERA Y TRABAJA</text>
+
+      <rect x="940" y="432" width="224" height="56" rx="6" fill="#f5f5f3"/>
+      <rect x="940" y="432" width="224" height="56" rx="6" fill="rgba(184,145,90,0.06)" stroke="rgba(184,145,90,0.35)" stroke-width="1"/>
+      <rect x="940" y="432" width="4" height="56" fill="rgba(184,145,90,0.55)"/>
+      <text x="1052" y="458" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle">SIMULACION_POR_CONFIRMAR</text>
+      <text x="1052" y="474" fill="#8a6a34" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.10em">TALENTO · CALIFICA Y CONVERSA</text>
+
+      <!-- ============================ CELDAS · VALIDACIÓN ============================ -->
+      <rect x="196" y="544" width="224" height="56" rx="6" fill="#f5f5f3"/>
+      <rect x="196" y="544" width="224" height="56" rx="6" fill="rgba(184,145,90,0.06)" stroke="rgba(184,145,90,0.35)" stroke-width="1"/>
+      <rect x="196" y="544" width="4" height="56" fill="rgba(184,145,90,0.55)"/>
+      <text x="308" y="570" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle">VALIDACION_POR_HABILITAR</text>
+      <text x="308" y="586" fill="#8a6a34" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.10em">TALENTO · FALTA LA FIGURA CONTRACTUAL</text>
+
+      <rect x="444" y="544" width="224" height="56" rx="6" fill="#f5f5f3"/>
+      <rect x="444" y="544" width="224" height="56" rx="6" fill="rgba(94,122,155,0.06)" stroke="rgba(94,122,155,0.35)" stroke-width="1"/>
+      <rect x="444" y="544" width="4" height="56" fill="rgba(94,122,155,0.55)"/>
+      <text x="556" y="570" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle">VALIDACION_TURNO_CANDIDATO</text>
+      <text x="556" y="586" fill="#4c6683" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.10em">CANDIDATO · TRABAJA LOS DÍAS FIJADOS</text>
+
+      <rect x="940" y="544" width="224" height="56" rx="6" fill="#f5f5f3"/>
+      <rect x="940" y="544" width="224" height="56" rx="6" fill="rgba(124,143,111,0.06)" stroke="rgba(124,143,111,0.35)" stroke-width="1"/>
+      <rect x="940" y="544" width="4" height="56" fill="rgba(124,143,111,0.55)"/>
+      <text x="1052" y="570" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle">VALIDACION_POR_CONFIRMAR</text>
+      <text x="1052" y="586" fill="#5c6f4c" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.10em">ÁREA · LO QUE NO SE OBSERVA CON DATOS</text>
+
+      <!-- ============================ CELDAS · DECISIÓN ============================ -->
+      <rect x="444" y="632" width="224" height="56" rx="6" fill="#f5f5f3"/>
+      <rect x="444" y="632" width="224" height="56" rx="6" fill="rgba(94,122,155,0.06)" stroke="rgba(94,122,155,0.35)" stroke-width="1"/>
+      <rect x="444" y="632" width="4" height="56" fill="rgba(94,122,155,0.55)"/>
+      <text x="556" y="658" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle">DECISION_TURNO_CANDIDATO</text>
+      <text x="556" y="674" fill="#4c6683" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.10em">CANDIDATO · MÁXIMO 2 RONDAS</text>
+
+      <rect x="940" y="632" width="224" height="56" rx="6" fill="#f5f5f3"/>
+      <rect x="940" y="632" width="224" height="56" rx="6" fill="rgba(124,143,111,0.06)" stroke="rgba(124,143,111,0.35)" stroke-width="1"/>
+      <rect x="940" y="632" width="4" height="56" fill="rgba(124,143,111,0.55)"/>
+      <text x="1052" y="658" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle">DECISION_POR_CONFIRMAR</text>
+      <text x="1052" y="674" fill="#5c6f4c" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.10em">ÁREA · VERDE ÁMBAR ROJO SIN-DATOS RESERVA</text>
+
+      <!-- ============================ NOTA ============================ -->
+      <text x="36" y="700" fill="#0d0d0d" font-size="13" font-style="italic" font-family="'Instrument Serif', serif">La decisión se entra por POR_CONFIRMAR, no por</text>
+      <text x="36" y="718" fill="#0d0d0d" font-size="13" font-style="italic" font-family="'Instrument Serif', serif">el primer momento. Es la única excepción al cálculo.</text>
+
+      <!-- ============================ SALIDAS ============================ -->
+      <line x1="36" y1="740" x2="1164" y2="740" stroke="rgba(13,13,13,0.14)" stroke-width="0.8"/>
+      <text x="36" y="788" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em">SALIDAS</text>
+
+      <rect x="444" y="756" width="224" height="56" rx="6" fill="#f5f5f3"/>
+      <rect x="444" y="756" width="224" height="56" rx="6" fill="rgba(13,13,13,0.05)" stroke="rgba(13,13,13,0.30)" stroke-width="1"/>
+      <text x="556" y="782" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle">CONTRATADO</text>
+      <text x="556" y="798" fill="#70706b" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.10em">DECISIÓN VERDE</text>
+
+      <rect x="692" y="756" width="224" height="56" rx="6" fill="#f5f5f3"/>
+      <rect x="692" y="756" width="224" height="56" rx="6" fill="rgba(13,13,13,0.05)" stroke="rgba(13,13,13,0.30)" stroke-width="1"/>
+      <text x="804" y="782" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle">NO_CONTINUA</text>
+      <text x="804" y="798" fill="#70706b" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.10em">DESDE CUALQUIER POR_CONFIRMAR · CON MOTIVO</text>
+
+      <rect x="940" y="756" width="224" height="56" rx="6" fill="#f5f5f3"/>
+      <rect x="940" y="756" width="224" height="56" rx="6" fill="rgba(13,13,13,0.05)" stroke="rgba(13,13,13,0.30)" stroke-width="1"/>
+      <text x="1052" y="782" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist Mono', monospace" text-anchor="middle">CERRADA</text>
+      <text x="1052" y="798" fill="#70706b" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.10em">DESDE CUALQUIER ESTADO NO FINAL · CON MOTIVO</text>
+
+      <!-- ============================ LEYENDA ============================ -->
+      <line x1="36" y1="840" x2="1164" y2="840" stroke="rgba(13,13,13,0.10)" stroke-width="0.8"/>
+      <text x="36" y="867" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em">ESPERA A</text>
+
+      <rect x="132" y="858" width="10" height="10" rx="2" fill="rgba(94,122,155,0.55)"/>
+      <text x="148" y="867" fill="#70706b" font-size="9" font-family="'Geist', sans-serif">Candidato</text>
+
+      <rect x="308" y="858" width="10" height="10" rx="2" fill="rgba(110,100,121,0.55)"/>
+      <text x="324" y="867" fill="#70706b" font-size="9" font-family="'Geist', sans-serif">Sistema · la IA califica</text>
+
+      <rect x="484" y="858" width="10" height="10" rx="2" fill="rgba(184,145,90,0.55)"/>
+      <text x="500" y="867" fill="#70706b" font-size="9" font-family="'Geist', sans-serif">Equipo de Talento</text>
+
+      <rect x="660" y="858" width="10" height="10" rx="2" fill="rgba(124,143,111,0.55)"/>
+      <text x="676" y="867" fill="#70706b" font-size="9" font-family="'Geist', sans-serif">Responsable del área</text>
+
+      <rect x="836" y="858" width="10" height="10" rx="2" fill="rgba(13,13,13,0.30)"/>
+      <text x="852" y="867" fill="#70706b" font-size="9" font-family="'Geist', sans-serif">Nadie · terminó</text>
+
+      <text x="1012" y="867" fill="rgba(13,13,13,0.30)" font-size="12" font-family="'Geist Mono', monospace">—</text>
+      <text x="1028" y="867" fill="#70706b" font-size="9" font-family="'Geist', sans-serif">La etapa no usa ese momento</text>
+    </svg>
+  </div>
+</body>
+</html>

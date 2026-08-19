@@ -1,0 +1,110 @@
+# La corrida nocturna: lo lento y lo exploratorio, que no puede bloquear un PR.
+#
+#   fuzzing  Schemathesis lee el contrato OpenAPI y bombardea los 158 endpoints con
+#            entradas raras. Cualquier 500 es un bug: la API debe contestar 4xx a la
+#            basura. Corre contra una aplicación LOCAL del runner, nunca contra Render:
+#            la calificación con IA va apagada y las claves son de mentira, así que
+#            ningún currículum falso llega a DeepSeek ni ensucia la base de pruebas.
+#   pit      Mutation testing. HOY NO CORRE SOLO: pitest todavía no lee bytecode de
+#            Java 25 (ver el perfil `pit` del pom.xml). Queda tras un interruptor
+#            manual para reintentarlo cuando salga la versión compatible.
+#
+# Si algo sale rojo aquí, no se bloquea nada: alguien lo mira por la mañana.
+name: nocturno
+
+on:
+  schedule:
+    # 05:00 UTC = medianoche en Perú/Ecuador/Colombia
+    - cron: '0 5 * * *'
+  workflow_dispatch:
+    inputs:
+      intentar_pit:
+        description: 'Intentar PIT (fallará hasta que pitest soporte Java 25)'
+        type: boolean
+        default: false
+
+jobs:
+  fuzzing:
+    name: fuzzing de la API (Schemathesis)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      # Claves de mentira: la aplicación arranca, pero si algo intentara llamar al
+      # proveedor de verdad, recibiría un 401 y quedaría registrado como fallo.
+      JWT_SECRETO: clave-solo-para-fuzzing-suficientemente-larga-para-hmac-256
+      DEEPSEEK_API_KEY: clave-de-mentira-el-fuzzing-no-califica
+      # Apaga la calificación con IA: postular no encola ningún trabajo
+      RENASER_AI_CALIFICACION_HABILITADA: 'false'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      - name: Levantar Postgres y RabbitMQ
+        run: docker compose up -d --wait
+
+      - name: Arrancar la aplicación
+        run: |
+          nohup ./mvnw -B spring-boot:run > app.log 2>&1 &
+          for i in $(seq 1 36); do
+            if curl --fail --silent --output /dev/null http://localhost:8080/v3/api-docs; then
+              echo "La aplicación contesta."
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "La aplicación no arrancó en 3 minutos:" >&2
+          tail -50 app.log >&2
+          exit 1
+
+      - name: Sembrar datos de prueba
+        run: |
+          pip install requests
+          python3 scripts/sembrar-datos-de-prueba.py --uid fuzzer-nocturno
+
+      - name: Fuzzear todos los endpoints
+        run: |
+          pip install 'schemathesis>=4,<5'
+          TOKEN=$(curl --fail --silent -X POST http://localhost:8080/api/v1/panel/auth/dev-login \
+            -H 'Content-Type: application/json' \
+            -d '{"usuarioRenaserOsId":"fuzzer-nocturno"}' | python3 -c 'import sys,json; print(json.load(sys.stdin)["token"])')
+          schemathesis run http://localhost:8080/v3/api-docs \
+            --header "Authorization: Bearer $TOKEN"
+
+      # El registro de la aplicación es lo único que explica un 500: se guarda siempre
+      - name: Guardar el registro de la aplicación
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: registro-aplicacion
+          path: app.log
+          retention-days: 7
+
+  pit:
+    name: mutation testing (PIT)
+    if: github.event_name == 'workflow_dispatch' && inputs.intentar_pit
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      - name: Correr PIT sobre los paquetes de reglas
+        run: ./mvnw -B -Ppit test-compile pitest:mutationCoverage
+
+      - name: Guardar el reporte
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reporte-pit
+          path: target/pit-reports/
+          retention-days: 30

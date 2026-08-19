@@ -1,0 +1,1001 @@
+{
+  "ok": true,
+  "frames_root": "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.pet-runs/luoxiaohei2d-v2/frames",
+  "states": [
+    "idle",
+    "running-right",
+    "running-left",
+    "waving",
+    "jumping",
+    "failed",
+    "waiting",
+    "running",
+    "review"
+  ],
+  "errors": [],
+  "warnings": [
+    "idle used extraction method stable-slots; confirm motion playback remains stable and unclipped",
+    "running-right used extraction method stable-slots; confirm motion playback remains stable and unclipped",
+    "running-left used extraction method stable-slots; confirm motion playback remains stable and unclipped",
+    "waving used extraction method stable-slots; confirm motion playback remains stable and unclipped",
+    "jumping used extraction method stable-slots; confirm motion playback remains stable and unclipped",
+    "failed used extraction method stable-slots; confirm motion playback remains stable and unclipped",
+    "waiting used extraction method stable-slots; confirm motion playback remains stable and unclipped",
+    "running used extraction method stable-slots; confirm motion playback remains stable and unclipped",
+    "review used extraction method stable-slots; confirm motion playback remains stable and unclipped"
+  ],
+  "rows": [
+    {
+      "state": "idle",
+      "expected_frames": 6,
+      "actual_frames": 6,
+      "extraction_method": "stable-slots",
+      "ok": true,
+      "errors": [],
+      "warnings": [
+        "idle used extraction method stable-slots; confirm motion playback remains stable and unclipped"
+      ],
+      "frames": [
+        {
+          "index": 0,
+          "file": "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.pet-runs/luoxiaohei2d-v2/frames/idle/00.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 21534,
+          "bbox": [
+            12,
+            6,
+            180,
+            201
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 1,
+          "file": "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.pet-runs/luoxiaohei2d-v2/frames/idle/01.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 22073,
+          "bbox": [
+            6,
+            6,
+            186,
+            201
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 2,
+          "file": "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.pet-runs/luoxiaohei2d-v2/frames/idle/02.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 22067,
+          "bbox": [
+            7,
+            6,
+            185,
+            201
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 3,
+          "file": "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.pet-runs/luoxiaohei2d-v2/frames/idle/03.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 21463,
+          "bbox": [
+            9,
+            6,
+            182,
+            201
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 4,
+          "file": "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.pet-runs/luoxiaohei2d-v2/frames/idle/04.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 21719,
+          "bbox": [
+            8,
+            6,
+            184,
+            201
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 5,
+          "file": "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.pet-runs/luoxiaohei2d-v2/frames/idle/05.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 21706,
+          "bbox": [
+            11,
+            6,
+            181,
+            201
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        }
+      ]
+    },
+    {
+      "state": "running-right",
+      "expected_frames": 8,
+      "actual_frames": 8,
+      "extraction_method": "stable-slots",
+      "ok": true,
+      "errors": [],
+      "warnings": [
+        "running-right used extraction method stable-slots; confirm motion playback remains stable and unclipped"
+      ],
+      "frames": [
+        {
+          "index": 0,
+          "file": "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.pet-runs/luoxiaohei2d-v2/frames/running-right/00.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 13588,
+          "bbox": [
+            6,
+            39,
+            186,
+            169
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 1,
+          "file": "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.pet-runs/luoxiaohei2d-v2/frames/running-right/01.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 13497,
+          "bbox": [
+            6,
+            41,
+            186,
+            166
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 2,
+          "file": "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.pet-runs/luoxiaohei2d-v2/frames/running-right/02.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 12001,
+          "bbox": [
+            6,
+            47,
+            186,
+            160
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 3,
+          "file": "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.pet-runs/luoxiaohei2d-v2/frames/running-right/03.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 12575,
+          "bbox": [
+            6,
+            41,
+            186,
+            166
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 4,
+          "file": "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.pet-runs/luoxiaohei2d-v2/frames/running-right/04.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 13521,
+          "bbox": [
+            6,
+            40,
+            186,
+            168
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 5,
+          "file": "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.pet-runs/luoxiaohei2d-v2/frames/running-right/05.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 15443,
+          "bbox": [
+            6,
+            36,
+            186,
+            172
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 6,
+          "file": "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.pet-runs/luoxiaohei2d-v2/frames/running-right/06.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 11821,
+          "bbox": [
+            6,
+            47,
+            186,
+            161
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 7,
+          "file": "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.pet-runs/luoxiaohei2d-v2/frames/running-right/07.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14823,
+          "bbox": [
+            6,
+            35,
+            186,
+            173
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        }
+      ]
+    },
+    {
+      "state": "running-left",
+      "expected_frames": 8,
+      "actual_frames": 8,
+      "extraction_method": "stable-slots",
+      "ok": true,
+      "errors": [],
+      "warnings": [
+        "running-left used extraction method stable-slots; confirm motion playback remains stable and unclipped"
+      ],
+      "frames": [
+        {
+          "index": 0,
+          "file": "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.pet-runs/luoxiaohei2d-v2/frames/running-left/00.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 14823,
+          "bbox": [
+            6,
+            35,
+            186,
+            173
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 1,
+          "file": "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.pet-runs/luoxiaohei2d-v2/frames/running-left/01.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 11821,
+          "bbox": [
+            6,
+            47,
+            186,
+            161
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 2,
+          "file": "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.pet-runs/luoxiaohei2d-v2/frames/running-left/02.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 15443,
+          "bbox": [
+            6,
+            36,
+            186,
+            172
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 3,
+          "file": "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.pet-runs/luoxiaohei2d-v2/frames/running-left/03.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 13521,
+          "bbox": [
+            6,
+            40,
+            186,
+            168
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 4,
+          "file": "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.pet-runs/luoxiaohei2d-v2/frames/running-left/04.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 12575,
+          "bbox": [
+            6,
+            41,
+            186,
+            166
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 5,
+          "file": "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.pet-runs/luoxiaohei2d-v2/frames/running-left/05.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 12001,
+          "bbox": [
+            6,
+            47,
+            186,
+            160
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 6,
+          "file": "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.pet-runs/luoxiaohei2d-v2/frames/running-left/06.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 13497,
+          "bbox": [
+            6,
+            41,
+            186,
+            166
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 7,
+          "file": "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.pet-runs/luoxiaohei2d-v2/frames/running-left/07.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 13588,
+          "bbox": [
+            6,
+            39,
+            186,
+            169
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        }
+      ]
+    },
+    {
+      "state": "waving",
+      "expected_frames": 4,
+      "actual_frames": 4,
+      "extraction_method": "stable-slots",
+      "ok": true,
+      "errors": [],
+      "warnings": [
+        "waving used extraction method stable-slots; confirm motion playback remains stable and unclipped"
+      ],
+      "frames": [
+        {
+          "index": 0,
+          "file": "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.pet-runs/luoxiaohei2d-v2/frames/waving/00.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 22632,
+          "bbox": [
+            6,
+            9,
+            186,
+            198
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 1,
+          "file": "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.pet-runs/luoxiaohei2d-v2/frames/waving/01.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 21235,
+          "bbox": [
+            6,
+            13,
+            186,
+            194
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 2,
+          "file": "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.pet-runs/luoxiaohei2d-v2/frames/waving/02.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 19853,
+          "bbox": [
+            6,
+            17,
+            186,
+            189
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 3,
+          "file": "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.pet-runs/luoxiaohei2d-v2/frames/waving/03.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 23360,
+          "bbox": [
+            7,
+            6,
+            185,
+            201
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        }
+      ]
+    },
+    {
+      "state": "jumping",
+      "expected_frames": 5,
+      "actual_frames": 5,
+      "extraction_method": "stable-slots",
+      "ok": true,
+      "errors": [],
+      "warnings": [
+        "jumping used extraction method stable-slots; confirm motion playback remains stable and unclipped"
+      ],
+      "frames": [
+        {
+          "index": 0,
+          "file": "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.pet-runs/luoxiaohei2d-v2/frames/jumping/00.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 16409,
+          "bbox": [
+            6,
+            35,
+            186,
+            173
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 1,
+          "file": "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.pet-runs/luoxiaohei2d-v2/frames/jumping/01.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 19675,
+          "bbox": [
+            6,
+            12,
+            186,
+            195
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 2,
+          "file": "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.pet-runs/luoxiaohei2d-v2/frames/jumping/02.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 22731,
+          "bbox": [
+            6,
+            16,
+            186,
+            191
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 3,
+          "file": "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.pet-runs/luoxiaohei2d-v2/frames/jumping/03.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 16962,
+          "bbox": [
+            6,
+            30,
+            186,
+            178
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 4,
+          "file": "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.pet-runs/luoxiaohei2d-v2/frames/jumping/04.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 21279,
+          "bbox": [
+            6,
+            12,
+            186,
+            196
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        }
+      ]
+    },
+    {
+      "state": "failed",
+      "expected_frames": 8,
+      "actual_frames": 8,
+      "extraction_method": "stable-slots",
+      "ok": true,
+      "errors": [],
+      "warnings": [
+        "failed used extraction method stable-slots; confirm motion playback remains stable and unclipped"
+      ],
+      "frames": [
+        {
+          "index": 0,
+          "file": "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.pet-runs/luoxiaohei2d-v2/frames/failed/00.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 22548,
+          "bbox": [
+            6,
+            8,
+            186,
+            198
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 1,
+          "file": "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.pet-runs/luoxiaohei2d-v2/frames/failed/01.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 22405,
+          "bbox": [
+            6,
+            8,
+            186,
+            199
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 2,
+          "file": "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.pet-runs/luoxiaohei2d-v2/frames/failed/02.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 21294,
+          "bbox": [
+            6,
+            11,
+            186,
+            195
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 3,
+          "file": "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.pet-runs/luoxiaohei2d-v2/frames/failed/03.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 18637,
+          "bbox": [
+            6,
+            19,
+            186,
+            188
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 4,
+          "file": "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.pet-runs/luoxiaohei2d-v2/frames/failed/04.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 22547,
+          "bbox": [
+            10,
+            6,
+            182,
+            201
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 5,
+          "file": "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.pet-runs/luoxiaohei2d-v2/frames/failed/05.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 17472,
+          "bbox": [
+            6,
+            20,
+            186,
+            186
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 6,
+          "file": "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.pet-runs/luoxiaohei2d-v2/frames/failed/06.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 19190,
+          "bbox": [
+            6,
+            27,
+            186,
+            180
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 7,
+          "file": "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.pet-runs/luoxiaohei2d-v2/frames/failed/07.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 22879,
+          "bbox": [
+            6,
+            6,
+            186,
+            201
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        }
+      ]
+    },
+    {
+      "state": "waiting",
+      "expected_frames": 6,
+      "actual_frames": 6,
+      "extraction_method": "stable-slots",
+      "ok": true,
+      "errors": [],
+      "warnings": [
+        "waiting used extraction method stable-slots; confirm motion playback remains stable and unclipped"
+      ],
+      "frames": [
+        {
+          "index": 0,
+          "file": "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.pet-runs/luoxiaohei2d-v2/frames/waiting/00.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 21548,
+          "bbox": [
+            11,
+            6,
+            180,
+            201
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 1,
+          "file": "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.pet-runs/luoxiaohei2d-v2/frames/waiting/01.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 22359,
+          "bbox": [
+            9,
+            6,
+            183,
+            201
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 2,
+          "file": "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.pet-runs/luoxiaohei2d-v2/frames/waiting/02.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 22620,
+          "bbox": [
+            6,
+            7,
+            186,
+            199
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 3,
+          "file": "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.pet-runs/luoxiaohei2d-v2/frames/waiting/03.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 20538,
+          "bbox": [
+            18,
+            6,
+            174,
+            201
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 4,
+          "file": "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.pet-runs/luoxiaohei2d-v2/frames/waiting/04.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 22720,
+          "bbox": [
+            6,
+            6,
+            186,
+            200
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 5,
+          "file": "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.pet-runs/luoxiaohei2d-v2/frames/waiting/05.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 21646,
+          "bbox": [
+            12,
+            6,
+            180,
+            201
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        }
+      ]
+    },
+    {
+      "state": "running",
+      "expected_frames": 6,
+      "actual_frames": 6,
+      "extraction_method": "stable-slots",
+      "ok": true,
+      "errors": [],
+      "warnings": [
+        "running used extraction method stable-slots; confirm motion playback remains stable and unclipped"
+      ],
+      "frames": [
+        {
+          "index": 0,
+          "file": "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.pet-runs/luoxiaohei2d-v2/frames/running/00.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 23044,
+          "bbox": [
+            6,
+            6,
+            186,
+            201
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 1,
+          "file": "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.pet-runs/luoxiaohei2d-v2/frames/running/01.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 19803,
+          "bbox": [
+            6,
+            13,
+            186,
+            194
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 2,
+          "file": "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.pet-runs/luoxiaohei2d-v2/frames/running/02.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 22343,
+          "bbox": [
+            6,
+            7,
+            186,
+            199
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 3,
+          "file": "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.pet-runs/luoxiaohei2d-v2/frames/running/03.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 20527,
+          "bbox": [
+            6,
+            14,
+            186,
+            192
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 4,
+          "file": "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.pet-runs/luoxiaohei2d-v2/frames/running/04.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 21008,
+          "bbox": [
+            6,
+            9,
+            186,
+            198
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 5,
+          "file": "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.pet-runs/luoxiaohei2d-v2/frames/running/05.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 21890,
+          "bbox": [
+            6,
+            6,
+            185,
+            201
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        }
+      ]
+    },
+    {
+      "state": "review",
+      "expected_frames": 6,
+      "actual_frames": 6,
+      "extraction_method": "stable-slots",
+      "ok": true,
+      "errors": [],
+      "warnings": [
+        "review used extraction method stable-slots; confirm motion playback remains stable and unclipped"
+      ],
+      "frames": [
+        {
+          "index": 0,
+          "file": "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.pet-runs/luoxiaohei2d-v2/frames/review/00.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 21924,
+          "bbox": [
+            11,
+            6,
+            181,
+            201
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 1,
+          "file": "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.pet-runs/luoxiaohei2d-v2/frames/review/01.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 21328,
+          "bbox": [
+            11,
+            6,
+            180,
+            201
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 2,
+          "file": "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.pet-runs/luoxiaohei2d-v2/frames/review/02.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 20306,
+          "bbox": [
+            18,
+            6,
+            174,
+            201
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 3,
+          "file": "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.pet-runs/luoxiaohei2d-v2/frames/review/03.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 21671,
+          "bbox": [
+            6,
+            13,
+            186,
+            194
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 4,
+          "file": "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.pet-runs/luoxiaohei2d-v2/frames/review/04.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 19757,
+          "bbox": [
+            6,
+            8,
+            186,
+            198
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        },
+        {
+          "index": 5,
+          "file": "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.pet-runs/luoxiaohei2d-v2/frames/review/05.png",
+          "width": 192,
+          "height": 208,
+          "nontransparent_pixels": 21556,
+          "bbox": [
+            12,
+            6,
+            180,
+            201
+          ],
+          "edge_pixels": 0,
+          "chroma_adjacent_pixels": 0
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+# Lo único que el build necesita es .mvn/, mvnw, pom.xml y src/.
+# Todo lo demás fuera — y los secretos, los primeros.
+application-secrets.yaml
+*.env
+
+.git
+.github
+.claude
+.codex
+.agents
+.impeccable
+.pet-runs
+.semgrep
+
+target
+docs
+mockups
+cv-de-prueba
+almacen-archivos
+scripts
+*.md
+docker-compose.yml
+skills-lock.json

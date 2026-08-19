@@ -1,0 +1,43 @@
+# Perfil "supabase": la base de datos principal deja de ser el Postgres de docker-compose
+# y pasa a ser el Postgres que hospeda Supabase.
+#
+# Se enciende a mano, no por defecto:
+#   .\mvnw.cmd spring-boot:run "-Dspring-boot.run.profiles=supabase"
+#
+# Las comillas son obligatorias en PowerShell: sin ellas parte el argumento en dos por el
+# guion de "spring-boot" y Maven se queja de una fase del ciclo de vida que no existe.
+#
+# Sin el perfil, todo sigue igual que siempre: el contenedor local del puerto 5433. Asi
+# nadie mas del equipo se ve arrastrado por este cambio.
+#
+# El host, el usuario y la contrasena NO estan aqui: viven en application-secrets.yaml,
+# que no se versiona. La plantilla es application-secrets.yaml.example.
+#
+# RabbitMQ sigue siendo el local: Supabase solo reemplaza a la base de datos.
+
+spring:
+  datasource:
+    # Supabase crea una sola base y se llama "postgres"; no deja crear otras.
+    # sslmode=require porque Supabase rechaza las conexiones sin cifrar.
+    url: jdbc:postgresql://${renaser.supabase.db.host}:${renaser.supabase.db.port:5432}/postgres?sslmode=require
+    username: ${renaser.supabase.db.user}
+    password: ${renaser.supabase.db.password}
+    hikari:
+      # Supabase corta por numero de conexiones abiertas, no por carga. Entre los 8-12
+      # consumidores de RabbitMQ y el trafico web se pueden pedir muchas a la vez, asi que
+      # el tope se fija aqui en vez de dejar que lo fije el servidor con un error.
+      maximum-pool-size: ${renaser.supabase.db.pool-size:10}
+      # La base ya no esta en esta maquina. Una conexion que lleva rato quieta la cierra el
+      # otro extremo sin avisar, y la aplicacion se entera al intentar usarla. Reciclarla
+      # antes evita ese fallo intermitente que solo aparece despues de un rato de silencio.
+      max-lifetime: 900000
+      idle-timeout: 300000
+      connection-timeout: 30000
+
+  flyway:
+    # En local esto vale true porque aquella base ya tenia la tabla agent_run antes de que
+    # Flyway existiera en el proyecto. Aqui la base arranca vacia y dejarlo en true seria
+    # peligroso: bastaria un solo objeto suelto en el esquema public para que Flyway diera
+    # la V1 por aplicada sin ejecutarla, no crease agent_run, y la aplicacion muriera
+    # despues en la validacion de Hibernate con un error que no explica la causa.
+    baseline-on-migrate: false

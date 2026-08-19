@@ -1,0 +1,11 @@
+{
+  "visual_qa": "pass",
+  "qa_note": "All standard rows and 16 look directions preserve the same pet identity, palette, silhouette, face, proportions, tail, registration, and clean playback; cardinals pass and no wrong-quadrant, reversal, clipping, or attachment failures are visible.",
+  "review_warnings": [
+    "Intermediate blind-axis ambiguities and disagreement accepted for diagonals.",
+    "Continuity outliers at 022.5 to 045, 135 to 157.5, 247.5 to 270, and 315 to 337.5 accepted with no visible reversal.",
+    "Stable-slots extraction warnings accepted after GIF playback review."
+  ],
+  "repair_rows": [],
+  "repair_notes": []
+}

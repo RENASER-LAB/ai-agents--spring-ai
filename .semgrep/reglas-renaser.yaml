@@ -1,0 +1,46 @@
+# Reglas propias del proyecto. Cada una codifica un acuerdo que ya estaba escrito en
+# prosa (CLAUDE.md, javadoc, docs/) y que un cambio con prisa puede romper sin que
+# compile mal ni falle un test. Complementan a ArquitecturaTest: ArchUnit razona sobre
+# clases y dependencias; esto razona sobre el texto del código.
+rules:
+  - id: ia-no-lee-el-texto-sin-anonimizar
+    languages: [java]
+    severity: ERROR
+    message: >
+      El módulo de agentes no puede leer getTextoExtraido(): esa es la versión completa
+      del currículum, que solo ve el equipo (RF-42). La IA solo recibe
+      getTextoAnonimizado(), sin edad, sexo ni estado civil (RF-41), y las dos versiones
+      se guardan para poder demostrar que la regla se cumplió.
+    paths:
+      include:
+        - src/main/java/com/renaser/ai/ai_engine/ai/
+    patterns:
+      - pattern: $CV.getTextoExtraido()
+
+  - id: permitall-solo-en-configuracion-seguridad
+    languages: [java]
+    severity: ERROR
+    message: >
+      permitAll() solo puede aparecer en ConfiguracionSeguridad: es el único archivo
+      donde las rutas públicas se ven todas juntas y se pueden revisar. Una ruta abierta
+      en cualquier otro lado es una puerta que nadie sabe que existe.
+    paths:
+      include:
+        - src/main/java/
+      exclude:
+        - src/main/java/com/renaser/ai/ai_engine/seguridad/config/ConfiguracionSeguridad.java
+    patterns:
+      - pattern: $X.permitAll()
+
+  - id: excepciones-no-se-tragan-por-consola
+    languages: [java]
+    severity: ERROR
+    message: >
+      printStackTrace() escribe en la consola y no en el registro: en producción ese
+      error desaparece. Usar el logger de la clase (@Slf4j / LoggerFactory), que es lo
+      único que queda cuando algo falla de verdad.
+    paths:
+      include:
+        - src/main/java/
+    patterns:
+      - pattern: $E.printStackTrace()

@@ -1,0 +1,35 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "design-system-font",
+        "value": "*",
+        "files": [
+          "frontend/src/estilos.css"
+        ],
+        "createdAt": "2026-08-18T20:39:39.573Z",
+        "reason": "CLAUDE.md del proyecto: DESIGN.md es de la herramienta de mockups, no de este trabajo; este CSS sigue la paleta de RENASER OS que el propio CLAUDE.md prescribe"
+      },
+      {
+        "rule": "design-system-radius",
+        "value": "*",
+        "files": [
+          "frontend/src/estilos.css"
+        ],
+        "createdAt": "2026-08-18T20:39:46.549Z",
+        "reason": "CLAUDE.md del proyecto: DESIGN.md es de la herramienta de mockups, no de este trabajo"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "*",
+        "files": [
+          "frontend/src/estilos.css"
+        ],
+        "createdAt": "2026-08-18T20:39:49.976Z",
+        "reason": "CLAUDE.md del proyecto: DESIGN.md es de la herramienta de mockups, no de este trabajo"
+      }
+    ]
+  }
+}

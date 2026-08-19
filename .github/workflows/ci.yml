@@ -1,0 +1,111 @@
+# El pipeline de cada cambio. Tres trabajos:
+#
+#   build    compila, corre los tests unitarios y los de integración (Testcontainers),
+#            y manda la cobertura a SonarCloud, que vigila el código NUEVO del PR.
+#   estatico Semgrep (patrones prohibidos, reglas en .semgrep/) y Gitleaks (secretos).
+#   desplegar solo cuando main cambia y los otros dos quedaron en verde: avisa a Render
+#            y espera a que la URL de pruebas conteste.
+#
+# La prueba que llama a DeepSeek de verdad (CalificacionIaRealIT) NO corre aquí: se
+# apaga sola si no existe la variable RENASER_IA_REAL. Ver docs/CI-CD.md.
+name: ci
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# Si llega un push nuevo al mismo PR, la corrida vieja ya no le importa a nadie
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  build:
+    name: compilar y probar
+    runs-on: ubuntu-latest
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Historia completa: SonarCloud la necesita para saber qué líneas son nuevas
+          fetch-depth: 0
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      # verify = unitarios (surefire) + integración (failsafe, Testcontainers usa el
+      # Docker que el runner ya trae) + reporte de cobertura de JaCoCo
+      - name: Compilar y correr todos los tests
+        run: ./mvnw -B verify
+
+      # Solo si el secreto existe: en un PR desde un fork no está, y no debe fallar por eso
+      - name: Cobertura del código nuevo (SonarCloud)
+        if: ${{ env.SONAR_TOKEN != '' }}
+        run: ./mvnw -B sonar:sonar
+
+  estatico:
+    name: análisis estático
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Gitleaks revisa la historia, no solo el estado actual
+          fetch-depth: 0
+
+      - name: Semgrep (patrones prohibidos del proyecto)
+        run: |
+          pip install semgrep
+          semgrep scan --error --config p/java --config .semgrep/
+
+      - name: Gitleaks (secretos filtrados)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  desplegar:
+    name: desplegar a pruebas
+    needs: [build, estatico]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      # Render construye la imagen con el Dockerfile del repositorio; aquí solo se le avisa.
+      # El auto-deploy de Render está apagado a propósito: si desplegara solo, lo haría
+      # también con el CI en rojo, y este pipeline no serviría de nada.
+      - name: Avisar a Render
+        env:
+          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$HOOK" ]; then
+            echo "Falta el secreto RENDER_DEPLOY_HOOK: no se despliega." >&2
+            exit 1
+          fi
+          curl --fail --silent --show-error "$HOOK"
+
+      # El plan gratuito duerme a los 15 minutos y tarda ~1 minuto en despertar,
+      # y encima hay que esperar a que Render construya la imagen: se reintenta
+      # hasta 10 minutos antes de dar el despliegue por muerto.
+      - name: Esperar a que la aplicación conteste (smoke test)
+        env:
+          URL: ${{ vars.PRUEBAS_URL }}
+        run: |
+          if [ -z "$URL" ]; then
+            echo "Falta la variable PRUEBAS_URL: no hay contra qué probar." >&2
+            exit 1
+          fi
+          for i in $(seq 1 60); do
+            if curl --fail --silent --output /dev/null "$URL/v3/api-docs" \
+               && curl --fail --silent --output /dev/null "$URL/api/v1/portal/vacantes"; then
+              echo "La aplicación contesta."
+              exit 0
+            fi
+            echo "Intento $i/60: todavía no contesta, se espera 10s..."
+            sleep 10
+          done
+          echo "La aplicación no contestó en 10 minutos." >&2
+          exit 1

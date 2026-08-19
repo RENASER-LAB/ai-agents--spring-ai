@@ -1,0 +1,253 @@
+# Las APIs del sistema
+
+Sistema de selección de personal — Renaser Consulting
+Versión 1.3 · 2026-08-18 · Cubre **las cinco etapas del embudo**: postulación, Perfil Integral,
+prueba del puesto, simulación de trabajo, validación práctica y decisión final
+
+Este documento explica las APIs para quien las va a consumir: el frontend de RENASER OS y el
+portal del candidato. **La referencia viva es Swagger**, en `http://localhost:8080/swagger-ui.html`
+cuando la aplicación corre: ahí están los cuerpos exactos, se prueban las llamadas y siempre está
+al día porque se genera del código. Este documento cuenta lo que Swagger no cuenta: cómo entrar,
+qué puerta usar y las reglas que no se ven en un esquema.
+
+---
+
+## Las dos puertas
+
+Todo vive bajo `/api/v1/`, en dos zonas con reglas distintas:
+
+| Puerta | Quién la usa | Cómo se identifica |
+|---|---|---|
+| `/api/v1/portal/**` | El candidato | Token propio, de crear cuenta y entrar con correo y contraseña |
+| `/api/v1/panel/**` | El equipo de Renaser | Token de equipo. Lo emitirá RENASER OS; mientras no exista ese contrato, el login de desarrollo |
+
+El token va en cada llamada, en la cabecera `Authorization: Bearer <token>`.
+
+Un token de candidato **no abre** el panel, ni al revés. Y dentro del panel, cada acción exige su
+permiso: quien no lo tiene recibe un **403 con explicación**, no un error opaco. Además el
+permiso tiene **alcance**: el responsable de un área solo ve las postulaciones de sus vacantes,
+aunque llame al mismo endpoint que Talento.
+
+## Cómo entrar
+
+**El candidato:** `POST /portal/cuentas` para crear la cuenta (exige aceptar el tratamiento de
+datos; el consentimiento de futuros contactos es aparte y opcional), y `POST /portal/auth/login`
+con correo y contraseña. Si no cuadran, responde **401** con el mismo texto tanto si el correo
+no existe como si la contraseña es otra: decir cuál de las dos falló le regalaría a un atacante
+la lista de correos registrados. Tras varios intentos fallidos seguidos (configurable, arranca
+en 5), la entrada se bloquea unos minutos y responde **429** con la cabecera `Retry-After` y el
+campo `segundosDeEspera`, para que la pantalla pueda decir cuánto falta en vez de adivinarlo.
+
+**El equipo, mientras no hay RENASER OS:** `POST /panel/auth/dev-login` con el id de RENASER OS.
+El primer id que entre en una base recién creada se registra solo, con los roles completos del
+equipo — es el arranque de desarrollo. En producción este login se apaga con
+`app.seguridad.dev-login-activo: false`.
+
+## Los errores hablan claro
+
+Todos los errores salen en el mismo formato (RFC 7807): un `title`, un `status` y un `detail`
+en lenguaje normal.
+
+| Código | Qué significa |
+|---|---|
+| 400 | La petición incumple una regla: «toda transición manual exige un motivo escrito» |
+| 401 | Falta el token, venció, o el correo y la contraseña no cuadran al entrar |
+| 403 | El token vale, pero ese permiso no lo tienes |
+| 404 | No existe, **o no te toca verlo**: el alcance también responde 404 |
+| 409 | El estado actual no lo permite: «ya postulaste a esta vacante» |
+| 413 | El archivo pasa de 10 MB |
+| 429 | Demasiados intentos de entrar seguidos. Trae `Retry-After` con los segundos que faltan |
+
+---
+
+## El portal del candidato (`/api/v1/portal`)
+
+| Método y ruta | Qué hace | Quién |
+|---|---|---|
+| GET `/vacantes` | Las vacantes publicadas | Cualquiera, sin token |
+| GET `/vacantes/{id}` | El detalle público, con los requisitos indispensables | Cualquiera |
+| GET `/consentimientos/textos` | Los textos vigentes de los dos consentimientos | Cualquiera |
+| POST `/cuentas` | Crear la cuenta y registrar los consentimientos | Cualquiera |
+| POST `/auth/login` | Entrar; devuelve el token | Cualquiera |
+| POST `/postulaciones` | Postular: CV (PDF o Word, máx. 10 MB), enlaces, el resultado del que se siente orgulloso, y la confirmación de los requisitos | Candidato |
+| GET `/postulaciones` | Sus postulaciones, con estado y días sin cambio | Candidato |
+| GET `/postulaciones/{uuid}` | El detalle de una suya, con el historial completo | Candidato |
+| POST `/postulaciones/{uuid}/retiro` | Retirarla. **No borra sus datos**: eso se pide aparte | Candidato |
+| POST `/consentimientos/futuros/retiro` | Retirar el consentimiento de futuros contactos | Candidato |
+| POST `/solicitudes-borrado` | Pedir el borrado de sus datos | Candidato |
+| GET `/evaluacion/{uuid}` | Su evaluación: las preguntas en **su** orden y lo que lleva respondido | Candidato |
+| POST `/evaluacion/{uuid}/inicio` | Empezar. La primera vez elige qué preguntas le tocan | Candidato |
+| PUT `/evaluacion/{uuid}/respuestas/{preguntaId}` | Guardar una respuesta | Candidato |
+| POST `/evaluacion/{uuid}/entrega` | Entregar. Ya no se cambia, y pasa a calificarse | Candidato |
+
+**La evaluación es de quien la responde.** Todo entra por el código de la postulación, no por
+el id de la evaluación, y una que no es suya responde 404 — un 403 ya confirmaría que existe.
+
+**Lo que nunca sale al portal:** el puntaje de cada opción, la lógica interna de la pregunta y
+el código de dimensión que mide. No es que se filtren al serializar: los contratos no tienen
+ese campo. Si la clave llega al navegador, el banco entero queda inutilizado.
+
+**La regla que importa al postular:** el formulario pregunta por cada requisito indispensable de
+la vacante y el candidato confirma cuáles cumple. Cualquier requisito activo no confirmado cierra
+la postulación en el acto (`NO_CONTINUA`), con la regla exacta escrita en su historial. Es el
+**único** descarte automático de todo el sistema.
+
+## El panel del equipo (`/api/v1/panel`)
+
+### Solicitudes de Talento — Talento prepara, Dirección aprueba
+
+| Método y ruta | Qué hace | Permiso |
+|---|---|---|
+| POST `/solicitudes` | Registrar una solicitud, con sus 3 a 5 resultados esperados y el análisis de capacidad (obligatorio) | `crear_solicitud` |
+| GET `/solicitudes` · `/{id}` | Verlas, según el alcance de quien mira | `ver_solicitudes` |
+| POST `/solicitudes/{id}/aprobacion` | Aprobar: queda ABIERTA y ya admite vacante | `aprobar_solicitud` |
+| POST `/solicitudes/{id}/rechazo` | Rechazar, con motivo | `aprobar_solicitud` |
+
+### Vacantes
+
+| Método y ruta | Qué hace | Permiso |
+|---|---|---|
+| GET/POST `/puestos` | El catálogo de puestos | `ver_vacantes` / `crear_vacante` |
+| GET `/vacantes` · `/{id}` | Todas las vacantes | `ver_vacantes` |
+| POST `/vacantes` | Crear en borrador. **Exige una solicitud aprobada** | `crear_vacante` |
+| PUT `/vacantes/{id}` | Editar mientras no esté cerrada | `editar_vacante` |
+| GET/POST `/vacantes/{id}/requisitos` · DELETE `/{requisitoId}` | Los requisitos indispensables. No se borran: se desactivan | `definir_requisitos_objetivos` |
+| POST `/vacantes/{id}/plantilla-evaluacion` | Qué evaluación responderá quien postule. **Hace falta antes de publicar** | `elegir_plantilla_evaluacion` |
+| POST `/vacantes/{id}/plantilla-prueba` | Qué prueba del puesto rendirá quien llegue a esa etapa. **Hace falta antes de publicar** | `elegir_plantilla_prueba` |
+| GET/POST `/vacantes/{id}/barreras-criticas` | Las capacidades que ningún promedio alto compensa | `definir_barreras_criticas` |
+| POST `/vacantes/{id}/publicacion` | Publicar: aparece en el portal | `publicar_vacante` |
+| POST `/vacantes/{id}/cierre` | Cerrar: frena postulaciones nuevas, **no arrastra las que van en marcha** | `cerrar_vacante` |
+
+### Postulaciones
+
+| Método y ruta | Qué hace | Permiso |
+|---|---|---|
+| GET `/bandeja?espera_a=` | La bandeja: todo lo que espera a `CANDIDATO`, `SISTEMA`, `TALENTO` o `AREA` | `ver_candidatos` |
+| GET `/vacantes/{id}/embudo` | Cuántas postulaciones hay en cada estado | `ver_embudo` |
+| GET `/vacantes/{id}/ranking` | La tanda ordenada de más apto a menos, con las ocho notas del currículum de cada uno. **Incluye a quien todavía no tiene nota** | `ver_embudo` |
+| GET `/postulaciones/{id}` · `/historial` | La ficha completa y el recorrido | `abrir_ficha_candidato` |
+| POST `/postulaciones/{id}/transiciones` | Mover a cualquier estado. **El motivo es obligatorio, sin excepción** | `mover_postulacion` |
+| POST `/postulaciones/{id}/confirmacion-avance` | Confirmar que avanza: el sistema calcula el estado siguiente | `confirmar_avance` |
+| GET `/postulaciones/{id}/perfil-integral` | El retrato de la IA: notas del currículum, hallazgos y avisos | `ver_perfil_integral` |
+| POST `/postulaciones/{id}/criba-cv` | Que la IA lea **solo el currículum** y arme el retrato con eso. Es lo que se pide con una tanda recién llegada | `ajustar_nota` |
+| POST `/postulaciones/{id}/calificacion-perfil-integral` | Calificar con todo: currículum y evaluación. Exige evaluación entregada | `ajustar_nota` |
+| POST `/postulaciones/{id}/cv` | Reemplazar el currículum desde el panel | `ajustar_nota` |
+| GET `/archivos/{id}/descarga` | Descargar el CV | `descargar_entregables` |
+
+### La prueba del puesto (hito 3)
+
+| Método y ruta | Qué hace | Permiso |
+|---|---|---|
+| POST `/plantillas-prueba` · `/{id}/versiones` | Crear la plantilla y una versión en borrador | `editar_plantillas_prueba` |
+| POST `/plantillas-prueba/versiones/{id}/publicacion` | Publicar: exige 8-10 preguntas universales, 3-5 específicas, y la rúbrica sumando 100 | `editar_plantillas_prueba` |
+| POST `/postulaciones/{id}/prueba/criterios/{criterioId}/nota` | Poner la nota de un criterio, con explicación obligatoria | `ajustar_nota` |
+| POST `/postulaciones/{id}/prueba/calificacion` | Ponderar las notas ya puestas. Exige que estén todos los criterios | `ajustar_nota` |
+
+**El portal del candidato es `/api/v1/portal/prueba/{codigo}`**: ver, iniciar (arranca el
+reloj), responder, subir entregables y entregar. Mismas reglas que la evaluación: nada de
+lo interno viaja, y una prueba ajena responde 404.
+
+### Simulación de trabajo
+
+| Método y ruta | Qué hace | Permiso |
+|---|---|---|
+| GET/POST `/sesiones-simulacion` | Las sesiones con fecha y cupo. Publicar una mueve a quien estaba esperando | `crear_sesiones_simulacion` |
+| POST `/sesiones-simulacion/{id}/cupo` · `/cancelacion` | Ampliar o cancelar. Al cancelar se avisa a los inscritos | `crear_sesiones_simulacion` |
+| POST `/sesiones-simulacion/{id}/responsables` | Quién conduce la sesión | `crear_sesiones_simulacion` |
+| GET/POST `/sesiones-simulacion/{id}/informacion-critica` | Qué debería preguntar un candidato fuerte | `definir_informacion_critica` |
+| GET/POST `/inscripciones/{id}/marcas` | Los diez eventos observables, marcados en vivo | `marcar_eventos_simulacion` |
+| POST `/inscripciones/{id}/asistencia` | Si asistió. Si no, vuelve a la bandeja del equipo | `marcar_asistencia` |
+| POST `/postulaciones/{id}/ausencia-simulacion` | Qué hacer con quien faltó: otra fecha o cerrar | `decidir_sobre_ausente` |
+| POST `/postulaciones/{id}/simulacion/...` | Poner notas y ponderarlas, como en la prueba | `calificar_simulacion` |
+| GET/POST `/postulaciones/{id}/conversacion-final` | Las 3-5 preguntas y lo que se respondió | `hacer_conversacion_final` |
+
+**El portal del candidato es `/portal/simulacion/{codigo}`**: ver las fechas de su vacante que
+tengan cupo, elegir una, y consultar la que eligió.
+
+⚠️ **Tres reglas mueven al candidato solo**, y son el único punto del sistema donde el estado de
+una postulación depende de otra tabla: publicar una sesión o ampliar su cupo mueve a quien
+esperaba; llenar la última devuelve a quien no se inscribió; cancelar devuelve a los inscritos.
+**Faltar a la sesión no reinscribe solo** — eso lo decide una persona.
+
+**Solo se registra lo que se hizo, nunca lo que se supone que pensó.** El evento «detectó el
+bloqueo» no existe: quedan «apareció el cambio» y «lo abrió», que son dos actos observables.
+
+### Validación práctica
+
+| Método y ruta | Qué hace | Permiso |
+|---|---|---|
+| GET `/postulaciones/{id}/validacion` | El periodo, su modalidad y sus fechas | `completar_metricas_validacion` |
+| POST `/postulaciones/{id}/validacion/habilitacion` | Modalidad y días. **El trabajo real exige la figura contractual** | `habilitar_validacion` |
+| POST `/postulaciones/{id}/validacion/inicio` | Arrancar: fija inicio y fin | `iniciar_validacion` |
+| GET/POST `/postulaciones/{id}/validacion/metricas` | Las nueve métricas, con de dónde salió cada valor | `completar_metricas_validacion` |
+| POST `/postulaciones/{id}/validacion/cierre` | Ponderar y pasar a la decisión | `cerrar_validacion` |
+
+⚠️ **No se pone a nadie a trabajar de verdad sin figura contractual registrada.** La otra
+modalidad —simulación extendida, sin trabajo productivo— no la necesita y se puede usar desde
+el primer día.
+
+**Quién facilita y quién completa métricas es configurable** desde
+`PUT /panel/parametros/{codigo}`: `roles_facilitador_simulacion` y
+`roles_completan_metricas_validacion`. No hace falta un rol nuevo ni tocar código.
+
+### La decisión final (hito 3)
+
+| Método y ruta | Qué hace | Permiso |
+|---|---|---|
+| GET `/postulaciones/{id}/semaforo` | La Puntuación Global y una propuesta de semáforo | `ver_semaforo_decision` |
+| POST `/postulaciones/{id}/decision` | Decidir. El motivo es siempre obligatorio (RF-119) | `decidir_contratacion` la primera vez, `cambiar_decision` para corregir |
+| POST `/postulaciones/{id}/evidencia-adicional` | Pedir evidencia adicional cuando sale ámbar. Tope configurable | `pedir_evidencia_adicional` |
+
+⚠️ **La decisión de contratar no es de Talento.** Es del responsable del área o de
+Dirección (RF-119) — la primera vez en el sistema que Talento no tiene el permiso de
+escritura más importante de un flujo.
+
+### Administración
+
+| Método y ruta | Qué hace | Permiso |
+|---|---|---|
+| GET `/areas` · POST `/areas` | Las áreas de la organización: hace falta una para registrar una solicitud | `ver_solicitudes` / `crear_usuarios_y_asignar_roles` |
+| GET/PUT `/parametros` | Los valores que Renaser cambia sin programar | `editar_parametros` |
+| GET/POST `/plantillas-correo` | Los textos de correo. Editar = crear versión nueva | `editar_textos_correo` |
+| GET `/auditoria` | El registro, paginado. No se puede modificar ni borrar | `ver_auditoria` |
+| GET `/solicitudes-borrado` · POST `/{id}/ejecucion` | Ver y ejecutar los borrados: la persona queda vacía, la trazabilidad queda | `ejecutar_borrado_datos` |
+| GET/POST `/usuarios` · POST `/{id}/roles` · GET `/roles` | El equipo y sus roles. El último administrador no se puede quitar | `crear_usuarios_y_asignar_roles` |
+
+---
+
+## Lo que conviene saber antes de consumirlas
+
+**Los correos no salen todavía.** Cada aviso al candidato queda guardado con su texto exacto en
+la base (`correo_enviado`), pero el envío real espera a que Renaser confirme su dominio de
+correo. Cuando exista, se enchufa el transporte y nada más cambia.
+
+**Las tres últimas etapas ya viven aquí, pero les falta contenido** (18/08/2026). La mecánica
+está construida y se puede llamar; lo que todavía no existe es lo que va dentro:
+
+| Etapa | Qué ya funciona | Qué falta |
+|---|---|---|
+| Prueba del puesto | El cronómetro corre en el servidor, el cambio aparece en un minuto sorteado, el candidato sube sus entregables y entrega | **La califica una persona**, criterio por criterio: el agente que lo haría no está escrito. Y falta el enunciado real de una prueba en formato de dos horas, que lo escribe Renaser |
+| Simulación de trabajo | Sesiones con fecha y cupo, el candidato elige la suya, el facilitador marca los diez eventos y se califica | **El contenido de la sesión**: el enunciado del encargo y la matriz de información crítica —qué se le oculta al candidato y debería preguntar— los escribe Renaser, sesión por sesión. Y las preguntas de la conversación final se escriben a mano, porque el agente que las generaría tampoco está |
+| Validación práctica | Habilitar la modalidad, arrancar el periodo, cargar las nueve métricas y cerrar | **Las métricas se cargan a mano.** El campo dice de dónde salió cada valor y hoy todas dicen `PERSONA`; que RENASER OS las alimente solo es la integración que falta |
+
+Ninguna de esas faltas frena a la de al lado: un candidato puede recorrer las cinco etapas de
+punta a punta hoy mismo, con personas poniendo las notas.
+
+**El id público de una postulación es su `uuid`,** no el número interno. Es lo que ve el
+candidato y lo que viaja en sus rutas.
+
+**El módulo de agentes IA** (`/api/v1/agent-runs`, `/flows`, `/rag`, `/supabase`) es otra zona,
+del proyecto original de agentes, y hoy queda abierta como estaba. Se endurecerá cuando gane
+autenticación propia.
+
+---
+
+# Documentos relacionados
+
+| Documento | Qué contiene |
+|---|---|
+| [Qué hace el sistema](00-QUE-HACE-EL-SISTEMA.md) | El sistema entero, sin nada técnico |
+| [Alcance del MVP](08-ALCANCE-DEL-MVP.md) | Qué se construye primero y por qué |
+| [Roles y permisos](04-ROLES-Y-PERMISOS.md) | Quién puede hacer qué, acción por acción |
+| [Estados de la postulación](03-ESTADOS-POSTULACION.md) | Los estados que mueve esta API |
+| [Diccionario de datos](07-DICCIONARIO-DE-DATOS.md) | Las tablas que hay detrás |

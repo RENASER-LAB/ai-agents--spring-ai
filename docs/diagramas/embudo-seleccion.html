@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Las cinco etapas y su peso</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --color-paper:   #f5f5f3;
+      --color-ink:     #0d0d0d;
+      --color-muted:   #70706b;
+      --color-accent:  #a43b36;
+      --font-sans:     'Geist', system-ui, sans-serif;
+      --font-serif:    'Instrument Serif', serif;
+      --font-mono:     'Geist Mono', ui-monospace, monospace;
+    }
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-paper);
+      color: var(--color-ink);
+      min-height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+      padding: 3rem 2rem;
+    }
+    .frame { max-width: 1000px; width: 100%; }
+    .eyebrow {
+      font-family: var(--font-mono); font-size: 0.66rem; font-weight: 500;
+      letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--color-muted); margin-bottom: 0.5rem;
+    }
+    h1 {
+      font-family: var(--font-serif);
+      font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem);
+      font-weight: 400; letter-spacing: -0.02em; line-height: 1.15;
+      color: var(--color-ink); margin-bottom: 0.5rem;
+    }
+    .sub {
+      font-size: 0.9rem; color: var(--color-muted);
+      margin-bottom: 1.5rem; max-width: 74ch; line-height: 1.5;
+    }
+    svg { width: 100%; min-width: 780px; display: block; }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Etapas y pesos · Sistema de selección RENASER · v2.0</p>
+    <h1>Cien puntos, cuatro etapas, un solo filtro</h1>
+    <p class="sub">Los pesos son <strong>iguales para todos los niveles</strong>: el nivel del puesto ya no cambia cuánto vale cada etapa. El ancho de cada bloque es su peso. Y salvo el requisito objetivo de la entrada, <strong>ninguna etapa descarta</strong>: cada una ordena a los candidatos en cuatro grupos de prioridad, y una persona confirma.</p>
+
+    <svg viewBox="0 0 944 600" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="etapas-title etapas-desc">
+      <title id="etapas-title">Las cuatro etapas que puntúan y la decisión</title>
+      <desc id="etapas-desc">Cuatro bandas apiladas. La primera es la entrada: el candidato postula y sube su currículum, y el sistema solo comprueba los requisitos objetivos indispensables, que es el único descarte automático de todo el proceso. La segunda es una barra de cien puntos repartida en cuatro etapas, con el ancho proporcional al peso: Perfil Integral cuarenta, prueba del puesto treinta, simulación quince y validación práctica quince. Dentro del Perfil Integral se ve su reparto: currículum diez, módulo psicométrico cinco, todavía reservado y vacío, y evaluación veinticinco. Las dos primeras etapas las califica la inteligencia artificial y las dos últimas una persona. La tercera banda son los cuatro grupos de prioridad en que se ordena a los candidatos después de cada etapa: alta prioridad, alto potencial con riesgo, no priorizados e incompatibilidad objetiva. La cuarta banda son los cinco resultados posibles de la decisión final: verde, ámbar, rojo, sin datos y reserva.</desc>
+
+      <defs>
+        <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#70706b"/></marker>
+      </defs>
+
+      <rect width="100%" height="100%" fill="#f5f5f3"/>
+
+      <!-- ============================ CONECTOR (antes que las cajas) ============================ -->
+      <line x1="472" y1="104" x2="472" y2="144" stroke="#70706b" stroke-width="1" marker-end="url(#arrow)"/>
+
+      <!-- ============================ 1 · ENTRADA ============================ -->
+      <text x="36" y="44" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em">1 · ENTRADA</text>
+
+      <rect x="36" y="56" width="872" height="48" rx="6" fill="#f5f5f3"/>
+      <rect x="36" y="56" width="872" height="48" rx="6" fill="rgba(13,13,13,0.03)" stroke="rgba(13,13,13,0.25)" stroke-width="1"/>
+      <text x="52" y="85" fill="#0d0d0d" font-size="13" font-weight="600" font-family="'Geist', sans-serif">Postula y sube su currículum</text>
+      <text x="892" y="76" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="end" letter-spacing="0.06em">EL SISTEMA SOLO COMPRUEBA LOS REQUISITOS OBJETIVOS INDISPENSABLES,</text>
+      <text x="892" y="90" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="end" letter-spacing="0.06em">CONFIGURADOS ANTES DE PUBLICAR. ES EL ÚNICO DESCARTE AUTOMÁTICO.</text>
+
+      <!-- ============================ 2 · LAS ETAPAS QUE PUNTÚAN ============================ -->
+      <text x="36" y="132" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em">2 · LAS CUATRO ETAPAS QUE PUNTÚAN — EL ANCHO ES EL PESO</text>
+
+      <!-- Perfil Integral · 40 · FOCAL -->
+      <rect x="36" y="144" width="320" height="136" rx="6" fill="#f5f5f3"/>
+      <rect x="36" y="144" width="320" height="136" rx="6" fill="rgba(164,59,54,0.05)" stroke="#a43b36" stroke-width="1"/>
+      <text x="340" y="168" fill="#a43b36" font-size="7" font-family="'Geist Mono', monospace" text-anchor="end" letter-spacing="0.10em">CALIFICA LA IA</text>
+      <text x="52" y="212" fill="#a43b36" font-size="30" font-family="'Instrument Serif', serif">40</text>
+      <text x="52" y="234" fill="#0d0d0d" font-size="13" font-weight="600" font-family="'Geist', sans-serif">Perfil Integral</text>
+      <text x="52" y="252" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">CURRÍCULUM, PSICOMÉTRICO Y EVALUACIÓN, LEÍDOS JUNTOS</text>
+
+      <!-- Reparto interno del Perfil Integral, a la misma escala -->
+      <rect x="36" y="256" width="80" height="24" fill="rgba(164,59,54,0.16)" stroke="rgba(164,59,54,0.45)" stroke-width="0.8"/>
+      <text x="76" y="272" fill="#a43b36" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">CV · 10</text>
+
+      <rect x="116" y="256" width="40" height="24" fill="rgba(13,13,13,0.02)" stroke="rgba(13,13,13,0.30)" stroke-width="0.8" stroke-dasharray="4,3"/>
+      <text x="136" y="272" fill="#70706b" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">PSI 5</text>
+
+      <rect x="156" y="256" width="200" height="24" fill="rgba(13,13,13,0.05)" stroke="rgba(13,13,13,0.25)" stroke-width="0.8"/>
+      <text x="256" y="272" fill="#70706b" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">EVALUACIÓN · 25</text>
+
+      <!-- Prueba del puesto · 30 -->
+      <rect x="380" y="144" width="240" height="136" rx="6" fill="#f5f5f3"/>
+      <rect x="380" y="144" width="240" height="136" rx="6" fill="#ffffff" stroke="rgba(13,13,13,0.25)" stroke-width="1"/>
+      <text x="604" y="168" fill="#70706b" font-size="7" font-family="'Geist Mono', monospace" text-anchor="end" letter-spacing="0.10em">CALIFICA LA IA</text>
+      <text x="396" y="212" fill="#0d0d0d" font-size="30" font-family="'Instrument Serif', serif">30</text>
+      <text x="396" y="234" fill="#0d0d0d" font-size="13" font-weight="600" font-family="'Geist', sans-serif">Prueba del puesto</text>
+      <text x="396" y="252" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">CRONOMETRADA</text>
+      <text x="396" y="266" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">CAMBIA UNA VARIANTE A MITAD</text>
+
+      <!-- Simulación · 15 -->
+      <rect x="644" y="144" width="120" height="136" rx="6" fill="#f5f5f3"/>
+      <rect x="644" y="144" width="120" height="136" rx="6" fill="#ffffff" stroke="rgba(13,13,13,0.25)" stroke-width="1"/>
+      <text x="748" y="168" fill="#70706b" font-size="6.5" font-family="'Geist Mono', monospace" text-anchor="end" letter-spacing="0.10em">CALIFICA UNA PERSONA</text>
+      <text x="660" y="212" fill="#0d0d0d" font-size="30" font-family="'Instrument Serif', serif">15</text>
+      <text x="660" y="234" fill="#0d0d0d" font-size="13" font-weight="600" font-family="'Geist', sans-serif">Simulación</text>
+      <text x="660" y="252" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">HASTA 2 H, EN SALA</text>
+      <text x="660" y="266" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">SOLO ACTOS VISIBLES</text>
+
+      <!-- Validación · 15 -->
+      <rect x="788" y="144" width="120" height="136" rx="6" fill="#f5f5f3"/>
+      <rect x="788" y="144" width="120" height="136" rx="6" fill="#ffffff" stroke="rgba(13,13,13,0.25)" stroke-width="1"/>
+      <text x="892" y="168" fill="#70706b" font-size="6.5" font-family="'Geist Mono', monospace" text-anchor="end" letter-spacing="0.10em">CALIFICA UNA PERSONA</text>
+      <text x="804" y="212" fill="#0d0d0d" font-size="30" font-family="'Instrument Serif', serif">15</text>
+      <text x="804" y="234" fill="#0d0d0d" font-size="13" font-weight="600" font-family="'Geist', sans-serif">Validación</text>
+      <text x="804" y="252" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">DÍAS DE TRABAJO</text>
+      <text x="804" y="266" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">DATOS DE RENASER OS</text>
+
+      <!-- ============================ 3 · GRUPOS DE PRIORIDAD ============================ -->
+      <text x="36" y="316" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em">3 · DESPUÉS DE CADA ETAPA — SE ORDENA, NO SE DESCARTA</text>
+
+      <rect x="36" y="328" width="200" height="72" rx="6" fill="#f5f5f3"/>
+      <rect x="36" y="328" width="200" height="72" rx="6" fill="rgba(124,143,111,0.06)" stroke="rgba(124,143,111,0.35)" stroke-width="1"/>
+      <text x="52" y="356" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif">Alta prioridad</text>
+      <text x="52" y="374" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">EVIDENCIA CONSISTENTE</text>
+      <text x="52" y="388" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">SE REVISA PRIMERO</text>
+
+      <rect x="260" y="328" width="200" height="72" rx="6" fill="#f5f5f3"/>
+      <rect x="260" y="328" width="200" height="72" rx="6" fill="rgba(184,145,90,0.06)" stroke="rgba(184,145,90,0.35)" stroke-width="1"/>
+      <text x="276" y="356" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif">Alto potencial con riesgo</text>
+      <text x="276" y="374" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">VALE LA PENA, PERO HAY UNA</text>
+      <text x="276" y="388" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">CONTRADICCIÓN QUE MIRAR</text>
+
+      <rect x="484" y="328" width="200" height="72" rx="6" fill="#f5f5f3"/>
+      <rect x="484" y="328" width="200" height="72" rx="6" fill="rgba(110,100,121,0.06)" stroke="rgba(110,100,121,0.35)" stroke-width="1"/>
+      <text x="500" y="356" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif">No priorizados</text>
+      <text x="500" y="374" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">SE CONFIRMAN POR LOTE, Y AUN</text>
+      <text x="500" y="388" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">ASÍ CADA UNO CON SU RAZÓN</text>
+
+      <rect x="708" y="328" width="200" height="72" rx="6" fill="#f5f5f3"/>
+      <rect x="708" y="328" width="200" height="72" rx="6" fill="rgba(13,13,13,0.05)" stroke="rgba(13,13,13,0.30)" stroke-width="1"/>
+      <text x="724" y="356" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif">Incompatibilidad objetiva</text>
+      <text x="724" y="374" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">FALLA ALGO INDISPENSABLE</text>
+      <text x="724" y="388" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.06em">DEL PUESTO</text>
+
+      <!-- ============================ 4 · LA DECISIÓN ============================ -->
+      <text x="36" y="436" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em">4 · LA DECISIÓN — LA TOMA EL RESPONSABLE DEL ÁREA O DIRECCIÓN, NUNCA LA MÁQUINA</text>
+
+      <rect x="36" y="448" width="152" height="64" rx="6" fill="#f5f5f3"/>
+      <rect x="36" y="448" width="152" height="64" rx="6" fill="#ffffff" stroke="rgba(13,13,13,0.20)" stroke-width="1"/>
+      <rect x="52" y="466" width="10" height="10" rx="2" fill="rgba(124,143,111,0.75)"/>
+      <text x="68" y="475" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif">Verde</text>
+      <text x="52" y="490" fill="#70706b" font-size="7" font-family="'Geist Mono', monospace" letter-spacing="0.06em">SE CONTRATA</text>
+
+      <rect x="216" y="448" width="152" height="64" rx="6" fill="#f5f5f3"/>
+      <rect x="216" y="448" width="152" height="64" rx="6" fill="#ffffff" stroke="rgba(13,13,13,0.20)" stroke-width="1"/>
+      <rect x="232" y="466" width="10" height="10" rx="2" fill="rgba(184,145,90,0.85)"/>
+      <text x="248" y="475" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif">Ámbar</text>
+      <text x="232" y="490" fill="#70706b" font-size="7" font-family="'Geist Mono', monospace" letter-spacing="0.06em">PIDE EVIDENCIA DIRIGIDA</text>
+      <text x="232" y="504" fill="#70706b" font-size="7" font-family="'Geist Mono', monospace" letter-spacing="0.06em">MÁXIMO 2 RONDAS</text>
+
+      <rect x="396" y="448" width="152" height="64" rx="6" fill="#f5f5f3"/>
+      <rect x="396" y="448" width="152" height="64" rx="6" fill="#ffffff" stroke="rgba(13,13,13,0.20)" stroke-width="1"/>
+      <rect x="412" y="466" width="10" height="10" rx="2" fill="rgba(164,59,54,0.75)"/>
+      <text x="428" y="475" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif">Rojo</text>
+      <text x="412" y="490" fill="#70706b" font-size="7" font-family="'Geist Mono', monospace" letter-spacing="0.06em">NO CONTINÚA EN ESTA VACANTE</text>
+
+      <rect x="576" y="448" width="152" height="64" rx="6" fill="#f5f5f3"/>
+      <rect x="576" y="448" width="152" height="64" rx="6" fill="#ffffff" stroke="rgba(13,13,13,0.20)" stroke-width="1"/>
+      <rect x="592" y="466" width="10" height="10" rx="2" fill="rgba(13,13,13,0.15)" stroke="rgba(13,13,13,0.35)" stroke-width="0.8"/>
+      <text x="608" y="475" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif">Sin datos</text>
+      <text x="592" y="490" fill="#70706b" font-size="7" font-family="'Geist Mono', monospace" letter-spacing="0.06em">SE PIDE MÁS EVIDENCIA</text>
+      <text x="592" y="504" fill="#70706b" font-size="7" font-family="'Geist Mono', monospace" letter-spacing="0.06em">NO SE ASUME QUE FALLA</text>
+
+      <rect x="756" y="448" width="152" height="64" rx="6" fill="#f5f5f3"/>
+      <rect x="756" y="448" width="152" height="64" rx="6" fill="#ffffff" stroke="rgba(13,13,13,0.20)" stroke-width="1"/>
+      <rect x="772" y="466" width="10" height="10" rx="2" fill="rgba(94,122,155,0.75)"/>
+      <text x="788" y="475" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif">Reserva</text>
+      <text x="772" y="490" fill="#70706b" font-size="7" font-family="'Geist Mono', monospace" letter-spacing="0.06em">INTERESA PARA OTRA VACANTE</text>
+
+      <!-- ============================ LEYENDA ============================ -->
+      <line x1="36" y1="544" x2="908" y2="544" stroke="rgba(13,13,13,0.10)" stroke-width="0.8"/>
+
+      <rect x="36" y="562" width="10" height="10" rx="2" fill="rgba(164,59,54,0.16)" stroke="rgba(164,59,54,0.45)" stroke-width="0.8"/>
+      <text x="52" y="571" fill="#70706b" font-size="9" font-family="'Geist', sans-serif">El currículum ya no es una etapa que descarta: son 10 de los 40 puntos del Perfil Integral</text>
+
+      <rect x="36" y="580" width="10" height="10" rx="2" fill="rgba(13,13,13,0.02)" stroke="rgba(13,13,13,0.30)" stroke-width="0.8" stroke-dasharray="3,2"/>
+      <text x="52" y="589" fill="#70706b" font-size="9" font-family="'Geist', sans-serif">Módulo psicométrico propio: el hueco está reservado y hoy va vacío, así que su 5 % se reparte</text>
+    </svg>
+  </div>
+</body>
+</html>

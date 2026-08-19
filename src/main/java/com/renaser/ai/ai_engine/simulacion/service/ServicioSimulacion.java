@@ -1,0 +1,60 @@
+package com.renaser.ai.ai_engine.simulacion.service;
+
+import com.renaser.ai.ai_engine.simulacion.dto.DtosSimulacion.*;
+import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
+
+import java.util.List;
+import java.util.UUID;
+
+/**
+ * La simulación de trabajo: sesiones, inscripciones, lo que ocurre durante la sesión y la
+ * conversación final.
+ *
+ * <p>A diferencia del resto del sistema —donde el candidato actúa solo y cuando quiere—, esta
+ * etapa pasa en un momento programado y con alguien mirando. Eso explica la forma de casi todo
+ * lo que hay aquí: cupos, inscripciones que se pueden perder, y un facilitador que anota
+ * eventos mientras ocurren.
+ */
+public interface ServicioSimulacion {
+
+    // ---------- Administración de sesiones ----------
+
+    Long crearSesion(ContextoUsuario quien, CrearSesion datos);
+    List<SesionPanel> listarSesiones(ContextoUsuario quien);
+    SesionPanel verSesion(ContextoUsuario quien, Long sesionId);
+    void ampliarCupo(ContextoUsuario quien, Long sesionId, AmpliarCupo datos);
+    void cancelarSesion(ContextoUsuario quien, Long sesionId, CancelarSesion datos);
+    void asignarResponsable(ContextoUsuario quien, Long sesionId, AsignarResponsable datos);
+
+    Long agregarInformacionCritica(ContextoUsuario quien, Long sesionId, CrearInformacionCritica datos);
+    List<InformacionCriticaResponse> verInformacionCritica(ContextoUsuario quien, Long sesionId);
+
+    // ---------- El candidato ----------
+
+    List<SesionDisponible> sesionesDisponibles(ContextoUsuario quien, UUID uuidPostulacion);
+    MiSesion inscribirse(ContextoUsuario quien, UUID uuidPostulacion, Long sesionId);
+    MiSesion miSesion(ContextoUsuario quien, UUID uuidPostulacion);
+
+    // ---------- Durante la sesión ----------
+
+    /**
+     * Marca uno de los diez eventos observables.
+     *
+     * <p>Solo puede hacerlo quien tenga el permiso <b>y</b> un rol de los que el parámetro
+     * {@code roles_facilitador_simulacion} admite — así se puede cambiar quién facilita sin
+     * tocar código.
+     */
+    void marcarEvento(ContextoUsuario quien, Long inscripcionId, MarcarEvento datos);
+    List<MarcaResponse> verMarcas(ContextoUsuario quien, Long inscripcionId);
+
+    void marcarAsistencia(ContextoUsuario quien, Long inscripcionId, MarcarAsistencia datos);
+
+    /** Qué hacer con quien faltó: darle otra fecha o cerrar su postulación. Nunca automático. */
+    void decidirSobreAusente(ContextoUsuario quien, Long postulacionId, DecidirSobreAusente datos);
+
+    // ---------- La conversación final ----------
+
+    Long registrarPregunta(ContextoUsuario quien, Long postulacionId, RegistrarPregunta datos);
+    void responderPregunta(ContextoUsuario quien, Long preguntaId, ResponderPregunta datos);
+    List<PreguntaResponse> verPreguntas(ContextoUsuario quien, Long postulacionId);
+}

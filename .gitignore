@@ -1,0 +1,63 @@
+HELP.md
+target/
+.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### VS Code ###
+.vscode/
+
+### Secrets (nunca commitear) ###
+application-secrets.yaml
+
+### Graphify (cache local, se regenera con `graphify .`) ###
+graphify-out/
+
+### Almacen de archivos subidos en desarrollo local ###
+### Almacen de archivos de candidatos (nunca commitear) ###
+# Aqui aterrizan los CV que sube la gente: datos personales reales.
+# La ruta la fija app.archivos.ruta y en local apunta aqui.
+almacen-archivos/
+
+### Frontend del panel ###
+frontend/node_modules/
+frontend/dist/
+
+### Curriculums de una convocatoria real (nunca commitear) ###
+# Aqui se descarga la carpeta de Drive antes de cargarla. Son CV de gente real.
+cv-convocatoria/
+cv-asistente/
+cv-administrador/
+
+### La foto de datos para la demo (datos de gente real, nunca commitear) ###
+frontend/src/datos-demo.json
+
+### Los enlaces a los CV en Drive (nunca commitear) ###
+# Lleva el nombre de cada candidato con el enlace directo a su curriculum, y este
+# repositorio es publico. Se regenera: python scripts/enlaces-de-drive.py
+scripts/enlaces-cv.json

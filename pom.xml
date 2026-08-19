@@ -1,0 +1,383 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+	<parent>
+		<groupId>org.springframework.boot</groupId>
+		<artifactId>spring-boot-starter-parent</artifactId>
+		<version>4.1.0</version>
+		<relativePath/> <!-- lookup parent from repository -->
+	</parent>
+	<groupId>com.renaser.ai</groupId>
+	<artifactId>ai-engine</artifactId>
+	<version>0.0.1-SNAPSHOT</version>
+	<name/>
+	<description/>
+	<url/>
+	<licenses>
+		<license/>
+	</licenses>
+	<developers>
+		<developer/>
+	</developers>
+	<scm>
+		<connection/>
+		<developerConnection/>
+		<tag/>
+		<url/>
+	</scm>
+	<properties>
+		<java.version>25</java.version>
+		<spring-ai.version>2.0.0</spring-ai.version>
+		<org.mapstruct.version>1.6.3</org.mapstruct.version>
+		<!-- springdoc 3.x es la linea para Spring Boot 4. La 2.x es de Boot 3 y no arranca aqui -->
+		<springdoc.version>3.1.0</springdoc.version>
+		<testcontainers.version>2.0.5</testcontainers.version>
+		<!-- La misma que ya traia spring-ai-pdf-document-reader: no baja nada nuevo -->
+		<pdfbox.version>3.0.7</pdfbox.version>
+		<archunit.version>1.4.1</archunit.version>
+		<!-- 0.8.13+ es la primera que entiende los .class de Java 25 -->
+		<jacoco.version>0.8.13</jacoco.version>
+		<!-- SonarCloud mira la cobertura solo del código NUEVO de cada PR (Clean as You
+		     Code). La clave del proyecto la asigna SonarCloud al importar el repositorio:
+		     si no coincide con estas dos propiedades, se corrigen aquí. -->
+		<sonar.organization>ricardoismael</sonar.organization>
+		<sonar.projectKey>ricardoIsmael_ai-agents--spring-ai</sonar.projectKey>
+		<sonar.host.url>https://sonarcloud.io</sonar.host.url>
+		<sonar.coverage.jacoco.xmlReportPaths>${project.build.directory}/site/jacoco/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
+	</properties>
+	<dependencies>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-jpa</artifactId>
+		</dependency>
+
+		<!-- Migraciones: el esquema vive en archivos versionados, nadie toca tablas a mano.
+		     En Boot 4 la autoconfiguración de Flyway va en su propio starter: con solo
+		     flyway-core en el classpath, Flyway NUNCA corre y nadie avisa. -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-flyway</artifactId>
+		</dependency>
+		<!-- Desde Flyway 10 el soporte de PostgreSQL va en su propio artefacto -->
+		<dependency>
+			<groupId>org.flywaydb</groupId>
+			<artifactId>flyway-database-postgresql</artifactId>
+		</dependency>
+		<!-- Autoconfiguración de Flyway en los tests de slice (@DataJpaTest) -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-flyway-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+
+		<!-- Identidad y permisos: Spring Boot es el dueno, no se delega en la base -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-security</artifactId>
+		</dependency>
+		<!-- Emite y valida los tokens JWT. Evita depender de una libreria externa -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
+		</dependency>
+
+		<!-- Validacion de lo que llega por la API -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-validation</artifactId>
+		</dependency>
+
+		<!-- Documentacion de la API: el contrato con el frontend Next.js -->
+		<dependency>
+			<groupId>org.springdoc</groupId>
+			<artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+			<version>${springdoc.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.mapstruct</groupId>
+			<artifactId>mapstruct</artifactId>
+			<version>${org.mapstruct.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-webmvc</artifactId>
+		</dependency>
+		<!-- Chat: DeepSeek V4 Pro (hosted). Reemplaza a Ollama como proveedor de chat. -->
+		<dependency>
+			<groupId>org.springframework.ai</groupId>
+			<artifactId>spring-ai-starter-model-deepseek</artifactId>
+		</dependency>
+		<!-- Embeddings: Gemini (Google GenAI), en la nube. Reemplaza a Ollama local:
+		     DeepSeek no expone endpoint de embeddings, y ya no se quiere depender de un
+		     modelo local. El ruteo chat/embedding se define en application.yaml. -->
+		<dependency>
+			<groupId>org.springframework.ai</groupId>
+			<artifactId>spring-ai-starter-model-google-genai-embedding</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.ai</groupId>
+			<artifactId>spring-ai-starter-vector-store-pgvector</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.ai</groupId>
+			<artifactId>spring-ai-vector-store-advisor</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.ai</groupId>
+			<artifactId>spring-ai-pdf-document-reader</artifactId>
+		</dependency>
+		<!-- Saca el texto del curriculum en PDF: sin eso la IA no tiene que leer (RF-41).
+		     Ya venia dentro de spring-ai-pdf-document-reader; se declara aparte para que
+		     nuestro codigo no dependa de una transitiva que manda otra libreria. Los .docx
+		     se leen sin libreria (ver ExtractorTextoCv), asi que Apache POI no hace falta. -->
+		<dependency>
+			<groupId>org.apache.pdfbox</groupId>
+			<artifactId>pdfbox</artifactId>
+			<version>${pdfbox.version}</version>
+		</dependency>
+
+		<dependency>
+			<groupId>org.postgresql</groupId>
+			<artifactId>postgresql</artifactId>
+			<scope>runtime</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.projectlombok</groupId>
+			<artifactId>lombok</artifactId>
+			<optional>true</optional>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-data-jpa-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-amqp</artifactId>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-webmvc-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+
+		<!-- Tests de integracion contra un Postgres real y efimero: las migraciones se
+		     prueban donde van a correr, no contra H2 -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-testcontainers</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>testcontainers-junit-jupiter</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>testcontainers-postgresql</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.testcontainers</groupId>
+			<artifactId>testcontainers-rabbitmq</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.security</groupId>
+			<artifactId>spring-security-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<!-- Comprueba las reglas de arquitectura que el CLAUDE.md tiene en prosa: la
+		     frontera con el motor de agentes, las capas, y que el estado de una postulación
+		     solo lo mueva la máquina de estados. Solo en pruebas. -->
+		<dependency>
+			<groupId>com.tngtech.archunit</groupId>
+			<artifactId>archunit-junit5</artifactId>
+			<version>${archunit.version}</version>
+			<scope>test</scope>
+		</dependency>
+
+	</dependencies>
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>org.springframework.ai</groupId>
+				<artifactId>spring-ai-bom</artifactId>
+				<version>${spring-ai.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+			<!-- Boot 4 ya no gestiona las versiones de Testcontainers: hace falta su BOM -->
+			<dependency>
+				<groupId>org.testcontainers</groupId>
+				<artifactId>testcontainers-bom</artifactId>
+				<version>${testcontainers.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+	</dependencies>
+	</dependencyManagement>
+
+	<build>
+		<plugins>
+			<plugin>
+				<groupId>org.springframework.boot</groupId>
+				<artifactId>spring-boot-maven-plugin</artifactId>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<configuration>
+					<!-- Solo unitarios: rápidos, sin Docker y sin gastar en el proveedor.
+					     Los de integración (*IT) los corre failsafe en `mvn verify`. -->
+					<includes>
+						<include>**/*Test.java</include>
+						<include>**/*Tests.java</include>
+					</includes>
+				</configuration>
+			</plugin>
+			<plugin>
+				<!-- Mide qué líneas ejecutan los tests y deja el XML que SonarCloud lee.
+				     No impone umbral: la puerta la pone SonarCloud, y solo sobre lo nuevo. -->
+				<groupId>org.jacoco</groupId>
+				<artifactId>jacoco-maven-plugin</artifactId>
+				<version>${jacoco.version}</version>
+				<executions>
+					<execution>
+						<goals>
+							<goal>prepare-agent</goal>
+						</goals>
+					</execution>
+					<execution>
+						<id>reporte</id>
+						<phase>verify</phase>
+						<goals>
+							<goal>report</goal>
+						</goals>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-failsafe-plugin</artifactId>
+				<executions>
+					<execution>
+						<goals>
+							<goal>integration-test</goal>
+							<goal>verify</goal>
+						</goals>
+					</execution>
+				</executions>
+				<configuration>
+					<!-- Por convención failsafe ya toma **/*IT.java -->
+					<environmentVariables>
+						<!-- Docker Desktop: dentro de su VM el socket es el estándar. En un
+						     Docker normal esto es la misma ruta, así que no estorba. -->
+						<TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE>/var/run/docker.sock</TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE>
+					</environmentVariables>
+				</configuration>
+			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-compiler-plugin</artifactId>
+				<executions>
+					<execution>
+						<id>default-compile</id>
+						<phase>compile</phase>
+						<goals>
+							<goal>compile</goal>
+						</goals>
+						<configuration>
+							<annotationProcessorPaths>
+								<path>
+									<groupId>org.projectlombok</groupId>
+									<artifactId>lombok</artifactId>
+								</path>
+								<path>
+									<groupId>org.mapstruct</groupId>
+									<artifactId>mapstruct-processor</artifactId>
+									<version>${org.mapstruct.version}</version>
+								</path>
+							</annotationProcessorPaths>
+						</configuration>
+					</execution>
+					<execution>
+						<id>default-testCompile</id>
+						<phase>test-compile</phase>
+						<goals>
+							<goal>testCompile</goal>
+						</goals>
+						<configuration>
+							<annotationProcessorPaths>
+								<path>
+									<groupId>org.projectlombok</groupId>
+									<artifactId>lombok</artifactId>
+								</path>
+								<path>
+								<groupId>org.mapstruct</groupId>
+								<artifactId>mapstruct-processor</artifactId>
+								<version>${org.mapstruct.version}</version>
+							</path>
+							</annotationProcessorPaths>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+		</plugins>
+	</build>
+
+	<profiles>
+		<!-- Mutation testing: mete fallos a propósito en el código y comprueba que algún
+		     test se ponga rojo. Mide si los tests protegen, no cuánto código pisan — la
+		     cobertura alta con tests huecos pasa JaCoCo pero no pasa esto.
+
+		     ⚠️ Hoy NO corre: pitest 1.19.1 (la última publicada, 19/08/2026) no lee
+		     bytecode de Java 25 («Unsupported class file major version 69»). La
+		     configuración se queda lista a propósito: cuando salga la versión que lo
+		     soporte, se sube el número de abajo y se prueba con
+		       ./mvnw -B -Ppit test-compile pitest:mutationCoverage
+		     El workflow nocturno lo intenta solo si se le pide (interruptor manual).
+
+		     No corre en cada PR: es lento a propósito. Solo apunta a los paquetes de
+		     reglas cerradas, donde un mutante vivo es un hueco real. Meter aquí
+		     controladores o dtos solo haría ruido. -->
+		<profile>
+			<id>pit</id>
+			<build>
+				<plugins>
+					<plugin>
+						<groupId>org.pitest</groupId>
+						<artifactId>pitest-maven</artifactId>
+						<version>1.19.1</version>
+						<dependencies>
+							<dependency>
+								<groupId>org.pitest</groupId>
+								<artifactId>pitest-junit5-plugin</artifactId>
+								<version>1.2.2</version>
+							</dependency>
+						</dependencies>
+						<configuration>
+							<targetClasses>
+								<param>com.renaser.ai.ai_engine.postulacion.*</param>
+								<param>com.renaser.ai.ai_engine.perfilintegral.*</param>
+								<param>com.renaser.ai.ai_engine.pesos.*</param>
+								<param>com.renaser.ai.ai_engine.seguridad.*</param>
+							</targetClasses>
+							<!-- Solo los unitarios: los *IT levantan contenedores y PIT corre
+							     la suite una vez POR MUTANTE — con ellos no terminaría nunca -->
+							<targetTests>
+								<param>com.renaser.ai.ai_engine.*Test</param>
+							</targetTests>
+							<!-- Guarda lo ya analizado: la segunda corrida solo mira lo que cambió -->
+							<withHistory>true</withHistory>
+							<timestampedReports>false</timestampedReports>
+						</configuration>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+	</profiles>
+
+</project>

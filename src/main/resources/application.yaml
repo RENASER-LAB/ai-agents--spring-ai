@@ -1,0 +1,143 @@
+spring:
+  application:
+    name: ai-engine
+
+  config:
+    import: optional:file:./application-secrets.yaml
+
+  threads:
+    virtual:
+      enabled: true
+  http:
+    client:
+      connect-timeout: 10s
+      read-timeout: 90s
+
+  datasource:
+    url: jdbc:postgresql://localhost:5433/renaser_db
+    username: postgres
+    password: postgrespassword
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      # Flyway es el dueño del esquema. Hibernate solo comprueba que las entidades
+      # coincidan con lo que las migraciones crearon: si algo no cuadra, no arranca.
+      ddl-auto: validate
+    show-sql: true
+
+  # El esquema vive en src/main/resources/db/migration, versionado. Nadie toca tablas a mano.
+  flyway:
+    enabled: true
+    # La BD local ya tenía agent_run antes de adoptar Flyway en V1.
+    # Flyway registra V1 como base y ejecuta V2 a V9 en el primer arranque.
+    baseline-on-migrate: true
+    baseline-version: 1
+
+  # El CV pesa hasta 10 MB (regla del portal). El request completo un poco más, por el multipart.
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 12MB
+
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+    listener:
+      simple:
+        # Cuántos candidatos se califican a la vez.
+        #
+        # Con el valor por defecto —uno— una tanda de diez currículums tarda lo que suman
+        # las veinte llamadas al modelo, una detrás de otra: unos trece minutos. En paralelo
+        # tarda lo que tarda el candidato más lento, que es alrededor de un minuto.
+        #
+        # No hace falta pensar en hilos del sistema: son hilos virtuales, y el trabajo es
+        # esperar a una API, no calcular. El techo real lo pone el proveedor con su límite
+        # de peticiones por minuto; si empiezan a salir errores 429, se baja este número.
+        concurrency: 8
+        max-concurrency: 12
+        # Uno por consumidor: cada trabajo tarda medio minuto y repartirlos de a montones
+        # deja a unos consumidores con cola y a otros de brazos cruzados.
+        prefetch: 1
+  ai:
+    model:
+      chat: deepseek
+      embedding:
+        text: google-genai
+
+    deepseek:
+      # ⚠️ La clave de verdad NO está aquí: está en application-secrets.yaml, que se importa
+      # arriba (spring.config.import) y que no se versiona. Lo importado gana sobre este
+      # archivo, así que este valor solo se usa si ese archivo no existe, y entonces cae en
+      # la variable de entorno DEEPSEEK_API_KEY o, si tampoco está, en vacío.
+      #
+      # Vacío no da un error claro: da un 401 del proveedor a la primera calificación. Por
+      # eso CalificacionIaRealIT comprueba que la clave se resuelva antes de nada — si un día
+      # alguien cambia el orden de precedencia sin querer, salta ahí y no en producción.
+      api-key: "${DEEPSEEK_API_KEY:}"
+      chat:
+        options:
+          model: ${renaser.ai.chat.default-model}
+          max-tokens: ${renaser.ai.chat.max-tokens}
+
+    # Embeddings en la nube (Gemini Developer API, autenticado con API key, no Vertex).
+    # gemini-embedding-2 normaliza solo los vectores truncados a menos de 3072 dimensiones;
+    # gemini-embedding-001 (el modelo anterior) exige normalizarlos a mano.
+    google:
+      genai:
+        embedding:
+          api-key: ${google.gemini.api-key}
+          text:
+            model: gemini-embedding-2
+            dimensions: 1536
+    vectorstore:
+      pgvector:
+        index-type: HNSW
+        distance-type: COSINE_DISTANCE
+        dimensions: 1536
+        initialize-schema: true
+server:
+  port: 8080
+renaser:
+  ai:
+    chat:
+      default-model: deepseek-v4-flash
+      # El de la primera pasada. Contesta sin razonar: 19 segundos por currículum en vez de
+      # 48, porque se ahorra los ~5.000 tokens de pensamiento interno que el otro gasta
+      # antes de escribir. A cambio ordena distinto el medio de la tabla y ve menos riesgos,
+      # así que sirve para ordenar la tanda, no para decidir a quién se contrata.
+      modelo-rapido: deepseek-chat
+      # 4096 truncaba el envelope: V4 Pro razona y esos tokens cuentan como salida.
+      max-tokens: 16384
+      max-intentos: 3
+    # Los tres agentes que califican una postulación del hito 2 de selección
+    calificacion:
+      # Apagarla deja la postulación en PERFIL_CALIFICANDO sin encolar nada. Se usa en las
+      # pruebas que no quieren tocar el modelo, y sirve de freno si el proveedor está caído.
+      habilitada: true
+      # Cuántas veces se reintenta un trabajo antes de darlo por fallido. Fallido NO significa
+      # nota cero: significa que la postulación se queda esperando y hay que mirarla.
+      max-intentos: 3
+      # A partir de cuántos minutos un trabajo se considera colgado y se vuelve a encolar
+      minutos-colgado: 15
+      periodo-sondeo-ms: 300000
+
+supabase:
+  url: https://ikyjurujfxpazygwloja.supabase.co
+  service-role-key: ${SUPABASE_SERVICE_ROLE_KEY:}
+
+# Configuración propia del módulo de reclutamiento
+app:
+  archivos:
+    # Dónde se guardan los CV en disco. En producción apunta a un volumen propio.
+    ruta: ${ARCHIVOS_RUTA:./almacen-archivos}
+  seguridad:
+    # Clave HMAC para firmar los tokens. Va en application-secrets.yaml (no se versiona)
+    # o por variable de entorno. Mínimo 32 bytes; sin ella la aplicación no arranca.
+    jwt-secreto: ${JWT_SECRETO:}
+    # Cuánto vive un token de candidato y uno del equipo (en minutos)
+    minutos-token-candidato: 120
+    minutos-token-equipo: 480

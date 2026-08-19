@@ -1,0 +1,29 @@
+{
+  "ok": true,
+  "reviewed_by": "independent-final-visual-qa-worker",
+  "directions": [
+    {"direction":"000","verdict":"pass","expected":"up","observed":"frontal up gaze","horizontal_evidence":"no horizontal axis required","vertical_evidence":"both complete eyes and pupils sit unmistakably high","reason":"matches the approved up cardinal and blind hard gate"},
+    {"direction":"022.5","verdict":"warning","expected":"up-right","observed":"strong up with subtle right lead","horizontal_evidence":"blind majority was ambiguous; labeled head and eye motion begin toward screen-right","vertical_evidence":"blind majority confirms up","reason":"near-cardinal horizontal cue is subtle but the ordered loop advances right"},
+    {"direction":"045","verdict":"warning","expected":"up-right","observed":"right-turning face with restrained up cue","horizontal_evidence":"blind majority confirms screen-right","vertical_evidence":"blind majority was ambiguous; labeled eyes remain above center","reason":"vertical cue is subtle without a wrong quadrant or reversal"},
+    {"direction":"067.5","verdict":"warning","expected":"up-right","observed":"clear right profile with a subtle high gaze","horizontal_evidence":"blind majority confirms screen-right","vertical_evidence":"blind majority was ambiguous; labeled eye remains high in transition","reason":"vertical cue is subtle but motion continues correctly into 090"},
+    {"direction":"090","verdict":"pass","expected":"right","observed":"unmistakable screen-right profile","horizontal_evidence":"mint inner ear is on screen-left and cream eye construction on screen-right; blind hard gate passes","vertical_evidence":"no vertical axis required","reason":"matches approved right cardinal"},
+    {"direction":"112.5","verdict":"warning","expected":"down-right","observed":"clear right profile with subtle downward transition","horizontal_evidence":"blind majority confirms screen-right","vertical_evidence":"blind majority was ambiguous; labeled sequence begins descending","reason":"subtle vertical cue without reversal"},
+    {"direction":"135","verdict":"warning","expected":"down-right","observed":"right profile progressing toward a bowed face","horizontal_evidence":"blind majority confirms screen-right","vertical_evidence":"blind majority was ambiguous; labeled head arc descends toward 157.5","reason":"vertical cue is restrained but the ordered loop remains cohesive"},
+    {"direction":"157.5","verdict":"warning","expected":"down-right","observed":"strong down gaze with a subtle residual right-hand arc","horizontal_evidence":"blind majority was ambiguous","vertical_evidence":"blind majority confirms down","reason":"one step before 180, the horizontal component is intentionally subtle"},
+    {"direction":"180","verdict":"pass","expected":"down","observed":"frontal bowed down gaze","horizontal_evidence":"no horizontal axis required","vertical_evidence":"both complete eyes sit low; blind hard gate confirms down","reason":"matches approved down cardinal"},
+    {"direction":"202.5","verdict":"pass","expected":"down-left","observed":"down gaze beginning a screen-left yaw","horizontal_evidence":"blind majority confirms screen-left","vertical_evidence":"blind majority confirms down","reason":"both axes are readable"},
+    {"direction":"225","verdict":"pass","expected":"down-left","observed":"clear down-left face and eye orientation","horizontal_evidence":"blind majority confirms screen-left","vertical_evidence":"blind majority confirms down","reason":"both axes are readable"},
+    {"direction":"247.5","verdict":"warning","expected":"down-left","observed":"strong left profile with a restrained low gaze","horizontal_evidence":"blind majority confirms screen-left","vertical_evidence":"blind majority was ambiguous; labeled eye remains below the 270 position","reason":"vertical cue is subtle without wrong-quadrant motion"},
+    {"direction":"270","verdict":"pass","expected":"left","observed":"unmistakable screen-left profile","horizontal_evidence":"cream eye construction occupies screen-left and mint inner ear is on screen-right; blind hard gate passes","vertical_evidence":"no vertical axis required","reason":"matches approved left cardinal"},
+    {"direction":"292.5","verdict":"pass","expected":"up-left","observed":"left profile beginning to lift","horizontal_evidence":"blind majority confirms screen-left","vertical_evidence":"blind majority confirms up","reason":"both axes are readable"},
+    {"direction":"315","verdict":"warning","expected":"up-left","observed":"upward gaze with a left-turning head silhouette","horizontal_evidence":"blind majority called screen-right, but labeled normal-size view retains the 270 family's mint ear on screen-right and eye construction left of the head center","vertical_evidence":"blind majority confirms up","reason":"blind horizontal disagreement is minor because the labeled silhouette stays in the left pose family and the loop does not reverse"},
+    {"direction":"337.5","verdict":"warning","expected":"up-left","observed":"strong up gaze with subtle residual left head orientation","horizontal_evidence":"blind majority was ambiguous; labeled ear/cheek construction remains on the left-hand arc","vertical_evidence":"blind majority confirms up","reason":"near-cardinal horizontal cue is subtle one step before 000"}
+  ],
+  "failures": [],
+  "review_warnings": [
+    "Intermediate blind-axis uncertainty is retained as warning evidence; all four cardinals pass and labeled loop review finds no wrong quadrant or reversal.",
+    "Continuity metric outliers are accepted because normal-size playback has no visible snap, reversal, identity change, or broken attachment.",
+    "Stable-slots extraction warnings are accepted after independent GIF playback review."
+  ],
+  "independent_visual_qa": "pass"
+}

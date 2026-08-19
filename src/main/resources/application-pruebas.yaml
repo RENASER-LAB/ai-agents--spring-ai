@@ -1,0 +1,43 @@
+# El entorno de Pruebas: la aplicación en Render, la base en Supabase y la cola en
+# CloudAMQP. Se activa con SPRING_PROFILES_ACTIVE=pruebas.
+#
+# Aquí solo está lo que cambia respecto del desarrollo local. Los valores sensibles
+# llegan por variables de entorno de Render (la lista completa está en docs/CI-CD.md);
+# los que no tienen valor por defecto son obligatorios a propósito: si faltan, la
+# aplicación no arranca y lo dice, en vez de arrancar apuntando a localhost.
+
+server:
+  # El puerto lo decide Render y lo pasa en PORT
+  port: ${PORT:8080}
+
+spring:
+  datasource:
+    # La cadena DIRECTA de Supabase (puerto 5432), no la del pooler (6543): el pooler
+    # en modo transacción no mantiene la sesión y rompe las migraciones de Flyway.
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+
+  flyway:
+    # El `true` global existe por la historia de la base LOCAL: agent_run ya existía
+    # antes de adoptar Flyway. Aquí sería peligroso: si el esquema no está vacío —la
+    # extensión vector ya deja rastro—, Flyway marcaría V1 como punto de partida SIN
+    # ejecutarla, agent_run no se crearía y la aplicación no arrancaría (ddl-auto:
+    # validate). Tras el primer despliegue se comprueba en flyway_schema_history que
+    # la V1 aparezca ejecutada, no como baseline.
+    baseline-on-migrate: false
+
+  jpa:
+    # Imprimir cada SQL es ruido, y en un entorno remoto además se paga
+    show-sql: false
+
+  rabbitmq:
+    # CloudAMQP va con TLS por el 5671, no el 5672 plano del compose local
+    host: ${RABBITMQ_HOST}
+    port: ${RABBITMQ_PORT:5671}
+    username: ${RABBITMQ_USERNAME}
+    password: ${RABBITMQ_PASSWORD}
+    # En CloudAMQP el vhost lleva el nombre del usuario, no «/»
+    virtual-host: ${RABBITMQ_VHOST}
+    ssl:
+      enabled: true

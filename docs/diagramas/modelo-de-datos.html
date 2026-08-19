@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Modelo de datos</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --color-paper:   #f5f5f3;
+      --color-ink:     #0d0d0d;
+      --color-muted:   #70706b;
+      --color-accent:  #a43b36;
+      --font-sans:     'Geist', system-ui, sans-serif;
+      --font-serif:    'Instrument Serif', serif;
+      --font-mono:     'Geist Mono', ui-monospace, monospace;
+    }
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-paper);
+      color: var(--color-ink);
+      min-height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+      padding: 3rem 2rem;
+    }
+    .frame { max-width: 1200px; width: 100%; }
+    .eyebrow {
+      font-family: var(--font-mono); font-size: 0.66rem; font-weight: 500;
+      letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--color-muted); margin-bottom: 0.5rem;
+    }
+    h1 {
+      font-family: var(--font-serif);
+      font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem);
+      font-weight: 400; letter-spacing: -0.02em; line-height: 1.15;
+      color: var(--color-ink); margin-bottom: 0.5rem;
+    }
+    .sub {
+      font-size: 0.9rem; color: var(--color-muted);
+      margin-bottom: 1.5rem; max-width: 70ch; line-height: 1.5;
+    }
+    svg { width: 100%; min-width: 900px; display: block; }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Modelo de datos · Sistema de selección RENASER · v2.0</p>
+    <h1>El mapa de la base de datos</h1>
+    <p class="sub">Noventa y tres tablas agrupadas por área. No hay una tabla de candidatos: un candidato es un <strong>usuario</strong> que postuló, y sus datos personales viven en <strong>persona</strong>, la misma tabla que usa el equipo de Renaser. Toda entidad de negocio pertenece además a una <strong>organización</strong>.</p>
+
+    <svg viewBox="0 60 1200 760" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="modelo-title modelo-desc">
+      <title id="modelo-title">Modelo de datos del sistema de selección</title>
+      <desc id="modelo-desc">Mapa de las áreas de la base de datos y cómo se relacionan. Arriba, la fila que configura: la Solicitud de Talento da origen a la vacante, y el banco de preguntas con sus plantillas y la configuración de pesos alimentan la evaluación. Abajo, la fila que ejecuta: personas y consentimiento, la postulación como núcleo, las etapas con sus notas, y el perfil de talento con la decisión final. Las respuestas de la evaluación cuelgan del usuario y no de la postulación, para poder reutilizarse cuando la familia de trabajo es afín. Dos bandas transversales recogen los agentes de inteligencia artificial con la auditoría, y las dos piezas que no se construyen aquí: el Radar de Talento, pendiente, y RENASER OS, que es otro servicio.</desc>
+      <defs>
+        <marker id="arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#70706b"/></marker>
+        <marker id="arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#a43b36"/></marker>
+      </defs>
+
+      <rect width="100%" height="100%" fill="#f5f5f3"/>
+
+      <!-- ============================ CONECTORES (antes que las cajas) ============================ -->
+
+      <!-- 1 · Solicitud -> Vacantes  (horizontal, fila 1) -->
+      <line x1="272" y1="164" x2="330" y2="164" stroke="#70706b" stroke-width="1" marker-end="url(#arrow)"/>
+
+      <!-- 2 · Vacantes -> Postulacion  (vertical, columna 2) -->
+      <line x1="452" y1="232" x2="452" y2="322" stroke="#70706b" stroke-width="1" marker-end="url(#arrow)"/>
+
+      <!-- 3 · Personas -> Postulacion  (horizontal, fila 2) -->
+      <line x1="272" y1="404" x2="330" y2="404" stroke="#a43b36" stroke-width="1.2" marker-end="url(#arrow-accent)"/>
+
+      <!-- 4 · Postulacion -> Etapas  (horizontal, fila 2) -->
+      <line x1="568" y1="404" x2="626" y2="404" stroke="#a43b36" stroke-width="1.2" marker-end="url(#arrow-accent)"/>
+
+      <!-- 5 · Etapas -> Perfil y decision  (horizontal, fila 2) -->
+      <line x1="864" y1="404" x2="922" y2="404" stroke="#70706b" stroke-width="1" marker-end="url(#arrow)"/>
+
+      <!-- 6 · Banco y plantillas -> Etapas  (vertical, columna 3) -->
+      <line x1="748" y1="232" x2="748" y2="322" stroke="#70706b" stroke-width="1" marker-end="url(#arrow)"/>
+
+      <!-- 7 · Configuracion -> Perfil y decision  (vertical, columna 4) -->
+      <line x1="1044" y1="232" x2="1044" y2="322" stroke="#70706b" stroke-width="1" marker-end="url(#arrow)"/>
+
+      <!-- 8 · Personas -> Etapas (codo por debajo: la evaluacion cuelga del usuario) -->
+      <path d="M 156 480 L 156 500 Q 156 508 164 508 L 740 508 Q 748 508 748 500 L 748 486"
+            fill="none" stroke="#a43b36" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#arrow-accent)"/>
+
+      <!-- ============================ ETIQUETAS DE CONECTOR ============================ -->
+
+      <rect x="276" y="144" width="52" height="12" rx="2" fill="#f5f5f3"/>
+      <text x="302" y="153" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">ORIGEN</text>
+
+      <rect x="460" y="266" width="36" height="12" rx="2" fill="#f5f5f3"/>
+      <text x="478" y="275" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">1 : N</text>
+
+      <rect x="280" y="384" width="48" height="12" rx="2" fill="#f5f5f3"/>
+      <text x="304" y="393" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">POSTULA</text>
+
+      <rect x="580" y="384" width="40" height="12" rx="2" fill="#f5f5f3"/>
+      <text x="600" y="393" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">AVANZA</text>
+
+      <rect x="872" y="384" width="48" height="12" rx="2" fill="#f5f5f3"/>
+      <text x="896" y="393" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">4 NOTAS</text>
+
+      <rect x="756" y="266" width="76" height="12" rx="2" fill="#f5f5f3"/>
+      <text x="794" y="275" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">VERSIÓN FIJA</text>
+
+      <rect x="1052" y="266" width="44" height="12" rx="2" fill="#f5f5f3"/>
+      <text x="1074" y="275" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">PESOS</text>
+
+      <rect x="416" y="488" width="72" height="12" rx="2" fill="#f5f5f3"/>
+      <text x="452" y="497" fill="#a43b36" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.06em">SE REUTILIZA</text>
+
+      <!-- ============================ CAJAS · FILA 1 · LO QUE CONFIGURA ============================ -->
+
+      <!-- Solicitud de Talento -->
+      <rect x="40" y="96" width="232" height="136" rx="6" fill="#f5f5f3"/>
+      <rect x="40" y="96" width="232" height="136" rx="6" fill="#ffffff" stroke="#0d0d0d" stroke-width="1"/>
+      <line x1="40" y1="132" x2="272" y2="132" stroke="rgba(13,13,13,0.12)" stroke-width="0.8"/>
+      <rect x="52" y="108" width="46" height="12" rx="2" fill="none" stroke="rgba(13,13,13,0.35)" stroke-width="0.8"/>
+      <text x="75" y="117" fill="#70706b" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">ORIGEN</text>
+      <text x="106" y="121" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif">Solicitud de Talento</text>
+      <text x="52" y="152" fill="#70706b" font-size="9" font-family="'Geist Mono', monospace">solicitud_talento</text>
+      <text x="52" y="168" fill="#70706b" font-size="9" font-family="'Geist Mono', monospace">resultado_esperado</text>
+      <text x="52" y="184" fill="#70706b" font-size="9" font-family="'Geist Mono', monospace">evidencia_necesidad</text>
+      <text x="52" y="204" fill="#0d0d0d" font-size="8" font-family="'Geist', sans-serif" font-style="italic">ninguna vacante existe sin</text>
+      <text x="52" y="218" fill="#0d0d0d" font-size="8" font-family="'Geist', sans-serif" font-style="italic">una solicitud detrás</text>
+
+      <!-- Vacantes -->
+      <rect x="336" y="96" width="232" height="136" rx="6" fill="#f5f5f3"/>
+      <rect x="336" y="96" width="232" height="136" rx="6" fill="#ffffff" stroke="#0d0d0d" stroke-width="1"/>
+      <line x1="336" y1="132" x2="568" y2="132" stroke="rgba(13,13,13,0.12)" stroke-width="0.8"/>
+      <rect x="348" y="108" width="60" height="12" rx="2" fill="none" stroke="rgba(13,13,13,0.35)" stroke-width="0.8"/>
+      <text x="378" y="117" fill="#70706b" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">MAESTRO</text>
+      <text x="416" y="121" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif">Vacantes</text>
+      <text x="348" y="152" fill="#70706b" font-size="9" font-family="'Geist Mono', monospace">nivel_puesto · familia</text>
+      <text x="348" y="168" fill="#70706b" font-size="9" font-family="'Geist Mono', monospace">puesto · vacante</text>
+      <text x="348" y="184" fill="#70706b" font-size="9" font-family="'Geist Mono', monospace">requisito_objetivo</text>
+      <text x="348" y="200" fill="#70706b" font-size="9" font-family="'Geist Mono', monospace">barrera_critica</text>
+      <text x="348" y="220" fill="#0d0d0d" font-size="8" font-family="'Geist', sans-serif" font-style="italic">la familia decide qué preguntas</text>
+
+      <!-- Banco y plantillas -->
+      <rect x="632" y="96" width="232" height="136" rx="6" fill="#f5f5f3"/>
+      <rect x="632" y="96" width="232" height="136" rx="6" fill="rgba(13,13,13,0.04)" stroke="rgba(13,13,13,0.30)" stroke-width="1"/>
+      <line x1="632" y1="132" x2="864" y2="132" stroke="rgba(13,13,13,0.12)" stroke-width="0.8"/>
+      <rect x="644" y="108" width="68" height="12" rx="2" fill="none" stroke="rgba(13,13,13,0.35)" stroke-width="0.8"/>
+      <text x="678" y="117" fill="#70706b" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">VERSIONADO</text>
+      <text x="720" y="121" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif">Banco y plantillas</text>
+      <text x="644" y="152" fill="#70706b" font-size="9" font-family="'Geist Mono', monospace">version_banco</text>
+      <text x="644" y="168" fill="#70706b" font-size="9" font-family="'Geist Mono', monospace">pregunta · opcion</text>
+      <text x="644" y="184" fill="#70706b" font-size="9" font-family="'Geist Mono', monospace">dimension</text>
+      <text x="644" y="200" fill="#70706b" font-size="9" font-family="'Geist Mono', monospace">plantilla_evaluacion</text>
+      <text x="644" y="220" fill="#0d0d0d" font-size="8" font-family="'Geist', sans-serif" font-style="italic">el banco no es el examen</text>
+
+      <!-- Configuracion -->
+      <rect x="928" y="96" width="232" height="136" rx="6" fill="#f5f5f3"/>
+      <rect x="928" y="96" width="232" height="136" rx="6" fill="rgba(13,13,13,0.04)" stroke="rgba(13,13,13,0.30)" stroke-width="1"/>
+      <line x1="928" y1="132" x2="1160" y2="132" stroke="rgba(13,13,13,0.12)" stroke-width="0.8"/>
+      <rect x="940" y="108" width="68" height="12" rx="2" fill="none" stroke="rgba(13,13,13,0.35)" stroke-width="0.8"/>
+      <text x="974" y="117" fill="#70706b" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">VERSIONADO</text>
+      <text x="1016" y="121" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif">Configuración</text>
+      <text x="940" y="152" fill="#70706b" font-size="9" font-family="'Geist Mono', monospace">version_pesos</text>
+      <text x="940" y="168" fill="#70706b" font-size="9" font-family="'Geist Mono', monospace">peso_etapa · parametro</text>
+      <text x="940" y="184" fill="#70706b" font-size="9" font-family="'Geist Mono', monospace">plantilla_correo</text>
+      <text x="940" y="200" fill="#70706b" font-size="9" font-family="'Geist Mono', monospace">instruccion_ia</text>
+      <text x="940" y="220" fill="#0d0d0d" font-size="8" font-family="'Geist', sans-serif" font-style="italic">publicada nunca se modifica</text>
+
+      <!-- ============================ CAJAS · FILA 2 · LO QUE EJECUTA ============================ -->
+
+      <!-- Personas y consentimiento -->
+      <rect x="40" y="328" width="232" height="152" rx="6" fill="#f5f5f3"/>
+      <rect x="40" y="328" width="232" height="152" rx="6" fill="rgba(112,112,107,0.10)" stroke="#70706b" stroke-width="1"/>
+      <line x1="40" y1="364" x2="272" y2="364" stroke="rgba(13,13,13,0.12)" stroke-width="0.8"/>
+      <rect x="52" y="340" width="60" height="12" rx="2" fill="none" stroke="rgba(13,13,13,0.35)" stroke-width="0.8"/>
+      <text x="82" y="349" fill="#70706b" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">LEY 29733</text>
+      <text x="120" y="353" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif">Personas y acceso</text>
+      <text x="52" y="384" fill="#70706b" font-size="9" font-family="'Geist Mono', monospace">persona · usuario · area</text>
+      <text x="52" y="400" fill="#70706b" font-size="9" font-family="'Geist Mono', monospace">rol · permiso</text>
+      <text x="52" y="416" fill="#70706b" font-size="9" font-family="'Geist Mono', monospace">texto_consentimiento</text>
+      <text x="52" y="432" fill="#70706b" font-size="9" font-family="'Geist Mono', monospace">politica_conservacion</text>
+      <text x="52" y="452" fill="#0d0d0d" font-size="8" font-family="'Geist', sans-serif" font-style="italic">un candidato es un usuario</text>
+      <text x="52" y="466" fill="#0d0d0d" font-size="8" font-family="'Geist', sans-serif" font-style="italic">más. No hay tabla aparte</text>
+
+      <!-- Postulacion · FOCAL -->
+      <rect x="336" y="328" width="232" height="152" rx="6" fill="#f5f5f3"/>
+      <rect x="336" y="328" width="232" height="152" rx="6" fill="rgba(164,59,54,0.07)" stroke="#a43b36" stroke-width="1.2"/>
+      <line x1="336" y1="364" x2="568" y2="364" stroke="rgba(164,59,54,0.25)" stroke-width="0.8"/>
+      <rect x="348" y="340" width="52" height="12" rx="2" fill="none" stroke="rgba(164,59,54,0.45)" stroke-width="0.8"/>
+      <text x="374" y="349" fill="#a43b36" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">NÚCLEO</text>
+      <text x="408" y="353" fill="#a43b36" font-size="12" font-weight="600" font-family="'Geist', sans-serif">Postulación</text>
+      <text x="348" y="384" fill="#70706b" font-size="9" font-family="'Geist Mono', monospace">postulacion</text>
+      <text x="348" y="400" fill="#70706b" font-size="9" font-family="'Geist Mono', monospace">estado_postulacion</text>
+      <text x="348" y="416" fill="#70706b" font-size="9" font-family="'Geist Mono', monospace">transicion_estado</text>
+      <text x="348" y="436" fill="#0d0d0d" font-size="8" font-family="'Geist', sans-serif" font-style="italic">18 estados · uno a la vez</text>
+      <text x="348" y="450" fill="#0d0d0d" font-size="8" font-family="'Geist', sans-serif" font-style="italic">el grupo de prioridad ordena</text>
+      <text x="348" y="464" fill="#0d0d0d" font-size="8" font-family="'Geist', sans-serif" font-style="italic">el trabajo humano</text>
+
+      <!-- Etapas y notas -->
+      <rect x="632" y="328" width="232" height="152" rx="6" fill="#f5f5f3"/>
+      <rect x="632" y="328" width="232" height="152" rx="6" fill="#ffffff" stroke="#0d0d0d" stroke-width="1"/>
+      <line x1="632" y1="364" x2="864" y2="364" stroke="rgba(13,13,13,0.12)" stroke-width="0.8"/>
+      <rect x="644" y="340" width="68" height="12" rx="2" fill="none" stroke="rgba(13,13,13,0.35)" stroke-width="0.8"/>
+      <text x="678" y="349" fill="#70706b" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">EVALUACIÓN</text>
+      <text x="720" y="353" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif">Etapas y notas</text>
+      <text x="644" y="384" fill="#70706b" font-size="9" font-family="'Geist Mono', monospace">cv · evaluacion</text>
+      <text x="644" y="400" fill="#70706b" font-size="9" font-family="'Geist Mono', monospace">respuesta · repregunta</text>
+      <text x="644" y="416" fill="#70706b" font-size="9" font-family="'Geist Mono', monospace">intento_prueba</text>
+      <text x="644" y="432" fill="#70706b" font-size="9" font-family="'Geist Mono', monospace">sesion_simulacion</text>
+      <text x="644" y="448" fill="#70706b" font-size="9" font-family="'Geist Mono', monospace">validacion · nota_etapa</text>
+      <text x="644" y="468" fill="#0d0d0d" font-size="8" font-family="'Geist', sans-serif" font-style="italic">toda nota guarda por qué y con qué versión</text>
+
+      <!-- Perfil y decision -->
+      <rect x="928" y="328" width="232" height="152" rx="6" fill="#f5f5f3"/>
+      <rect x="928" y="328" width="232" height="152" rx="6" fill="#ffffff" stroke="#0d0d0d" stroke-width="1"/>
+      <line x1="928" y1="364" x2="1160" y2="364" stroke="rgba(13,13,13,0.12)" stroke-width="0.8"/>
+      <rect x="940" y="340" width="52" height="12" rx="2" fill="none" stroke="rgba(13,13,13,0.35)" stroke-width="0.8"/>
+      <text x="966" y="349" fill="#70706b" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">CIERRE</text>
+      <text x="1000" y="353" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif">Perfil y decisión</text>
+      <text x="940" y="384" fill="#70706b" font-size="9" font-family="'Geist Mono', monospace">perfil_talento</text>
+      <text x="940" y="400" fill="#70706b" font-size="9" font-family="'Geist Mono', monospace">hallazgo_perfil</text>
+      <text x="940" y="416" fill="#70706b" font-size="9" font-family="'Geist Mono', monospace">barrera_detectada</text>
+      <text x="940" y="432" fill="#70706b" font-size="9" font-family="'Geist Mono', monospace">decision</text>
+      <text x="940" y="452" fill="#0d0d0d" font-size="8" font-family="'Geist', sans-serif" font-style="italic">verde · ámbar · rojo</text>
+      <text x="940" y="466" fill="#0d0d0d" font-size="8" font-family="'Geist', sans-serif" font-style="italic">sin datos · reserva</text>
+
+      <!-- ============================ ANOTACIÓN ============================ -->
+      <text x="800" y="528" fill="#0d0d0d" font-size="14" font-family="'Instrument Serif', serif" font-style="italic">La evaluación cuelga del usuario, no de la</text>
+      <text x="800" y="544" fill="#0d0d0d" font-size="14" font-family="'Instrument Serif', serif" font-style="italic">postulación. Se reutiliza si el puesto nuevo es</text>
+      <text x="800" y="560" fill="#0d0d0d" font-size="14" font-family="'Instrument Serif', serif" font-style="italic">de la misma familia, o de una afín, y sigue vigente.</text>
+
+      <!-- ============================ BANDA TRANSVERSAL ============================ -->
+      <rect x="40" y="592" width="1120" height="72" rx="6" fill="rgba(13,13,13,0.02)" stroke="rgba(13,13,13,0.28)" stroke-width="1" stroke-dasharray="4,4"/>
+      <rect x="56" y="606" width="76" height="12" rx="2" fill="none" stroke="rgba(13,13,13,0.35)" stroke-width="0.8"/>
+      <text x="94" y="615" fill="#70706b" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">TRANSVERSAL</text>
+      <text x="144" y="619" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif">Los nueve agentes de inteligencia artificial, y la auditoría</text>
+      <text x="56" y="640" fill="#70706b" font-size="9" font-family="'Geist Mono', monospace">agente · trabajo_ia · ejecucion_ia · auditoria · archivo · correo_enviado</text>
+      <text x="56" y="656" fill="#0d0d0d" font-size="8" font-family="'Geist', sans-serif" font-style="italic">Cada nota automática apunta a la ejecución que la produjo, con su versión de agente y su confianza. Ninguna de las dos se modifica ni se borra.</text>
+
+      <!-- ============================ LO QUE NO SE CONSTRUYE AQUÍ ============================ -->
+
+      <!-- Radar de Talento -->
+      <rect x="40" y="680" width="548" height="64" rx="6" fill="rgba(112,112,107,0.10)" stroke="#70706b" stroke-width="1"/>
+      <rect x="56" y="692" width="60" height="12" rx="2" fill="none" stroke="rgba(13,13,13,0.35)" stroke-width="0.8"/>
+      <text x="86" y="701" fill="#70706b" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">PENDIENTE</text>
+      <text x="126" y="705" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif">Radar de Talento</text>
+      <text x="56" y="724" fill="#70706b" font-size="9" font-family="'Geist Mono', monospace">prospecto · prospecto_familia · contacto_prospecto</text>
+      <text x="56" y="738" fill="#0d0d0d" font-size="8" font-family="'Geist', sans-serif" font-style="italic">Se modela ahora y se construye después. Es donde pgvector encuentra su uso.</text>
+
+      <!-- RENASER OS -->
+      <rect x="612" y="680" width="548" height="64" rx="6" fill="none" stroke="#70706b" stroke-width="1" stroke-dasharray="2,3"/>
+      <rect x="628" y="692" width="46" height="12" rx="2" fill="none" stroke="rgba(13,13,13,0.35)" stroke-width="0.8"/>
+      <text x="651" y="701" fill="#70706b" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">FUERA</text>
+      <text x="684" y="705" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif">RENASER OS</text>
+      <text x="628" y="724" fill="#70706b" font-size="9" font-family="'Geist Mono', monospace">identidad del equipo · tareas y tiempos · desempeño 30/90/180</text>
+      <text x="628" y="738" fill="#0d0d0d" font-size="8" font-family="'Geist', sans-serif" font-style="italic">Otro servicio, por HTTP. No comparte base: su identificador va suelto, sin clave foránea.</text>
+
+      <!-- ============================ LEYENDA ============================ -->
+      <line x1="40" y1="772" x2="1160" y2="772" stroke="rgba(13,13,13,0.10)" stroke-width="0.8"/>
+      <text x="40" y="794" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em">LEYENDA</text>
+
+      <rect x="140" y="784" width="12" height="12" rx="2" fill="rgba(164,59,54,0.07)" stroke="#a43b36" stroke-width="1"/>
+      <text x="160" y="794" fill="#70706b" font-size="9" font-family="'Geist', sans-serif">Núcleo del modelo</text>
+
+      <rect x="300" y="784" width="12" height="12" rx="2" fill="rgba(13,13,13,0.04)" stroke="rgba(13,13,13,0.30)" stroke-width="1"/>
+      <text x="320" y="794" fill="#70706b" font-size="9" font-family="'Geist', sans-serif">Versionado</text>
+
+      <rect x="420" y="784" width="12" height="12" rx="2" fill="rgba(112,112,107,0.10)" stroke="#70706b" stroke-width="1"/>
+      <text x="440" y="794" fill="#70706b" font-size="9" font-family="'Geist', sans-serif">Datos personales</text>
+
+      <rect x="570" y="784" width="12" height="12" rx="2" fill="rgba(13,13,13,0.02)" stroke="rgba(13,13,13,0.28)" stroke-width="1" stroke-dasharray="3,3"/>
+      <text x="590" y="794" fill="#70706b" font-size="9" font-family="'Geist', sans-serif">Toca todas las áreas</text>
+
+      <rect x="740" y="784" width="12" height="12" rx="2" fill="none" stroke="#70706b" stroke-width="1" stroke-dasharray="2,3"/>
+      <text x="760" y="794" fill="#70706b" font-size="9" font-family="'Geist', sans-serif">Fuera de este sistema</text>
+
+      <line x1="910" y1="790" x2="942" y2="790" stroke="#a43b36" stroke-width="1.2" stroke-dasharray="5,4"/>
+      <text x="950" y="794" fill="#70706b" font-size="9" font-family="'Geist', sans-serif">Se reutiliza entre postulaciones</text>
+    </svg>
+  </div>
+</body>
+</html>

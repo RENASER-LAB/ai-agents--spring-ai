@@ -1,0 +1,14 @@
+# Avisa con un PR cuando una dependencia tiene versión nueva o una vulnerabilidad
+# conocida. No fusiona nada solo: el PR pasa por el mismo CI que cualquier cambio.
+version: 2
+updates:
+  - package-ecosystem: maven
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

@@ -1,0 +1,154 @@
+{
+  "_lea_esto": [
+    "Las convocatorias que se pueden cargar. Una por clave.",
+    "",
+    "El texto de 'titulo', 'proposito', 'responsabilidades' y 'requisitos' es lo que la IA",
+    "lee como «qué busca este puesto»: se le manda pegado, tal cual está aquí. Cambiarlo",
+    "cambia las notas, así que se copia el anuncio real y no un resumen.",
+    "",
+    "'nivelPuestoCodigo' decide el peso de los ocho criterios del currículum:",
+    "  DIRECCION   · pesan más los resultados (25) y la complejidad (15)",
+    "  SUPERVISION · pesan más los sistemas creados y el desarrollo de personas (15 cada uno)",
+    "  EJECUCION   · pesan más las habilidades del puesto (25) y el aprendizaje (15);",
+    "                el desarrollo de personas vale 0",
+    "No es un detalle de catálogo: es la diferencia entre dos rankings distintos.",
+    "",
+    "'familiaCodigo' sale del catálogo sembrado: DIRECCION_NEGOCIO, OPERACIONES,",
+    "CRECIMIENTO, TECNOLOGIA, CREATIVO, TALENTO, SEGURIDAD_CRITICA.",
+    "",
+    "'carpetaDrive' es donde viven los currículums de esa convocatoria. La pantalla no los",
+    "sirve: solo enseña el nombre del archivo y un enlace a la carpeta, y quien tenga acceso",
+    "a esa carpeta lo abre. Así el control de quién ve un CV sigue siendo el de Drive, que",
+    "es el que ya existe, y no hay una segunda copia por ahí con sus propios permisos."
+  ],
+  "talento": {
+    "area": "Talento",
+    "puesto": {
+      "codigo": "TALENTO_ESP",
+      "nombre": "Especialista en Gestión del Talento",
+      "nivelPuestoCodigo": "SUPERVISION",
+      "familiaCodigo": "TALENTO"
+    },
+    "solicitud": {
+      "urgencia": "PRIORITARIA",
+      "resultadoPrincipal": "Un sistema de gestión del talento que funcione sin depender de quien lo armó",
+      "motivo": "Hoy la selección se lleva a mano y no hay forma de comparar a dos candidatos con el mismo criterio",
+      "consecuenciaNoContratar": "Seguimos contratando por impresión y perdiendo a la gente buena en el primer año",
+      "analisisCapacidad": "Se evaluó repartir el trabajo entre las áreas: nadie tiene horas ni criterio formado para diseñar el sistema entero.",
+      "resultadosEsperados": [
+        {
+          "descripcion": "Proceso de selección completo y documentado",
+          "indicador": "cada etapa con su criterio escrito"
+        },
+        {
+          "descripcion": "Indicadores de talento en marcha",
+          "indicador": "tablero revisado cada mes"
+        },
+        {
+          "descripcion": "Seguimiento de la integración de quien entra",
+          "indicador": "medición a los 30, 90 y 180 días"
+        }
+      ]
+    },
+    "vacante": {
+      "titulo": "Especialista en Gestión del Talento",
+      "descripcion": "Construcción de equipos de alto rendimiento. En RENASER no creemos que una empresa crezca porque contrata más personas: creemos que crece porque incorpora a las personas correctas. Buscamos a quien diseñe y construya nuestro sistema de gestión del talento. No será un puesto administrativo: será una posición estratégica con impacto directo en el crecimiento de la organización.",
+      "proposito": "Diseñar un sistema capaz de atraer, seleccionar, desarrollar y retener personas extraordinarias. No buscamos cubrir vacantes: buscamos construir equipos de alto rendimiento.",
+      "responsabilidades": "Diseñar y mejorar el proceso completo de selección. Identificar talento de alto potencial. Crear pruebas y sistemas de evaluación. Realizar entrevistas por competencias. Medir desempeño durante la integración. Diseñar procesos de desarrollo y crecimiento. Construir indicadores de talento. Proteger y fortalecer la cultura organizacional. Participar en proyectos relacionados con talento interno y soluciones para clientes cuando corresponda.",
+      "requisitos": "Experiencia en selección, talento humano o desarrollo organizacional. Excelente redacción y comunicación. Capacidad analítica. Manejo de herramientas digitales e inteligencia artificial. Disponibilidad para trabajar de manera presencial en Arequipa. Buscamos a alguien que tome decisiones basadas en criterio y evidencia, sea extremadamente organizado, tenga pensamiento estratégico, sea capaz de detectar potencial donde otros solo ven un CV, disfrute construir procesos desde cero, sea exigente consigo mismo y con los estándares de calidad, y utilice herramientas de IA para trabajar con mayor eficiencia. No es para quien busca únicamente estabilidad, necesita supervisión constante, evita asumir responsabilidades, se incomoda con los retos o el cambio, o espera hacer únicamente tareas administrativas.",
+      "modalidad": "PRESENCIAL",
+      "ubicacion": "Arequipa",
+      "tipoCierre": "PERMANENTE",
+      "plazas": 1
+    },
+    "carpetaDrive": "https://drive.google.com/drive/folders/1rmctP8znXcaPcXCMpOsHnRtMCrblzSUw"
+  },
+  "asistente-admin": {
+    "area": "Administración",
+    "puesto": {
+      "codigo": "ADMIN_ASIST",
+      "nombre": "Asistente Administrativo",
+      "nivelPuestoCodigo": "EJECUCION",
+      "familiaCodigo": "OPERACIONES"
+    },
+    "solicitud": {
+      "urgencia": "NORMAL",
+      "resultadoPrincipal": "Que ningún pendiente administrativo se quede sin cerrar ni sin dueño",
+      "motivo": "El seguimiento de tareas, controles e incidencias hoy depende de que alguien se acuerde",
+      "consecuenciaNoContratar": "Los pendientes se acumulan, los reportes llegan tarde y los errores se detectan cuando ya costaron dinero",
+      "analisisCapacidad": "Se evaluó repartir el seguimiento entre las áreas: cada una atiende lo suyo y nadie mira el conjunto, que es justo donde se pierden las cosas.",
+      "resultadosEsperados": [
+        {
+          "descripcion": "Pendientes cerrados dentro del plazo",
+          "indicador": "ninguno abierto más de lo acordado"
+        },
+        {
+          "descripcion": "Reportes e indicadores al día",
+          "indicador": "entregados antes de que se pidan"
+        },
+        {
+          "descripcion": "Procesos repetitivos documentados",
+          "indicador": "checklist escrita por cada uno"
+        }
+      ]
+    },
+    "vacante": {
+      "titulo": "Asistente Administrativo",
+      "descripcion": "No buscamos únicamente experiencia. Buscamos capacidad, criterio y ejecución. Si puedes demostrar que mejoras aquello que administras, queremos conocerte. Ofrecemos aprendizaje acelerado, exposición a decisiones y procesos reales de negocio, oportunidad de asumir mayores responsabilidades, desarrollo profesional según desempeño, y un entorno exigente y orientado a resultados.",
+      "proposito": "Asegurar que información, tareas, controles y pendientes administrativos sean ejecutados con rapidez, precisión y seguimiento hasta el cierre.",
+      "responsabilidades": "Dar seguimiento a tareas y responsabilidades. Actualizar indicadores y reportes. Verificar información y detectar inconsistencias. Organizar documentación administrativa. Documentar procesos y elaborar checklists. Apoyar controles internos. Coordinar actividades entre áreas. Registrar y hacer seguimiento de incidencias. Preparar información para Administración y Gerencia. Asegurar el cierre de pendientes. Proponer mejoras en tareas repetitivas.",
+      "requisitos": "Bachilleres o titulados de Administración, Finanzas, Economía, Ingeniería Industrial, Contabilidad y afines. Deseable con experiencia en sector financiero, banca, tesorería, operaciones o negocios con alto nivel de control. Manejo de herramientas de Microsoft Office o Google Workspace. Deseable conocimiento en elaboración de procesos, protocolos o mejora continua. Competencias conductuales: orden, rapidez, iniciativa, atención al detalle, capacidad numérica, responsabilidad, confidencialidad, seguimiento, proactividad, capacidad de aprendizaje, resolución de problemas y orientación a resultados. Reporta directamente a Administración, con evaluación permanente según desempeño y resultados.",
+      "modalidad": "PRESENCIAL",
+      "ubicacion": "Lima",
+      "horario": "Tiempo completo",
+      "tipoCierre": "PERMANENTE",
+      "plazas": 1,
+      "cierraEn": "2026-08-15T23:59:59Z"
+    },
+    "carpetaDrive": "https://drive.google.com/drive/folders/1ZzerUNS5_ZKQdhW_jjlRpWEEVxQpZLoK"
+  },
+  "administrador": {
+    "area": "Administración",
+    "puesto": {
+      "codigo": "ADMIN_JEFE",
+      "nombre": "Administrador",
+      "nivelPuestoCodigo": "SUPERVISION",
+      "familiaCodigo": "OPERACIONES"
+    },
+    "solicitud": {
+      "urgencia": "PRIORITARIA",
+      "resultadoPrincipal": "Una operación que funcione con procesos e indicadores, sin depender de Gerencia",
+      "motivo": "Hoy los errores y los cuellos de botella se detectan cuando ya escalaron, y cada decisión operativa termina en Gerencia",
+      "consecuenciaNoContratar": "Gerencia sigue resolviendo lo que debería resolverse abajo, y los reprocesos y la dependencia crecen con el volumen",
+      "analisisCapacidad": "Se evaluó repartir la supervisión entre los responsables de cada área: ninguno tiene mando sobre el conjunto, que es donde están los cuellos de botella.",
+      "resultadosEsperados": [
+        {
+          "descripcion": "Procesos e indicadores implantados",
+          "indicador": "cada proceso con su checklist y su medición"
+        },
+        {
+          "descripcion": "Menos errores y reprocesos",
+          "indicador": "reducción medible respecto del trimestre anterior"
+        },
+        {
+          "descripcion": "Menos decisiones operativas escaladas a Gerencia",
+          "indicador": "las que suben son solo las que le tocan"
+        }
+      ]
+    },
+    "vacante": {
+      "titulo": "Administrador",
+      "descripcion": "No buscamos un administrador tradicional. Buscamos una persona capaz de tomar control de la operación, liderar personas, crear procesos, implementar indicadores y mejorar resultados de forma medible. Ofrecemos una posición con impacto real dentro de la organización, autonomía para implementar mejoras, contacto directo con Gerencia, oportunidad de liderar procesos de transformación, desarrollo profesional basado en resultados y un entorno exigente, dinámico y orientado al crecimiento.",
+      "proposito": "Convertir la operación en un sistema más eficiente, controlado, medible y escalable, reduciendo errores, dependencia de Gerencia y reprocesos.",
+      "responsabilidades": "Supervisar y dirigir al personal. Controlar cumplimiento de funciones, metas y responsabilidades. Implementar procesos, procedimientos, checklists e indicadores. Detectar errores, riesgos y cuellos de botella. Resolver problemas antes de escalarlos. Elaborar reportes de gestión para Gerencia. Mejorar productividad, tiempos y uso de recursos. Supervisar controles administrativos y operativos. Gestionar evaluación y seguimiento del personal. Proponer mejoras, automatizaciones y nuevas formas de trabajo. Asegurar que los acuerdos y pendientes lleguen a cierre.",
+      "requisitos": "Profesionales titulados de Administración, Finanzas, Economía, Ingeniería Industrial, Contabilidad y afines. Deseable con experiencia en sector financiero, banca, tesorería, operaciones o negocios con alto nivel de control. Manejo de herramientas de Microsoft Office o Google Workspace. Deseable conocimiento en elaboración de procesos, protocolos o mejora continua. Competencias conductuales: liderazgo y carácter, pensamiento analítico, criterio para tomar decisiones, orientación a resultados, capacidad para resolver problemas, alto sentido de responsabilidad, integridad y confidencialidad, atención al detalle, comunicación efectiva, capacidad para exigir y hacer seguimiento, velocidad de ejecución y mentalidad de mejora continua. Posición con alto nivel de responsabilidad y exposición directa a Gerencia, con evaluación por resultados, cumplimiento e indicadores.",
+      "modalidad": "PRESENCIAL",
+      "ubicacion": "Lima",
+      "horario": "Tiempo completo",
+      "tipoCierre": "PERMANENTE",
+      "plazas": 1,
+      "cierraEn": "2026-08-15T23:59:59Z"
+    },
+    "carpetaDrive": "https://drive.google.com/drive/folders/13ZS5dZ1PvVSgH8ebo1deQSlb3My145Tx"
+  }
+}

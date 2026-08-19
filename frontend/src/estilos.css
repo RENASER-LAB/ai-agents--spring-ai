@@ -1,0 +1,348 @@
+/* La paleta es la de RENASER OS, y el semáforo el del propio sistema. */
+:root {
+  --papel: #f5f5f3;
+  --tinta: #0d0d0d;
+  --apagado: #70706b;
+  --linea: #e3e3df;
+  --verde: #2f6e51;
+  --ambar: #9b6a22;
+  --rojo: #a43b36;
+  --blanco: #fff;
+
+  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-size: 15px;
+  color: var(--tinta);
+  background: var(--papel);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--papel);
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+  border: 1px solid var(--linea);
+  background: var(--blanco);
+  color: var(--tinta);
+  padding: 0.4rem 0.8rem;
+  border-radius: 4px;
+}
+button:hover:not(:disabled) { border-color: var(--apagado); }
+button:disabled { opacity: 0.45; cursor: default; }
+
+input, select {
+  font: inherit;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--linea);
+  border-radius: 4px;
+  background: var(--blanco);
+  color: var(--tinta);
+}
+
+/* ---------------------------------------------------------------- estructura */
+
+.marco {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 1.5rem 1.5rem 4rem;
+}
+
+.cabecera {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--linea);
+  padding-bottom: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+h1 { font-size: 1.35rem; margin: 0 0 0.2rem; font-weight: 600; }
+h2 { font-size: 1rem; margin: 2rem 0 0.75rem; font-weight: 600; }
+h3 { font-size: 0.9rem; margin: 1.25rem 0 0.5rem; font-weight: 600; }
+
+.apagado { color: var(--apagado); }
+.pequeno { font-size: 0.82rem; }
+
+.aviso {
+  --acento: var(--ambar);
+  border: 1px solid color-mix(in srgb, var(--acento) 35%, var(--linea));
+  background: color-mix(in srgb, var(--acento) 7%, var(--blanco));
+  padding: 0.7rem 0.9rem;
+  border-radius: 4px;
+  margin-bottom: 1rem;
+  font-size: 0.87rem;
+}
+.aviso.error { --acento: var(--rojo); }
+
+/* ------------------------------------------------------------------- entrada */
+
+.entrada {
+  max-width: 380px;
+  margin: 12vh auto;
+  background: var(--blanco);
+  border: 1px solid var(--linea);
+  border-radius: 6px;
+  padding: 1.75rem;
+}
+.entrada label { display: block; font-size: 0.85rem; margin-bottom: 0.35rem; }
+.entrada input { width: 100%; margin-bottom: 1rem; }
+.entrada button { width: 100%; }
+
+/* ------------------------------------------------------------------- resumen */
+
+.tarjetas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+.tarjeta {
+  background: var(--blanco);
+  border: 1px solid var(--linea);
+  border-radius: 5px;
+  padding: 0.8rem 0.9rem;
+}
+.tarjeta .cifra { font-size: 1.6rem; font-weight: 600; line-height: 1.1; }
+.tarjeta .etiqueta { font-size: 0.78rem; color: var(--apagado); }
+
+/* -------------------------------------------------------------------- embudo */
+
+.embudo { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
+.escalon {
+  background: var(--blanco);
+  border: 1px solid var(--linea);
+  border-radius: 5px;
+  padding: 0.55rem 0.8rem;
+  min-width: 118px;
+}
+.escalon .cifra { font-size: 1.15rem; font-weight: 600; }
+.escalon .etiqueta {
+  font-size: 0.74rem;
+  color: var(--apagado);
+  line-height: 1.25;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.escalon .etiqueta::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--linea);
+}
+.escalon.espera-sistema .etiqueta::before { background: var(--ambar); }
+.escalon.espera-equipo .etiqueta::before { background: var(--verde); }
+
+/* --------------------------------------------------------------------- tabla */
+
+table { width: 100%; border-collapse: collapse; background: var(--blanco); }
+thead th {
+  text-align: left;
+  font-size: 0.76rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--apagado);
+  font-weight: 600;
+  padding: 0.55rem 0.6rem;
+  border-bottom: 1px solid var(--linea);
+  white-space: nowrap;
+}
+tbody td {
+  padding: 0.55rem 0.6rem;
+  border-bottom: 1px solid var(--linea);
+  font-size: 0.88rem;
+}
+tbody tr { cursor: pointer; }
+tbody tr:hover { background: var(--papel); }
+tbody tr.elegida { background: var(--papel); box-shadow: inset 3px 0 0 var(--tinta); }
+.num { text-align: right; font-variant-numeric: tabular-nums; }
+.posicion { color: var(--apagado); font-variant-numeric: tabular-nums; }
+
+.marca {
+  display: inline-block;
+  font-size: 0.74rem;
+  padding: 0.12rem 0.45rem;
+  border-radius: 3px;
+  border: 1px solid;
+  white-space: nowrap;
+}
+.marca.alta { color: var(--verde); border-color: var(--verde); }
+.marca.riesgo { color: var(--ambar); border-color: var(--ambar); }
+.marca.no { color: var(--apagado); border-color: var(--linea); }
+.marca.incompatible { color: var(--rojo); border-color: var(--rojo); }
+.marca.sin { color: var(--apagado); border-color: var(--linea); font-style: italic; }
+
+/* --------------------------------------------------------------------- ficha */
+
+.ficha {
+  background: var(--blanco);
+  border: 1px solid var(--linea);
+  border-radius: 6px;
+  padding: 1.25rem 1.4rem;
+  margin-top: 1.5rem;
+}
+.ficha .titulo {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+.resumen {
+  margin: 1rem 0 1.4rem;
+  max-width: 62ch;
+  font-size: 0.96rem;
+  line-height: 1.65;
+}
+
+.medidas { display: flex; gap: 1.5rem; flex-wrap: wrap; margin-bottom: 0.5rem; }
+.medida .cifra { font-size: 1.3rem; font-weight: 600; }
+.medida .etiqueta { font-size: 0.76rem; color: var(--apagado); }
+
+.criterio { margin-bottom: 0.85rem; }
+.criterio .fila {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  font-size: 0.86rem;
+}
+.criterio .nombre { font-weight: 500; }
+.barra {
+  height: 5px;
+  background: var(--linea);
+  border-radius: 3px;
+  overflow: hidden;
+  margin: 0.25rem 0 0.3rem;
+}
+.barra span { display: block; height: 100%; background: var(--tinta); }
+.criterio .porque { font-size: 0.82rem; color: var(--apagado); line-height: 1.5; }
+.criterio.hueco .nombre { color: var(--apagado); }
+
+.hallazgo {
+  --acento: var(--apagado);
+  border: 1px solid color-mix(in srgb, var(--acento) 28%, var(--linea));
+  border-radius: 4px;
+  padding: 0.6rem 0.8rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.86rem;
+  line-height: 1.5;
+}
+.hallazgo .tipo {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+  color: var(--acento);
+  display: block;
+  margin-bottom: 0.15rem;
+}
+.hallazgo.fortaleza { --acento: var(--verde); }
+.hallazgo.riesgo-critico { --acento: var(--rojo); }
+.hallazgo.riesgo-desarrollable { --acento: var(--ambar); }
+.hallazgo .evidencia { color: var(--apagado); font-style: italic; }
+
+.columnas { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; }
+@media (max-width: 800px) { .columnas { grid-template-columns: 1fr; gap: 0; } }
+
+/* ------------------------------------------------- la ficha de datos del candidato */
+
+.datos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 2rem;
+  margin: 1rem 0 0.25rem;
+  padding: 0.75rem 0;
+  border-top: 1px solid var(--linea);
+  border-bottom: 1px solid var(--linea);
+}
+.dato { display: flex; flex-direction: column; font-size: 0.87rem; }
+.dato .etiqueta {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--apagado);
+}
+
+/* El archivo del currículum: se enseña para poder encontrarlo, no se sirve desde aquí. */
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.9em;
+  background: var(--papel);
+  border: 1px solid var(--linea);
+  border-radius: 3px;
+  padding: 0.05rem 0.3rem;
+}
+a { color: var(--tinta); }
+
+/* El enlace al currículum: se ve como botón porque es la accion que mas se usa de la ficha. */
+.enlace-cv {
+  display: inline-block;
+  border: 1px solid var(--linea);
+  border-radius: 4px;
+  padding: 0.3rem 0.7rem;
+  text-decoration: none;
+  margin-right: 0.6rem;
+}
+.enlace-cv:hover { border-color: var(--apagado); }
+
+/* Los dos iconos de la fila: el curriculum y el retrato. Apagados hasta que el raton
+   pasa por encima, para que cien filas no parezcan un arbol de navidad. */
+.iconos { white-space: nowrap; width: 1px; }
+.icono {
+  text-decoration: none;
+  font-size: 1rem;
+  line-height: 1;
+  opacity: 0.3;
+  padding: 0.15rem 0.25rem;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+tbody tr:hover .icono { opacity: 1; }
+.icono:hover { transform: scale(1.15); }
+
+/* La cuenta de la nota, escrita. Numeros de ancho fijo para que se lea como una suma. */
+.cuenta {
+  font-variant-numeric: tabular-nums;
+  color: var(--apagado);
+  border-top: 1px solid var(--linea);
+  padding-top: 0.6rem;
+  margin-top: 0.9rem;
+  line-height: 1.7;
+}
+
+/* ------------------------------------------------------------------- la ventana */
+
+.modal {
+  border: none;
+  border-radius: 8px;
+  padding: 0;
+  background: var(--blanco);
+  color: var(--tinta);
+  width: min(1100px, calc(100vw - 3rem));
+  max-height: calc(100vh - 3rem);
+  /* La sombra y el fondo salen de la tinta de la paleta, no de negro puro: asi la
+     ventana se apoya sobre el mismo gris calido del resto y no sobre un agujero. */
+  box-shadow: 0 12px 40px color-mix(in srgb, var(--tinta) 18%, transparent);
+}
+.modal::backdrop { background: color-mix(in srgb, #0d0d0d 45%, transparent); }
+.modal-caja { padding: 1.5rem 1.75rem 2rem; }
+
+/* La ficha dentro de la ventana no necesita su propio marco: ya lo tiene. */
+.modal .titulo { position: sticky; top: 0; background: var(--blanco); z-index: 1; }
+.acciones { display: flex; gap: 0.5rem; align-items: center; }
+.cerrar {
+  border: 1px solid var(--linea);
+  border-radius: 4px;
+  padding: 0.3rem 0.6rem;
+  line-height: 1;
+}
