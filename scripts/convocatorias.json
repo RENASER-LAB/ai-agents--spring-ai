@@ -150,5 +150,44 @@
       "cierraEn": "2026-08-15T23:59:59Z"
     },
     "carpetaDrive": "https://drive.google.com/drive/folders/13ZS5dZ1PvVSgH8ebo1deQSlb3My145Tx"
+  },
+  "arquitecto": {
+    "area": "Arquitectura, Innovación e Inteligencia Artificial",
+    "puesto": {
+      "codigo": "ARQ_BUILDER_JR",
+      "nombre": "Arquitecto Builder Junior",
+      "nivelPuestoCodigo": "EJECUCION",
+      "familiaCodigo": "CREATIVO"
+    },
+    "solicitud": {
+      "urgencia": "NORMAL",
+      "resultadoPrincipal": "Ideas de proyecto convertidas en propuestas arquitectónicas presentables, apoyadas en investigación y en herramientas de IA",
+      "motivo": "Hoy no hay quien investigue referentes, conceptualice y arme la propuesta visual de un proyecto antes de construirlo",
+      "consecuenciaNoContratar": "Los proyectos siguen empezando sin concepto ni referentes, se decide sobre planos sueltos y se pierde tiempo y dinero corrigiendo después",
+      "analisisCapacidad": "Se evaluó repartir el trabajo entre quienes ya diseñan: resuelven el encargo puntual, pero nadie tiene horas para investigar referentes ni para aprender a producir con IA.",
+      "resultadosEsperados": [
+        {
+          "descripcion": "Propuestas conceptuales completas por proyecto",
+          "indicador": "concepto, planos conceptuales y referentes en una sola entrega"
+        },
+        {
+          "descripcion": "Uso de IA incorporado al diseño y a la presentación",
+          "indicador": "renders conceptuales y presentaciones producidos con herramientas de IA"
+        },
+        {
+          "descripcion": "Investigación de materiales y sistemas constructivos",
+          "indicador": "alternativas comparadas con su costo y tiempo estimados"
+        }
+      ]
+    },
+    "vacante": {
+      "titulo": "Arquitecto Builder Junior",
+      "descripcion": "Buscamos un estudiante de últimos ciclos, recién egresado o arquitecto junior que no solo dibuje planos o haga renders, sino que investigue, conceptualice y desarrolle proyectos: viviendas, hoteles, restaurantes y espacios de bienestar. Alguien que use inteligencia artificial para diseñar más rápido y comunicar mejor sus ideas. La posición pertenece al área de Arquitectura, Innovación e Inteligencia Artificial, y es de nivel junior y de ejecución.",
+      "proposito": "Convertir ideas en propuestas arquitectónicas reales: investigar, conceptualizar y desarrollar proyectos, y comunicarlos de forma que la idea se entienda y se pueda vender antes de construirla, apoyándose en herramientas de inteligencia artificial.",
+      "responsabilidades": "Arquitectura: desarrollar propuestas para viviendas, hoteles, restaurantes y espacios de bienestar; diseñar experiencias, no solo espacios; elaborar planos conceptuales y arquitectónicos; realizar metrados básicos y estimación de materiales; investigar materiales y sistemas constructivos innovadores. Innovación: investigar referentes de arquitectura a nivel mundial; seguir tendencias de arquitectura, hospitalidad y bienestar; buscar formas de construir más rápido, más barato y mejor; proponer mejoras a los proyectos. Inteligencia artificial: usar IA para acelerar el diseño; generar renders conceptuales; crear presentaciones que vendan la idea antes de construirla; investigar y probar herramientas nuevas. Coordinación: trabajar con el Ingeniero Civil y con el área de Biología y Agronomía para integrar arquitectura y naturaleza.",
+      "requisitos": "Estudiante de últimos ciclos, recién egresado o arquitecto junior. Curiosidad por aprender y capacidad de investigar por cuenta propia. Buen criterio estético. Interés por el bienestar y la sostenibilidad. Interés por la inteligencia artificial aplicada al diseño. Capacidad de convertir ideas en propuestas reales. Se valora especialmente: capacidad de investigar, calidad de la idea, creatividad, uso inteligente de herramientas de IA, capacidad de comunicar una visión, criterio arquitectónico, innovación, capacidad de convertir una idea en un proyecto y atención al detalle.",
+      "tipoCierre": "PERMANENTE",
+      "plazas": 1
+    }
   }
 }

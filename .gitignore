@@ -61,3 +61,4 @@ frontend/src/datos-demo.json
 # Lleva el nombre de cada candidato con el enlace directo a su curriculum, y este
 # repositorio es publico. Se regenera: python scripts/enlaces-de-drive.py
 scripts/enlaces-cv.json
+cv-arquitecto/
