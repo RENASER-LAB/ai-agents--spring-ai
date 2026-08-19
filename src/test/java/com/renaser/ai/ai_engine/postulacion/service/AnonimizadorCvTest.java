@@ -4,7 +4,10 @@ import com.renaser.ai.ai_engine.postulacion.service.impl.AnonimizadorCv;
 
 import org.junit.jupiter.api.Test;
 
+import java.time.Duration;
+
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 /**
  * Lo que la IA no puede ver del currículum (RF-41).
@@ -59,5 +62,70 @@ class AnonimizadorCvTest {
     void noSeRompeConTextoVacio() {
         assertThat(anonimizador.anonimizar(null)).isNull();
         assertThat(anonimizador.anonimizar("   ")).isEqualTo("   ");
+    }
+
+    // La edad escrita en mayúsculas con Ñ. Es la forma normal de un encabezado de currículum
+    // en español, no un caso raro: «AÑOS DE EXPERIENCIA» aparece en casi todos.
+    @Test
+    void tapaLaEdadAunqueVengaEnMayusculasConEne() {
+        String recortado = anonimizador.anonimizar("Tengo 34 AÑOS");
+
+        assertThat(recortado).doesNotContain("34").doesNotContain("AÑOS");
+        assertThat(recortado).contains(AnonimizadorCv.TAPADO);
+    }
+
+    /**
+     * El caso que decide cuál de las dos banderas Unicode se usa.
+     *
+     * <p>Un PDF mal extraído pega la cifra a lo que va delante: «Nº34 años». Con
+     * {@code UNICODE_CHARACTER_CLASS} la {@code º} pasa a contar como letra, desaparece el
+     * límite de palabra antes del número y esto <b>deja de taparse</b>. Con
+     * {@code UNICODE_CASE} se tapa igual y las mayúsculas acentuadas también.
+     *
+     * <p>Está escrito aquí porque es la clase de detalle que alguien deshace de buena fe
+     * para callar un aviso de análisis estático, sin ver que a cambio manda una edad fuera.
+     */
+    @Test
+    void tapaLaEdadAunqueLaCifraVengaPegadaAUnSimbolo() {
+        assertThat(anonimizador.anonimizar("Nº34 años"))
+                .doesNotContain("34")
+                .contains(AnonimizadorCv.TAPADO);
+    }
+
+    // «GÉNERO» con É mayúscula. Sin la bandera Unicode el rótulo entero sobrevive y viaja.
+    @Test
+    void tapaElGeneroAunqueVengaEnMayusculasConTilde() {
+        assertThat(anonimizador.anonimizar("GÉNERO: Femenino"))
+                .doesNotContain("GÉNERO")
+                .doesNotContain("Femenino")
+                .contains(AnonimizadorCv.TAPADO);
+
+        // Sin valor de diccionario detrás, el rótulo era lo único que podía enganchar:
+        // si él falla, la letra sale tal cual hacia el modelo.
+        assertThat(anonimizador.anonimizar("GÉNERO: F")).doesNotContain("F");
+    }
+
+    // «UNIÓN LIBRE» con Ó mayúscula, y al lado el mismo dato en ASCII puro («VIUDA»), que ya
+    // se tapaba antes del arreglo. Los dos tienen que salir igual: la única diferencia entre
+    // ellos era el acento.
+    @Test
+    void tapaElEstadoCivilAunqueVengaEnMayusculasConTilde() {
+        assertThat(anonimizador.anonimizar("Estado: UNIÓN LIBRE"))
+                .doesNotContain("UNIÓN")
+                .doesNotContain("LIBRE")
+                .contains(AnonimizadorCv.TAPADO);
+
+        assertThat(anonimizador.anonimizar("Estado civil: VIUDA")).doesNotContain("VIUDA");
+    }
+
+    // Un currículum es un PDF que sube cualquiera con cuenta de candidato, así que este texto
+    // es alcanzable desde fuera: «Edad» seguida de un montón de espacios y ninguna cifra
+    // detrás. Con los cuantificadores normales el motor prueba todas las formas de repartir
+    // esos espacios entre los dos huecos y tarda minutos; con los posesivos, milisegundos.
+    @Test
+    void noSeCuelgaConUnTextoHechoAMala() {
+        String cebo = "Edad" + " ".repeat(100_000) + "x";
+
+        assertTimeoutPreemptively(Duration.ofSeconds(2), () -> anonimizador.anonimizar(cebo));
     }
 }
