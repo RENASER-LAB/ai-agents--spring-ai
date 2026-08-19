@@ -110,27 +110,18 @@ class ArquitecturaTest {
     // ========================================================================
 
     /**
-     * Dos controladores se saltan esta regla desde antes, y quedan nombrados a propósito.
+     * Sin excepciones. Los dos controladores que se la saltaban ya no lo hacen.
      *
-     * <p>Esconderlos con un patrón genérico dejaría la regla verde y sin valor. Nombrarlos
-     * hace dos cosas: protege todo lo demás, y deja la desviación a la vista de quien
-     * decida si vale la pena arreglarla.
-     *
-     * <ul>
-     *   <li>{@code CatalogoController} devuelve catálogos de solo lectura —niveles,
-     *       familias, etapas, estados— sin ninguna regla que aplicar. Un servicio ahí sería
-     *       una capa que solo reenvía.
-     *   <li>{@code PanelAuthController} monta el primer usuario del equipo cuando la base
-     *       está vacía. Es el arranque, y todavía no hay servicio al que pedírselo.
-     * </ul>
+     * <p>Estuvieron nombrados aquí un tiempo, con su motivo escrito, y eso fue lo que hizo
+     * que se arreglaran: una desviación a la vista se decide, una escondida tras un patrón
+     * genérico se olvida. {@code CatalogoController} pide sus listas a
+     * {@code ServicioCatalogo} y {@code PanelAuthController} el arranque del primer usuario
+     * a {@code ServicioAccesoEquipo}.
      */
     @Test
     void ningunControladorHablaDirectamenteConUnRepositorio() {
         ArchRule regla = noClasses()
                 .that().resideInAPackage("..controller..")
-                .and().doNotHaveFullyQualifiedName(RAIZ + ".catalogo.controller.CatalogoController")
-                .and().doNotHaveFullyQualifiedName(
-                        RAIZ + ".seguridad.controller.PanelAuthController")
                 .should().dependOnClassesThat().resideInAPackage("..repository..")
                 .because("entre la petición y la base hay reglas que cumplir —permisos con "
                         + "alcance, transiciones, auditoría— y el servicio es donde viven. Un "
@@ -196,18 +187,13 @@ class ArquitecturaTest {
     /**
      * La entidad no viaja por la API; lo que viaja es un dto.
      *
-     * <p>Quedan fuera los dos de siempre, y por la misma razón que en la regla de arriba:
-     * {@code CatalogoController} convierte catálogos a dto ahí mismo —toca la entidad, no
-     * la publica— y {@code PanelAuthController} crea al primer usuario del equipo cuando la
-     * base está vacía, que es construir entidades, no devolverlas.
+     * <p>También sin excepciones, y por lo mismo: al mover las consultas al servicio, las
+     * entidades se quedaron detrás de él y los controladores solo ven dto.
      */
     @Test
     void lasEntidadesDeLaBaseNoSalenPorUnEndpoint() {
         ArchRule regla = noClasses()
                 .that().resideInAPackage("..controller..")
-                .and().doNotHaveFullyQualifiedName(RAIZ + ".catalogo.controller.CatalogoController")
-                .and().doNotHaveFullyQualifiedName(
-                        RAIZ + ".seguridad.controller.PanelAuthController")
                 .should().dependOnClassesThat().resideInAPackage("..entity..")
                 .because("una entidad que sale por la API convierte cualquier columna nueva en "
                         + "un cambio de contrato, y expone campos que nadie decidió publicar. "

@@ -42,6 +42,10 @@ spring:
       max-request-size: 12MB
 
   rabbitmq:
+    # El broker de desarrollo, el del docker-compose. Para apuntar a otro —CloudAMQP, o el
+    # que haya en produccion— se sobreescriben host, puerto, usuario, contrasena, vhost y
+    # ssl en application-secrets.yaml, que no se versiona. Aqui nunca va una credencial de
+    # verdad: este archivo esta en git.
     host: localhost
     port: 5672
     username: guest

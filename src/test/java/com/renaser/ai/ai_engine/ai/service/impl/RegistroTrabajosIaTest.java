@@ -128,7 +128,7 @@ class RegistroTrabajosIaTest {
                 55L, "EVIDENCIA_CV", "FINA")).thenReturn(Optional.empty());
         when(trabajos.save(any(TrabajoIa.class))).thenAnswer(i -> i.getArgument(0));
 
-        assertThat(registro.crearSiHaceFalta(1L, 55L, "EVIDENCIA_CV", "FINA")).isPresent();
+        assertThat(registro.crearSiHaceFalta(1L, 55L, "EVIDENCIA_CV", "FINA", null)).isPresent();
 
         ArgumentCaptor<TrabajoIa> creado = ArgumentCaptor.forClass(TrabajoIa.class);
         verify(trabajos).save(creado.capture());
@@ -144,7 +144,33 @@ class RegistroTrabajosIaTest {
                 55L, "EVIDENCIA_CV", "FINA"))
                 .thenReturn(Optional.of(trabajo(9L, "TERMINADO", 1)));
 
-        assertThat(registro.crearSiHaceFalta(1L, 55L, "EVIDENCIA_CV", "FINA")).isEmpty();
+        assertThat(registro.crearSiHaceFalta(1L, 55L, "EVIDENCIA_CV", "FINA", null)).isEmpty();
+        verify(trabajos, never()).save(any(TrabajoIa.class));
+    }
+
+    @Test
+    void loQueSeHizoAntesDeLoQueLoAlimentaSiSeRehace() {
+        // El retrato de un candidato cribado se armó sin sus respuestas. Cuando el evaluador
+        // termina, ese retrato queda viejo: sin esto se quedaba en pie uno que no vio la
+        // mitad de lo que hay, y el candidato se presentaba con una nota incompleta.
+        when(trabajos.findFirstByPostulacionIdAndAgenteCodigoAndModoOrderByIdDesc(
+                55L, "POTENCIAL_RIESGO", "FINA"))
+                .thenReturn(Optional.of(trabajo(5L, "TERMINADO", 1)));
+        when(trabajos.save(any(TrabajoIa.class))).thenAnswer(i -> i.getArgument(0));
+
+        // Alimentado por el trabajo 6, que es posterior al 5 que ya estaba hecho.
+        assertThat(registro.crearSiHaceFalta(1L, 55L, "POTENCIAL_RIESGO", "FINA", 6L)).isPresent();
+    }
+
+    @Test
+    void loQueSeHizoDespuesDeLoQueLoAlimentaSeQuedaComoEsta() {
+        // El otro lado de la regla, y el que evita pagar de más: si el retrato ya se armó
+        // después del evaluador, ya lo tuvo en cuenta y rehacerlo no cambiaría nada.
+        when(trabajos.findFirstByPostulacionIdAndAgenteCodigoAndModoOrderByIdDesc(
+                55L, "POTENCIAL_RIESGO", "FINA"))
+                .thenReturn(Optional.of(trabajo(7L, "TERMINADO", 1)));
+
+        assertThat(registro.crearSiHaceFalta(1L, 55L, "POTENCIAL_RIESGO", "FINA", 6L)).isEmpty();
         verify(trabajos, never()).save(any(TrabajoIa.class));
     }
 
@@ -157,7 +183,7 @@ class RegistroTrabajosIaTest {
                 .thenReturn(Optional.of(trabajo(9L, "FALLIDO", 3)));
         when(trabajos.save(any(TrabajoIa.class))).thenAnswer(i -> i.getArgument(0));
 
-        assertThat(registro.crearSiHaceFalta(1L, 55L, "EVIDENCIA_CV", "FINA")).isPresent();
+        assertThat(registro.crearSiHaceFalta(1L, 55L, "EVIDENCIA_CV", "FINA", null)).isPresent();
     }
 
     private TrabajoIa trabajo(Long id, String estado, int intentos) {

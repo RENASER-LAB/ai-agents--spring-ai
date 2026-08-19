@@ -23,8 +23,16 @@ public interface ColaCalificacionIa {
      * Arranca la calificación de una postulación que acaba de entregar su evaluación.
      *
      * <p>Es idempotente: llamarla dos veces no duplica trabajos ni recalifica lo ya hecho.
+     *
+     * <p><b>No empieza siempre por el principio.</b> Si el currículum ya se leyó en una
+     * criba, esa parte no se repite: la fila arranca en el primer paso que de verdad falta,
+     * que en ese caso es el evaluador. Empezar por el principio dejaba a esos candidatos
+     * calificándose para siempre, porque el primer paso ya estaba hecho y no se encolaba nada.
+     *
+     * @return true si quedó algo en la cola; false si no había nada pendiente que hacer o si
+     *         ya hay un trabajo vivo. Quien lo llame no debe decir «encolado» sin mirarlo.
      */
-    void encolarPerfilIntegral(Long postulacionId);
+    boolean encolarPerfilIntegral(Long postulacionId);
 
     /**
      * Arranca la criba: leer el currículum y armar el Perfil de Talento con solo eso.
@@ -39,8 +47,10 @@ public interface ColaCalificacionIa {
      *
      * <p>Igual de idempotente: pedirla dos veces no duplica trabajos. Y si más tarde el
      * candidato entrega su evaluación, {@link #encolarPerfilIntegral} recalifica con todo.
+     *
+     * @return true si quedó algo en la cola
      */
-    void encolarCribaCv(Long postulacionId);
+    boolean encolarCribaCv(Long postulacionId);
 
     /**
      * Primera pasada: rápida, sobre todos.
@@ -52,8 +62,10 @@ public interface ColaCalificacionIa {
      * <p>No sirve para decidir a quién se contrata. Medido sobre los mismos diez
      * currículums, solo tres quedan en la misma posición que con el modelo que razona, y
      * este ve menos riesgos críticos. Para eso está la segunda.
+     *
+     * @return true si quedó algo en la cola
      */
-    void encolarCribaRapida(Long postulacionId);
+    boolean encolarCribaRapida(Long postulacionId);
 
     /**
      * Segunda pasada: cuidadosa, solo sobre los de arriba.
@@ -63,8 +75,10 @@ public interface ColaCalificacionIa {
      *
      * <p>Se pide por separado y no se encadena a la primera a propósito. Cuál es «arriba»
      * depende de cómo salió la tanda entera, y eso no se sabe hasta que la primera termina.
+     *
+     * @return true si quedó algo en la cola
      */
-    void encolarCribaFina(Long postulacionId);
+    boolean encolarCribaFina(Long postulacionId);
 
     /**
      * Ejecuta un trabajo concreto. Lo llama el listener de la cola, y también el sondeo.
@@ -91,8 +105,12 @@ public interface ColaCalificacionIa {
      * calificación pedida desde el panel corre sin que ese estado cambie: preguntarle a la
      * postulación diría «no hay nada» mientras los tres agentes están trabajando.
      *
-     * @return {@code EN_CURSO} si queda algún trabajo vivo, {@code FALLIDA} si el último se
-     *         agotó en reintentos, {@code TERMINADA} si los tres acabaron, o
+     * <p><b>Se mira solo la última pasada.</b> Una postulación puede tener una pasada rápida
+     * terminada y una fina fallida; mirarlas juntas diría «terminada» y presentaría como
+     * definitivas unas notas que son provisionales. Lo que vale es cómo fue el último intento.
+     *
+     * @return {@code EN_CURSO} si queda algún trabajo vivo, {@code FALLIDA} si la última
+     *         pasada se agotó en reintentos, {@code TERMINADA} si llegó al final, o
      *         {@code SIN_EMPEZAR} si nadie ha pedido nada todavía.
      */
     String comoVa(Long postulacionId);

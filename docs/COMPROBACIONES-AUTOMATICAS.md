@@ -37,18 +37,23 @@ demás de la calificación se prueba con un doble del modelo y no gasta nada.
 
 ---
 
-## 128 pruebas
+## 147 pruebas
 
 | Qué | Cuántas | Necesita |
 |---|---:|---|
-| Unitarias, con dobles | 100 | nada |
+| Unitarias, con dobles | 102 | nada |
 | Arquitectura | 7 | nada |
-| Integración, de punta a punta | 21 | Docker |
+| Integración, de punta a punta | 38 | Docker |
 | Contra el proveedor de verdad | 5 | Docker, saldo y la bandera |
 
 Las de integración levantan un PostgreSQL y un RabbitMQ de verdad con Testcontainers, y
 recorren el flujo entero. **El modelo siempre se simula**: ninguna prueba de la tanda normal
 llama al proveedor.
+
+Cada prueba de integración fija además su propio broker. Suena a detalle y no lo es: sin eso
+heredaban lo que cada uno tuviera en su `application-secrets.yaml`, y seis empezaron a fallar
+el día que ese archivo apuntó a un broker con TLS. Una prueba que da distinto según la máquina
+no sirve para nada.
 
 ---
 
@@ -69,20 +74,17 @@ estas siete impiden.
 | Las entidades no salen por un endpoint | Una entidad publicada convierte cualquier columna nueva en un cambio de contrato |
 | Nadie escribe en la consola a pelo | Lo que se imprime así no aparece en el registro, y el registro es lo único que queda cuando algo falla en producción |
 
-### Las dos desviaciones que ya existían
+### Las dos desviaciones que había, y ya no
 
-Al poner las reglas aparecieron dos sitios que se las saltan **desde antes**. Están
-**nombrados uno por uno en la prueba, con su motivo**, y no escondidos tras un patrón
-genérico: así la regla protege todo lo demás y la desviación sigue a la vista de quien
-decida si vale la pena arreglarla.
+Al poner las reglas aparecieron dos sitios que se las saltaban desde antes:
+`CatalogoController` y `PanelAuthController` inyectaban repositorios y tocaban entidades.
 
-| Dónde | Qué se salta | La defensa que tiene |
-|---|---|---|
-| `CatalogoController` | Inyecta cuatro repositorios y toca entidades | Devuelve catálogos de solo lectura —niveles, familias, etapas, estados— sin ninguna regla que aplicar. Un servicio ahí sería una capa que solo reenvía |
-| `PanelAuthController` | Lo mismo | Monta el primer usuario del equipo cuando la base está vacía. Es el arranque, y todavía no hay servicio al que pedírselo |
+Quedaron **nombrados uno por uno en la prueba, con su motivo escrito**, en vez de escondidos
+tras un patrón genérico. Eso es lo que hizo que se arreglaran: una desviación a la vista se
+decide, una escondida se olvida. Hoy los catálogos salen de `ServicioCatalogo` y el arranque
+del primer usuario del equipo de `ServicioAccesoEquipo`.
 
-**Es una decisión pendiente, no un olvido.** Si se prefiere que pasen por un servicio, se
-quitan esos dos nombres de la prueba y ella misma dice qué falta.
+**Las siete reglas no tienen excepciones.**
 
 ---
 
