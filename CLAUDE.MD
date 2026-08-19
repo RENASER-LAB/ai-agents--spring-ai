@@ -152,29 +152,64 @@ Las tres consultan el mismo backend, asi que ensenan el mismo orden.
 - Nada se recalcula hacia atras: cada nota queda atada a la version de pesos de su vacante.
 
 ### Correr los tests
-Hace falta Docker levantado (Testcontainers), `renaser-postgres` en el puerto 5433 y RabbitMQ.
-`./mvnw test`.
+**148 tests, todos en verde (19/08/2026).** Son dos tandas y el comando decide cual corre:
 
-Desde el merge de `origin/ricardo` del 18/08/2026 son **103 tests** y compilan bien: Ricardo
-arreglo la firma del doble del modelo y sumo unitarios de la cola, del registro de trabajos,
-del panel y **7 reglas de arquitectura con ArchUnit** (la frontera del motor, las capas y que
-el estado solo lo mueva la maquina — las mismas reglas que este archivo tiene en prosa).
+| Comando | Que corre | Cuantos | Necesita |
+|---|---|---:|---|
+| `./mvnw test` | unitarias con dobles y las de arquitectura | 106 | nada |
+| `./mvnw verify` | lo anterior mas las de integracion | 148 | Docker |
 
-**El test que gasta dinero ya no corre solo**: `CalificacionIaRealIT` esta detras de la
-variable `RENASER_IA_REAL`. `./mvnw test` a secas ya es seguro y no llama a DeepSeek.
+Las de integracion levantan su propio PostgreSQL y su propio RabbitMQ con Testcontainers: hace
+falta el demonio de Docker encendido. El desglose completo esta en
+[docs/COMPROBACIONES-AUTOMATICAS.md](docs/COMPROBACIONES-AUTOMATICAS.md).
 
-⚠️ **Cada ejecucion cuesta dinero.** El `pom.xml` mete `**/*IT.java` en los `includes` de
-surefire, asi que `CalificacionIaRealIT` corre siempre y hace **cuatro llamadas reales a
-DeepSeek**. Para saltarlo:
+Entre las 106 hay **7 reglas de arquitectura con ArchUnit** (la frontera del motor, las capas y
+que el estado solo lo mueva la maquina — las mismas reglas que este archivo tiene en prosa).
+
+**El test que gasta dinero no corre solo**: `CalificacionIaRealIT` esta detras de
+`@EnabledIfEnvironmentVariable`, asi que se salta sola si no esta la variable. Ni `test` ni
+`verify` llaman a DeepSeek. Para pedirla a proposito:
 
 ```
-./mvnw test -Dtest='*Test,*Tests,*IT,!CalificacionIaRealIT' -Dsurefire.failIfNoSpecifiedTests=false
+RENASER_IA_REAL=si ./mvnw verify -Dit.test=CalificacionIaRealIT
 ```
 
 **Ruido esperado que NO es un fallo**: `Failed to check/redeclare auto-delete queue(s)` de
-RabbitMQ, y los reintentos agotados de `CalificacionIaRealIT` («el proveedor del modelo no
-responde»), que es un test que llama a DeepSeek de verdad y registra el fallo si no hay clave o
-red. Si termina en `BUILD SUCCESS`, esta bien.
+RabbitMQ, y los cinco tests saltados de `CalificacionIaRealIT`. Si termina en `BUILD SUCCESS`,
+esta bien.
+
+## La tuberia (19/08/2026)
+Cada cambio pasa por GitHub Actions antes de llegar a nadie. **Si algo sale rojo, no se
+fusiona.** El detalle esta en [docs/CI-CD.md](docs/CI-CD.md); aqui lo que hay que saber:
+
+| Cuando | Que corre |
+|---|---|
+| En cada PR y en cada push a `main` | `./mvnw verify` (los 148 tests), Semgrep, Gitleaks y la cobertura del codigo nuevo en SonarCloud |
+| Al fusionar a `main`, si todo quedo verde | Se avisa a Render por su Deploy Hook, que construye la imagen con el `Dockerfile` y publica en Pruebas |
+| De noche, sin bloquear a nadie | PIT (mutation testing) y fuzzing de la API con Schemathesis |
+
+**Render no despliega solo**: su auto-deploy esta apagado a proposito, para que no publique con
+la tuberia en rojo.
+
+**Semgrep** corre con las reglas de serie de Java mas tres propias en `.semgrep/`: que la IA no
+lea el curriculum sin anonimizar, que no aparezcan rutas publicas fuera de
+`ConfiguracionSeguridad`, y que ningun error se trague por consola.
+
+### Los tres perfiles de configuracion
+| Archivo | Cuando se usa | Que lo activa |
+|---|---|---|
+| `application.yaml` | siempre, es la base: Postgres local en el 5433, RabbitMQ sin TLS | nada |
+| `application-pruebas.yaml` | la aplicacion corriendo en Render (Supabase + CloudAMQP) | `SPRING_PROFILES_ACTIVE=pruebas` |
+| `application-supabase.yaml` | tu backend local apuntando a Supabase | `-Dspring-boot.run.profiles=supabase` |
+
+Los perfiles son aditivos: cada uno solo escribe encima lo que cambia.
+
+**Cuidado con el nombre**: el perfil `pruebas` es el entorno de Pruebas, **no** los tests. Los
+tests no usan ningun perfil — cada uno se inyecta sus valores con `@DynamicPropertySource`.
+
+En Render **no existe `application-secrets.yaml`**: el `Dockerfile` no lo copia y el import es
+`optional:`, asi que alli todo llega por variable de entorno. La lista completa esta en
+[docs/CI-CD.md](docs/CI-CD.md).
 
 ## Como esta organizado el codigo
 Un solo proyecto para dos cosas: el modulo de seleccion de personal y el motor de agentes de
@@ -257,6 +292,10 @@ Todo vive en `docs/`. Empezar por [docs/README.md](docs/README.md).
   abierto y arma el Perfil de Talento. Y que pasa cuando falla.
 - [Avance de simulacion y validacion](docs/AVANCE-SIMULACION-VALIDACION-2026-08-18.md) — las dos
   ultimas etapas y sus tres reglas automaticas de disponibilidad.
+- [CI/CD](docs/CI-CD.md) — que se comprueba solo en cada cambio, como se despliega a Pruebas y
+  que variables de entorno pide Render. **Leerlo antes de tocar `.github/workflows/`.**
+- [Comprobaciones automaticas](docs/COMPROBACIONES-AUTOMATICAS.md) — las 148 pruebas y las siete
+  reglas de arquitectura, una por una. Que se mira solo y que no.
 - `docs/diagramas/` — HTML autocontenidos, se abren en el navegador.
 - `docs/mockups/` — prototipos de pantalla. **Los mantiene otra persona, no editarlos.**
 - `docs/insumos/` — documentos originales del cliente y notas de analisis.

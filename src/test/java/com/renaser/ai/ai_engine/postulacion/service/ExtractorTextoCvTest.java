@@ -2,6 +2,7 @@ package com.renaser.ai.ai_engine.postulacion.service;
 
 import com.renaser.ai.ai_engine.postulacion.service.impl.ExtractorTextoCv;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.io.ByteArrayOutputStream;
@@ -26,6 +27,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * armar aquí mismo— porque es la única forma de meter un byte nulo en el texto de entrada
  * sin arrastrar un archivo de ejemplo al repositorio.
  */
+@DisplayName("La lectura del currículum en PDF y Word")
 class ExtractorTextoCvTest {
 
     // Los caracteres que nunca deberían llegar a la base ni al modelo. Se nombran así

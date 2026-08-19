@@ -2,6 +2,7 @@ package com.renaser.ai.ai_engine.postulacion.service;
 
 import com.renaser.ai.ai_engine.postulacion.entity.EstadoPostulacion;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -11,6 +12,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 // El cálculo del estado siguiente, contra el catálogo real de 18 estados.
 // Es lógica pura: sin Spring, sin base de datos.
+@DisplayName("La máquina de estados de una postulación")
 class MaquinaEstadosTest {
 
     // El mismo catálogo que siembra V9__semillas.sql

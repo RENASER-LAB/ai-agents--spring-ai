@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.renaser.ai.ai_engine.comun.programado.SondeoVencimientos;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,6 +48,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @Testcontainers
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@DisplayName("Simulación de trabajo y validación práctica")
 public class FlujoSimulacionValidacionIT {
 
     @Container
@@ -90,6 +92,7 @@ public class FlujoSimulacionValidacionIT {
     static long sesionId;
     static long inscripcionA;
 
+    @DisplayName("Dos candidatos llegan a esperar una sesión")
     @Test
     @Order(1)
     void dosCandidatosLleganAEsperarSesion() throws Exception {
@@ -117,6 +120,7 @@ public class FlujoSimulacionValidacionIT {
         assertThat(estadoDe(postulacionB)).isEqualTo("SIMULACION_POR_HABILITAR");
     }
 
+    @DisplayName("Publicar una sesión mueve a quien estaba esperando")
     @Test
     @Order(2)
     void publicarUnaSesionMueveAQuienEstabaEsperando() throws Exception {
@@ -141,6 +145,7 @@ public class FlujoSimulacionValidacionIT {
         assertThat(sesion.get("tramos").get(0).get("codigo").asText()).isEqualTo("CONTEXTO");
     }
 
+    @DisplayName("Llenar el cupo devuelve a quien no alcanzó plaza")
     @Test
     @Order(3)
     void llenarElCupoDevuelveAQuienNoAlcanzoPlaza() throws Exception {
@@ -161,6 +166,7 @@ public class FlujoSimulacionValidacionIT {
                 .andExpect(jsonPath("$.length()").value(0));
     }
 
+    @DisplayName("Cancelar la sesión devuelve a los inscritos y conserva su historial")
     @Test
     @Order(4)
     void cancelarLaSesionDevuelveALosInscritosYConservaSuHistorial() throws Exception {
@@ -185,6 +191,7 @@ public class FlujoSimulacionValidacionIT {
         assertThat(avisos).isEqualTo(1);
     }
 
+    @DisplayName("Faltar a la sesión no reinscribe solo")
     @Test
     @Order(5)
     void faltarALaSesionNoReinscribeSolo() throws Exception {
@@ -215,6 +222,7 @@ public class FlujoSimulacionValidacionIT {
         assertThat(estadoDe(postulacionA)).isEqualTo("SIMULACION_TURNO_CANDIDATO");
     }
 
+    @DisplayName("El facilitador marca los eventos observables")
     @Test
     @Order(6)
     void elFacilitadorMarcaLosEventosObservables() throws Exception {
@@ -248,6 +256,7 @@ public class FlujoSimulacionValidacionIT {
         assertThat(estadoDe(postulacionA)).isEqualTo("SIMULACION_POR_CONFIRMAR");
     }
 
+    @DisplayName("Quien no tiene rol de facilitador no puede marcar")
     @Test
     @Order(7)
     void quienNoTieneUnRolDeFacilitadorNoPuedeMarcar() throws Exception {
@@ -278,6 +287,7 @@ public class FlujoSimulacionValidacionIT {
                 "{\"evento\":\"INICIO\"}").andExpect(status().isOk());
     }
 
+    @DisplayName("Se califica la simulación y se pasa a validación")
     @Test
     @Order(8)
     void seCalificaLaSimulacionYSePasaAValidacion() throws Exception {
@@ -317,6 +327,7 @@ public class FlujoSimulacionValidacionIT {
         assertThat(estadoDe(postulacionA)).isEqualTo("VALIDACION_POR_HABILITAR");
     }
 
+    @DisplayName("No se pone a nadie a trabajar sin figura contractual")
     @Test
     @Order(9)
     void noSePonAAlguienATrabajarSinFiguraContractual() throws Exception {
@@ -341,6 +352,7 @@ public class FlujoSimulacionValidacionIT {
         assertThat(v.get("fin_en")).isNotNull();
     }
 
+    @DisplayName("El periodo vencido termina solo y se completan las métricas")
     @Test
     @Order(10)
     void elPeriodoVencidoTerminaSoloYSeCompletanLasMetricas() throws Exception {

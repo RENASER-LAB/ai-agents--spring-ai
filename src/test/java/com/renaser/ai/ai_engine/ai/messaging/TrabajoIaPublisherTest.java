@@ -4,6 +4,7 @@ import com.renaser.ai.ai_engine.ai.config.RabbitMQConfig;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -30,6 +31,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
  * en desarrollo. Este test es la única forma de que no vuelva.
  */
 @ExtendWith(MockitoExtension.class)
+@DisplayName("La publicación de trabajos en la cola")
 class TrabajoIaPublisherTest {
 
     @Mock

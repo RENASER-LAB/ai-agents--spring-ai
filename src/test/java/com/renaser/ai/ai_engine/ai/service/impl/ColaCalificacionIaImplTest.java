@@ -7,6 +7,7 @@ import com.renaser.ai.ai_engine.ai.service.AgenteSeleccion;
 import com.renaser.ai.ai_engine.perfilintegral.service.PuenteCalificacionIa;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -49,6 +50,7 @@ import static org.mockito.Mockito.when;
  * </ul>
  */
 @ExtendWith(MockitoExtension.class)
+@DisplayName("La cola de calificación")
 class ColaCalificacionIaImplTest {
 
     private static final long POSTULACION = 55L;

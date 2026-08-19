@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -46,6 +47,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @Testcontainers
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@DisplayName("Hito 1 · De la vacante a la postulación")
 public class FlujoHito1IT {
 
     @LocalServerPort int puerto;
@@ -99,6 +101,7 @@ public class FlujoHito1IT {
     static long postulacionId;
     static String codigoPostulacion;
 
+    @DisplayName("El equipo prepara y publica una vacante")
     @Test
     @Order(1)
     void elEquipoPreparaYPublicaUnaVacante() throws Exception {
@@ -198,6 +201,7 @@ public class FlujoHito1IT {
                 .andExpect(jsonPath("$[0].titulo").value("Desarrollador web"));
     }
 
+    @DisplayName("El candidato crea su cuenta y postula")
     @Test
     @Order(2)
     void elCandidatoCreaSuCuentaYPostula() throws Exception {
@@ -293,6 +297,7 @@ public class FlujoHito1IT {
         assertThat(estado.value()).isEqualTo(413);
     }
 
+    @DisplayName("El equipo mueve la postulación de etapa")
     @Test
     @Order(3)
     void elEquipoMueveLaPostulacion() throws Exception {
@@ -323,6 +328,7 @@ public class FlujoHito1IT {
                 .andExpect(jsonPath("$.length()").value(4));
     }
 
+    @DisplayName("El candidato se retira y todo queda registrado")
     @Test
     @Order(4)
     void elCandidatoSeRetiraYTodoQuedaRegistrado() throws Exception {
@@ -342,6 +348,7 @@ public class FlujoHito1IT {
         assertThat(auditorias).isGreaterThan(0);
     }
 
+    @DisplayName("El responsable de área solo ve lo suyo")
     @Test
     @Order(5)
     void elResponsableDeAreaSoloVeLoSuyo() throws Exception {

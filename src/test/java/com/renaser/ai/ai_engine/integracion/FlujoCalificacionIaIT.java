@@ -12,6 +12,7 @@ import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -77,6 +78,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @Testcontainers
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@DisplayName("La calificación con inteligencia artificial")
 public class FlujoCalificacionIaIT {
 
     @Container
@@ -255,6 +257,7 @@ public class FlujoCalificacionIaIT {
 
     // ============ Las pruebas ============
 
+    @DisplayName("La IA califica y la postulación avanza sola")
     @Test
     @Order(1)
     void laIaCalificaYLaPostulacionAvanzaSola() throws Exception {
@@ -370,6 +373,7 @@ public class FlujoCalificacionIaIT {
         assertThat(nota.get("version_pesos_id")).isEqualTo(versionDeLaVacante);
     }
 
+    @DisplayName("Si la IA falla se reintenta, y no se inventa ninguna nota")
     @Test
     @Order(2)
     void siLaIaFallaSeReintentaYNoSeInventaNingunaNota() throws Exception {
@@ -441,6 +445,7 @@ public class FlujoCalificacionIaIT {
      * milisegundos, no encontraría el trabajo y lo soltaría: los tres se quedarían en
      * PENDIENTE para siempre y la espera de aquí abajo se agotaría sin que nada diera error.
      */
+    @DisplayName("La criba rápida lee la tanda sin razonar y salta al evaluador")
     @Test
     @Order(3)
     void laCribaRapidaLeeLaTandaSinRazonarYSaltaAlEvaluador() throws Exception {
@@ -536,6 +541,7 @@ public class FlujoCalificacionIaIT {
      * hace falta para decidir sin abrir la ficha: quién es, de qué pasada viene su nota,
      * cómo se llama su archivo y cuánto pesa cada criterio.
      */
+    @DisplayName("El ranking ordena por grupo y deja al final a quien no tiene nota")
     @Test
     @Order(4)
     void elRankingOrdenaPorGrupoYDejaAlSinCalificarAlFinal() throws Exception {
@@ -644,6 +650,7 @@ public class FlujoCalificacionIaIT {
      * que no se gaste en la tanda entera: si volviera a mirar a todos, la primera pasada no
      * habría ahorrado nada.
      */
+    @DisplayName("La criba fina vuelve solo sobre los de arriba, y esa sí razona")
     @Test
     @Order(5)
     void laCribaFinaVuelveSoloSobreLosDeArribaYEsaSiRazona() throws Exception {
@@ -748,6 +755,7 @@ public class FlujoCalificacionIaIT {
      * había nada que calificar. Es el botón de la ficha, el que se usa cuando alguien quiere
      * volver a mirar a un candidato concreto de la tanda.
      */
+    @DisplayName("Se criba un currículum suelto aunque nadie haya respondido nada")
     @Test
     @Order(6)
     void seCribaUnCurriculumSueltoAunqueNadieHayaRespondidoNada() throws Exception {
@@ -797,6 +805,7 @@ public class FlujoCalificacionIaIT {
      * fácil de cometer —basta pulsar el botón mientras la tanda se está cargando— y caro de
      * descubrir, porque no falla: califica, y califica a quien no era.
      */
+    @DisplayName("La segunda pasada se niega si todavía no hay ninguna nota")
     @Test
     @Order(7)
     void laSegundaPasadaSeNiegaSiTodaviaNoHayNingunaNota() throws Exception {

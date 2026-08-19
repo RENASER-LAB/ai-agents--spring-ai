@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -48,6 +49,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @Testcontainers
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@DisplayName("Hito 2 · La evaluación del candidato")
 public class FlujoEvaluacionIT {
 
     @Container
@@ -87,6 +89,7 @@ public class FlujoEvaluacionIT {
     static String codigoPostulacion;
     static long vacanteId;
 
+    @DisplayName("Hay un banco de preguntas de verdad")
     @Test
     @Order(1)
     void hayUnBancoDePreguntasDeVerdad() throws Exception {
@@ -109,6 +112,7 @@ public class FlujoEvaluacionIT {
                 assertThat(((Number) fila.get("suma")).doubleValue()).isEqualTo(100.0));
     }
 
+    @DisplayName("El candidato recibe su evaluación al postular")
     @Test
     @Order(2)
     void elCandidatoRecibeSuEvaluacionAlPostular() throws Exception {
@@ -143,6 +147,7 @@ public class FlujoEvaluacionIT {
                 .andExpect(jsonPath("$.total").value(0));   // todavía sin empezar
     }
 
+    @DisplayName("Al empezar se le arma su examen, y la clave de respuestas no viaja")
     @Test
     @Order(3)
     void alEmpezarSeLeArmaSuExamenYLaClaveNoViaja() throws Exception {
@@ -188,6 +193,7 @@ public class FlujoEvaluacionIT {
                 .andExpect(jsonPath("$.total").value(total));
     }
 
+    @DisplayName("Responde, y no puede entregar a medias")
     @Test
     @Order(4)
     void respondeYNoPuedeEntregarAMedias() throws Exception {
@@ -250,6 +256,7 @@ public class FlujoEvaluacionIT {
         assertThat(nota.get("version_pesos_id")).isNotNull();
     }
 
+    @DisplayName("La evaluación de otro candidato no se ve")
     @Test
     @Order(5)
     void laEvaluacionDeOtroNoSeVe() throws Exception {
