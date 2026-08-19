@@ -69,9 +69,19 @@ Si el nocturno sale rojo, alguien lo revisa por la mañana. No bloquea PRs.
 1. **SonarCloud**: entrar a sonarcloud.io con la cuenta de GitHub, importar el
    repositorio, apagar «Automatic Analysis» (el análisis lo manda el CI), generar un
    token y guardarlo como secreto `SONAR_TOKEN`. La organización y la clave del
-   proyecto ya están en el `pom.xml` (`RENASER-LAB` y `renaser-lab-1`), copiadas de la
-   pantalla de SonarCloud. Si algún día se recrea el proyecto allí, hay que traer los
-   valores nuevos: con una clave que no existe, el análisis se sube a la nada.
+   proyecto ya están en el `pom.xml`, y **son dos cosas distintas que se confunden
+   muy fácil**:
+
+   | Propiedad | Valor | Ojo |
+   |---|---|---|
+   | `sonar.organization` | `renaser-lab-1` | En minúsculas. «RENASER-LAB» es el nombre que se ve en pantalla, no la clave. Lleva `-1` porque existen dos organizaciones con ese nombre y el proyecto está en la segunda |
+   | `sonar.projectKey` | `RENASER-LAB_ai-agents--spring-ai` | Esta sí conserva las mayúsculas |
+
+   Si algún día hay que confirmarlos, se preguntan a SonarCloud en vez de adivinarlos:
+
+   ```bash
+   curl -s "https://sonarcloud.io/api/components/search_projects?organization=renaser-lab-1"
+   ```
 2. **Supabase** (el proyecto de Pruebas ya existe): en el SQL Editor, ejecutar
    `create extension if not exists vector;`. Copiar la cadena de conexión directa.
 3. **CloudAMQP**: crear una instancia gratuita y copiar host, vhost, usuario y contraseña.

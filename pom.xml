@@ -40,11 +40,20 @@
 		<jacoco.version>0.8.13</jacoco.version>
 		<sonar-maven-plugin.version>5.7.0.6970</sonar-maven-plugin.version>
 		<!-- SonarCloud mira la cobertura solo del código NUEVO de cada PR (Clean as You
-		     Code). Estos dos valores son los que SonarCloud asignó al importar el
-		     repositorio, copiados de su pantalla: no se adivinan, porque con una clave
-		     que no existe el análisis se sube a un proyecto que nadie mira. -->
-		<sonar.organization>RENASER-LAB</sonar.organization>
-		<sonar.projectKey>renaser-lab-1</sonar.projectKey>
+		     Code).
+
+		     Ojo con estos dos, que se confunden con facilidad: la organización se
+		     escribe SIEMPRE en minúsculas («RENASER-LAB» es el nombre que se ve en
+		     pantalla, no la clave), y lleva el «-1» porque en SonarCloud hay dos
+		     organizaciones con ese mismo nombre —`renaser-lab` y `renaser-lab-1`— y el
+		     proyecto está en la segunda. La clave del proyecto, en cambio, sí conserva
+		     las mayúsculas.
+
+		     Comprobados contra la API de SonarCloud, no copiados de memoria:
+		       curl -s "https://sonarcloud.io/api/components/search_projects?organization=renaser-lab-1"
+		-->
+		<sonar.organization>renaser-lab-1</sonar.organization>
+		<sonar.projectKey>RENASER-LAB_ai-agents--spring-ai</sonar.projectKey>
 		<sonar.host.url>https://sonarcloud.io</sonar.host.url>
 		<sonar.coverage.jacoco.xmlReportPaths>${project.build.directory}/site/jacoco/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
 	</properties>
