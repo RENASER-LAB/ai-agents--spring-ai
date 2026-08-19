@@ -7,7 +7,6 @@ import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
-import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
@@ -23,7 +22,6 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.rabbitmq.RabbitMQContainer;
 
-import java.nio.file.Path;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -59,9 +57,6 @@ public class FlujoSimulacionValidacionIT {
     @ServiceConnection
     static RabbitMQContainer rabbit = new RabbitMQContainer("rabbitmq:3-management-alpine");
 
-    @TempDir
-    static Path carpetaArchivos;
-
     @DynamicPropertySource
     static void propiedades(DynamicPropertyRegistry registro) {
         // El broker de las pruebas es el contenedor, y habla en claro. Sin esto manda lo
@@ -70,7 +65,9 @@ public class FlujoSimulacionValidacionIT {
         // puede pasar a una prueba.
         registro.add("spring.rabbitmq.ssl.enabled", () -> "false");
         registro.add("spring.rabbitmq.virtual-host", () -> "/");
-        registro.add("app.archivos.ruta", () -> carpetaArchivos.toString());
+        // El almacen de las pruebas vive en un mapa, no en disco: no hay ningun
+        // sitio donde un curriculum pueda quedarse olvidado despues de correrlas.
+        registro.add("app.archivos.tipo", () -> "memoria");
         registro.add("app.seguridad.jwt-secreto",
                 () -> "clave-de-pruebas-suficientemente-larga-para-hmac-256-bits");
         registro.add("spring.ai.deepseek.api-key", () -> "clave-de-pruebas-no-se-usa");

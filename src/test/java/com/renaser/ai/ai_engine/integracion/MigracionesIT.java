@@ -36,6 +36,8 @@ public class MigracionesIT {
 
     @DynamicPropertySource
     static void propiedades(DynamicPropertyRegistry registro) {
+        // El almacen de las pruebas vive en un mapa, no en disco.
+        registro.add("app.archivos.tipo", () -> "memoria");
         registro.add("app.seguridad.jwt-secreto",
                 () -> "clave-de-pruebas-suficientemente-larga-para-hmac-256-bits");
         registro.add("spring.ai.deepseek.api-key", () -> "clave-de-pruebas-no-se-usa");

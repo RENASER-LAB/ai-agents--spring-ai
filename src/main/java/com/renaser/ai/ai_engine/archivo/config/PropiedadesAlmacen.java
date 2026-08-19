@@ -6,27 +6,27 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 
 /**
- * Dónde viven los currículums y las entregas.
+ * Dónde viven los currículums y las entregas: un bucket privado de Supabase.
  *
- * <p>Hay dos almacenes y se elige con {@code app.archivos.tipo}. El de <b>disco</b> es el de
- * siempre y sigue siendo el que vale sin configurar nada: quien trabaja en su máquina no
- * necesita una cuenta de nada. El de <b>supabase</b> es el que se usa desplegado.
- *
- * <p><b>El del bucket es el que hay que usar en cuanto haya más de una máquina.</b> Con el de
- * disco, el archivo queda en el ordenador que atendió la subida: si mañana corren dos copias
- * del backend detrás de un balanceador, la mitad de las descargas devuelve «no existe», y un
- * despliegue que reemplaza el contenedor se lleva los currículums por delante.
+ * <p><b>Ya no hay opción de guardarlos en disco.</b> La hubo, y se quitó por tres razones que
+ * aparecen todas en cuanto el sistema se usa de verdad: el archivo queda en la máquina que
+ * atendió la subida —así que con dos copias del backend la mitad de las descargas contesta
+ * «no existe»—, un despliegue que reemplaza el contenedor se los lleva por delante, y leerlo
+ * obligaba a construir una ruta de fichero a partir de un dato guardado en la base.
  */
 @Component
 @ConfigurationProperties(prefix = "app.archivos")
 @Getter @Setter
 public class PropiedadesAlmacen {
 
-    /** {@code disco} o {@code supabase}. */
-    private String tipo = "disco";
-
-    /** Solo para el de disco: la carpeta raíz. */
-    private String ruta;
+    /**
+     * Qué almacén se usa. En cualquier entorno de verdad, {@code supabase}.
+     *
+     * <p>Las pruebas ponen {@code memoria}, que es un doble que vive en el código de pruebas
+     * y no escribe en ningún sitio. No existe ninguna opción que guarde en disco: la hubo y
+     * se quitó, porque el archivo quedaba en la máquina que atendió la subida.
+     */
+    private String tipo = "supabase";
 
     private Supabase supabase = new Supabase();
 

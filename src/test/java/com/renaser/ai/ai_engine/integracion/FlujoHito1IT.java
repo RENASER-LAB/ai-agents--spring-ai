@@ -6,7 +6,6 @@ import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
-import org.junit.jupiter.api.io.TempDir;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
@@ -16,6 +15,7 @@ import org.springframework.core.io.FileSystemResource;
 
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
+import org.junit.jupiter.api.io.TempDir;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -59,8 +59,11 @@ public class FlujoHito1IT {
     @ServiceConnection
     static RabbitMQContainer rabbit = new RabbitMQContainer("rabbitmq:3-management-alpine");
 
+    // Sigue haciendo falta un sitio temporal, pero ya no para guardar curriculums: solo
+    // para fabricar el archivo de 13 MB con el que se comprueba que el limite de subida
+    // responde 413 y no un 500 mudo.
     @TempDir
-    static Path carpetaArchivos;
+    static Path carpetaTemporal;
 
     @DynamicPropertySource
     static void propiedades(DynamicPropertyRegistry registro) {
@@ -70,7 +73,9 @@ public class FlujoHito1IT {
         // puede pasar a una prueba.
         registro.add("spring.rabbitmq.ssl.enabled", () -> "false");
         registro.add("spring.rabbitmq.virtual-host", () -> "/");
-        registro.add("app.archivos.ruta", () -> carpetaArchivos.toString());
+        // El almacen de las pruebas vive en un mapa, no en disco: no hay ningun
+        // sitio donde un curriculum pueda quedarse olvidado despues de correrlas.
+        registro.add("app.archivos.tipo", () -> "memoria");
         registro.add("app.seguridad.jwt-secreto",
                 () -> "clave-de-pruebas-suficientemente-larga-para-hmac-256-bits");
         // El chat de agentes exige una clave para construir su bean. Aquí nadie llama al
@@ -261,13 +266,18 @@ public class FlujoHito1IT {
                         .header("Authorization", "Bearer " + tokenCandidato))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].estado").value("PERFIL_TURNO_CANDIDATO"));
-        assertThat(carpetaArchivos.resolve("1").toFile().listFiles()).hasSize(1);
+        // El curriculum quedo guardado, con su ruta. Antes esto se comprobaba mirando la
+        // carpeta del disco; ya no hay carpeta, asi que se comprueba donde de verdad importa:
+        // que la fila exista y sepa donde esta el archivo.
+        assertThat(jdbc.queryForObject(
+                "select count(*) from archivo where ruta is not null", Integer.class))
+                .isEqualTo(1);
 
         // Un CV de más de 10 MB responde 413 con explicación, no un 500 mudo. Va por HTTP real
         // y no por MockMvc a propósito: el tope lo aplica el contenedor al leer el multipart,
         // antes de que se sepa qué método atiende la llamada, y MockMvc no tiene contenedor.
         // Por lo mismo su manejador no puede ir limitado a un paquete (si lo está, sale 500).
-        Path enorme = carpetaArchivos.resolve("enorme.pdf");
+        Path enorme = carpetaTemporal.resolve("enorme.pdf");
         Files.write(enorme, new byte[13 * 1024 * 1024]);
         MultiValueMap<String, Object> cuerpo = new LinkedMultiValueMap<>();
         cuerpo.add("cv", new FileSystemResource(enorme));

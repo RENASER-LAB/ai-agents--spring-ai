@@ -26,6 +26,8 @@ class AiEngineApplicationIT {
 
 	@DynamicPropertySource
 	static void propiedades(DynamicPropertyRegistry registro) {
+        // El almacen de las pruebas vive en un mapa, no en disco.
+        registro.add("app.archivos.tipo", () -> "memoria");
         // El broker de las pruebas es el contenedor, y habla en claro. Sin esto manda lo
         // que cada uno tenga en su application-secrets.yaml —hoy, un CloudAMQP con TLS— y
         // la tanda entera falla según la máquina en la que corra, que es lo peor que le

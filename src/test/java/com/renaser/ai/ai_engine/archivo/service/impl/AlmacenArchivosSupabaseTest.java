@@ -28,6 +28,8 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withResourceNotFound;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withServerError;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 /**
@@ -184,11 +186,89 @@ class AlmacenArchivosSupabaseTest {
         supabase.verify();
     }
 
+    // ============ Leer y borrar, que es lo que usa el resto del sistema ============
+
+    @Test
+    void leerTraeLosBytesDelBucket() {
+        // Lo usa el extractor de texto: es el unico que necesita mirar DENTRO del archivo,
+        // para darle el contenido al modelo. Entregarselo a una persona no pasa por aqui.
+        supabase.expect(requestTo(URL + "/storage/v1/object/curriculums/1/abc.pdf"))
+                .andExpect(method(org.springframework.http.HttpMethod.GET))
+                .andExpect(header(HttpHeaders.AUTHORIZATION, "Bearer " + CLAVE))
+                .andRespond(withSuccess("%PDF-1.4 contenido".getBytes(),
+                        MediaType.APPLICATION_OCTET_STREAM));
+
+        assertThat(almacen.leer(archivoEn("1/abc.pdf"))).asString().startsWith("%PDF");
+        supabase.verify();
+    }
+
+    @Test
+    void borrarQuitaElObjetoPeroConservaLaFila() {
+        // La anonimizacion borra el contenido y deja la fila: se sabe que existio sin poder
+        // recuperarlo. Si la fila se fuera tambien, desapareceria el rastro de que hubo algo.
+        supabase.expect(requestTo(URL + "/storage/v1/object/curriculums/1/abc.pdf"))
+                .andExpect(method(org.springframework.http.HttpMethod.DELETE))
+                .andRespond(withSuccess());
+
+        Archivo archivo = archivoEn("1/abc.pdf");
+        almacen.borrarContenido(archivo);
+
+        supabase.verify();
+        assertThat(archivo.getRuta()).isNull();
+        assertThat(archivo.getBorradoEn()).isNotNull();
+        verify(archivos).save(archivo);
+    }
+
+    @Test
+    void siElBucketNoDejaBorrarLaFilaSeMarcaIgual() {
+        // La anonimizacion de la base no puede quedarse a medias porque el bucket tuviera un
+        // mal dia. Se anota el fallo y se sigue: lo que el candidato pidio es que sus datos
+        // dejen de estar, y la fila es la que los tiene.
+        supabase.expect(requestTo(URL + "/storage/v1/object/curriculums/1/abc.pdf"))
+                .andRespond(withServerError());
+
+        Archivo archivo = archivoEn("1/abc.pdf");
+        almacen.borrarContenido(archivo);
+
+        assertThat(archivo.getRuta()).isNull();
+        assertThat(archivo.getBorradoEn()).isNotNull();
+    }
+
+    @Test
+    void unaSubidaQueSiLlegoAnotaSuTamanoDeVerdad() {
+        // El tamano se le pregunta al bucket, no a quien subio. Fiarse de lo que diga el
+        // cliente es como no comprobarlo.
+        supabase.expect(requestTo(URL + "/storage/v1/object/curriculums/1/abc.pdf"))
+                .andExpect(method(org.springframework.http.HttpMethod.HEAD))
+                .andRespond(withStatus(org.springframework.http.HttpStatus.OK)
+                        .headers(cabecerasCon(4096)));
+
+        Archivo confirmado = almacen.confirmarSubida(archivoEn("1/abc.pdf"));
+
+        supabase.verify();
+        assertThat(confirmado.getTamano()).isEqualTo(4096);
+        assertThat(confirmado.getSubidoEn()).isNotNull();
+    }
+
+    @Test
+    void deUnArchivoBorradoNoSeLeeNada() {
+        assertThatThrownBy(() -> almacen.leer(archivoEn(null)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("borrado");
+    }
+
     // ============ Apoyo ============
 
     private MockMultipartFile unPdf() {
         return new MockMultipartFile("cv", "curriculum.pdf", "application/pdf",
                 "%PDF-1.4 lo que sea".getBytes());
+    }
+
+    /** Las cabeceras que devolveria el bucket para un objeto de ese tamano. */
+    private HttpHeaders cabecerasCon(long tamano) {
+        HttpHeaders h = new HttpHeaders();
+        h.setContentLength(tamano);
+        return h;
     }
 
     private Archivo archivoEn(String ruta) {

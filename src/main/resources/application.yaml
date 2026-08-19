@@ -104,7 +104,7 @@ spring:
         dimensions: 1536
         initialize-schema: true
 server:
-  port: 8080
+  port: 8081
 renaser:
   ai:
     chat:
@@ -136,18 +136,17 @@ supabase:
 # Configuración propia del módulo de reclutamiento
 app:
   archivos:
-    # Dónde viven los currículums: «disco» o «supabase».
+    # Dónde viven los currículums. Hoy solo hay un sitio: el bucket.
     #
-    # Disco es el de trabajar en tu máquina y no necesita configurar nada. Desplegado hay
-    # que poner «supabase»: con disco, el archivo queda en la máquina que atendió la subida,
-    # así que dos copias del backend se pierden la mitad de las descargas y un despliegue
-    # que reemplaza el contenedor se lleva los currículums por delante.
-    tipo: ${ARCHIVOS_TIPO:disco}
-
-    # Solo para «disco»: la carpeta raíz.
-    ruta: ${ARCHIVOS_RUTA:./almacen-archivos}
-
-    # Solo para «supabase».
+    # Hubo un almacén de disco y se quitó. Guardar el archivo en la máquina que atendió la
+    # subida funciona con una sola: en cuanto corren dos copias del backend, la mitad de las
+    # descargas contesta «no existe», y un despliegue que reemplaza el contenedor se lleva
+    # los currículums por delante. Además obligaba a construir una ruta de fichero con un
+    # dato que viene de la base, que es un patrón que ningún análisis de seguridad perdona.
+    #
+    # Las pruebas usan «memoria», que vive en el código de pruebas y no escribe en ningún
+    # sitio. Ningún entorno de verdad tiene esa opción.
+    tipo: ${ARCHIVOS_TIPO:supabase}
     #
     # La url y el nombre del bucket SÍ pueden vivir aquí: no son secretos. La url del
     # proyecto aparece en cualquier frontend que hable con Supabase, y el nombre del bucket
