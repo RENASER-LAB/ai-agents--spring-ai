@@ -25,4 +25,23 @@ public class Pregunta {
     private boolean esPuntuable;
     private Integer orden;
     private Instant creadoEn;
+
+    // --- Banco v3 ---
+    /** 0 no suma, 1 vale hasta 3 puntos, 2 hasta 6. Vacío en el banco v0.1, que no tenía pesos. */
+    private Short peso;
+
+    /** El ítem clave (★): hay que preguntar por él en la entrevista. */
+    private boolean esClave;
+
+    /** Descarta al candidato por sí solo, con independencia del puntaje. */
+    private boolean esEliminatorio;
+
+    /** CD: cuántos campos tiene cada caso. */
+    private Short casosPedidos;
+
+    /** V: si remite a la tabla de tramos de otro ítem, su código. */
+    private String rangosDePreguntaCodigo;
+
+    /** V: si en vez de tabla trae la fórmula escrita. */
+    private String formulaPuntaje;
 }

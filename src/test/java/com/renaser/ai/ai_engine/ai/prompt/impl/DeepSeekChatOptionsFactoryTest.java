@@ -2,6 +2,7 @@ package com.renaser.ai.ai_engine.ai.prompt.impl;
 
 import com.renaser.ai.ai_engine.ai.model.AgentType;
 import com.renaser.ai.ai_engine.ai.prompt.AgentModelSelector;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.deepseek.DeepSeekChatOptions;
 import org.springframework.ai.deepseek.api.ResponseFormat;
@@ -12,6 +13,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Corre sin levantar Spring ni tocar la base: ese es el punto de haber sacado la
  * construcción de opciones fuera de AgentInvoker.
  */
+@DisplayName("Las opciones que se le mandan a DeepSeek")
 class DeepSeekChatOptionsFactoryTest {
 
     private static final int MAX_TOKENS = 4096;

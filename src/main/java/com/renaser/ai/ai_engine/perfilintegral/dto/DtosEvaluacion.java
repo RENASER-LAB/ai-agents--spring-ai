@@ -4,6 +4,7 @@ import jakarta.validation.constraints.Size;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Los contratos de la evaluación que responde el candidato.
@@ -58,14 +59,27 @@ public final class DtosEvaluacion {
     /**
      * Lo que envía el candidato al responder.
      *
-     * <p>Una de las dos: {@code opcionId} para las de opción múltiple, {@code texto} para las
-     * abiertas. {@code segundos} es cuánto tardó, que sirve para detectar respuestas
+     * <p>Una de las tres: {@code opcionId} para las de opción única, {@code texto} para las
+     * abiertas, y {@code detalle} para los formatos del banco v3, que necesitan más de un
+     * valor. {@code segundos} es cuánto tardó, que sirve para detectar respuestas
      * apresuradas — no para penalizar a nadie.
+     *
+     * <p>La forma de {@code detalle} depende del tipo de la pregunta, y se comprueba contra él
+     * al guardar:
+     *
+     * <pre>{@code
+     * EF-4    {"mas": 12, "menos": 15}                      ids de opción, distintos
+     * SJT-R   {"calificaciones": {"12": 5, "13": 2}}        id de opción -> 1..5
+     * SEC     {"orden": [14, 12, 13, 15, 16]}               ids en el orden que eligió
+     * INV/DE  {"marcadas": [12, 14, 17]}                    ids de lo que marcó
+     * CD      {"campos": {"1": "...", "2": "..."}}          nº de campo -> lo que puso
+     * }</pre>
      */
     public record Responder(
             Long opcionId,
             @Size(max = 20_000, message = "La respuesta es demasiado larga")
             String texto,
+            Map<String, Object> detalle,
             Integer segundos) {}
 
     /** Lo que devuelve entregar la evaluación. */

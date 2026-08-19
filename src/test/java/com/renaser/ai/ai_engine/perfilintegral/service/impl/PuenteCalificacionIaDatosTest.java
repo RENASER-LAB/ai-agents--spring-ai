@@ -12,6 +12,7 @@ import com.renaser.ai.ai_engine.vacante.entity.Vacante;
 import com.renaser.ai.ai_engine.vacante.repository.PuestoRepository;
 import com.renaser.ai.ai_engine.vacante.repository.VacanteRepository;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -43,6 +44,7 @@ import static org.mockito.Mockito.when;
  * un cambio que hay que ver, no uno que pase inadvertido.
  */
 @ExtendWith(MockitoExtension.class)
+@DisplayName("El puente entre la IA y los datos del currículum")
 class PuenteCalificacionIaDatosTest {
 
     private static final long POSTULACION = 55L;

@@ -2,6 +2,7 @@ package com.renaser.ai.ai_engine.postulacion.service;
 
 import com.renaser.ai.ai_engine.postulacion.service.impl.AnonimizadorCv;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
@@ -15,6 +16,7 @@ import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
  * <p>Es la única regla del hito 2 que no se puede comprobar mirando la base: o el texto sale
  * limpio, o el dato viaja al modelo y nadie se entera.
  */
+@DisplayName("El anonimizador del currículum")
 class AnonimizadorCvTest {
 
     private final AnonimizadorCv anonimizador = new AnonimizadorCv();

@@ -39,6 +39,7 @@ import com.renaser.ai.ai_engine.vacante.repository.PuestoRepository;
 import com.renaser.ai.ai_engine.vacante.repository.VacanteRepository;
 
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -90,6 +91,7 @@ import static org.mockito.Mockito.when;
  * </ul>
  */
 @ExtendWith(MockitoExtension.class)
+@DisplayName("El Perfil Integral que ve el panel")
 class ServicioPerfilIntegralPanelImplTest {
 
     private static final long VACANTE = 7L;
