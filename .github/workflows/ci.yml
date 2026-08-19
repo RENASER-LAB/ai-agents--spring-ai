@@ -33,7 +33,7 @@ jobs:
           # Historia completa: SonarCloud la necesita para saber qué líneas son nuevas
           fetch-depth: 0
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '25'
