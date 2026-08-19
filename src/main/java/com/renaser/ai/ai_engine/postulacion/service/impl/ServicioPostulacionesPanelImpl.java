@@ -168,11 +168,33 @@ public class ServicioPostulacionesPanelImpl implements ServicioPostulacionesPane
 
     @Override
     public byte[] descargarArchivo(ContextoUsuario quien, Long archivoId, StringBuilder nombreSalida) {
-        permisos.alcanceDe("descargar_entregables");
-        Archivo archivo = archivos.findByIdAndOrganizacionId(archivoId, quien.organizacionId())
-                .orElseThrow(() -> new ResourceNotFoundException("Archivo", "id", archivoId));
+        Archivo archivo = elVisible(quien, archivoId);
         nombreSalida.append(archivo.getNombreOriginal() == null ? "archivo" : archivo.getNombreOriginal());
         return almacen.leer(archivo);
+    }
+
+    @Override
+    public EnlaceArchivo enlaceDeArchivo(ContextoUsuario quien, Long archivoId) {
+        Archivo archivo = elVisible(quien, archivoId);
+        var firmado = almacen.urlDeDescarga(archivo)
+                .orElseThrow(() -> new IllegalStateException(
+                        "El almacen de archivos de este entorno no reparte enlaces: usa la "
+                                + "descarga de siempre"));
+        return new EnlaceArchivo(firmado.url(), firmado.expira(),
+                archivo.getNombreOriginal() == null ? "archivo" : archivo.getNombreOriginal());
+    }
+
+    /**
+     * El archivo, si quien pregunta puede verlo.
+     *
+     * <p>Lo comparten la descarga y el enlace <b>a proposito</b>: son dos formas de entregar
+     * lo mismo, y si una comprobara el permiso y la otra no, la que no lo comprueba se
+     * convierte en la puerta de atras.
+     */
+    private Archivo elVisible(ContextoUsuario quien, Long archivoId) {
+        permisos.alcanceDe("descargar_entregables");
+        return archivos.findByIdAndOrganizacionId(archivoId, quien.organizacionId())
+                .orElseThrow(() -> new ResourceNotFoundException("Archivo", "id", archivoId));
     }
 
     // ============ ayudas ============

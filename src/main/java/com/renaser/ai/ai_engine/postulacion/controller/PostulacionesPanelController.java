@@ -139,9 +139,20 @@ public class PostulacionesPanelController {
         servicio.confirmarAvance(permisos.actual(), id, datos.motivo());
     }
 
+    @GetMapping("/archivos/{id}/enlace")
+    @PreAuthorize("@permisos.tiene('descargar_entregables')")
+    @Operation(summary = "Un enlace temporal para bajarse el archivo del almacen "
+            + "directamente, sin que pase por aqui. Es lo que hay que usar cuando los "
+            + "archivos viven en un bucket; con el almacen de disco no hay enlace y toca "
+            + "/descarga")
+    public EnlaceArchivo enlace(@PathVariable Long id) {
+        return servicio.enlaceDeArchivo(permisos.actual(), id);
+    }
+
     @GetMapping("/archivos/{id}/descarga")
     @PreAuthorize("@permisos.tiene('descargar_entregables')")
-    @Operation(summary = "Descargar un archivo (el CV) por su id")
+    @Operation(summary = "Descargar un archivo (el CV) por su id. El contenido pasa por el "
+            + "backend; con los archivos en un bucket es mejor /enlace")
     public ResponseEntity<byte[]> descargar(@PathVariable Long id) {
         StringBuilder nombre = new StringBuilder();
         byte[] contenido = servicio.descargarArchivo(permisos.actual(), id, nombre);

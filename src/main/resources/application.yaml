@@ -136,8 +136,31 @@ supabase:
 # Configuración propia del módulo de reclutamiento
 app:
   archivos:
-    # Dónde se guardan los CV en disco. En producción apunta a un volumen propio.
+    # Dónde viven los currículums: «disco» o «supabase».
+    #
+    # Disco es el de trabajar en tu máquina y no necesita configurar nada. Desplegado hay
+    # que poner «supabase»: con disco, el archivo queda en la máquina que atendió la subida,
+    # así que dos copias del backend se pierden la mitad de las descargas y un despliegue
+    # que reemplaza el contenedor se lleva los currículums por delante.
+    tipo: ${ARCHIVOS_TIPO:disco}
+
+    # Solo para «disco»: la carpeta raíz.
     ruta: ${ARCHIVOS_RUTA:./almacen-archivos}
+
+    # Solo para «supabase».
+    #
+    # La url y el nombre del bucket SÍ pueden vivir aquí: no son secretos. La url del
+    # proyecto aparece en cualquier frontend que hable con Supabase, y el nombre del bucket
+    # no abre nada por sí solo. Lo que no puede estar aquí es la clave: es la service_role,
+    # se salta todas las reglas de acceso, y quien la tenga lee el bucket entero. Esa vive
+    # en application-secrets.yaml, que no se versiona.
+    supabase:
+      # El proyecto de la base de datos del backend, NO el de los agentes de IA.
+      url: ${SUPABASE_URL:https://jcmjaiwwnbbhflguydnq.supabase.co}
+      bucket: ${ARCHIVOS_BUCKET:Documentos-cv}
+      # Lo que dura un enlace de descarga. Corto a propósito: el enlace no vuelve a
+      # preguntar quién eres, así que es tan secreto como el currículum que abre.
+      minutos-enlace: 5
   seguridad:
     # Clave HMAC para firmar los tokens. Va en application-secrets.yaml (no se versiona)
     # o por variable de entorno. Mínimo 32 bytes; sin ella la aplicación no arranca.

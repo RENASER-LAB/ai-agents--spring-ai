@@ -42,6 +42,7 @@ requisitos nuevos el 14 de agosto y cambian bastante.
 - [Los siete fallos de la auditoría](FALLOS-CORREGIDOS-AUDITORIA.md) — lo que encontró la revisión del 18/08: cuatro que tocaban dinero o decisiones de contratación, y ninguno daba error
 | [Comprobaciones automáticas](COMPROBACIONES-AUTOMATICAS.md) | Qué se comprueba solo: 128 pruebas y 7 reglas de arquitectura. Y qué falta: la seguridad, con Semgrep |
 | [Conectar la base a Supabase](CONEXION-SUPABASE.md) | Cómo hacer que la base de datos deje de vivir en tu máquina y pase a Supabase. Paso a paso, y cómo volver atrás |
+- [Los curriculums dejan de vivir en el backend](ARCHIVOS-EN-BUCKET.md) — el bucket, los dos enlaces firmados, y por que un PDF en el disco del backend se pierde en el primer despliegue
 
 ### Diagramas
 
