@@ -178,6 +178,66 @@ RENASER_IA_REAL=si ./mvnw verify -Dit.test=CalificacionIaRealIT
 RabbitMQ, y los cinco tests saltados de `CalificacionIaRealIT`. Si termina en `BUILD SUCCESS`,
 esta bien.
 
+## El banco de preguntas v3 (19/08/2026)
+El cliente reemplazo el banco entero. Son **190 items** (85 directivo, 55 coordinacion, 50
+operativo) con **ocho formatos nuevos** —`EF-4`, `SJT-R`, `SEC`, `INV`, `DE`, `CD`, `V`, `PC`—
+y ninguno coincide con los seis de antes. El banco v0.1 y sus 200 preguntas **ya no existen**:
+la migracion `V20` los borra. Se pudo porque no habia ni una respuesta guardada.
+
+**El examen ya no se muestrea: se aplica el banco completo del nivel**, en el orden del
+documento. Ese orden importa — separa cada par de consistencia de su pareja al menos quince
+items — asi que **no se baraja**.
+
+El insumo es `docs/insumos/banco-renaser-v3-completo.pdf` y lo convierte
+`scripts/importar-banco-v3.py`, que comprueba cuatro totales que el propio documento declara y
+no genera nada si alguno no cuadra. **No transcribir items a mano.**
+
+### PENDIENTE · el detalle de las respuestas tiene que pasar a tabla
+Los formatos nuevos no se responden con una sola opcion: un `SJT-R` califica cada opcion del 1
+al 5, un `EF-4` marca dos, un `SEC` ordena cinco pasos. Eso se guarda hoy en
+**`respuesta.detalle`, una columna `jsonb`** (migracion `V21`).
+
+**Es deuda tecnica y se tomo a sabiendas.** Lo correcto es una tabla
+`respuesta_detalle(respuesta_id, opcion_id, valor, orden)`. Lo que cuesta mientras tanto:
+
+- La base **no comprueba nada**: nada impide apuntar a una opcion de otra pregunta, ni guardar
+  un detalle con la forma de otro formato. Esa comprobacion vive ahora en
+  `ValidadorDetalleV3`, y **es lo unico** entre una respuesta mal formada y una nota calculada
+  sobre ella. Si se toca ese validador, hay que mirar sus tests primero.
+- Un informe que cruce respuestas ya no sale con SQL normal.
+
+Al pasarlo a tabla, migrar lo que haya en `detalle` y borrar la columna.
+
+### Cuidado con Jackson: el proyecto va con la 3, no con la 2
+Spring Boot 4 trae **Jackson 3** (`tools.jackson.databind.ObjectMapper`), no el
+`com.fasterxml.jackson.databind` de toda la vida. El de siempre **compila** —entra como
+transitiva— pero **no existe en tiempo de ejecucion**, y el sintoma no dice nada de Jackson:
+la clase que lo usa deja de registrarse como bean y salen decenas de errores de contexto
+(«No qualifying bean of type ServicioEvaluacion»). Costo 37 tests en rojo averiguarlo.
+
+En codigo de produccion: `tools.jackson`. Las pruebas de integracion siguen con Jackson 2, que
+esta en su classpath, asi que `integracion/soporte/RespuestaV3` usa la 2 a proposito.
+
+### El motor de puntuacion v3
+`ServicioCalificacionImpl` **ya no es el del banco v0.1**: se reescribio sobre
+`FormulasBancoV3`, que tiene las siete formulas del documento con sus tests. Cada item da de 0
+a 3 segun su formato, se multiplica por su peso (1 llega a 3 puntos, 2 llega a 6) y la nota es
+lo obtenido sobre la suma de los maximos.
+
+**Un item sin responder no cuenta como cero**: se queda fuera del maximo tambien. Inventarle un
+cero castigaria dos veces a quien no termino.
+
+**PENDIENTE del motor**, que todavia no esta:
+- Los items `V` no se puntuan: hace falta interpretar el dato escrito contra su tabla de tramos.
+- En los `CD` solo se mira que el campo venga lleno, no que este dentro de rango ni que sea
+  coherente con los demas campos del caso.
+- Faltan los multiplicadores por familia, los umbrales de nivel (I, II, III), los cinco filtros
+  eliminatorios y las banderas.
+- `detectarContradicciones` sigue con la regla del v0.1 (`diferencia_maxima`); la del v3 es
+  −5% del global y bandera roja.
+
+Ver [docs/AVANCE-BANCO-V3-2026-08-19.md](docs/AVANCE-BANCO-V3-2026-08-19.md).
+
 ## La tuberia (19/08/2026)
 Cada cambio pasa por GitHub Actions antes de llegar a nadie. **Si algo sale rojo, no se
 fusiona.** El detalle esta en [docs/CI-CD.md](docs/CI-CD.md); aqui lo que hay que saber:

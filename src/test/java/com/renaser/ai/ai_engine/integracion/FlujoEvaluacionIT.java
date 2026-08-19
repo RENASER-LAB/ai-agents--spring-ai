@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.DisplayName;
+import com.renaser.ai.ai_engine.integracion.soporte.RespuestaV3;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -93,13 +94,20 @@ public class FlujoEvaluacionIT {
     @Test
     @Order(1)
     void hayUnBancoDePreguntasDeVerdad() throws Exception {
-        // Las 200 preguntas del Banco Maestro del cliente, no un banco vacío
-        assertThat(jdbc.queryForObject("select count(*) from pregunta", Integer.class)).isEqualTo(200);
+        // Los 190 ítems del Banco RENASER v3, no un banco vacío. Eran 200 hasta que la V20
+        // reemplazó el banco v0.1: son 85 del directivo, 55 del de coordinación y 50 del
+        // operativo, y esos tres números los declara el propio documento del cliente.
+        assertThat(jdbc.queryForObject("select count(*) from pregunta", Integer.class)).isEqualTo(190);
         assertThat(jdbc.queryForObject("select count(*) from plantilla_evaluacion", Integer.class)).isEqualTo(3);
 
-        // Las de estilo no suman nota y las de consistencia tampoco: no pueden ser filtro (RF-54)
+        // Lo que no debe sumar, no suma. En el v3 son los pares de consistencia y los ítems
+        // puramente eliminatorios: llevan peso 0 y no pueden aportar nota (RF-54).
         assertThat(jdbc.queryForObject(
-                "select count(*) from pregunta where tipo in ('ESTILO','CONSISTENCIA') and es_puntuable",
+                "select count(*) from pregunta where peso = 0 and es_puntuable",
+                Integer.class)).isZero();
+        // Y al revés: todo lo que puntúa tiene un peso de verdad
+        assertThat(jdbc.queryForObject(
+                "select count(*) from pregunta where es_puntuable and (peso is null or peso = 0)",
                 Integer.class)).isZero();
 
         // Y los pesos suman 100 por nivel DENTRO DE CADA VERSION, que es lo que exige publicar
@@ -160,14 +168,20 @@ public class FlujoEvaluacionIT {
         JsonNode evaluacion = json.readTree(cuerpo);
         int total = evaluacion.get("total").asInt();
 
-        // La plantilla de Ejecución pide entre 20 y 27 preguntas (la suma de sus cuotas), no
+        // ANTES: la plantilla de Ejecución pedía entre 20 y 27 preguntas, la suma de sus cuotas.
+        // AHORA el banco v3 se aplica entero —son sus 50 ítems los que forman el examen—, porque
+        // el máximo de 168 que declara el documento solo se alcanza respondiéndolos todos.
+        // Comentario viejo, conservado para entender el cambio: pedía entre 20 y 27 preguntas, no
         // las 50 del banco: el banco es un repositorio, no el examen (RF-47)
-        assertThat(total).isBetween(20, 27);
-        assertThat(total).isLessThan(50);
+        assertThat(total).isEqualTo(50);
 
         // RF-53: ni puntajes, ni lógica interna, ni códigos de dimensión. Se comprueba sobre
         // el JSON crudo porque es exactamente lo que llegaría al navegador.
         assertThat(cuerpo).doesNotContain("puntaje", "logicaInterna", "esPuntuable", "dimension");
+        // El v3 añadió más clave a la opción, y ninguna puede llegar al candidato: "valor" es
+        // la puntuación oculta de los EF-4, "esDistractor" delataría qué elementos de un
+        // inventario están inventados, y "ordenCorrecto" es la respuesta de los ordenamientos.
+        assertThat(cuerpo).doesNotContain("valor", "esDistractor", "ordenCorrecto");
 
         // Y en particular ninguna de las 22 dimensiones se cuela por un campo de texto. Las
         // de estilo traían su tradeoff ("VEL vs CRI") en un campo que sí viajaba: es
@@ -270,12 +284,9 @@ public class FlujoEvaluacionIT {
     // ============ Apoyo ============
 
     private void responder(long preguntaId, JsonNode pregunta) throws Exception {
-        JsonNode opciones = pregunta.get("opciones");
-        // Las de opción se responden con el id de la opción elegida, que es lo que permite
-        // puntuarlas contra la clave. Las abiertas, con texto.
-        String cuerpo = opciones != null && !opciones.isEmpty()
-                ? "{\"opcionId\":%d,\"segundos\":30}".formatted(opciones.get(0).get("id").asLong())
-                : "{\"texto\":\"Un caso concreto: reduje el tiempo de cierre midiendo antes y después\",\"segundos\":90}";
+        // Cada formato del banco v3 tiene su propia forma de respuesta —un SJT-R califica cada
+        // opción, un EF-4 marca dos, un SEC las ordena— y el validador rechaza las demás.
+        String cuerpo = RespuestaV3.para(pregunta);
         mvc.perform(put("/api/v1/portal/evaluacion/" + codigoPostulacion + "/respuestas/" + preguntaId)
                         .header("Authorization", "Bearer " + tokenCandidato)
                         .contentType(MediaType.APPLICATION_JSON)

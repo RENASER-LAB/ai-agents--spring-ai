@@ -47,14 +47,21 @@ demás de la calificación se prueba con un doble del modelo y no gasta nada.
 
 ---
 
-## 148 pruebas
+## 191 pruebas
 
 | Qué | Cuántas | Necesita |
 |---|---:|---|
 | Unitarias, con dobles | 99 | nada |
 | Arquitectura | 7 | nada |
+| Las fórmulas del banco v3 | 22 | nada |
+| El validador de las respuestas v3 | 21 | nada |
 | Integración, de punta a punta | 37 | Docker |
 | Contra el proveedor de verdad | 5 | Docker, saldo y la bandera |
+
+Las dos tandas del banco v3 se prueban sueltas porque deciden la nota de una persona: las
+fórmulas contra los ejemplos del documento del cliente, y el validador sobre todo contra lo
+que tiene que **rechazar** — desde que se guarda el detalle en `jsonb`, es lo único que impide
+que una respuesta con mala forma acabe convertida en un puntaje.
 
 Las de integración levantan un PostgreSQL y un RabbitMQ de verdad con Testcontainers, y
 recorren el flujo entero. **El modelo siempre se simula**: ninguna prueba de la tanda normal

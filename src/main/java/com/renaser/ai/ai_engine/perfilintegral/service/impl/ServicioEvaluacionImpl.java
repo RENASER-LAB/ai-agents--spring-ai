@@ -1,5 +1,6 @@
 package com.renaser.ai.ai_engine.perfilintegral.service.impl;
 
+import tools.jackson.databind.ObjectMapper;
 import com.renaser.ai.ai_engine.ai.exception.ResourceNotFoundException;
 import com.renaser.ai.ai_engine.ai.service.ColaCalificacionIa;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosEvaluacion.EntregaResponse;
@@ -7,7 +8,6 @@ import com.renaser.ai.ai_engine.perfilintegral.dto.DtosEvaluacion.EvaluacionCand
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosEvaluacion.OpcionCandidato;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosEvaluacion.PreguntaCandidato;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosEvaluacion.Responder;
-import com.renaser.ai.ai_engine.perfilintegral.entity.CuotaPlantillaEvaluacion;
 import com.renaser.ai.ai_engine.perfilintegral.entity.Evaluacion;
 import com.renaser.ai.ai_engine.perfilintegral.entity.Opcion;
 import com.renaser.ai.ai_engine.perfilintegral.entity.OrdenPregunta;
@@ -15,7 +15,6 @@ import com.renaser.ai.ai_engine.perfilintegral.entity.PlantillaEvaluacion;
 import com.renaser.ai.ai_engine.perfilintegral.entity.Pregunta;
 import com.renaser.ai.ai_engine.perfilintegral.entity.Respuesta;
 import com.renaser.ai.ai_engine.perfilintegral.entity.VersionBanco;
-import com.renaser.ai.ai_engine.perfilintegral.repository.CuotaPlantillaEvaluacionRepository;
 import com.renaser.ai.ai_engine.perfilintegral.repository.EvaluacionRepository;
 import com.renaser.ai.ai_engine.perfilintegral.repository.OpcionRepository;
 import com.renaser.ai.ai_engine.perfilintegral.repository.OrdenPreguntaRepository;
@@ -25,6 +24,7 @@ import com.renaser.ai.ai_engine.perfilintegral.repository.RespuestaRepository;
 import com.renaser.ai.ai_engine.perfilintegral.repository.VersionBancoRepository;
 import com.renaser.ai.ai_engine.perfilintegral.service.ServicioCalificacion;
 import com.renaser.ai.ai_engine.perfilintegral.service.ServicioEvaluacion;
+import com.renaser.ai.ai_engine.perfilintegral.service.ValidadorDetalleV3;
 import com.renaser.ai.ai_engine.postulacion.entity.Postulacion;
 import com.renaser.ai.ai_engine.postulacion.repository.PostulacionRepository;
 import com.renaser.ai.ai_engine.postulacion.service.MaquinaEstados;
@@ -39,7 +39,6 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -70,7 +69,6 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
 
     private final EvaluacionRepository evaluaciones;
     private final PlantillaEvaluacionRepository plantillas;
-    private final CuotaPlantillaEvaluacionRepository cuotas;
     private final VersionBancoRepository versionesBanco;
     private final PreguntaRepository preguntas;
     private final OpcionRepository opciones;
@@ -82,6 +80,10 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
     private final ColaCalificacionIa colaIa;
 
     private final SecureRandom azar = new SecureRandom();
+
+    // Jackson 3 (tools.jackson), que es el que trae Spring Boot 4 — no el com.fasterxml de
+    // siempre. Propio y no inyectado: serializar un mapa no necesita la configuración de nadie.
+    private static final ObjectMapper JSON = new ObjectMapper();
 
     // ============ Crear ============
 
@@ -154,7 +156,19 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
         if (!leToca) {
             throw new ResourceNotFoundException("Pregunta", "id", preguntaId);
         }
-        if (datos.opcionId() == null && (datos.texto() == null || datos.texto().isBlank())) {
+        Pregunta pregunta = preguntas.findById(preguntaId)
+                .orElseThrow(() -> new ResourceNotFoundException("Pregunta", "id", preguntaId));
+
+        // Los formatos del banco v3 no se responden con una sola opción, así que traen su
+        // detalle. Y como ese detalle se guarda en jsonb, la base no comprueba nada de él:
+        // esta llamada es lo único que impide que una respuesta con mala forma acabe
+        // convertida en una nota. Ver ValidadorDetalleV3 y la migración V21.
+        boolean conDetalle = ValidadorDetalleV3.necesitaDetalle(pregunta.getTipo());
+        if (conDetalle) {
+            Set<Long> suyas = opciones.findByPreguntaIdOrderByLetra(preguntaId).stream()
+                    .map(Opcion::getId).collect(Collectors.toSet());
+            ValidadorDetalleV3.validar(pregunta.getTipo(), suyas, datos.detalle());
+        } else if (datos.opcionId() == null && (datos.texto() == null || datos.texto().isBlank())) {
             throw new IllegalArgumentException("Hay que elegir una opción o escribir una respuesta");
         }
 
@@ -167,6 +181,7 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
                         .build());
         respuesta.setOpcionId(datos.opcionId());
         respuesta.setTexto(datos.texto());
+        respuesta.setDetalle(comoJson(datos.detalle()));
         respuesta.setSegundos(datos.segundos());
         respuesta.setRespondidaEn(Instant.now());
         respuestas.save(respuesta);
@@ -235,40 +250,32 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
     // ============ Armar el examen ============
 
     /**
-     * Elige qué preguntas le tocan y en qué orden, según las cuotas de su plantilla.
+     * Arma el examen del candidato: el banco entero de su nivel, en el orden del documento.
+     *
+     * <p><b>El banco v3 no se muestrea, se aplica completo.</b> Sus 85, 55 o 50 ítems son el
+     * examen, y de ahí salen los máximos que el cliente declara —288, 186 y 168—: si se
+     * aplicara solo una parte, ese máximo no sería alcanzable y los umbrales que deciden el
+     * nivel (I, II o III) dejarían de significar nada.
+     *
+     * <p>Por eso ya no se usan las cuotas de la plantilla, que servían para el banco v0.1:
+     * aquel era un repositorio del que cada vacante elegía una muestra. La plantilla sigue
+     * mandando en lo suyo —el tiempo objetivo y la vigencia—, pero no en qué preguntas caen.
+     *
+     * <p><b>Y el orden no se baraja.</b> El del documento no es arbitrario: agrupa los ítems
+     * por bloque y coloca cada par de consistencia bien lejos de su pareja —al menos quince
+     * ítems— para que el candidato no las vea juntas y las cuadre. Barajar rompería eso.
      *
      * <p>Se hace una sola vez, la primera vez que entra. A partir de ahí el examen es el suyo
      * y no cambia, aunque vuelva a entrar tres días después.
      */
     private void armarOrden(Evaluacion evaluacion) {
-        List<CuotaPlantillaEvaluacion> receta =
-                cuotas.findByPlantillaEvaluacionId(evaluacion.getPlantillaEvaluacionId());
-        if (receta.isEmpty()) {
+        List<Pregunta> finales = preguntas.findByVersionBancoIdOrderByOrden(
+                evaluacion.getVersionBancoNivelId());
+        if (finales.isEmpty()) {
             throw new IllegalStateException(
-                    "La plantilla de evaluación no tiene ninguna cuota: no hay con qué armar el examen");
+                    "El banco de preguntas de este nivel no tiene ninguna pregunta: "
+                            + "no hay con qué armar el examen");
         }
-
-        Set<Pregunta> elegidas = new LinkedHashSet<>();
-        for (CuotaPlantillaEvaluacion cuota : receta) {
-            List<Pregunta> candidatas = new ArrayList<>(preguntas.findByVersionBancoIdAndTipo(
-                    evaluacion.getVersionBancoNivelId(), cuota.getTipoPregunta()));
-            candidatas.removeAll(elegidas);
-
-            int cuantas = entre(cuota.getCantidadMin(), cuota.getCantidadMax());
-            if (candidatas.size() < cuota.getCantidadMin()) {
-                throw new IllegalStateException(
-                        "El banco no tiene suficientes preguntas de tipo " + cuota.getTipoPregunta()
-                                + ": la plantilla pide al menos " + cuota.getCantidadMin()
-                                + " y hay " + candidatas.size());
-            }
-            barajar(candidatas);
-            elegidas.addAll(candidatas.subList(0, Math.min(cuantas, candidatas.size())));
-        }
-
-        // El orden final también se baraja: si no, todas las de estilo irían juntas y el
-        // examen sería predecible entre candidatos.
-        List<Pregunta> finales = new ArrayList<>(elegidas);
-        barajar(finales);
 
         Map<Long, List<Opcion>> porPregunta = opciones
                 .findByPreguntaIdIn(finales.stream().map(Pregunta::getId).toList()).stream()
@@ -375,8 +382,12 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
         }
     }
 
-    private int entre(int minimo, int maximo) {
-        return maximo <= minimo ? minimo : minimo + azar.nextInt(maximo - minimo + 1);
+    /** El detalle viaja como objeto y se guarda como jsonb; null si la pregunta no lo usa. */
+    private String comoJson(Map<String, Object> detalle) {
+        if (detalle == null || detalle.isEmpty()) {
+            return null;
+        }
+        return JSON.writeValueAsString(detalle);
     }
 
     private void barajar(List<?> lista) {

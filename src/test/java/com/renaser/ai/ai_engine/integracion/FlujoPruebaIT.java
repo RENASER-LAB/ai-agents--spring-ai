@@ -6,6 +6,7 @@ import com.renaser.ai.ai_engine.comun.programado.SondeoVencimientos;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.DisplayName;
+import com.renaser.ai.ai_engine.integracion.soporte.RespuestaV3;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -209,10 +210,8 @@ public class FlujoPruebaIT {
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString());
         for (JsonNode p : evaluacion.get("preguntas")) {
-            JsonNode opciones = p.get("opciones");
-            String cuerpo = opciones != null && !opciones.isEmpty()
-                    ? "{\"opcionId\":%d,\"segundos\":20}".formatted(opciones.get(0).get("id").asLong())
-                    : "{\"texto\":\"Un caso: automaticé el pipeline y medí el resultado\",\"segundos\":60}";
+            // Cada formato del banco v3 se responde a su manera; RespuestaV3 arma la que toque.
+            String cuerpo = RespuestaV3.para(p);
             mvc.perform(put("/api/v1/portal/evaluacion/" + codigoPostulacion + "/respuestas/" + p.get("id").asLong())
                             .header("Authorization", "Bearer " + tokenCandidato)
                             .contentType(MediaType.APPLICATION_JSON).content(cuerpo))
