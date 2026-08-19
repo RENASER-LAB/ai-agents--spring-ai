@@ -94,6 +94,12 @@ public class FlujoCalificacionIaIT {
 
     @DynamicPropertySource
     static void propiedades(DynamicPropertyRegistry registro) {
+        // El broker de las pruebas es el contenedor, y habla en claro. Sin esto manda lo
+        // que cada uno tenga en su application-secrets.yaml —hoy, un CloudAMQP con TLS— y
+        // la tanda entera falla según la máquina en la que corra, que es lo peor que le
+        // puede pasar a una prueba.
+        registro.add("spring.rabbitmq.ssl.enabled", () -> "false");
+        registro.add("spring.rabbitmq.virtual-host", () -> "/");
         registro.add("app.archivos.ruta", () -> carpetaArchivos.toString());
         registro.add("app.seguridad.jwt-secreto",
                 () -> "clave-de-pruebas-suficientemente-larga-para-hmac-256-bits");
@@ -264,8 +270,11 @@ public class FlujoCalificacionIaIT {
         responderYEntregar(codigoBueno);
 
         // La cola arrancó sola al entregar: nadie tuvo que pulsar nada
-        esperarA(() -> contar("select count(*) from trabajo_ia where estado = 'TERMINADO'") == 3,
-                "los tres agentes terminen");
+        // Cuatro y no tres: la fila normal empieza sacando la ficha de datos del candidato.
+        // Antes solo la sacaba la pasada rápida, y quien se calificaba por aquí salía sin
+        // teléfono, sin experiencia y sin último puesto, sin manera de rellenarlo después.
+        esperarA(() -> contar("select count(*) from trabajo_ia where estado = 'TERMINADO'") == 4,
+                "los cuatro agentes terminen");
 
         long postulacionId = idDe(codigoBueno);
 
@@ -299,7 +308,7 @@ public class FlujoCalificacionIaIT {
                 select agente_codigo, version_agente, instruccion_ia_id, es_exitosa,
                        tokens_entrada, duracion_ms
                 from ejecucion_ia order by id""");
-        assertThat(ejecuciones).hasSize(3);
+        assertThat(ejecuciones).hasSize(4);
         assertThat(ejecuciones).allSatisfy(fila -> {
             assertThat(fila.get("instruccion_ia_id")).isNotNull();
             assertThat(fila.get("version_agente")).isNotNull();
@@ -307,7 +316,7 @@ public class FlujoCalificacionIaIT {
             assertThat(fila.get("tokens_entrada")).isNotNull();
         });
         assertThat(ejecuciones.stream().map(f -> f.get("agente_codigo")).toList())
-                .containsExactly("EVIDENCIA_CV", "EVALUADOR", "POTENCIAL_RIESGO");
+                .containsExactly("DATOS_CV", "EVIDENCIA_CV", "EVALUADOR", "POTENCIAL_RIESGO");
 
         // 4 · Los ocho criterios del currículum, ni uno más. El noveno que devolvió el modelo
         // no existe y el décimo venía sin explicación: los dos se descartan (RF-150).
@@ -708,13 +717,16 @@ public class FlujoCalificacionIaIT {
                 .isNotEmpty()
                 .allSatisfy(llamada -> assertThat(llamada).endsWith(":true"));
 
-        // 2 · Y el trabajo quedó marcado como de la pasada fina. Sin la columna «modo» la
-        // cola habría encontrado el trabajo de la rápida y no habría corrido nada.
+        // 2 · Y a nadie se le sacó la ficha de datos dos veces. Ese paso está en las dos
+        // filas, pero se salta solo cuando la ficha ya existe: son datos copiados del
+        // currículum, no notas, y no cambian salvo que cambie el archivo.
         assertThat(contar("""
-                select count(*) from trabajo_ia
-                where modo = 'FINA' and agente_codigo = 'DATOS_CV'"""))
-                .withFailMessage("La fila de la pasada fina no incluye al lector de datos: "
-                        + "sus datos ya se sacaron en la rápida y no cambian")
+                select count(*) from (
+                    select postulacion_id from trabajo_ia
+                    where agente_codigo = 'DATOS_CV' and estado = 'TERMINADO'
+                    group by postulacion_id having count(*) > 1) repetidos"""))
+                .withFailMessage("Alguien pagó su ficha de datos dos veces: la segunda pasada "
+                        + "tiene que saltarse ese paso cuando la ficha ya está sacada")
                 .isZero();
 
         // 3 · Nadie perdió su nota por volver a pasar: se pisan, no se borran

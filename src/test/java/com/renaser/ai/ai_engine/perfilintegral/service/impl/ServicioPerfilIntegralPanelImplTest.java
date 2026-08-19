@@ -1,5 +1,6 @@
 package com.renaser.ai.ai_engine.perfilintegral.service.impl;
 
+import com.renaser.ai.ai_engine.ai.exception.ResourceNotFoundException;
 import com.renaser.ai.ai_engine.ai.service.ColaCalificacionIa;
 import com.renaser.ai.ai_engine.archivo.repository.ArchivoRepository;
 import com.renaser.ai.ai_engine.archivo.service.AlmacenArchivos;
@@ -17,6 +18,8 @@ import com.renaser.ai.ai_engine.perfilintegral.repository.NotaCriterioRepository
 import com.renaser.ai.ai_engine.perfilintegral.repository.NotaEtapaRepository;
 import com.renaser.ai.ai_engine.perfilintegral.repository.PerfilTalentoRepository;
 import com.renaser.ai.ai_engine.perfilintegral.repository.PesoCriterioRepository;
+import com.renaser.ai.ai_engine.postulacion.entity.Cv;
+import com.renaser.ai.ai_engine.postulacion.entity.EstadoPostulacion;
 import com.renaser.ai.ai_engine.postulacion.entity.Postulacion;
 import com.renaser.ai.ai_engine.postulacion.repository.CvRepository;
 import com.renaser.ai.ai_engine.postulacion.repository.DatoCvRepository;
@@ -52,19 +55,23 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyIterable;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * El orden de la tanda y a quién mira la segunda pasada.
+ * El orden de la tanda, a quién mira la segunda pasada, y a quién no debe mirar ninguna.
  *
- * <p>Aquí viven dos fallos que ya se rompieron:
+ * <p>Aquí viven los fallos que ya se rompieron:
  *
  * <ul>
  *   <li>Un candidato que la IA todavía no había clasificado hacía reventar el ranking
@@ -73,6 +80,13 @@ import static org.mockito.Mockito.when;
  *   <li>La segunda pasada se podía pedir con la tanda sin calificar. Entonces «los de
  *       arriba» no existen: la lista sale por orden alfabético y el gasto se va en la gente
  *       que tocó por la letra de su apellido.
+ *   <li>Las cribas barrían la vacante entera sin mirar el estado, así que un retirado o un
+ *       contratado con currículum volvía a «por confirmar» pagando el modelo por el camino.
+ *   <li>Los botones contaban lo que intentaban encolar y no lo que encolaban, así que un
+ *       segundo clic respondía «43 en cola» sin haber encolado a nadie.
+ *   <li>La nota del currículum sumaba cualquier criterio con peso, y desde que existen la
+ *       simulación y la validación eso incluye los suyos: la columna cambiaba sola en cuanto
+ *       un facilitador calificaba.
  * </ul>
  */
 @ExtendWith(MockitoExtension.class)
@@ -227,6 +241,25 @@ class ServicioPerfilIntegralPanelImplTest {
     }
 
     @Test
+    void laNotaDelCurriculumNoSeMezclaConLaDeOtrasEtapas() {
+        // El fallo que se arregló. La versión de pesos trae también los diez criterios de la
+        // simulación y los nueve de la validación, así que sumar «todo lo que tenga peso»
+        // hacía que esta columna cambiara en cuanto un facilitador calificaba una simulación.
+        // Dos currículums idénticos mostraban notas distintas sin que nadie tocara un
+        // currículum.
+        candidatos(candidato(1L, "ALTA", "80"));
+        pesos(peso(10L, "100"));
+        // El 99 es del criterio de una simulación: tiene peso en la misma versión, pero no
+        // es del currículum y no puede entrar en esta cuenta.
+        pesoSuelto(peso(99L, "100"));
+        notasDeLaTanda.addAll(List.of(nota(1L, 10L, "80"), nota(1L, 99L, "20")));
+
+        List<FilaRanking> filas = servicio.ranking(quien, VACANTE).filas();
+
+        assertThat(filas.get(0).notaCurriculum()).isEqualByComparingTo("80.00");
+    }
+
+    @Test
     void sinNingunaNotaDeCriterioNoSeInventaUnCero() {
         candidatos(candidato(1L, "ALTA", "80"));
         pesos(peso(10L, "30"));
@@ -260,6 +293,7 @@ class ServicioPerfilIntegralPanelImplTest {
                    candidato(3L, "ALTA", "70"), candidato(4L, null, null),
                    candidato(5L, null, null), candidato(6L, null, null));
         when(parametros.entero(ORGANIZACION, "porcentaje_criba_fina", 50)).thenReturn(50);
+        lenient().when(cola.encolarCribaFina(anyLong())).thenReturn(true);
 
         servicio.cribaFina(quien, VACANTE);
 
@@ -295,7 +329,134 @@ class ServicioPerfilIntegralPanelImplTest {
         verify(cola).encolarCribaFina(2L);
     }
 
+    // ============ A quién no toca ninguna criba ============
+
+    @Test
+    void laCribaRapidaNoResucitaAQuienYaTermino() {
+        // El fallo que se arregló. Un retirado, un contratado y un descartado siguen en la
+        // vacante con su currículum puesto: barrerla sin mirar el estado los devolvía a «por
+        // confirmar», a la bandeja de alguien, y pagaba el modelo por cada uno.
+        catalogoDeEstados();
+        Postulacion viva = candidato(1L, null, null);
+        Postulacion contratado = enEstado(candidato(2L, null, null), "CONTRATADO");
+        Postulacion retirado = enEstado(candidato(3L, null, null), "CERRADA");
+        conCurriculum(viva, contratado, retirado);
+        candidatos(viva, contratado, retirado);
+        when(cola.encolarCribaRapida(1L)).thenReturn(true);
+
+        servicio.cribaRapida(quien, VACANTE);
+
+        verify(cola).encolarCribaRapida(1L);
+        verify(cola, never()).encolarCribaRapida(2L);
+        verify(cola, never()).encolarCribaRapida(3L);
+    }
+
+    @Test
+    void laCribaDeUnCurriculumSeNiegaSiLaPostulacionYaTermino() {
+        catalogoDeEstados();
+        Postulacion contratado = enEstado(candidato(2L, null, null), "CONTRATADO");
+        when(postulaciones.findByIdAndOrganizacionId(2L, ORGANIZACION))
+                .thenReturn(Optional.of(contratado));
+        conCurriculum(contratado);
+
+        assertThatThrownBy(() -> servicio.cribarCv(quien, 2L))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("cerrada");
+
+        verify(cola, never()).encolarCribaCv(anyLong());
+    }
+
+    // ============ Los botones cuentan lo que de verdad encolaron ============
+
+    @Test
+    void laCribaRapidaSoloCuentaAQuienDeVerdadQuedoEnLaCola() {
+        // Antes se sumaba siempre. Un segundo clic respondía «2 en cola» sin haber encolado
+        // a nadie, y ese número falso quedaba escrito también en la auditoría, que es donde
+        // alguien va a mirar dentro de tres meses.
+        Postulacion uno = candidato(1L, null, null);
+        Postulacion dos = candidato(2L, null, null);
+        conCurriculum(uno, dos);
+        candidatos(uno, dos);
+        when(cola.encolarCribaRapida(1L)).thenReturn(true);
+        when(cola.encolarCribaRapida(2L)).thenReturn(false);
+
+        assertThat(servicio.cribaRapida(quien, VACANTE).candidatos()).isEqualTo(1);
+        // Y a quien no se encoló tampoco se le mueve el estado: seguiría diciendo que se le
+        // está calificando cuando no hay nada calificándose.
+        verify(maquina, never()).transicionar(eq(dos), anyString(), any(), any(),
+                anyBoolean(), anyBoolean(), any());
+    }
+
+    @Test
+    void laCribaDeUnCurriculumAvisaCuandoNoHabiaNadaQueHacer() {
+        Postulacion p = candidato(1L, null, null);
+        when(postulaciones.findByIdAndOrganizacionId(1L, ORGANIZACION)).thenReturn(Optional.of(p));
+        conCurriculum(p);
+        when(cola.encolarCribaCv(1L)).thenReturn(false);
+
+        assertThat(servicio.cribarCv(quien, 1L).estado()).isEqualTo("SIN_CAMBIOS");
+        verify(auditoria, never()).registrar(anyLong(), any(), anyString(), anyString(),
+                anyLong(), any(), any(), any());
+    }
+
+    // ============ El alcance del permiso que se está usando ============
+
+    @Test
+    void laCribaFiltraConElAlcanceDeSuPropioPermisoYNoConElDeOtro() {
+        // El endpoint exige ajustar_nota, pero el filtro miraba siempre el alcance de
+        // ver_embudo. Un rol con ajustar_nota limitado a sus vacantes y ver_embudo sin
+        // límite podía cribar una convocatoria ajena. Hoy ningún rol sembrado tiene esa
+        // forma, pero los roles se configuran desde el panel.
+        when(permisos.alcanceDe("ajustar_nota"))
+                .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.SUS_VACANTES, 10L));
+        // La vacante es de otra persona del equipo.
+        when(vacantes.findById(VACANTE)).thenReturn(Optional.of(Vacante.builder()
+                .id(VACANTE).organizacionId(ORGANIZACION).puestoId(3L).versionPesosId(2L)
+                .titulo("Analista de procesos").responsableUsuarioId(77L).build()));
+
+        assertThatThrownBy(() -> servicio.cribaRapida(quien, VACANTE))
+                .isInstanceOf(ResourceNotFoundException.class);
+
+        verify(cola, never()).encolarCribaRapida(anyLong());
+    }
+
     // ============ Apoyo ============
+
+    /** El catálogo de estados, con los tres de los que ya no se sale. */
+    private void catalogoDeEstados() {
+        when(estados.findAllByOrderByOrden()).thenReturn(List.of(
+                estado("PERFIL_POR_CONFIRMAR", false),
+                estado("CONTRATADO", true),
+                estado("NO_CONTINUA", true),
+                estado("CERRADA", true)));
+    }
+
+    private EstadoPostulacion estado(String codigo, boolean esFinal) {
+        return EstadoPostulacion.builder().codigo(codigo).nombre(codigo).esFinal(esFinal).build();
+    }
+
+    private Postulacion enEstado(Postulacion p, String codigo) {
+        p.setEstadoCodigo(codigo);
+        return p;
+    }
+
+    /** Les pone currículum: sin archivo la criba ni los mira. */
+    private void conCurriculum(Postulacion... losSuyos) {
+        for (Postulacion p : losSuyos) {
+            lenient().when(cvs.findByPostulacionId(p.getId()))
+                    .thenReturn(Optional.of(Cv.builder().id(500L + p.getId())
+                            .postulacionId(p.getId()).build()));
+        }
+    }
+
+    /** Un peso que existe en la versión pero cuyo criterio no es del currículum. */
+    private void pesoSuelto(PesoCriterio suelto) {
+        List<PesoCriterio> todos = new ArrayList<>(
+                pesosCriterio.findByVersionPesosIdAndNivelPuestoCodigo(2L, "OPERATIVO"));
+        todos.add(suelto);
+        when(pesosCriterio.findByVersionPesosIdAndNivelPuestoCodigo(2L, "OPERATIVO"))
+                .thenReturn(todos);
+    }
 
     /** Deja a ese candidato como ya mirado a fondo, antes de armar la tanda. */
     private void yaPasoPorLaFina(Long postulacionId) {

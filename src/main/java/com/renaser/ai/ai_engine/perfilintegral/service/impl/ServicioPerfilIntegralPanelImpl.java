@@ -63,6 +63,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -165,7 +166,11 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
                     "Esta postulación todavía no tiene evaluación: no hay nada que calificar");
         }
 
-        cola.encolarPerfilIntegral(postulacionId);
+        if (!cola.encolarPerfilIntegral(postulacionId)) {
+            return new CalificacionEncoladaResponse("SIN_CAMBIOS",
+                    "No había nada que calificar: o ya está todo hecho, o hay un trabajo en "
+                            + "marcha ahora mismo. Consulta el perfil para verlo.");
+        }
         return new CalificacionEncoladaResponse("ENCOLADA",
                 "La calificación quedó en cola. Tarda decenas de segundos: "
                         + "consulta el perfil para ver cuándo termina.");
@@ -182,15 +187,21 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Currículum", "postulación", postulacionId));
 
-        // El estado tiene que decir la verdad mientras corre: si se quedara en
-        // PERFIL_TURNO_CANDIDATO, la bandeja seguiría pidiendo algo al candidato que ya
-        // nadie espera. Solo se mueve si aún no está ahí: recalificar no es retroceder.
-        if (!"PERFIL_CALIFICANDO".equals(postulacion.getEstadoCodigo())
-                && !"PERFIL_POR_CONFIRMAR".equals(postulacion.getEstadoCodigo())) {
-            maquina.transicionar(postulacion, "PERFIL_CALIFICANDO", null, null, true, false, null);
+        // Una postulación cerrada no se vuelve a calificar. Da igual que tenga currículum:
+        // el candidato se retiró, no continuó o ya está contratado, y calificarlo lo
+        // devolvería a «por confirmar» —a la bandeja de alguien— además de pagar el modelo.
+        if (cerrados().contains(postulacion.getEstadoCodigo())) {
+            throw new IllegalStateException(
+                    "Esta postulación ya está cerrada («" + postulacion.getEstadoCodigo()
+                            + "»): no se vuelve a calificar");
         }
 
-        cola.encolarCribaCv(postulacionId);
+        if (!cola.encolarCribaCv(postulacionId)) {
+            return new CalificacionEncoladaResponse("SIN_CAMBIOS",
+                    "No había nada que cribar: o el currículum ya está leído, o hay un "
+                            + "trabajo en marcha ahora mismo.");
+        }
+        moverACalificando(postulacion);
         auditoria.registrar(quien.organizacionId(), quien, "cribar_cv",
                 "postulacion", postulacionId, null, Map.of(), null);
         return new CalificacionEncoladaResponse("ENCOLADA",
@@ -201,16 +212,28 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
     @Override
     @Transactional
     public PasadaEncolada cribaRapida(ContextoUsuario quien, Long vacanteId) {
-        Vacante vacante = vacanteVisible(quien, vacanteId);
+        Vacante vacante = vacanteVisible(quien, vacanteId, "ajustar_nota");
+        Set<String> cerrados = cerrados();
         int encolados = 0;
         for (Postulacion p : postulaciones.findByVacanteIdOrderByCreadoEnDesc(vacanteId)) {
+            // Una tanda no es «todo el mundo que tenga currículum». Quien se retiró, quien
+            // no continuó y quien ya está contratado siguen en la vacante, y barrerla sin
+            // mirar el estado los devolvía a «por confirmar» pagando el modelo por el camino.
+            if (cerrados.contains(p.getEstadoCodigo())) {
+                continue;
+            }
             // Quien ya tiene retrato no se vuelve a calificar: repetirlo cuesta lo mismo y
             // no cambia nada. Para rehacer uno concreto está el botón de su ficha.
             if (cola.pasadaDe(p.getId()) != null || cvs.findByPostulacionId(p.getId()).isEmpty()) {
                 continue;
             }
+            // Se cuenta lo que de verdad quedó en la cola, no lo que se intentó. Antes se
+            // sumaba siempre, así que un segundo clic respondía «43 en cola» sin haber
+            // encolado a nadie, y eso mismo quedaba escrito en la auditoría.
+            if (!cola.encolarCribaRapida(p.getId())) {
+                continue;
+            }
             moverACalificando(p);
-            cola.encolarCribaRapida(p.getId());
             encolados++;
         }
         auditoria.registrar(quien.organizacionId(), quien, "criba_rapida",
@@ -225,8 +248,11 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
     @Override
     @Transactional
     public PasadaEncolada cribaFina(ContextoUsuario quien, Long vacanteId) {
-        vacanteVisible(quien, vacanteId);
-        List<FilaRanking> filas = ranking(quien, vacanteId).filas();
+        vacanteVisible(quien, vacanteId, "ajustar_nota");
+        Set<String> cerrados = cerrados();
+        List<FilaRanking> filas = ranking(quien, vacanteId).filas().stream()
+                .filter(f -> !cerrados.contains(f.estado()))
+                .toList();
 
         // Sin una primera pasada que haya ordenado, «los de arriba» no existen: la lista
         // sale por orden alfabético y la segunda pasada se gastaría en la gente que tocó
@@ -258,8 +284,10 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
             if ("FINA".equals(f.pasada())) {
                 continue;
             }
+            if (!cola.encolarCribaFina(f.postulacionId())) {
+                continue;
+            }
             postulaciones.findById(f.postulacionId()).ifPresent(this::moverACalificando);
-            cola.encolarCribaFina(f.postulacionId());
             encolados++;
         }
         auditoria.registrar(quien.organizacionId(), quien, "criba_fina",
@@ -290,7 +318,7 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
     @Override
     @Transactional(readOnly = true)
     public RankingVacante ranking(ContextoUsuario quien, Long vacanteId) {
-        Vacante vacante = vacanteVisible(quien, vacanteId);
+        Vacante vacante = vacanteVisible(quien, vacanteId, "ver_embudo");
         Puesto puesto = puestos.findById(vacante.getPuestoId()).orElse(null);
 
         // Los pesos son los de la versión de la vacante, no los de la última publicada: una
@@ -303,6 +331,8 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
 
         List<Criterio> delCurriculum =
                 criterios.findByEtapaCodigoAndVersionPlantillaPruebaIdIsNullOrderByOrden(ETAPA);
+        Set<Long> idsDelCurriculum =
+                delCurriculum.stream().map(Criterio::getId).collect(Collectors.toSet());
         Map<String, String> nombreEstado = estados.findAllByOrderByOrden().stream()
                 .collect(Collectors.toMap(EstadoPostulacion::getCodigo,
                         EstadoPostulacion::getNombre, (a, b) -> a));
@@ -391,7 +421,7 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
                     pintarDatos(fichas.get(p.getId())),
                     p.getGrupoPrioridad(),
                     etapa(etapaPorPostulacion.get(p.getId())),
-                    notaCurriculum(notaPorCriterio.values(), pesos),
+                    notaCurriculum(notaPorCriterio.values(), pesos, idsDelCurriculum),
                     perfil == null ? null : perfil.getAdecuacion(),
                     perfil == null ? null : perfil.getPotencial(),
                     perfil == null ? null : perfil.getAltoRendimiento(),
@@ -483,11 +513,23 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
      * pudo puntuar uno, lo justo es repartir su peso entre los demás, no restarlo: un hueco
      * no es un cero.
      */
+    /**
+     * La nota del currículum de una fila del ranking.
+     *
+     * <p><b>Solo suma los criterios del currículum</b>, y hay que decirlo explícitamente
+     * porque la versión de pesos ya no es solo suya: desde que existen la simulación y la
+     * validación, la misma versión trae también los diez criterios de una y los nueve de la
+     * otra. Sumar «todo lo que tenga peso» hacía que esta columna cambiara en cuanto un
+     * facilitador calificaba una simulación, y dos currículums idénticos mostraban notas
+     * distintas sin que nadie hubiera tocado un currículum.
+     */
     private BigDecimal notaCurriculum(java.util.Collection<NotaCriterio> notas,
-                                      Map<Long, BigDecimal> pesos) {
+                                      Map<Long, BigDecimal> pesos,
+                                      Set<Long> idsDelCurriculum) {
         BigDecimal suma = BigDecimal.ZERO;
         BigDecimal pesoTotal = BigDecimal.ZERO;
         for (NotaCriterio nota : notas) {
+            if (!idsDelCurriculum.contains(nota.getCriterioId())) continue;
             BigDecimal peso = pesos.get(nota.getCriterioId());
             if (peso == null || nota.getPuntaje() == null) continue;
             suma = suma.add(nota.getPuntaje().multiply(peso));
@@ -515,11 +557,21 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
                 + (persona.getApellidos() == null ? "" : persona.getApellidos())).trim();
     }
 
-    private Vacante vacanteVisible(ContextoUsuario quien, Long vacanteId) {
+    /**
+     * La vacante, si quien pregunta puede verla <b>con el permiso que está usando</b>.
+     *
+     * <p>El permiso llega por parámetro y no está escrito aquí dentro a propósito. Antes
+     * siempre se miraba el alcance de {@code ver_embudo}, aunque el endpoint exigiera otro:
+     * un rol al que se le diera {@code ajustar_nota} limitado a sus vacantes, pero
+     * {@code ver_embudo} sin límite, podía lanzar una criba sobre una convocatoria ajena. Hoy
+     * ningún rol sembrado tiene esa forma, pero los roles se configuran desde el panel y esto
+     * dejaría de ser cierto sin que nadie tocara una línea de código.
+     */
+    private Vacante vacanteVisible(ContextoUsuario quien, Long vacanteId, String permiso) {
         Vacante vacante = vacantes.findById(vacanteId)
                 .filter(v -> quien.organizacionId().equals(v.getOrganizacionId()))
                 .orElseThrow(() -> new ResourceNotFoundException("Vacante", "id", vacanteId));
-        FiltroAlcance alcance = permisos.alcanceDe("ver_embudo");
+        FiltroAlcance alcance = permisos.alcanceDe(permiso);
         if (alcance.tipo() == FiltroAlcance.Tipo.SUS_VACANTES
                 && !quien.usuarioId().equals(vacante.getResponsableUsuarioId())) {
             throw new ResourceNotFoundException("Vacante", "id", vacanteId);
@@ -544,12 +596,31 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
         curriculum.setAnonimizadoEn(null);
         cvs.save(curriculum);
 
+        // La ficha de datos —teléfono, último puesto, años de experiencia— salió del
+        // currículum anterior. Se borra para que la próxima calificación la vuelva a sacar:
+        // la cola se salta ese paso cuando la ficha ya existe, así que dejarla puesta
+        // enseñaría los datos del archivo viejo debajo del nuevo.
+        datosCv.findByPostulacionId(postulacionId).ifPresent(datosCv::delete);
+
         auditoria.registrar(quien.organizacionId(), quien, "reemplazar_cv",
                 "cv", curriculum.getId(), null,
                 Map.of("archivoOriginalId", String.valueOf(guardado.getId())), null);
     }
 
     // ============ Apoyo ============
+
+    /**
+     * Los estados de los que ya no se sale: contratado, no continúa y cerrada.
+     *
+     * <p>No están escritos a mano: se leen de la tabla, que es quien manda. Si Renaser añade
+     * un estado final desde una migración, esto lo respeta sin que nadie lo recuerde.
+     */
+    private Set<String> cerrados() {
+        return estados.findAllByOrderByOrden().stream()
+                .filter(EstadoPostulacion::isEsFinal)
+                .map(EstadoPostulacion::getCodigo)
+                .collect(Collectors.toSet());
+    }
 
     private NotaCriterioResponse pintarNota(Criterio criterio, NotaCriterio nota,
                                            Map<Long, BigDecimal> pesos) {

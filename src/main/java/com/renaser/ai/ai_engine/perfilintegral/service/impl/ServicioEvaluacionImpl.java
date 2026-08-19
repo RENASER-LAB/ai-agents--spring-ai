@@ -220,8 +220,15 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
             evaluacion.setEstado("VENCIDA");
             evaluaciones.save(evaluacion);
 
-            postulaciones.findByEvaluacionId(evaluacion.getId()).ifPresent(postulacion ->
-                    maquina.transicionar(postulacion, "CERRADA", null, null, true, false, "PLAZO_VENCIDO"));
+            // Solo se cierra lo que sigue vivo. Un candidato que se retiró deja su
+            // evaluación sin responder, y esa evaluación vence igual: sin esta comprobación
+            // se intentaría cerrar una postulación ya cerrada y se le mandaría un segundo
+            // correo diciéndole algo que ya sabe.
+            postulaciones.findByEvaluacionId(evaluacion.getId())
+                    .filter(postulacion -> !maquina.yaTermino(postulacion))
+                    .ifPresent(postulacion ->
+                            maquina.transicionar(postulacion, "CERRADA", null, null,
+                                    true, false, "PLAZO_VENCIDO"));
         }
     }
 

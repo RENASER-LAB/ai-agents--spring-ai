@@ -102,6 +102,12 @@ public class CalificacionIaRealIT {
      */
     @DynamicPropertySource
     static void propiedades(DynamicPropertyRegistry registro) {
+        // El broker de las pruebas es el contenedor, y habla en claro. Sin esto manda lo
+        // que cada uno tenga en su application-secrets.yaml —hoy, un CloudAMQP con TLS— y
+        // la tanda entera falla según la máquina en la que corra, que es lo peor que le
+        // puede pasar a una prueba.
+        registro.add("spring.rabbitmq.ssl.enabled", () -> "false");
+        registro.add("spring.rabbitmq.virtual-host", () -> "/");
         registro.add("app.seguridad.jwt-secreto",
                 () -> "clave-de-pruebas-suficientemente-larga-para-hmac-256-bits");
     }

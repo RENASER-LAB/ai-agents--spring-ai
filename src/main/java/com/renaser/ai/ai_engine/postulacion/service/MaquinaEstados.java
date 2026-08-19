@@ -101,6 +101,19 @@ public class MaquinaEstados {
                 .min(Comparator.comparing(e -> MOMENTOS.indexOf(e.getMomentoCodigo())));
     }
 
+    /**
+     * Si esta postulacion ya termino su recorrido: contratado, no continua o cerrada.
+     *
+     * <p>Existe para que quien vaya a moverla pueda preguntar antes en vez de chocar contra
+     * la excepcion. Lo usa el cierre por plazo vencido, que barre evaluaciones sin mirar si
+     * el candidato sigue en carrera.
+     */
+    public boolean yaTermino(Postulacion postulacion) {
+        return postulacion.getEstadoCodigo() != null
+                && estados.findById(postulacion.getEstadoCodigo())
+                        .map(EstadoPostulacion::isEsFinal).orElse(false);
+    }
+
     // ============ Las operaciones con efectos ============
 
     public Optional<EstadoPostulacion> siguiente(String codigoActual) {
@@ -120,6 +133,21 @@ public class MaquinaEstados {
                              boolean esSistema, boolean esPorLote, String motivoCierre) {
         EstadoPostulacion nuevo = estados.findById(estadoNuevoCodigo)
                 .orElseThrow(() -> new IllegalArgumentException("No existe el estado " + estadoNuevoCodigo));
+
+        // De un estado final no se sale. Hasta ahora esto lo comprobaba cada quien llamara
+        // —y quien se olvidaba, resucitaba a un contratado o a un retirado sin que nada
+        // fallara—. Comprobar el origen aquí lo hace cierto una vez y para todos: la
+        // postulación de alguien que ya se fue no vuelve a la bandeja de nadie.
+        if (postulacion.getEstadoCodigo() != null) {
+            boolean yaTermino = estados.findById(postulacion.getEstadoCodigo())
+                    .map(EstadoPostulacion::isEsFinal).orElse(false);
+            if (yaTermino) {
+                throw new IllegalStateException(
+                        "La postulación " + postulacion.getId() + " ya terminó en «"
+                                + postulacion.getEstadoCodigo() + "»: de un estado final no "
+                                + "se sale, y menos hacia «" + estadoNuevoCodigo + "»");
+            }
+        }
 
         if (!esSistema && (motivo == null || motivo.isBlank())) {
             // La base también lo impide (CHECK), pero el error debe ser legible

@@ -16,6 +16,7 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -31,7 +32,8 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
      * las notas que resume, y eso no lo cambia nadie desde un panel.
      */
     private static final List<String> ORDEN = List.of(
-            AgenteEvidenciaCv.CODIGO, AgenteEvaluador.CODIGO, AgentePotencialRiesgo.CODIGO);
+            AgenteDatosCv.CODIGO, AgenteEvidenciaCv.CODIGO,
+            AgenteEvaluador.CODIGO, AgentePotencialRiesgo.CODIGO);
 
     /**
      * La fila de la primera pasada. Empieza sacando los datos del candidato —que no cuestan
@@ -40,6 +42,14 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
      */
     private static final List<String> ORDEN_RAPIDA = List.of(
             AgenteDatosCv.CODIGO, AgenteEvidenciaCv.CODIGO, AgentePotencialRiesgo.CODIGO);
+
+    /**
+     * El que cierra la etapa, y por eso el que dice si la calificación llegó al final.
+     *
+     * <p>Es el mismo en las dos filas y tiene que seguir siéndolo: es quien arma el Perfil de
+     * Talento y mueve la postulación a {@code PERFIL_POR_CONFIRMAR}.
+     */
+    private static final String ULTIMO = AgentePotencialRiesgo.CODIGO;
 
     public static final String RAPIDA = "RAPIDA";
     public static final String FINA = "FINA";
@@ -73,36 +83,36 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
     }
 
     @Override
-    public void encolarPerfilIntegral(Long postulacionId) {
+    public boolean encolarPerfilIntegral(Long postulacionId) {
         if (!habilitada) {
             log.warn("La calificación con IA está apagada por configuración: la postulación {} "
                     + "se queda en PERFIL_CALIFICANDO", postulacionId);
-            return;
+            return false;
         }
-        encolar(postulacionId, ORDEN.get(0), FINA);
+        return encolar(postulacionId, ORDEN, FINA, 0, null);
     }
 
     @Override
-    public void encolarCribaCv(Long postulacionId) {
+    public boolean encolarCribaCv(Long postulacionId) {
         // Arranca por el mismo sitio: la diferencia no la decide quien llama, la decide el
         // candidato. Si no hay evaluación entregada, la fila se salta sola al evaluador.
-        encolarPerfilIntegral(postulacionId);
+        return encolarPerfilIntegral(postulacionId);
     }
 
     @Override
-    public void encolarCribaRapida(Long postulacionId) {
+    public boolean encolarCribaRapida(Long postulacionId) {
         if (apagada(postulacionId)) {
-            return;
+            return false;
         }
-        encolar(postulacionId, ORDEN_RAPIDA.get(0), RAPIDA);
+        return encolar(postulacionId, ORDEN_RAPIDA, RAPIDA, 0, null);
     }
 
     @Override
-    public void encolarCribaFina(Long postulacionId) {
+    public boolean encolarCribaFina(Long postulacionId) {
         if (apagada(postulacionId)) {
-            return;
+            return false;
         }
-        encolar(postulacionId, ORDEN.get(0), FINA);
+        return encolar(postulacionId, ORDEN, FINA, 0, null);
     }
 
     private boolean apagada(Long postulacionId) {
@@ -182,19 +192,30 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
         if (vivo) {
             return "EN_CURSO";
         }
-        // Terminó cuando el último de la fila terminó. No se cuentan los trabajos: una
-        // criba de currículum tiene dos y no tres, porque el evaluador no tenía nada que
-        // puntuar, y contar diría «en curso» para siempre.
+
+        // Solo cuenta la última pasada, y esto es lo importante de aquí. Un candidato puede
+        // tener la rápida terminada y la fina fallida: mirarlas juntas encontraría el agente
+        // que cierra la etapa TERMINADO en la rápida y diría «terminada», el contador de
+        // fallidos marcaría cero, y unas notas provisionales se presentarían como
+        // definitivas. Lo que vale es cómo fue el último intento; con qué pasada está
+        // calificado ahora mismo lo dice pasadaDe, que es otra pregunta.
+        String ultimoModo = suyos.get(suyos.size() - 1).getModo();
+        List<TrabajoIa> tanda = suyos.stream()
+                .filter(t -> Objects.equals(ultimoModo, t.getModo()))
+                .toList();
+
+        // Terminó cuando el que cierra la etapa terminó. No se cuentan los trabajos: una
+        // criba de currículum tiene menos, porque el evaluador no tenía nada que puntuar, y
+        // contar diría «en curso» para siempre.
         //
         // Y esto se mira ANTES que los fallos, no después: quien falló y luego salió bien
         // al reintentar arrastra su fila fallida para siempre, y preguntar primero por el
         // fallo dejaría marcado como fallido a un candidato que sí tiene su retrato.
-        String ultimo = ORDEN.get(ORDEN.size() - 1);
-        if (suyos.stream().anyMatch(t -> ultimo.equals(t.getAgenteCodigo())
+        if (tanda.stream().anyMatch(t -> ULTIMO.equals(t.getAgenteCodigo())
                 && "TERMINADO".equals(t.getEstado()))) {
             return "TERMINADA";
         }
-        if (suyos.stream().anyMatch(t -> "FALLIDO".equals(t.getEstado()))) {
+        if (tanda.stream().anyMatch(t -> "FALLIDO".equals(t.getEstado()))) {
             return "FALLIDA";
         }
         return "EN_CURSO";
@@ -206,9 +227,8 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
     }
 
     private String pasadaDe(List<TrabajoIa> suyos) {
-        String ultimo = ORDEN.get(ORDEN.size() - 1);
         List<TrabajoIa> hechos = suyos.stream()
-                .filter(t -> ultimo.equals(t.getAgenteCodigo()) && "TERMINADO".equals(t.getEstado()))
+                .filter(t -> ULTIMO.equals(t.getAgenteCodigo()) && "TERMINADO".equals(t.getEstado()))
                 .toList();
         // La fina manda aunque la rápida sea posterior: es la que pisa las notas.
         if (hechos.stream().anyMatch(t -> FINA.equals(t.getModo()))) {
@@ -242,41 +262,101 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
     }
 
     /**
-     * El siguiente de la fila.
+     * El siguiente de la fila, cuando uno acaba de terminar.
      *
-     * <p>Si el que acaba de terminar era el último, no hay nada que encolar: la postulación
-     * ya está en {@code PERFIL_POR_CONFIRMAR}, esperando a una persona.
+     * <p>Si no queda ninguno, no hay nada que encolar: la postulación ya está en
+     * {@code PERFIL_POR_CONFIRMAR}, esperando a una persona.
      */
     private void encolarSiguiente(TrabajoIa terminado) {
         List<String> orden = ordenDe(terminado.getModo());
         int posicion = orden.indexOf(terminado.getAgenteCodigo());
-        if (posicion < 0 || posicion == orden.size() - 1) {
+        if (posicion < 0) {
             return;
         }
-        String siguiente = orden.get(posicion + 1);
-
-        // El evaluador solo tiene sentido si hay respuestas. En una criba de currículum no
-        // las hay, y llamarlo gastaría una petición al modelo para no puntuar nada: se
-        // salta y el Perfil de Talento se arma con lo que dejó el lector del currículum.
-        if (AgenteEvaluador.CODIGO.equals(siguiente)
-                && !puente.tieneEvaluacionEntregada(terminado.getPostulacionId())) {
-            log.info("La postulación {} no tiene evaluación entregada: el evaluador se salta",
-                    terminado.getPostulacionId());
-            // Si el evaluador fuera el último de la fila no habría a quién saltar: se
-            // acabó el recorrido. Hoy va en medio, pero la fila puede crecer y salirse
-            // del índice aquí sería un fallo que solo aparecería ese día.
-            if (posicion + 2 >= orden.size()) {
-                return;
-            }
-            siguiente = orden.get(posicion + 2);
-        }
-        encolar(terminado.getPostulacionId(), siguiente, terminado.getModo());
+        // Se pasa el id del que acaba de terminar: lo que venga después y ya estuviera hecho
+        // de una vuelta anterior se calculó sin este resultado, así que se rehace.
+        encolar(terminado.getPostulacionId(), orden, terminado.getModo(),
+                posicion + 1, terminado.getId());
     }
 
-    private void encolar(Long postulacionId, String agenteCodigo, String modo) {
+    /**
+     * Pone en la cola el paso que toca, mirando la fila desde {@code desde}.
+     *
+     * @return true si algo quedó encolado de verdad
+     */
+    private boolean encolar(Long postulacionId, List<String> orden, String modo,
+                            int desde, Long alimentadoPor) {
+        Optional<String> agente = pasoQueToca(postulacionId, orden, modo, desde, alimentadoPor);
+        if (agente.isEmpty()) {
+            return false;
+        }
         Long organizacionId = puente.organizacionDe(postulacionId);
-        registro.crearSiHaceFalta(organizacionId, postulacionId, agenteCodigo, modo)
-                .ifPresent(trabajo -> publicador.publicar(trabajo.getId()));
+        Optional<TrabajoIa> creado = registro.crearSiHaceFalta(
+                organizacionId, postulacionId, agente.get(), modo, alimentadoPor);
+        creado.ifPresent(trabajo -> publicador.publicar(trabajo.getId()));
+        return creado.isPresent();
+    }
+
+    /**
+     * Cuál es el primer paso de la fila que de verdad hay que hacer.
+     *
+     * <p><b>Recorre la fila en vez de mirar solo el primero</b>, y eso arregla el fallo más
+     * caro que tenía esto: un candidato ya cribado que después entregaba su evaluación se
+     * quedaba en «calificando» para siempre. Se pedía la calificación, el primer paso ya
+     * estaba TERMINADO de la criba, no se encolaba nada, y ningún botón lo rescataba.
+     *
+     * <p>Se detiene en cuanto encuentra un paso vivo: si hay uno en marcha la fila sigue
+     * sola, y adelantarse pagaría dos veces por el mismo candidato.
+     */
+    private Optional<String> pasoQueToca(Long postulacionId, List<String> orden, String modo,
+                                         int desde, Long alimentadoPor) {
+        for (int i = desde; i < orden.size(); i++) {
+            String agente = orden.get(i);
+            if (seSalta(postulacionId, agente)) {
+                continue;
+            }
+            Optional<TrabajoIa> ultimo = trabajos
+                    .findFirstByPostulacionIdAndAgenteCodigoAndModoOrderByIdDesc(
+                            postulacionId, agente, modo);
+            if (ultimo.isEmpty()) {
+                return Optional.of(agente);
+            }
+            String estado = ultimo.get().getEstado();
+            if ("PENDIENTE".equals(estado) || "EN_CURSO".equals(estado)) {
+                return Optional.empty();
+            }
+            if ("FALLIDO".equals(estado)) {
+                return Optional.of(agente);
+            }
+            // TERMINADO: solo se rehace si se hizo antes que aquello de lo que depende.
+            if (alimentadoPor != null && ultimo.get().getId() < alimentadoPor) {
+                return Optional.of(agente);
+            }
+        }
+        return Optional.empty();
+    }
+
+    /**
+     * Los dos pasos que a veces no tienen nada que hacer, y entonces no se pagan.
+     *
+     * <ul>
+     *   <li><b>El evaluador</b> sin respuestas entregadas: en una criba de currículum nadie
+     *       ha respondido, y llamarlo gastaría una petición al modelo para no puntuar nada.
+     *       El Perfil de Talento se arma con lo que dejó el lector del currículum.
+     *   <li><b>La ficha de datos</b> si ya está sacada. Son datos copiados del currículum, no
+     *       notas: no cambian salvo que cambie el currículum, y quien lo reemplaza borra la
+     *       ficha para que se vuelva a sacar. Así la ficha existe se llegue por donde se
+     *       llegue, sin pagarla dos veces.
+     * </ul>
+     */
+    private boolean seSalta(Long postulacionId, String agente) {
+        if (AgenteEvaluador.CODIGO.equals(agente)
+                && !puente.tieneEvaluacionEntregada(postulacionId)) {
+            log.info("La postulación {} no tiene evaluación entregada: el evaluador se salta",
+                    postulacionId);
+            return true;
+        }
+        return AgenteDatosCv.CODIGO.equals(agente) && puente.tieneFichaCv(postulacionId);
     }
 
     private String mensaje(Throwable e) {

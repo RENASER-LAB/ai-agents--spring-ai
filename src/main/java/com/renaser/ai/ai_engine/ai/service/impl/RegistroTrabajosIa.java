@@ -34,23 +34,31 @@ public class RegistroTrabajosIa {
     private final TrabajoIaRepository trabajos;
 
     /**
-     * Crea el trabajo de un agente si no lo hay ya vivo o terminado.
+     * Crea el trabajo de un agente si de verdad hace falta.
      *
-     * @return vacío si ya está hecho o ya hay uno en marcha
+     * <p>Hace falta cuando nunca se hizo, cuando el último intento se agotó en reintentos, o
+     * cuando <b>lo que ya estaba hecho quedó viejo</b>. Esto último es lo que permite que un
+     * candidato ya cribado se recalifique al entregar su evaluación: el retrato existía, pero
+     * se armó sin las respuestas, así que hay que rehacerlo.
+     *
+     * @param alimentadoPor el trabajo cuyo resultado entra en este. Si el trabajo que ya
+     *                      existe es anterior a él, se hizo con información vieja y se
+     *                      rehace. Va nulo cuando nadie lo alimenta —el primer paso de una
+     *                      fila—, y entonces lo ya terminado se respeta.
+     * @return vacío si no hace falta: ya está al día, o ya hay uno en marcha
      */
     @Transactional
     public Optional<TrabajoIa> crearSiHaceFalta(Long organizacionId, Long postulacionId,
-                                                String agenteCodigo, String modo) {
+                                                String agenteCodigo, String modo,
+                                                Long alimentadoPor) {
         // La búsqueda incluye el modo: sin eso la pasada fina encontraría el trabajo que ya
         // hizo la rápida y no correría nunca, que es justo lo contrario de lo que se pide.
         Optional<TrabajoIa> existente = trabajos
                 .findFirstByPostulacionIdAndAgenteCodigoAndModoOrderByIdDesc(
                         postulacionId, agenteCodigo, modo);
-        if (existente.isPresent() && !"FALLIDO".equals(existente.get().getEstado())) {
+        if (existente.isPresent() && !hayQueRehacerlo(existente.get(), alimentadoPor)) {
             return Optional.empty();
         }
-        // Un FALLIDO sí se puede volver a intentar: es lo que permite reencolar a mano una
-        // postulación que se quedó colgada por un problema del proveedor.
         return Optional.of(trabajos.save(TrabajoIa.builder()
                 .organizacionId(organizacionId)
                 .agenteCodigo(agenteCodigo)
@@ -62,6 +70,26 @@ public class RegistroTrabajosIa {
                 .intentos(0)
                 .creadoEn(Instant.now())
                 .build()));
+    }
+
+    /**
+     * Si un trabajo que ya existe se queda corto y hay que volver a correrlo.
+     *
+     * <p>Dos casos, y ninguno más. Un <b>FALLIDO</b> se puede reintentar: es lo que permite
+     * reencolar a mano una postulación que se colgó por un problema del proveedor. Y un
+     * <b>TERMINADO anterior a quien lo alimenta</b> está viejo: se calculó antes de que
+     * existiera el dato del que depende. Los ids crecen, así que «anterior» es «id menor».
+     *
+     * <p>Lo que está PENDIENTE o EN_CURSO no se toca nunca: hay uno vivo y duplicarlo sería
+     * pagarle dos veces al proveedor por el mismo candidato.
+     */
+    private boolean hayQueRehacerlo(TrabajoIa existente, Long alimentadoPor) {
+        if ("FALLIDO".equals(existente.getEstado())) {
+            return true;
+        }
+        return "TERMINADO".equals(existente.getEstado())
+                && alimentadoPor != null
+                && existente.getId() < alimentadoPor;
     }
 
     /**

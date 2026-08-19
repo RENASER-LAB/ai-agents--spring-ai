@@ -72,6 +72,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -128,6 +129,12 @@ public class PuenteCalificacionIaImpl implements PuenteCalificacionIa {
         Postulacion postulacion = postulacion(postulacionId);
         return postulacion.getEvaluacionId() != null
                 && !respuestas.findByEvaluacionId(postulacion.getEvaluacionId()).isEmpty();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean tieneFichaCv(Long postulacionId) {
+        return datosCv.findByPostulacionId(postulacionId).isPresent();
     }
 
     // ==================== DATOS_CV ====================
@@ -503,11 +510,24 @@ public class PuenteCalificacionIaImpl implements PuenteCalificacionIa {
      * <p>Los pesos de RF-43 suman 100 en los tres niveles, así que el resultado ya viene en
      * esa escala. Se divide entre los pesos <b>de los criterios que sí tienen nota</b>, no
      * entre 100 fijo: si la IA no pudo puntuar uno, lo justo es repartir, no restar.
+     *
+     * <p><b>Solo entran los criterios del currículum</b>, y hay que ser explícito porque la
+     * versión de pesos ya no es solo suya: desde que existen la simulación y la validación,
+     * la misma versión trae también los diez criterios de una y los nueve de la otra. Sumar
+     * «todo lo que tenga peso» hacía que la nota del currículum cambiara en cuanto un
+     * facilitador calificaba una simulación, y dos currículums idénticos mostraban notas
+     * distintas sin que nadie hubiera tocado el currículum.
      */
     private BigDecimal notaCurriculum(Long postulacionId, Vacante vacante, Puesto puesto) {
+        Set<Long> delCurriculum = criterios
+                .findByEtapaCodigoAndVersionPlantillaPruebaIdIsNullOrderByOrden(ETAPA).stream()
+                .map(Criterio::getId)
+                .collect(Collectors.toSet());
+
         Map<Long, BigDecimal> pesos = pesosCriterio
                 .findByVersionPesosIdAndNivelPuestoCodigo(
                         vacante.getVersionPesosId(), puesto.getNivelPuestoCodigo()).stream()
+                .filter(pc -> delCurriculum.contains(pc.getCriterioId()))
                 .collect(Collectors.toMap(PesoCriterio::getCriterioId, PesoCriterio::getPeso,
                         (a, b) -> a));
 

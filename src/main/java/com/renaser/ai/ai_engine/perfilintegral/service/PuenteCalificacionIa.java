@@ -44,6 +44,15 @@ public interface PuenteCalificacionIa {
      */
     boolean tieneEvaluacionEntregada(Long postulacionId);
 
+    /**
+     * Si esta postulación ya tiene la ficha de datos sacada del currículum.
+     *
+     * <p>Lo pregunta la cola para no volver a pagarla. Son datos copiados —teléfono, último
+     * puesto, años de experiencia—, no una nota: una vez sacados no cambian salvo que el
+     * currículum cambie, y en ese caso quien lo reemplaza borra la ficha.
+     */
+    boolean tieneFichaCv(Long postulacionId);
+
     // ==================== DATOS_CV ====================
 
     /** El currículum recortado, para el agente que solo saca datos y no puntúa. */
