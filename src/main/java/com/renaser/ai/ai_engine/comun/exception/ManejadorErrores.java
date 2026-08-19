@@ -31,6 +31,7 @@ import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 
@@ -115,6 +116,22 @@ public class ManejadorErrores {
         log.warn("Estado no lo permite - Path: {}, Message: {}", request.getDescription(false), ex.getMessage());
         return construir(HttpStatus.CONFLICT, "El estado actual no permite esta operación",
                 "estado-invalido", ex.getMessage());
+    }
+
+    /* Una URL que no existe se iba por el manejador de «error inesperado»: 500, y en el
+       registro un ERROR con traza entera. Las dos cosas mienten. A quien llama le dice que
+       el problema esta en el servidor cuando esta en su direccion —y le hace reintentar, que
+       es lo peor que puede hacer—; y a quien mantiene le llena el registro de averias falsas
+       que tapan las de verdad, que es como se pierde el aviso que si importaba.
+
+       Va con nivel de aviso y sin traza a proposito: una URL equivocada es un dato malo de
+       quien llama, no un fallo del sistema. */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ProblemDetail rutaQueNoExiste(NoResourceFoundException ex, WebRequest request) {
+        log.warn("Ruta inexistente - Path: {}", request.getDescription(false));
+        return construir(HttpStatus.NOT_FOUND, "Esa dirección no existe", "ruta-inexistente",
+                "No hay ningún endpoint en «" + ex.getResourcePath() + "». Revisa la ruta; "
+                        + "la lista completa está en /swagger-ui.html");
     }
 
     // El documento de roles exige un mensaje claro cuando falta un permiso, no un error opaco
