@@ -35,7 +35,7 @@
 		<testcontainers.version>2.0.5</testcontainers.version>
 		<!-- La misma que ya traia spring-ai-pdf-document-reader: no baja nada nuevo -->
 		<pdfbox.version>3.0.7</pdfbox.version>
-		<archunit.version>1.4.1</archunit.version>
+		<archunit.version>1.5.0</archunit.version>
 		<!-- 0.8.13+ es la primera que entiende los .class de Java 25 -->
 		<jacoco.version>0.8.13</jacoco.version>
 		<!-- SonarCloud mira la cobertura solo del código NUEVO de cada PR (Clean as You
