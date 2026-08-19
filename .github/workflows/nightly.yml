@@ -5,9 +5,9 @@
 #            basura. Corre contra una aplicación LOCAL del runner, nunca contra Render:
 #            la calificación con IA va apagada y las claves son de mentira, así que
 #            ningún currículum falso llega a DeepSeek ni ensucia la base de pruebas.
-#   pit      Mutation testing. HOY NO CORRE SOLO: pitest todavía no lee bytecode de
-#            Java 25 (ver el perfil `pit` del pom.xml). Queda tras un interruptor
-#            manual para reintentarlo cuando salga la versión compatible.
+#   pit      Mutation testing: mete fallos a propósito en los cuatro paquetes de reglas
+#            y comprueba que algún test se ponga rojo. Lo que mide no es cuánto código
+#            pisan los tests, sino cuánto protegen. El reporte queda como artefacto.
 #
 # Si algo sale rojo aquí, no se bloquea nada: alguien lo mira por la mañana.
 name: nocturno
@@ -17,11 +17,6 @@ on:
     # 05:00 UTC = medianoche en Perú/Ecuador/Colombia
     - cron: '0 5 * * *'
   workflow_dispatch:
-    inputs:
-      intentar_pit:
-        description: 'Intentar PIT (fallará hasta que pitest soporte Java 25)'
-        type: boolean
-        default: false
 
 jobs:
   fuzzing:
@@ -86,7 +81,6 @@ jobs:
 
   pit:
     name: mutation testing (PIT)
-    if: github.event_name == 'workflow_dispatch' && inputs.intentar_pit
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:

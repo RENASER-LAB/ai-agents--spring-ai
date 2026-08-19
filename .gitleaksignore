@@ -1,0 +1,11 @@
+# Hallazgos revisados a mano y descartados. Se apuntan por huella exacta —commit,
+# archivo, regla y línea— y no por patrón: así se calla ESTE hallazgo concreto y
+# cualquier secreto de verdad que aparezca mañana en el mismo archivo sigue saltando.
+#
+# Antes de añadir una línea aquí hay que mirar el commit y confirmar que no es un
+# secreto real. Si lo fuera, no se silencia: se rota la clave.
+
+# El texto de ejemplo del jwt-secreto en la plantilla de secretos, tal como estaba el
+# 15/08/2026: «PEGA_AQUI_UNA_CLAVE_DE_AL_MENOS_32_BYTES». Es un hueco para rellenar, no
+# una clave; la regla generic-api-key lo marcó solo por ser una cadena larga y variada.
+f884582bacd62c7c289d4c6e58f8026d1ad2211f:application-secrets.yaml.example:generic-api-key:8
