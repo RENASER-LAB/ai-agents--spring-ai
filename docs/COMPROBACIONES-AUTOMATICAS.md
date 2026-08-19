@@ -10,8 +10,11 @@ nadie salvo una persona leyendo el código.
 ## Cómo se lanza todo
 
 ```bash
-DOCKER_HOST='npipe:////./pipe/docker_engine' ./mvnw test
+DOCKER_HOST='npipe:////./pipe/docker_engine' ./mvnw verify
 ```
+
+`test` lanza solo las unitarias y las de arquitectura; `verify` añade las de integración,
+que ahora corren en su propia fase. Es lo mismo que hace la tubería de integración continua.
 
 **`DOCKER_HOST` hace falta en esta máquina.** El contexto activo de Docker es
 `desktop-linux`, cuyo canal no existe; el que funciona es el `default`. Sin esto, todas las
@@ -37,13 +40,13 @@ demás de la calificación se prueba con un doble del modelo y no gasta nada.
 
 ---
 
-## 147 pruebas
+## 148 pruebas
 
 | Qué | Cuántas | Necesita |
 |---|---:|---|
-| Unitarias, con dobles | 102 | nada |
+| Unitarias, con dobles | 99 | nada |
 | Arquitectura | 7 | nada |
-| Integración, de punta a punta | 38 | Docker |
+| Integración, de punta a punta | 37 | Docker |
 | Contra el proveedor de verdad | 5 | Docker, saldo y la bandera |
 
 Las de integración levantan un PostgreSQL y un RabbitMQ de verdad con Testcontainers, y
