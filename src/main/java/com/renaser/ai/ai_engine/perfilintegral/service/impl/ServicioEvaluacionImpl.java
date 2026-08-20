@@ -28,6 +28,7 @@ import com.renaser.ai.ai_engine.perfilintegral.service.ValidadorDetalleV3;
 import com.renaser.ai.ai_engine.postulacion.entity.Postulacion;
 import com.renaser.ai.ai_engine.postulacion.repository.PostulacionRepository;
 import com.renaser.ai.ai_engine.postulacion.service.MaquinaEstados;
+import com.renaser.ai.ai_engine.parametro.service.ServicioParametros;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
 
 import lombok.RequiredArgsConstructor;
@@ -64,8 +65,19 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ServicioEvaluacionImpl implements ServicioEvaluacion {
 
-    // Cuántos días tiene el candidato para responder desde que postula
-    private static final int DIAS_DE_PLAZO = 14;
+    /**
+     * Cuántos días tiene el candidato para responder, y de dónde sale ese número.
+     *
+     * <p>Estuvo escrito aquí como constante hasta la V22. Cambiarlo obligaba a recompilar y
+     * desplegar, y es justo la clase de número que se mueve: entre que se reabre una tanda y
+     * que sale la invitación pasan días, y cada uno de esos días se le come al candidato.
+     *
+     * <p>El valor de verdad vive en el parámetro {@code dias_plazo_evaluacion} y Renaser lo
+     * cambia desde el panel. Este es solo el respaldo para una base anterior a la V22, para
+     * que ninguna evaluación nazca sin plazo.
+     */
+    public static final String PARAMETRO_PLAZO = "dias_plazo_evaluacion";
+    static final int DIAS_DE_PLAZO_POR_DEFECTO = 14;
 
     private final EvaluacionRepository evaluaciones;
     private final PlantillaEvaluacionRepository plantillas;
@@ -78,6 +90,7 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
     private final MaquinaEstados maquina;
     private final ServicioCalificacion calificacion;
     private final ColaCalificacionIa colaIa;
+    private final ServicioParametros parametros;
 
     private final SecureRandom azar = new SecureRandom();
 
@@ -86,6 +99,16 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
     private static final ObjectMapper JSON = new ObjectMapper();
 
     // ============ Crear ============
+
+    /**
+     * Los días de plazo que rigen ahora mismo para esta organización.
+     *
+     * <p>Se lee en cada llamada y no se guarda: si Renaser lo cambia en el panel, la siguiente
+     * evaluación ya nace con el plazo nuevo, sin reiniciar nada.
+     */
+    int diasDePlazo(Long organizacionId) {
+        return parametros.entero(organizacionId, PARAMETRO_PLAZO, DIAS_DE_PLAZO_POR_DEFECTO);
+    }
 
     @Override
     @Transactional
@@ -109,7 +132,7 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
                 .plantillaEvaluacionId(plantilla.getId())
                 .versionBancoNivelId(banco.getId())
                 .estado("PENDIENTE")
-                .venceEn(Instant.now().plus(DIAS_DE_PLAZO, ChronoUnit.DAYS))
+                .venceEn(Instant.now().plus(diasDePlazo(organizacionId), ChronoUnit.DAYS))
                 .vigenteHasta(Instant.now().plus(
                         plantilla.getVigenciaMeses() * 30L, ChronoUnit.DAYS))
                 .creadoEn(Instant.now())

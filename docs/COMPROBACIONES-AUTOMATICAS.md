@@ -47,16 +47,21 @@ demás de la calificación se prueba con un doble del modelo y no gasta nada.
 
 ---
 
-## 238 pruebas
+## 299 pruebas
+
+Contadas de correrlas el 20/08/2026, no de recordarlas: el desglose sale de los
+informes de surefire y failsafe.
 
 | Qué | Cuántas | Necesita |
 |---|---:|---|
-| Unitarias, con dobles | 140 | nada |
+| Unitarias, con dobles | 189 | nada |
 | Arquitectura | 7 | nada |
-| Las fórmulas del banco v3 | 22 | nada |
-| El validador de las respuestas v3 | 21 | nada |
+| Las fórmulas del banco v3 | 20 | nada |
+| El validador de las respuestas v3 | 14 | nada |
+| Los dos agentes nuevos y sus puentes | 20 | nada |
 | Integración, de punta a punta | 43 | Docker |
-| Contra el proveedor de verdad | 5 | Docker, saldo y la bandera |
+| Migraciones contra Postgres real | 3 | Docker |
+| Contra el proveedor de verdad, y el envío de correo | 6 | Docker o SMTP, y su bandera |
 
 Entre las de integración hay dos que no se parecen al resto y conviene conocer: la del **banco
 por el panel** (`FlujoBancoPreguntasIT`), donde un administrador construye, publica y archiva un

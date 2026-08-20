@@ -62,3 +62,7 @@ frontend/src/datos-demo.json
 # repositorio es publico. Se regenera: python scripts/enlaces-de-drive.py
 scripts/enlaces-cv.json
 cv-arquitecto/
+
+# Cache de Python: es un compilado, no fuente
+__pycache__/
+*.pyc

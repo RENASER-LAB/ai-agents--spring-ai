@@ -189,5 +189,44 @@
       "tipoCierre": "PERMANENTE",
       "plazas": 1
     }
+  },
+  "civil": {
+    "area": "Arquitectura, Innovación e Inteligencia Artificial",
+    "puesto": {
+      "codigo": "CIVIL_BUILDER_JR",
+      "nombre": "Ingeniero Civil Builder Junior",
+      "nivelPuestoCodigo": "EJECUCION",
+      "familiaCodigo": "TALENTO"
+    },
+    "solicitud": {
+      "urgencia": "NORMAL",
+      "resultadoPrincipal": "Propuestas de infraestructura, hidráulica y saneamiento investigadas y comparadas, listas para decidir antes de construir",
+      "motivo": "Hoy nadie investiga sistemas constructivos, abastecimiento de agua ni reutilización: cada proyecto resuelve esa parte sobre la marcha",
+      "consecuenciaNoContratar": "Se sigue decidiendo la infraestructura y el agua de cada proyecto sin alternativas comparadas, y el sobrecosto aparece cuando ya está construido",
+      "analisisCapacidad": "Se evaluó repartir el trabajo entre quienes ya calculan y ejecutan: resuelven el encargo puntual, pero nadie tiene horas para investigar alternativas ni para producir con herramientas de IA.",
+      "resultadosEsperados": [
+        {
+          "descripcion": "Propuestas de infraestructura con alternativas comparadas",
+          "indicador": "cada propuesta con su sistema constructivo, su costo y su tiempo estimados"
+        },
+        {
+          "descripcion": "Soluciones de agua y saneamiento investigadas por proyecto",
+          "indicador": "alternativas de abastecimiento, riego, reutilización y tratamiento evaluadas"
+        },
+        {
+          "descripcion": "Uso de IA incorporado a la investigación y a la propuesta",
+          "indicador": "comparaciones técnicas y propuestas producidas con herramientas de IA"
+        }
+      ]
+    },
+    "vacante": {
+      "titulo": "Ingeniero Civil Builder Junior",
+      "descripcion": "Infraestructura, Hidráulica, Construcción Inteligente e Inteligencia Artificial. Buscamos un estudiante de los últimos ciclos, recién egresado o ingeniero civil junior que quiera construir proyectos diferentes. No buscamos únicamente a alguien que calcule estructuras: buscamos una persona capaz de investigar, diseñar y desarrollar soluciones inteligentes para infraestructura, hidráulica, saneamiento, optimización del agua y construcción sostenible. Nos interesa alguien que utilice Inteligencia Artificial para acelerar su trabajo, investigar nuevas soluciones y desarrollar propuestas innovadoras.",
+      "proposito": "Investigar, diseñar y desarrollar soluciones inteligentes de infraestructura, hidráulica, saneamiento y optimización del agua, y convertir esa investigación en propuestas reales para los proyectos, apoyándose en herramientas de inteligencia artificial.",
+      "responsabilidades": "Infraestructura: desarrollar propuestas para la infraestructura del proyecto; investigar sistemas constructivos innovadores; apoyar en metrados y presupuestos; investigar materiales que reduzcan costos y mantenimiento. Hidráulica y saneamiento: investigar sistemas de abastecimiento de agua, de riego y tecnologías para reutilización de agua; evaluar alternativas para tratamiento de aguas residuales; proponer soluciones para optimizar el consumo de agua. Innovación: investigar tecnologías de construcción y proyectos referentes a nivel mundial; proponer mejoras técnicas. Inteligencia Artificial: usar IA para acelerar investigación y desarrollo, investigar herramientas de productividad y generar propuestas y comparaciones técnicas. Coordinación: trabajar junto al Arquitecto, coordinar con Biología y Agronomía y participar en el desarrollo técnico de nuevos proyectos.",
+      "requisitos": "Estudiante de últimos ciclos, recién egresado o ingeniero civil junior. Interés por infraestructura, hidráulica y saneamiento. Curiosidad por investigar. Capacidad para resolver problemas. Interés por construcción sostenible y por Inteligencia Artificial. Capacidad para convertir investigaciones en soluciones reales. Edad referencial: hasta 28 años.",
+      "tipoCierre": "PERMANENTE",
+      "plazas": 1
+    }
   }
 }

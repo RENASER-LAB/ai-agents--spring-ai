@@ -63,24 +63,40 @@ Perfil Integral → prueba del puesto → simulacion → validacion → decision
 |---|---|
 | **1** · Solicitud, vacante, postulacion, estados, permisos | Completo |
 | **2** · Perfil Integral (curriculum, evaluacion, Perfil de Talento) | Completo, **con IA corriendo de verdad** |
-| **3** · Prueba del puesto y decision | Completo salvo su calificacion con IA |
+| **3** · Prueba del puesto y decision | Completo, **con IA corriendo de verdad** |
 | **Simulacion y validacion** (estaban fuera del MVP) | Construidas |
 
 | | |
 |---|---|
-| Base de datos | **Flyway es el dueno del esquema**: V1-V19 en `src/main/resources/db/migration`, **85 tablas de este modulo** (88 en la base contando `flyway_schema_history` y las dos del motor de agentes, `agent_run` y `vector_store`). `ddl-auto: validate` |
+| Base de datos | **Flyway es el dueno del esquema**: V1-V23 en `src/main/resources/db/migration`, **85 tablas de este modulo** (88 en la base contando `flyway_schema_history` y las dos del motor de agentes, `agent_run` y `vector_store`). `ddl-auto: validate` |
 | Codigo | Veintiun paquetes de dominio bajo `ai_engine` (ver «Como esta organizado el codigo») |
-| Tests | **103** (ver «Correr los tests»): unitarios de la maquina y del anonimizador, migraciones contra Postgres real (Testcontainers) y cinco flujos de punta a punta: hito 1, evaluacion, prueba, simulacion/validacion y calificacion con IA |
-| IA que califica | **Tres de los nueve agentes del catalogo estan implementados**: evidencia del curriculum, evaluador y potencial/riesgo. Corren por cola de RabbitMQ contra DeepSeek. Ver [Calificacion con IA](docs/CALIFICACION-CON-IA.md) |
+| Tests | **299, todos en verde (20/08/2026)**: 250 unitarios y 49 de integracion. Ver «Correr los tests»: unitarios de la maquina y del anonimizador, migraciones contra Postgres real (Testcontainers) y flujos de punta a punta: hito 1, evaluacion, prueba, simulacion/validacion y calificacion con IA |
+| IA que califica | **Seis de los diez agentes del catalogo estan implementados**: datos del curriculum, evidencia, evaluador, potencial/riesgo, prueba del puesto y las preguntas de la conversacion final. Todos corren por cola de RabbitMQ contra DeepSeek. Ver [Calificacion con IA](docs/CALIFICACION-CON-IA.md) |
 | Correo | Se registra en `correo_enviado` pero NO se envia: falta el dominio de Renaser (`EnviadorCorreoLog`) |
 | Identidad equipo | `dev-login` de desarrollo; el contrato de RENASER OS no existe aun (`ProveedorIdentidadEquipo`) |
 | Frontend | **Dos, y hacen cosas distintas.** Ver «Las dos pantallas» mas abajo |
 | Mockups | Los mantiene otra persona y **describen la version anterior** |
 
-**Lo que falta de codigo:** los agentes que califican la prueba del puesto (`PRUEBA_PUESTO`) y
-que generan las preguntas de la conversacion final (`SIMULACION`). Existen como filas del
-catalogo, sin instruccion sembrada ni clase. Hoy esas dos cosas las hace una persona a mano, en
-las mismas tablas que usaran los agentes.
+**Lo que falta de codigo:** de los diez agentes del catalogo quedan cuatro sin clase, y
+ninguno es del MVP: `NECESIDAD_TALENTO`, `CAZATALENTOS`, `DESEMPENO` y `APRENDIZAJE`.
+
+Los dos del hito 3 ya corren (20/08/2026), y los dos se **piden a mano** desde el panel, igual
+que la criba de curriculums: cada llamada al modelo cuesta dinero y a quien se califica lo
+decide quien lleva la vacante.
+
+| Agente | Que hace | Por donde se pide |
+|---|---|---|
+| `PRUEBA_PUESTO` | Puntua los criterios de la rubrica **marcados como `AGENTE`**; los de `PERSONA` los sigue poniendo alguien. Al terminar mueve la postulacion a `PRUEBA_POR_CONFIRMAR` | `POST /api/v1/panel/postulaciones/{id}/prueba/calificacion-ia` |
+| `SIMULACION` | Escribe entre tres y cinco preguntas para la conversacion final, sacadas de las contradicciones entre lo que dijo y lo que se le vio hacer. **No puntua nada** | `POST /api/v1/panel/postulaciones/{id}/conversacion-final/generar` |
+
+Dos cosas que no son obvias:
+
+- **Lo que no se puede leer no se puntua.** Una entrega en video, en imagen o en un enlace no
+  da texto, y esos criterios se quedan sin nota para que los mire una persona. Es a proposito:
+  un modelo al que se le exige una nota siempre da una nota, y despues nadie distingue la
+  fundada de la inventada.
+- **Una pregunta ya contestada no se borra.** Volver a pedir las preguntas rehace solo las que
+  nadie llego a hacer.
 
 **Lo que falta y no es codigo** — son decisiones de Renaser que los documentos defieren a
 proposito, no trabajo olvidado:
@@ -151,18 +167,18 @@ Las dos consultan el mismo backend, asi que ensenan el mismo orden.
 - Nada se recalcula hacia atras: cada nota queda atada a la version de pesos de su vacante.
 
 ### Correr los tests
-**238 tests, todos en verde (19/08/2026, tarde).** Son dos tandas y el comando decide cual corre:
+**299 tests, todos en verde (20/08/2026).** Son dos tandas y el comando decide cual corre:
 
 | Comando | Que corre | Cuantos | Necesita |
 |---|---|---:|---|
-| `./mvnw test` | unitarias con dobles y las de arquitectura | 190 | nada |
-| `./mvnw verify` | lo anterior mas las de integracion | 238 | Docker |
+| `./mvnw test` | unitarias con dobles y las de arquitectura | 250 | nada |
+| `./mvnw verify` | lo anterior mas las de integracion | 299 | Docker |
 
 Las de integracion levantan su propio PostgreSQL y su propio RabbitMQ con Testcontainers: hace
 falta el demonio de Docker encendido. El desglose completo esta en
 [docs/COMPROBACIONES-AUTOMATICAS.md](docs/COMPROBACIONES-AUTOMATICAS.md).
 
-Entre las 106 hay **7 reglas de arquitectura con ArchUnit** (la frontera del motor, las capas y
+Entre las 250 hay **7 reglas de arquitectura con ArchUnit** (la frontera del motor, las capas y
 que el estado solo lo mueva la maquina — las mismas reglas que este archivo tiene en prosa).
 
 **El test que gasta dinero no corre solo**: `CalificacionIaRealIT` esta detras de
@@ -243,7 +259,7 @@ fusiona.** El detalle esta en [docs/CI-CD.md](docs/CI-CD.md); aqui lo que hay qu
 
 | Cuando | Que corre |
 |---|---|
-| En cada PR y en cada push a `main` | `./mvnw verify` (los 238 tests), Semgrep, Gitleaks y la cobertura del codigo nuevo en SonarCloud |
+| En cada PR y en cada push a `main` | `./mvnw verify` (los 299 tests), Semgrep, Gitleaks y la cobertura del codigo nuevo en SonarCloud |
 | Al fusionar a `main`, si todo quedo verde | Se avisa a Render por su Deploy Hook, que construye la imagen con el `Dockerfile` y publica en Pruebas |
 | De noche, sin bloquear a nadie | PIT (mutation testing) y fuzzing de la API con Schemathesis |
 
@@ -353,7 +369,7 @@ Todo vive en `docs/`. Empezar por [docs/README.md](docs/README.md).
   ultimas etapas y sus tres reglas automaticas de disponibilidad.
 - [CI/CD](docs/CI-CD.md) — que se comprueba solo en cada cambio, como se despliega a Pruebas y
   que variables de entorno pide Render. **Leerlo antes de tocar `.github/workflows/`.**
-- [Comprobaciones automaticas](docs/COMPROBACIONES-AUTOMATICAS.md) — las 238 pruebas y las siete
+- [Comprobaciones automaticas](docs/COMPROBACIONES-AUTOMATICAS.md) — las 299 pruebas y las siete
   reglas de arquitectura, una por una. Que se mira solo y que no.
 - `docs/diagramas/` — HTML autocontenidos, se abren en el navegador.
 - `docs/mockups/` — prototipos de pantalla. **Los mantiene otra persona, no editarlos.**

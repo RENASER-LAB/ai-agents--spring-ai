@@ -1,7 +1,8 @@
 # La calificación con inteligencia artificial
 
-Cómo funciona la parte del hito 2 en la que la IA lee el currículum, califica las respuestas
-abiertas y arma el Perfil de Talento. Es lo último que le faltaba al hito 2.
+Cómo funciona la parte en la que la IA lee el currículum, califica las respuestas abiertas y
+arma el Perfil de Talento. Al final están también los dos agentes de las etapas siguientes:
+el que califica la prueba del puesto y el que prepara la conversación final.
 
 ---
 
@@ -128,10 +129,59 @@ código**. Salieron de las bandas del Banco Maestro y **Renaser todavía no los 
 
 ---
 
+## Los otros dos agentes: la prueba del puesto y la conversación final
+
+Todo lo de arriba es del **Perfil Integral**, que es la primera etapa. Semanas después el
+candidato pasa por otras dos en las que también ayuda la IA, y funcionan distinto en algo
+importante: **no arrancan solas**. Alguien las pide desde el panel, igual que la criba de
+currículums, porque cada llamada al modelo cuesta dinero y a quién se califica lo decide
+quien lleva la vacante.
+
+| Agente | Qué hace |
+|---|---|
+| **Prueba del puesto** | Lee la entrega del candidato y le pone nota a los criterios de la rúbrica. Al terminar, la prueba pasa a «por confirmar», que es donde una persona la revisa |
+| **Conversación final** | Escribe entre tres y cinco preguntas para los quince minutos que cierran la simulación. **No pone ninguna nota** |
+
+### Quién mira cada criterio de la prueba lo dice la rúbrica
+
+Cada criterio de una prueba declara cómo se comprueba: con el sistema, con un agente o con
+una persona. **El agente solo ve los suyos.** Si una prueba se califica mirando un video y
+todos sus criterios son de persona, el agente ni siquiera llama al modelo, y quien apriete el
+botón recibe esa respuesta.
+
+### Lo que no se puede leer no se puntúa
+
+Una prueba del puesto se entrega en un archivo, en un video o en un enlace a un repositorio.
+De varios de esos no sale texto, y de lo que no se puede leer **el agente deja el criterio sin
+nota** para que lo mire una persona.
+
+Esto es lo contrario de lo que hace un modelo por su cuenta: a un modelo al que se le exige
+una nota, siempre da una nota. El daño no es que se equivoque —una persona también se
+equivoca—, es que después nadie puede distinguir la nota fundada de la inventada. Quien abra
+la ficha ve la rúbrica con unos criterios puestos por el agente y otros vacíos, y eso es
+exactamente lo que ocurrió.
+
+### De dónde salen las preguntas de la conversación final
+
+De una **contradicción** entre lo que el candidato dijo y lo que se le vio hacer. Por eso al
+agente no se le da un texto, se le dan piezas sueltas: el retrato, las alertas, lo que dijo en
+el currículum, las notas de la simulación y las horas de los eventos que el facilitador marcó
+durante la sesión. La contradicción vive *entre* dos de ellas.
+
+Una pregunta útil nombra el hecho: «lo viste a las 10:41 y lo informaste a las 10:49, ¿qué
+pasó en esos ocho minutos?». Una genérica —«cuéntame de una vez que fallaste»— no aporta nada
+que no estuviera ya en el currículum.
+
+Se pueden volver a pedir las veces que haga falta. **Las preguntas que ya se hicieron y se
+contestaron no se tocan**: lo que se dijo en la sala es un hecho ocurrido, y una segunda tanda
+no puede borrarlo. Solo se rehacen las que nadie llegó a hacer.
+
+---
+
 ## Cómo apagarlo
 
 `renaser.ai.calificacion.habilitada: false` en la configuración. Con eso la postulación se
-queda en «calificando» y no se encola nada. Sirve si el proveedor está caído y no se quiere
+queda en «calificando» y no se encola nada — tampoco los dos agentes de las etapas siguientes. Sirve si el proveedor está caído y no se quiere
 gastar reintentos.
 
 ---

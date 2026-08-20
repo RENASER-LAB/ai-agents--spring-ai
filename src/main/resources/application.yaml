@@ -129,6 +129,43 @@ renaser:
       minutos-colgado: 15
       periodo-sondeo-ms: 300000
 
+  # ¿Sale el correo de esta máquina, o solo se anota?
+  #
+  # «log» —el valor por defecto— guarda el aviso en `correo_enviado` y no manda nada. Es lo
+  # que estaba antes y lo que tienen que seguir viendo los tests y quien arranque sin
+  # credenciales: un descuido aquí le escribe a un candidato de verdad.
+  #
+  # «smtp» manda. Para encenderlo hacen falta, en application-secrets.yaml:
+  #     spring.mail.host, .port, .username, .password
+  #     renaser.correo.remitente
+  #
+  # ⚠️ Con Gmail la contraseña NO es la de la cuenta: desde 2022 hay que crear una
+  # «contraseña de aplicación» con la verificación en dos pasos activada. La normal
+  # devuelve 535 «Username and Password not accepted» y el error no explica por qué.
+  #
+  # En Render NO existe application-secrets.yaml —el Dockerfile no lo copia—, así que allí
+  # esto llega por variable de entorno: CORREO_TRANSPORTE, CORREO_REMITENTE, y las de Spring
+  # con su nombre en mayúsculas (SPRING_MAIL_HOST, SPRING_MAIL_PORT, SPRING_MAIL_USERNAME,
+  # SPRING_MAIL_PASSWORD). Van en la tabla de docs/CI-CD.md.
+  # La direccion del portal del candidato, la que se le pega en el correo.
+  #
+  # Se configura y no se adivina porque no es la misma en cada sitio: en la maquina de un
+  # desarrollador es el Vite local del puerto 5174, y publicado es Vercel. Una plantilla de
+  # correo con la direccion escrita a mano acabaria mandando candidatos a localhost.
+  #
+  # ⚠️ Ese portal necesita una pantalla en /acceso que lea el token de la URL, llame a
+  # POST /api/v1/portal/auth/acceso y guarde la sesion. Sin ella el enlace cae en la pagina
+  # de vacantes sin iniciar sesion. Vive en el repositorio RenaserOsPostulantes.
+  portal:
+    url: ${PORTAL_URL:https://renaser-os-postulantes.vercel.app}
+
+  correo:
+    transporte: ${CORREO_TRANSPORTE:log}
+    # La dirección que ve el candidato. Puede no ser la misma que autentica: con un dominio
+    # propio se autentica una cuenta de servicio y se escribe desde no-responder@.
+    remitente: ${CORREO_REMITENTE:}
+    nombre-remitente: ${CORREO_NOMBRE_REMITENTE:Renaser}
+
 supabase:
   url: https://ikyjurujfxpazygwloja.supabase.co
   service-role-key: ${SUPABASE_SERVICE_ROLE_KEY:}
