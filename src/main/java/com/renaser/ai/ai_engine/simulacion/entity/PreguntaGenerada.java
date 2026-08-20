@@ -24,6 +24,10 @@ public class PreguntaGenerada {
 
     private Long postulacionId;
     private String texto;
+    // El hecho concreto del que sale, en una oración. Lo escribe el agente SIMULACION;
+    // las que se registran a mano lo dejan vacío. Sin esto el facilitador recibe una
+    // pregunta sin saber por qué se la dan, y no puede repreguntar bien.
+    private String motivo;
     // De qué contradicción salió, si salió de una
     private Long alertaId;
     private Long ejecucionIaId;

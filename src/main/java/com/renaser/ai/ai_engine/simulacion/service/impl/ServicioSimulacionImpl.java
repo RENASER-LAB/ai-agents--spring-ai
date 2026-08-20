@@ -1,6 +1,7 @@
 package com.renaser.ai.ai_engine.simulacion.service.impl;
 
 import com.renaser.ai.ai_engine.ai.exception.ResourceNotFoundException;
+import com.renaser.ai.ai_engine.ai.service.ColaCalificacionIa;
 import com.renaser.ai.ai_engine.auditoria.service.ServicioAuditoria;
 import com.renaser.ai.ai_engine.parametro.service.ServicioParametros;
 import com.renaser.ai.ai_engine.postulacion.entity.Postulacion;
@@ -58,6 +59,7 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
     private final PreguntaGeneradaRepository preguntas;
     private final PostulacionRepository postulaciones;
     private final VacanteRepository vacantes;
+    private final ColaCalificacionIa cola;
     private final RolRepository roles;
     private final UsuarioRolRepository usuarioRoles;
     private final MaquinaEstados maquina;
@@ -385,10 +387,23 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
     }
 
     @Override
+    public PreguntasEncoladas generarPreguntas(ContextoUsuario quien, Long postulacionId) {
+        laVisible(quien, postulacionId, "hacer_conversacion_final");
+        if (!cola.encolarPreguntasSimulacion(postulacionId)) {
+            return new PreguntasEncoladas("SIN_CAMBIOS",
+                    "No se pidió nada: o las preguntas ya están preparadas, o hay una petición "
+                            + "en marcha ahora mismo.");
+        }
+        return new PreguntasEncoladas("ENCOLADA",
+                "Las preguntas quedaron pedidas. Tardan decenas de segundos: vuelve a consultar "
+                        + "la conversación final para verlas.");
+    }
+
+    @Override
     public List<PreguntaResponse> verPreguntas(ContextoUsuario quien, Long postulacionId) {
         laVisible(quien, postulacionId, "hacer_conversacion_final");
         return preguntas.findByPostulacionIdOrderByOrden(postulacionId).stream()
-                .map(p -> new PreguntaResponse(p.getId(), p.getTexto(), p.getOrden(),
+                .map(p -> new PreguntaResponse(p.getId(), p.getTexto(), p.getMotivo(), p.getOrden(),
                         p.getRespuesta(), p.getRiesgoResuelto(), p.getObservacion()))
                 .toList();
     }

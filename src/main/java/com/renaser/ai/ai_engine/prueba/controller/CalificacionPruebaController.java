@@ -36,6 +36,14 @@ public class CalificacionPruebaController {
         return servicio.verNotas(permisos.actual(), postulacionId);
     }
 
+    @PostMapping("/calificacion-ia")
+    @PreAuthorize("@permisos.tiene('ajustar_nota')")
+    @Operation(summary = "Pedirle al agente PRUEBA_PUESTO que califique los criterios que la "
+            + "rúbrica le reserva. Tarda decenas de segundos y no pisa ningún ajuste a mano")
+    public CalificacionIaEncolada calificarConIa(@PathVariable Long postulacionId) {
+        return servicio.calificarConIa(permisos.actual(), postulacionId);
+    }
+
     @PostMapping("/criterios/{criterioId}/nota")
     @PreAuthorize("@permisos.tiene('ajustar_nota')")
     @Operation(summary = "Poner o corregir la nota de un criterio. La explicación es obligatoria")

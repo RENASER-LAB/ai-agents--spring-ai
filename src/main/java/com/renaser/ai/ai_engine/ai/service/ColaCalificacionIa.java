@@ -81,6 +81,33 @@ public interface ColaCalificacionIa {
     boolean encolarCribaFina(Long postulacionId);
 
     /**
+     * Pide que la IA califique la prueba del puesto que el candidato ya entregó.
+     *
+     * <p><b>No se encadena a nada.</b> Corre sola, y no entra ni sale de la fila del Perfil
+     * Integral: lo que califica es otra etapa, con otra rúbrica y otra escala. Por eso
+     * tampoco cuenta para {@link #comoVa}, que sigue hablando solo del retrato del candidato.
+     *
+     * <p><b>Se pide, no se dispara sola al entregar.</b> Es la misma decisión que ya se tomó
+     * con la criba de currículums: cada llamada al modelo cuesta dinero, y quién y cuándo se
+     * califica es de quien lleva la vacante. Entregar la prueba deja la postulación en
+     * «calificando», y desde ahí una persona puede pedir esto o calificarla a mano.
+     *
+     * @return true si quedó algo en la cola; false si ya está calificada o hay un trabajo vivo
+     */
+    boolean encolarPruebaPuesto(Long postulacionId);
+
+    /**
+     * Pide las preguntas de la conversación final de la simulación.
+     *
+     * <p>No califica nada: prepara el guion de los quince minutos finales de la sesión. Se
+     * puede pedir varias veces —después de ajustar una nota, por ejemplo— y las preguntas
+     * que ya se hicieron y se contestaron se quedan como estaban.
+     *
+     * @return true si quedó algo en la cola
+     */
+    boolean encolarPreguntasSimulacion(Long postulacionId);
+
+    /**
      * Ejecuta un trabajo concreto. Lo llama el listener de la cola, y también el sondeo.
      *
      * <p>No lanza excepción: el resultado —bien, a reintentar o fallido— queda escrito en

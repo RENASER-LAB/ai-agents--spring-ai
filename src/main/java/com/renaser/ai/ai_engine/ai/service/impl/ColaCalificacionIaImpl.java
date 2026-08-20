@@ -51,6 +51,16 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
      */
     private static final String ULTIMO = AgentePotencialRiesgo.CODIGO;
 
+    /**
+     * Los dos que no van en fila con nadie.
+     *
+     * <p>Cada uno atiende una etapa posterior —la prueba del puesto y la simulación— y se
+     * pide a mano, así que su «fila» tiene un solo paso. Se escriben igual que las otras dos
+     * listas para que {@code encolar} no necesite un camino aparte.
+     */
+    private static final List<String> SOLO_LA_PRUEBA = List.of(AgentePruebaPuesto.CODIGO);
+    private static final List<String> SOLO_LAS_PREGUNTAS = List.of(AgenteSimulacion.CODIGO);
+
     public static final String RAPIDA = "RAPIDA";
     public static final String FINA = "FINA";
 
@@ -113,6 +123,22 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
             return false;
         }
         return encolar(postulacionId, ORDEN, FINA, 0, null);
+    }
+
+    @Override
+    public boolean encolarPruebaPuesto(Long postulacionId) {
+        if (apagada(postulacionId)) {
+            return false;
+        }
+        return encolar(postulacionId, SOLO_LA_PRUEBA, FINA, 0, null);
+    }
+
+    @Override
+    public boolean encolarPreguntasSimulacion(Long postulacionId) {
+        if (apagada(postulacionId)) {
+            return false;
+        }
+        return encolar(postulacionId, SOLO_LAS_PREGUNTAS, FINA, 0, null);
     }
 
     private boolean apagada(Long postulacionId) {
@@ -181,7 +207,15 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
     }
 
     /** La cuenta, ya con los trabajos delante. La comparten el uno y la tanda entera. */
-    private String comoVan(List<TrabajoIa> suyos) {
+    private String comoVan(List<TrabajoIa> todos) {
+        // Solo los del retrato. Desde que existen los agentes de la prueba y de la
+        // conversación final, una misma postulación puede tener trabajos de tres etapas
+        // distintas, y esta pregunta es siempre la misma: cómo va SU retrato. Sin este
+        // filtro, pedir las preguntas de la simulación dejaría el ranking entero diciendo
+        // «en curso» por un trabajo que no tiene nada que ver con la nota que enseña.
+        List<TrabajoIa> suyos = todos.stream()
+                .filter(t -> ORDEN.contains(t.getAgenteCodigo()))
+                .toList();
         if (suyos.isEmpty()) {
             return "SIN_EMPEZAR";
         }

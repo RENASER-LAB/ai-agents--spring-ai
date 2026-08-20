@@ -14,4 +14,7 @@ public final class DtosCalificacionPrueba {
     public record NotaCriterioResponse(
             Long criterioId, String nombre, Double puntosMaximos,
             Double puntaje, String explicacion, String origen) {}
+
+    /** Lo que se contesta al pedirle al agente que califique. */
+    public record CalificacionIaEncolada(String estado, String mensaje) {}
 }

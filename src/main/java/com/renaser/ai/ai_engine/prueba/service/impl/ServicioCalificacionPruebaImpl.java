@@ -1,6 +1,7 @@
 package com.renaser.ai.ai_engine.prueba.service.impl;
 
 import com.renaser.ai.ai_engine.ai.exception.ResourceNotFoundException;
+import com.renaser.ai.ai_engine.ai.service.ColaCalificacionIa;
 import com.renaser.ai.ai_engine.perfilintegral.entity.Criterio;
 import com.renaser.ai.ai_engine.perfilintegral.entity.NotaCriterio;
 import com.renaser.ai.ai_engine.perfilintegral.repository.CriterioRepository;
@@ -10,6 +11,7 @@ import com.renaser.ai.ai_engine.perfilintegral.entity.NotaEtapa;
 import com.renaser.ai.ai_engine.pesos.repository.VersionPesosRepository;
 import com.renaser.ai.ai_engine.postulacion.entity.Postulacion;
 import com.renaser.ai.ai_engine.postulacion.repository.PostulacionRepository;
+import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.CalificacionIaEncolada;
 import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.NotaCriterioResponse;
 import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.PonerNotaCriterio;
 import com.renaser.ai.ai_engine.prueba.entity.IntentoPrueba;
@@ -43,6 +45,7 @@ public class ServicioCalificacionPruebaImpl implements ServicioCalificacionPrueb
     private final NotaCriterioRepository notasCriterio;
     private final NotaEtapaRepository notasEtapa;
     private final VersionPesosRepository versionesPesos;
+    private final ColaCalificacionIa cola;
     private final Permisos permisos;
 
     @Override
@@ -60,6 +63,43 @@ public class ServicioCalificacionPruebaImpl implements ServicioCalificacionPrueb
                     n == null ? null : n.getExplicacion(),
                     n == null ? null : n.getOrigen());
         }).toList();
+    }
+
+    @Override
+    public CalificacionIaEncolada calificarConIa(ContextoUsuario quien, Long postulacionId) {
+        Postulacion postulacion = laVisible(quien, postulacionId, "ajustar_nota");
+
+        // Lo indispensable, dicho aquí y no tres reintentos después. El agente se plantaría
+        // igual al pedir el insumo, pero entonces el mensaje se quedaría en el registro en
+        // vez de llegar a quien apretó el botón.
+        IntentoPrueba intento = intentos.findByPostulacionId(postulacionId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Prueba del puesto", "postulación", postulacionId));
+        if (intento.getEntregadoEn() == null) {
+            throw new IllegalStateException(
+                    "Esta prueba todavía no está entregada: calificarla ahora daría una nota "
+                            + "de lo que el candidato lleve escrito a medias");
+        }
+
+        // Si la rúbrica no le reserva nada al agente, encolar solo gastaría una vuelta de
+        // cola para que el agente descubra lo mismo y termine sin hacer nada.
+        long paraElAgente = laRubricaDe(postulacion).stream()
+                .filter(c -> "AGENTE".equals(c.getMetodoVerificacion()))
+                .count();
+        if (paraElAgente == 0) {
+            return new CalificacionIaEncolada("SIN_CAMBIOS",
+                    "La rúbrica de esta prueba no tiene ningún criterio marcado para el agente: "
+                            + "la califica una persona entera.");
+        }
+
+        if (!cola.encolarPruebaPuesto(postulacionId)) {
+            return new CalificacionIaEncolada("SIN_CAMBIOS",
+                    "No se pidió nada: o ya está calificada por el agente, o hay un trabajo en "
+                            + "marcha ahora mismo.");
+        }
+        return new CalificacionIaEncolada("ENCOLADA",
+                "La calificación quedó en cola. Tarda decenas de segundos: vuelve a consultar "
+                        + "las notas para verla.");
     }
 
     @Override

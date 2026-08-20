@@ -63,6 +63,8 @@ class ColaCalificacionIaImplTest {
     @Mock private AgenteSeleccion evidenciaCv;
     @Mock private AgenteSeleccion evaluador;
     @Mock private AgenteSeleccion potencialRiesgo;
+    @Mock private AgenteSeleccion pruebaPuesto;
+    @Mock private AgenteSeleccion simulacion;
 
     private ColaCalificacionIaImpl cola;
 
@@ -72,6 +74,8 @@ class ColaCalificacionIaImplTest {
         when(evidenciaCv.codigo()).thenReturn(AgenteEvidenciaCv.CODIGO);
         when(evaluador.codigo()).thenReturn(AgenteEvaluador.CODIGO);
         when(potencialRiesgo.codigo()).thenReturn(AgentePotencialRiesgo.CODIGO);
+        when(pruebaPuesto.codigo()).thenReturn(AgentePruebaPuesto.CODIGO);
+        when(simulacion.codigo()).thenReturn(AgenteSimulacion.CODIGO);
         // Solo lo miran los tests que encolan; los que preguntan «cómo va» no pasan por ahí.
         lenient().when(puente.organizacionDe(POSTULACION)).thenReturn(1L);
         cola = conLaCalificacion(true);
@@ -447,9 +451,69 @@ class ColaCalificacionIaImplTest {
 
     // ============ Apoyo ============
 
+    // ============ Los dos que corren solos ============
+
+    @Test
+    void laPruebaDelPuestoSeEncolaSolaYNoArrastraAlRestoDeLaFila() {
+        // Es otra etapa: otra rúbrica, otra escala y semanas después. Meterla en la fila del
+        // retrato haría que calificar una prueba volviera a leer el currículum.
+        cola.encolarPruebaPuesto(POSTULACION);
+
+        verify(registro).crearSiHaceFalta(1L, POSTULACION, AgentePruebaPuesto.CODIGO, "FINA", null);
+        verify(registro, never()).crearSiHaceFalta(
+                anyLong(), anyLong(), eq(AgenteEvidenciaCv.CODIGO), anyString(), any());
+    }
+
+    @Test
+    void lasPreguntasDeLaConversacionSeEncolanSolas() {
+        cola.encolarPreguntasSimulacion(POSTULACION);
+
+        verify(registro).crearSiHaceFalta(1L, POSTULACION, AgenteSimulacion.CODIGO, "FINA", null);
+    }
+
+    @Test
+    void alTerminarLaPruebaNoSeEncolaANadieDetras() {
+        // Su fila tiene un solo paso. Si esto encolara al siguiente de la fila del retrato,
+        // calificar una prueba pagaría de propina un Perfil de Talento que nadie pidió.
+        when(registro.tomar(9L))
+                .thenReturn(Optional.of(trabajo(9L, AgentePruebaPuesto.CODIGO, "EN_CURSO", "FINA")));
+
+        cola.ejecutar(9L);
+
+        verify(pruebaPuesto).ejecutar(any(TrabajoIa.class));
+        verify(registro).terminar(9L);
+        verify(registro, never()).crearSiHaceFalta(
+                anyLong(), anyLong(), anyString(), anyString(), any());
+    }
+
+    @Test
+    void unTrabajoDeOtraEtapaNoCambiaComoVaElRetrato() {
+        // La trampa que esto evita: «cómo va» habla del retrato del candidato, y con estos
+        // dos agentes una misma postulación tiene trabajos de tres etapas distintas. Sin
+        // filtrar, pedir las preguntas de la conversación pintaba el ranking entero «en
+        // curso» por algo que no toca ninguna de las notas que el ranking enseña.
+        when(trabajos.findByPostulacionIdOrderByIdAsc(POSTULACION)).thenReturn(List.of(
+                trabajo(1L, AgenteEvidenciaCv.CODIGO, "TERMINADO", "FINA"),
+                trabajo(2L, AgentePotencialRiesgo.CODIGO, "TERMINADO", "FINA"),
+                trabajo(3L, AgenteSimulacion.CODIGO, "PENDIENTE", "FINA")));
+
+        assertThat(cola.comoVa(POSTULACION)).isEqualTo("TERMINADA");
+    }
+
+    @Test
+    void unaPruebaFallidaNoDejaAlCandidatoComoSiNoTuvieraRetrato() {
+        // Al revés que el anterior, y por el mismo motivo: que la prueba del puesto falle no
+        // borra el Perfil de Talento que ya estaba hecho.
+        when(trabajos.findByPostulacionIdOrderByIdAsc(POSTULACION)).thenReturn(List.of(
+                trabajo(1L, AgentePotencialRiesgo.CODIGO, "TERMINADO", "FINA"),
+                trabajo(2L, AgentePruebaPuesto.CODIGO, "FALLIDO", "FINA")));
+
+        assertThat(cola.comoVa(POSTULACION)).isEqualTo("TERMINADA");
+    }
+
     private ColaCalificacionIaImpl conLaCalificacion(boolean habilitada) {
         return new ColaCalificacionIaImpl(trabajos, registro, publicador, puente,
-                List.of(datosCv, evidenciaCv, evaluador, potencialRiesgo),
+                List.of(datosCv, evidenciaCv, evaluador, potencialRiesgo, pruebaPuesto, simulacion),
                 habilitada, 3, 15);
     }
 

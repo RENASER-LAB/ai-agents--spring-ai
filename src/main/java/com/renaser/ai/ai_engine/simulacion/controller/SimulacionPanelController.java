@@ -151,10 +151,18 @@ public class SimulacionPanelController {
     @PostMapping("/postulaciones/{id}/conversacion-final")
     @PreAuthorize("@permisos.tiene('hacer_conversacion_final')")
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Registrar una pregunta. Cuando exista el agente, las generará él")
+    @Operation(summary = "Registrar una pregunta escrita a mano")
     public Map<String, Long> registrarPregunta(@PathVariable Long id,
                                                @Valid @RequestBody RegistrarPregunta datos) {
         return Map.of("id", servicio.registrarPregunta(permisos.actual(), id, datos));
+    }
+
+    @PostMapping("/postulaciones/{id}/conversacion-final/generar")
+    @PreAuthorize("@permisos.tiene('hacer_conversacion_final')")
+    @Operation(summary = "Pedirle al agente SIMULACION que prepare las preguntas. Tarda "
+            + "decenas de segundos; las que ya se contestaron no se tocan")
+    public PreguntasEncoladas generarPreguntas(@PathVariable Long id) {
+        return servicio.generarPreguntas(permisos.actual(), id);
     }
 
     @PostMapping("/conversacion-final/{preguntaId}/respuesta")

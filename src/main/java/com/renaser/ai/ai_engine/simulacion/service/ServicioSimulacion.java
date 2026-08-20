@@ -54,6 +54,19 @@ public interface ServicioSimulacion {
 
     // ---------- La conversación final ----------
 
+    /**
+     * Pide que la IA prepare las preguntas, en vez de escribirlas a mano.
+     *
+     * <p>Las saca de lo que el candidato mostró antes: el retrato, las alertas, las notas de
+     * la simulación y las horas de la sesión. Tarda decenas de segundos, así que no contesta
+     * con las preguntas: contesta que quedó pedido, y se consultan con {@link #verPreguntas}.
+     *
+     * <p>Se puede pedir más de una vez. <b>Las que ya se hicieron y se contestaron no se
+     * tocan</b>: lo que se dijo en la sala es un hecho ocurrido, y una segunda pasada no
+     * puede hacerlo desaparecer.
+     */
+    PreguntasEncoladas generarPreguntas(ContextoUsuario quien, Long postulacionId);
+
     Long registrarPregunta(ContextoUsuario quien, Long postulacionId, RegistrarPregunta datos);
     void responderPregunta(ContextoUsuario quien, Long preguntaId, ResponderPregunta datos);
     List<PreguntaResponse> verPreguntas(ContextoUsuario quien, Long postulacionId);

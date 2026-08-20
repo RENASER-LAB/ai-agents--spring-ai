@@ -1,5 +1,6 @@
 package com.renaser.ai.ai_engine.prueba.service;
 
+import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.CalificacionIaEncolada;
 import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.NotaCriterioResponse;
 import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.PonerNotaCriterio;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
@@ -17,12 +18,30 @@ import java.util.List;
  *
  * <p>Lo que sí es determinístico es <b>ponderar</b> lo que ya se calificó: cada criterio
  * declara sus puntos ({@code criterio.puntos}) y cómo se verifica (RF-87). Este servicio no
- * inventa notas — las suma. Ponerlas es trabajo de una persona hoy, y del agente
- * {@code PRUEBA_PUESTO} cuando exista.
+ * inventa notas — las suma.
+ *
+ * <p><b>Quién pone cada nota lo dice la propia rúbrica.</b> Los criterios marcados como
+ * verificables por agente los puntúa {@code PRUEBA_PUESTO}; los de persona, una persona. Por
+ * eso conviven aquí las dos puertas: {@link #calificarConIa} y {@link #ponerNota}.
  */
 public interface ServicioCalificacionPrueba {
 
     List<NotaCriterioResponse> verNotas(ContextoUsuario quien, Long postulacionId);
+
+    /**
+     * Le pide al agente que califique la parte de la rúbrica que le toca.
+     *
+     * <p>Solo los criterios marcados como verificables por agente, y solo si la prueba está
+     * entregada. Tarda decenas de segundos, así que no devuelve notas: devuelve que quedó
+     * pedido, y las notas se consultan después con {@link #verNotas}.
+     *
+     * <p><b>No lo hace solo al entregar</b>, a propósito: cada llamada al modelo cuesta
+     * dinero y a quién se califica lo decide quien lleva la vacante. Es la misma decisión
+     * que ya se tomó con la criba de currículums.
+     *
+     * @throws IllegalStateException si la prueba todavía no está entregada
+     */
+    CalificacionIaEncolada calificarConIa(ContextoUsuario quien, Long postulacionId);
 
     void ponerNota(ContextoUsuario quien, Long postulacionId, Long criterioId, PonerNotaCriterio datos);
 

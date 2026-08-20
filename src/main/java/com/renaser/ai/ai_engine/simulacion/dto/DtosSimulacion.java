@@ -98,6 +98,9 @@ public final class DtosSimulacion {
             String observacion) {}
 
     public record PreguntaResponse(
-            Long id, String texto, Integer orden, String respuesta,
+            Long id, String texto, String motivo, Integer orden, String respuesta,
             Boolean riesgoResuelto, String observacion) {}
+
+    /** Lo que se contesta al pedir que la IA prepare las preguntas. */
+    public record PreguntasEncoladas(String estado, String mensaje) {}
 }
