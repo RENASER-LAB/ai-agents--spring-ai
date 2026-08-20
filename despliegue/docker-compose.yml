@@ -99,7 +99,12 @@ services:
       - caddy_datos:/data
       - caddy_config:/config
     environment:
-      DOMINIO: ${DOMINIO}
+      # Si no hay dominio se pasa «:80» y Caddy sirve por HTTP contra la IP. El valor por
+      # defecto va AQUI y no en el Caddyfile porque el de Caddy solo aplica si la variable
+      # no existe, y esta existe: llega vacia desde el .env. Con la cadena vacia la primera
+      # linea del Caddyfile queda como « {», que Caddy lee como un bloque de opciones
+      # globales y falla con «unrecognized global option: encode».
+      DOMINIO: ${DOMINIO:-:80}
     logging: *registro
 
 volumes:

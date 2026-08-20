@@ -1,7 +1,7 @@
 # La puerta de entrada. Saca y renueva el certificado de Let's Encrypt solo.
 #
-# El {$DOMINIO} sale del .env. Si se deja vacio, Caddy sirve por HTTP en el puerto 80 y
-# NO intenta sacar certificado: util para probar con la IP antes de tener dominio.
+# El {$DOMINIO} lo pone el compose: si el .env no trae dominio, le pasa «:80» y Caddy sirve
+# por HTTP contra la IP, sin intentar sacar certificado.
 
 {$DOMINIO} {
 	encode gzip
