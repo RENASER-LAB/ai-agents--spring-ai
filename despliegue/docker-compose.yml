@@ -33,17 +33,26 @@ services:
       #   - por lo mismo, ssl.enabled tiene que ir en true
       #   - el HOST va sin «amqps://» y sin puerto. Spring arma la url el solo; pegar el
       #     endpoint entero da un fallo de resolucion de nombre que no menciona el esquema
-      SPRING_RABBITMQ_HOST: ${RABBITMQ_HOST}
-      SPRING_RABBITMQ_PORT: 5671
-      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER}
-      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
-      SPRING_RABBITMQ_VIRTUAL_HOST: /
-      SPRING_RABBITMQ_SSL_ENABLED: "true"
+      # Los nombres son los que espera application-pruebas.yaml, y NO llevan el prefijo
+      # SPRING_: ese archivo hace `host: ${RABBITMQ_HOST}` sin valor por defecto, asi que si
+      # se ponen como SPRING_RABBITMQ_* el marcador se queda sin resolver y la aplicacion no
+      # arranca — con un error que habla de un placeholder, no de la cola.
+      RABBITMQ_HOST: ${RABBITMQ_HOST}
+      RABBITMQ_PORT: 5671
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST:-/}
 
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
       GOOGLE_GEMINI_API_KEY: ${GOOGLE_GEMINI_API_KEY}
       JWT_SECRETO: ${JWT_SECRETO}
       SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+
+      # La clave del bucket donde viven los curriculums. Sin esto la aplicacion arranca
+      # igual y falla al abrir el primer CV, que es peor que no arrancar: se descubre
+      # tarde y con un candidato delante.
+      APP_ARCHIVOS_TIPO: supabase
+      APP_ARCHIVOS_SUPABASE_CLAVE: ${APP_ARCHIVOS_SUPABASE_CLAVE}
 
       # Correo. Sin CORREO_TRANSPORTE=smtp la aplicacion arranca igual y solo anota los
       # avisos en correo_enviado, que es el comportamiento por defecto y no rompe nada.
