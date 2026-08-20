@@ -40,7 +40,7 @@ requisitos nuevos el 14 de agosto y cambian bastante.
 | [Criba de currículums](CRIBA-DE-CURRICULUMS.md) | Cargar una convocatoria con una carpeta de currículums, pedir que la IA los lea y ver quién es el más apto |
 | [Fallos corregidos de la criba](FALLOS-CORREGIDOS-CRIBA.md) | Los cinco fallos que salieron al pasar 190 currículums reales. Cuatro no daban error |
 | [Los siete fallos de la auditoría](FALLOS-CORREGIDOS-AUDITORIA.md) | Lo que encontró la revisión del 18/08: cuatro que tocaban dinero o decisiones de contratación, y ninguno daba error |
-| [Comprobaciones automáticas](COMPROBACIONES-AUTOMATICAS.md) | Qué se comprueba solo: 299 pruebas, 7 reglas de arquitectura y Semgrep |
+| [Comprobaciones automáticas](COMPROBACIONES-AUTOMATICAS.md) | Qué se comprueba solo: 381 pruebas, 7 reglas de arquitectura y Semgrep |
 | [Banco de preguntas v3](AVANCE-BANCO-V3-2026-08-19.md) | El banco nuevo del cliente: 190 ítems, ocho formatos y su motor de puntuación. Qué está hecho y qué falta |
 | [CI/CD](CI-CD.md) | Qué corre en cada cambio, cómo se despliega a Pruebas en Render y qué variables de entorno hacen falta |
 | [Conectar la base a Supabase](CONEXION-SUPABASE.md) | Cómo hacer que la base de datos deje de vivir en tu máquina y pase a Supabase. Paso a paso, y cómo volver atrás |

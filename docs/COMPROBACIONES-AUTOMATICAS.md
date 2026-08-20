@@ -47,7 +47,7 @@ demás de la calificación se prueba con un doble del modelo y no gasta nada.
 
 ---
 
-## 299 pruebas
+## 381 pruebas
 
 Contadas de correrlas el 20/08/2026, no de recordarlas: el desglose sale de los
 informes de surefire y failsafe.
@@ -58,8 +58,9 @@ informes de surefire y failsafe.
 | Arquitectura | 7 | nada |
 | Las fórmulas del banco v3 | 20 | nada |
 | El validador de las respuestas v3 | 14 | nada |
-| Los dos agentes nuevos y sus puentes | 20 | nada |
-| Integración, de punta a punta | 43 | Docker |
+| Los dos agentes nuevos y sus puentes | 92 | nada |
+| El enlace de acceso y el correo | 26 | nada |
+| Integración, de punta a punta | 44 | Docker |
 | Migraciones contra Postgres real | 3 | Docker |
 | Contra el proveedor de verdad, y el envío de correo | 6 | Docker o SMTP, y su bandera |
 

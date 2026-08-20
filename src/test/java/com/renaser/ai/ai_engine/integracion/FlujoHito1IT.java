@@ -418,6 +418,72 @@ public class FlujoHito1IT {
         return versionId;
     }
 
+    @DisplayName("El candidato entra con el enlace del correo, sin contraseña")
+    @Test
+    @Order(6)
+    void elCandidatoEntraConElEnlaceDelCorreo() throws Exception {
+        // Por que existe esto: los candidatos que llegan por una carga masiva de curriculums
+        // tienen cuenta, pero con un correo inventado del nombre del archivo y una clave que
+        // nadie les dijo. Por la puerta de /auth/login no pasan, y no hay pantalla de
+        // recuperar contrasena. Sin el enlace, el aviso que se les manda lleva a una puerta
+        // cerrada y todo lo que el portal sabe hacer les queda fuera de alcance.
+
+        String enlace = conToken(post("/api/v1/panel/postulaciones/" + postulacionId + "/enlace-acceso"),
+                tokenEquipo, null)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.venceEn").isNotEmpty())
+                .andReturn().getResponse().getContentAsString();
+        String url = leer(enlace, "url");
+        assertThat(url).contains("/acceso?token=");
+
+        String token = java.net.URLDecoder.decode(
+                url.substring(url.indexOf("token=") + 6), java.nio.charset.StandardCharsets.UTF_8);
+
+        // El token de verdad no esta en la base: solo su hash. Si apareciera en claro,
+        // guardarlo seria como guardar una contrasena sin cifrar.
+        Integer enClaro = jdbc.queryForObject(
+                "SELECT count(*) FROM enlace_acceso WHERE token_hash = ?", Integer.class, token);
+        assertThat(enClaro).as("la base no puede tener el token tal cual").isZero();
+
+        // Se canjea SIN autenticacion: quien lo usa todavia no tiene sesion. Ese es el punto.
+        String sesion = mvc.perform(post("/api/v1/portal/auth/acceso")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"token\":\"" + token + "\"}"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        String tokenDelEnlace = leer(sesion, "token");
+
+        // Y la sesion que devuelve sirve de verdad: ve SU postulacion, la que le toca.
+        conTokenGet("/api/v1/portal/postulaciones", tokenDelEnlace)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1));
+
+        // No es de un solo uso: la sesion dura dos horas y el plazo del candidato son dias,
+        // asi que gastarlo al primer clic lo dejaria fuera al dia siguiente.
+        mvc.perform(post("/api/v1/portal/auth/acceso")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"token\":\"" + token + "\"}"))
+                .andExpect(status().isOk());
+
+        Integer usos = jdbc.queryForObject(
+                "SELECT usos FROM enlace_acceso WHERE postulacion_id = ?", Integer.class, postulacionId);
+        assertThat(usos).as("se anota cada uso, para saber si el candidato llego a entrar").isEqualTo(2);
+
+        // Un token inventado no entra, y dice lo mismo que uno vencido: distinguirlos le
+        // diria a quien prueba al azar cuales existieron alguna vez.
+        mvc.perform(post("/api/v1/portal/auth/acceso")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"token\":\"me-lo-acabo-de-inventar\"}"))
+                .andExpect(status().isUnauthorized());
+
+        // Y uno revocado tampoco, aunque no haya vencido.
+        jdbc.update("UPDATE enlace_acceso SET revocado_en = now() WHERE postulacion_id = ?", postulacionId);
+        mvc.perform(post("/api/v1/portal/auth/acceso")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"token\":\"" + token + "\"}"))
+                .andExpect(status().isUnauthorized());
+    }
+
     private org.springframework.test.web.servlet.ResultActions conToken(
             org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder peticion,
             String token, String cuerpo) throws Exception {

@@ -70,7 +70,7 @@ Perfil Integral → prueba del puesto → simulacion → validacion → decision
 |---|---|
 | Base de datos | **Flyway es el dueno del esquema**: V1-V23 en `src/main/resources/db/migration`, **85 tablas de este modulo** (88 en la base contando `flyway_schema_history` y las dos del motor de agentes, `agent_run` y `vector_store`). `ddl-auto: validate` |
 | Codigo | Veintiun paquetes de dominio bajo `ai_engine` (ver «Como esta organizado el codigo») |
-| Tests | **299, todos en verde (20/08/2026)**: 250 unitarios y 49 de integracion. Ver «Correr los tests»: unitarios de la maquina y del anonimizador, migraciones contra Postgres real (Testcontainers) y flujos de punta a punta: hito 1, evaluacion, prueba, simulacion/validacion y calificacion con IA |
+| Tests | **381, todos en verde (20/08/2026)**: 331 unitarios y 50 de integracion. Ver «Correr los tests»: unitarios de la maquina y del anonimizador, migraciones contra Postgres real (Testcontainers) y flujos de punta a punta: hito 1, evaluacion, prueba, simulacion/validacion y calificacion con IA |
 | IA que califica | **Seis de los diez agentes del catalogo estan implementados**: datos del curriculum, evidencia, evaluador, potencial/riesgo, prueba del puesto y las preguntas de la conversacion final. Todos corren por cola de RabbitMQ contra DeepSeek. Ver [Calificacion con IA](docs/CALIFICACION-CON-IA.md) |
 | Correo | Se registra en `correo_enviado` pero NO se envia: falta el dominio de Renaser (`EnviadorCorreoLog`) |
 | Identidad equipo | `dev-login` de desarrollo; el contrato de RENASER OS no existe aun (`ProveedorIdentidadEquipo`) |
@@ -167,18 +167,18 @@ Las dos consultan el mismo backend, asi que ensenan el mismo orden.
 - Nada se recalcula hacia atras: cada nota queda atada a la version de pesos de su vacante.
 
 ### Correr los tests
-**299 tests, todos en verde (20/08/2026).** Son dos tandas y el comando decide cual corre:
+**381 tests, todos en verde (20/08/2026).** Son dos tandas y el comando decide cual corre:
 
 | Comando | Que corre | Cuantos | Necesita |
 |---|---|---:|---|
-| `./mvnw test` | unitarias con dobles y las de arquitectura | 250 | nada |
-| `./mvnw verify` | lo anterior mas las de integracion | 299 | Docker |
+| `./mvnw test` | unitarias con dobles y las de arquitectura | 331 | nada |
+| `./mvnw verify` | lo anterior mas las de integracion | 381 | Docker |
 
 Las de integracion levantan su propio PostgreSQL y su propio RabbitMQ con Testcontainers: hace
 falta el demonio de Docker encendido. El desglose completo esta en
 [docs/COMPROBACIONES-AUTOMATICAS.md](docs/COMPROBACIONES-AUTOMATICAS.md).
 
-Entre las 250 hay **7 reglas de arquitectura con ArchUnit** (la frontera del motor, las capas y
+Entre las 331 hay **7 reglas de arquitectura con ArchUnit** (la frontera del motor, las capas y
 que el estado solo lo mueva la maquina — las mismas reglas que este archivo tiene en prosa).
 
 **El test que gasta dinero no corre solo**: `CalificacionIaRealIT` esta detras de
@@ -259,7 +259,7 @@ fusiona.** El detalle esta en [docs/CI-CD.md](docs/CI-CD.md); aqui lo que hay qu
 
 | Cuando | Que corre |
 |---|---|
-| En cada PR y en cada push a `main` | `./mvnw verify` (los 299 tests), Semgrep, Gitleaks y la cobertura del codigo nuevo en SonarCloud |
+| En cada PR y en cada push a `main` | `./mvnw verify` (los 381 tests), Semgrep, Gitleaks y la cobertura del codigo nuevo en SonarCloud |
 | Al fusionar a `main`, si todo quedo verde | Se avisa a Render por su Deploy Hook, que construye la imagen con el `Dockerfile` y publica en Pruebas |
 | De noche, sin bloquear a nadie | PIT (mutation testing) y fuzzing de la API con Schemathesis |
 
@@ -369,7 +369,7 @@ Todo vive en `docs/`. Empezar por [docs/README.md](docs/README.md).
   ultimas etapas y sus tres reglas automaticas de disponibilidad.
 - [CI/CD](docs/CI-CD.md) — que se comprueba solo en cada cambio, como se despliega a Pruebas y
   que variables de entorno pide Render. **Leerlo antes de tocar `.github/workflows/`.**
-- [Comprobaciones automaticas](docs/COMPROBACIONES-AUTOMATICAS.md) — las 299 pruebas y las siete
+- [Comprobaciones automaticas](docs/COMPROBACIONES-AUTOMATICAS.md) — las 381 pruebas y las siete
   reglas de arquitectura, una por una. Que se mira solo y que no.
 - `docs/diagramas/` — HTML autocontenidos, se abren en el navegador.
 - `docs/mockups/` — prototipos de pantalla. **Los mantiene otra persona, no editarlos.**
