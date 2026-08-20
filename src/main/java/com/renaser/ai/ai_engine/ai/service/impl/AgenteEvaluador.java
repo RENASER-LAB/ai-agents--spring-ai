@@ -27,7 +27,7 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class AgenteEvaluador implements AgenteSeleccion {
 
-    public static final String CODIGO = "EVALUADOR";
+    public static final String CODIGO_AGENTE = "EVALUADOR";
 
     private static final String OBJETIVO = "Calificar de 0 a 4 las respuestas abiertas de la evaluación";
 
@@ -52,7 +52,7 @@ public class AgenteEvaluador implements AgenteSeleccion {
 
     @Override
     public String codigo() {
-        return CODIGO;
+        return CODIGO_AGENTE;
     }
 
     @Override

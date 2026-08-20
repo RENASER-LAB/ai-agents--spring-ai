@@ -103,7 +103,7 @@ class AgentePruebaPuestoTest {
                 .id(1L)
                 .postulacionId(POSTULACION)
                 .organizacionId(1L)
-                .agenteCodigo(AgentePruebaPuesto.CODIGO)
+                .agenteCodigo(AgentePruebaPuesto.CODIGO_AGENTE)
                 .modo("FINA")
                 .estado("EN_CURSO")
                 .creadoEn(Instant.now())

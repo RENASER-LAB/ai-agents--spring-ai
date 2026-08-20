@@ -10,7 +10,6 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
-import java.io.UnsupportedEncodingException;
 import java.nio.charset.StandardCharsets;
 
 /**
@@ -56,7 +55,11 @@ public class EnviadorCorreoSmtp implements EnviadorCorreo {
             armador.setTo(correoDestino);
             armador.setSubject(asunto);
             armador.setText(cuerpo, false);
-            ponerRemitente(armador);
+            // setFrom(direccion, nombre) declara UnsupportedEncodingException, pero la
+            // codificacion es la del armador y arriba se fija en UTF-8, que toda JVM tiene.
+            // Es decir: esa excepcion no puede ocurrir. Si algun dia ocurriera, cae en el
+            // catch de abajo como cualquier otro fallo y el correo sale como FALLIDO.
+            armador.setFrom(remitente, nombreRemitente);
 
             correo.send(mensaje);
             log.info("Correo enviado a {} · asunto «{}»", correoDestino, asunto);
@@ -67,20 +70,6 @@ public class EnviadorCorreoSmtp implements EnviadorCorreo {
             // entera va al log —no a la consola— y el fallo queda escrito en correo_enviado.
             log.error("No se pudo enviar el correo a {} · asunto «{}»", correoDestino, asunto, e);
             return Resultado.FALLIDO;
-        }
-    }
-
-    /**
-     * El nombre visible es cosmetico: si la codificacion del nombre falla, el correo sale
-     * igual con la direccion sola. Perder el nombre no justifica perder el aviso.
-     */
-    private void ponerRemitente(MimeMessageHelper armador) throws jakarta.mail.MessagingException {
-        try {
-            armador.setFrom(remitente, nombreRemitente);
-        } catch (UnsupportedEncodingException e) {
-            log.warn("No se pudo codificar el nombre del remitente «{}»; va solo la direccion",
-                    nombreRemitente, e);
-            armador.setFrom(remitente);
         }
     }
 }

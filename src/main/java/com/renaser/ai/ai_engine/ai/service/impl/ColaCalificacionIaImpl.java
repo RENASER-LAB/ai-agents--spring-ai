@@ -32,8 +32,8 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
      * las notas que resume, y eso no lo cambia nadie desde un panel.
      */
     private static final List<String> ORDEN = List.of(
-            AgenteDatosCv.CODIGO, AgenteEvidenciaCv.CODIGO,
-            AgenteEvaluador.CODIGO, AgentePotencialRiesgo.CODIGO);
+            AgenteDatosCv.CODIGO_AGENTE, AgenteEvidenciaCv.CODIGO_AGENTE,
+            AgenteEvaluador.CODIGO_AGENTE, AgentePotencialRiesgo.CODIGO_AGENTE);
 
     /**
      * La fila de la primera pasada. Empieza sacando los datos del candidato —que no cuestan
@@ -41,7 +41,7 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
      * una criba nadie ha respondido todavía.
      */
     private static final List<String> ORDEN_RAPIDA = List.of(
-            AgenteDatosCv.CODIGO, AgenteEvidenciaCv.CODIGO, AgentePotencialRiesgo.CODIGO);
+            AgenteDatosCv.CODIGO_AGENTE, AgenteEvidenciaCv.CODIGO_AGENTE, AgentePotencialRiesgo.CODIGO_AGENTE);
 
     /**
      * El que cierra la etapa, y por eso el que dice si la calificación llegó al final.
@@ -49,7 +49,7 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
      * <p>Es el mismo en las dos filas y tiene que seguir siéndolo: es quien arma el Perfil de
      * Talento y mueve la postulación a {@code PERFIL_POR_CONFIRMAR}.
      */
-    private static final String ULTIMO = AgentePotencialRiesgo.CODIGO;
+    private static final String ULTIMO = AgentePotencialRiesgo.CODIGO_AGENTE;
 
     /**
      * Los dos que no van en fila con nadie.
@@ -58,8 +58,8 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
      * pide a mano, así que su «fila» tiene un solo paso. Se escriben igual que las otras dos
      * listas para que {@code encolar} no necesite un camino aparte.
      */
-    private static final List<String> SOLO_LA_PRUEBA = List.of(AgentePruebaPuesto.CODIGO);
-    private static final List<String> SOLO_LAS_PREGUNTAS = List.of(AgenteSimulacion.CODIGO);
+    private static final List<String> SOLO_LA_PRUEBA = List.of(AgentePruebaPuesto.CODIGO_AGENTE);
+    private static final List<String> SOLO_LAS_PREGUNTAS = List.of(AgenteSimulacion.CODIGO_AGENTE);
 
     public static final String RAPIDA = "RAPIDA";
     public static final String FINA = "FINA";
@@ -384,13 +384,13 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
      * </ul>
      */
     private boolean seSalta(Long postulacionId, String agente) {
-        if (AgenteEvaluador.CODIGO.equals(agente)
+        if (AgenteEvaluador.CODIGO_AGENTE.equals(agente)
                 && !puente.tieneEvaluacionEntregada(postulacionId)) {
             log.info("La postulación {} no tiene evaluación entregada: el evaluador se salta",
                     postulacionId);
             return true;
         }
-        return AgenteDatosCv.CODIGO.equals(agente) && puente.tieneFichaCv(postulacionId);
+        return AgenteDatosCv.CODIGO_AGENTE.equals(agente) && puente.tieneFichaCv(postulacionId);
     }
 
     private String mensaje(Throwable e) {

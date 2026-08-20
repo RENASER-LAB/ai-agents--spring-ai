@@ -101,7 +101,7 @@ class AgenteSimulacionTest {
                 .id(1L)
                 .postulacionId(POSTULACION)
                 .organizacionId(1L)
-                .agenteCodigo(AgenteSimulacion.CODIGO)
+                .agenteCodigo(AgenteSimulacion.CODIGO_AGENTE)
                 .modo("FINA")
                 .estado("EN_CURSO")
                 .creadoEn(Instant.now())

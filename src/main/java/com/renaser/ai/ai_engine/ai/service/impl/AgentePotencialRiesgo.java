@@ -30,7 +30,7 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class AgentePotencialRiesgo implements AgenteSeleccion {
 
-    public static final String CODIGO = "POTENCIAL_RIESGO";
+    public static final String CODIGO_AGENTE = "POTENCIAL_RIESGO";
 
     private static final String OBJETIVO = "Armar el Perfil de Talento a partir de lo ya calificado";
 
@@ -68,7 +68,7 @@ public class AgentePotencialRiesgo implements AgenteSeleccion {
 
     @Override
     public String codigo() {
-        return CODIGO;
+        return CODIGO_AGENTE;
     }
 
     @Override

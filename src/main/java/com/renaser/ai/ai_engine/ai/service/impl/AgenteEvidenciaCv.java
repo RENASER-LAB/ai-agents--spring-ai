@@ -27,7 +27,7 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class AgenteEvidenciaCv implements AgenteSeleccion {
 
-    public static final String CODIGO = "EVIDENCIA_CV";
+    public static final String CODIGO_AGENTE = "EVIDENCIA_CV";
 
     private static final String OBJETIVO =
             "Puntuar el currículum contra los ocho criterios y clasificar sus afirmaciones";
@@ -63,7 +63,7 @@ public class AgenteEvidenciaCv implements AgenteSeleccion {
 
     @Override
     public String codigo() {
-        return CODIGO;
+        return CODIGO_AGENTE;
     }
 
     @Override

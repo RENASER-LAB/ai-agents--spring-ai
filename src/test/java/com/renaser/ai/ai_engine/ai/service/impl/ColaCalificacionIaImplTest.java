@@ -70,12 +70,12 @@ class ColaCalificacionIaImplTest {
 
     @BeforeEach
     void armarLaCola() {
-        when(datosCv.codigo()).thenReturn(AgenteDatosCv.CODIGO);
-        when(evidenciaCv.codigo()).thenReturn(AgenteEvidenciaCv.CODIGO);
-        when(evaluador.codigo()).thenReturn(AgenteEvaluador.CODIGO);
-        when(potencialRiesgo.codigo()).thenReturn(AgentePotencialRiesgo.CODIGO);
-        when(pruebaPuesto.codigo()).thenReturn(AgentePruebaPuesto.CODIGO);
-        when(simulacion.codigo()).thenReturn(AgenteSimulacion.CODIGO);
+        when(datosCv.codigo()).thenReturn(AgenteDatosCv.CODIGO_AGENTE);
+        when(evidenciaCv.codigo()).thenReturn(AgenteEvidenciaCv.CODIGO_AGENTE);
+        when(evaluador.codigo()).thenReturn(AgenteEvaluador.CODIGO_AGENTE);
+        when(potencialRiesgo.codigo()).thenReturn(AgentePotencialRiesgo.CODIGO_AGENTE);
+        when(pruebaPuesto.codigo()).thenReturn(AgentePruebaPuesto.CODIGO_AGENTE);
+        when(simulacion.codigo()).thenReturn(AgenteSimulacion.CODIGO_AGENTE);
         // Solo lo miran los tests que encolan; los que preguntan «cómo va» no pasan por ahí.
         lenient().when(puente.organizacionDe(POSTULACION)).thenReturn(1L);
         cola = conLaCalificacion(true);
@@ -90,7 +90,7 @@ class ColaCalificacionIaImplTest {
         // había manera de rellenarlo después.
         cola.encolarPerfilIntegral(POSTULACION);
 
-        verify(registro).crearSiHaceFalta(1L, POSTULACION, AgenteDatosCv.CODIGO, "FINA", null);
+        verify(registro).crearSiHaceFalta(1L, POSTULACION, AgenteDatosCv.CODIGO_AGENTE, "FINA", null);
     }
 
     @Test
@@ -101,7 +101,7 @@ class ColaCalificacionIaImplTest {
 
         cola.encolarPerfilIntegral(POSTULACION);
 
-        verify(registro).crearSiHaceFalta(1L, POSTULACION, AgenteEvidenciaCv.CODIGO, "FINA", null);
+        verify(registro).crearSiHaceFalta(1L, POSTULACION, AgenteEvidenciaCv.CODIGO_AGENTE, "FINA", null);
     }
 
     @Test
@@ -110,7 +110,7 @@ class ColaCalificacionIaImplTest {
         // ellos la primera pasada deja una lista de nombres de archivo.
         cola.encolarCribaRapida(POSTULACION);
 
-        verify(registro).crearSiHaceFalta(1L, POSTULACION, AgenteDatosCv.CODIGO, "RAPIDA", null);
+        verify(registro).crearSiHaceFalta(1L, POSTULACION, AgenteDatosCv.CODIGO_AGENTE, "RAPIDA", null);
     }
 
     @Test
@@ -119,13 +119,13 @@ class ColaCalificacionIaImplTest {
         // fila se salta sola al evaluador más adelante.
         cola.encolarCribaCv(POSTULACION);
 
-        verify(registro).crearSiHaceFalta(1L, POSTULACION, AgenteDatosCv.CODIGO, "FINA", null);
+        verify(registro).crearSiHaceFalta(1L, POSTULACION, AgenteDatosCv.CODIGO_AGENTE, "FINA", null);
     }
 
     @Test
     void elAvisoALaColaLlevaElIdDelTrabajoRecienCreado() {
-        when(registro.crearSiHaceFalta(1L, POSTULACION, AgenteDatosCv.CODIGO, "FINA", null))
-                .thenReturn(Optional.of(trabajo(42L, AgenteDatosCv.CODIGO, "PENDIENTE", "FINA")));
+        when(registro.crearSiHaceFalta(1L, POSTULACION, AgenteDatosCv.CODIGO_AGENTE, "FINA", null))
+                .thenReturn(Optional.of(trabajo(42L, AgenteDatosCv.CODIGO_AGENTE, "PENDIENTE", "FINA")));
 
         cola.encolarCribaFina(POSTULACION);
 
@@ -169,9 +169,9 @@ class ColaCalificacionIaImplTest {
         // para siempre sin que ningún botón la rescatara.
         when(puente.tieneFichaCv(POSTULACION)).thenReturn(true);
         when(puente.tieneEvaluacionEntregada(POSTULACION)).thenReturn(true);
-        yaHecho(AgenteEvidenciaCv.CODIGO, "FINA", 4L);
-        when(registro.crearSiHaceFalta(1L, POSTULACION, AgenteEvaluador.CODIGO, "FINA", null))
-                .thenReturn(Optional.of(trabajo(6L, AgenteEvaluador.CODIGO, "PENDIENTE", "FINA")));
+        yaHecho(AgenteEvidenciaCv.CODIGO_AGENTE, "FINA", 4L);
+        when(registro.crearSiHaceFalta(1L, POSTULACION, AgenteEvaluador.CODIGO_AGENTE, "FINA", null))
+                .thenReturn(Optional.of(trabajo(6L, AgenteEvaluador.CODIGO_AGENTE, "PENDIENTE", "FINA")));
 
         assertThat(cola.encolarPerfilIntegral(POSTULACION)).isTrue();
 
@@ -183,11 +183,11 @@ class ColaCalificacionIaImplTest {
         // El retrato de ese mismo candidato se armó en la criba, sin sus respuestas. Cuando
         // el evaluador termina, ese retrato queda viejo: se rehace en vez de dejar en pie uno
         // que no vio la mitad de lo que hay.
-        yaHecho(AgentePotencialRiesgo.CODIGO, "FINA", 5L);
+        yaHecho(AgentePotencialRiesgo.CODIGO_AGENTE, "FINA", 5L);
 
-        ejecutar(trabajo(6L, AgenteEvaluador.CODIGO, "PENDIENTE", "FINA"), evaluador);
+        ejecutar(trabajo(6L, AgenteEvaluador.CODIGO_AGENTE, "PENDIENTE", "FINA"), evaluador);
 
-        verify(registro).crearSiHaceFalta(1L, POSTULACION, AgentePotencialRiesgo.CODIGO, "FINA", 6L);
+        verify(registro).crearSiHaceFalta(1L, POSTULACION, AgentePotencialRiesgo.CODIGO_AGENTE, "FINA", 6L);
     }
 
     @Test
@@ -196,8 +196,8 @@ class ColaCalificacionIaImplTest {
         // candidato, que es exactamente lo que la fila existe para evitar.
         when(puente.tieneFichaCv(POSTULACION)).thenReturn(true);
         when(trabajos.findFirstByPostulacionIdAndAgenteCodigoAndModoOrderByIdDesc(
-                POSTULACION, AgenteEvidenciaCv.CODIGO, "FINA"))
-                .thenReturn(Optional.of(trabajo(7L, AgenteEvidenciaCv.CODIGO, "EN_CURSO", "FINA")));
+                POSTULACION, AgenteEvidenciaCv.CODIGO_AGENTE, "FINA"))
+                .thenReturn(Optional.of(trabajo(7L, AgenteEvidenciaCv.CODIGO_AGENTE, "EN_CURSO", "FINA")));
 
         assertThat(cola.encolarPerfilIntegral(POSTULACION)).isFalse();
 
@@ -211,12 +211,12 @@ class ColaCalificacionIaImplTest {
         // proveedor: se pide otra vez y arranca justo donde se rompió.
         when(puente.tieneFichaCv(POSTULACION)).thenReturn(true);
         when(trabajos.findFirstByPostulacionIdAndAgenteCodigoAndModoOrderByIdDesc(
-                POSTULACION, AgenteEvidenciaCv.CODIGO, "FINA"))
-                .thenReturn(Optional.of(trabajo(7L, AgenteEvidenciaCv.CODIGO, "FALLIDO", "FINA")));
+                POSTULACION, AgenteEvidenciaCv.CODIGO_AGENTE, "FINA"))
+                .thenReturn(Optional.of(trabajo(7L, AgenteEvidenciaCv.CODIGO_AGENTE, "FALLIDO", "FINA")));
 
         cola.encolarPerfilIntegral(POSTULACION);
 
-        verify(registro).crearSiHaceFalta(1L, POSTULACION, AgenteEvidenciaCv.CODIGO, "FINA", null);
+        verify(registro).crearSiHaceFalta(1L, POSTULACION, AgenteEvidenciaCv.CODIGO_AGENTE, "FINA", null);
     }
 
     // ============ Quién va después de quién ============
@@ -225,9 +225,9 @@ class ColaCalificacionIaImplTest {
     void trasLeerElCurriculumTocaElEvaluadorSiElCandidatoRespondio() {
         when(puente.tieneEvaluacionEntregada(POSTULACION)).thenReturn(true);
 
-        ejecutar(trabajo(1L, AgenteEvidenciaCv.CODIGO, "PENDIENTE", "FINA"), evidenciaCv);
+        ejecutar(trabajo(1L, AgenteEvidenciaCv.CODIGO_AGENTE, "PENDIENTE", "FINA"), evidenciaCv);
 
-        verify(registro).crearSiHaceFalta(1L, POSTULACION, AgenteEvaluador.CODIGO, "FINA", 1L);
+        verify(registro).crearSiHaceFalta(1L, POSTULACION, AgenteEvaluador.CODIGO_AGENTE, "FINA", 1L);
     }
 
     @Test
@@ -236,32 +236,32 @@ class ColaCalificacionIaImplTest {
         // modelo para puntuar una lista de respuestas vacía.
         when(puente.tieneEvaluacionEntregada(POSTULACION)).thenReturn(false);
 
-        ejecutar(trabajo(1L, AgenteEvidenciaCv.CODIGO, "PENDIENTE", "FINA"), evidenciaCv);
+        ejecutar(trabajo(1L, AgenteEvidenciaCv.CODIGO_AGENTE, "PENDIENTE", "FINA"), evidenciaCv);
 
         verify(registro, never()).crearSiHaceFalta(
-                anyLong(), anyLong(), eq(AgenteEvaluador.CODIGO), anyString(), any());
+                anyLong(), anyLong(), eq(AgenteEvaluador.CODIGO_AGENTE), anyString(), any());
         verify(registro).crearSiHaceFalta(
-                1L, POSTULACION, AgentePotencialRiesgo.CODIGO, "FINA", 1L);
+                1L, POSTULACION, AgentePotencialRiesgo.CODIGO_AGENTE, "FINA", 1L);
     }
 
     @Test
     void laPasadaRapidaNiSiquieraPreguntaPorElEvaluador() {
         // Su fila no lo incluye. Preguntar por la evaluación sería una consulta a la base
         // por cada candidato de la tanda para una respuesta que da igual.
-        ejecutar(trabajo(1L, AgenteDatosCv.CODIGO, "PENDIENTE", "RAPIDA"), datosCv);
+        ejecutar(trabajo(1L, AgenteDatosCv.CODIGO_AGENTE, "PENDIENTE", "RAPIDA"), datosCv);
         verify(registro).crearSiHaceFalta(
-                1L, POSTULACION, AgenteEvidenciaCv.CODIGO, "RAPIDA", 1L);
+                1L, POSTULACION, AgenteEvidenciaCv.CODIGO_AGENTE, "RAPIDA", 1L);
 
-        ejecutar(trabajo(2L, AgenteEvidenciaCv.CODIGO, "PENDIENTE", "RAPIDA"), evidenciaCv);
+        ejecutar(trabajo(2L, AgenteEvidenciaCv.CODIGO_AGENTE, "PENDIENTE", "RAPIDA"), evidenciaCv);
         verify(registro).crearSiHaceFalta(
-                1L, POSTULACION, AgentePotencialRiesgo.CODIGO, "RAPIDA", 2L);
+                1L, POSTULACION, AgentePotencialRiesgo.CODIGO_AGENTE, "RAPIDA", 2L);
 
         verify(puente, never()).tieneEvaluacionEntregada(anyLong());
     }
 
     @Test
     void elRetratoCierraLaFilaYNoEncolaANadieMas() {
-        ejecutar(trabajo(3L, AgentePotencialRiesgo.CODIGO, "PENDIENTE", "FINA"), potencialRiesgo);
+        ejecutar(trabajo(3L, AgentePotencialRiesgo.CODIGO_AGENTE, "PENDIENTE", "FINA"), potencialRiesgo);
 
         verify(registro, never()).crearSiHaceFalta(
                 anyLong(), anyLong(), anyString(), anyString(), any());
@@ -294,7 +294,7 @@ class ColaCalificacionIaImplTest {
 
     @Test
     void siElAgenteFallaYQuedaIntentoElTrabajoVuelveALaCola() {
-        TrabajoIa suyo = trabajo(1L, AgenteEvidenciaCv.CODIGO, "EN_CURSO", "FINA");
+        TrabajoIa suyo = trabajo(1L, AgenteEvidenciaCv.CODIGO_AGENTE, "EN_CURSO", "FINA");
         when(registro.tomar(1L)).thenReturn(Optional.of(suyo));
         doThrowEn(evidenciaCv);
         when(registro.fallar(eq(1L), anyInt(), anyString())).thenReturn(true);
@@ -312,7 +312,7 @@ class ColaCalificacionIaImplTest {
         // Publicar de nuevo un trabajo ya marcado FALLIDO sería un mensaje que da vueltas
         // sin que nadie pueda tomarlo.
         when(registro.tomar(1L))
-                .thenReturn(Optional.of(trabajo(1L, AgenteEvidenciaCv.CODIGO, "EN_CURSO", "FINA")));
+                .thenReturn(Optional.of(trabajo(1L, AgenteEvidenciaCv.CODIGO_AGENTE, "EN_CURSO", "FINA")));
         doThrowEn(evidenciaCv);
         when(registro.fallar(eq(1L), anyInt(), anyString())).thenReturn(false);
 
@@ -335,8 +335,8 @@ class ColaCalificacionIaImplTest {
         // Aunque los anteriores hayan salido bien, mientras quede uno la calificación no ha
         // terminado y la pantalla no puede dar por bueno lo que hay.
         when(trabajos.findByPostulacionIdOrderByIdAsc(POSTULACION)).thenReturn(List.of(
-                trabajo(1L, AgenteEvidenciaCv.CODIGO, "TERMINADO", "FINA"),
-                trabajo(2L, AgentePotencialRiesgo.CODIGO, "PENDIENTE", "FINA")));
+                trabajo(1L, AgenteEvidenciaCv.CODIGO_AGENTE, "TERMINADO", "FINA"),
+                trabajo(2L, AgentePotencialRiesgo.CODIGO_AGENTE, "PENDIENTE", "FINA")));
 
         assertThat(cola.comoVa(POSTULACION)).isEqualTo("EN_CURSO");
     }
@@ -347,9 +347,9 @@ class ColaCalificacionIaImplTest {
         // primero por el fallo dejaba marcado como fallido a un candidato que sí tiene su
         // retrato hecho: aparecía en rojo en el ranking con todas sus notas puestas.
         when(trabajos.findByPostulacionIdOrderByIdAsc(POSTULACION)).thenReturn(List.of(
-                trabajo(1L, AgenteEvidenciaCv.CODIGO, "FALLIDO", "FINA"),
-                trabajo(2L, AgenteEvidenciaCv.CODIGO, "TERMINADO", "FINA"),
-                trabajo(3L, AgentePotencialRiesgo.CODIGO, "TERMINADO", "FINA")));
+                trabajo(1L, AgenteEvidenciaCv.CODIGO_AGENTE, "FALLIDO", "FINA"),
+                trabajo(2L, AgenteEvidenciaCv.CODIGO_AGENTE, "TERMINADO", "FINA"),
+                trabajo(3L, AgentePotencialRiesgo.CODIGO_AGENTE, "TERMINADO", "FINA")));
 
         assertThat(cola.comoVa(POSTULACION)).isEqualTo("TERMINADA");
     }
@@ -357,8 +357,8 @@ class ColaCalificacionIaImplTest {
     @Test
     void siElRetratoNoLlegoAHacerseLaCalificacionSiEsFallida() {
         when(trabajos.findByPostulacionIdOrderByIdAsc(POSTULACION)).thenReturn(List.of(
-                trabajo(1L, AgenteEvidenciaCv.CODIGO, "TERMINADO", "FINA"),
-                trabajo(2L, AgentePotencialRiesgo.CODIGO, "FALLIDO", "FINA")));
+                trabajo(1L, AgenteEvidenciaCv.CODIGO_AGENTE, "TERMINADO", "FINA"),
+                trabajo(2L, AgentePotencialRiesgo.CODIGO_AGENTE, "FALLIDO", "FINA")));
 
         assertThat(cola.comoVa(POSTULACION)).isEqualTo("FALLIDA");
     }
@@ -369,8 +369,8 @@ class ColaCalificacionIaImplTest {
         // contando trabajos: contar diría «en curso» para siempre en cuanto el evaluador se
         // salta.
         when(trabajos.findByPostulacionIdOrderByIdAsc(POSTULACION)).thenReturn(List.of(
-                trabajo(1L, AgenteEvidenciaCv.CODIGO, "TERMINADO", "FINA"),
-                trabajo(2L, AgentePotencialRiesgo.CODIGO, "TERMINADO", "FINA")));
+                trabajo(1L, AgenteEvidenciaCv.CODIGO_AGENTE, "TERMINADO", "FINA"),
+                trabajo(2L, AgentePotencialRiesgo.CODIGO_AGENTE, "TERMINADO", "FINA")));
 
         assertThat(cola.comoVa(POSTULACION)).isEqualTo("TERMINADA");
     }
@@ -382,9 +382,9 @@ class ColaCalificacionIaImplTest {
         // contador de fallidos marcaba cero y unas notas provisionales del modelo que no
         // razona se presentaban como definitivas.
         when(trabajos.findByPostulacionIdOrderByIdAsc(POSTULACION)).thenReturn(List.of(
-                trabajo(1L, AgenteEvidenciaCv.CODIGO, "TERMINADO", "RAPIDA"),
-                trabajo(2L, AgentePotencialRiesgo.CODIGO, "TERMINADO", "RAPIDA"),
-                trabajo(3L, AgenteEvidenciaCv.CODIGO, "FALLIDO", "FINA")));
+                trabajo(1L, AgenteEvidenciaCv.CODIGO_AGENTE, "TERMINADO", "RAPIDA"),
+                trabajo(2L, AgentePotencialRiesgo.CODIGO_AGENTE, "TERMINADO", "RAPIDA"),
+                trabajo(3L, AgenteEvidenciaCv.CODIGO_AGENTE, "FALLIDO", "FINA")));
 
         assertThat(cola.comoVa(POSTULACION)).isEqualTo("FALLIDA");
         // Y la nota que hay en pantalla sigue siendo la de la rápida: provisional, pero real.
@@ -396,8 +396,8 @@ class ColaCalificacionIaImplTest {
     @Test
     void sinRetratoTerminadoTodaviaNoHayPasada() {
         when(trabajos.findByPostulacionIdOrderByIdAsc(POSTULACION)).thenReturn(List.of(
-                trabajo(1L, AgenteEvidenciaCv.CODIGO, "TERMINADO", "RAPIDA"),
-                trabajo(2L, AgentePotencialRiesgo.CODIGO, "EN_CURSO", "RAPIDA")));
+                trabajo(1L, AgenteEvidenciaCv.CODIGO_AGENTE, "TERMINADO", "RAPIDA"),
+                trabajo(2L, AgentePotencialRiesgo.CODIGO_AGENTE, "EN_CURSO", "RAPIDA")));
 
         assertThat(cola.pasadaDe(POSTULACION)).isNull();
     }
@@ -407,7 +407,7 @@ class ColaCalificacionIaImplTest {
         // La pantalla lo necesita para no enseñar como definitivo un número que salió del
         // modelo que no razona: se ven igual y no valen lo mismo.
         when(trabajos.findByPostulacionIdOrderByIdAsc(POSTULACION)).thenReturn(List.of(
-                trabajo(1L, AgentePotencialRiesgo.CODIGO, "TERMINADO", "RAPIDA")));
+                trabajo(1L, AgentePotencialRiesgo.CODIGO_AGENTE, "TERMINADO", "RAPIDA")));
 
         assertThat(cola.pasadaDe(POSTULACION)).isEqualTo("RAPIDA");
     }
@@ -416,8 +416,8 @@ class ColaCalificacionIaImplTest {
     void laFinaMandaAunqueLaRapidaSeaPosterior() {
         // La fina es la que pisa las notas: da igual el orden en que quedaron las filas.
         when(trabajos.findByPostulacionIdOrderByIdAsc(POSTULACION)).thenReturn(List.of(
-                trabajo(1L, AgentePotencialRiesgo.CODIGO, "TERMINADO", "FINA"),
-                trabajo(2L, AgentePotencialRiesgo.CODIGO, "TERMINADO", "RAPIDA")));
+                trabajo(1L, AgentePotencialRiesgo.CODIGO_AGENTE, "TERMINADO", "FINA"),
+                trabajo(2L, AgentePotencialRiesgo.CODIGO_AGENTE, "TERMINADO", "RAPIDA")));
 
         assertThat(cola.pasadaDe(POSTULACION)).isEqualTo("FINA");
     }
@@ -429,7 +429,7 @@ class ColaCalificacionIaImplTest {
         // Se pierde el mensaje, o RabbitMQ estaba caído al publicarlo. El trabajo es
         // idempotente, así que volver a empujarlo es barato.
         when(trabajos.findByEstadoAndCreadoEnBefore(eq("PENDIENTE"), any(Instant.class)))
-                .thenReturn(List.of(trabajo(8L, AgenteEvidenciaCv.CODIGO, "PENDIENTE", "FINA")));
+                .thenReturn(List.of(trabajo(8L, AgenteEvidenciaCv.CODIGO_AGENTE, "PENDIENTE", "FINA")));
 
         cola.reintentarAtascados();
 
@@ -441,7 +441,7 @@ class ColaCalificacionIaImplTest {
         // Alguien lo tomó y el proceso murió a mitad. Publicarlo sin devolverlo a pendiente
         // no serviría: quien lo recogiera se lo encontraría en EN_CURSO y lo soltaría.
         when(trabajos.findByEstadoAndTomadoEnBefore(eq("EN_CURSO"), any(Instant.class)))
-                .thenReturn(List.of(trabajo(9L, AgenteEvidenciaCv.CODIGO, "EN_CURSO", "FINA")));
+                .thenReturn(List.of(trabajo(9L, AgenteEvidenciaCv.CODIGO_AGENTE, "EN_CURSO", "FINA")));
 
         cola.reintentarAtascados();
 
@@ -459,16 +459,16 @@ class ColaCalificacionIaImplTest {
         // retrato haría que calificar una prueba volviera a leer el currículum.
         cola.encolarPruebaPuesto(POSTULACION);
 
-        verify(registro).crearSiHaceFalta(1L, POSTULACION, AgentePruebaPuesto.CODIGO, "FINA", null);
+        verify(registro).crearSiHaceFalta(1L, POSTULACION, AgentePruebaPuesto.CODIGO_AGENTE, "FINA", null);
         verify(registro, never()).crearSiHaceFalta(
-                anyLong(), anyLong(), eq(AgenteEvidenciaCv.CODIGO), anyString(), any());
+                anyLong(), anyLong(), eq(AgenteEvidenciaCv.CODIGO_AGENTE), anyString(), any());
     }
 
     @Test
     void lasPreguntasDeLaConversacionSeEncolanSolas() {
         cola.encolarPreguntasSimulacion(POSTULACION);
 
-        verify(registro).crearSiHaceFalta(1L, POSTULACION, AgenteSimulacion.CODIGO, "FINA", null);
+        verify(registro).crearSiHaceFalta(1L, POSTULACION, AgenteSimulacion.CODIGO_AGENTE, "FINA", null);
     }
 
     @Test
@@ -476,7 +476,7 @@ class ColaCalificacionIaImplTest {
         // Su fila tiene un solo paso. Si esto encolara al siguiente de la fila del retrato,
         // calificar una prueba pagaría de propina un Perfil de Talento que nadie pidió.
         when(registro.tomar(9L))
-                .thenReturn(Optional.of(trabajo(9L, AgentePruebaPuesto.CODIGO, "EN_CURSO", "FINA")));
+                .thenReturn(Optional.of(trabajo(9L, AgentePruebaPuesto.CODIGO_AGENTE, "EN_CURSO", "FINA")));
 
         cola.ejecutar(9L);
 
@@ -493,9 +493,9 @@ class ColaCalificacionIaImplTest {
         // filtrar, pedir las preguntas de la conversación pintaba el ranking entero «en
         // curso» por algo que no toca ninguna de las notas que el ranking enseña.
         when(trabajos.findByPostulacionIdOrderByIdAsc(POSTULACION)).thenReturn(List.of(
-                trabajo(1L, AgenteEvidenciaCv.CODIGO, "TERMINADO", "FINA"),
-                trabajo(2L, AgentePotencialRiesgo.CODIGO, "TERMINADO", "FINA"),
-                trabajo(3L, AgenteSimulacion.CODIGO, "PENDIENTE", "FINA")));
+                trabajo(1L, AgenteEvidenciaCv.CODIGO_AGENTE, "TERMINADO", "FINA"),
+                trabajo(2L, AgentePotencialRiesgo.CODIGO_AGENTE, "TERMINADO", "FINA"),
+                trabajo(3L, AgenteSimulacion.CODIGO_AGENTE, "PENDIENTE", "FINA")));
 
         assertThat(cola.comoVa(POSTULACION)).isEqualTo("TERMINADA");
     }
@@ -505,8 +505,8 @@ class ColaCalificacionIaImplTest {
         // Al revés que el anterior, y por el mismo motivo: que la prueba del puesto falle no
         // borra el Perfil de Talento que ya estaba hecho.
         when(trabajos.findByPostulacionIdOrderByIdAsc(POSTULACION)).thenReturn(List.of(
-                trabajo(1L, AgentePotencialRiesgo.CODIGO, "TERMINADO", "FINA"),
-                trabajo(2L, AgentePruebaPuesto.CODIGO, "FALLIDO", "FINA")));
+                trabajo(1L, AgentePotencialRiesgo.CODIGO_AGENTE, "TERMINADO", "FINA"),
+                trabajo(2L, AgentePruebaPuesto.CODIGO_AGENTE, "FALLIDO", "FINA")));
 
         assertThat(cola.comoVa(POSTULACION)).isEqualTo("TERMINADA");
     }

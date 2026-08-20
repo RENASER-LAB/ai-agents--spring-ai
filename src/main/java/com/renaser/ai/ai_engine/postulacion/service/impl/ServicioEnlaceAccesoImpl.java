@@ -57,6 +57,39 @@ public class ServicioEnlaceAccesoImpl implements ServicioEnlaceAcceso {
     @Override
     @Transactional
     public String crear(Long postulacionId) {
+        return nuevoEnlace(postulacionId).token();
+    }
+
+    @Override
+    @Transactional
+    public EnlaceGenerado generarEnlace(Long postulacionId) {
+        Recien recien = nuevoEnlace(postulacionId);
+
+        String base = urlDelPortal.endsWith("/")
+                ? urlDelPortal.substring(0, urlDelPortal.length() - 1)
+                : urlDelPortal;
+
+        // El token va en la query y no en el camino porque es lo que el portal sabe leer sin
+        // que su enrutador tenga que entenderlo como parte de la direccion.
+        String url = base + "/acceso?token="
+                + URLEncoder.encode(recien.token(), StandardCharsets.UTF_8);
+
+        return new EnlaceGenerado(url, recien.fila().getVenceEn());
+    }
+
+    /** El enlace recien creado y su token en claro, que solo existe aqui. */
+    private record Recien(EnlaceAcceso fila, String token) {}
+
+    /**
+     * Lo que hacen en comun los dos verbos publicos.
+     *
+     * <p>Es privado y no {@code @Transactional} a proposito. Si {@code generarEnlace} llamara
+     * a {@code crear} —los dos publicos y los dos transaccionales—, esa llamada saldria por
+     * {@code this} y <b>no pasaria por el proxy de Spring</b>: la anotacion del segundo no
+     * haria nada. Funciona igual porque el primero ya abrio la transaccion, pero es la clase
+     * de detalle que deja de ser cierto en cuanto alguien cambia una propagacion.
+     */
+    private Recien nuevoEnlace(Long postulacionId) {
         Postulacion postulacion = postulaciones.findById(postulacionId)
                 .orElseThrow(() -> new IllegalArgumentException(
                         "No existe la postulación " + postulacionId));
@@ -69,7 +102,7 @@ public class ServicioEnlaceAccesoImpl implements ServicioEnlaceAcceso {
         // o un «=» ahí se rompe al copiarlo o al pasar por un cliente de correo.
         String token = Base64.getUrlEncoder().withoutPadding().encodeToString(crudo);
 
-        enlaces.save(EnlaceAcceso.builder()
+        EnlaceAcceso fila = enlaces.save(EnlaceAcceso.builder()
                 .postulacionId(postulacionId)
                 .tokenHash(hashDe(token))
                 .venceEn(Instant.now().plus(dias, ChronoUnit.DAYS))
@@ -82,25 +115,7 @@ public class ServicioEnlaceAccesoImpl implements ServicioEnlaceAcceso {
         log.info("Enlace de acceso creado para la postulación {} · vence en {} días",
                 postulacionId, dias);
 
-        return token;
-    }
-
-    @Override
-    @Transactional
-    public EnlaceGenerado generarEnlace(Long postulacionId) {
-        String token = crear(postulacionId);
-        EnlaceAcceso recien = enlaces.findByTokenHash(hashDe(token)).orElseThrow();
-
-        String base = urlDelPortal.endsWith("/")
-                ? urlDelPortal.substring(0, urlDelPortal.length() - 1)
-                : urlDelPortal;
-
-        // El token va en la query y no en el camino porque es lo que el portal sabe leer sin
-        // que su enrutador tenga que entenderlo como parte de la direccion.
-        String url = base + "/acceso?token="
-                + URLEncoder.encode(token, StandardCharsets.UTF_8);
-
-        return new EnlaceGenerado(url, recien.getVenceEn());
+        return new Recien(fila, token);
     }
 
     @Override

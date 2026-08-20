@@ -193,7 +193,7 @@ public class CalificacionIaRealIT {
                         new CriterioConPeso("CV_EVIDENCIA", "Calidad de la evidencia",
                                 "Lo que dice se puede comprobar", new BigDecimal("15"))));
 
-        TrabajoIa trabajo = trabajoDePrueba(AgenteEvidenciaCv.CODIGO);
+        TrabajoIa trabajo = trabajoDePrueba(AgenteEvidenciaCv.CODIGO_AGENTE);
         ResultadoCv resultado = ejecutor.ejecutar(trabajo, "Prueba real de EVIDENCIA_CV",
                 AgenteEvidenciaCv.FORMATO, insumo, ResultadoCv.class).resultado();
 
@@ -208,7 +208,7 @@ public class CalificacionIaRealIT {
         assertThat(resultado.criterios().stream().map(NotaCriterioIa::codigo))
                 .contains("CV_RESULTADOS");
 
-        comprobarBitacora(trabajo, AgenteEvidenciaCv.CODIGO);
+        comprobarBitacora(trabajo, AgenteEvidenciaCv.CODIGO_AGENTE);
     }
 
     @DisplayName("El evaluador califica respuestas abiertas de verdad")
@@ -230,7 +230,7 @@ public class CalificacionIaRealIT {
                                 null, List.of("APR"),
                                 "Aprendí lo que hacía falta y salió bien.")));
 
-        TrabajoIa trabajo = trabajoDePrueba(AgenteEvaluador.CODIGO);
+        TrabajoIa trabajo = trabajoDePrueba(AgenteEvaluador.CODIGO_AGENTE);
         ResultadoEvaluador resultado = ejecutor.ejecutar(trabajo, "Prueba real de EVALUADOR",
                 AgenteEvaluador.FORMATO, insumo, ResultadoEvaluador.class).resultado();
 
@@ -242,7 +242,7 @@ public class CalificacionIaRealIT {
             assertThat(nota.explicacion()).isNotBlank();
         });
 
-        comprobarBitacora(trabajo, AgenteEvaluador.CODIGO);
+        comprobarBitacora(trabajo, AgenteEvaluador.CODIGO_AGENTE);
     }
 
     @DisplayName("Potencial y riesgo arma el perfil de verdad")
@@ -264,7 +264,7 @@ public class CalificacionIaRealIT {
                         "lo avisé el mismo día", new BigDecimal("70"))),
                 List.of("Respondió de forma muy distinta a dos preguntas que miden lo mismo"));
 
-        TrabajoIa trabajo = trabajoDePrueba(AgentePotencialRiesgo.CODIGO);
+        TrabajoIa trabajo = trabajoDePrueba(AgentePotencialRiesgo.CODIGO_AGENTE);
         ResultadoPerfil resultado = ejecutor.ejecutar(trabajo, "Prueba real de POTENCIAL_RIESGO",
                 AgentePotencialRiesgo.FORMATO, insumo, ResultadoPerfil.class).resultado();
 
@@ -276,7 +276,7 @@ public class CalificacionIaRealIT {
                 assertThat(hallazgo.tipo()).isIn("FORTALEZA", "RIESGO_CRITICO",
                         "RIESGO_DESARROLLABLE", "PREFERENCIA", "FALTA_EVIDENCIA"));
 
-        comprobarBitacora(trabajo, AgentePotencialRiesgo.CODIGO);
+        comprobarBitacora(trabajo, AgentePotencialRiesgo.CODIGO_AGENTE);
     }
 
     // ============ Apoyo ============

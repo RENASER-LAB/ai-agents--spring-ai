@@ -37,7 +37,7 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class AgenteSimulacion implements AgenteSeleccion {
 
-    public static final String CODIGO = "SIMULACION";
+    public static final String CODIGO_AGENTE = "SIMULACION";
 
     private static final String OBJETIVO =
             "Preparar las preguntas de la conversación final de la simulación";
@@ -61,7 +61,7 @@ public class AgenteSimulacion implements AgenteSeleccion {
 
     @Override
     public String codigo() {
-        return CODIGO;
+        return CODIGO_AGENTE;
     }
 
     @Override

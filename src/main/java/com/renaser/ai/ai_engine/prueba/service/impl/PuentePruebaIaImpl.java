@@ -358,7 +358,7 @@ public class PuentePruebaIaImpl implements PuentePruebaIa {
             }
             fila.setPuntaje(acotar(nota.puntaje(), maximo));
             fila.setExplicacion(conEvidencia(nota.explicacion(), nota.evidencia()));
-            fila.setOrigen("AGENTE");
+            fila.setOrigen(POR_AGENTE);
             fila.setConfianza(acotar(resultado.confianza(), CIEN));
             fila.setEjecucionIaId(ejecucionIaId);
             notasCriterio.save(fila);
