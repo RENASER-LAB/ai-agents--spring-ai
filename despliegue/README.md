@@ -1,10 +1,20 @@
 # Levantar el backend en AWS
 
-Una máquina, tres contenedores, sin base de datos que administrar.
+Una máquina, dos contenedores, y nada que administrar en ella.
 
-Esto sale barato por un motivo concreto: **todo lo pesado ya vive fuera**. La base de datos
-está en Supabase, los currículums en su bucket, y el chat y los embeddings son APIs de
-terceros. Lo único que hay que hospedar es la aplicación.
+**Todo lo pesado vive fuera**: la base en Supabase, los currículums en su bucket, la cola en
+Amazon MQ, y el chat y los embeddings en APIs de terceros. Esta máquina se puede tirar y
+volver a crear sin perder nada más que los certificados, que Caddy saca otra vez solo.
+
+**Lo que ya está creado** (cuenta 526338061654, `us-east-1`):
+
+| | |
+|---|---|
+| Instancia | `i-05fc037e853d07264` · `t3.medium` · IP `3.237.47.194` |
+| Imagen | `526338061654.dkr.ecr.us-east-1.amazonaws.com/ai-engine:latest` |
+| Broker | `renaser-mq` · RabbitMQ 4.2 · `amqps://…:5671` |
+| Grupo de seguridad | `sg-0fe61167414449546` — solo 80 y 443 |
+| Rol | `renaser-ec2` — ECR de lectura y SSM |
 
 ---
 
@@ -13,25 +23,24 @@ terceros. Lo único que hay que hospedar es la aplicación.
 | Contenedor | Para qué | Puertos al mundo |
 |---|---|---|
 | `aplicacion` | El backend | ninguno |
-| `rabbitmq` | La cola de calificación | ninguno |
 | `caddy` | HTTPS y reparto | 80 y 443 |
 
-Solo Caddy mira a internet. Ni la aplicación ni la cola publican un puerto: se hablan por la
-red interna. **El panel de RabbitMQ tampoco se publica** — ese panel con su contraseña por
-defecto es una de las formas más comunes de que entren a un servidor.
+Solo Caddy mira a internet; la aplicación no publica ningún puerto. **Y el 22 está cerrado**:
+se entra por SSM Session Manager, así que no hay ninguna llave que perder ni rotar.
 
 ## Lo que cuesta
 
 | | Al mes |
 |---|---:|
-| EC2 `t4g.medium` (4 GB, ARM) | ~$24 |
+| EC2 `t3.medium` (4 GB) | ~$30 |
 | Disco EBS 20 GB | ~$2 |
-| ECR (la imagen pesa ~400 MB) | ~$0,04 |
-| Tráfico de salida | los primeros 100 GB son gratis |
-| **Total** | **~$26** |
+| Amazon MQ `mq.m7g.medium` | ~$57 |
+| ECR (la imagen pesa ~450 MB) | ~$0,05 |
+| **Total** | **~$89** |
 
-Con `t4g.small` (2 GB) son ~$14, pero va justo: la JVM pide el 70% y la cola necesita su
-parte. Si eliges esa, pon `MEMORIA_APP=1500m` en el `.env`.
+La línea grande es el broker, y fue una decisión tomada a sabiendas. Si algún día se quiere
+recortar, ahí está el margen: bajarlo a `mq.t3.micro` son ~$26, y meter RabbitMQ como un
+contenedor más en esta misma máquina son $0.
 
 ### La cola: Amazon MQ
 
@@ -66,28 +75,25 @@ consultas, lo que hay que mover es el broker, no el servidor.
 
 ### 2. El repositorio de imágenes
 
-```bash
-aws ecr create-repository --repository-name ai-engine --region us-west-2
-```
+Ya creado: `ai-engine`.
 
 ### 3. Construir y subir
 
-El `Dockerfile` usa `eclipse-temurin`, que es multiarquitectura, así que ARM funciona sin
-tocar nada. Pero hay que **construir para ARM**, no para la arquitectura de tu portátil:
-
 ```bash
-CUENTA=$(aws sts get-caller-identity --query Account --output text)
-aws ecr get-login-password --region us-west-2 \
-  | docker login --username AWS --password-stdin $CUENTA.dkr.ecr.us-west-2.amazonaws.com
+aws ecr get-login-password --region us-east-1 --profile renaser   | docker login --username AWS --password-stdin 526338061654.dkr.ecr.us-east-1.amazonaws.com
 
-docker buildx build --platform linux/arm64 \
-  -t $CUENTA.dkr.ecr.us-west-2.amazonaws.com/ai-engine:latest --push .
+docker build -t 526338061654.dkr.ecr.us-east-1.amazonaws.com/ai-engine:latest .
+docker push 526338061654.dkr.ecr.us-east-1.amazonaws.com/ai-engine:latest
 ```
+
+La máquina es Intel (`t3.medium`), así que se construye para la arquitectura de siempre. Si
+algún día se pasa a Graviton para ahorrar, hay que añadir `--platform linux/arm64`: el
+`Dockerfile` usa `eclipse-temurin`, que es multiarquitectura y no hay que tocarlo.
 
 ### 4. La máquina
 
-- **AMI**: Amazon Linux 2023, **arm64**
-- **Tipo**: `t4g.medium`
+- **AMI**: Amazon Linux 2023, x86_64
+- **Tipo**: `t3.medium`
 - **Disco**: 20 GB gp3
 - **User data**: el contenido de [`user-data.sh`](user-data.sh)
 - **Rol IAM**: uno con `AmazonEC2ContainerRegistryReadOnly`, para bajar la imagen sin claves
@@ -96,11 +102,12 @@ docker buildx build --platform linux/arm64 \
 
 ### 5. Las credenciales
 
-Copia los tres archivos y crea el `.env`:
+Los archivos **ya están** en `/opt/renaser`. Falta el `.env`. Como el 22 está cerrado, se entra
+sin llave:
 
 ```bash
-scp despliegue/{docker-compose.yml,Caddyfile,desplegar.sh,.env.example} ec2-user@<IP>:/opt/renaser/
-ssh ec2-user@<IP>
+aws ssm start-session --target i-05fc037e853d07264 --region us-east-1 --profile renaser
+sudo -u ec2-user -i
 cd /opt/renaser && cp .env.example .env && nano .env
 ```
 
@@ -108,9 +115,11 @@ Casi todos los valores están ya en tu `application-secrets.yaml` local; el prop
 `.env.example` dice de qué clave sale cada uno. **Dos hay que inventarlos:**
 
 ```bash
-openssl rand -base64 24   # RABBITMQ_PASSWORD
 openssl rand -base64 48   # JWT_SECRETO
 ```
+
+Y el usuario y la contraseña del broker son los que pusiste al crearlo: **no se pueden sacar de
+AWS**, los guarda el propio RabbitMQ.
 
 ⚠️ **El `JWT_SECRETO` tiene que ser distinto del local.** Si se reutiliza, un token emitido
 en la máquina de cualquier desarrollador vale en producción.
@@ -163,5 +172,6 @@ enseña los registros en vez de dejar el servicio caído sin que nadie se entere
 la base de verdad. Si falla, la aplicación no arranca — que es lo correcto, pero conviene
 saber por qué se cayó.
 
-**El disco de la máquina es prescindible.** Lo único con volumen propio es la cola, y solo
-para sobrevivir a un reinicio. No hay ningún currículum en esta máquina: viven en el bucket.
+**El disco de la máquina es prescindible.** No hay ningún currículum aquí: viven en el bucket
+de Supabase. Lo único con volumen propio son los certificados de Caddy, y se vuelven a sacar
+solos.
