@@ -94,20 +94,39 @@ public class FlujoEvaluacionIT {
     @Test
     @Order(1)
     void hayUnBancoDePreguntasDeVerdad() throws Exception {
-        // Los 190 ítems del Banco RENASER v3, no un banco vacío. Eran 200 hasta que la V20
-        // reemplazó el banco v0.1: son 85 del directivo, 55 del de coordinación y 50 del
-        // operativo, y esos tres números los declara el propio documento del cliente.
-        assertThat(jdbc.queryForObject("select count(*) from pregunta", Integer.class)).isEqualTo(190);
+        // Los 190 ítems del Banco RENASER v3, no un banco vacío: son 85 del directivo, 55 del
+        // de coordinación y 50 del operativo, y esos tres números los declara el propio
+        // documento del cliente.
+        //
+        // Se cuenta sobre los bancos PUBLICADA, no sobre la tabla entera. La V20 ya no borra
+        // el v0.1 —lo archiva, para no arrancarle su banco a quien ya fue evaluado con él
+        // (RF-138)—, así que sus 200 preguntas siguen en la tabla y contarlas todas daría 390.
+        // Lo que importa aquí es qué se le puede poner delante a un candidato de hoy.
+        assertThat(jdbc.queryForObject("""
+                select count(*) from pregunta p
+                  join version_banco vb on vb.id = p.version_banco_id
+                 where vb.estado = 'PUBLICADA'""", Integer.class)).isEqualTo(190);
         assertThat(jdbc.queryForObject("select count(*) from plantilla_evaluacion", Integer.class)).isEqualTo(3);
 
         // Lo que no debe sumar, no suma. En el v3 son los pares de consistencia y los ítems
         // puramente eliminatorios: llevan peso 0 y no pueden aportar nota (RF-54).
-        assertThat(jdbc.queryForObject(
-                "select count(*) from pregunta where peso = 0 and es_puntuable",
+        //
+        // Igual que arriba, solo sobre lo PUBLICADA: la columna `peso` la estrena la V20 con
+        // el motor de puntuación del v3, así que las preguntas del v0.1 archivado la tienen
+        // nula. Es correcto que sea así —ese banco se calificaba de otra forma— y exigirles
+        // el peso del v3 sería pedirle a un instrumento retirado que cumpla reglas que nunca
+        // tuvo.
+        assertThat(jdbc.queryForObject("""
+                select count(*) from pregunta p
+                  join version_banco vb on vb.id = p.version_banco_id
+                 where vb.estado = 'PUBLICADA' and p.peso = 0 and p.es_puntuable""",
                 Integer.class)).isZero();
         // Y al revés: todo lo que puntúa tiene un peso de verdad
-        assertThat(jdbc.queryForObject(
-                "select count(*) from pregunta where es_puntuable and (peso is null or peso = 0)",
+        assertThat(jdbc.queryForObject("""
+                select count(*) from pregunta p
+                  join version_banco vb on vb.id = p.version_banco_id
+                 where vb.estado = 'PUBLICADA' and p.es_puntuable
+                   and (p.peso is null or p.peso = 0)""",
                 Integer.class)).isZero();
 
         // Y los pesos suman 100 por nivel DENTRO DE CADA VERSION, que es lo que exige publicar

@@ -5,11 +5,15 @@ El cliente mandó el banco nuevo (`docs/insumos/banco-renaser-v3-completo.pdf`, 
 propio. Sustituye al banco v0.1 que hoy está en la base.
 
 **Hecho:** la extracción, la migración de reemplazo, el examen de banco completo, las siete
-fórmulas, el guardado de las respuestas v3 y el motor cableado sobre esas fórmulas.
-**Pendiente:** los ítems `V`, la validación de campos de los `CD`, los multiplicadores, los
-umbrales, los filtros eliminatorios y los pares de consistencia del v3.
+fórmulas, el guardado de las respuestas v3, el motor cableado sobre esas fórmulas y —desde el
+19/08 por la tarde— **la administración completa del banco por la API del panel**: crear una
+versión con los ocho formatos, sus claves, tramos, campos y pares, publicarla (con validación
+de coherencia y relevo automático de la saliente) y archivarla. El banco v4 que venga no
+necesitará una migración. Ver la sección del banco en `docs/09-APIS.md`.
+**Pendiente:** puntuar los ítems `V`, la validación de campos de los `CD`, los multiplicadores,
+los umbrales, los filtros eliminatorios y la regla v3 de los pares de consistencia.
 
-**Estado de las pruebas:** 191 en verde (149 unitarias + 42 de integración), `BUILD SUCCESS`.
+**Estado de las pruebas:** 238 en verde (190 unitarias + 48 de integración), `BUILD SUCCESS`.
 
 ---
 
@@ -57,9 +61,11 @@ usar esto con candidatos reales conviene revisar a mano unas cuantas claves de `
 
 ## La migración · `V20__banco_v3_y_motor_de_puntuacion.sql`
 
-Escrita y **aplicable**: `MigracionesIT` aplica las 20 migraciones en una base limpia y pasa,
-y los 106 tests unitarios siguen en verde. Todo lo que hace es aditivo — no borra ni una fila
-ni una columna. Pero **rompe tres pruebas de integración**, así que todavía no vale.
+Escrita y **aplicable**: `MigracionesIT` aplica las migraciones en una base limpia y pasa, y
+`MigracionPorFasesIT` la aplica además sobre una base que ya venía con datos, que es donde el
+despliegue del 19/08 la atrapó. En esquema todo es aditivo — no quita ni una fila ni una
+columna; el banco v0.1 no se borra: se archiva. Las tres pruebas de integración que rompía por
+la mañana quedaron resueltas ese mismo día (ver el final del documento).
 
 Lo que carga:
 
@@ -75,11 +81,15 @@ Lo que carga:
 | `filtro_eliminatorio` | 5 por banco |
 | `multiplicador_bloque` | 20 (4 familias × 5 bloques A) |
 
-**Cómo se retira el v0.1 sin tocarlo:** las tres versiones del v3 entran `PUBLICADA` con la
-fecha de hoy, y el código pide la publicada **más reciente** de cada nivel
-(`VersionBancoRepository.findFirstBy...OrderByPublicadaEnDesc`). Las evaluaciones nuevas cogen
-el v3; las ya hechas siguen atadas a la suya. No hizo falta cambiar ningún estado ni saltarse
-RF-138.
+**Cómo se retira el v0.1:** la V20 lo **archiva** (`estado = 'ARCHIVADA'`, un valor que esa
+misma migración añade al CHECK) y el selector pide la `PUBLICADA` más reciente de cada nivel
+(`VersionBancoRepository.findFirstBy...OrderByPublicadaEnDesc`), así que un banco archivado no
+vuelve a asignarse. Las evaluaciones que no habían empezado se repuntan al v3; a las que sí, se
+les vence el plazo para que el sondeo las cierre — el motor v3 no sabe puntuar preguntas sin
+peso y les habría puesto un 0.00 de verdad. La primera versión de la V20 borraba el banco viejo
+apoyándose en que no había respuestas: era cierto en local y falso en Pruebas (249 evaluaciones,
+16 respuestas), y el despliegue del 19/08 murió contra `postulacion_evaluacion_fk`. RF-138
+intacto: a quien ya fue evaluado no se le toca su banco.
 
 **Dos cosas que quedaron a medias a propósito:**
 
@@ -144,35 +154,18 @@ el documento sea regular.
 
 ---
 
-## Lo que falta por arreglar antes de seguir
+## Los tres rojos de la mañana, y cómo se resolvieron (mismo día)
 
-Con la V20 puesta, `./mvnw verify` deja tres clases en rojo. Sin ella pasaban las 148.
+Con la V20 recién puesta, `./mvnw verify` dejaba tres clases en rojo. Quedó resuelto el mismo
+19/08 y la suite completa está en verde; se deja el resumen porque las dos causas enseñan algo:
 
-| Prueba | Qué pasa |
-|---|---|
-| `FlujoEvaluacionIT` | `hayUnBancoDePreguntasDeVerdad` cuenta `select count(*) from pregunta` y espera **200**; ahora hay **390**, porque el v3 suma 190 |
-| `FlujoEvaluacionIT`, `FlujoCalificacionIaIT`, `FlujoPruebaIT` | Al responder y entregar la evaluación devuelven **409** donde esperaban 200. Salta en `responderYEntregar` |
-
-**El primero es fácil y es culpa del test, no de la migración**: cuenta el total de preguntas
-de la base entera en vez de las del banco que esa prueba usa. Añadir un banco nuevo cambia ese
-número legítimamente. Se arregla contando las del v0.1.
-
-**El segundo no está diagnosticado.** Lo que ya se descartó:
-
-- No es por publicar el banco. Las tres versiones del v3 se pasaron a `BORRADOR` —de modo que
-  el selector sigue devolviendo el v0.1— y el 409 sigue igual.
-- No es la carga en sí: la migración se aplica sin error y los 106 unitarios pasan.
-- **No es de otra rama ni de otra sesión.** Se comprobó apartando el archivo de la V20 y
-  volviendo a correr `FlujoCalificacionIaIT`: con la migración fuera pasan sus 7 pruebas; con
-  ella puesta fallan 5. La causa está en la V20, no en el código de alrededor.
-
-Por dónde seguir: sacar el cuerpo del 409 (`MockMvc` solo enseña el código), mirando
-`FlujoCalificacionIaIT:923` y el servicio que atiende la entrega. La hipótesis a comprobar
-primero es que el examen se arma con más preguntas de las que la prueba responde, o que alguna
-consulta que antes veía un solo banco ahora ve dos.
-
-**Hasta que eso esté resuelto, la V20 no debe llegar a `main`**: la tubería la rechazaría, y
-con razón.
+- **El conteo global de `pregunta`** (`hayUnBancoDePreguntasDeVerdad` esperaba 200 y había 390):
+  culpa del test, que contaba la tabla entera. Hoy cuenta solo los bancos `PUBLICADA` — con el
+  v0.1 archivado, cualquier consulta global sobre `pregunta` arrastra instrumentos retirados.
+- **El 409 al responder y entregar**: el examen del v3 se arma con el banco entero y sus
+  formatos se responden con `detalle`, así que las pruebas que respondían al estilo v0.1
+  entregaban a medias. Se diagnosticó trazando el recorrido petición por petición (`TrazaHttp`)
+  y las pruebas se adaptaron a los formatos v3 (`RespuestaV3`).
 
 
 ---
@@ -239,7 +232,7 @@ califica con el motor viejo. Lo que no está es la puntuación v3 de verdad.
 
 ## Lo que queda, en orden
 
-1. Migración con `respuesta_detalle` y el endpoint de responder adaptado.
+1. Migración con `respuesta_detalle` y el endpoint de responder adaptado (la más alta hoy es V21).
 2. Reescribir `ServicioCalificacionImpl` sobre `FormulasBancoV3`: sumar con pesos, aplicar el
    multiplicador de bloque según la familia, sacar el porcentaje sobre el máximo del banco y
    traducirlo a nivel I/II/III con `umbral_nivel`.

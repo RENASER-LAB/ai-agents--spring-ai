@@ -74,7 +74,7 @@ Perfil Integral → prueba del puesto → simulacion → validacion → decision
 | IA que califica | **Tres de los nueve agentes del catalogo estan implementados**: evidencia del curriculum, evaluador y potencial/riesgo. Corren por cola de RabbitMQ contra DeepSeek. Ver [Calificacion con IA](docs/CALIFICACION-CON-IA.md) |
 | Correo | Se registra en `correo_enviado` pero NO se envia: falta el dominio de Renaser (`EnviadorCorreoLog`) |
 | Identidad equipo | `dev-login` de desarrollo; el contrato de RENASER OS no existe aun (`ProveedorIdentidadEquipo`) |
-| Frontend | **Tres, y hacen cosas distintas.** Ver «Las tres pantallas» mas abajo |
+| Frontend | **Dos, y hacen cosas distintas.** Ver «Las dos pantallas» mas abajo |
 | Mockups | Los mantiene otra persona y **describen la version anterior** |
 
 **Lo que falta de codigo:** los agentes que califican la prueba del puesto (`PRUEBA_PUESTO`) y
@@ -129,16 +129,15 @@ en una base recien sembrada la criba los marca como fallidos: es correcto, no es
 
 Ver [La criba de curriculums](docs/CRIBA-DE-CURRICULUMS.md).
 
-### Las tres pantallas
-Ninguna reemplaza a otra, y solo una vive en este repositorio.
+### Las dos pantallas
+Ninguna vive en este repositorio: el `frontend/` de demostracion que habia aqui se borro a proposito (2e7b176) cuando el panel de verdad quedo en RENASER OS.
 
 | | Donde | Que hace | Como se levanta |
 |---|---|---|---|
-| `frontend/` | **En este repo** | Ranking y ficha del candidato, con los ocho criterios y los hallazgos. **No sube curriculums**: entran por `scripts/cargar-convocatoria.py` | `cd frontend && npm install && npm run dev` (5173) |
 | `RenaserTalentoFrontend` | `~/Documentos/RenaserTalentoFrontend`, fuera de git | Una pagina sola: elegir puesto, **arrastrar curriculums**, lanzar las dos pasadas y ver la tabla. Para ensenar el flujo sin tocar la terminal | `node servidor.js` (3000), sin `npm install` |
 | RENASER OS | `/home/n4nd0/Documentos/RenaserOs`, rama `feat/talento` | El panel de verdad: solicitudes, vacantes, bandeja, ficha, embudo y administracion. React con Vite, **no Next.js** como decian los documentos | Proxy de Vite hacia `localhost:8080` |
 
-Las tres consultan el mismo backend, asi que ensenan el mismo orden.
+Las dos consultan el mismo backend, asi que ensenan el mismo orden.
 
 ### Reglas que no se negocian al tocar el codigo
 - Toda transicion pasa por `MaquinaEstados.transicionar`. **Nunca** tocar
@@ -152,12 +151,12 @@ Las tres consultan el mismo backend, asi que ensenan el mismo orden.
 - Nada se recalcula hacia atras: cada nota queda atada a la version de pesos de su vacante.
 
 ### Correr los tests
-**148 tests, todos en verde (19/08/2026).** Son dos tandas y el comando decide cual corre:
+**238 tests, todos en verde (19/08/2026, tarde).** Son dos tandas y el comando decide cual corre:
 
 | Comando | Que corre | Cuantos | Necesita |
 |---|---|---:|---|
-| `./mvnw test` | unitarias con dobles y las de arquitectura | 106 | nada |
-| `./mvnw verify` | lo anterior mas las de integracion | 148 | Docker |
+| `./mvnw test` | unitarias con dobles y las de arquitectura | 190 | nada |
+| `./mvnw verify` | lo anterior mas las de integracion | 238 | Docker |
 
 Las de integracion levantan su propio PostgreSQL y su propio RabbitMQ con Testcontainers: hace
 falta el demonio de Docker encendido. El desglose completo esta en
@@ -244,7 +243,7 @@ fusiona.** El detalle esta en [docs/CI-CD.md](docs/CI-CD.md); aqui lo que hay qu
 
 | Cuando | Que corre |
 |---|---|
-| En cada PR y en cada push a `main` | `./mvnw verify` (los 148 tests), Semgrep, Gitleaks y la cobertura del codigo nuevo en SonarCloud |
+| En cada PR y en cada push a `main` | `./mvnw verify` (los 238 tests), Semgrep, Gitleaks y la cobertura del codigo nuevo en SonarCloud |
 | Al fusionar a `main`, si todo quedo verde | Se avisa a Render por su Deploy Hook, que construye la imagen con el `Dockerfile` y publica en Pruebas |
 | De noche, sin bloquear a nadie | PIT (mutation testing) y fuzzing de la API con Schemathesis |
 
@@ -354,7 +353,7 @@ Todo vive en `docs/`. Empezar por [docs/README.md](docs/README.md).
   ultimas etapas y sus tres reglas automaticas de disponibilidad.
 - [CI/CD](docs/CI-CD.md) — que se comprueba solo en cada cambio, como se despliega a Pruebas y
   que variables de entorno pide Render. **Leerlo antes de tocar `.github/workflows/`.**
-- [Comprobaciones automaticas](docs/COMPROBACIONES-AUTOMATICAS.md) — las 148 pruebas y las siete
+- [Comprobaciones automaticas](docs/COMPROBACIONES-AUTOMATICAS.md) — las 238 pruebas y las siete
   reglas de arquitectura, una por una. Que se mira solo y que no.
 - `docs/diagramas/` — HTML autocontenidos, se abren en el navegador.
 - `docs/mockups/` — prototipos de pantalla. **Los mantiene otra persona, no editarlos.**

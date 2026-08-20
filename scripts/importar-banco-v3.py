@@ -283,7 +283,7 @@ def emitir_sql(items):
         '-- algo, se corrige el script y se vuelve a generar, o la próxima carga lo pisa.',
         '',
         '-- Las tres versiones del banco, una por nivel de puesto. Publicadas: el v3 reemplaza',
-        '-- al v0.1, que esta misma migración borra, así que son las únicas que quedan. El',
+        '-- al v0.1, que esta misma migración archiva, así que son las únicas que se asignan. El',
         '-- documento del cliente viene cerrado y él lo declara definitivo.',
     ]
     for pref, (etiqueta, nivel) in ETIQUETAS.items():

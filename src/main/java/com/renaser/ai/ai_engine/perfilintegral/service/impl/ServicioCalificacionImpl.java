@@ -311,6 +311,13 @@ public class ServicioCalificacionImpl implements ServicioCalificacion {
                         (a, b) -> a));
 
         for (ParConsistencia par : configurados) {
+            // Los pares del v3 no traen diferencia_maxima: su regla es la penalización del
+            // -5% sobre el global, que es del motor pendiente, no de esta comparación v0.1.
+            // Sin esta guardia, el primer par v3 cuyas dos preguntas se respondan con
+            // opcionId revienta con un NPE al entregar la evaluación.
+            if (par.getDiferenciaMaxima() == null) {
+                continue;
+            }
             BigDecimal a = puntajePorPregunta.get(par.getPreguntaAId());
             BigDecimal b = puntajePorPregunta.get(par.getPreguntaBId());
             if (a == null || b == null) {
