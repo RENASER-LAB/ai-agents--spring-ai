@@ -43,6 +43,11 @@ public class ConfiguracionSeguridad {
                 .requestMatchers(HttpMethod.GET, "/api/v1/portal/consentimientos/textos").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/portal/cuentas").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/portal/auth/login").permitAll()
+                // El enlace del correo. Es público a la fuerza: el token que lleva ES la
+                // credencial, y quien lo usa todavía no tiene sesión. Lo que acota el riesgo
+                // está en ServicioEnlaceAcceso: 32 bytes de azar, solo se guarda el hash,
+                // vence, y se puede revocar.
+                .requestMatchers(HttpMethod.POST, "/api/v1/portal/auth/acceso").permitAll()
                 .anyRequest().hasAuthority("TIPO_CANDIDATO"))
             .exceptionHandling(e -> e.authenticationEntryPoint(entradaSinIdentidad()));
         return http.build();

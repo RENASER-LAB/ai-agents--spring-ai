@@ -1,5 +1,6 @@
 package com.renaser.ai.ai_engine.postulacion.controller;
 
+import com.renaser.ai.ai_engine.postulacion.service.ServicioEnlaceAcceso;
 import com.renaser.ai.ai_engine.postulacion.service.ServicioPostulacionesPanel;
 
 import com.renaser.ai.ai_engine.postulacion.dto.DtosPostulacion.*;
@@ -30,6 +31,7 @@ public class PostulacionesPanelController {
 
     private final ServicioPostulacionesPanel servicio;
     private final ServicioPerfilIntegralPanel perfilIntegral;
+    private final ServicioEnlaceAcceso enlaces;
     private final Permisos permisos;
 
     @GetMapping("/bandeja")
@@ -130,6 +132,15 @@ public class PostulacionesPanelController {
             + "Si el destino es un cierre, motivoCierre dice de qué clase")
     public void transicionar(@PathVariable Long id, @Valid @RequestBody Transicionar datos) {
         servicio.transicionar(permisos.actual(), id, datos);
+    }
+
+    @PostMapping("/postulaciones/{id}/enlace-acceso")
+    @PreAuthorize("@permisos.tiene('mover_postulacion')")
+    @Operation(summary = "Generar el enlace que deja al candidato entrar al portal sin "
+            + "contraseña. El token viaja en el enlace y NO se puede recuperar después: "
+            + "sale una sola vez, aquí")
+    public ServicioEnlaceAcceso.EnlaceGenerado enlaceDeAcceso(@PathVariable Long id) {
+        return enlaces.generarEnlace(id);
     }
 
     @PostMapping("/postulaciones/{id}/confirmacion-avance")

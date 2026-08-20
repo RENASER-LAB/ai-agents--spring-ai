@@ -40,6 +40,15 @@ public final class DtosPortal {
 
     public record Sesion(String token, Long usuarioId) {}
 
+    /**
+     * Lo unico que se manda para entrar con el enlace del correo: el token.
+     *
+     * <p>Va en el cuerpo y no en la URL a proposito. Un token en la query string acaba
+     * escrito en el registro del servidor, en el historial del navegador y en la cabecera
+     * Referer de cualquier recurso externo que cargue la pagina siguiente.
+     */
+    public record AccesoPorEnlace(@NotBlank String token) {}
+
     public record MiPostulacion(String uuid, String vacante, String estado, String estadoNombre,
                                 String grupoPrioridad, long diasSinCambio, Instant creadoEn) {}
 

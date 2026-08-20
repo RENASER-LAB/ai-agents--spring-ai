@@ -1,6 +1,7 @@
 package com.renaser.ai.ai_engine.portal.controller;
 
 import com.renaser.ai.ai_engine.portal.service.ServicioPortal;
+import com.renaser.ai.ai_engine.postulacion.service.ServicioEnlaceAcceso;
 
 import com.renaser.ai.ai_engine.portal.dto.DtosPortal.*;
 import com.renaser.ai.ai_engine.seguridad.service.Permisos;
@@ -29,6 +30,7 @@ import java.util.UUID;
 public class PortalController {
 
     private final ServicioPortal servicio;
+    private final ServicioEnlaceAcceso enlaces;
     private final Permisos permisos;
 
     // ---------- público ----------
@@ -62,6 +64,26 @@ public class PortalController {
     @Operation(summary = "Entrar con correo y contraseña; devuelve el token")
     public Sesion login(@Valid @RequestBody Login datos) {
         return servicio.entrar(datos);
+    }
+
+    /**
+     * La otra puerta: la de quien nunca eligió una contraseña.
+     *
+     * <p>Un candidato que llegó por una carga masiva de currículums tiene cuenta, pero con un
+     * correo inventado y una clave que nadie le dijo. Este endpoint canjea el token que le
+     * llegó por correo y le abre la misma sesión que el login normal.
+     *
+     * <p>Es público a la fuerza: el token <b>es</b> la credencial. Por eso vale poco tiempo,
+     * se guarda solo su hash, y un token inválido, vencido o revocado devuelven los tres el
+     * mismo 401 sin decir cuál de los tres fue.
+     */
+    @PostMapping("/auth/acceso")
+    @Operation(summary = "Entrar con el enlace que llegó por correo, sin contraseña")
+    public Sesion accesoPorEnlace(@Valid @RequestBody AccesoPorEnlace datos) {
+        var sesion = enlaces.canjear(datos.token());
+        // El portal tiene su propio record, idéntico: así el contrato público no queda atado
+        // a un DTO del paquete de seguridad, que es interno.
+        return new Sesion(sesion.token(), sesion.usuarioId());
     }
 
     // ---------- con token de candidato ----------
