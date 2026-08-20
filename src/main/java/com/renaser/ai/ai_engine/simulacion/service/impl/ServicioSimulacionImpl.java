@@ -210,6 +210,20 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
     @Override
     public List<SesionDisponible> sesionesDisponibles(ContextoUsuario quien, UUID uuidPostulacion) {
         Postulacion postulacion = laMia(quien, uuidPostulacion);
+
+        // Solo se ven las fechas cuando de verdad toca elegir una.
+        //
+        // Antes se listaban siempre, y un candidato que iba por el Perfil Integral veía la
+        // sesión de simulación en su pantalla. No podía inscribirse —`inscribirse` sí mira el
+        // estado y contesta «todavía no te toca»— pero eso es peor, no mejor: se le enseña
+        // algo sobre lo que no puede actuar, y lo que aprende es que la pantalla miente.
+        //
+        // La comprobación es la misma que la de inscribirse, a propósito: si las dos no dicen
+        // lo mismo, vuelve a aparecer el hueco por otro lado.
+        if (!PUEDE_ELEGIR.equals(postulacion.getEstadoCodigo())) {
+            return List.of();
+        }
+
         return sesiones.disponiblesPara(postulacion.getOrganizacionId(), postulacion.getVacanteId()).stream()
                 .map(s -> new SesionDisponible(s.getId(), s.getFechaHora(), s.getDuracionMinutos(),
                         s.getModalidad(), s.getLugar(), s.getEnlace(),

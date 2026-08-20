@@ -89,6 +89,8 @@ class ServicioSimulacionImplTest {
     private static final Long USUARIO = 12L;
     private static final Long OTRO_USUARIO = 99L;
     private static final Long VACANTE = 5L;
+    private static final java.util.UUID UUID_POSTULACION =
+            java.util.UUID.fromString("11111111-2222-3333-4444-555555555555");
 
     private static final ContextoUsuario QUIEN = new ContextoUsuario(
             USUARIO, 3L, ORGANIZACION, "EQUIPO", List.of(2L), Map.of());
@@ -119,6 +121,70 @@ class ServicioSimulacionImplTest {
         servicio = new ServicioSimulacionImpl(sesiones, sesionesVacante, responsables, tramos,
                 informacionCritica, inscripciones, marcas, preguntas, postulaciones, vacantes,
                 cola, roles, usuarioRoles, maquina, disponibilidad, parametros, auditoria, permisos);
+    }
+
+    // ============ Las fechas que ve el candidato ============
+
+    /**
+     * Un candidato solo debe ver las fechas cuando de verdad le toca elegir una.
+     *
+     * <p>Antes se listaban siempre, y quien iba por el Perfil Integral veía la sesión de
+     * simulación en su pantalla. No podía inscribirse —eso sí estaba comprobado— pero eso lo
+     * hace peor, no mejor: se le enseña algo sobre lo que no puede actuar, y lo que aprende es
+     * que la pantalla miente.
+     */
+    private void suPostulacionEstaEn(String estado) {
+        when(postulaciones.findByUuid(UUID_POSTULACION)).thenReturn(Optional.of(
+                Postulacion.builder().id(POSTULACION).uuid(UUID_POSTULACION)
+                        .usuarioId(USUARIO).organizacionId(ORGANIZACION).vacanteId(VACANTE)
+                        .estadoCodigo(estado).build()));
+    }
+
+    @Test
+    @DisplayName("cuando le toca elegir fecha, ve las sesiones con sus plazas libres")
+    void veLasFechasCuandoLeToca() {
+        suPostulacionEstaEn(PUEDE_ELEGIR);
+        when(sesiones.disponiblesPara(ORGANIZACION, VACANTE)).thenReturn(List.of(
+                com.renaser.ai.ai_engine.simulacion.entity.SesionSimulacion.builder().id(SESION).fechaHora(Instant.now().plusSeconds(86400))
+                        .duracionMinutos(120).modalidad("GRUPAL").lugar("Sala 1").cupo(6).build()));
+        when(inscripciones.countBySesionSimulacionIdAndEsVigenteTrue(SESION)).thenReturn(2L);
+
+        var fechas = servicio.sesionesDisponibles(QUIEN, UUID_POSTULACION);
+
+        assertThat(fechas).hasSize(1);
+        assertThat(fechas.get(0).plazasLibres())
+                .as("seis de cupo menos dos ya inscritos")
+                .isEqualTo(4);
+    }
+
+    @Test
+    @DisplayName("mientras va por el Perfil Integral no ve ninguna fecha")
+    void noVeFechasAntesDeTiempo() {
+        suPostulacionEstaEn("PERFIL_TURNO_CANDIDATO");
+
+        assertThat(servicio.sesionesDisponibles(QUIEN, UUID_POSTULACION))
+                .as("ensenar una fecha que no puede elegir solo confunde")
+                .isEmpty();
+
+        verifyNoInteractions(sesiones);
+    }
+
+    @Test
+    @DisplayName("ni cuando la simulación aún no se le ha habilitado")
+    void noVeFechasSiTodaviaNoSeLeHabilito() {
+        suPostulacionEstaEn(ESPERANDO);
+
+        assertThat(servicio.sesionesDisponibles(QUIEN, UUID_POSTULACION)).isEmpty();
+        verifyNoInteractions(sesiones);
+    }
+
+    @Test
+    @DisplayName("y una vez pasada la simulación, tampoco")
+    void noVeFechasDespues() {
+        suPostulacionEstaEn(POR_CONFIRMAR);
+
+        assertThat(servicio.sesionesDisponibles(QUIEN, UUID_POSTULACION)).isEmpty();
+        verifyNoInteractions(sesiones);
     }
 
     // ============ Pedirle a la IA las preguntas de la conversación final ============
