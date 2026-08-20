@@ -37,7 +37,7 @@
 		<pdfbox.version>3.0.7</pdfbox.version>
 		<archunit.version>1.4.1</archunit.version>
 		<!-- 0.8.13+ es la primera que entiende los .class de Java 25 -->
-		<jacoco.version>0.8.13</jacoco.version>
+		<jacoco.version>0.8.15</jacoco.version>
 		<sonar-maven-plugin.version>5.7.0.6970</sonar-maven-plugin.version>
 		<!-- SonarCloud mira la cobertura solo del código NUEVO de cada PR (Clean as You
 		     Code).
