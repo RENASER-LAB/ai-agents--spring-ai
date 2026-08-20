@@ -23,7 +23,8 @@ RENASER_IA_REAL=si ./mvnw verify -Dit.test=CalificacionIaRealIT
 ## Qué pasa al fusionar a main
 
 1. La misma tubería corre otra vez.
-2. Si todo queda en verde, se le avisa a Render con el *Deploy Hook* y Render
+2. Si todo queda en verde, se construye la imagen, se sube a ECR y se le dice a la
+   máquina de EC2 que se actualice. Antes esto era un aviso a Render; ahora Render
    construye la imagen con el `Dockerfile` y la publica en **Pruebas**.
 3. Un *smoke test* espera hasta 10 minutos (el plan gratuito arranca en frío) a que
    la aplicación conteste. Si no contesta, el despliegue queda marcado en rojo.
@@ -45,7 +46,24 @@ Si el nocturno sale rojo, alguien lo revisa por la mañana. No bloquea PRs.
 | Nombre | Tipo | Qué es |
 |---|---|---|
 | `SONAR_TOKEN` | Secreto | Lo genera SonarCloud al importar el repositorio |
-| `RENDER_DEPLOY_HOOK` | Secreto | La URL del Deploy Hook del servicio en Render |
+| ~~`RENDER_DEPLOY_HOOK`~~ | — | **Ya no hace falta.** El despliegue va a AWS |
+
+**Y no hay ninguna clave de AWS guardada en GitHub**, a propósito. Se usa OIDC: GitHub firma
+un token de un solo uso, AWS lo verifica y devuelve credenciales que caducan en minutos. Una
+clave de acceso guardada como secreto no caduca nunca — si se filtra, sigue valiendo.
+
+Lo que lo hace posible, ya creado en la cuenta:
+
+| Qué | Cuál |
+|---|---|
+| Proveedor OIDC | `token.actions.githubusercontent.com` |
+| Rol que asume GitHub | `github-despliegue` |
+| Quién puede asumirlo | **Solo este repositorio**, por la condición `sub` del token |
+| Qué puede hacer | Subir a `ai-engine` en ECR, y `SendCommand` **solo** sobre `i-05fc037e853d07264` |
+
+La imagen se sube con **dos etiquetas**: `latest`, que es la que despliega, y el SHA del
+commit. Esa segunda es la que permite volver atrás: sin ella «la versión anterior» no tiene
+nombre y revertir obliga a reconstruir desde el código.
 | `PRUEBAS_URL` | Variable | La URL pública de la aplicación en Render (ej. `https://ai-engine-xxxx.onrender.com`) |
 
 ## Las variables de entorno del servicio en Render
