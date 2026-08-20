@@ -162,6 +162,20 @@ enseña los registros en vez de dejar el servicio caído sin que nadie se entere
 
 ---
 
+## El dominio y el HTTPS
+
+Va por **`https://18-204-177-210.nip.io`**, con certificado de Let's Encrypt válido y gratis.
+
+`nip.io` resuelve cualquier `IP.nip.io` a esa IP, así que Let's Encrypt puede verificar el
+dominio sin que haya que registrar ni pagar nada. El certificado lo saca y lo renueva Caddy
+solo, y HTTP redirige a HTTPS con un 308.
+
+La IP es **fija** (Elastic IP `18.204.177.210`), así que no cambia si la instancia se reinicia.
+
+⚠️ **Es provisional a propósito.** `nip.io` es un servicio de terceros: si se cae, el dominio
+se cae con él. Cuando Renaser tenga uno propio, se apunta un registro A a esa misma IP, se
+cambia `DOMINIO` en el `.env` y se reinicia Caddy. Nada más.
+
 ## Lo que hay que saber antes de tocar esto
 
 **Supabase corta por número de conexiones, no por carga.** Su pooler admite 30 en total y
@@ -171,6 +185,12 @@ enseña los registros en vez de dejar el servicio caído sin que nadie se entere
 **Las migraciones corren al arrancar.** Un despliegue con una migración nueva la aplica sobre
 la base de verdad. Si falla, la aplicación no arranca — que es lo correcto, pero conviene
 saber por qué se cayó.
+
+**Te van a escanear desde el primer minuto.** A los pocos minutos de levantarlo ya había bots
+probando `/trace.axd`, `/.vscode/sftp.json` y rutas de WordPress. Es normal en cualquier IP
+pública. Lo que no es normal es que cada intento devuelva **500 en vez de 404** — está anotado
+como pendiente en el `CLAUDE.MD`, y mientras siga así el registro se llena de ruido en el que
+un 500 de verdad pasa desapercibido.
 
 **El disco de la máquina es prescindible.** No hay ningún currículum aquí: viven en el bucket
 de Supabase. Lo único con volumen propio son los certificados de Caddy, y se vuelven a sacar

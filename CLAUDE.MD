@@ -115,6 +115,30 @@ Conocido y aceptado: `FiltroAlcance.responsableOFiltroNulo()` trata el alcance `
 `TODO` —devuelve nulo y no filtra—. Hoy no es alcanzable porque ninguna semilla da un permiso de
 panel con ese alcance, pero si alguien configura un rol asi, veria de mas.
 
+Conocido y sin arreglar: **una ruta que no existe devuelve 500, no 404.** Se ve con cualquier
+direccion inventada:
+
+```
+GET /no-existe  ->  500
+{"detail":"Ha ocurrido un error inesperado...",
+ "type":"https://api.motoragentes.com/errors/internal"}
+```
+
+Ese `motoragentes.com` delata la causa: no lo contesta nuestro `ManejadorErrores`, sino el
+`@ExceptionHandler(Exception.class)` del motor de agentes, que atrapa lo que cae fuera de
+nuestros controladores. El commit «una direccion que no existe es un 404, no una averia del
+sistema» arreglo los casos que pasan por los nuestros; este no.
+
+**Por que importa mas de lo que parece.** Desde que el backend esta en una IP publica lo
+escanean bots todo el rato —se vieron intentos contra `/trace.axd`, `/.vscode/sftp.json` y
+`/?rest_route=/wp/v2/users/` a los pocos minutos de levantarlo—. Cada uno deja un 500 en el
+registro, asi que un 500 **de verdad** se pierde entre el ruido. Y un 500 le dice a quien
+escanea que ahi hay algo que revienta, en vez de un 404 aburrido.
+
+**Como se arregla**: un `@ExceptionHandler(NoResourceFoundException.class)` en
+`comun/exception/ManejadorErrores` que devuelva 404, y que se registre antes que el generico
+del otro paquete.
+
 ### La criba de curriculums (18/08/2026)
 Contesta «llegaron cien curriculums, a quien invito primero». Antes la IA solo arrancaba
 cuando el candidato entregaba su evaluacion, asi que con una carpeta recien llegada no habia
