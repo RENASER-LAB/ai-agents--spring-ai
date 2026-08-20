@@ -136,11 +136,10 @@ un cero: son cosas distintas.
    python scripts/cargar-convocatoria.py --uid TU_UID --convocatoria asistente-admin --carpeta cv-asistente --esperar
    ```
 
-7. **Abre la pantalla**:
-   ```bash
-   cd frontend && npm install && npm run dev
-   ```
-   Queda en `http://localhost:5173`. Entra con el mismo `TU_UID`.
+7. **Abre la pantalla**: el ranking y la ficha se ven en el panel de RENASER OS
+   (`~/Documentos/RenaserOs`, rama `feat/talento`, con su proxy de Vite hacia
+   `localhost:8080`). El `frontend/` de demostración que vivía en este repositorio se
+   retiró a propósito (2e7b176) cuando el panel de verdad quedó en RENASER OS.
 
 Para volver a mirar la tanda sin cargar nada:
 ```bash
@@ -168,7 +167,7 @@ puesto, **arrastrar los currículums**, lanzar las dos pasadas y ver la tabla. L
 mismas llamadas del portal que usa el script, así que no hay un segundo camino de entrada que
 mantener.
 
-| | `frontend/` | `RenaserTalentoFrontend` |
+| | RENASER OS (panel) | `RenaserTalentoFrontend` |
 |---|---|---|
 | Para qué sirve | Trabajar sobre una tanda ya cargada | Enseñar el flujo y probar con pocos |
 | Subir currículums | No, con el script de Python | Sí, desde el navegador |

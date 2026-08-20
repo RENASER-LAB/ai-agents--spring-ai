@@ -6,11 +6,10 @@
 --
 -- El v3 **reemplaza** al v0.1, no convive con él: son instrumentos distintos y tener los dos
 -- publicados significaría evaluar a dos candidatos con reglas diferentes. Por eso esta migración
--- borra las 200 preguntas viejas (sección 10) antes de cargar las 190 nuevas.
---
--- Se puede borrar porque no había ninguna respuesta ni ninguna nota en la base: nadie ha sido
--- evaluado todavía. El día que existan evaluaciones de verdad, un cambio así ya no sería posible
--- sin romper decisiones tomadas, y habría que convivir con las dos versiones.
+-- archiva el banco viejo (sección 10) antes de cargar los 190 ítems nuevos: deja de asignarse,
+-- pero sus 200 preguntas se quedan, porque en Pruebas ya había evaluaciones colgando de ellas
+-- y RF-138 dice que a quien ya fue evaluado no se le cambia el examen por debajo. Las secciones
+-- 15 y 16 se ocupan de esas evaluaciones.
 --
 -- Los cambios de ESQUEMA sí son aditivos: no se quita ninguna columna ni ninguna tabla.
 
@@ -197,52 +196,29 @@ CREATE INDEX idx_rango_pregunta ON rango_pregunta(pregunta_id);
 CREATE INDEX idx_campo_caso ON campo_caso(pregunta_id);
 
 -- ============================================================================
--- 10 · Fuera el banco v0.1
+-- 10 · El banco v0.1 se archiva, no se borra
 -- ============================================================================
 -- El v3 no se suma al anterior: lo reemplaza. Son instrumentos distintos —ningún formato
 -- de los seis viejos existe en el nuevo— y dejar los dos publicados significaría evaluar a
 -- dos candidatos con reglas diferentes según cuál cogiera el sistema.
 --
--- Se puede borrar sin perder nada: al escribir esta migración no había NI UNA respuesta ni
--- una nota en la base (`select count(*) from respuesta` y `nota_respuesta` daban 0). Nadie
--- ha sido evaluado todavía con el banco viejo, así que no hay decisión pasada que dependa
--- de él y RF-138 no protege nada aquí.
+-- Pero reemplazar no es borrar. La versión del banco se le fija a la evaluación cuando el
+-- candidato postula y queda atada a ella para siempre (RF-138, ServicioEvaluacionImpl):
+-- borrar el banco viejo le arranca el suyo a quien ya fue evaluado, y con él la posibilidad
+-- de reproducir el examen que vio —que es justo para lo que existe orden_pregunta—.
 --
--- El orden lo mandan las claves foráneas, de la hoja a la raíz. Si alguna vez esto falla
--- por una FK nueva, el error dirá cuál: añadirla arriba, no quitar el borrado.
-DELETE FROM nota_respuesta WHERE respuesta_id IN (
-    SELECT r.id FROM respuesta r JOIN pregunta p ON p.id = r.pregunta_id
-     JOIN version_banco vb ON vb.id = p.version_banco_id WHERE vb.etiqueta LIKE '%V0.1');
-DELETE FROM respuesta WHERE pregunta_id IN (
-    SELECT p.id FROM pregunta p JOIN version_banco vb ON vb.id = p.version_banco_id
-     WHERE vb.etiqueta LIKE '%V0.1');
-DELETE FROM opcion_dimension WHERE opcion_id IN (
-    SELECT o.id FROM opcion o JOIN pregunta p ON p.id = o.pregunta_id
-     JOIN version_banco vb ON vb.id = p.version_banco_id WHERE vb.etiqueta LIKE '%V0.1');
-DELETE FROM alerta WHERE pregunta_a_id IN (
-    SELECT p.id FROM pregunta p JOIN version_banco vb ON vb.id = p.version_banco_id
-     WHERE vb.etiqueta LIKE '%V0.1');
-DELETE FROM orden_pregunta WHERE pregunta_id IN (
-    SELECT p.id FROM pregunta p JOIN version_banco vb ON vb.id = p.version_banco_id
-     WHERE vb.etiqueta LIKE '%V0.1');
-DELETE FROM pregunta_dimension WHERE pregunta_id IN (
-    SELECT p.id FROM pregunta p JOIN version_banco vb ON vb.id = p.version_banco_id
-     WHERE vb.etiqueta LIKE '%V0.1');
-DELETE FROM par_consistencia WHERE version_banco_id IN (
-    SELECT id FROM version_banco WHERE etiqueta LIKE '%V0.1');
-DELETE FROM opcion WHERE pregunta_id IN (
-    SELECT p.id FROM pregunta p JOIN version_banco vb ON vb.id = p.version_banco_id
-     WHERE vb.etiqueta LIKE '%V0.1');
+-- Basta con retirarlo de la circulación: el selector pide estado 'PUBLICADA', así que un
+-- banco ARCHIVADA no vuelve a asignársele a nadie. Quien ya lo tenía, lo conserva.
+--
+-- La versión anterior de esta migración borraba, apoyándose en que no había ni una respuesta
+-- en la base. Era cierto en local y falso en Pruebas: allí había 249 evaluaciones y 16
+-- respuestas, y el despliegue del 19/08 murió contra postulacion_evaluacion_fk. Archivar no
+-- depende de cuántas filas haya, así que no puede repetirse — ni con el v4 que venga.
+ALTER TABLE version_banco DROP CONSTRAINT IF EXISTS version_banco_estado_check;
+ALTER TABLE version_banco ADD CONSTRAINT version_banco_estado_check
+    CHECK (estado IN ('BORRADOR', 'PUBLICADA', 'ARCHIVADA'));
 
--- Las evaluaciones que apuntaban al banco viejo. Al escribir esto eran cinco, todas en
--- PENDIENTE y sin una sola respuesta: son los candidatos de prueba que se cargaron a mano
--- el 18/08 para ver el flujo. En una base nueva no existe ninguna y esto no borra nada.
-DELETE FROM evaluacion WHERE version_banco_nivel_id IN (
-    SELECT id FROM version_banco WHERE etiqueta LIKE '%V0.1');
-
-DELETE FROM pregunta WHERE version_banco_id IN (
-    SELECT id FROM version_banco WHERE etiqueta LIKE '%V0.1');
-DELETE FROM version_banco WHERE etiqueta LIKE '%V0.1';
+UPDATE version_banco SET estado = 'ARCHIVADA' WHERE etiqueta LIKE '%V0.1';
 
 -- ============================================================================
 -- 11 · Los datos del banco v3
@@ -256,7 +232,7 @@ DELETE FROM version_banco WHERE etiqueta LIKE '%V0.1';
 -- algo, se corrige el script y se vuelve a generar, o la próxima carga lo pisa.
 
 -- Las tres versiones del banco, una por nivel de puesto. Publicadas: el v3 reemplaza
--- al v0.1, que esta misma migración borra, así que son las únicas que quedan. El
+-- al v0.1, que esta misma migración archiva, así que son las únicas que se asignan. El
 -- documento del cliente viene cerrado y él lo declara definitivo.
 INSERT INTO version_banco (organizacion_id, tipo_banco, nivel_puesto_codigo, etiqueta, estado, publicada_en)
 SELECT id, 'NIVEL', 'DIRECCION', 'Banco RENASER v3 · Directivo', 'PUBLICADA', now()
@@ -1326,3 +1302,57 @@ SELECT vb.id, m.familia, m.bloque, m.mult
 -- Los bloques B (alto rendimiento) y C (excelencia) van siempre con 1.0: son el sello RENASER
 -- y el documento dice que no se negocian por área. No se insertan filas para ellos —la
 -- ausencia significa 1.0— para que nadie los cambie creyendo que es configuración.
+
+-- ============================================================================
+-- 15 · Las evaluaciones que aún no habían empezado pasan al v3
+-- ============================================================================
+-- Archivar el v0.1 deja en el aire a quien tenía una evaluación pendiente sobre él: si la
+-- reanudara, el motor del v3 se encontraría preguntas sin `peso` —esa columna la estrena
+-- esta misma migración—, las saltaría todas y le pondría un 0 que no significa nada.
+--
+-- A quien todavía no ha empezado se le puede dar el banco nuevo sin que note nada: el examen
+-- se arma en `iniciar()`, leyendo las preguntas de `version_banco_nivel_id` (ver armarOrden),
+-- así que basta con repuntar esa columna y al entrar recibirá el v3.
+--
+-- `iniciada_en IS NULL` es la frontera, no el estado: es justo lo que mira `iniciar()` para
+-- decidir si arma el examen. El NOT EXISTS es redundante mientras ambos concuerden, y barato
+-- si algún día una fila se desvía.
+--
+-- Va al final y no en el punto 10 a propósito: el banco v3 no existe hasta el punto 11, y
+-- antes de eso la subconsulta devolvería NULL contra una columna NOT NULL.
+UPDATE evaluacion e
+   SET version_banco_nivel_id = (
+        SELECT nuevo.id FROM version_banco nuevo
+         WHERE nuevo.tipo_banco = 'NIVEL'
+           AND nuevo.estado = 'PUBLICADA'
+           AND nuevo.nivel_puesto_codigo = viejo.nivel_puesto_codigo
+         ORDER BY nuevo.publicada_en DESC
+         LIMIT 1)
+  FROM version_banco viejo
+ WHERE viejo.id = e.version_banco_nivel_id
+   AND viejo.etiqueta LIKE '%V0.1'
+   AND e.iniciada_en IS NULL
+   AND NOT EXISTS (SELECT 1 FROM orden_pregunta op WHERE op.evaluacion_id = e.id);
+
+-- Las que sí habían empezado se quedan con el suyo: su `orden_pregunta` apunta a preguntas
+-- del v0.1 y cambiarles el banco debajo les dejaría un examen que no cuadra con su origen.
+
+-- ============================================================================
+-- 16 · Las que sí habían empezado el examen viejo se vencen
+-- ============================================================================
+-- A quien ya empezó no se le puede repuntar (su orden_pregunta apunta a preguntas del v0.1),
+-- pero tampoco puede seguir: el motor del v3 no sabe puntuar preguntas sin `peso` y al
+-- entregar le pondría un 0.00 en nota_etapa como si fuera una nota de verdad.
+--
+-- No se fija estado = 'VENCIDA' a mano: se le vence el plazo AHORA y lo demás lo hace el
+-- sondeo (SondeoVencimientos, cada minuto) igual que con cualquier plazo agotado — pasa la
+-- evaluación a VENCIDA y ADEMÁS cierra su postulación por la máquina de estados con motivo
+-- PLAZO_VENCIDO. Un UPDATE directo del estado dejaría esa postulación esperando para siempre,
+-- porque cerrarVencidas solo mira PENDIENTE y EN_CURSO.
+UPDATE evaluacion e
+   SET vence_en = now()
+  FROM version_banco viejo
+ WHERE viejo.id = e.version_banco_nivel_id
+   AND viejo.etiqueta LIKE '%V0.1'
+   AND e.iniciada_en IS NOT NULL
+   AND e.estado IN ('PENDIENTE', 'EN_CURSO');

@@ -1,7 +1,7 @@
 # Las APIs del sistema
 
 Sistema de selección de personal — Renaser Consulting
-Versión 1.3 · 2026-08-18 · Cubre **las cinco etapas del embudo**: postulación, Perfil Integral,
+Versión 1.4 · 2026-08-19 · Cubre **las cinco etapas del embudo**: postulación, Perfil Integral,
 prueba del puesto, simulación de trabajo, validación práctica y decisión final
 
 Este documento explica las APIs para quien las va a consumir: el frontend de RENASER OS y el
@@ -201,6 +201,34 @@ el primer día.
 ⚠️ **La decisión de contratar no es de Talento.** Es del responsable del área o de
 Dirección (RF-119) — la primera vez en el sistema que Talento no tiene el permiso de
 escritura más importante de un flujo.
+
+### El banco de preguntas
+
+El repositorio del que sale el examen del Perfil Integral. Se administra entero desde aquí:
+el banco v4 que venga no necesitará una migración. El ciclo es
+**BORRADOR → PUBLICADA → ARCHIVADA**, y tres reglas lo sostienen:
+
+- **Solo un borrador se edita.** Una versión publicada no admite ni una opción más: su clave
+  no se altera por debajo de un examen en curso.
+- **Publicar valida y hace el relevo.** Valida la coherencia de cada formato (un EF-4 sin
+  valores, un SEC con huecos o un CD sin denominador se rechazan con el código del ítem) y
+  archiva a la versión que reemplaza. Quien tenía una evaluación sin empezar pasa al banco
+  nuevo sin notarlo; quien ya empezó conserva el suyo (RF-138).
+- **La clave se ve aquí y solo aquí.** El panel devuelve puntajes, valores ocultos y
+  distractores —quien edita el banco necesita ver lo que escribió—; al portal del candidato
+  no viaja ninguno, y `logicaInterna` entra pero no sale ni por aquí (RF-53).
+
+| Método y ruta | Qué hace | Permiso |
+|---|---|---|
+| GET `/banco-preguntas/versiones` | Todas las visibles, con su estado; las archivadas también: son historia | `ver_banco_preguntas` |
+| POST `/banco-preguntas/versiones` | Crear una versión, en borrador | `editar_banco_preguntas` |
+| POST `/banco-preguntas/versiones/{id}/publicacion` | Validar, publicar y archivar a la saliente | `publicar_version_banco` |
+| POST `/banco-preguntas/versiones/{id}/archivado` | Retirarla sin reemplazo. Se bloquea si dejaría candidatos esperando sin banco | `publicar_version_banco` |
+| GET/POST `/banco-preguntas/versiones/{id}/preguntas` | Las preguntas: los 14 formatos (6 del v0.1 + 8 del v3) con peso, ítem clave y eliminatorio | `ver` / `editar_banco_preguntas` |
+| GET/POST `/banco-preguntas/preguntas/{id}/opciones` | Las opciones con su clave: puntaje, valor oculto (EF-4), distractor (INV/DE), orden correcto (SEC) | `ver` / `editar_banco_preguntas` |
+| GET/POST `/banco-preguntas/preguntas/{id}/rangos` | Los tramos de puntaje de los ítems V | `ver` / `editar_banco_preguntas` |
+| GET/POST `/banco-preguntas/preguntas/{id}/campos-caso` | Los campos de los casos descompuestos (CD) | `ver` / `editar_banco_preguntas` |
+| GET/POST `/banco-preguntas/versiones/{id}/pares-consistencia` | Emparejar dos preguntas de la versión para vigilar contradicciones | `ver` / `editar_banco_preguntas` |
 
 ### Administración
 

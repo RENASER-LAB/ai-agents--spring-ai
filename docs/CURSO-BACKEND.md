@@ -190,9 +190,9 @@ Pequeño y prerrequisito duro de la etapa 13: si la IA no tiene texto, no tiene 
 
 | | Archivo | Líneas | Qué vas a ver |
 |---|---|---|---|
-| 45 | `archivo/entity/Archivo.java` | 27 | El archivo como fila, el contenido en disco |
+| 45 | `archivo/entity/Archivo.java` | 27 | El archivo como fila, el contenido en el bucket |
 | 46 | `archivo/service/AlmacenArchivos.java` | 20 | La interfaz que aísla dónde se guarda |
-| 47 | `archivo/service/impl/AlmacenArchivosDisco.java` | 100 | La implementación de hoy: `./almacen-archivos` |
+| 47 | `archivo/service/impl/AlmacenArchivosSupabase.java` | 278 | La implementación de hoy: el bucket privado de Supabase |
 | 48 | `postulacion/service/impl/ExtractorTextoCv.java` | 109 | Saca el texto del PDF y del `.docx` |
 | 49 | `postulacion/service/impl/ServicioTextoCvImpl.java` | 74 | Quién lo dispara y dónde lo deja |
 

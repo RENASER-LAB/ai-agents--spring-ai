@@ -47,16 +47,22 @@ demás de la calificación se prueba con un doble del modelo y no gasta nada.
 
 ---
 
-## 191 pruebas
+## 238 pruebas
 
 | Qué | Cuántas | Necesita |
 |---|---:|---|
-| Unitarias, con dobles | 99 | nada |
+| Unitarias, con dobles | 140 | nada |
 | Arquitectura | 7 | nada |
 | Las fórmulas del banco v3 | 22 | nada |
 | El validador de las respuestas v3 | 21 | nada |
-| Integración, de punta a punta | 37 | Docker |
+| Integración, de punta a punta | 43 | Docker |
 | Contra el proveedor de verdad | 5 | Docker, saldo y la bandera |
+
+Entre las de integración hay dos que no se parecen al resto y conviene conocer: la del **banco
+por el panel** (`FlujoBancoPreguntasIT`), donde un administrador construye, publica y archiva un
+banco entero por la API; y la de **migraciones por fases** (`MigracionPorFasesIT`), que migra
+hasta la V19, siembra los datos que había en Pruebas y solo entonces aplica la V20 — es la única
+forma de que una migración se tope con datos viejos, que es donde murió el despliegue del 19/08.
 
 Las dos tandas del banco v3 se prueban sueltas porque deciden la nota de una persona: las
 fórmulas contra los ejemplos del documento del cliente, y el validador sobre todo contra lo
