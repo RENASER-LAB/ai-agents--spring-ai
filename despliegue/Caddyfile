@@ -1,0 +1,32 @@
+# La puerta de entrada. Saca y renueva el certificado de Let's Encrypt solo.
+#
+# El {$DOMINIO} sale del .env. Si se deja vacio, Caddy sirve por HTTP en el puerto 80 y
+# NO intenta sacar certificado: util para probar con la IP antes de tener dominio.
+
+{$DOMINIO} {
+	encode gzip
+
+	# Todo va al backend. El portal del candidato vive en Vercel, asi que aqui solo
+	# hay API: no se sirve ningun archivo estatico.
+	reverse_proxy aplicacion:8080 {
+		# La calificacion con IA puede tardar. Sin esto Caddy corta a los 30 segundos y
+		# el candidato ve un error mientras el trabajo sigue corriendo por dentro.
+		transport http {
+			read_timeout 120s
+		}
+	}
+
+	# Cabeceras que no cuestan nada y quitan avisos de cualquier analisis de seguridad.
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}

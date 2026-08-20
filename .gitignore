@@ -66,3 +66,7 @@ cv-arquitecto/
 # Cache de Python: es un compilado, no fuente
 __pycache__/
 *.pyc
+
+# El .env del despliegue lleva las mismas claves que application-secrets.yaml
+.env
+despliegue/.env

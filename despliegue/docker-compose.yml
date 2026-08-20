@@ -1,0 +1,133 @@
+# Lo que corre en el servidor de AWS.
+#
+# Son tres contenedores y ninguno guarda nada que no se pueda perder: la base es Supabase,
+# los curriculums viven en su bucket, y lo unico con disco propio es la cola, que solo
+# necesita sobrevivir a un reinicio.
+#
+# Se levanta con:
+#   docker compose --env-file .env up -d
+#
+# Las credenciales NO estan aqui: vienen de .env, que no se versiona. Ver .env.example.
+
+services:
+
+  # ---------------------------------------------------------------- la aplicacion
+  aplicacion:
+    image: ${IMAGEN}
+    container_name: renaser-backend
+    restart: always
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: pruebas
+
+      # Base de datos: Supabase. Puerto 5432 (la conexion directa), NO el 6543 del pooler
+      # de transacciones, que no soporta las consultas preparadas que Flyway necesita para
+      # migrar y hace fallar el arranque con un error que no dice por que.
+      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL}
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD}
+
+      # La cola es el contenedor de al lado. Se habla por la red interna de compose, asi
+      # que el puerto 5672 NO se publica al mundo: nadie de fuera tiene por que verla.
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: ${RABBITMQ_USER}
+      SPRING_RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      SPRING_RABBITMQ_VIRTUAL_HOST: /
+      SPRING_RABBITMQ_SSL_ENABLED: "false"
+
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
+      GOOGLE_GEMINI_API_KEY: ${GOOGLE_GEMINI_API_KEY}
+      JWT_SECRETO: ${JWT_SECRETO}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+
+      # Correo. Sin CORREO_TRANSPORTE=smtp la aplicacion arranca igual y solo anota los
+      # avisos en correo_enviado, que es el comportamiento por defecto y no rompe nada.
+      CORREO_TRANSPORTE: ${CORREO_TRANSPORTE:-log}
+      CORREO_REMITENTE: ${CORREO_REMITENTE:-}
+      SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-}
+      SPRING_MAIL_PORT: ${SPRING_MAIL_PORT:-587}
+      SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME:-}
+      SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD:-}
+
+      # Sin esto los correos saldrian con enlaces a localhost:5174.
+      PORTAL_URL: ${PORTAL_URL}
+
+      # El Dockerfile pide el 75% de la memoria del contenedor. En una maquina de 2 GB eso
+      # deja al sistema sin aire; el limite de abajo es lo que hace que ese 75% sea de 1,5 GB
+      # y no de toda la maquina.
+      JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=70.0
+    mem_limit: ${MEMORIA_APP:-2g}
+    # Solo escucha en la red interna: quien habla con el mundo es Caddy.
+    expose:
+      - "8080"
+    logging: &registro
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ---------------------------------------------------------------- la cola
+  #
+  # Aqui dentro y no en Amazon MQ, y es una decision de dinero: el broker gestionado mas
+  # pequeno (mq.t3.micro) cuesta unos 26 dolares al mes, mas que el propio servidor. Esta
+  # cola es interna —solo la usa la aplicacion para calificar en segundo plano, nadie se
+  # conecta desde fuera—, asi que no hay nada que justifique ese precio.
+  #
+  # Si algun dia hicieran falta varias instancias de la aplicacion, o alta disponibilidad
+  # de verdad, entonces si: se cambian estas tres variables por las del broker gestionado y
+  # este servicio se borra. La aplicacion no se entera.
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: renaser-rabbitmq
+    restart: always
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+      # Una inferencia contra el modelo puede tardar decenas de minutos. Con el valor por
+      # defecto (30 min) el broker da el mensaje por perdido y lo reencola, y el mismo
+      # curriculum se califica dos veces. Se paga dos veces, tambien.
+      RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS: "-rabbit consumer_timeout 3600000"
+    volumes:
+      - cola:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    # NO se publica ningun puerto. Ni el 5672 ni el 15672 del panel: ese panel con la
+    # contrasena por defecto es una de las formas mas comunes de que entren a un servidor.
+    expose:
+      - "5672"
+    mem_limit: 512m
+    logging: *registro
+
+  # ---------------------------------------------------------------- la puerta
+  #
+  # Caddy y no un balanceador de AWS por lo mismo que la cola: un ALB son 16 dolares al mes
+  # para repartir trafico entre UNA maquina. Caddy saca y renueva el certificado de Let's
+  # Encrypt solo, sin cron ni recordatorios.
+  caddy:
+    image: caddy:2-alpine
+    container_name: renaser-caddy
+    restart: always
+    depends_on:
+      - aplicacion
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_datos:/data
+      - caddy_config:/config
+    environment:
+      DOMINIO: ${DOMINIO}
+    logging: *registro
+
+volumes:
+  cola:
+  caddy_datos:
+  caddy_config:
