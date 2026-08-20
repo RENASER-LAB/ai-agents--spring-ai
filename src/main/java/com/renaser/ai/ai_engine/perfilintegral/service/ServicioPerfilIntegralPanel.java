@@ -3,6 +3,7 @@ package com.renaser.ai.ai_engine.perfilintegral.service;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.CalificacionEncoladaResponse;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.PerfilIntegralResponse;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.PasadaEncolada;
+import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.EvaluacionReabierta;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.RankingVacante;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
 
@@ -63,6 +64,26 @@ public interface ServicioPerfilIntegralPanel {
      * <p>Incluye a quien todavía no tiene nota. Un candidato cuya calificación falló no
      * puede desaparecer de la lista: desaparecería también el problema.
      */
+    /**
+     * Vuelve a abrir la evaluación de un candidato y le devuelve el turno.
+     *
+     * <p>Hace falta porque hay 249 evaluaciones <b>vencidas y sin responder</b>: la migración
+     * del banco v3 les venció el plazo a propósito —el motor nuevo no sabía puntuar las
+     * preguntas del banco viejo y les habría puesto un 0.00 de verdad—. Esos candidatos
+     * tienen cuenta, tienen currículum y tienen nota de criba, pero si entran al portal se
+     * encuentran con «el plazo para responder ya pasó» y no hay forma de darles otro.
+     *
+     * <p>Mueve también la postulación a {@code PERFIL_TURNO_CANDIDATO}, y no es un extra: si
+     * se le reabre la evaluación pero el estado sigue diciendo que se espera algo de Renaser,
+     * el candidato aparece en la bandeja del equipo y su pantalla no le ofrece nada que hacer.
+     * El estado contesta «de quién se espera algo», y a partir de aquí se espera de él.
+     *
+     * <p>Lo que NO hace: tocar una evaluación ya entregada. Reabrir esa borraría el sentido de
+     * una nota que alguien ya usó para decidir.
+     */
+    EvaluacionReabierta reabrirEvaluacion(ContextoUsuario quien, Long postulacionId,
+                                          Integer dias, String motivo);
+
     RankingVacante ranking(ContextoUsuario quien, Long vacanteId);
 
     /**

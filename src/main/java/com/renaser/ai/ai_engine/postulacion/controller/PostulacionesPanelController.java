@@ -134,6 +134,16 @@ public class PostulacionesPanelController {
         servicio.transicionar(permisos.actual(), id, datos);
     }
 
+    @PostMapping("/postulaciones/{id}/reapertura-evaluacion")
+    @PreAuthorize("@permisos.tiene('mover_postulacion')")
+    @Operation(summary = "Volver a abrir la evaluación de un candidato y devolverle el turno. "
+            + "Hace falta para los 249 que la migración del banco v3 dejó vencidos sin haber "
+            + "respondido: hoy entran al portal y solo ven «el plazo ya pasó»")
+    public com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.EvaluacionReabierta
+            reabrirEvaluacion(@PathVariable Long id, @Valid @RequestBody ReabrirEvaluacion datos) {
+        return perfilIntegral.reabrirEvaluacion(permisos.actual(), id, datos.dias(), datos.motivo());
+    }
+
     @PostMapping("/postulaciones/{id}/enlace-acceso")
     @PreAuthorize("@permisos.tiene('mover_postulacion')")
     @Operation(summary = "Generar el enlace que deja al candidato entrar al portal sin "

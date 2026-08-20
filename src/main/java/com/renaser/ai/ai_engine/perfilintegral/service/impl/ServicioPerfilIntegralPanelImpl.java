@@ -102,6 +102,7 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
     private final ServicioAuditoria auditoria;
     private final ColaCalificacionIa cola;
     private final MaquinaEstados maquina;
+    private final com.renaser.ai.ai_engine.perfilintegral.repository.EvaluacionRepository evaluaciones;
     private final Permisos permisos;
 
     // El orden de la tanda. Manda el grupo, no la nota: quien llega a la nota arrastrando un
@@ -314,6 +315,73 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
             maquina.transicionar(p, "PERFIL_CALIFICANDO", null, null, true, false, null);
         }
     }
+
+    /** El estado en el que le toca al candidato responder su evaluación. */
+    private static final String LE_TOCA = "PERFIL_TURNO_CANDIDATO";
+
+    @Override
+    @Transactional
+    public com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.EvaluacionReabierta
+            reabrirEvaluacion(ContextoUsuario quien, Long postulacionId, Integer dias, String motivo) {
+
+        if (motivo == null || motivo.isBlank()) {
+            throw new IllegalArgumentException("Reabrir una evaluación exige un motivo escrito");
+        }
+
+        Postulacion postulacion = postulaciones.findByIdAndOrganizacionId(
+                        postulacionId, quien.organizacionId())
+                .orElseThrow(() -> new ResourceNotFoundException("Postulación", "id", postulacionId));
+
+        if (maquina.yaTermino(postulacion)) {
+            throw new IllegalStateException("Esta postulación ya terminó: no se le reabre nada");
+        }
+        if (postulacion.getEvaluacionId() == null) {
+            throw new IllegalStateException("Esta postulación no tiene evaluación que reabrir");
+        }
+
+        var evaluacion = evaluaciones.findById(postulacion.getEvaluacionId())
+                .orElseThrow(() -> new IllegalStateException(
+                        "La postulación apunta a una evaluación que no existe"));
+
+        // Una entregada no se reabre. Su nota ya pudo usarse para decidir, y volver a abrirla
+        // dejaría esa decisión apoyada en algo que después cambió.
+        if ("TERMINADA".equals(evaluacion.getEstado())) {
+            throw new IllegalStateException(
+                    "Esa evaluación ya fue entregada: reabrirla invalidaría su nota");
+        }
+
+        int plazo = dias != null && dias > 0
+                ? dias
+                : parametros.entero(postulacion.getOrganizacionId(), "dias_plazo_evaluacion", 14);
+
+        java.time.Instant vence = java.time.Instant.now()
+                .plus(plazo, java.time.temporal.ChronoUnit.DAYS);
+        String venceAntes = String.valueOf(evaluacion.getVenceEn());
+
+        // Si ya la había empezado se respeta: vuelve a EN_CURSO y conserva lo respondido.
+        evaluacion.setEstado(evaluacion.getIniciadaEn() == null ? "PENDIENTE" : "EN_CURSO");
+        evaluacion.setVenceEn(vence);
+        // La vigencia manda sobre el plazo: de nada sirve poder responder si el resultado ya
+        // no vale. Se estira solo si se quedaría corta.
+        if (evaluacion.getVigenteHasta() == null || evaluacion.getVigenteHasta().isBefore(vence)) {
+            evaluacion.setVigenteHasta(vence);
+        }
+        evaluaciones.save(evaluacion);
+
+        if (!LE_TOCA.equals(postulacion.getEstadoCodigo())) {
+            maquina.transicionar(postulacion, LE_TOCA, quien, motivo, false, false, null);
+        }
+
+        auditoria.registrar(postulacion.getOrganizacionId(), quien,
+                "reabrir_evaluacion", "postulacion", postulacion.getId(),
+                java.util.Map.of("venceEn", venceAntes),
+                java.util.Map.of("venceEn", vence.toString(), "dias", String.valueOf(plazo)),
+                motivo);
+
+        return new com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.EvaluacionReabierta(
+                postulacion.getId(), postulacion.getEstadoCodigo(), vence, plazo);
+    }
+
 
     @Override
     @Transactional(readOnly = true)

@@ -78,6 +78,13 @@ public final class DtosPerfilIntegral {
      * prioridad y no la nota: alguien con 92 y un riesgo crítico no va por delante de
      * alguien con 88 y ninguno, y ordenar solo por número escondería justo eso.
      */
+    /**
+     * Lo que devuelve reabrir una evaluación: hasta cuándo tiene ahora, y en qué estado
+     * quedó la postulación.
+     */
+    public record EvaluacionReabierta(Long postulacionId, String estado,
+                                      java.time.Instant venceEn, int diasDePlazo) {}
+
     public record RankingVacante(
             Long vacanteId,
             String vacante,

@@ -31,6 +31,12 @@ public final class DtosPostulacion {
 
     public record ConfirmarAvance(@NotBlank String motivo) {}
 
+    /**
+     * Reabrir una evaluación. Los días son opcionales: sin ellos manda el parámetro
+     * {@code dias_plazo_evaluacion}, que es donde Renaser lo cambia sin desplegar.
+     */
+    public record ReabrirEvaluacion(Integer dias, @NotBlank String motivo) {}
+
     public record ConteoEmbudo(Map<String, Long> porEstado) {}
 
     /**
