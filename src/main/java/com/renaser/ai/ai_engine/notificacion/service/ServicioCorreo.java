@@ -37,7 +37,7 @@ public class ServicioCorreo {
         String asunto = reemplazar(plantilla.getAsunto(), variables);
         String cuerpo = reemplazar(plantilla.getCuerpo(), variables);
 
-        enviados.save(CorreoEnviado.builder()
+        CorreoEnviado registro = enviados.save(CorreoEnviado.builder()
                 .usuarioId(usuarioId)
                 .plantillaCorreoCodigo(plantilla.getCodigo())
                 .versionPlantilla(plantilla.getVersion())
@@ -48,9 +48,16 @@ public class ServicioCorreo {
                 .creadoEn(Instant.now())
                 .build());
 
-        if (correoDestino != null) {
-            transporte.enviar(correoDestino, asunto, cuerpo);
-        }
+        // El registro se guarda ANTES de intentar el envio: lo que se le dijo al candidato
+        // queda escrito aunque el servidor de correo se caiga a mitad. Despues se anota como
+        // acabo el intento, porque una fila que dice «enviado» cuando nadie lo recibio es
+        // peor que no tener la fila: se descubre cuando el candidato reclama.
+        EnviadorCorreo.Resultado resultado = correoDestino == null
+                ? EnviadorCorreo.Resultado.NO_ENVIADO
+                : transporte.enviar(correoDestino, asunto, cuerpo);
+
+        registro.setEstadoEntrega(resultado.name());
+        enviados.save(registro);
     }
 
     private String reemplazar(String texto, Map<String, String> variables) {

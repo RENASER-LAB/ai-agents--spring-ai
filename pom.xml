@@ -99,6 +99,18 @@
 			<artifactId>spring-boot-starter-validation</artifactId>
 		</dependency>
 
+		<!-- Envio de correo. Hasta ahora el aviso al candidato se guardaba en `correo_enviado`
+		     y no salia de la maquina: la unica implementacion del transporte escribia al log.
+		     Con esto sale de verdad.
+
+		     No cambia nada por si sola: el transporte SMTP solo se activa si
+		     `renaser.correo.transporte` vale `smtp`. Sin eso sigue el de log, asi que ni los
+		     tests ni quien no configure nada se ven arrastrados. -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-mail</artifactId>
+		</dependency>
+
 		<!-- Documentacion de la API: el contrato con el frontend Next.js -->
 		<dependency>
 			<groupId>org.springdoc</groupId>
