@@ -12,6 +12,8 @@ import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.pdfbox.pdmodel.font.Standard14Fonts;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
+import org.junit.jupiter.api.DisplayName;
+import com.renaser.ai.ai_engine.integracion.soporte.RespuestaV3;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -77,6 +79,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @Testcontainers
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@DisplayName("La calificación con inteligencia artificial")
 public class FlujoCalificacionIaIT {
 
     @Container
@@ -255,6 +258,7 @@ public class FlujoCalificacionIaIT {
 
     // ============ Las pruebas ============
 
+    @DisplayName("La IA califica y la postulación avanza sola")
     @Test
     @Order(1)
     void laIaCalificaYLaPostulacionAvanzaSola() throws Exception {
@@ -329,12 +333,18 @@ public class FlujoCalificacionIaIT {
         assertThat(contar("select count(*) from afirmacion_cv")).isEqualTo(2);
 
         // 5 · Las respuestas abiertas calificadas de 0 a 4, y ninguna ajena
+        //
+        // «Abierta» ya no se puede reconocer por `opcion_id is null`: con el banco v3 los
+        // formatos que se responden con detalle (SJT-R, EF-4, SEC...) también lo dejan vacío,
+        // y de esos no se encarga la IA sino las fórmulas. Abierta es la que se contesta
+        // escribiendo: sin opción y sin detalle.
         int abiertas = contar("""
                 select count(*) from respuesta r
                 join pregunta p on p.id = r.pregunta_id
                 join evaluacion e on e.id = r.evaluacion_id
                 join postulacion po on po.evaluacion_id = e.id
-                where po.id = %d and r.opcion_id is null and p.es_puntuable""".formatted(postulacionId));
+                where po.id = %d and r.opcion_id is null and r.detalle is null
+                  and p.es_puntuable""".formatted(postulacionId));
         assertThat(abiertas)
                 .withFailMessage("La plantilla de Ejecución tiene que traer preguntas abiertas; "
                         + "sin ellas esta prueba no comprueba nada del EVALUADOR")
@@ -370,6 +380,7 @@ public class FlujoCalificacionIaIT {
         assertThat(nota.get("version_pesos_id")).isEqualTo(versionDeLaVacante);
     }
 
+    @DisplayName("Si la IA falla se reintenta, y no se inventa ninguna nota")
     @Test
     @Order(2)
     void siLaIaFallaSeReintentaYNoSeInventaNingunaNota() throws Exception {
@@ -441,6 +452,7 @@ public class FlujoCalificacionIaIT {
      * milisegundos, no encontraría el trabajo y lo soltaría: los tres se quedarían en
      * PENDIENTE para siempre y la espera de aquí abajo se agotaría sin que nada diera error.
      */
+    @DisplayName("La criba rápida lee la tanda sin razonar y salta al evaluador")
     @Test
     @Order(3)
     void laCribaRapidaLeeLaTandaSinRazonarYSaltaAlEvaluador() throws Exception {
@@ -536,6 +548,7 @@ public class FlujoCalificacionIaIT {
      * hace falta para decidir sin abrir la ficha: quién es, de qué pasada viene su nota,
      * cómo se llama su archivo y cuánto pesa cada criterio.
      */
+    @DisplayName("El ranking ordena por grupo y deja al final a quien no tiene nota")
     @Test
     @Order(4)
     void elRankingOrdenaPorGrupoYDejaAlSinCalificarAlFinal() throws Exception {
@@ -644,6 +657,7 @@ public class FlujoCalificacionIaIT {
      * que no se gaste en la tanda entera: si volviera a mirar a todos, la primera pasada no
      * habría ahorrado nada.
      */
+    @DisplayName("La criba fina vuelve solo sobre los de arriba, y esa sí razona")
     @Test
     @Order(5)
     void laCribaFinaVuelveSoloSobreLosDeArribaYEsaSiRazona() throws Exception {
@@ -748,6 +762,7 @@ public class FlujoCalificacionIaIT {
      * había nada que calificar. Es el botón de la ficha, el que se usa cuando alguien quiere
      * volver a mirar a un candidato concreto de la tanda.
      */
+    @DisplayName("Se criba un currículum suelto aunque nadie haya respondido nada")
     @Test
     @Order(6)
     void seCribaUnCurriculumSueltoAunqueNadieHayaRespondidoNada() throws Exception {
@@ -797,6 +812,7 @@ public class FlujoCalificacionIaIT {
      * fácil de cometer —basta pulsar el botón mientras la tanda se está cargando— y caro de
      * descubrir, porque no falla: califica, y califica a quien no era.
      */
+    @DisplayName("La segunda pasada se niega si todavía no hay ninguna nota")
     @Test
     @Order(7)
     void laSegundaPasadaSeNiegaSiTodaviaNoHayNingunaNota() throws Exception {
@@ -913,11 +929,9 @@ public class FlujoCalificacionIaIT {
 
         JsonNode preguntas = json.readTree(cuerpo).get("preguntas");
         for (JsonNode pregunta : preguntas) {
-            JsonNode opciones = pregunta.get("opciones");
-            String respuesta = opciones != null && !opciones.isEmpty()
-                    ? "{\"opcionId\":%d,\"segundos\":30}".formatted(opciones.get(0).get("id").asLong())
-                    : "{\"texto\":\"Un caso concreto: reduje el tiempo de cierre midiendo antes y "
-                            + "después, y dejé el proceso documentado\",\"segundos\":90}";
+            // Cada formato del banco v3 se responde de una manera distinta, y el validador
+            // rechaza lo que no traiga su forma. RespuestaV3 arma la que toque.
+            String respuesta = RespuestaV3.para(pregunta);
             mvc.perform(put("/api/v1/portal/evaluacion/" + codigo + "/respuestas/"
                             + pregunta.get("id").asLong())
                             .header("Authorization", "Bearer " + token)

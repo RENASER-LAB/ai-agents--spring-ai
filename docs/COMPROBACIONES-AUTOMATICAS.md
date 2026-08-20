@@ -10,16 +10,23 @@ nadie salvo una persona leyendo el código.
 ## Cómo se lanza todo
 
 ```bash
-DOCKER_HOST='npipe:////./pipe/docker_engine' ./mvnw verify
+./mvnw verify
 ```
 
 `test` lanza solo las unitarias y las de arquitectura; `verify` añade las de integración,
-que ahora corren en su propia fase. Es lo mismo que hace la tubería de integración continua.
+que corren en su propia fase. Es lo mismo que hace la tubería de integración continua.
 
-**`DOCKER_HOST` hace falta en esta máquina.** El contexto activo de Docker es
-`desktop-linux`, cuyo canal no existe; el que funciona es el `default`. Sin esto, todas las
-pruebas de integración fallan con «Could not find a valid Docker environment», y **eso no es
-un fallo del código**.
+En Linux basta con el demonio de Docker encendido: comprobado el 19/08/2026, `verify` corre
+limpio sin tocar nada más.
+
+**En Windows puede hacer falta forzar el canal de Docker.** Si el contexto activo es
+`desktop-linux`, cuyo canal no existe allí, todas las pruebas de integración fallan con
+«Could not find a valid Docker environment» —y **eso no es un fallo del código**—. Se
+arregla apuntando al `default`:
+
+```bash
+DOCKER_HOST='npipe:////./pipe/docker_engine' ./mvnw verify
+```
 
 ### La que no corre sola
 
@@ -40,14 +47,27 @@ demás de la calificación se prueba con un doble del modelo y no gasta nada.
 
 ---
 
-## 148 pruebas
+## 238 pruebas
 
 | Qué | Cuántas | Necesita |
 |---|---:|---|
-| Unitarias, con dobles | 99 | nada |
+| Unitarias, con dobles | 140 | nada |
 | Arquitectura | 7 | nada |
-| Integración, de punta a punta | 37 | Docker |
+| Las fórmulas del banco v3 | 22 | nada |
+| El validador de las respuestas v3 | 21 | nada |
+| Integración, de punta a punta | 43 | Docker |
 | Contra el proveedor de verdad | 5 | Docker, saldo y la bandera |
+
+Entre las de integración hay dos que no se parecen al resto y conviene conocer: la del **banco
+por el panel** (`FlujoBancoPreguntasIT`), donde un administrador construye, publica y archiva un
+banco entero por la API; y la de **migraciones por fases** (`MigracionPorFasesIT`), que migra
+hasta la V19, siembra los datos que había en Pruebas y solo entonces aplica la V20 — es la única
+forma de que una migración se tope con datos viejos, que es donde murió el despliegue del 19/08.
+
+Las dos tandas del banco v3 se prueban sueltas porque deciden la nota de una persona: las
+fórmulas contra los ejemplos del documento del cliente, y el validador sobre todo contra lo
+que tiene que **rechazar** — desde que se guarda el detalle en `jsonb`, es lo único que impide
+que una respuesta con mala forma acabe convertida en un puntaje.
 
 Las de integración levantan un PostgreSQL y un RabbitMQ de verdad con Testcontainers, y
 recorren el flujo entero. **El modelo siempre se simula**: ninguna prueba de la tanda normal
@@ -91,28 +111,44 @@ del primer usuario del equipo de `ServicioAccesoEquipo`.
 
 ---
 
-## Lo que falta: la seguridad
+## La seguridad: Semgrep y Gitleaks
 
-**Hoy nadie mira el código buscando fallos de seguridad.** Ni la compilación, ni las pruebas,
-ni las reglas de arquitectura. Las pruebas comprueban que el sistema hace lo que debe; no que
-no haga lo que no debe.
+Las pruebas comprueban que el sistema hace lo que debe; no que no haga lo que no debe. De eso
+se encarga **Semgrep**, que lee el código buscando patrones peligrosos: consultas armadas
+pegando cadenas, secretos escritos a mano, endpoints sin permiso, datos personales que acaban
+en el registro.
 
-Se va a cubrir con **Semgrep**, que lee el código buscando patrones peligrosos: consultas
-armadas pegando cadenas, secretos escritos a mano, endpoints sin permiso, datos personales
-que acaban en el registro.
+**Desde el 19/08/2026 ya no hay que acordarse de lanzarlo**: corre solo en cada Pull Request y
+en cada push a `main`, dentro del trabajo «análisis estático» de la tubería. A mano es:
 
-**Cuándo toca usarlo:**
+```bash
+semgrep scan --error --config p/java --config .semgrep/
+```
+
+Son las reglas de serie para Java más **tres propias**, escritas contra fallos que este
+proyecto ya tuvo, en `.semgrep/reglas-renaser.yaml`:
+
+| Regla | Qué impide |
+|---|---|
+| `ia-no-lee-el-texto-sin-anonimizar` | Que el currículum salga hacia el proveedor sin quitarle edad, sexo y estado civil |
+| `permitall-solo-en-configuracion-seguridad` | Que aparezca una ruta pública nueva fuera de `ConfiguracionSeguridad` |
+| `excepciones-no-se-tragan-por-consola` | Que un error se imprima por consola y se dé por atendido |
+
+Al lado corre **Gitleaks**, que revisa la historia entera de git buscando claves filtradas. Va
+con `--redact`: un secreto encontrado no se imprime en el registro público de la corrida, que
+sería peor que no haberlo buscado.
+
+**Cuándo mirarlo con atención**, además de cuando la tubería avise:
 
 - Antes de una **auditoría de código** o de seguridad, propia o de un tercero.
 - Cuando se toque algo que maneja **datos de candidatos**: currículums, correos, teléfonos.
   Este sistema mueve datos personales de gente real hacia dos proveedores externos.
 - Al añadir un **endpoint nuevo**, para comprobar que lleva su permiso y su alcance.
-- De forma periódica sobre la rama principal, para que una regresión no espere a la
-  siguiente auditoría.
 
-Queda pendiente decidir dos cosas: **qué reglas** se aplican —las que trae de serie para Java
-y Spring, más las propias del proyecto— y **dónde corre**, si en la máquina de quien programa,
-en la integración continua, o en las dos.
+Las **dependencias** las vigila **Dependabot**, aparte: una vez por semana revisa las de Maven
+y las de GitHub Actions, y abre un Pull Request cuando alguna tiene versión nueva o una
+vulnerabilidad conocida. No fusiona nada solo — su PR pasa por la misma tubería que cualquier
+otro cambio.
 
 ---
 

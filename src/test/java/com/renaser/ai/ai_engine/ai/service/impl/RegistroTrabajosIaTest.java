@@ -3,6 +3,7 @@ package com.renaser.ai.ai_engine.ai.service.impl;
 import com.renaser.ai.ai_engine.ai.model.TrabajoIa;
 import com.renaser.ai.ai_engine.ai.repository.TrabajoIaRepository;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -30,6 +31,7 @@ import static org.mockito.Mockito.when;
  * modelo por el mismo candidato y guardar la nota del que termine último.
  */
 @ExtendWith(MockitoExtension.class)
+@DisplayName("El registro y los reintentos de los trabajos de IA")
 class RegistroTrabajosIaTest {
 
     @Mock

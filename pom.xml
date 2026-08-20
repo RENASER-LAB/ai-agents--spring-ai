@@ -247,6 +247,14 @@
 						<include>**/*Test.java</include>
 						<include>**/*Tests.java</include>
 					</includes>
+					<!-- Igual que en failsafe: los XML llevan el @DisplayName legible -->
+					<statelessTestsetReporter
+						implementation="org.apache.maven.plugin.surefire.extensions.junit5.JUnit5Xml30StatelessReporter">
+						<usePhrasedFileName>false</usePhrasedFileName>
+						<usePhrasedTestSuiteClassName>true</usePhrasedTestSuiteClassName>
+						<usePhrasedTestCaseClassName>true</usePhrasedTestCaseClassName>
+						<usePhrasedTestCaseMethodName>true</usePhrasedTestCaseMethodName>
+					</statelessTestsetReporter>
 				</configuration>
 			</plugin>
 			<plugin>
@@ -298,6 +306,16 @@
 					</execution>
 				</executions>
 				<configuration>
+					<!-- Que los XML lleven el texto de @DisplayName y no el nombre pegado
+					     del método: es lo que convierte el reporte en algo legible por
+					     alguien que no lee Java. Lo consume scripts/reporte-pruebas.py -->
+					<statelessTestsetReporter
+						implementation="org.apache.maven.plugin.surefire.extensions.junit5.JUnit5Xml30StatelessReporter">
+						<usePhrasedFileName>false</usePhrasedFileName>
+						<usePhrasedTestSuiteClassName>true</usePhrasedTestSuiteClassName>
+						<usePhrasedTestCaseClassName>true</usePhrasedTestCaseClassName>
+						<usePhrasedTestCaseMethodName>true</usePhrasedTestCaseMethodName>
+					</statelessTestsetReporter>
 					<!-- Por convención failsafe ya toma **/*IT.java -->
 					<environmentVariables>
 						<!-- Docker Desktop: dentro de su VM el socket es el estándar. En un

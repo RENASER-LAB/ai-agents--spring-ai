@@ -105,9 +105,10 @@ el esquema y volver a desplegar.
 
 ## Limitaciones conocidas de esta fase
 
-- **El disco de Render es efímero**: los currículums subidos a Pruebas se pierden en
-  cada despliegue. Para probar está bien; para candidatos reales hará falta disco
-  persistente o un almacén externo.
+- **El disco de Render es efímero, y ya no importa**: los currículums viven en el
+  bucket privado de Supabase (ver `docs/ARCHIVOS-EN-BUCKET.md`), así que un despliegue
+  no pierde nada. Lo único que muere con el contenedor es lo que nadie debería guardar
+  en su disco.
 - **Supabase gratuito se pausa a los 7 días sin uso** y despierta en ~30 segundos.
   El smoke test ya lo tolera. En cuanto entre el primer candidato real, Producción
   necesita plan de pago.

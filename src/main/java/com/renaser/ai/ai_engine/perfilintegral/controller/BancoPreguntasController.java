@@ -43,9 +43,16 @@ public class BancoPreguntasController {
 
     @PostMapping("/versiones/{id}/publicacion")
     @PreAuthorize("@permisos.tiene('publicar_version_banco')")
-    @Operation(summary = "Publicar: la versión queda cerrada, ya no admite más preguntas")
+    @Operation(summary = "Publicar: valida la coherencia de cada formato, cierra la versión y archiva a la que reemplaza")
     public void publicarVersion(@PathVariable Long id) {
         servicio.publicarVersion(permisos.actual(), id);
+    }
+
+    @PostMapping("/versiones/{id}/archivado")
+    @PreAuthorize("@permisos.tiene('publicar_version_banco')")
+    @Operation(summary = "Archivar: la versión deja de asignarse; quien no empezó pasa al banco vigente, quien empezó conserva el suyo")
+    public void archivarVersion(@PathVariable Long id) {
+        servicio.archivarVersion(permisos.actual(), id);
     }
 
     // ---------- Preguntas ----------
@@ -75,8 +82,57 @@ public class BancoPreguntasController {
     @PostMapping("/preguntas/{id}/opciones")
     @PreAuthorize("@permisos.tiene('editar_banco_preguntas')")
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Agregar una opción a una pregunta cerrada")
+    @Operation(summary = "Agregar una opción a una pregunta de una versión en borrador")
     public Map<String, Long> agregarOpcion(@PathVariable Long id, @Valid @RequestBody CrearOpcion datos) {
         return Map.of("id", servicio.agregarOpcion(permisos.actual(), id, datos));
+    }
+
+    // ---------- Los tramos de los ítems V ----------
+
+    @GetMapping("/preguntas/{id}/rangos")
+    @PreAuthorize("@permisos.tiene('ver_banco_preguntas')")
+    public List<RangoResponse> rangos(@PathVariable Long id) {
+        return servicio.listarRangos(permisos.actual(), id);
+    }
+
+    @PostMapping("/preguntas/{id}/rangos")
+    @PreAuthorize("@permisos.tiene('editar_banco_preguntas')")
+    @ResponseStatus(HttpStatus.CREATED)
+    @Operation(summary = "Agregar un tramo de puntaje a un ítem V en borrador")
+    public Map<String, Long> agregarRango(@PathVariable Long id, @Valid @RequestBody CrearRango datos) {
+        return Map.of("id", servicio.agregarRango(permisos.actual(), id, datos));
+    }
+
+    // ---------- Los campos de los casos descompuestos ----------
+
+    @GetMapping("/preguntas/{id}/campos-caso")
+    @PreAuthorize("@permisos.tiene('ver_banco_preguntas')")
+    public List<CampoCasoResponse> camposCaso(@PathVariable Long id) {
+        return servicio.listarCamposCaso(permisos.actual(), id);
+    }
+
+    @PostMapping("/preguntas/{id}/campos-caso")
+    @PreAuthorize("@permisos.tiene('editar_banco_preguntas')")
+    @ResponseStatus(HttpStatus.CREATED)
+    @Operation(summary = "Agregar un campo a un caso descompuesto (CD) en borrador")
+    public Map<String, Long> agregarCampoCaso(@PathVariable Long id, @Valid @RequestBody CrearCampoCaso datos) {
+        return Map.of("id", servicio.agregarCampoCaso(permisos.actual(), id, datos));
+    }
+
+    // ---------- Los pares de consistencia ----------
+
+    @GetMapping("/versiones/{id}/pares-consistencia")
+    @PreAuthorize("@permisos.tiene('ver_banco_preguntas')")
+    public List<ParConsistenciaResponse> paresConsistencia(@PathVariable Long id) {
+        return servicio.listarParesConsistencia(permisos.actual(), id);
+    }
+
+    @PostMapping("/versiones/{id}/pares-consistencia")
+    @PreAuthorize("@permisos.tiene('editar_banco_preguntas')")
+    @ResponseStatus(HttpStatus.CREATED)
+    @Operation(summary = "Emparejar dos preguntas de la versión para vigilar contradicciones")
+    public Map<String, Long> agregarParConsistencia(@PathVariable Long id,
+                                                    @Valid @RequestBody CrearParConsistencia datos) {
+        return Map.of("id", servicio.agregarParConsistencia(permisos.actual(), id, datos));
     }
 }

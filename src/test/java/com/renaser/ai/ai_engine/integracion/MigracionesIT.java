@@ -3,6 +3,7 @@ package com.renaser.ai.ai_engine.integracion;
 import com.renaser.ai.ai_engine.postulacion.entity.EstadoPostulacion;
 import com.renaser.ai.ai_engine.postulacion.repository.EstadoPostulacionRepository;
 import com.renaser.ai.ai_engine.organizacion.repository.OrganizacionRepository;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
@@ -27,6 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
         "spring.jpa.hibernate.ddl-auto=validate",
         "spring.flyway.enabled=true"
 })
+@DisplayName("Las migraciones de la base de datos")
 public class MigracionesIT {
 
     @Container

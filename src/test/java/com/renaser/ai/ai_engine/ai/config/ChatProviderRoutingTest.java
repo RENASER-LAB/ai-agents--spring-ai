@@ -1,5 +1,6 @@
 package com.renaser.ai.ai_engine.ai.config;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.deepseek.DeepSeekChatModel;
@@ -28,6 +29,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Usa ApplicationContextRunner en vez de @SpringBootTest para no arrastrar JPA ni pgvector,
  * que necesitan un Postgres vivo.
  */
+@DisplayName("A qué proveedor va cada llamada de IA")
 class ChatProviderRoutingTest {
 
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()

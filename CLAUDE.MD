@@ -74,7 +74,7 @@ Perfil Integral → prueba del puesto → simulacion → validacion → decision
 | IA que califica | **Tres de los nueve agentes del catalogo estan implementados**: evidencia del curriculum, evaluador y potencial/riesgo. Corren por cola de RabbitMQ contra DeepSeek. Ver [Calificacion con IA](docs/CALIFICACION-CON-IA.md) |
 | Correo | Se registra en `correo_enviado` pero NO se envia: falta el dominio de Renaser (`EnviadorCorreoLog`) |
 | Identidad equipo | `dev-login` de desarrollo; el contrato de RENASER OS no existe aun (`ProveedorIdentidadEquipo`) |
-| Frontend | **Tres, y hacen cosas distintas.** Ver «Las tres pantallas» mas abajo |
+| Frontend | **Dos, y hacen cosas distintas.** Ver «Las dos pantallas» mas abajo |
 | Mockups | Los mantiene otra persona y **describen la version anterior** |
 
 **Lo que falta de codigo:** los agentes que califican la prueba del puesto (`PRUEBA_PUESTO`) y
@@ -129,16 +129,15 @@ en una base recien sembrada la criba los marca como fallidos: es correcto, no es
 
 Ver [La criba de curriculums](docs/CRIBA-DE-CURRICULUMS.md).
 
-### Las tres pantallas
-Ninguna reemplaza a otra, y solo una vive en este repositorio.
+### Las dos pantallas
+Ninguna vive en este repositorio: el `frontend/` de demostracion que habia aqui se borro a proposito (2e7b176) cuando el panel de verdad quedo en RENASER OS.
 
 | | Donde | Que hace | Como se levanta |
 |---|---|---|---|
-| `frontend/` | **En este repo** | Ranking y ficha del candidato, con los ocho criterios y los hallazgos. **No sube curriculums**: entran por `scripts/cargar-convocatoria.py` | `cd frontend && npm install && npm run dev` (5173) |
 | `RenaserTalentoFrontend` | `~/Documentos/RenaserTalentoFrontend`, fuera de git | Una pagina sola: elegir puesto, **arrastrar curriculums**, lanzar las dos pasadas y ver la tabla. Para ensenar el flujo sin tocar la terminal | `node servidor.js` (3000), sin `npm install` |
 | RENASER OS | `/home/n4nd0/Documentos/RenaserOs`, rama `feat/talento` | El panel de verdad: solicitudes, vacantes, bandeja, ficha, embudo y administracion. React con Vite, **no Next.js** como decian los documentos | Proxy de Vite hacia `localhost:8080` |
 
-Las tres consultan el mismo backend, asi que ensenan el mismo orden.
+Las dos consultan el mismo backend, asi que ensenan el mismo orden.
 
 ### Reglas que no se negocian al tocar el codigo
 - Toda transicion pasa por `MaquinaEstados.transicionar`. **Nunca** tocar
@@ -152,29 +151,124 @@ Las tres consultan el mismo backend, asi que ensenan el mismo orden.
 - Nada se recalcula hacia atras: cada nota queda atada a la version de pesos de su vacante.
 
 ### Correr los tests
-Hace falta Docker levantado (Testcontainers), `renaser-postgres` en el puerto 5433 y RabbitMQ.
-`./mvnw test`.
+**238 tests, todos en verde (19/08/2026, tarde).** Son dos tandas y el comando decide cual corre:
 
-Desde el merge de `origin/ricardo` del 18/08/2026 son **103 tests** y compilan bien: Ricardo
-arreglo la firma del doble del modelo y sumo unitarios de la cola, del registro de trabajos,
-del panel y **7 reglas de arquitectura con ArchUnit** (la frontera del motor, las capas y que
-el estado solo lo mueva la maquina — las mismas reglas que este archivo tiene en prosa).
+| Comando | Que corre | Cuantos | Necesita |
+|---|---|---:|---|
+| `./mvnw test` | unitarias con dobles y las de arquitectura | 190 | nada |
+| `./mvnw verify` | lo anterior mas las de integracion | 238 | Docker |
 
-**El test que gasta dinero ya no corre solo**: `CalificacionIaRealIT` esta detras de la
-variable `RENASER_IA_REAL`. `./mvnw test` a secas ya es seguro y no llama a DeepSeek.
+Las de integracion levantan su propio PostgreSQL y su propio RabbitMQ con Testcontainers: hace
+falta el demonio de Docker encendido. El desglose completo esta en
+[docs/COMPROBACIONES-AUTOMATICAS.md](docs/COMPROBACIONES-AUTOMATICAS.md).
 
-⚠️ **Cada ejecucion cuesta dinero.** El `pom.xml` mete `**/*IT.java` en los `includes` de
-surefire, asi que `CalificacionIaRealIT` corre siempre y hace **cuatro llamadas reales a
-DeepSeek**. Para saltarlo:
+Entre las 106 hay **7 reglas de arquitectura con ArchUnit** (la frontera del motor, las capas y
+que el estado solo lo mueva la maquina — las mismas reglas que este archivo tiene en prosa).
+
+**El test que gasta dinero no corre solo**: `CalificacionIaRealIT` esta detras de
+`@EnabledIfEnvironmentVariable`, asi que se salta sola si no esta la variable. Ni `test` ni
+`verify` llaman a DeepSeek. Para pedirla a proposito:
 
 ```
-./mvnw test -Dtest='*Test,*Tests,*IT,!CalificacionIaRealIT' -Dsurefire.failIfNoSpecifiedTests=false
+RENASER_IA_REAL=si ./mvnw verify -Dit.test=CalificacionIaRealIT
 ```
 
 **Ruido esperado que NO es un fallo**: `Failed to check/redeclare auto-delete queue(s)` de
-RabbitMQ, y los reintentos agotados de `CalificacionIaRealIT` («el proveedor del modelo no
-responde»), que es un test que llama a DeepSeek de verdad y registra el fallo si no hay clave o
-red. Si termina en `BUILD SUCCESS`, esta bien.
+RabbitMQ, y los cinco tests saltados de `CalificacionIaRealIT`. Si termina en `BUILD SUCCESS`,
+esta bien.
+
+## El banco de preguntas v3 (19/08/2026)
+El cliente reemplazo el banco entero. Son **190 items** (85 directivo, 55 coordinacion, 50
+operativo) con **ocho formatos nuevos** —`EF-4`, `SJT-R`, `SEC`, `INV`, `DE`, `CD`, `V`, `PC`—
+y ninguno coincide con los seis de antes. El banco v0.1 y sus 200 preguntas **ya no existen**:
+la migracion `V20` los borra. Se pudo porque no habia ni una respuesta guardada.
+
+**El examen ya no se muestrea: se aplica el banco completo del nivel**, en el orden del
+documento. Ese orden importa — separa cada par de consistencia de su pareja al menos quince
+items — asi que **no se baraja**.
+
+El insumo es `docs/insumos/banco-renaser-v3-completo.pdf` y lo convierte
+`scripts/importar-banco-v3.py`, que comprueba cuatro totales que el propio documento declara y
+no genera nada si alguno no cuadra. **No transcribir items a mano.**
+
+### PENDIENTE · el detalle de las respuestas tiene que pasar a tabla
+Los formatos nuevos no se responden con una sola opcion: un `SJT-R` califica cada opcion del 1
+al 5, un `EF-4` marca dos, un `SEC` ordena cinco pasos. Eso se guarda hoy en
+**`respuesta.detalle`, una columna `jsonb`** (migracion `V21`).
+
+**Es deuda tecnica y se tomo a sabiendas.** Lo correcto es una tabla
+`respuesta_detalle(respuesta_id, opcion_id, valor, orden)`. Lo que cuesta mientras tanto:
+
+- La base **no comprueba nada**: nada impide apuntar a una opcion de otra pregunta, ni guardar
+  un detalle con la forma de otro formato. Esa comprobacion vive ahora en
+  `ValidadorDetalleV3`, y **es lo unico** entre una respuesta mal formada y una nota calculada
+  sobre ella. Si se toca ese validador, hay que mirar sus tests primero.
+- Un informe que cruce respuestas ya no sale con SQL normal.
+
+Al pasarlo a tabla, migrar lo que haya en `detalle` y borrar la columna.
+
+### Cuidado con Jackson: el proyecto va con la 3, no con la 2
+Spring Boot 4 trae **Jackson 3** (`tools.jackson.databind.ObjectMapper`), no el
+`com.fasterxml.jackson.databind` de toda la vida. El de siempre **compila** —entra como
+transitiva— pero **no existe en tiempo de ejecucion**, y el sintoma no dice nada de Jackson:
+la clase que lo usa deja de registrarse como bean y salen decenas de errores de contexto
+(«No qualifying bean of type ServicioEvaluacion»). Costo 37 tests en rojo averiguarlo.
+
+En codigo de produccion: `tools.jackson`. Las pruebas de integracion siguen con Jackson 2, que
+esta en su classpath, asi que `integracion/soporte/RespuestaV3` usa la 2 a proposito.
+
+### El motor de puntuacion v3
+`ServicioCalificacionImpl` **ya no es el del banco v0.1**: se reescribio sobre
+`FormulasBancoV3`, que tiene las siete formulas del documento con sus tests. Cada item da de 0
+a 3 segun su formato, se multiplica por su peso (1 llega a 3 puntos, 2 llega a 6) y la nota es
+lo obtenido sobre la suma de los maximos.
+
+**Un item sin responder no cuenta como cero**: se queda fuera del maximo tambien. Inventarle un
+cero castigaria dos veces a quien no termino.
+
+**PENDIENTE del motor**, que todavia no esta:
+- Los items `V` no se puntuan: hace falta interpretar el dato escrito contra su tabla de tramos.
+- En los `CD` solo se mira que el campo venga lleno, no que este dentro de rango ni que sea
+  coherente con los demas campos del caso.
+- Faltan los multiplicadores por familia, los umbrales de nivel (I, II, III), los cinco filtros
+  eliminatorios y las banderas.
+- `detectarContradicciones` sigue con la regla del v0.1 (`diferencia_maxima`); la del v3 es
+  −5% del global y bandera roja.
+
+Ver [docs/AVANCE-BANCO-V3-2026-08-19.md](docs/AVANCE-BANCO-V3-2026-08-19.md).
+
+## La tuberia (19/08/2026)
+Cada cambio pasa por GitHub Actions antes de llegar a nadie. **Si algo sale rojo, no se
+fusiona.** El detalle esta en [docs/CI-CD.md](docs/CI-CD.md); aqui lo que hay que saber:
+
+| Cuando | Que corre |
+|---|---|
+| En cada PR y en cada push a `main` | `./mvnw verify` (los 238 tests), Semgrep, Gitleaks y la cobertura del codigo nuevo en SonarCloud |
+| Al fusionar a `main`, si todo quedo verde | Se avisa a Render por su Deploy Hook, que construye la imagen con el `Dockerfile` y publica en Pruebas |
+| De noche, sin bloquear a nadie | PIT (mutation testing) y fuzzing de la API con Schemathesis |
+
+**Render no despliega solo**: su auto-deploy esta apagado a proposito, para que no publique con
+la tuberia en rojo.
+
+**Semgrep** corre con las reglas de serie de Java mas tres propias en `.semgrep/`: que la IA no
+lea el curriculum sin anonimizar, que no aparezcan rutas publicas fuera de
+`ConfiguracionSeguridad`, y que ningun error se trague por consola.
+
+### Los tres perfiles de configuracion
+| Archivo | Cuando se usa | Que lo activa |
+|---|---|---|
+| `application.yaml` | siempre, es la base: Postgres local en el 5433, RabbitMQ sin TLS | nada |
+| `application-pruebas.yaml` | la aplicacion corriendo en Render (Supabase + CloudAMQP) | `SPRING_PROFILES_ACTIVE=pruebas` |
+| `application-supabase.yaml` | tu backend local apuntando a Supabase | `-Dspring-boot.run.profiles=supabase` |
+
+Los perfiles son aditivos: cada uno solo escribe encima lo que cambia.
+
+**Cuidado con el nombre**: el perfil `pruebas` es el entorno de Pruebas, **no** los tests. Los
+tests no usan ningun perfil — cada uno se inyecta sus valores con `@DynamicPropertySource`.
+
+En Render **no existe `application-secrets.yaml`**: el `Dockerfile` no lo copia y el import es
+`optional:`, asi que alli todo llega por variable de entorno. La lista completa esta en
+[docs/CI-CD.md](docs/CI-CD.md).
 
 ## Como esta organizado el codigo
 Un solo proyecto para dos cosas: el modulo de seleccion de personal y el motor de agentes de
@@ -257,6 +351,10 @@ Todo vive en `docs/`. Empezar por [docs/README.md](docs/README.md).
   abierto y arma el Perfil de Talento. Y que pasa cuando falla.
 - [Avance de simulacion y validacion](docs/AVANCE-SIMULACION-VALIDACION-2026-08-18.md) — las dos
   ultimas etapas y sus tres reglas automaticas de disponibilidad.
+- [CI/CD](docs/CI-CD.md) — que se comprueba solo en cada cambio, como se despliega a Pruebas y
+  que variables de entorno pide Render. **Leerlo antes de tocar `.github/workflows/`.**
+- [Comprobaciones automaticas](docs/COMPROBACIONES-AUTOMATICAS.md) — las 238 pruebas y las siete
+  reglas de arquitectura, una por una. Que se mira solo y que no.
 - `docs/diagramas/` — HTML autocontenidos, se abren en el navegador.
 - `docs/mockups/` — prototipos de pantalla. **Los mantiene otra persona, no editarlos.**
 - `docs/insumos/` — documentos originales del cliente y notas de analisis.

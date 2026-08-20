@@ -21,4 +21,14 @@ public class Opcion {
     private String texto;
     private BigDecimal puntaje;
     private Instant creadoEn;
+
+    // --- Banco v3 ---
+    /** EF-4: el valor oculto de −2 a +2 que hay detrás de la afirmación. Nunca viaja al portal. */
+    private BigDecimal valor;
+
+    /** INV y DE: si el elemento es de los inventados. El candidato no puede distinguirlo. */
+    private boolean esDistractor;
+
+    /** SEC: el lugar que le toca a este paso en el orden correcto. */
+    private Short ordenCorrecto;
 }

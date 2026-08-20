@@ -1,6 +1,7 @@
 package com.renaser.ai.ai_engine.ai.prompt.impl;
 
 import com.renaser.ai.ai_engine.ai.model.AgentType;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -11,6 +12,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * ORCHESTRATOR se degrada en silencio; y si alguien mete a los 15 en pro, el costo se
  * triplica sin que falle nada. Ninguno de los dos casos se nota sin este test.
  */
+@DisplayName("Qué modelo usa cada agente")
 class AgentModelSelectorImplTest {
 
     private static final String FLASH = "deepseek-v4-flash";

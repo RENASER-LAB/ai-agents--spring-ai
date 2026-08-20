@@ -49,6 +49,21 @@ jobs:
         if: ${{ env.SONAR_TOKEN != '' }}
         run: ./mvnw -B sonar:sonar
 
+      # La lista de lo que el sistema garantiza, en castellano y navegable. Se genera
+      # también cuando algo falla —ahí es cuando más sirve, porque señala qué regla
+      # dejó de cumplirse— y se descarga desde la pestaña Summary de la corrida.
+      - name: Reporte legible de las pruebas
+        if: always()
+        run: python3 scripts/reporte-pruebas.py
+
+      - name: Guardar el reporte
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reporte-pruebas
+          path: target/reporte-pruebas.html
+          retention-days: 30
+
   estatico:
     name: análisis estático
     runs-on: ubuntu-latest

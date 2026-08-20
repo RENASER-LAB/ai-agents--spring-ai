@@ -1,5 +1,6 @@
 package com.renaser.ai.ai_engine;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
@@ -14,6 +15,7 @@ import org.testcontainers.rabbitmq.RabbitMQContainer;
 // los suyos con Testcontainers y pasa en cualquier máquina con Docker.
 @SpringBootTest
 @Testcontainers
+@DisplayName("El arranque de la aplicación")
 class AiEngineApplicationIT {
 
 	@Container
@@ -41,6 +43,7 @@ class AiEngineApplicationIT {
 		registro.add("spring.ai.deepseek.api-key", () -> "clave-de-pruebas-no-se-usa");
 	}
 
+	@DisplayName("La aplicación arranca con todo su contexto")
 	@Test
 	void contextLoads() {
 	}

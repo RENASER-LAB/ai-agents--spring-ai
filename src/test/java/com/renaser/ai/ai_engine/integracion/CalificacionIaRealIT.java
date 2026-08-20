@@ -21,6 +21,7 @@ import com.renaser.ai.ai_engine.perfilintegral.dto.DtosCalificacionIa.ResultadoP
 
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
@@ -84,6 +85,7 @@ import static org.assertj.core.api.Assertions.assertThat;
         disabledReason = "Llama a DeepSeek de verdad y gasta saldo. "
                 + "Para lanzarla: RENASER_IA_REAL=si")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@DisplayName("El contrato con el proveedor de IA · solo a petición")
 public class CalificacionIaRealIT {
 
     @Container
@@ -120,6 +122,7 @@ public class CalificacionIaRealIT {
     @Autowired TrabajoIaRepository trabajos;
     @Autowired JdbcTemplate jdbc;
 
+    @DisplayName("La clave del proveedor se resuelve sola")
     @Test
     @Order(1)
     void laClaveDelProveedorSeResuelveSola() {
@@ -139,6 +142,7 @@ public class CalificacionIaRealIT {
                 .isNotBlank();
     }
 
+    @DisplayName("El proveedor contesta y no devuelve vacío")
     @Test
     @Order(2)
     void elProveedorContestaYNoDevuelveVacio() {
@@ -154,6 +158,7 @@ public class CalificacionIaRealIT {
         assertThat(respuesta.tokensSalida()).isNotNull().isPositive();
     }
 
+    @DisplayName("Evidencia del CV puntúa los ocho criterios de verdad")
     @Test
     @Order(3)
     void evidenciaCvPuntuaLosOchoCriteriosDeVerdad() {
@@ -206,6 +211,7 @@ public class CalificacionIaRealIT {
         comprobarBitacora(trabajo, AgenteEvidenciaCv.CODIGO);
     }
 
+    @DisplayName("El evaluador califica respuestas abiertas de verdad")
     @Test
     @Order(4)
     void elEvaluadorCalificaRespuestasAbiertasDeVerdad() {
@@ -239,6 +245,7 @@ public class CalificacionIaRealIT {
         comprobarBitacora(trabajo, AgenteEvaluador.CODIGO);
     }
 
+    @DisplayName("Potencial y riesgo arma el perfil de verdad")
     @Test
     @Order(5)
     void potencialRiesgoArmaElPerfilDeVerdad() {

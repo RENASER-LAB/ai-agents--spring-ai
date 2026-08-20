@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.renaser.ai.ai_engine.comun.programado.SondeoVencimientos;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
+import org.junit.jupiter.api.DisplayName;
+import com.renaser.ai.ai_engine.integracion.soporte.RespuestaV3;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -50,6 +52,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @Testcontainers
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@DisplayName("Hito 3 · La prueba del puesto y la decisión")
 public class FlujoPruebaIT {
 
     @Container
@@ -95,6 +98,7 @@ public class FlujoPruebaIT {
     static long criterioId;
     static long entregableObligatorioId;
 
+    @DisplayName("Talento arma una prueba con su rúbrica")
     @Test
     @Order(1)
     void talentoArmaUnaPruebaConSuRubrica() throws Exception {
@@ -183,6 +187,7 @@ public class FlujoPruebaIT {
         criterioId = criterioIncompleto;   // se usa el primero para poner nota más adelante junto al segundo
     }
 
+    @DisplayName("Una vacante recorre todo el camino hasta la prueba del puesto")
     @Test
     @Order(2)
     void unaVacanteConTodoElCaminoHastaPruebaPuesto() throws Exception {
@@ -205,10 +210,8 @@ public class FlujoPruebaIT {
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString());
         for (JsonNode p : evaluacion.get("preguntas")) {
-            JsonNode opciones = p.get("opciones");
-            String cuerpo = opciones != null && !opciones.isEmpty()
-                    ? "{\"opcionId\":%d,\"segundos\":20}".formatted(opciones.get(0).get("id").asLong())
-                    : "{\"texto\":\"Un caso: automaticé el pipeline y medí el resultado\",\"segundos\":60}";
+            // Cada formato del banco v3 se responde a su manera; RespuestaV3 arma la que toque.
+            String cuerpo = RespuestaV3.para(p);
             mvc.perform(put("/api/v1/portal/evaluacion/" + codigoPostulacion + "/respuestas/" + p.get("id").asLong())
                             .header("Authorization", "Bearer " + tokenCandidato)
                             .contentType(MediaType.APPLICATION_JSON).content(cuerpo))
@@ -234,6 +237,7 @@ public class FlujoPruebaIT {
                 .andExpect(jsonPath("$[0].estado").value("PRUEBA_TURNO_CANDIDATO"));
     }
 
+    @DisplayName("El candidato rinde la prueba con su cronómetro")
     @Test
     @Order(3)
     void elCandidatoRindeLaPruebaConSuCronometro() throws Exception {
@@ -276,6 +280,7 @@ public class FlujoPruebaIT {
                 .andExpect(jsonPath("$[0].estado").value("PRUEBA_CALIFICANDO"));
     }
 
+    @DisplayName("El recorrido sigue sin saltos manuales")
     @Test
     @Order(4)
     void elRecorridoSigueSinSaltosManuales() throws Exception {
@@ -294,6 +299,7 @@ public class FlujoPruebaIT {
                 .andExpect(jsonPath("$[0].estado").value("SIMULACION_POR_HABILITAR"));
     }
 
+    @DisplayName("Talento califica la prueba criterio a criterio")
     @Test
     @Order(5)
     void talentoCalificaLaPruebaCriterioACriterio() throws Exception {
@@ -331,6 +337,7 @@ public class FlujoPruebaIT {
         assertThat(nota.get("version_pesos_id")).isNotNull();
     }
 
+    @DisplayName("Se salta lo que no aplica y se toma la decisión")
     @Test
     @Order(6)
     void seSaltaLoQueNoAplicaYSeDecide() throws Exception {
@@ -374,6 +381,7 @@ public class FlujoPruebaIT {
         assertThat(decision.get("decidida_por_usuario_id")).isNotNull();
     }
 
+    @DisplayName("Un intento vencido se entrega solo")
     @Test
     @Order(7)
     void unIntentoVencidoSeEntregaSolo() throws Exception {
