@@ -33,16 +33,21 @@ defecto es una de las formas más comunes de que entren a un servidor.
 Con `t4g.small` (2 GB) son ~$14, pero va justo: la JVM pide el 70% y la cola necesita su
 parte. Si eliges esa, pon `MEMORIA_APP=1500m` en el `.env`.
 
-### Por qué no Amazon MQ
+### La cola: Amazon MQ
 
-El broker gestionado más pequeño (`mq.t3.micro`) cuesta **unos $26 al mes: más que el propio
-servidor**, y duplicaría la factura. Esta cola es interna —solo la usa la aplicación para
-calificar en segundo plano, nadie se conecta desde fuera—, así que no hay nada que lo
-justifique.
+Renaser ya tenía el broker creado (`renaser-mq`, RabbitMQ 4.2, `mq.m7g.medium`), así que la
+aplicación lo usa en vez de levantar uno propio. Cuesta más que el servidor, y fue una
+decisión tomada a sabiendas.
 
-El día que haga falta —varias instancias de la aplicación, o alta disponibilidad de verdad—
-se cambian tres variables del `.env` por las del broker y se borra el servicio `rabbitmq` del
-compose. **La aplicación no se entera**: para ella es la misma cola.
+**Tres cosas que no son como en local** y rompen el arranque si se copian mal:
+
+- El puerto es **5671**, no 5672: Amazon MQ solo habla AMQPS.
+- Por lo mismo, `SPRING_RABBITMQ_SSL_ENABLED` va en **`true`**.
+- El `RABBITMQ_HOST` va **sin `amqps://` y sin puerto**. Spring arma la url solo; pegar el
+  endpoint entero da un fallo de resolución de nombre que no menciona el esquema.
+
+El usuario y la contraseña se pusieron al crear el broker y **no se pueden recuperar desde la
+API de AWS**: los usuarios de un broker RabbitMQ se gestionan dentro del propio RabbitMQ.
 
 ### Por qué no un balanceador
 
@@ -55,8 +60,9 @@ el certificado de Let's Encrypt solo, sin cron ni recordatorios, y va en el mism
 
 ### 1. Región
 
-Ponlo en **`us-west-2`**, que es donde está Supabase. En `us-east-1` es unos céntimos más
-barato pero cada consulta cruza el país: hay pantallas que hacen veinte consultas y se nota.
+**`us-east-1`**, porque es donde ya está el broker. Supabase está en `us-west-2`, así que cada
+consulta a la base cruza el país; si algún día se nota en las pantallas que hacen muchas
+consultas, lo que hay que mover es el broker, no el servidor.
 
 ### 2. El repositorio de imágenes
 

@@ -11,10 +11,12 @@ systemctl enable --now docker
 usermod -aG docker ec2-user
 
 # Compose v2 como plugin del propio Docker.
-mkdir -p /usr/libexec/docker/cli-plugins
+# Docker 25 busca los plugins en /usr/local/lib, no en /usr/libexec. Con la ruta vieja el
+# binario se descarga y «docker compose» sigue diciendo que no es un comando.
+mkdir -p /usr/local/lib/docker/cli-plugins
 curl -sSL "https://github.com/docker/compose/releases/latest/download/docker-compose-linux-aarch64" \
-  -o /usr/libexec/docker/cli-plugins/docker-compose
-chmod +x /usr/libexec/docker/cli-plugins/docker-compose
+  -o /usr/local/lib/docker/cli-plugins/docker-compose
+chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
 
 # Swap. La JVM en una maquina justa de memoria muere con un OOM del sistema, y ese error
 # no aparece en el log de la aplicacion: el contenedor simplemente desaparece. Con swap se
