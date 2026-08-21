@@ -54,13 +54,13 @@ informes de surefire y failsafe.
 
 | Qué | Cuántas | Necesita |
 |---|---:|---|
-| Unitarias, con dobles | 189 | nada |
-| Arquitectura | 7 | nada |
+| Unitarias, con dobles | 171 | nada |
+| Arquitectura | 8 | nada |
 | Las fórmulas del banco v3 | 20 | nada |
 | El validador de las respuestas v3 | 14 | nada |
 | Los dos agentes nuevos y sus puentes | 92 | nada |
 | El enlace de acceso y el correo | 26 | nada |
-| Integración, de punta a punta | 44 | Docker |
+| Integración, de punta a punta | 41 | Docker |
 | Migraciones contra Postgres real | 3 | Docker |
 | Contra el proveedor de verdad, y el envío de correo | 6 | Docker o SMTP, y su bandera |
 
@@ -86,12 +86,12 @@ no sirve para nada.
 
 ---
 
-## Las siete reglas de arquitectura
+## Las ocho reglas de arquitectura
 
 Están en `ArquitecturaTest` y no inventan nada: son las reglas que el `CLAUDE.md` ya tenía
 escritas en prosa. **Una regla en prosa se rompe sin que nadie se entere** —alguien añade un
 import, el código compila, las pruebas pasan y la frontera ya no existe— y eso es lo que
-estas siete impiden.
+estas ocho impiden.
 
 | Regla | Por qué importa |
 |---|---|
@@ -101,6 +101,7 @@ estas siete impiden.
 | **Solo la máquina de estados cambia el estado de una postulación** | La más cara de romper. Saltársela no da error: la postulación se mueve igual. Lo que desaparece es el registro de quién la movió y por qué, el correo al candidato y la auditoría |
 | Cada clase está en el paquete que su nombre promete | Quien busca un endpoint mira en `controller` |
 | Las entidades no salen por un endpoint | Una entidad publicada convierte cualquier columna nueva en un cambio de contrato |
+| Todo controlador nuevo está en la lista del candado de Swagger | Un endpoint que nadie apuntó ahí queda fuera del candado, y se publica sin que nadie lo haya decidido |
 | Nadie escribe en la consola a pelo | Lo que se imprime así no aparece en el registro, y el registro es lo único que queda cuando algo falla en producción |
 
 ### Las dos desviaciones que había, y ya no
@@ -113,7 +114,7 @@ tras un patrón genérico. Eso es lo que hizo que se arreglaran: una desviación
 decide, una escondida se olvida. Hoy los catálogos salen de `ServicioCatalogo` y el arranque
 del primer usuario del equipo de `ServicioAccesoEquipo`.
 
-**Las siete reglas no tienen excepciones.**
+**Las ocho reglas no tienen excepciones.**
 
 ---
 
