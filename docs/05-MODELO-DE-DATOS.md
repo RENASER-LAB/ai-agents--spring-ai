@@ -23,15 +23,17 @@ Sirve para tres cosas:
 - **Entender el sistema.** Un modelo de datos bien contado explica el negocio mejor que
   cualquier otro documento.
 
-**La base ya está construida.** Las migraciones `V1` a `V24` viven en
+**La base ya está construida.** Las migraciones `V1` a `V28` viven en
 `src/main/resources/db/migration` —**91 tablas de este módulo**, 94 en la base contando la de
 Flyway y las dos del motor de agentes— y Flyway es el dueño del esquema. Cambiar algo de aquí
 ya cuesta una migración nueva, y **una migración aplicada no se edita nunca**: se escribe otra
 encima.
 
-Las dos últimas son del banco de preguntas v3: `V20` reemplaza el banco entero y añade cinco
+Cuatro son del banco de preguntas v3: `V20` reemplaza el banco entero y añade cinco
 tablas (`rango_pregunta`, `campo_caso`, `multiplicador_bloque`, `umbral_nivel` y
-`filtro_eliminatorio`), y `V21` añade `respuesta.detalle`. Ver
+`filtro_eliminatorio`), `V21` añade `respuesta.detalle`, y `V25` y `V28` reparan lo que la
+importación del PDF dejó a medias (opciones que nunca se cargaron; etiquetas y enunciados
+cortados por el ancho de página). Ver
 [AVANCE-BANCO-V3-2026-08-19.md](AVANCE-BANCO-V3-2026-08-19.md).
 
 `V19__datos_del_cv_y_dos_pasadas.sql` trae `dato_cv`: quién es la persona según su
