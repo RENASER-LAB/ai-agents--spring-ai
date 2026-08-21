@@ -114,8 +114,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Fijada por SHA y no por «@v4», que es una etiqueta y se puede mover. Esta accion
+      # es la que pide las credenciales de AWS: si alguien se hiciera con el repositorio de
+      # la accion y reapuntara la etiqueta, ese codigo correria aqui con permiso para subir
+      # imagenes y lanzar comandos en el servidor. El SHA no se puede reapuntar.
+      #
+      # El SHA es el de v4 (7474bc4). Para subir de version: mirar el commit de la etiqueta
+      # nueva con «gh api repos/aws-actions/configure-aws-credentials/git/ref/tags/vN» y
+      # cambiar los dos, el hash y el comentario.
       - name: Pedirle permiso a AWS
-        uses: aws-actions/configure-aws-credentials@v4
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
         with:
           role-to-assume: arn:aws:iam::526338061654:role/github-despliegue
           aws-region: us-east-1
