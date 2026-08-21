@@ -26,8 +26,11 @@ python3 scripts/importar-banco-v3.py         > /tmp/banco-v3.json   # para revis
 python3 scripts/importar-banco-v3.py --sql   > /tmp/banco-v3.sql    # lo que va en la migración
 ```
 
-Termina en 0 y sin avisos. No toca la base: la salida se revisa y de ahí sale la migración,
-igual que hizo `importar-banco-maestro.py` con el v0.1.
+No toca la base: la salida se revisa y de ahí sale la migración, igual que hizo
+`importar-banco-maestro.py` con el v0.1. Hoy termina en 1 con una docena de avisos **sabidos y
+tolerados** (los cuatro EF-4 que en el documento arrancan directo en su tabla, los PC que no
+titulan su regla, y los dos enunciados que el parser no sabe leer enteros): son cosas a mirar,
+no fallos nuevos. Un aviso que no esté en esa lista sí lo es.
 
 **Las cuatro comprobaciones** salen de la sección 0.3 del propio documento y se recalculan
 desde lo parseado. Si el parser lee mal un peso o una clave, dejan de cuadrar:
@@ -239,3 +242,42 @@ califica con el motor viejo. Lo que no está es la puntuación v3 de verdad.
 3. Los cinco filtros eliminatorios y las banderas (inflación, rango implausible).
 4. Reescribir `detectarContradicciones` a la regla v3: −5% del global y bandera roja, en vez de
    la `diferencia_maxima` del v0.1, que los pares nuevos no usan.
+
+---
+
+## Los textos cortados · añadido el 21/08/2026
+
+**Qué se encontró.** La importación del PDF dejó texto cortado por el ancho de página en tres
+sitios, y ninguna comprobación lo vio: **24 etiquetas de `campo_caso`** a media lista de
+alternativas («medio día / un día o» sin el «más)», en C03, D05, D14, D22, D34 y O03),
+**29 enunciados de `pregunta`** a media frase —texto que el candidato lee tal cual—, y el
+defecto inverso: en los **31 CD "sueltos"** el primer campo se guardó con la pregunta entera
+pegada delante. En un CD las alternativas viven solo en la etiqueta (no hay filas en
+`opcion`), así que lo cortado no estaba en ninguna otra parte del esquema.
+
+**Por qué no lo vio nadie.** Las cinco comprobaciones del importador cuentan y no leen: siete
+campos cortados siguen siendo siete campos, y todos los totales cuadraban. El mismo agujero
+por el que pasaron las opciones ausentes que arregló la V25.
+
+**Qué lo arregla.**
+
+- `scripts/importar-banco-v3.py`: la rama numerada de los CD pliega las líneas de
+  continuación (`campos_numerados`), la rama suelta separa el preámbulo del primer campo, y
+  una **sexta comprobación** avisa de cualquier paréntesis sin pareja.
+- **`V28__etiquetas_y_enunciados_cortados_del_banco_v3.sql`** repara las bases ya cargadas:
+  completa con `starts_with` (nunca pisa una edición del panel) y recorta con igualdad
+  exacta del texto viejo.
+- `scripts/comparar-banco-v3-con-base.py` compara desde ahora lo guardado contra el PDF,
+  texto a texto, y es la red que las comprobaciones de conteo no pueden ser:
+
+```bash
+python3 scripts/comparar-banco-v3-con-base.py            # sale 0 si todo casa con el PDF
+python3 scripts/comparar-banco-v3-con-base.py --emitir-v28   # las tuplas, si hiciera falta otra vez
+```
+
+- `MigracionesIT` asevera desde CI que ningún texto del banco v3 queda con paréntesis sin
+  pareja, que es la firma del corte.
+
+Diez enunciados no los sabe leer enteros el parser (rompen en un «·» de la línea de
+continuación, o absorberían la fórmula): su texto se decidió leyendo el PDF y vive por
+duplicado en la V28 §3 y en `ENUNCIADOS_A_MANO` del comparador, que vigila que no se separen.
