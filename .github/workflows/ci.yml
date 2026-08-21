@@ -29,7 +29,7 @@ jobs:
     env:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # Historia completa: SonarCloud la necesita para saber qué líneas son nuevas
           fetch-depth: 0
@@ -69,7 +69,7 @@ jobs:
     name: análisis estático
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # Gitleaks revisa la historia, no solo el estado actual
           fetch-depth: 0
@@ -112,7 +112,7 @@ jobs:
       URL: https://18-204-177-210.nip.io
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Fijada por SHA y no por «@v4», que es una etiqueta y se puede mover. Esta accion
       # es la que pide las credenciales de AWS: si alguien se hiciera con el repositorio de
