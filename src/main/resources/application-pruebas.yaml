@@ -18,6 +18,46 @@ spring:
     username: ${SPRING_DATASOURCE_USERNAME}
     password: ${SPRING_DATASOURCE_PASSWORD}
 
+    # Supabase no corta por carga: corta por número de conexiones abiertas, y el proyecto
+    # tiene 30 para todo el equipo. Lo que no se reparta aquí lo reparte quien llegue
+    # primero, así que el reparto se escribe.
+    hikari:
+      # El aviso de Hikari empieza por el nombre del pool. Con el de fábrica
+      # («HikariPool-1») el registro de Render no dice si el que se quedó sin conexiones
+      # es este backend o cualquier otra cosa que arranque al lado.
+      pool-name: renaser-pruebas
+      # Doce de las treinta, contando UNA instancia de la aplicación. Las otras dieciocho
+      # son para las personas: psql, el panel de Supabase, la rama de otro.
+      #
+      # Doce no es poco para los ~50 del portal. Una consulta del portal dura milisegundos
+      # y devuelve la conexión enseguida, así que la misma conexión atiende a mucha gente
+      # seguida. Lo que agota un pool no es cuánta gente hay, sino el trabajo lento que
+      # retiene conexiones — y ese se limita más abajo, en los consumidores.
+      maximum-pool-size: 12
+      # El suelo. No se iguala al máximo —que es lo que recomienda Hikari cuando la base es
+      # tuya— justamente porque no lo es: de madrugada no tiene sentido reservar doce
+      # conexiones del cupo compartido para no usarlas. Con el mínimo por debajo del
+      # máximo, Hikari suelta las que sobran tras diez minutos quietas (su idle-timeout de
+      # fábrica) y vuelven al equipo. Cuatro y no cero para que la primera visita de la
+      # mañana no pague el abrir: contra Supabase, con TLS, abrir cuesta cientos de ms.
+      minimum-idle: 4
+      # Diez segundos esperando un hueco, no los treinta de fábrica. Si el pool está lleno
+      # es que algo va mal, y esperar treinta no lo arregla: solo apila peticiones y deja
+      # al candidato mirando una pantalla que no dice ni que sí ni que no. A los diez falla,
+      # el registro lo cuenta con el nombre del pool, y quien esté delante puede reintentar.
+      connection-timeout: 10000
+      # Quince minutos y a renovar, aunque la conexión parezca sana. La base ya no está en
+      # esta máquina: Supabase —y cualquier cortafuegos de AWS por el camino— cierra
+      # conexiones por su lado sin avisar, y la aplicación se entera al usarlas. El síntoma
+      # es el peor de todos: un fallo intermitente que solo aparece tras un rato de calma.
+      # Reciclarlas antes de que las cierre el otro extremo es lo que lo evita.
+      max-lifetime: 900000
+      # Cada cinco minutos Hikari toca las que están dormidas. Sin ese saludo, un NAT de
+      # AWS da por muerta una conexión callada y la corta en silencio; con él, la que ya no
+      # sirve se descubre dentro del pool y no en mitad de la petición de un candidato.
+      # Tiene que ser menor que max-lifetime, o Hikari lo desactiva sin más.
+      keepalive-time: 300000
+
   flyway:
     # El `true` global existe por la historia de la base LOCAL: agent_run ya existía
     # antes de adoptar Flyway. Aquí sería peligroso: si el esquema no está vacío —la
@@ -41,3 +81,16 @@ spring:
     virtual-host: ${RABBITMQ_VHOST}
     ssl:
       enabled: true
+    listener:
+      simple:
+        # Los ocho del archivo base salen de una base local que regala conexiones. Aquí no
+        # las regala nadie. Calificar a un candidato son varias idas y venidas a la base
+        # repartidas entre llamadas al modelo que duran decenas de segundos, y ocho o doce
+        # consumidores compitiendo por las mismas doce conexiones dejan esperando al
+        # portal por un trabajo de fondo que a nadie le corre prisa.
+        #
+        # Con cuatro de techo, los consumidores nunca pueden pedir más de un tercio del
+        # pool y al portal le quedan ocho pase lo que pase. Calificar una tanda tarda el
+        # doble; postularse sigue tardando lo mismo. Ese es el cambio que se acepta.
+        concurrency: 2
+        max-concurrency: 4

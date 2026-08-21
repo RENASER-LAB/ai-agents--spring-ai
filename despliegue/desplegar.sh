@@ -7,7 +7,11 @@
 # lo dice y para, en vez de dejar el servicio caido sin que nadie se entere.
 set -euo pipefail
 
-REGION="${REGION:-us-west-2}"
+# us-east-1 porque es donde estan el registro de imagenes y el broker. Si esto no coincide
+# con la region real, el login «funciona» —ECR da un token para cualquier region— y el
+# fallo aparece dos lineas mas abajo como «no basic auth credentials», que no menciona
+# la region por ningun lado.
+REGION="${REGION:-us-east-1}"
 CUENTA="$(aws sts get-caller-identity --query Account --output text)"
 
 echo "==> Entrando al registro"

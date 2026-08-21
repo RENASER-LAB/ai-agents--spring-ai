@@ -43,6 +43,18 @@ services:
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
       RABBITMQ_VHOST: ${RABBITMQ_VHOST:-/}
 
+      # Cuantos candidatos se califican a la vez.
+      #
+      # application-pruebas.yaml los deja en 2/4, que es lo prudente mientras el panel hace
+      # consultas caras: los consumidores compiten por las mismas conexiones que el portal.
+      # Con el N+1 de la bandeja arreglado eso deja de ser cierto, y a 2/4 la criba va a un
+      # quinto de su ritmo — medido: 3,9 trabajos por minuto contra 19,8.
+      #
+      # Va por variable y no en el yaml para poder subirlo o bajarlo sin reconstruir la
+      # imagen, que es justo lo que hace falta cuando hay una tanda esperando.
+      SPRING_RABBITMQ_LISTENER_SIMPLE_CONCURRENCY: ${IA_CONSUMIDORES:-8}
+      SPRING_RABBITMQ_LISTENER_SIMPLE_MAX_CONCURRENCY: ${IA_CONSUMIDORES_MAX:-12}
+
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
       GOOGLE_GEMINI_API_KEY: ${GOOGLE_GEMINI_API_KEY}
       JWT_SECRETO: ${JWT_SECRETO}
@@ -62,6 +74,13 @@ services:
       SPRING_MAIL_PORT: ${SPRING_MAIL_PORT:-587}
       SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME:-}
       SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD:-}
+      # Sin esto el envio falla contra cualquier proveedor serio en el 587. Gmail contesta
+      # «530-5.7.0 Must issue a STARTTLS command first», que no nombra ni el TLS ni la
+      # propiedad que falta. Van tambien en application.yaml; aqui estan para poder
+      # arreglarlo sin reconstruir la imagen.
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH:-true}
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE:-true}
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_REQUIRED: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_REQUIRED:-true}
 
       # Sin esto los correos saldrian con enlaces a localhost:5174.
       PORTAL_URL: ${PORTAL_URL}
