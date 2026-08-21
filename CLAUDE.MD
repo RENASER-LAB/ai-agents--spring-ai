@@ -68,11 +68,13 @@ Perfil Integral → prueba del puesto → simulacion → validacion → decision
 
 | | |
 |---|---|
-| Base de datos | **Flyway es el dueno del esquema**: V1-V23 en `src/main/resources/db/migration`, **85 tablas de este modulo** (88 en la base contando `flyway_schema_history` y las dos del motor de agentes, `agent_run` y `vector_store`). `ddl-auto: validate` |
+| Base de datos | **Flyway es el dueno del esquema**: V1-V24 en `src/main/resources/db/migration`, **91 tablas de este modulo** (94 en la base contando `flyway_schema_history` y las dos del motor de agentes, `agent_run` y `vector_store`). `ddl-auto: validate` |
 | Codigo | Veintiun paquetes de dominio bajo `ai_engine` (ver «Como esta organizado el codigo») |
 | Tests | **381, todos en verde (20/08/2026)**: 331 unitarios y 50 de integracion. Ver «Correr los tests»: unitarios de la maquina y del anonimizador, migraciones contra Postgres real (Testcontainers) y flujos de punta a punta: hito 1, evaluacion, prueba, simulacion/validacion y calificacion con IA |
 | IA que califica | **Seis de los diez agentes del catalogo estan implementados**: datos del curriculum, evidencia, evaluador, potencial/riesgo, prueba del puesto y las preguntas de la conversacion final. Todos corren por cola de RabbitMQ contra DeepSeek. Ver [Calificacion con IA](docs/CALIFICACION-CON-IA.md) |
-| Correo | Se registra en `correo_enviado` pero NO se envia: falta el dominio de Renaser (`EnviadorCorreoLog`) |
+| Correo | **Ya sabe salir de verdad** (`EnviadorCorreoSmtp`), pero **por defecto no sale**: `renaser.correo.transporte` vale `log` salvo que se ponga `smtp`, y entonces solo se registra en `correo_enviado`. Para encenderlo hacen falta `CORREO_TRANSPORTE=smtp`, `CORREO_REMITENTE` y una cuenta que autentique. El RNF-65 pide que salga **desde el dominio propio de Renaser**: confirmar con ellos si ya lo tienen antes de encenderlo |
+| Acceso del candidato | Entra al portal **con un enlace, sin contrasena** (`EnlaceAcceso`, `ServicioEnlaceAcceso`). El enlace se le manda por correo, asi que depende de lo de arriba |
+| Lo configurable | El plazo para responder la evaluacion dejo de estar en el codigo: es el parametro `dias_plazo_evaluacion` (14 por defecto, migracion `V22`). Se cuenta desde que sale la invitacion, no desde que se creo la evaluacion |
 | Identidad equipo | `dev-login` de desarrollo; el contrato de RENASER OS no existe aun (`ProveedorIdentidadEquipo`) |
 | Frontend | **Dos, y hacen cosas distintas.** Ver «Las dos pantallas» mas abajo |
 | Mockups | Los mantiene otra persona y **describen la version anterior** |
@@ -178,7 +180,7 @@ Las de integracion levantan su propio PostgreSQL y su propio RabbitMQ con Testco
 falta el demonio de Docker encendido. El desglose completo esta en
 [docs/COMPROBACIONES-AUTOMATICAS.md](docs/COMPROBACIONES-AUTOMATICAS.md).
 
-Entre las 331 hay **7 reglas de arquitectura con ArchUnit** (la frontera del motor, las capas y
+Entre las 331 hay **8 reglas de arquitectura con ArchUnit** (la frontera del motor, las capas y
 que el estado solo lo mueva la maquina — las mismas reglas que este archivo tiene en prosa).
 
 **El test que gasta dinero no corre solo**: `CalificacionIaRealIT` esta detras de
