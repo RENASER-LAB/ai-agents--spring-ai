@@ -85,6 +85,17 @@ REGLA_INTERNA = re.compile(
 ESCAPE_INV = re.compile('^(?:Nada|Ning\u00fan|Ningun|Ninguno|Ninguna|No aplica)',
                         re.IGNORECASE)
 
+# La tabla de validación con que algunos CD cierran. Sus renglones no son campos ni
+# continuación de uno: ahí terminan los campos. Ver campos_numerados.
+CIERRA_CAMPOS = re.compile(r'^\s*(?:Rangos?|Validaci[oó]n)\s*:')
+
+# Cómo declara un CD "suelto" cuántos campos tiene: «(7 campos)», «(6 campos × 3 = 18
+# campos):», «5 campos cada una:», «con 4 campos:». Todo lo anterior al final de esa
+# declaración es el enunciado del ítem, no el primer campo; sin este corte, el primer
+# campo de cada CD suelto salía con la pregunta entera pegada delante.
+DECLARACION_CAMPOS = re.compile(
+    r'\d+\s*campos(?:\s+cada\s+una)?(?:\s*[×x]\s*\d+)?(?:\s*=\s*\d+\s*campos)?\s*\)?\s*:?')
+
 avisos = []
 
 
@@ -306,6 +317,44 @@ def afirmaciones_de(cuerpo):
     return filas
 
 
+def campos_numerados(cuerpo):
+    """Los campos de un CD escritos como lista numerada (1. 2. 3.), enteros.
+
+    Cada campo trae sus alternativas entre paréntesis, y como son largas el PDF las parte
+    en dos o tres renglones: el primero abre con «N.» y los demás siguen indentados. La
+    primera versión de esta lectura se quedaba con el renglón del «N.» y tiraba el resto,
+    y así llegaron a producción 24 etiquetas cortadas a media lista —«medio día / un día o»
+    sin el «más)»— en seis ítems. Lo perdido eran justo las alternativas, que en un CD no
+    viven en ninguna otra tabla.
+
+    Un renglón indentado se absorbe al campo abierto. Cierran la absorción: el siguiente
+    «N.», una línea en blanco (cierra el campo pero se sigue buscando el siguiente número,
+    por si un salto de página se metió en medio), la tabla de «Rangos:»/«Validación:» y la
+    regla interna del ítem. Los rótulos de tabla y las columnas de números sueltos se
+    saltan, igual que en el resto de lecturas.
+    """
+    campos, abierto = [], False
+    for linea in cuerpo:
+        limpia = linea.strip()
+        if not limpia:
+            abierto = False
+            continue
+        if CIERRA_CAMPOS.match(linea) or REGLA_INTERNA.match(limpia):
+            abierto = False
+            continue
+        if CABECERA_TABLA.match(linea) or SOLO_NUMERO.match(linea):
+            continue
+        m = re.match(r'^\s*(\d+)\.\s+(\S.*)$', linea)
+        if m:
+            campos.append(m.group(2).strip())
+            abierto = True
+        elif abierto and linea[:1] in (' ', '\t', '\f'):
+            campos[-1] += ' ' + COLA_COLUMNA.sub('', linea).strip()
+        else:
+            abierto = False
+    return campos
+
+
 def opciones_pc(cuerpo):
     """Lo que el candidato elige en un par de consistencia.
 
@@ -401,16 +450,30 @@ def parsear_contenido(codigo, formato, cuerpo, enunciado):
         # "(5 campos × 3)", "(6 campos × 3 = 18 campos)" y "5 campos cada una". En todas,
         # el número que interesa es el primero: los demás son la multiplicación por caso.
         declarados = re.search(r'(\d+)\s*campos?', texto)
-        numerados = re.findall(r'^\s*(\d+)\.\s+(\S.*)$', texto, re.M)
+        numerados = campos_numerados(cuerpo)
         esperados = int(declarados.group(1)) if declarados else None
         rangos = re.search(r'^\s*(?:Rangos?|Validaci[oó]n):\s*(.+)$', texto, re.M)
+        preambulo = None
         if numerados:
-            campos, cuadra = [c[1].strip() for c in numerados], len(numerados) == esperados
+            campos, cuadra = numerados, len(numerados) == esperados
         else:
             sueltos = [c.strip() for c in re.split(r'\s·\s', texto.replace('\n', ' '))
                        if c.strip()]
+            # El primer trozo llega con el enunciado pegado delante («Tu día típico.
+            # (5 campos) Hora en que despiertas ___»): la pregunta y el primer campo van
+            # corridos en el documento y el '·' solo separa campos entre sí. El corte es
+            # el final de la declaración de campos, que en todos los ítems sueltos existe.
+            m = None
+            for m in DECLARACION_CAMPOS.finditer(sueltos[0] if sueltos else ''):
+                pass                                  # interesa la última aparición
+            if m and sueltos[0][m.end():].strip():
+                preambulo = sueltos[0][:m.end()].strip()
+                sueltos[0] = sueltos[0][m.end():].strip()
+            elif sueltos:
+                aviso(codigo, 'CD suelto sin declaración de campos reconocible: el primer '
+                              'campo puede llevar el enunciado pegado')
             campos, cuadra = sueltos, esperados is not None and len(sueltos) >= 2
-        return ({'campos_esperados': esperados, 'campos': campos,
+        return ({'campos_esperados': esperados, 'campos': campos, 'preambulo': preambulo,
                  'rangos': rangos.group(1).strip() if rangos else None}, cuadra)
 
     if formato == 'V':
@@ -576,6 +639,12 @@ def emitir_sql(items):
               for n, campo in enumerate(it['contenido'].get('campos', []), 1)]
     if campos:
         out += ['', '-- CD · los campos de cada caso, en orden']
+        # El recorte a 500 existe por prudencia y nunca debería actuar: si actúa es que el
+        # plegado de continuaciones absorbió algo que no era del campo, y callarlo sería
+        # repetir el fallo de los campos cortados, solo que al revés.
+        for c, n, txt in campos:
+            if len(txt) > 500:
+                aviso(c, f'el campo {n} pasa de 500 caracteres y la migración lo recortaría')
         filas = [f'    ({lit(c)}, {n}, {lit(txt[:500])})' for c, n, txt in campos]
         out.append(
             'INSERT INTO campo_caso (pregunta_id, orden, etiqueta)\n'
@@ -629,6 +698,16 @@ def main():
         enunciado = enunciado_de(cuerpo)
         contenido, ok = ({}, True) if not formato else parsear_contenido(
             codigo, formato, cuerpo, enunciado)
+        # En los CD sueltos el preámbulo separado del primer campo ES el enunciado. Hoy los
+        # dos caminos leen lo mismo, pero si una edición futura del PDF parte la declaración
+        # de campos de forma que enunciado_de rompa antes (su parada en ' · '), el preámbulo
+        # trae la versión entera. Solo se adopta si extiende (o iguala) lo ya leído: si
+        # difieren de raíz, manda lo conservador.
+        preambulo = contenido.get('preambulo')
+        if preambulo:
+            preambulo = re.sub(r'\s+', ' ', preambulo)
+            if preambulo.startswith(enunciado):
+                enunciado = preambulo
         if not enunciado:
             aviso(codigo, "sin enunciado: en el documento el ítem arranca directo en su tabla")
         if not ok:
@@ -687,6 +766,26 @@ def main():
     if mudos:
         aviso('varios', 'se quedan sin opciones y así no se pueden responder: '
                         + ', '.join(mudos))
+
+    # --- la sexta: ningún texto cortado a media frase ---
+    # Las cinco de arriba cuentan; ninguna lee. Así llegaron a producción 24 etiquetas de
+    # campo y una tanda de enunciados cortados por el ancho de página del PDF: siete campos
+    # cortados siguen siendo siete campos y todos los totales cuadran. Un paréntesis que se
+    # abre y no se cierra es la firma de ese corte, porque las alternativas viven entre
+    # paréntesis. Lo que este heurístico no ve: un corte fuera de paréntesis (un enunciado
+    # que termina en «los últimos 3» pasa limpio); para eso está
+    # scripts/comparar-banco-v3-con-base.py, que compara contra la base ya cargada.
+    desparejados = []
+    for x in items:
+        textos = [('enunciado', x['enunciado'])] + [
+            (f'campo {n}', c)
+            for n, c in enumerate(x['contenido'].get('campos') or [], 1)]
+        for donde, t in textos:
+            if t and t.count('(') != t.count(')'):
+                desparejados.append(f'{x["codigo"]} ({donde})')
+    if desparejados:
+        aviso('varios', 'paréntesis sin pareja, huele a texto cortado: '
+                        + ', '.join(desparejados))
 
     repes = {c for c in (x['codigo'] for x in items)
              if [y['codigo'] for y in items].count(c) > 1}
