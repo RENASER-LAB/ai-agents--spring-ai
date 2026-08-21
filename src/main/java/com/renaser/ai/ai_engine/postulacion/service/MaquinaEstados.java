@@ -8,6 +8,8 @@ import com.renaser.ai.ai_engine.postulacion.repository.PostulacionRepository;
 import com.renaser.ai.ai_engine.postulacion.repository.TransicionEstadoRepository;
 
 import com.renaser.ai.ai_engine.auditoria.service.ServicioAuditoria;
+import com.renaser.ai.ai_engine.notificacion.service.DireccionDelCandidato;
+import com.renaser.ai.ai_engine.postulacion.service.ServicioEnlaceAcceso;
 import com.renaser.ai.ai_engine.notificacion.service.ServicioCorreo;
 import com.renaser.ai.ai_engine.usuario.entity.Persona;
 import com.renaser.ai.ai_engine.usuario.repository.PersonaRepository;
@@ -17,6 +19,7 @@ import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
 import com.renaser.ai.ai_engine.vacante.entity.Vacante;
 import com.renaser.ai.ai_engine.vacante.repository.VacanteRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,6 +35,7 @@ import java.util.Optional;
 // Ver docs/03-ESTADOS-POSTULACION.md.
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class MaquinaEstados {
 
     // El orden de los momentos dentro de una etapa es fijo por diseño
@@ -46,6 +50,8 @@ public class MaquinaEstados {
     private final VacanteRepository vacantes;
     private final ServicioAuditoria auditoria;
     private final ServicioCorreo correo;
+    private final DireccionDelCandidato direcciones;
+    private final ServicioEnlaceAcceso enlaces;
 
     // ============ El cálculo, puro y testeable ============
 
@@ -204,10 +210,35 @@ public class MaquinaEstados {
         String vacante = vacantes.findById(postulacion.getVacanteId())
                 .map(Vacante::getTitulo).orElse("");
 
-        correo.enviar(postulacion.getOrganizacionId(), usuario.getId(), usuario.getCorreo(), plantilla,
+        // La direccion de la cuenta no siempre se puede entregar: a los candidatos que
+        // entraron como una carpeta de curriculums se les invento una. Ver DireccionDelCandidato.
+        String destino = direcciones.de(usuario, postulacion.getId());
+
+        // Y el aviso lleva por donde entrar, no solo la noticia.
+        //
+        // Sin esto el correo decia «entra a tu panel» y no daba ni la direccion ni la forma:
+        // a estos candidatos les creo la cuenta el cargador de curriculums, con una
+        // contrasena que nadie les dijo. Diecinueve personas recibieron un aviso que no
+        // podian atender, y el fallo no daba ninguna senal — el correo salio, se registro
+        // como ENVIADO, y simplemente no servia para nada.
+        //
+        // El enlace se genera al avisar y no antes: cada uno reemplaza al anterior, asi que
+        // el que vale es siempre el del ultimo correo que recibio.
+        String enlace = "";
+        try {
+            enlace = enlaces.generarEnlace(postulacion.getId()).url();
+        } catch (RuntimeException e) {
+            // Que falle el enlace no puede tumbar la transicion: la postulacion ya avanzo y
+            // deshacerlo por un correo seria peor. Se avisa igual, sin enlace, y queda escrito.
+            log.error("No se pudo crear el enlace de acceso de la postulacion {}: {}",
+                    postulacion.getId(), e.getMessage());
+        }
+
+        correo.enviar(postulacion.getOrganizacionId(), usuario.getId(), destino, plantilla,
                 Map.of("nombre", nombre == null ? "" : nombre,
                        "vacante", vacante,
                        "estado", nuevo.getNombre(),
+                       "enlace", enlace,
                        "codigo", String.valueOf(postulacion.getUuid())));
     }
 }

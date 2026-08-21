@@ -41,6 +41,31 @@ spring:
       max-file-size: 10MB
       max-request-size: 12MB
 
+  # El correo sale por SMTP con TLS, y esto es lo que lo enciende.
+  #
+  # El host, el puerto y las credenciales viven en application-secrets.yaml porque son de
+  # cada cual; esto no es secreto y ademas es obligatorio, asi que va aqui y no se olvida.
+  #
+  # ⚠️ Sin starttls el envio falla contra CUALQUIER proveedor serio en el puerto 587. Gmail
+  # contesta «530-5.7.0 Must issue a STARTTLS command first», que no dice ni la palabra TLS
+  # ni que falte una propiedad. Costo diecinueve correos que cambiaron de estado a los
+  # candidatos y no le llegaron a ninguno: el sistema los dio por avisados y estaban
+  # esperando un correo que nunca salio.
+  mail:
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            # Y ademas exigido: con «enable» a secas, si el servidor no ofrece TLS el
+            # cliente sigue en claro. Preferimos que falle a mandar un curriculum sin cifrar.
+            required: true
+      # Que no se quede colgado media hora si el servidor de correo no contesta.
+      "mail.smtp.connectiontimeout": 10000
+      "mail.smtp.timeout": 10000
+      "mail.smtp.writetimeout": 10000
+
   rabbitmq:
     # El broker de desarrollo, el del docker-compose. Para apuntar a otro —CloudAMQP, o el
     # que haya en produccion— se sobreescriben host, puerto, usuario, contrasena, vhost y
@@ -117,6 +142,30 @@ renaser:
       # 4096 truncaba el envelope: V4 Pro razona y esos tokens cuentan como salida.
       max-tokens: 16384
       max-intentos: 3
+      # Cuanta libertad tiene el modelo al elegir cada palabra.
+      #
+      # Hasta el 20/08/2026 esto no estaba fijado en ningun sitio y todas las llamadas salian
+      # con el valor por defecto del proveedor, que no es cero: el mismo curriculum calificado
+      # dos veces dio 71,00 y 58,50. Cero para todo lo que pone una nota, porque un candidato
+      # puede reclamar y hay que poder repetir la corrida.
+      #
+      # No es lo mismo que reproducibilidad exacta, y no hay que venderlo asi. Lee el javadoc
+      # de PoliticaDeterminismoImpl: cero es necesario, no suficiente.
+      temperatura-puntuacion: 0.0
+      # La del agente SIMULACION, que no puntua: escribe las preguntas de la conversacion
+      # final para que las lea una persona. A cero saldrian planas y calcadas entre
+      # candidatos, que es justo lo que no sirve en una entrevista.
+      temperatura-redaccion: 1.0
+      # La semilla de los que puntuan. Fija y siempre la misma; el numero es la fecha en que
+      # se decidio, y da igual cual sea mientras no cambie.
+      #
+      # ⚠️ Hoy NO llega al proveedor: Spring AI 2.0 no tiene campo seed en las opciones de
+      # DeepSeek y la API de DeepSeek tampoco lo acepta. Queda decidida y versionada para el
+      # dia que se pueda mandar. Nadie debe leer esto como «las corridas estan sembradas».
+      semilla: 20260820
+      #
+      # top_p NO se toca a proposito: DeepSeek documenta que se mueve temperature O top_p, no
+      # los dos. El proyecto nunca lo fijo y asi se queda.
     # Los tres agentes que califican una postulación del hito 2 de selección
     calificacion:
       # Apagarla deja la postulación en PERFIL_CALIFICANDO sin encolar nada. Se usa en las

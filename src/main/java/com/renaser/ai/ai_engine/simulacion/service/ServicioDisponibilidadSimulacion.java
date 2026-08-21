@@ -1,5 +1,6 @@
 package com.renaser.ai.ai_engine.simulacion.service;
 
+import com.renaser.ai.ai_engine.notificacion.service.DireccionDelCandidato;
 import com.renaser.ai.ai_engine.notificacion.service.ServicioCorreo;
 import com.renaser.ai.ai_engine.postulacion.entity.Postulacion;
 import com.renaser.ai.ai_engine.postulacion.repository.PostulacionRepository;
@@ -58,6 +59,7 @@ public class ServicioDisponibilidadSimulacion {
     private final PersonaRepository personas;
     private final MaquinaEstados maquina;
     private final ServicioCorreo correo;
+    private final DireccionDelCandidato direcciones;
 
     /**
      * Vuelve a mirar las postulaciones de las vacantes que toca esta sesión y las coloca donde
@@ -128,7 +130,8 @@ public class ServicioDisponibilidadSimulacion {
         if (usuario == null) return;
         String nombre = personas.findById(usuario.getPersonaId()).map(Persona::getNombre).orElse("");
         String vacante = vacantes.findById(postulacion.getVacanteId()).map(Vacante::getTitulo).orElse("");
-        correo.enviar(postulacion.getOrganizacionId(), usuario.getId(), usuario.getCorreo(), plantilla,
+        correo.enviar(postulacion.getOrganizacionId(), usuario.getId(),
+                direcciones.de(usuario, postulacion.getId()), plantilla,
                 Map.of("nombre", nombre == null ? "" : nombre, "vacante", vacante));
     }
 }
