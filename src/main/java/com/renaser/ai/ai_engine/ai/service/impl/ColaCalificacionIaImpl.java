@@ -27,42 +27,63 @@ import java.util.stream.Collectors;
 public class ColaCalificacionIaImpl implements ColaCalificacionIa {
 
     /**
-     * El orden de la fila. Es una lista y no un campo en la base porque es una decisión de
-     * diseño, no de configuración: el Perfil de Talento no puede armarse antes de que estén
-     * las notas que resume, y eso no lo cambia nadie desde un panel.
+     * Los tres que arman el retrato y <b>no dependen unos de otros</b>, así que van a la vez.
+     *
+     * <p>Se comprobó mirando qué lee y qué escribe cada uno: la ficha de datos y las notas
+     * del currículum salen las dos del mismo texto recortado y se guardan en tablas
+     * distintas —{@code dato_cv} y {@code nota_criterio}—, y el evaluador ni siquiera abre el
+     * currículum: lee las respuestas de la evaluación y escribe {@code nota_respuesta}.
+     * Ninguno de los tres mira lo que dejó otro.
+     *
+     * <p>En fila cada uno esperaba a que el anterior terminara de hablar con el proveedor, y
+     * calificar a un candidato costaba ocho minutos y medio. A la vez cuesta lo que cueste el
+     * más lento.
+     *
+     * <p>Es una lista y no un campo en la base porque es una decisión de diseño, no de
+     * configuración: quién depende de quién no lo cambia nadie desde un panel.
      */
-    private static final List<String> ORDEN = List.of(
+    private static final List<String> A_LA_VEZ = List.of(
             AgenteDatosCv.CODIGO_AGENTE, AgenteEvidenciaCv.CODIGO_AGENTE,
-            AgenteEvaluador.CODIGO_AGENTE, AgentePotencialRiesgo.CODIGO_AGENTE);
+            AgenteEvaluador.CODIGO_AGENTE);
 
     /**
-     * La fila de la primera pasada. Empieza sacando los datos del candidato —que no cuestan
-     * casi nada y son lo que hace legible la tabla— y no pasa por el evaluador, porque en
-     * una criba nadie ha respondido todavía.
+     * Los que van a la vez en la primera pasada. No entra el evaluador, porque en una criba
+     * nadie ha respondido todavía.
      */
-    private static final List<String> ORDEN_RAPIDA = List.of(
-            AgenteDatosCv.CODIGO_AGENTE, AgenteEvidenciaCv.CODIGO_AGENTE, AgentePotencialRiesgo.CODIGO_AGENTE);
+    private static final List<String> A_LA_VEZ_RAPIDA = List.of(
+            AgenteDatosCv.CODIGO_AGENTE, AgenteEvidenciaCv.CODIGO_AGENTE);
 
     /**
      * El que cierra la etapa, y por eso el que dice si la calificación llegó al final.
      *
-     * <p>Es el mismo en las dos filas y tiene que seguir siéndolo: es quien arma el Perfil de
-     * Talento y mueve la postulación a {@code PERFIL_POR_CONFIRMAR}.
+     * <p>Es el único que sí depende de los demás: arma el Perfil de Talento con lo que ellos
+     * dejaron. Es el mismo en las dos pasadas y tiene que seguir siéndolo, porque además es
+     * quien mueve la postulación a {@code PERFIL_POR_CONFIRMAR}.
      */
     private static final String ULTIMO = AgentePotencialRiesgo.CODIGO_AGENTE;
 
     /**
-     * Los dos que no van en fila con nadie.
+     * Los cuatro del retrato: los que van a la vez más el que cierra.
      *
-     * <p>Cada uno atiende una etapa posterior —la prueba del puesto y la simulación— y se
-     * pide a mano, así que su «fila» tiene un solo paso. Se escriben igual que las otras dos
-     * listas para que {@code encolar} no necesite un camino aparte.
+     * <p>Sirve para una sola cosa —saber qué trabajos hablan del retrato y cuáles son de otra
+     * etapa— y por eso incluye al evaluador aunque la pasada rápida no lo use.
      */
-    private static final List<String> SOLO_LA_PRUEBA = List.of(AgentePruebaPuesto.CODIGO_AGENTE);
-    private static final List<String> SOLO_LAS_PREGUNTAS = List.of(AgenteSimulacion.CODIGO_AGENTE);
+    private static final List<String> DEL_RETRATO = List.of(
+            AgenteDatosCv.CODIGO_AGENTE, AgenteEvidenciaCv.CODIGO_AGENTE,
+            AgenteEvaluador.CODIGO_AGENTE, AgentePotencialRiesgo.CODIGO_AGENTE);
 
     public static final String RAPIDA = "RAPIDA";
     public static final String FINA = "FINA";
+
+    /** Qué hacer con un paso concreto cuando se mira la tanda. */
+    private enum Situacion {
+        /** Nunca se hizo, falló, o quedó viejo: hay que ponerlo en la cola. */
+        HAY_QUE_ENCOLARLO,
+        /** Está pendiente o corriendo. Ni se toca ni se da por terminado. */
+        ESTA_VIVO,
+        /** Ya está al día, o no tenía nada que hacer y se salta. */
+        NO_HACE_FALTA
+    }
 
     private final TrabajoIaRepository trabajos;
     private final RegistroTrabajosIa registro;
@@ -99,13 +120,13 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
                     + "se queda en PERFIL_CALIFICANDO", postulacionId);
             return false;
         }
-        return encolar(postulacionId, ORDEN, FINA, 0, null);
+        return encolarElRetrato(postulacionId, FINA);
     }
 
     @Override
     public boolean encolarCribaCv(Long postulacionId) {
         // Arranca por el mismo sitio: la diferencia no la decide quien llama, la decide el
-        // candidato. Si no hay evaluación entregada, la fila se salta sola al evaluador.
+        // candidato. Si no hay evaluación entregada, el evaluador se salta solo.
         return encolarPerfilIntegral(postulacionId);
     }
 
@@ -114,7 +135,7 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
         if (apagada(postulacionId)) {
             return false;
         }
-        return encolar(postulacionId, ORDEN_RAPIDA, RAPIDA, 0, null);
+        return encolarElRetrato(postulacionId, RAPIDA);
     }
 
     @Override
@@ -122,7 +143,7 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
         if (apagada(postulacionId)) {
             return false;
         }
-        return encolar(postulacionId, ORDEN, FINA, 0, null);
+        return encolarElRetrato(postulacionId, FINA);
     }
 
     @Override
@@ -130,7 +151,7 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
         if (apagada(postulacionId)) {
             return false;
         }
-        return encolar(postulacionId, SOLO_LA_PRUEBA, FINA, 0, null);
+        return encolarSuelto(postulacionId, AgentePruebaPuesto.CODIGO_AGENTE);
     }
 
     @Override
@@ -138,7 +159,7 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
         if (apagada(postulacionId)) {
             return false;
         }
-        return encolar(postulacionId, SOLO_LAS_PREGUNTAS, FINA, 0, null);
+        return encolarSuelto(postulacionId, AgenteSimulacion.CODIGO_AGENTE);
     }
 
     private boolean apagada(Long postulacionId) {
@@ -150,9 +171,9 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
         return false;
     }
 
-    /** Qué fila sigue este trabajo, según de qué pasada sea. */
-    private List<String> ordenDe(String modo) {
-        return RAPIDA.equals(modo) ? ORDEN_RAPIDA : ORDEN;
+    /** Los que van a la vez en esta pasada. */
+    private List<String> aLaVezDe(String modo) {
+        return RAPIDA.equals(modo) ? A_LA_VEZ_RAPIDA : A_LA_VEZ;
     }
 
     @Override
@@ -172,13 +193,21 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
         try {
             agente.ejecutar(trabajo);
             registro.terminar(trabajoIaId);
-            encolarSiguiente(trabajo);
+            intentarElRetrato(trabajo);
         } catch (RuntimeException e) {
             // Nunca se guarda una nota inventada ni se mueve la postulación: solo se anota
             // el fallo y, si queda intento, se vuelve a poner en la cola.
             if (registro.fallar(trabajoIaId, maxIntentos, mensaje(e))) {
                 publicador.publicar(trabajoIaId);
+                return;
             }
+            // Se agotaron los intentos y este paso ya no va a dar nada. Aquí está el arreglo
+            // que más se nota: antes la fila se cortaba justo aquí y el candidato se quedaba
+            // en PERFIL_CALIFICANDO para siempre —con su examen de cincuenta preguntas ya
+            // calificado y sin nadie que armara el retrato— porque su currículum era un PDF
+            // escaneado del que no sale texto. Pasa en cuatro de cada ciento dieciséis. El
+            // retrato tiene que salir igual, con lo que sí se pudo leer.
+            intentarElRetrato(trabajo);
         }
     }
 
@@ -214,7 +243,7 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
         // filtro, pedir las preguntas de la simulación dejaría el ranking entero diciendo
         // «en curso» por un trabajo que no tiene nada que ver con la nota que enseña.
         List<TrabajoIa> suyos = todos.stream()
-                .filter(t -> ORDEN.contains(t.getAgenteCodigo()))
+                .filter(t -> DEL_RETRATO.contains(t.getAgenteCodigo()))
                 .toList();
         if (suyos.isEmpty()) {
             return "SIN_EMPEZAR";
@@ -240,7 +269,9 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
 
         // Terminó cuando el que cierra la etapa terminó. No se cuentan los trabajos: una
         // criba de currículum tiene menos, porque el evaluador no tenía nada que puntuar, y
-        // contar diría «en curso» para siempre.
+        // contar diría «en curso» para siempre. Desde que los tres primeros van a la vez hay
+        // una razón más: uno de ellos puede haber fallado y el retrato haberse armado igual
+        // con menos evidencia, y eso es una calificación terminada, no una fallida.
         //
         // Y esto se mira ANTES que los fallos, no después: quien falló y luego salió bien
         // al reintentar arrastra su fila fallida para siempre, y preguntar primero por el
@@ -296,78 +327,123 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
     }
 
     /**
-     * El siguiente de la fila, cuando uno acaba de terminar.
+     * Pone en la cola la tanda del retrato: los que van a la vez, todos de golpe.
      *
-     * <p>Si no queda ninguno, no hay nada que encolar: la postulación ya está en
-     * {@code PERFIL_POR_CONFIRMAR}, esperando a una persona.
-     */
-    private void encolarSiguiente(TrabajoIa terminado) {
-        List<String> orden = ordenDe(terminado.getModo());
-        int posicion = orden.indexOf(terminado.getAgenteCodigo());
-        if (posicion < 0) {
-            return;
-        }
-        // Se pasa el id del que acaba de terminar: lo que venga después y ya estuviera hecho
-        // de una vuelta anterior se calculó sin este resultado, así que se rehace.
-        encolar(terminado.getPostulacionId(), orden, terminado.getModo(),
-                posicion + 1, terminado.getId());
-    }
-
-    /**
-     * Pone en la cola el paso que toca, mirando la fila desde {@code desde}.
+     * <p><b>El que cierra no se encola aquí.</b> Lo dispara quien termine el último, mirando
+     * la base. Encolarlo ahora lo armaría con la mitad de lo que va a haber.
      *
      * @return true si algo quedó encolado de verdad
      */
-    private boolean encolar(Long postulacionId, List<String> orden, String modo,
-                            int desde, Long alimentadoPor) {
-        Optional<String> agente = pasoQueToca(postulacionId, orden, modo, desde, alimentadoPor);
-        if (agente.isEmpty()) {
+    private boolean encolarElRetrato(Long postulacionId, String modo) {
+        boolean alguienVivo = false;
+        boolean alguienIntentado = false;
+        boolean alguienEncolado = false;
+
+        for (String agente : aLaVezDe(modo)) {
+            switch (situacionDe(postulacionId, agente, modo, null)) {
+                case ESTA_VIVO -> alguienVivo = true;
+                case HAY_QUE_ENCOLARLO -> {
+                    alguienIntentado = true;
+                    alguienEncolado |= crearYAvisar(postulacionId, agente, modo, null);
+                }
+                case NO_HACE_FALTA -> { }
+            }
+        }
+
+        if (alguienVivo || alguienIntentado) {
+            return alguienEncolado;
+        }
+
+        // Ninguno de los tres tiene nada que hacer y aun así alguien pidió calificar. O el
+        // retrato falló, o se quedó sin hacer —una tanda de cuando esto era una fila y se
+        // cortaba en el primer fallo—. La barrera lo resuelve mirando la base: si de verdad
+        // falta, lo crea; y si no falta, preguntarlo no cuesta nada.
+        return dispararElRetrato(postulacionId, modo, null);
+    }
+
+    /**
+     * Los dos que no van con nadie: la prueba del puesto y las preguntas de la conversación.
+     *
+     * <p>Cada uno atiende una etapa posterior y se pide a mano. Se mira igual que los demás
+     * para no pagarlos dos veces, pero detrás de ellos no va nadie.
+     */
+    private boolean encolarSuelto(Long postulacionId, String agente) {
+        if (situacionDe(postulacionId, agente, FINA, null) != Situacion.HAY_QUE_ENCOLARLO) {
             return false;
         }
+        return crearYAvisar(postulacionId, agente, FINA, null);
+    }
+
+    /**
+     * La barrera, vista desde fuera: si el que acaba de terminar era uno de los que van a la
+     * vez, se pregunta si ya se puede armar el retrato.
+     *
+     * <p>Se llama tanto cuando el agente sale bien como cuando se agota en reintentos, y por
+     * la misma razón: en los dos casos ese paso ya no va a dar nada más, y si era el último
+     * que quedaba vivo, el retrato tiene que salir.
+     *
+     * <p><b>Preguntan los tres, no solo el que cree ser el último</b>, porque desde aquí no
+     * hay forma de saber quién es el último: los tres corren a la vez y pueden estar en
+     * instancias distintas. Quien contesta es la base, y contesta que sí una sola vez.
+     */
+    private void intentarElRetrato(TrabajoIa acabado) {
+        if (!aLaVezDe(acabado.getModo()).contains(acabado.getAgenteCodigo())) {
+            // El que cierra la etapa y los dos sueltos no tienen a nadie detrás.
+            return;
+        }
+        dispararElRetrato(acabado.getPostulacionId(), acabado.getModo(), acabado.getId());
+    }
+
+    private boolean dispararElRetrato(Long postulacionId, String modo, Long alimentadoPor) {
+        Long organizacionId = puente.organizacionDe(postulacionId);
+        Optional<TrabajoIa> creado = registro.crearElRetratoSiLosDemasAcabaron(
+                organizacionId, postulacionId, aLaVezDe(modo), ULTIMO, modo, alimentadoPor);
+        creado.ifPresent(trabajo -> publicador.publicar(trabajo.getId()));
+        return creado.isPresent();
+    }
+
+    private boolean crearYAvisar(Long postulacionId, String agente, String modo,
+                                 Long alimentadoPor) {
         Long organizacionId = puente.organizacionDe(postulacionId);
         Optional<TrabajoIa> creado = registro.crearSiHaceFalta(
-                organizacionId, postulacionId, agente.get(), modo, alimentadoPor);
+                organizacionId, postulacionId, agente, modo, alimentadoPor);
         creado.ifPresent(trabajo -> publicador.publicar(trabajo.getId()));
         return creado.isPresent();
     }
 
     /**
-     * Cuál es el primer paso de la fila que de verdad hay que hacer.
+     * En qué situación está un paso concreto de la tanda.
      *
-     * <p><b>Recorre la fila en vez de mirar solo el primero</b>, y eso arregla el fallo más
-     * caro que tenía esto: un candidato ya cribado que después entregaba su evaluación se
-     * quedaba en «calificando» para siempre. Se pedía la calificación, el primer paso ya
-     * estaba TERMINADO de la criba, no se encolaba nada, y ningún botón lo rescataba.
+     * <p><b>Se pregunta antes de crear nada</b>, y eso arregla el fallo más caro que tuvo
+     * esto: un candidato ya cribado que después entregaba su evaluación se quedaba en
+     * «calificando» para siempre. Ahora los pasos ya hechos se dan por hechos y el que falta
+     * se encola solo, sin que ningún botón tenga que rescatarlo.
      *
-     * <p>Se detiene en cuanto encuentra un paso vivo: si hay uno en marcha la fila sigue
-     * sola, y adelantarse pagaría dos veces por el mismo candidato.
+     * <p>Un paso vivo tampoco se toca: hay uno en marcha y adelantarse pagaría dos veces por
+     * el mismo candidato.
      */
-    private Optional<String> pasoQueToca(Long postulacionId, List<String> orden, String modo,
-                                         int desde, Long alimentadoPor) {
-        for (int i = desde; i < orden.size(); i++) {
-            String agente = orden.get(i);
-            if (seSalta(postulacionId, agente)) {
-                continue;
-            }
-            Optional<TrabajoIa> ultimo = trabajos
-                    .findFirstByPostulacionIdAndAgenteCodigoAndModoOrderByIdDesc(
-                            postulacionId, agente, modo);
-            if (ultimo.isEmpty()) {
-                return Optional.of(agente);
-            }
-            String estado = ultimo.get().getEstado();
-            if ("PENDIENTE".equals(estado) || "EN_CURSO".equals(estado)) {
-                return Optional.empty();
-            }
-            if ("FALLIDO".equals(estado)) {
-                return Optional.of(agente);
-            }
-            // TERMINADO: solo se rehace si se hizo antes que aquello de lo que depende.
-            if (alimentadoPor != null && ultimo.get().getId() < alimentadoPor) {
-                return Optional.of(agente);
-            }
+    private Situacion situacionDe(Long postulacionId, String agente, String modo,
+                                  Long alimentadoPor) {
+        if (seSalta(postulacionId, agente)) {
+            return Situacion.NO_HACE_FALTA;
         }
-        return Optional.empty();
+        Optional<TrabajoIa> ultimo = trabajos
+                .findFirstByPostulacionIdAndAgenteCodigoAndModoOrderByIdDesc(
+                        postulacionId, agente, modo);
+        if (ultimo.isEmpty()) {
+            return Situacion.HAY_QUE_ENCOLARLO;
+        }
+        String estado = ultimo.get().getEstado();
+        if ("PENDIENTE".equals(estado) || "EN_CURSO".equals(estado)) {
+            return Situacion.ESTA_VIVO;
+        }
+        if ("FALLIDO".equals(estado)) {
+            return Situacion.HAY_QUE_ENCOLARLO;
+        }
+        // TERMINADO: solo se rehace si se hizo antes que aquello de lo que depende.
+        return alimentadoPor != null && ultimo.get().getId() < alimentadoPor
+                ? Situacion.HAY_QUE_ENCOLARLO
+                : Situacion.NO_HACE_FALTA;
     }
 
     /**

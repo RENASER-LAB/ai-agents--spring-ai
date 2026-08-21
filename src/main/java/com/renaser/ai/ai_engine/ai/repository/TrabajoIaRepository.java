@@ -2,7 +2,9 @@ package com.renaser.ai.ai_engine.ai.repository;
 
 import com.renaser.ai.ai_engine.ai.model.TrabajoIa;
 
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -50,4 +52,30 @@ public interface TrabajoIaRepository extends JpaRepository<TrabajoIa, Long> {
     // En bloque, para el ranking. Pedirlo de una en una son once consultas por
     // candidato, y esa pantalla existe justamente para ver la tanda entera.
     List<TrabajoIa> findByPostulacionIdInOrderByIdAsc(List<Long> postulacionIds);
+
+    /**
+     * Los trabajos de los agentes que corren a la vez, <b>bloqueados</b> hasta el fin de la
+     * transacción.
+     *
+     * <p>Es la puerta de la barrera. Los tres primeros agentes terminan cuando terminan, y
+     * los dos últimos pueden hacerlo en el mismo milisegundo y en instancias distintas: sin
+     * este bloqueo los dos leerían «ya no queda nadie vivo y no hay retrato» a la vez, los
+     * dos lo crearían, y se pagarían dos Perfiles de Talento por el mismo candidato.
+     *
+     * <p>Con él, el segundo en llegar se queda esperando aquí hasta que el primero confirme;
+     * cuando entra, la consulta que viene después ya ve la fila recién creada y se va con las
+     * manos vacías. El {@code order by} no es cosmético: bloquear siempre en el mismo orden
+     * es lo que impide que dos que llegan a la vez se queden trabados el uno con el otro.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select t from TrabajoIa t
+             where t.postulacionId = :postulacionId
+               and t.modo = :modo
+               and t.agenteCodigo in :agentes
+             order by t.id
+            """)
+    List<TrabajoIa> bloquearLosQueVanALaVez(@Param("postulacionId") Long postulacionId,
+                                            @Param("modo") String modo,
+                                            @Param("agentes") List<String> agentes);
 }

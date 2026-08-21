@@ -9,13 +9,22 @@ package com.renaser.ai.ai_engine.ai.service;
  * un servicio externo, así que no puede hacerse dentro de la petición del candidato. De eso
  * se encarga esto.
  *
- * <p><b>Los tres agentes corren en fila, no a la vez.</b> El Perfil de Talento necesita lo
- * que dejaron los otros dos, así que igual habría que esperarlos; y en fila hay un solo
- * trabajo vivo por postulación, que es lo que hace que reintentar sea trivial en vez de
- * tener que decidir qué hacer cuando uno de dos paralelos falla.
+ * <p><b>Tres corren a la vez y el cuarto espera a los tres.</b> Leer los datos del
+ * currículum, puntuarlo y calificar las respuestas de la evaluación son tres cosas
+ * independientes: leen fuentes distintas y escriben tablas distintas. El Perfil de Talento sí
+ * necesita lo que dejaron los tres, y por eso va después. En fila costaba ocho minutos y
+ * medio por candidato; a la vez cuesta lo que cueste el más lento.
  *
- * <p><b>Si la IA falla se reintenta y nunca se inventa una nota</b> (Regla 3 del doc 03). La
- * postulación se queda en {@code PERFIL_CALIFICANDO} hasta que haya resultado de verdad.
+ * <p><b>Un paso que falla no para a los demás.</b> Antes sí: un currículum escaneado del que
+ * no sale texto cortaba la fila y dejaba al candidato en {@code PERFIL_CALIFICANDO} para
+ * siempre, con su examen de cincuenta preguntas ya calificado y sin nadie que lo resumiera.
+ * Ahora el retrato se arma igual, con lo que sí se pudo leer, y queda escrito en el registro
+ * qué faltaba. Lo único que no se hace es armarlo cuando no salió bien ni un solo paso: sobre
+ * la nada no hay retrato que armar.
+ *
+ * <p><b>Si la IA falla se reintenta y nunca se inventa una nota</b> (Regla 3 del doc 03). Un
+ * paso que se agota en reintentos no deja nota ninguna, y lo que dependiera solo de él se
+ * queda sin llenar.
  */
 public interface ColaCalificacionIa {
 
@@ -24,10 +33,11 @@ public interface ColaCalificacionIa {
      *
      * <p>Es idempotente: llamarla dos veces no duplica trabajos ni recalifica lo ya hecho.
      *
-     * <p><b>No empieza siempre por el principio.</b> Si el currículum ya se leyó en una
-     * criba, esa parte no se repite: la fila arranca en el primer paso que de verdad falta,
-     * que en ese caso es el evaluador. Empezar por el principio dejaba a esos candidatos
-     * calificándose para siempre, porque el primer paso ya estaba hecho y no se encolaba nada.
+     * <p><b>No se encola todo siempre.</b> Si el currículum ya se leyó en una criba, esa
+     * parte no se repite: se encola solo lo que de verdad falta, que en ese caso es el
+     * evaluador. Y si no falta nada pero el retrato se quedó sin hacer, se pide el retrato:
+     * antes esos candidatos se calificaban para siempre, porque el primer paso ya estaba
+     * hecho y no se encolaba nada.
      *
      * @return true si quedó algo en la cola; false si no había nada pendiente que hacer o si
      *         ya hay un trabajo vivo. Quien lo llame no debe decir «encolado» sin mirarlo.

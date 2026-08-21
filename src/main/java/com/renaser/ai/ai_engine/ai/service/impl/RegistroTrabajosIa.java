@@ -10,7 +10,11 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
  * Los cambios de estado de la cola, cada uno en su propia transacción.
@@ -70,6 +74,94 @@ public class RegistroTrabajosIa {
                 .intentos(0)
                 .creadoEn(Instant.now())
                 .build()));
+    }
+
+    /**
+     * <b>La barrera.</b> Crea el trabajo que cierra la etapa, pero solo si los que corren a
+     * la vez ya acabaron todos.
+     *
+     * <p>Los tres primeros agentes no dependen unos de otros y se encolan de golpe, así que
+     * el cuarto no lo puede encolar «el siguiente de la fila»: lo tiene que disparar el
+     * último en terminar. El problema es que ninguno de los tres sabe si es el último. Por
+     * eso <b>preguntan los tres</b>, y quien decide es la base.
+     *
+     * <p><b>Por qué no se puede disparar dos veces.</b> Lo primero que hace es bloquear las
+     * filas de los tres. Si dos terminan a la vez, uno entra y el otro se queda esperando en
+     * esa línea; cuando el primero confirma y suelta, el segundo sigue, y la consulta de
+     * {@code crearSiHaceFalta} —que es una consulta nueva, y por eso ve lo que el otro acabó
+     * de guardar— encuentra el retrato ya creado y devuelve vacío. La cuenta no vive en
+     * memoria a propósito: hay ocho consumidores y pueden estar en instancias distintas.
+     *
+     * <p><b>Un fallo no para la fila.</b> Un paso agotado en reintentos no está vivo, así que
+     * no bloquea a nadie: el retrato se arma con lo que sí se pudo leer. Antes, un currículum
+     * escaneado sin texto dejaba al candidato en {@code PERFIL_CALIFICANDO} para siempre, con
+     * su examen de cincuenta preguntas ya calificado y sin nadie que lo resumiera.
+     *
+     * <p><b>Lo que sí se exige es que algo haya salido bien.</b> Con los tres fallidos no hay
+     * absolutamente nada que resumir, y armar un retrato sobre la nada sería inventarse una
+     * nota, que es justo lo que la Regla 3 prohíbe. En ese caso la tanda se queda fallida y
+     * se ve como fallida, que es lo que hace que alguien vuelva a pedirla.
+     *
+     * @param aLaVez los agentes que corren a la vez en esta pasada. Son dos en la rápida y
+     *               tres en la fina: el evaluador no entra donde nadie ha respondido nada
+     * @return vacío si todavía queda alguno trabajando, si no hay nada de lo que armar el
+     *         retrato, o si otro se adelantó y ya lo creó
+     */
+    @Transactional
+    public Optional<TrabajoIa> crearElRetratoSiLosDemasAcabaron(
+            Long organizacionId, Long postulacionId, List<String> aLaVez,
+            String agenteCodigo, String modo, Long alimentadoPor) {
+
+        // Cierra la puerta antes de mirar nada. Ver bloquearLosQueVanALaVez.
+        List<TrabajoIa> tanda = trabajos.bloquearLosQueVanALaVez(postulacionId, modo, aLaVez);
+
+        // De cada agente solo cuenta su último intento: quien falló y luego salió bien al
+        // reintentar arrastra su fila fallida para siempre, y mirarla contaría un fallo que
+        // ya no existe.
+        Map<String, TrabajoIa> ultimoDeCada = tanda.stream()
+                .collect(Collectors.toMap(TrabajoIa::getAgenteCodigo, Function.identity(),
+                        (a, b) -> a.getId() >= b.getId() ? a : b));
+
+        List<String> vivos = conEstado(ultimoDeCada, "PENDIENTE", "EN_CURSO");
+        if (!vivos.isEmpty()) {
+            log.debug("El retrato de la postulación {} todavía espera a {}", postulacionId, vivos);
+            return Optional.empty();
+        }
+
+        if (conEstado(ultimoDeCada, "TERMINADO").isEmpty()) {
+            log.error("La postulación {} se queda sin Perfil de Talento: no salió bien ni uno de "
+                            + "los pasos que lo alimentan ({}). NO se le inventa un retrato sobre "
+                            + "la nada; hay que volver a pedir la calificación",
+                    postulacionId, aLaVez);
+            return Optional.empty();
+        }
+
+        List<String> fallidos = conEstado(ultimoDeCada, "FALLIDO");
+        if (!fallidos.isEmpty()) {
+            // Queda escrito a propósito y con nombre y apellido: el retrato que salga de aquí
+            // se decidió con menos evidencia de la normal. Quien lo lea después tiene que
+            // poder saber qué faltaba, y en el propio Perfil de Talento eso se ve en la
+            // confianza de la evidencia, que baja sola porque el insumo llega con huecos.
+            log.warn("El Perfil de Talento de la postulación {} se arma SIN lo que debían dejar "
+                            + "{}: esos pasos se agotaron en reintentos. Se sigue igual, con lo que "
+                            + "hay, y la confianza de la evidencia sale más baja",
+                    postulacionId, fallidos);
+        }
+
+        // Se llama al método de al lado sin pasar por el proxy, y aquí eso es lo correcto:
+        // ya estamos dentro de la transacción que abrió la barrera, que es justo donde tiene
+        // que hacerse la comprobación de «¿ya existe?» para que no se creen dos.
+        return crearSiHaceFalta(organizacionId, postulacionId, agenteCodigo, modo, alimentadoPor);
+    }
+
+    /** Qué agentes de la tanda están en alguno de estos estados, por su último intento. */
+    private List<String> conEstado(Map<String, TrabajoIa> ultimoDeCada, String... estados) {
+        List<String> buscados = List.of(estados);
+        return ultimoDeCada.entrySet().stream()
+                .filter(e -> buscados.contains(e.getValue().getEstado()))
+                .map(Map.Entry::getKey)
+                .sorted()
+                .toList();
     }
 
     /**

@@ -12,6 +12,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -186,6 +187,122 @@ class RegistroTrabajosIaTest {
         when(trabajos.save(any(TrabajoIa.class))).thenAnswer(i -> i.getArgument(0));
 
         assertThat(registro.crearSiHaceFalta(1L, 55L, "EVIDENCIA_CV", "FINA", null)).isPresent();
+    }
+
+    // ============ La barrera: quién dispara el retrato, y una sola vez ============
+
+    @Test
+    void mientrasQuedeAlguienVivoElRetratoNoSeCrea() {
+        // Los tres primeros corren a la vez, así que los tres preguntan al terminar. El que
+        // pregunta cuando su compañero sigue hablando con el proveedor tiene que irse con
+        // las manos vacías: un retrato armado a medias no vale nada y cuesta lo mismo.
+        when(trabajos.bloquearLosQueVanALaVez(55L, "FINA", A_LA_VEZ)).thenReturn(List.of(
+                trabajo(1L, "DATOS_CV", "TERMINADO"),
+                trabajo(2L, "EVIDENCIA_CV", "EN_CURSO"),
+                trabajo(3L, "EVALUADOR", "TERMINADO")));
+
+        assertThat(registro.crearElRetratoSiLosDemasAcabaron(
+                1L, 55L, A_LA_VEZ, "POTENCIAL_RIESGO", "FINA", 3L)).isEmpty();
+        verify(trabajos, never()).save(any(TrabajoIa.class));
+    }
+
+    @Test
+    void cuandoLosTresAcabanElRetratoSeCrea() {
+        when(trabajos.bloquearLosQueVanALaVez(55L, "FINA", A_LA_VEZ)).thenReturn(List.of(
+                trabajo(1L, "DATOS_CV", "TERMINADO"),
+                trabajo(2L, "EVIDENCIA_CV", "TERMINADO"),
+                trabajo(3L, "EVALUADOR", "TERMINADO")));
+        when(trabajos.findFirstByPostulacionIdAndAgenteCodigoAndModoOrderByIdDesc(
+                55L, "POTENCIAL_RIESGO", "FINA")).thenReturn(Optional.empty());
+        when(trabajos.save(any(TrabajoIa.class))).thenAnswer(i -> i.getArgument(0));
+
+        assertThat(registro.crearElRetratoSiLosDemasAcabaron(
+                1L, 55L, A_LA_VEZ, "POTENCIAL_RIESGO", "FINA", 3L)).isPresent();
+
+        ArgumentCaptor<TrabajoIa> creado = ArgumentCaptor.forClass(TrabajoIa.class);
+        verify(trabajos).save(creado.capture());
+        assertThat(creado.getValue().getAgenteCodigo()).isEqualTo("POTENCIAL_RIESGO");
+        assertThat(creado.getValue().getEstado()).isEqualTo("PENDIENTE");
+    }
+
+    @Test
+    void elSegundoEnLlegarNoCreaUnRetratoQueElPrimeroYaCreo() {
+        // Aquí está el doble disparo, y por qué no ocurre. Dos terminan a la vez y los dos
+        // llegan hasta aquí: el bloqueo de la primera línea hace que entren de uno en uno, y
+        // el segundo, al mirar, ya ve el trabajo que creó el primero. Sin ese orden los dos
+        // leerían «no hay retrato» y se pagarían dos Perfiles de Talento por el mismo
+        // candidato.
+        when(trabajos.bloquearLosQueVanALaVez(55L, "FINA", A_LA_VEZ)).thenReturn(List.of(
+                trabajo(1L, "DATOS_CV", "TERMINADO"),
+                trabajo(2L, "EVIDENCIA_CV", "TERMINADO"),
+                trabajo(3L, "EVALUADOR", "TERMINADO")));
+        when(trabajos.findFirstByPostulacionIdAndAgenteCodigoAndModoOrderByIdDesc(
+                55L, "POTENCIAL_RIESGO", "FINA"))
+                .thenReturn(Optional.of(trabajo(4L, "POTENCIAL_RIESGO", "PENDIENTE")));
+
+        assertThat(registro.crearElRetratoSiLosDemasAcabaron(
+                1L, 55L, A_LA_VEZ, "POTENCIAL_RIESGO", "FINA", 3L)).isEmpty();
+        verify(trabajos, never()).save(any(TrabajoIa.class));
+    }
+
+    @Test
+    void unPasoAgotadoNoParaAlRetrato() {
+        // El arreglo que se nota. Un currículum escaneado no da texto y su lector se agota
+        // en reintentos; el examen de cincuenta preguntas del candidato ya está calificado y
+        // no necesitaba el currículum para nada. El retrato sale con lo que hay.
+        when(trabajos.bloquearLosQueVanALaVez(55L, "FINA", A_LA_VEZ)).thenReturn(List.of(
+                trabajo(1L, "DATOS_CV", "FALLIDO"),
+                trabajo(2L, "EVIDENCIA_CV", "FALLIDO"),
+                trabajo(3L, "EVALUADOR", "TERMINADO")));
+        when(trabajos.findFirstByPostulacionIdAndAgenteCodigoAndModoOrderByIdDesc(
+                55L, "POTENCIAL_RIESGO", "FINA")).thenReturn(Optional.empty());
+        when(trabajos.save(any(TrabajoIa.class))).thenAnswer(i -> i.getArgument(0));
+
+        assertThat(registro.crearElRetratoSiLosDemasAcabaron(
+                1L, 55L, A_LA_VEZ, "POTENCIAL_RIESGO", "FINA", 3L)).isPresent();
+    }
+
+    @Test
+    void elQueFalloYLuegoSalioBienNoCuentaComoFallido() {
+        // De cada agente solo vale su último intento. La fila fallida no se borra nunca, así
+        // que mirarlas todas contaría un fallo que ya no existe y, con los tres «fallidos»,
+        // se negaría a armar un retrato que sí tiene con qué armarse.
+        when(trabajos.bloquearLosQueVanALaVez(55L, "FINA", A_LA_VEZ)).thenReturn(List.of(
+                trabajo(1L, "DATOS_CV", "FALLIDO"),
+                trabajo(2L, "EVIDENCIA_CV", "FALLIDO"),
+                trabajo(5L, "DATOS_CV", "TERMINADO"),
+                trabajo(6L, "EVIDENCIA_CV", "TERMINADO")));
+        when(trabajos.findFirstByPostulacionIdAndAgenteCodigoAndModoOrderByIdDesc(
+                55L, "POTENCIAL_RIESGO", "FINA")).thenReturn(Optional.empty());
+        when(trabajos.save(any(TrabajoIa.class))).thenAnswer(i -> i.getArgument(0));
+
+        assertThat(registro.crearElRetratoSiLosDemasAcabaron(
+                1L, 55L, A_LA_VEZ, "POTENCIAL_RIESGO", "FINA", 6L)).isPresent();
+    }
+
+    @Test
+    void conTodoFallidoNoSeArmaUnRetratoSobreLaNada() {
+        // El límite de «un fallo no para la fila». Si no salió bien ni un solo paso no hay
+        // absolutamente nada que resumir, y pedirle al modelo un retrato de la nada es
+        // inventarse una nota. La tanda se queda fallida, se ve fallida, y alguien la
+        // vuelve a pedir.
+        when(trabajos.bloquearLosQueVanALaVez(55L, "FINA", A_LA_VEZ)).thenReturn(List.of(
+                trabajo(1L, "DATOS_CV", "FALLIDO"),
+                trabajo(2L, "EVIDENCIA_CV", "FALLIDO"),
+                trabajo(3L, "EVALUADOR", "FALLIDO")));
+
+        assertThat(registro.crearElRetratoSiLosDemasAcabaron(
+                1L, 55L, A_LA_VEZ, "POTENCIAL_RIESGO", "FINA", 3L)).isEmpty();
+        verify(trabajos, never()).save(any(TrabajoIa.class));
+    }
+
+    private static final List<String> A_LA_VEZ =
+            List.of("DATOS_CV", "EVIDENCIA_CV", "EVALUADOR");
+
+    private TrabajoIa trabajo(Long id, String agenteCodigo, String estado) {
+        TrabajoIa suyo = trabajo(id, estado, 1);
+        suyo.setAgenteCodigo(agenteCodigo);
+        return suyo;
     }
 
     private TrabajoIa trabajo(Long id, String estado, int intentos) {
