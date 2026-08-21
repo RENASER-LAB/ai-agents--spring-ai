@@ -93,6 +93,9 @@ services:
     # Solo escucha en la red interna: quien habla con el mundo es Caddy.
     expose:
       - "8080"
+    # En loopback ademas, y solo ahi: es por donde pregunta el chequeo de desplegar.sh.
+    ports:
+      - "127.0.0.1:8080:8080"
     logging: &registro
       driver: json-file
       options:

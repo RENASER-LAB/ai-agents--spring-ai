@@ -58,8 +58,23 @@ Lo que lo hace posible, ya creado en la cuenta:
 |---|---|
 | Proveedor OIDC | `token.actions.githubusercontent.com` |
 | Rol que asume GitHub | `github-despliegue` |
-| Quién puede asumirlo | **Solo este repositorio**, por la condición `sub` del token |
+| Quién puede asumirlo | **Solo la rama `main`** de este repositorio, por la condición `sub` del token |
 | Qué puede hacer | Subir a `ai-engine` en ECR, y `SendCommand` **solo** sobre `i-05fc037e853d07264` |
+
+Ese `sub` **no** tiene la forma que dice la documentación de GitHub. Esta organización emite
+*immutable subject claims*, con los identificadores numéricos pegados al nombre:
+
+```
+repo:RENASER-LAB@306311957/ai-agents--spring-ai@1339792194:ref:refs/heads/main
+```
+
+La condición de confianza del rol tiene que casar **esa** cadena. Una escrita contra el
+formato clásico (`repo:RENASER-LAB/ai-agents--spring-ai:*`) parece correcta a simple vista y
+no casa nunca. Engaña además que la API de GitHub conteste `use_immutable_subject: false`:
+el campo que manda es `sub_claim_prefix`, de esa misma respuesta. Si alguna vez el despliegue
+vuelve a morir en «Pedirle permiso a AWS» con *Not authorized to perform
+sts:AssumeRoleWithWebIdentity*, el `sub` real se lee en CloudTrail, buscando el evento
+`AssumeRoleWithWebIdentity`, en vez de deducirlo.
 
 La imagen se sube con **dos etiquetas**: `latest`, que es la que despliega, y el SHA del
 commit. Esa segunda es la que permite volver atrás: sin ella «la versión anterior» no tiene
