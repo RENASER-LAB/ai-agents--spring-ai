@@ -10,7 +10,7 @@ volver a crear sin perder nada más que los certificados, que Caddy saca otra ve
 
 | | |
 |---|---|
-| Instancia | `i-05fc037e853d07264` · `t3.medium` · IP `3.237.47.194` |
+| Instancia | `i-05fc037e853d07264` · `t3.medium` · Elastic IP `18.204.177.210` |
 | Imagen | `526338061654.dkr.ecr.us-east-1.amazonaws.com/ai-engine:latest` |
 | Broker | `renaser-mq` · RabbitMQ 4.2 · `amqps://…:5671` |
 | Grupo de seguridad | `sg-0fe61167414449546` — solo 80 y 443 |
