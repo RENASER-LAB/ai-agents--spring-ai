@@ -41,6 +41,8 @@ import org.springframework.web.multipart.MultipartFile;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -83,8 +85,18 @@ public class ServicioPortalImpl implements ServicioPortal {
 
     @Override
     public List<VacantePublica> vacantesPublicadas() {
-        return vacantes.findByOrganizacionIdAndEstadoOrderByPublicadaEnDesc(organizacion().getId(), "PUBLICADA")
-                .stream().map(this::comoPublica).toList();
+        List<Vacante> publicadas = vacantes.findByOrganizacionIdAndEstadoOrderByPublicadaEnDesc(
+                organizacion().getId(), "PUBLICADA");
+
+        // Los requisitos de todas de una vez. Este es el tablón de empleo: la única pantalla
+        // que se sirve sin haber entrado y, por eso, la que más veces se pide. Una consulta
+        // por vacante aquí no la paga un candidato, la paga cada visita.
+        Map<Long, List<RequisitoObjetivo>> porVacante = requisitosDe(
+                publicadas.stream().map(Vacante::getId).toList());
+
+        return publicadas.stream()
+                .map(v -> comoPublica(v, porVacante.getOrDefault(v.getId(), List.of())))
+                .toList();
     }
 
     @Override
@@ -92,11 +104,27 @@ public class ServicioPortalImpl implements ServicioPortal {
         Vacante vacante = vacantes.findByIdAndOrganizacionId(id, organizacion().getId())
                 .filter(v -> "PUBLICADA".equals(v.getEstado()))
                 .orElseThrow(() -> new ResourceNotFoundException("Vacante", "id", id));
-        return comoPublica(vacante);
+        return comoPublica(vacante, requisitos.findByVacanteIdAndEsActivoTrue(vacante.getId()));
     }
 
-    private VacantePublica comoPublica(Vacante v) {
-        List<RequisitoPublico> reqs = requisitos.findByVacanteIdAndEsActivoTrue(v.getId()).stream()
+    /**
+     * Los requisitos activos de un lote de vacantes, agrupados por la suya.
+     *
+     * <p>Ordenados por id porque la consulta no lo pedía y la base no lo promete: al traerlos
+     * en bloque llegan mezclados de todas las vacantes, y sin un orden explícito la misma
+     * vacante podría enseñar sus requisitos en distinto orden en dos visitas seguidas.
+     */
+    private Map<Long, List<RequisitoObjetivo>> requisitosDe(List<Long> vacanteIds) {
+        if (vacanteIds.isEmpty()) {
+            return Map.of();
+        }
+        return requisitos.findByVacanteIdInAndEsActivoTrue(vacanteIds).stream()
+                .sorted(Comparator.comparing(RequisitoObjetivo::getId))
+                .collect(Collectors.groupingBy(RequisitoObjetivo::getVacanteId));
+    }
+
+    private VacantePublica comoPublica(Vacante v, List<RequisitoObjetivo> suyos) {
+        List<RequisitoPublico> reqs = suyos.stream()
                 .map(r -> new RequisitoPublico(r.getId(), r.getDescripcion()))
                 .toList();
         return new VacantePublica(v.getId(), v.getTitulo(), v.getDescripcion(), v.getProposito(),
@@ -299,9 +327,20 @@ public class ServicioPortalImpl implements ServicioPortal {
 
     @Override
     public List<MiPostulacion> misPostulaciones(ContextoUsuario quien) {
-        return postulaciones.findByUsuarioIdOrderByCreadoEnDesc(quien.usuarioId()).stream()
-                .map(this::comoResumen)
-                .toList();
+        List<Postulacion> mias = postulaciones.findByUsuarioIdOrderByCreadoEnDesc(quien.usuarioId());
+
+        // Son pocas —las de una sola persona—, pero el catálogo de estados son dieciocho filas
+        // fijas y se estaba pidiendo una por postulación. Traerlo entero cuesta lo mismo que
+        // pedir uno, y así la pantalla no crece en consultas con lo que se postule nadie.
+        Map<String, String> nombreEstado = estados.findAllByOrderByOrden().stream()
+                .collect(Collectors.toMap(EstadoPostulacion::getCodigo,
+                        EstadoPostulacion::getNombre, (a, b) -> a));
+        List<Long> vacanteIds = mias.stream().map(Postulacion::getVacanteId)
+                .filter(Objects::nonNull).distinct().toList();
+        Map<Long, Vacante> porVacante = vacantes.findAllById(vacanteIds).stream()
+                .collect(Collectors.toMap(Vacante::getId, Function.identity()));
+
+        return mias.stream().map(p -> comoResumen(p, porVacante, nombreEstado)).toList();
     }
 
     @Override
@@ -363,10 +402,22 @@ public class ServicioPortalImpl implements ServicioPortal {
                 .orElseThrow(() -> new ResourceNotFoundException("Postulación", "código", uuid));
     }
 
+    /** Una sola: la vacante y su estado se piden sueltos porque no hay tanda con la que ir. */
     private MiPostulacion comoResumen(Postulacion p) {
-        String titulo = vacantes.findById(p.getVacanteId()).map(Vacante::getTitulo).orElse("");
-        String nombreEstado = estados.findById(p.getEstadoCodigo())
-                .map(EstadoPostulacion::getNombre).orElse(p.getEstadoCodigo());
+        Map<Long, Vacante> unaVacante = vacantes.findById(p.getVacanteId()).stream()
+                .collect(Collectors.toMap(Vacante::getId, Function.identity()));
+        Map<String, String> unEstado = estados.findById(p.getEstadoCodigo()).stream()
+                .collect(Collectors.toMap(EstadoPostulacion::getCodigo, EstadoPostulacion::getNombre));
+        return comoResumen(p, unaVacante, unEstado);
+    }
+
+    private MiPostulacion comoResumen(Postulacion p, Map<Long, Vacante> porVacante,
+                                      Map<String, String> nombrePorEstado) {
+        String titulo = Optional.ofNullable(porVacante.get(p.getVacanteId()))
+                .map(Vacante::getTitulo).orElse("");
+        // Si el código no está en el catálogo se enseña el código, igual que antes: es feo,
+        // pero deja ver qué estado es en vez de un hueco en blanco.
+        String nombreEstado = nombrePorEstado.getOrDefault(p.getEstadoCodigo(), p.getEstadoCodigo());
         long dias = Duration.between(p.getMovidoEn(), Instant.now()).toDays();
         return new MiPostulacion(p.getUuid().toString(), titulo, p.getEstadoCodigo(), nombreEstado,
                 p.getGrupoPrioridad(), dias, p.getCreadoEn());

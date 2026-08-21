@@ -9,5 +9,8 @@ import java.util.List;
 public interface SesionResponsableRepository extends JpaRepository<SesionResponsable, SesionResponsable.Clave> {
 
     List<SesionResponsable> findBySesionSimulacionId(Long sesionSimulacionId);
+
+    // Los de un lote de sesiones, para el listado del panel.
+    List<SesionResponsable> findBySesionSimulacionIdIn(List<Long> sesionIds);
     boolean existsBySesionSimulacionIdAndUsuarioId(Long sesionSimulacionId, Long usuarioId);
 }

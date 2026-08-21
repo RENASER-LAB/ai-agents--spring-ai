@@ -37,6 +37,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -67,9 +69,29 @@ public class ServicioPostulacionesPanelImpl implements ServicioPostulacionesPane
         }
         FiltroAlcance alcance = permisos.alcanceDe("ver_candidatos");
         Map<String, EstadoPostulacion> catalogo = catalogoEstados();
-        return postulaciones.bandeja(quien.organizacionId(), esperaA, alcance.responsableOFiltroNulo())
-                .stream()
-                .map(p -> filaBandeja(p, catalogo))
+        List<Postulacion> filas = postulaciones.bandeja(
+                quien.organizacionId(), esperaA, alcance.responsableOFiltroNulo());
+
+        // Quién es cada candidato y a qué vacante se apuntó se resuelven para la tanda entera,
+        // antes de mapear, y no una vez por fila.
+        //
+        // Preguntarlo dentro del map costaba tres viajes a la base por postulación. Ninguno es
+        // lento —son búsquedas por clave primaria—, pero van en serie y contra Supabase cada
+        // uno cuesta ~140 ms de ida y vuelta: con las 236 postulaciones de referencia salían
+        // 709 consultas encadenadas y minuto y medio de espera. Peor que la espera: esa
+        // petición retiene una conexión del pool todo ese rato, así que la bandeja no se
+        // colgaba sola, se llevaba por delante al resto del panel.
+        //
+        // Así son cuatro consultas fijas, haya una fila o quinientas.
+        Map<Long, Usuario> porUsuario = porId(
+                usuarios.findAllById(idsDe(filas, Postulacion::getUsuarioId)), Usuario::getId);
+        Map<Long, Persona> porPersona = porId(
+                personas.findAllById(idsDe(porUsuario.values(), Usuario::getPersonaId)), Persona::getId);
+        Map<Long, Vacante> porVacante = porId(
+                vacantes.findAllById(idsDe(filas, Postulacion::getVacanteId)), Vacante::getId);
+
+        return filas.stream()
+                .map(p -> filaBandeja(p, catalogo, porUsuario, porPersona, porVacante))
                 .toList();
     }
 
@@ -205,13 +227,35 @@ public class ServicioPostulacionesPanelImpl implements ServicioPostulacionesPane
         return mapa;
     }
 
-    private FilaBandeja filaBandeja(Postulacion p, Map<String, EstadoPostulacion> catalogo) {
+    /**
+     * Los ids no nulos y sin repetir de una tanda, listos para un {@code findAllById}.
+     *
+     * <p>Sin repetir porque en una bandeja se repiten mucho: veinte candidatos de la misma
+     * vacante son veinte veces el mismo id, y pedirlo veinte veces es volver al problema.
+     */
+    private static <T> Set<Long> idsDe(Collection<T> cosas, Function<T, Long> id) {
+        return cosas.stream().map(id).filter(Objects::nonNull).collect(Collectors.toSet());
+    }
+
+    private static <T> Map<Long, T> porId(Collection<T> cosas, Function<T, Long> id) {
+        return cosas.stream().collect(Collectors.toMap(id, Function.identity()));
+    }
+
+    private FilaBandeja filaBandeja(Postulacion p, Map<String, EstadoPostulacion> catalogo,
+                                    Map<Long, Usuario> porUsuario, Map<Long, Persona> porPersona,
+                                    Map<Long, Vacante> porVacante) {
         EstadoPostulacion estado = catalogo.get(p.getEstadoCodigo());
-        String candidato = usuarios.findById(p.getUsuarioId())
-                .flatMap(u -> personas.findById(u.getPersonaId()))
+        // Un id que no está en el mapa tiene que dar «(anonimizado)», exactamente igual que
+        // antes lo daba un findById vacío: a quien ejerció su derecho al borrado se le sigue
+        // viendo la fila —la postulación existió y el embudo tiene que cuadrar— pero no el
+        // nombre. Que el mapa no lo traiga y que la base no lo tenga son el mismo caso.
+        String candidato = Optional.ofNullable(porUsuario.get(p.getUsuarioId()))
+                .map(Usuario::getPersonaId)
+                .map(porPersona::get)
                 .map(this::nombreCompleto)
                 .orElse("(anonimizado)");
-        String vacante = vacantes.findById(p.getVacanteId()).map(Vacante::getTitulo).orElse("");
+        String vacante = Optional.ofNullable(porVacante.get(p.getVacanteId()))
+                .map(Vacante::getTitulo).orElse("");
         return new FilaBandeja(p.getId(), p.getUuid().toString(), candidato, vacante,
                 p.getEstadoCodigo(), estado == null ? "" : estado.getNombre(),
                 estado == null ? "" : estado.getEsperaA(), p.getGrupoPrioridad(),

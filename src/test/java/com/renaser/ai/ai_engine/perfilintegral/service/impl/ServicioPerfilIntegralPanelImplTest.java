@@ -66,6 +66,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -343,6 +344,7 @@ class ServicioPerfilIntegralPanelImplTest {
         Postulacion contratado = enEstado(candidato(2L, null, null), "CONTRATADO");
         Postulacion retirado = enEstado(candidato(3L, null, null), "CERRADA");
         conCurriculum(viva, contratado, retirado);
+        sinRetrato(1L, 2L, 3L);
         candidatos(viva, contratado, retirado);
         when(cola.encolarCribaRapida(1L)).thenReturn(true);
 
@@ -371,6 +373,33 @@ class ServicioPerfilIntegralPanelImplTest {
     // ============ Los botones cuentan lo que de verdad encolaron ============
 
     @Test
+    @DisplayName("La criba rápida mira la tanda en bloque, no candidato a candidato")
+    void laCribaRapidaNoPreguntaUnaVezPorCandidato() {
+        // La tanda de una criba es la misma que pinta el ranking: crece con los candidatos
+        // que se apunten. Preguntar por fila con qué pasada está cada uno y si tiene
+        // currículum eran dos consultas por persona antes siquiera de decidir si se encola.
+        Postulacion[] tanda = new Postulacion[60];
+        Long[] ids = new Long[60];
+        for (int i = 0; i < 60; i++) {
+            tanda[i] = candidato(i + 1L, null, null);
+            ids[i] = i + 1L;
+        }
+        conCurriculum(tanda);
+        sinRetrato(ids);
+        candidatos(tanda);
+        lenient().when(cola.encolarCribaRapida(anyLong())).thenReturn(true);
+
+        assertThat(servicio.cribaRapida(quien, VACANTE).candidatos()).isEqualTo(60);
+
+        verify(cvs, times(1)).findByPostulacionIdIn(anyList());
+        verify(cola, times(1)).estadoDe(anyList());
+        // Las dos consultas por fila que había antes. Si vuelve cualquiera de las dos, los
+        // conteos de arriba siguen en 1 y solo esto lo delata.
+        verify(cvs, never()).findByPostulacionId(anyLong());
+        verify(cola, never()).pasadaDe(anyLong());
+    }
+
+    @Test
     void laCribaRapidaSoloCuentaAQuienDeVerdadQuedoEnLaCola() {
         // Antes se sumaba siempre. Un segundo clic respondía «2 en cola» sin haber encolado
         // a nadie, y ese número falso quedaba escrito también en la auditoría, que es donde
@@ -378,6 +407,7 @@ class ServicioPerfilIntegralPanelImplTest {
         Postulacion uno = candidato(1L, null, null);
         Postulacion dos = candidato(2L, null, null);
         conCurriculum(uno, dos);
+        sinRetrato(1L, 2L);
         candidatos(uno, dos);
         when(cola.encolarCribaRapida(1L)).thenReturn(true);
         when(cola.encolarCribaRapida(2L)).thenReturn(false);
@@ -443,11 +473,26 @@ class ServicioPerfilIntegralPanelImplTest {
     }
 
     /** Les pone currículum: sin archivo la criba ni los mira. */
+    /**
+     * Estos candidatos tienen currículum.
+     *
+     * <p>Se apunta por las dos vías porque hay dos formas de preguntarlo y las dos existen:
+     * la ficha de uno solo lo pide suelto, y las cribas lo piden para la tanda entera. Si el
+     * doble solo supiera contestar a una, la criba se saltaría a todo el mundo y el test
+     * pasaría a verde sin haber probado nada.
+     */
     private void conCurriculum(Postulacion... losSuyos) {
         for (Postulacion p : losSuyos) {
-            lenient().when(cvs.findByPostulacionId(p.getId()))
-                    .thenReturn(Optional.of(Cv.builder().id(500L + p.getId())
-                            .postulacionId(p.getId()).build()));
+            Cv suyo = Cv.builder().id(500L + p.getId()).postulacionId(p.getId()).build();
+            lenient().when(cvs.findByPostulacionId(p.getId())).thenReturn(Optional.of(suyo));
+            cvsDeLaTanda.add(suyo);
+        }
+    }
+
+    /** Nadie le ha hecho todavía el retrato: es a quien la criba rápida tiene que mirar. */
+    private void sinRetrato(Long... postulacionIds) {
+        for (Long id : postulacionIds) {
+            estadosDeLaTanda.put(id, new ColaCalificacionIa.Estado("SIN_EMPEZAR", null));
         }
     }
 
@@ -481,7 +526,7 @@ class ServicioPerfilIntegralPanelImplTest {
         lenient().when(datosCv.findByPostulacionIdIn(ids)).thenReturn(List.of());
         lenient().when(perfiles.findByPostulacionIdIn(ids)).thenReturn(List.of());
         lenient().when(hallazgos.findByPerfilTalentoIdIn(anyList())).thenReturn(List.of());
-        lenient().when(cvs.findByPostulacionIdIn(ids)).thenReturn(List.of());
+        lenient().when(cvs.findByPostulacionIdIn(ids)).thenReturn(cvsDeLaTanda);
         lenient().when(alertas.findByPostulacionIdIn(ids)).thenReturn(List.of());
         lenient().when(notasCriterio.findByPostulacionIdIn(ids)).thenReturn(notasDeLaTanda);
         lenient().when(notasEtapa.findByPostulacionIdInAndEtapaCodigo(ids, "PERFIL_INTEGRAL"))
@@ -504,6 +549,7 @@ class ServicioPerfilIntegralPanelImplTest {
     private final List<NotaCriterio> notasDeLaTanda = new ArrayList<>();
     private final List<Usuario> usuariosDeLaTanda = new ArrayList<>();
     private final List<Persona> personasDeLaTanda = new ArrayList<>();
+    private final List<Cv> cvsDeLaTanda = new ArrayList<>();
     private final Map<Long, ColaCalificacionIa.Estado> estadosDeLaTanda = new HashMap<>();
 
     /**

@@ -215,8 +215,19 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
     public PasadaEncolada cribaRapida(ContextoUsuario quien, Long vacanteId) {
         Vacante vacante = vacanteVisible(quien, vacanteId, "ajustar_nota");
         Set<String> cerrados = cerrados();
+        List<Postulacion> suyas = postulaciones.findByVacanteIdOrderByCreadoEnDesc(vacanteId);
+        List<Long> ids = suyas.stream().map(Postulacion::getId).toList();
+
+        // Con qué pasada está cada uno y quién tiene currículum, para la tanda entera y no
+        // dentro del bucle. Es la misma tanda que pinta el ranking —crece con los candidatos
+        // que se apunten— y preguntarlo por fila costaba dos consultas por persona antes
+        // siquiera de decidir si se le encola.
+        Map<Long, ColaCalificacionIa.Estado> enCola = cola.estadoDe(ids);
+        Map<Long, Cv> cvPorPostulacion = porPostulacion(cvs.findByPostulacionIdIn(ids),
+                Cv::getPostulacionId);
+
         int encolados = 0;
-        for (Postulacion p : postulaciones.findByVacanteIdOrderByCreadoEnDesc(vacanteId)) {
+        for (Postulacion p : suyas) {
             // Una tanda no es «todo el mundo que tenga currículum». Quien se retiró, quien
             // no continuó y quien ya está contratado siguen en la vacante, y barrerla sin
             // mirar el estado los devolvía a «por confirmar» pagando el modelo por el camino.
@@ -225,7 +236,9 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
             }
             // Quien ya tiene retrato no se vuelve a calificar: repetirlo cuesta lo mismo y
             // no cambia nada. Para rehacer uno concreto está el botón de su ficha.
-            if (cola.pasadaDe(p.getId()) != null || cvs.findByPostulacionId(p.getId()).isEmpty()) {
+            ColaCalificacionIa.Estado estado = enCola.get(p.getId());
+            String pasada = estado == null ? null : estado.pasada();
+            if (pasada != null || !cvPorPostulacion.containsKey(p.getId())) {
                 continue;
             }
             // Se cuenta lo que de verdad quedó en la cola, no lo que se intentó. Antes se
@@ -277,10 +290,19 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
         // segunda pasada que no mira a nadie no es una segunda pasada.
         int cuantos = Math.max(1, (int) Math.ceil(conNota * porcentaje / 100.0));
 
-        int encolados = 0;
-        for (FilaRanking f : filas.stream()
+        List<FilaRanking> corte = filas.stream()
                 .filter(f -> f.notaEtapa() != null)
-                .limit(cuantos).toList()) {
+                .limit(cuantos).toList();
+
+        // El corte es la mitad de la tanda por defecto, así que crece con los candidatos.
+        // Traerlas de una vez y no con un findById por fila: la postulación solo hace falta
+        // para moverla de estado, y quién entra en el corte ya se sabe aquí.
+        Map<Long, Postulacion> porId = porId(
+                postulaciones.findAllById(corte.stream().map(FilaRanking::postulacionId).toList()),
+                Postulacion::getId);
+
+        int encolados = 0;
+        for (FilaRanking f : corte) {
             // Quien ya pasó por la fina no repite: es la definitiva.
             if ("FINA".equals(f.pasada())) {
                 continue;
@@ -288,7 +310,10 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
             if (!cola.encolarCribaFina(f.postulacionId())) {
                 continue;
             }
-            postulaciones.findById(f.postulacionId()).ifPresent(this::moverACalificando);
+            Postulacion p = porId.get(f.postulacionId());
+            if (p != null) {
+                moverACalificando(p);
+            }
             encolados++;
         }
         auditoria.registrar(quien.organizacionId(), quien, "criba_fina",

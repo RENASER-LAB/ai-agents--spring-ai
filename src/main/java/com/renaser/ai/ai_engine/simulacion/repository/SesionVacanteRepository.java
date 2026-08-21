@@ -9,5 +9,8 @@ import java.util.List;
 public interface SesionVacanteRepository extends JpaRepository<SesionVacante, SesionVacante.Clave> {
 
     List<SesionVacante> findBySesionSimulacionId(Long sesionSimulacionId);
+
+    // Las de un lote de sesiones, para el listado del panel.
+    List<SesionVacante> findBySesionSimulacionIdIn(List<Long> sesionIds);
     List<SesionVacante> findByVacanteId(Long vacanteId);
 }
