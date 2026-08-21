@@ -53,6 +53,32 @@ public final class ValidadorDetalleV3 {
         return List.of("EF-4", "SJT-R", "SEC", "INV", "DE", "CD").contains(tipo);
     }
 
+    /**
+     * Las claves que ese formato admite: exactamente las que el candidato llena al responder.
+     *
+     * <p>Sirve para el camino de vuelta. Al devolverle su respuesta guardada —para que pueda
+     * retomar el examen— se le manda solo lo que hay en esta lista, y no el objeto entero tal
+     * como está en la base. Al ser {@code jsonb} esa columna admite cualquier cosa, así que
+     * <b>filtrar por aquí es lo que garantiza que ningún puntaje llegue al navegador</b> aunque
+     * mañana alguien guarde uno ahí (RF-53).
+     *
+     * <p>Está junto a la validación a propósito: la forma de cada formato se decide en un solo
+     * archivo, y así añadir un formato nuevo obliga a decir también qué de él se puede
+     * devolver.
+     *
+     * @return las claves permitidas, o vacío si ese tipo no se responde con detalle
+     */
+    public static Set<String> clavesDe(String tipo) {
+        return switch (tipo == null ? "" : tipo) {
+            case "EF-4" -> Set.of("mas", "menos");
+            case "SJT-R" -> Set.of("calificaciones");
+            case "SEC" -> Set.of("orden");
+            case "INV", "DE" -> Set.of("marcadas");
+            case "CD" -> Set.of("campos");
+            default -> Set.of();
+        };
+    }
+
     private static void ef4(Set<Long> suyas, Map<String, Object> detalle) {
         Long mas = comoId(detalle.get("mas"), "mas");
         Long menos = comoId(detalle.get("menos"), "menos");

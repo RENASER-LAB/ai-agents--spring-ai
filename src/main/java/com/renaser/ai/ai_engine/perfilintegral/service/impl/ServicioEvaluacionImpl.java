@@ -1,5 +1,6 @@
 package com.renaser.ai.ai_engine.perfilintegral.service.impl;
 
+import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 import com.renaser.ai.ai_engine.ai.exception.ResourceNotFoundException;
 import com.renaser.ai.ai_engine.ai.service.ColaCalificacionIa;
@@ -32,6 +33,7 @@ import com.renaser.ai.ai_engine.parametro.service.ServicioParametros;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,6 +42,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -63,6 +66,7 @@ import java.util.stream.Collectors;
  */
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ServicioEvaluacionImpl implements ServicioEvaluacion {
 
     /**
@@ -351,10 +355,13 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
             Respuesta r = respuestaPorPregunta.get(o.getPreguntaId());
             lista.add(new PreguntaCandidato(
                     p.getId(), o.getPosicion(), p.getTipo(), p.getEnunciado(), p.getSituacion(),
+                    // Solo los CD lo traen; en el resto va en nulo y el portal lo ignora.
+                    p.getCasosPedidos(),
                     enSuOrden(opcionesPorPregunta.getOrDefault(p.getId(), List.of()),
                             o.getOrdenOpciones()),
                     r == null ? null : r.getTexto(),
-                    r == null ? null : r.getOpcionId()));
+                    r == null ? null : r.getOpcionId(),
+                    r == null ? null : soloLoQueEscribio(p.getTipo(), r)));
         }
 
         return new EvaluacionCandidato(evaluacion.getId(), evaluacion.getEstado(),
@@ -403,6 +410,50 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
         if (evaluacion.getVenceEn() != null && Instant.now().isAfter(evaluacion.getVenceEn())) {
             throw new IllegalStateException("El plazo para responder esta evaluación ya pasó");
         }
+    }
+
+    /**
+     * Le devuelve su propia respuesta al candidato, para que pueda retomar el examen.
+     *
+     * <p>Son 190 ítems: nadie los responde de una sentada. Si al volver al día siguiente los
+     * viera en blanco, o rehace todo o entrega a medias, y las respuestas estaban guardadas
+     * desde el principio.
+     *
+     * <p><b>Solo salen las claves de su formato</b>, las que llena él mismo al responder (ver
+     * {@link ValidadorDetalleV3#clavesDe}). El campo es {@code jsonb} y admite cualquier cosa,
+     * así que devolverlo entero sería confiar en que nadie guarde ahí nunca un puntaje. Un
+     * filtro cuesta tres líneas; la clave del banco filtrada al navegador no tiene arreglo
+     * (RF-53).
+     *
+     * <p>Un detalle ilegible no tumba la lectura: se registra y esa pregunta vuelve sin él,
+     * como si no estuviera respondida. Es preferible a dejar al candidato sin ver su examen.
+     *
+     * @return lo que escribió, o {@code null} si no hay nada — nunca un mapa vacío, que en el
+     *         portal se confundiría con «esta la respondí»
+     */
+    private Map<String, Object> soloLoQueEscribio(String tipo, Respuesta r) {
+        if (r.getDetalle() == null || r.getDetalle().isBlank()) {
+            return null;
+        }
+        Set<String> permitidas = ValidadorDetalleV3.clavesDe(tipo);
+        if (permitidas.isEmpty()) {
+            return null;
+        }
+        Map<String, Object> guardado;
+        try {
+            guardado = JSON.readValue(r.getDetalle(), new TypeReference<Map<String, Object>>() { });
+        } catch (RuntimeException e) {
+            log.warn("El detalle de la respuesta {} no se pudo leer: {}", r.getId(), e.getMessage());
+            return null;
+        }
+        Map<String, Object> suyo = new LinkedHashMap<>();
+        for (String clave : permitidas) {
+            Object valor = guardado.get(clave);
+            if (valor != null) {
+                suyo.put(clave, valor);
+            }
+        }
+        return suyo.isEmpty() ? null : suyo;
     }
 
     /** El detalle viaja como objeto y se guarda como jsonb; null si la pregunta no lo usa. */
