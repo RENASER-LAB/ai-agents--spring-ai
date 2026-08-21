@@ -144,6 +144,15 @@ public class PostulacionesPanelController {
         return perfilIntegral.reabrirEvaluacion(permisos.actual(), id, datos.dias(), datos.motivo());
     }
 
+    @PatchMapping("/postulaciones/{id}/contacto")
+    @PreAuthorize("@permisos.tiene('corregir_contacto_candidato')")
+    @Operation(summary = "Corregir el correo o el telefono que la IA leyo mal del curriculum. "
+            + "Se cambia solo lo que se manda, y queda auditado con el valor anterior y el motivo")
+    public ContactoDelCandidato corregirContacto(@PathVariable Long id,
+                                                 @Valid @RequestBody CorregirContacto datos) {
+        return servicio.corregirContacto(permisos.actual(), id, datos);
+    }
+
     @PostMapping("/postulaciones/{id}/enlace-acceso")
     @PreAuthorize("@permisos.tiene('mover_postulacion')")
     @Operation(summary = "Generar el enlace que deja al candidato entrar al portal sin "

@@ -4,6 +4,7 @@ import com.renaser.ai.ai_engine.ai.exception.ResourceNotFoundException;
 import com.renaser.ai.ai_engine.archivo.entity.Archivo;
 import com.renaser.ai.ai_engine.archivo.repository.ArchivoRepository;
 import com.renaser.ai.ai_engine.archivo.service.AlmacenArchivos;
+import com.renaser.ai.ai_engine.postulacion.dto.DtosPostulacion.CorregirContacto;
 import com.renaser.ai.ai_engine.postulacion.dto.DtosPostulacion.EnlaceArchivo;
 import com.renaser.ai.ai_engine.postulacion.dto.DtosPostulacion.FilaBandeja;
 import com.renaser.ai.ai_engine.postulacion.entity.EstadoPostulacion;
@@ -40,6 +41,8 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 /**
  * Lo que el equipo ve y se lleva del panel: la bandeja de trabajo y el currículum.
@@ -78,6 +81,8 @@ class ServicioPostulacionesPanelImplTest {
     @Mock private com.renaser.ai.ai_engine.prueba.service.ServicioPrueba prueba;
     @Mock private com.renaser.ai.ai_engine.validacion.service.ServicioValidacion validacion;
     @Mock private com.renaser.ai.ai_engine.simulacion.service.ServicioDisponibilidadSimulacion disponibilidad;
+    @Mock private com.renaser.ai.ai_engine.postulacion.repository.DatoCvRepository datosCv;
+    @Mock private com.renaser.ai.ai_engine.auditoria.service.ServicioAuditoria auditoria;
 
     @InjectMocks
     private ServicioPostulacionesPanelImpl servicio;
@@ -322,4 +327,68 @@ class ServicioPostulacionesPanelImplTest {
                 .ruta("1/abc.pdf").nombreOriginal("curriculum.pdf")
                 .tipo("application/pdf").build();
     }
+
+    @org.junit.jupiter.api.Nested
+    @DisplayName("Corregir el contacto de una ficha")
+    class CorregirElContacto {
+
+        private com.renaser.ai.ai_engine.postulacion.entity.DatoCv laFichaDe(String email, String tel) {
+            var ficha = com.renaser.ai.ai_engine.postulacion.entity.DatoCv.builder()
+                    .id(7L).postulacionId(1L).nombre("Ariana Belen Tineo").email(email).telefono(tel)
+                    .build();
+            Postulacion p = new Postulacion();
+            p.setId(1L);
+            p.setOrganizacionId(ORGANIZACION);
+            lenient().when(permisos.alcanceDe("corregir_contacto_candidato"))
+                    .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.TODO, 10L));
+            lenient().when(postulaciones.findByIdAndOrganizacionId(1L, ORGANIZACION))
+                    .thenReturn(java.util.Optional.of(p));
+            lenient().when(datosCv.findByPostulacionId(1L)).thenReturn(java.util.Optional.of(ficha));
+            return ficha;
+        }
+
+        @Test
+        @DisplayName("cambia solo lo que se manda, y deja el otro dato en paz")
+        void soloLoQueLlega() {
+            var ficha = laFichaDe("ariana_tineousmp.pe", "999888777");
+
+            var salida = servicio.corregirContacto(quien, 1L,
+                    new CorregirContacto("tineoariana00@gmail.com", null, "La IA leyo mal la arroba"));
+
+            assertThat(salida.email()).isEqualTo("tineoariana00@gmail.com");
+            // El telefono estaba bien: mandar solo el correo no puede tocarlo. Obligar a
+            // reescribir el que ya servia es la forma mas facil de estropearlo.
+            assertThat(salida.telefono()).isEqualTo("999888777");
+            assertThat(ficha.getEmail()).isEqualTo("tineoariana00@gmail.com");
+        }
+
+        @Test
+        @DisplayName("queda auditado con el valor anterior")
+        void quedaEscritoQueHabiaAntes() {
+            laFichaDe("ariana_tineousmp.pe", "999888777");
+
+            servicio.corregirContacto(quien, 1L,
+                    new CorregirContacto("tineoariana00@gmail.com", null, "La IA leyo mal la arroba"));
+
+            var anterior = org.mockito.ArgumentCaptor.forClass(Object.class);
+            verify(auditoria).registrar(eq(ORGANIZACION), eq(quien), eq("corregir_contacto_candidato"),
+                    eq("dato_cv"), eq(7L), anterior.capture(), any(), eq("La IA leyo mal la arroba"));
+            // Sin el valor viejo la auditoria no sirve para lo unico que hace falta: saber que
+            // decia el curriculum si el candidato pregunta por que su correo cambio.
+            assertThat(anterior.getValue().toString()).contains("ariana_tineousmp.pe");
+        }
+
+        @Test
+        @DisplayName("sin correo ni telefono no hay nada que corregir")
+        void nadaQueCorregir() {
+            laFichaDe("algo@ejemplo.com", "999888777");
+
+            assertThatThrownBy(() -> servicio.corregirContacto(quien, 1L,
+                    new CorregirContacto(null, "  ", "un motivo")))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("nada que corregir");
+            verifyNoInteractions(auditoria);
+        }
+    }
+
 }

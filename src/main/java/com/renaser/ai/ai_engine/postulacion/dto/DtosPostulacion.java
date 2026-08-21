@@ -1,6 +1,8 @@
 package com.renaser.ai.ai_engine.postulacion.dto;
 
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 
 import java.time.Instant;
 import java.util.List;
@@ -24,6 +26,29 @@ public final class DtosPostulacion {
     public record PasoHistorial(String estadoAnterior, String estadoNuevo, Long usuarioId,
                                 boolean fueElSistema, boolean fuePorLote, String motivo,
                                 Instant ocurridaEn) {}
+
+    /**
+     * Corregir el correo o el telefono que la IA leyo mal del curriculum.
+     *
+     * <p>Los dos van opcionales y se cambia solo lo que llegue: casi siempre falla uno de los
+     * dos, y obligar a reescribir el bueno es una invitacion a estropearlo.
+     *
+     * <p>El motivo es obligatorio y no es burocracia: esto pisa un dato que vino del
+     * curriculum de una persona. Si alguien pregunta despues por que su correo dice otra cosa,
+     * la respuesta tiene que estar escrita.
+     */
+    /** El contacto de una ficha, tal como queda tras corregirlo. */
+    public record ContactoDelCandidato(Long postulacionId, String nombre,
+                                       String email, String telefono) {}
+
+    public record CorregirContacto(
+            @Email(message = "Eso no parece un correo")
+            @Size(max = 320, message = "El correo es demasiado largo")
+            String email,
+            @Size(max = 40, message = "El telefono es demasiado largo")
+            String telefono,
+            @NotBlank(message = "Corregir un dato del curriculum exige un motivo escrito")
+            String motivo) {}
 
     public record Transicionar(@NotBlank String estadoDestino,
                                @NotBlank String motivo,

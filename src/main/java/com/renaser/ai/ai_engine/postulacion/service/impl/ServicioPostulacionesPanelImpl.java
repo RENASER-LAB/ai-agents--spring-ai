@@ -23,6 +23,7 @@ import com.renaser.ai.ai_engine.simulacion.service.ServicioDisponibilidadSimulac
 import com.renaser.ai.ai_engine.validacion.service.ServicioValidacion;
 import com.renaser.ai.ai_engine.postulacion.dto.DtosPostulacion.*;
 import com.renaser.ai.ai_engine.postulacion.entity.*;
+import com.renaser.ai.ai_engine.postulacion.repository.DatoCvRepository;
 import com.renaser.ai.ai_engine.postulacion.repository.*;
 import com.renaser.ai.ai_engine.postulacion.service.*;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
@@ -39,6 +40,8 @@ import java.time.Instant;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -61,6 +64,8 @@ public class ServicioPostulacionesPanelImpl implements ServicioPostulacionesPane
     private final ServicioPrueba prueba;
     private final ServicioValidacion validacion;
     private final ServicioDisponibilidadSimulacion disponibilidad;
+    private final DatoCvRepository datosCv;
+    private final ServicioAuditoria auditoria;
 
     @Override
     public List<FilaBandeja> bandeja(ContextoUsuario quien, String esperaA) {
@@ -294,4 +299,54 @@ public class ServicioPostulacionesPanelImpl implements ServicioPostulacionesPane
             throw new ResourceNotFoundException("Vacante", "id", vacanteId);
         }
     }
+
+    /**
+     * Corrige el correo o el telefono que la IA leyo mal del curriculum.
+     *
+     * <p>Solo se toca lo que llega: casi siempre falla uno de los dos, y obligar a reescribir
+     * el que estaba bien es una invitacion a estropearlo.
+     *
+     * <p>Queda auditado con el valor anterior y el motivo. Esto pisa un dato que vino del
+     * curriculum de una persona; si mañana pregunta por que su correo dice otra cosa, la
+     * respuesta tiene que estar escrita en algun sitio.
+     */
+    @Override
+    @Transactional
+    public ContactoDelCandidato corregirContacto(ContextoUsuario quien, Long postulacionId,
+                                                 CorregirContacto datos) {
+        Postulacion p = laVisible(quien, postulacionId, "corregir_contacto_candidato");
+
+        if ((datos.email() == null || datos.email().isBlank())
+                && (datos.telefono() == null || datos.telefono().isBlank())) {
+            throw new IllegalArgumentException(
+                    "No se manda ni correo ni telefono: no hay nada que corregir");
+        }
+
+        DatoCv ficha = datosCv.findByPostulacionId(postulacionId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Ficha del curriculum", "postulacion", postulacionId));
+
+        Map<String, String> antes = new LinkedHashMap<>();
+        Map<String, String> despues = new LinkedHashMap<>();
+
+        if (datos.email() != null && !datos.email().isBlank()) {
+            antes.put("email", ficha.getEmail() == null ? "" : ficha.getEmail());
+            ficha.setEmail(datos.email().trim());
+            despues.put("email", ficha.getEmail());
+        }
+        if (datos.telefono() != null && !datos.telefono().isBlank()) {
+            antes.put("telefono", ficha.getTelefono() == null ? "" : ficha.getTelefono());
+            ficha.setTelefono(datos.telefono().trim());
+            despues.put("telefono", ficha.getTelefono());
+        }
+        ficha.setActualizadoEn(Instant.now());
+        datosCv.save(ficha);
+
+        auditoria.registrar(p.getOrganizacionId(), quien, "corregir_contacto_candidato",
+                "dato_cv", ficha.getId(), antes, despues, datos.motivo());
+
+        return new ContactoDelCandidato(postulacionId, ficha.getNombre(),
+                ficha.getEmail(), ficha.getTelefono());
+    }
+
 }
