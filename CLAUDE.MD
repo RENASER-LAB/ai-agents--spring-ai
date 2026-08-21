@@ -68,7 +68,7 @@ Perfil Integral → prueba del puesto → simulacion → validacion → decision
 
 | | |
 |---|---|
-| Base de datos | **Flyway es el dueno del esquema**: V1-V23 en `src/main/resources/db/migration`, **85 tablas de este modulo** (88 en la base contando `flyway_schema_history` y las dos del motor de agentes, `agent_run` y `vector_store`). `ddl-auto: validate` |
+| Base de datos | **Flyway es el dueno del esquema**: V1-V24 en `src/main/resources/db/migration`, **91 tablas de este modulo** (94 en la base contando `flyway_schema_history` y las dos del motor de agentes, `agent_run` y `vector_store`). `ddl-auto: validate` |
 | Codigo | Veintiun paquetes de dominio bajo `ai_engine` (ver «Como esta organizado el codigo») |
 | Tests | **381, todos en verde (20/08/2026)**: 331 unitarios y 50 de integracion. Ver «Correr los tests»: unitarios de la maquina y del anonimizador, migraciones contra Postgres real (Testcontainers) y flujos de punta a punta: hito 1, evaluacion, prueba, simulacion/validacion y calificacion con IA |
 | IA que califica | **Seis de los diez agentes del catalogo estan implementados**: datos del curriculum, evidencia, evaluador, potencial/riesgo, prueba del puesto y las preguntas de la conversacion final. Todos corren por cola de RabbitMQ contra DeepSeek. Ver [Calificacion con IA](docs/CALIFICACION-CON-IA.md) |
