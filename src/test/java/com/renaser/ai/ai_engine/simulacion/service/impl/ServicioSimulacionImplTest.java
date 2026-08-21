@@ -51,6 +51,8 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -444,5 +446,90 @@ class ServicioSimulacionImplTest {
     private void alcanceDeDecidir(FiltroAlcance.Tipo tipo) {
         when(permisos.alcanceDe("decidir_sobre_ausente"))
                 .thenReturn(new FiltroAlcance(tipo, USUARIO));
+    }
+
+    // ============ La lista de sesiones del panel ============
+
+    @org.junit.jupiter.api.Nested
+    @DisplayName("Al listar las sesiones en el panel")
+    class ListarSesiones {
+
+        private com.renaser.ai.ai_engine.simulacion.entity.SesionSimulacion sesion(long id) {
+            return com.renaser.ai.ai_engine.simulacion.entity.SesionSimulacion.builder()
+                    .id(id).organizacionId(ORGANIZACION)
+                    .fechaHora(Instant.parse("2026-09-01T15:00:00Z"))
+                    .duracionMinutos(120).modalidad("GRUPAL").lugar("Sala 1").cupo(6)
+                    .estado("PUBLICADA")
+                    .build();
+        }
+
+        @Test
+        @DisplayName("Sin ninguna sesión devuelve la lista vacía y no consulta nada más")
+        void sinSesionesNoConsultaLoQueCuelga() {
+            when(sesiones.findByOrganizacionIdOrderByFechaHora(ORGANIZACION))
+                    .thenReturn(List.of());
+
+            assertThat(servicio.listarSesiones(QUIEN)).isEmpty();
+
+            // Si preguntara igual, serían cuatro consultas con una lista de ids vacía: no
+            // devuelven nada y en algunos motores ni siquiera son SQL válido.
+            verifyNoInteractions(inscripciones, sesionesVacante, responsables, tramos);
+        }
+
+        @Test
+        @DisplayName("Con sesiones, cada una llega con sus inscritos, vacantes, responsables y tramos")
+        void cadaSesionLlegaCompleta() {
+            var una = sesion(1L);
+            var otra = sesion(2L);
+            when(sesiones.findByOrganizacionIdOrderByFechaHora(ORGANIZACION))
+                    .thenReturn(List.of(una, otra));
+            // La primera tiene dos inscritos; de la segunda la consulta no devuelve fila.
+            when(inscripciones.contarVigentesPorSesion(List.of(1L, 2L)))
+                    .thenReturn(java.util.List.<Object[]>of(new Object[]{1L, 2L}));
+            when(sesionesVacante.findBySesionSimulacionIdIn(List.of(1L, 2L))).thenReturn(List.of(
+                    com.renaser.ai.ai_engine.simulacion.entity.SesionVacante.builder()
+                            .sesionSimulacionId(1L).vacanteId(70L).build()));
+            when(responsables.findBySesionSimulacionIdIn(List.of(1L, 2L))).thenReturn(List.of(
+                    com.renaser.ai.ai_engine.simulacion.entity.SesionResponsable.builder()
+                            .sesionSimulacionId(1L).usuarioId(USUARIO).build()));
+            when(tramos.findBySesionSimulacionIdInOrderByMinutoInicio(List.of(1L, 2L)))
+                    .thenReturn(List.of());
+
+            var lista = servicio.listarSesiones(QUIEN);
+
+            assertThat(lista).hasSize(2);
+            assertThat(lista.get(0).inscritos()).isEqualTo(2L);
+            assertThat(lista.get(0).vacanteIds()).containsExactly(70L);
+            assertThat(lista.get(0).responsableIds()).containsExactly(USUARIO);
+
+            // Y la que no aparece en ninguna de las cuatro consultas no se cae de la lista:
+            // una sesión recién creada, sin nadie inscrito ni nada colgando, existe igual.
+            assertThat(lista.get(1).inscritos()).isZero();
+            assertThat(lista.get(1).vacanteIds()).isEmpty();
+            assertThat(lista.get(1).responsableIds()).isEmpty();
+            assertThat(lista.get(1).tramos()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("Lo que cuelga se pide de una vez para todas, no una consulta por sesión")
+        void unaConsultaPorTablaYNoPorFila() {
+            when(sesiones.findByOrganizacionIdOrderByFechaHora(ORGANIZACION))
+                    .thenReturn(List.of(sesion(1L), sesion(2L), sesion(3L)));
+            when(inscripciones.contarVigentesPorSesion(anyList())).thenReturn(List.of());
+            when(sesionesVacante.findBySesionSimulacionIdIn(anyList())).thenReturn(List.of());
+            when(responsables.findBySesionSimulacionIdIn(anyList())).thenReturn(List.of());
+            when(tramos.findBySesionSimulacionIdInOrderByMinutoInicio(anyList()))
+                    .thenReturn(List.of());
+
+            servicio.listarSesiones(QUIEN);
+
+            // Esta lista no se pagina ni se filtra por fecha: son todas las sesiones que la
+            // organización creó nunca. Con una consulta por fila, el día que haya un año de
+            // sesiones dentro la pantalla se cae sola.
+            verify(inscripciones, times(1)).contarVigentesPorSesion(anyList());
+            verify(sesionesVacante, times(1)).findBySesionSimulacionIdIn(anyList());
+            verify(responsables, times(1)).findBySesionSimulacionIdIn(anyList());
+            verify(tramos, times(1)).findBySesionSimulacionIdInOrderByMinutoInicio(anyList());
+        }
     }
 }
