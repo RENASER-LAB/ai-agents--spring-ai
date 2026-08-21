@@ -1,0 +1,131 @@
+# Lo que corre en el servidor de AWS.
+#
+# Son dos contenedores y ninguno guarda nada: la base es Supabase, los curriculums viven en
+# su bucket y la cola es Amazon MQ. Esta maquina se puede tirar y volver a crear sin perder
+# nada mas que los certificados, que Caddy vuelve a sacar solo.
+#
+# Se levanta con:
+#   docker compose --env-file .env up -d
+#
+# Las credenciales NO estan aqui: vienen de .env, que no se versiona. Ver .env.example.
+
+services:
+
+  # ---------------------------------------------------------------- la aplicacion
+  aplicacion:
+    image: ${IMAGEN}
+    container_name: renaser-backend
+    restart: always
+    environment:
+      SPRING_PROFILES_ACTIVE: pruebas
+
+      # Base de datos: Supabase. Puerto 5432 (la conexion directa), NO el 6543 del pooler
+      # de transacciones, que no soporta las consultas preparadas que Flyway necesita para
+      # migrar y hace fallar el arranque con un error que no dice por que.
+      SPRING_DATASOURCE_URL: ${SPRING_DATASOURCE_URL}
+      SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME}
+      SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD}
+
+      # La cola es Amazon MQ (broker renaser-mq, RabbitMQ 4.2, us-east-1).
+      #
+      # Tres cosas que no son como en local y rompen el arranque si se copian mal:
+      #   - el puerto es 5671, no 5672: Amazon MQ solo habla AMQPS, cifrado
+      #   - por lo mismo, ssl.enabled tiene que ir en true
+      #   - el HOST va sin «amqps://» y sin puerto. Spring arma la url el solo; pegar el
+      #     endpoint entero da un fallo de resolucion de nombre que no menciona el esquema
+      # Los nombres son los que espera application-pruebas.yaml, y NO llevan el prefijo
+      # SPRING_: ese archivo hace `host: ${RABBITMQ_HOST}` sin valor por defecto, asi que si
+      # se ponen como SPRING_RABBITMQ_* el marcador se queda sin resolver y la aplicacion no
+      # arranca — con un error que habla de un placeholder, no de la cola.
+      RABBITMQ_HOST: ${RABBITMQ_HOST}
+      RABBITMQ_PORT: 5671
+      RABBITMQ_USERNAME: ${RABBITMQ_USERNAME}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST:-/}
+
+      # Cuantos candidatos se califican a la vez.
+      #
+      # application-pruebas.yaml los deja en 2/4, que es lo prudente mientras el panel hace
+      # consultas caras: los consumidores compiten por las mismas conexiones que el portal.
+      # Con el N+1 de la bandeja arreglado eso deja de ser cierto, y a 2/4 la criba va a un
+      # quinto de su ritmo — medido: 3,9 trabajos por minuto contra 19,8.
+      #
+      # Va por variable y no en el yaml para poder subirlo o bajarlo sin reconstruir la
+      # imagen, que es justo lo que hace falta cuando hay una tanda esperando.
+      SPRING_RABBITMQ_LISTENER_SIMPLE_CONCURRENCY: ${IA_CONSUMIDORES:-8}
+      SPRING_RABBITMQ_LISTENER_SIMPLE_MAX_CONCURRENCY: ${IA_CONSUMIDORES_MAX:-12}
+
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
+      GOOGLE_GEMINI_API_KEY: ${GOOGLE_GEMINI_API_KEY}
+      JWT_SECRETO: ${JWT_SECRETO}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+
+      # La clave del bucket donde viven los curriculums. Sin esto la aplicacion arranca
+      # igual y falla al abrir el primer CV, que es peor que no arrancar: se descubre
+      # tarde y con un candidato delante.
+      APP_ARCHIVOS_TIPO: supabase
+      APP_ARCHIVOS_SUPABASE_CLAVE: ${APP_ARCHIVOS_SUPABASE_CLAVE}
+
+      # Correo. Sin CORREO_TRANSPORTE=smtp la aplicacion arranca igual y solo anota los
+      # avisos en correo_enviado, que es el comportamiento por defecto y no rompe nada.
+      CORREO_TRANSPORTE: ${CORREO_TRANSPORTE:-log}
+      CORREO_REMITENTE: ${CORREO_REMITENTE:-}
+      SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-}
+      SPRING_MAIL_PORT: ${SPRING_MAIL_PORT:-587}
+      SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME:-}
+      SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD:-}
+      # Sin esto el envio falla contra cualquier proveedor serio en el 587. Gmail contesta
+      # «530-5.7.0 Must issue a STARTTLS command first», que no nombra ni el TLS ni la
+      # propiedad que falta. Van tambien en application.yaml; aqui estan para poder
+      # arreglarlo sin reconstruir la imagen.
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH:-true}
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE:-true}
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_REQUIRED: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_REQUIRED:-true}
+
+      # Sin esto los correos saldrian con enlaces a localhost:5174.
+      PORTAL_URL: ${PORTAL_URL}
+
+      # El Dockerfile pide el 75% de la memoria del contenedor. En una maquina de 2 GB eso
+      # deja al sistema sin aire; el limite de abajo es lo que hace que ese 75% sea de 1,5 GB
+      # y no de toda la maquina.
+      JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=70.0
+    mem_limit: ${MEMORIA_APP:-2g}
+    # Solo escucha en la red interna: quien habla con el mundo es Caddy.
+    expose:
+      - "8080"
+    logging: &registro
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ---------------------------------------------------------------- la puerta
+  #
+  # Caddy y no un balanceador: un ALB son 16 dolares al mes para repartir trafico entre UNA
+  # maquina. Caddy saca y renueva el certificado de Let's Encrypt solo, sin cron ni
+  # recordatorios.
+  caddy:
+    image: caddy:2-alpine
+    container_name: renaser-caddy
+    restart: always
+    depends_on:
+      - aplicacion
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_datos:/data
+      - caddy_config:/config
+    environment:
+      # Si no hay dominio se pasa «:80» y Caddy sirve por HTTP contra la IP. El valor por
+      # defecto va AQUI y no en el Caddyfile porque el de Caddy solo aplica si la variable
+      # no existe, y esta existe: llega vacia desde el .env. Con la cadena vacia la primera
+      # linea del Caddyfile queda como « {», que Caddy lee como un bloque de opciones
+      # globales y falla con «unrecognized global option: encode».
+      DOMINIO: ${DOMINIO:-:80}
+    logging: *registro
+
+volumes:
+  caddy_datos:
+  caddy_config:

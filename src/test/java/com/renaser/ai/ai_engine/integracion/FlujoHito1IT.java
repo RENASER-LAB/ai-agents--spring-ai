@@ -465,8 +465,14 @@ public class FlujoHito1IT {
                         .content("{\"token\":\"" + token + "\"}"))
                 .andExpect(status().isOk());
 
+        // El ultimo, no «el» de la postulacion: una postulacion puede tener varios enlaces.
+        // MaquinaEstados genera uno cada vez que avisa al candidato, asi que al llegar aqui
+        // ya hay los de los avisos de las etapas anteriores mas el que pidio esta prueba.
+        // Sin el ORDER BY esto reventaba con «expected 1, actual 3» segun por donde hubiera
+        // pasado la postulacion, que es lo peor: falla o no segun el resto del recorrido.
         Integer usos = jdbc.queryForObject(
-                "SELECT usos FROM enlace_acceso WHERE postulacion_id = ?", Integer.class, postulacionId);
+                "SELECT usos FROM enlace_acceso WHERE postulacion_id = ? ORDER BY id DESC LIMIT 1",
+                Integer.class, postulacionId);
         assertThat(usos).as("se anota cada uso, para saber si el candidato llego a entrar").isEqualTo(2);
 
         // Un token inventado no entra, y dice lo mismo que uno vencido: distinguirlos le

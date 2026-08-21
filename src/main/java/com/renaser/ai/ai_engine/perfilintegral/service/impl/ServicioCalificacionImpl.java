@@ -39,6 +39,7 @@ import java.util.HashMap;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -87,12 +88,13 @@ public class ServicioCalificacionImpl implements ServicioCalificacion {
                         "Evaluación", "postulación", postulacionId));
 
         List<Respuesta> suyas = respuestas.findByEvaluacionId(evaluacion.getId());
-        Map<Long, Pregunta> porId = preguntas
-                .findByIdIn(suyas.stream().map(Respuesta::getPreguntaId).toList()).stream()
+        List<Long> preguntaIds = suyas.stream().map(Respuesta::getPreguntaId).toList();
+        Map<Long, Pregunta> porId = preguntas.findByIdIn(preguntaIds).stream()
                 .collect(Collectors.toMap(Pregunta::getId, Function.identity()));
+        Map<Long, List<Opcion>> opcionesPorPregunta = opcionesDe(preguntaIds);
 
-        ResumenCerrado resumen = puntuar(suyas, porId);
-        detectarContradicciones(postulacion, evaluacion, suyas, porId);
+        ResumenCerrado resumen = puntuar(suyas, porId, opcionesPorPregunta);
+        detectarContradicciones(postulacion, evaluacion, suyas, porId, opcionesPorPregunta);
         guardarNota(postulacion, resumen.nota());
         return resumen.nota();
     }
@@ -115,10 +117,33 @@ public class ServicioCalificacionImpl implements ServicioCalificacion {
         if (suyas.isEmpty()) {
             return new ResumenCerrado(BigDecimal.ZERO, 0);
         }
-        Map<Long, Pregunta> porId = preguntas
-                .findByIdIn(suyas.stream().map(Respuesta::getPreguntaId).toList()).stream()
+        List<Long> preguntaIds = suyas.stream().map(Respuesta::getPreguntaId).toList();
+        Map<Long, Pregunta> porId = preguntas.findByIdIn(preguntaIds).stream()
                 .collect(Collectors.toMap(Pregunta::getId, Function.identity()));
-        return puntuar(suyas, porId);
+        return puntuar(suyas, porId, opcionesDe(preguntaIds));
+    }
+
+    /**
+     * Las opciones de toda la tanda de preguntas, agrupadas por la suya.
+     *
+     * <p>Se piden una sola vez porque el examen del v3 <b>se aplica entero</b>: son 190 ítems,
+     * y pedir las opciones dentro del bucle que puntúa costaba 190 consultas cada vez que un
+     * candidato pulsa «entregar» —más otras tantas al comparar los pares de consistencia—.
+     * Eso lo paga el candidato esperando delante de la pantalla, en la única petición del
+     * recorrido que no se puede reintentar sin volver a hacer el examen.
+     *
+     * <p>Van ordenadas por letra igual que las traía la consulta de una en una: hoy ninguna
+     * fórmula depende de ese orden, pero la que se apoye en él mañana no tiene por qué
+     * enterarse de que la lista cambió de sitio.
+     */
+    private Map<Long, List<Opcion>> opcionesDe(List<Long> preguntaIds) {
+        if (preguntaIds.isEmpty()) {
+            return Map.of();
+        }
+        return opciones.findByPreguntaIdIn(preguntaIds).stream()
+                .sorted(Comparator.comparing(Opcion::getLetra,
+                        Comparator.nullsLast(Comparator.naturalOrder())))
+                .collect(Collectors.groupingBy(Opcion::getPreguntaId));
     }
 
     /**
@@ -135,7 +160,8 @@ public class ServicioCalificacionImpl implements ServicioCalificacion {
      * <p><b>Un ítem sin responder no es un cero, es un ítem que falta.</b> No se cuenta contra
      * el máximo: inventarle un cero sería castigar dos veces al que no llegó a terminar.
      */
-    private ResumenCerrado puntuar(List<Respuesta> suyas, Map<Long, Pregunta> porId) {
+    private ResumenCerrado puntuar(List<Respuesta> suyas, Map<Long, Pregunta> porId,
+                                   Map<Long, List<Opcion>> opcionesPorPregunta) {
         BigDecimal obtenido = BigDecimal.ZERO;
         BigDecimal maximo = BigDecimal.ZERO;
         int contadas = 0;
@@ -145,7 +171,8 @@ public class ServicioCalificacionImpl implements ServicioCalificacion {
             if (p == null || p.getPeso() == null || p.getPeso() == 0) {
                 continue;   // no puntúa: par de consistencia o eliminatorio
             }
-            BigDecimal delItem = puntuarItem(p, r);
+            BigDecimal delItem = puntuarItem(p, r,
+                    opcionesPorPregunta.getOrDefault(p.getId(), List.of()));
             if (delItem == null) {
                 continue;   // no se pudo leer la respuesta: no se inventa un cero
             }
@@ -165,9 +192,8 @@ public class ServicioCalificacionImpl implements ServicioCalificacion {
      * Lo que vale un ítem, de 0 a 3, según su formato. {@code null} si la respuesta no se
      * puede leer: eso no es un cero, es que no hay con qué puntuar.
      */
-    private BigDecimal puntuarItem(Pregunta p, Respuesta r) {
+    private BigDecimal puntuarItem(Pregunta p, Respuesta r, List<Opcion> suyas) {
         Map<String, Object> detalle = leerDetalle(r);
-        List<Opcion> suyas = opciones.findByPreguntaIdOrderByLetra(p.getId());
 
         return switch (p.getTipo()) {
             case "EF-4" -> {
@@ -296,17 +322,25 @@ public class ServicioCalificacionImpl implements ServicioCalificacion {
      * comparar: la ausencia de respuesta no es una contradicción.
      */
     private void detectarContradicciones(Postulacion postulacion, Evaluacion evaluacion,
-                                         List<Respuesta> suyas, Map<Long, Pregunta> porId) {
+                                         List<Respuesta> suyas, Map<Long, Pregunta> porId,
+                                         Map<Long, List<Opcion>> opcionesPorPregunta) {
         List<ParConsistencia> configurados = pares.findByVersionBancoId(
                 evaluacion.getVersionBancoNivelId());
         if (configurados.isEmpty()) {
             return;   // el cliente todavía no dijo qué preguntas se comparan con cuáles
         }
 
+        // La opción elegida sale del mismo lote que ya trajo puntuar, no de un findById por
+        // respuesta: si no, entregar la evaluación pagaba el banco entero DOS veces.
+        Map<Long, Opcion> porOpcionId = opcionesPorPregunta.values().stream()
+                .flatMap(List::stream)
+                .collect(Collectors.toMap(Opcion::getId, Function.identity(), (a, b) -> a));
+
+        // Una opción que no aparezca vale cero, igual que antes valía cero el findById vacío.
         Map<Long, BigDecimal> puntajePorPregunta = suyas.stream()
                 .filter(r -> r.getOpcionId() != null)
                 .collect(Collectors.toMap(Respuesta::getPreguntaId,
-                        r -> opciones.findById(r.getOpcionId())
+                        r -> Optional.ofNullable(porOpcionId.get(r.getOpcionId()))
                                 .map(Opcion::getPuntaje).orElse(BigDecimal.ZERO),
                         (a, b) -> a));
 

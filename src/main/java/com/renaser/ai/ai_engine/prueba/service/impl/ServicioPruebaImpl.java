@@ -162,8 +162,20 @@ public class ServicioPruebaImpl implements ServicioPrueba {
     @Override
     @Transactional
     public void entregarVencidos() {
-        for (IntentoPrueba intento : intentos.findByEntregadoEnIsNullAndIniciadoEnIsNotNullAndVenceEnBefore(Instant.now())) {
-            Postulacion postulacion = postulaciones.findById(intento.getPostulacionId()).orElse(null);
+        List<IntentoPrueba> vencidos =
+                intentos.findByEntregadoEnIsNullAndIniciadoEnIsNotNullAndVenceEnBefore(Instant.now());
+        if (vencidos.isEmpty()) {
+            return;
+        }
+        // Las postulaciones de la tanda entera, no una por intento. La tanda crece con los
+        // candidatos que estén haciendo la prueba, y esta tarea corre sola cada poco: no
+        // tiene por qué llevarse el pool de conexiones cada vez que despierta.
+        Map<Long, Postulacion> porId = postulaciones
+                .findAllById(vencidos.stream().map(IntentoPrueba::getPostulacionId).toList()).stream()
+                .collect(Collectors.toMap(Postulacion::getId, Function.identity()));
+
+        for (IntentoPrueba intento : vencidos) {
+            Postulacion postulacion = porId.get(intento.getPostulacionId());
             if (postulacion == null) continue;
             cerrarIntento(intento, postulacion, true);
         }

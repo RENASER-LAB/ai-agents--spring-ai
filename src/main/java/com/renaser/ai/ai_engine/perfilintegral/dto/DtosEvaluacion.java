@@ -33,6 +33,31 @@ public final class DtosEvaluacion {
      *
      * <p>{@code situacion} es el contexto del caso, que sí se muestra. {@code logicaInterna}
      * y {@code esPuntuable} se quedan fuera a propósito.
+     *
+     * <p>Los tres campos de respuesta son lo que ya contestó, y existen para que pueda
+     * <b>retomar</b>: el examen del banco v3 son 190 ítems, nadie los responde de una sentada.
+     * Si al volver los viera en blanco, o rehace todo o entrega a medias.
+     *
+     * <p>{@code respuestaDetalle} es el tercero, y hacía falta porque 162 de esos 190 ítems no
+     * se responden con una sola opción —un SJT-R califica cada opción, un EF-4 marca dos, un
+     * SEC ordena cinco pasos— y eso no cabe en {@code respuestaOpcionId} ni en
+     * {@code respuestaTexto}. Tiene la misma forma que el {@code detalle} de {@link Responder}:
+     * lo que se manda al guardar es lo que vuelve al leer, y así el portal pinta la pregunta
+     * con el mismo código con que la envió.
+     *
+     * <p><b>Vuelve solo lo que escribió el candidato</b>, clave por clave según el formato. No
+     * es que hoy haya otra cosa guardada ahí —solo escribe ese campo el propio candidato— sino
+     * que la columna es {@code jsonb} y admite cualquier cosa: filtrando al salir, ningún
+     * puntaje que alguien guarde ahí mañana puede llegar al navegador.
+     *
+     * <p>{@code casosPedidos} es <b>cuántos campos hay que llenar</b> en un caso descompuesto
+     * (CD), y solo lo traen los CD: en los demás formatos viene en nulo. Sin él, el portal
+     * tenía que adivinar el número leyendo el «(6 campos)» del propio enunciado, y cuando no
+     * lo encontraba pintaba un solo cuadro para un caso de seis datos.
+     *
+     * <p><b>No es clave</b> y por eso puede salir (RF-53): el enunciado que el candidato ya
+     * está leyendo dice ese mismo número entre paréntesis. Dice cuántas casillas llenar, no
+     * qué poner en ellas ni cuánto vale ponerlo.
      */
     public record PreguntaCandidato(
             Long id,
@@ -40,9 +65,11 @@ public final class DtosEvaluacion {
             String tipo,
             String enunciado,
             String situacion,
+            Short casosPedidos,
             List<OpcionCandidato> opciones,
             String respuestaTexto,
-            Long respuestaOpcionId) {}
+            Long respuestaOpcionId,
+            Map<String, Object> respuestaDetalle) {}
 
     /** La evaluación completa, con su avance. */
     public record EvaluacionCandidato(

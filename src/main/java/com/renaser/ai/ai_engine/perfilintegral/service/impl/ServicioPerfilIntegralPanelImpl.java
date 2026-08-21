@@ -102,6 +102,7 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
     private final ServicioAuditoria auditoria;
     private final ColaCalificacionIa cola;
     private final MaquinaEstados maquina;
+    private final com.renaser.ai.ai_engine.perfilintegral.repository.EvaluacionRepository evaluaciones;
     private final Permisos permisos;
 
     // El orden de la tanda. Manda el grupo, no la nota: quien llega a la nota arrastrando un
@@ -214,8 +215,19 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
     public PasadaEncolada cribaRapida(ContextoUsuario quien, Long vacanteId) {
         Vacante vacante = vacanteVisible(quien, vacanteId, "ajustar_nota");
         Set<String> cerrados = cerrados();
+        List<Postulacion> suyas = postulaciones.findByVacanteIdOrderByCreadoEnDesc(vacanteId);
+        List<Long> ids = suyas.stream().map(Postulacion::getId).toList();
+
+        // Con qué pasada está cada uno y quién tiene currículum, para la tanda entera y no
+        // dentro del bucle. Es la misma tanda que pinta el ranking —crece con los candidatos
+        // que se apunten— y preguntarlo por fila costaba dos consultas por persona antes
+        // siquiera de decidir si se le encola.
+        Map<Long, ColaCalificacionIa.Estado> enCola = cola.estadoDe(ids);
+        Map<Long, Cv> cvPorPostulacion = porPostulacion(cvs.findByPostulacionIdIn(ids),
+                Cv::getPostulacionId);
+
         int encolados = 0;
-        for (Postulacion p : postulaciones.findByVacanteIdOrderByCreadoEnDesc(vacanteId)) {
+        for (Postulacion p : suyas) {
             // Una tanda no es «todo el mundo que tenga currículum». Quien se retiró, quien
             // no continuó y quien ya está contratado siguen en la vacante, y barrerla sin
             // mirar el estado los devolvía a «por confirmar» pagando el modelo por el camino.
@@ -224,7 +236,9 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
             }
             // Quien ya tiene retrato no se vuelve a calificar: repetirlo cuesta lo mismo y
             // no cambia nada. Para rehacer uno concreto está el botón de su ficha.
-            if (cola.pasadaDe(p.getId()) != null || cvs.findByPostulacionId(p.getId()).isEmpty()) {
+            ColaCalificacionIa.Estado estado = enCola.get(p.getId());
+            String pasada = estado == null ? null : estado.pasada();
+            if (pasada != null || !cvPorPostulacion.containsKey(p.getId())) {
                 continue;
             }
             // Se cuenta lo que de verdad quedó en la cola, no lo que se intentó. Antes se
@@ -276,10 +290,19 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
         // segunda pasada que no mira a nadie no es una segunda pasada.
         int cuantos = Math.max(1, (int) Math.ceil(conNota * porcentaje / 100.0));
 
-        int encolados = 0;
-        for (FilaRanking f : filas.stream()
+        List<FilaRanking> corte = filas.stream()
                 .filter(f -> f.notaEtapa() != null)
-                .limit(cuantos).toList()) {
+                .limit(cuantos).toList();
+
+        // El corte es la mitad de la tanda por defecto, así que crece con los candidatos.
+        // Traerlas de una vez y no con un findById por fila: la postulación solo hace falta
+        // para moverla de estado, y quién entra en el corte ya se sabe aquí.
+        Map<Long, Postulacion> porId = porId(
+                postulaciones.findAllById(corte.stream().map(FilaRanking::postulacionId).toList()),
+                Postulacion::getId);
+
+        int encolados = 0;
+        for (FilaRanking f : corte) {
             // Quien ya pasó por la fina no repite: es la definitiva.
             if ("FINA".equals(f.pasada())) {
                 continue;
@@ -287,7 +310,10 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
             if (!cola.encolarCribaFina(f.postulacionId())) {
                 continue;
             }
-            postulaciones.findById(f.postulacionId()).ifPresent(this::moverACalificando);
+            Postulacion p = porId.get(f.postulacionId());
+            if (p != null) {
+                moverACalificando(p);
+            }
             encolados++;
         }
         auditoria.registrar(quien.organizacionId(), quien, "criba_fina",
@@ -314,6 +340,73 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
             maquina.transicionar(p, "PERFIL_CALIFICANDO", null, null, true, false, null);
         }
     }
+
+    /** El estado en el que le toca al candidato responder su evaluación. */
+    private static final String LE_TOCA = "PERFIL_TURNO_CANDIDATO";
+
+    @Override
+    @Transactional
+    public com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.EvaluacionReabierta
+            reabrirEvaluacion(ContextoUsuario quien, Long postulacionId, Integer dias, String motivo) {
+
+        if (motivo == null || motivo.isBlank()) {
+            throw new IllegalArgumentException("Reabrir una evaluación exige un motivo escrito");
+        }
+
+        Postulacion postulacion = postulaciones.findByIdAndOrganizacionId(
+                        postulacionId, quien.organizacionId())
+                .orElseThrow(() -> new ResourceNotFoundException("Postulación", "id", postulacionId));
+
+        if (maquina.yaTermino(postulacion)) {
+            throw new IllegalStateException("Esta postulación ya terminó: no se le reabre nada");
+        }
+        if (postulacion.getEvaluacionId() == null) {
+            throw new IllegalStateException("Esta postulación no tiene evaluación que reabrir");
+        }
+
+        var evaluacion = evaluaciones.findById(postulacion.getEvaluacionId())
+                .orElseThrow(() -> new IllegalStateException(
+                        "La postulación apunta a una evaluación que no existe"));
+
+        // Una entregada no se reabre. Su nota ya pudo usarse para decidir, y volver a abrirla
+        // dejaría esa decisión apoyada en algo que después cambió.
+        if ("TERMINADA".equals(evaluacion.getEstado())) {
+            throw new IllegalStateException(
+                    "Esa evaluación ya fue entregada: reabrirla invalidaría su nota");
+        }
+
+        int plazo = dias != null && dias > 0
+                ? dias
+                : parametros.entero(postulacion.getOrganizacionId(), "dias_plazo_evaluacion", 14);
+
+        java.time.Instant vence = java.time.Instant.now()
+                .plus(plazo, java.time.temporal.ChronoUnit.DAYS);
+        String venceAntes = String.valueOf(evaluacion.getVenceEn());
+
+        // Si ya la había empezado se respeta: vuelve a EN_CURSO y conserva lo respondido.
+        evaluacion.setEstado(evaluacion.getIniciadaEn() == null ? "PENDIENTE" : "EN_CURSO");
+        evaluacion.setVenceEn(vence);
+        // La vigencia manda sobre el plazo: de nada sirve poder responder si el resultado ya
+        // no vale. Se estira solo si se quedaría corta.
+        if (evaluacion.getVigenteHasta() == null || evaluacion.getVigenteHasta().isBefore(vence)) {
+            evaluacion.setVigenteHasta(vence);
+        }
+        evaluaciones.save(evaluacion);
+
+        if (!LE_TOCA.equals(postulacion.getEstadoCodigo())) {
+            maquina.transicionar(postulacion, LE_TOCA, quien, motivo, false, false, null);
+        }
+
+        auditoria.registrar(postulacion.getOrganizacionId(), quien,
+                "reabrir_evaluacion", "postulacion", postulacion.getId(),
+                java.util.Map.of("venceEn", venceAntes),
+                java.util.Map.of("venceEn", vence.toString(), "dias", String.valueOf(plazo)),
+                motivo);
+
+        return new com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.EvaluacionReabierta(
+                postulacion.getId(), postulacion.getEstadoCodigo(), vence, plazo);
+    }
+
 
     @Override
     @Transactional(readOnly = true)

@@ -62,11 +62,15 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyIterable;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -119,6 +123,7 @@ class ServicioPerfilIntegralPanelImplTest {
     @Mock private ColaCalificacionIa cola;
     @Mock private MaquinaEstados maquina;
     @Mock private Permisos permisos;
+    @Mock private com.renaser.ai.ai_engine.perfilintegral.repository.EvaluacionRepository evaluaciones;
 
     @InjectMocks
     private ServicioPerfilIntegralPanelImpl servicio;
@@ -343,6 +348,7 @@ class ServicioPerfilIntegralPanelImplTest {
         Postulacion contratado = enEstado(candidato(2L, null, null), "CONTRATADO");
         Postulacion retirado = enEstado(candidato(3L, null, null), "CERRADA");
         conCurriculum(viva, contratado, retirado);
+        sinRetrato(1L, 2L, 3L);
         candidatos(viva, contratado, retirado);
         when(cola.encolarCribaRapida(1L)).thenReturn(true);
 
@@ -371,6 +377,33 @@ class ServicioPerfilIntegralPanelImplTest {
     // ============ Los botones cuentan lo que de verdad encolaron ============
 
     @Test
+    @DisplayName("La criba rápida mira la tanda en bloque, no candidato a candidato")
+    void laCribaRapidaNoPreguntaUnaVezPorCandidato() {
+        // La tanda de una criba es la misma que pinta el ranking: crece con los candidatos
+        // que se apunten. Preguntar por fila con qué pasada está cada uno y si tiene
+        // currículum eran dos consultas por persona antes siquiera de decidir si se encola.
+        Postulacion[] tanda = new Postulacion[60];
+        Long[] ids = new Long[60];
+        for (int i = 0; i < 60; i++) {
+            tanda[i] = candidato(i + 1L, null, null);
+            ids[i] = i + 1L;
+        }
+        conCurriculum(tanda);
+        sinRetrato(ids);
+        candidatos(tanda);
+        lenient().when(cola.encolarCribaRapida(anyLong())).thenReturn(true);
+
+        assertThat(servicio.cribaRapida(quien, VACANTE).candidatos()).isEqualTo(60);
+
+        verify(cvs, times(1)).findByPostulacionIdIn(anyList());
+        verify(cola, times(1)).estadoDe(anyList());
+        // Las dos consultas por fila que había antes. Si vuelve cualquiera de las dos, los
+        // conteos de arriba siguen en 1 y solo esto lo delata.
+        verify(cvs, never()).findByPostulacionId(anyLong());
+        verify(cola, never()).pasadaDe(anyLong());
+    }
+
+    @Test
     void laCribaRapidaSoloCuentaAQuienDeVerdadQuedoEnLaCola() {
         // Antes se sumaba siempre. Un segundo clic respondía «2 en cola» sin haber encolado
         // a nadie, y ese número falso quedaba escrito también en la auditoría, que es donde
@@ -378,6 +411,7 @@ class ServicioPerfilIntegralPanelImplTest {
         Postulacion uno = candidato(1L, null, null);
         Postulacion dos = candidato(2L, null, null);
         conCurriculum(uno, dos);
+        sinRetrato(1L, 2L);
         candidatos(uno, dos);
         when(cola.encolarCribaRapida(1L)).thenReturn(true);
         when(cola.encolarCribaRapida(2L)).thenReturn(false);
@@ -443,11 +477,26 @@ class ServicioPerfilIntegralPanelImplTest {
     }
 
     /** Les pone currículum: sin archivo la criba ni los mira. */
+    /**
+     * Estos candidatos tienen currículum.
+     *
+     * <p>Se apunta por las dos vías porque hay dos formas de preguntarlo y las dos existen:
+     * la ficha de uno solo lo pide suelto, y las cribas lo piden para la tanda entera. Si el
+     * doble solo supiera contestar a una, la criba se saltaría a todo el mundo y el test
+     * pasaría a verde sin haber probado nada.
+     */
     private void conCurriculum(Postulacion... losSuyos) {
         for (Postulacion p : losSuyos) {
-            lenient().when(cvs.findByPostulacionId(p.getId()))
-                    .thenReturn(Optional.of(Cv.builder().id(500L + p.getId())
-                            .postulacionId(p.getId()).build()));
+            Cv suyo = Cv.builder().id(500L + p.getId()).postulacionId(p.getId()).build();
+            lenient().when(cvs.findByPostulacionId(p.getId())).thenReturn(Optional.of(suyo));
+            cvsDeLaTanda.add(suyo);
+        }
+    }
+
+    /** Nadie le ha hecho todavía el retrato: es a quien la criba rápida tiene que mirar. */
+    private void sinRetrato(Long... postulacionIds) {
+        for (Long id : postulacionIds) {
+            estadosDeLaTanda.put(id, new ColaCalificacionIa.Estado("SIN_EMPEZAR", null));
         }
     }
 
@@ -481,7 +530,7 @@ class ServicioPerfilIntegralPanelImplTest {
         lenient().when(datosCv.findByPostulacionIdIn(ids)).thenReturn(List.of());
         lenient().when(perfiles.findByPostulacionIdIn(ids)).thenReturn(List.of());
         lenient().when(hallazgos.findByPerfilTalentoIdIn(anyList())).thenReturn(List.of());
-        lenient().when(cvs.findByPostulacionIdIn(ids)).thenReturn(List.of());
+        lenient().when(cvs.findByPostulacionIdIn(ids)).thenReturn(cvsDeLaTanda);
         lenient().when(alertas.findByPostulacionIdIn(ids)).thenReturn(List.of());
         lenient().when(notasCriterio.findByPostulacionIdIn(ids)).thenReturn(notasDeLaTanda);
         lenient().when(notasEtapa.findByPostulacionIdInAndEtapaCodigo(ids, "PERFIL_INTEGRAL"))
@@ -504,6 +553,7 @@ class ServicioPerfilIntegralPanelImplTest {
     private final List<NotaCriterio> notasDeLaTanda = new ArrayList<>();
     private final List<Usuario> usuariosDeLaTanda = new ArrayList<>();
     private final List<Persona> personasDeLaTanda = new ArrayList<>();
+    private final List<Cv> cvsDeLaTanda = new ArrayList<>();
     private final Map<Long, ColaCalificacionIa.Estado> estadosDeLaTanda = new HashMap<>();
 
     /**
@@ -559,4 +609,145 @@ class ServicioPerfilIntegralPanelImplTest {
         return NotaCriterio.builder().postulacionId(postulacionId).criterioId(criterioId)
                 .puntaje(new BigDecimal(puntaje)).origen("IA").build();
     }
+
+    // ================== Reabrir la evaluación ==================
+    //
+    // Se le devuelve el turno a un candidato que no llegó a tiempo. Casi todo lo que hace
+    // este método es decir que NO, y por buenas razones: cada negativa protege una decisión
+    // que ya pudo tomarse con la nota vieja.
+
+    @org.junit.jupiter.api.Nested
+    @DisplayName("Al reabrir la evaluación de un candidato")
+    class ReabrirEvaluacion {
+
+        private static final long POSTULACION = 77L;
+
+        private Postulacion postulacionConEvaluacion(String estado, Long evaluacionId) {
+            Postulacion p = Postulacion.builder()
+                    .id(POSTULACION).organizacionId(ORGANIZACION).vacanteId(VACANTE)
+                    .usuarioId(500L).estadoCodigo(estado).build();
+            p.setEvaluacionId(evaluacionId);
+            return p;
+        }
+
+        private com.renaser.ai.ai_engine.perfilintegral.entity.Evaluacion evaluacion(
+                String estado, java.time.Instant iniciada) {
+            return com.renaser.ai.ai_engine.perfilintegral.entity.Evaluacion.builder()
+                    .id(9L).organizacionId(ORGANIZACION).estado(estado)
+                    .venceEn(java.time.Instant.parse("2020-01-01T00:00:00Z"))
+                    .iniciadaEn(iniciada)
+                    .build();
+        }
+
+        private void hayPostulacion(Postulacion p) {
+            when(postulaciones.findByIdAndOrganizacionId(POSTULACION, ORGANIZACION))
+                    .thenReturn(Optional.of(p));
+        }
+
+        @Test
+        @DisplayName("Sin motivo escrito no se reabre: es lo único que queda de por qué se hizo")
+        void exigeMotivo() {
+            org.assertj.core.api.Assertions.assertThatIllegalArgumentException()
+                    .isThrownBy(() -> servicio.reabrirEvaluacion(quien, POSTULACION, 7, "  "))
+                    .withMessageContaining("motivo");
+            verifyNoInteractions(maquina);
+        }
+
+        @Test
+        @DisplayName("Una postulación que ya terminó no se reabre")
+        void noSiYaTermino() {
+            Postulacion p = postulacionConEvaluacion("DESCARTADA", 9L);
+            hayPostulacion(p);
+            when(maquina.yaTermino(p)).thenReturn(true);
+
+            org.assertj.core.api.Assertions.assertThatIllegalStateException()
+                    .isThrownBy(() -> servicio.reabrirEvaluacion(quien, POSTULACION, 7, "se equivocó"))
+                    .withMessageContaining("ya terminó");
+        }
+
+        @Test
+        @DisplayName("Si nunca tuvo evaluación, no hay nada que reabrir")
+        void noSiNoTieneEvaluacion() {
+            hayPostulacion(postulacionConEvaluacion(LE_TOCA, null));
+
+            org.assertj.core.api.Assertions.assertThatIllegalStateException()
+                    .isThrownBy(() -> servicio.reabrirEvaluacion(quien, POSTULACION, 7, "se equivocó"))
+                    .withMessageContaining("no tiene evaluación");
+        }
+
+        @Test
+        @DisplayName("Una entregada no se reabre: su nota ya pudo usarse para decidir")
+        void noSiYaFueEntregada() {
+            hayPostulacion(postulacionConEvaluacion(LE_TOCA, 9L));
+            when(evaluaciones.findById(9L)).thenReturn(Optional.of(evaluacion("TERMINADA", null)));
+
+            org.assertj.core.api.Assertions.assertThatIllegalStateException()
+                    .isThrownBy(() -> servicio.reabrirEvaluacion(quien, POSTULACION, 7, "se equivocó"))
+                    .withMessageContaining("invalidaría su nota");
+        }
+
+        @Test
+        @DisplayName("La que nunca empezó vuelve a PENDIENTE, con el plazo que se le diga")
+        void laQueNoEmpezoVuelveAPendiente() {
+            Postulacion p = postulacionConEvaluacion("PERFIL_VENCIDO", 9L);
+            hayPostulacion(p);
+            var eva = evaluacion("VENCIDA", null);
+            when(evaluaciones.findById(9L)).thenReturn(Optional.of(eva));
+
+            var salida = servicio.reabrirEvaluacion(quien, POSTULACION, 5, "el correo no le llegó");
+
+            assertThat(eva.getEstado()).isEqualTo("PENDIENTE");
+            assertThat(salida.diasDePlazo()).isEqualTo(5);
+            assertThat(salida.venceEn()).isAfter(java.time.Instant.now());
+            // La vigencia se estira con el plazo: de nada sirve poder responder si el
+            // resultado ya no vale cuando responda.
+            assertThat(eva.getVigenteHasta()).isEqualTo(eva.getVenceEn());
+            verify(maquina).transicionar(eq(p), eq(LE_TOCA), eq(quien), eq("el correo no le llegó"),
+                    eq(false), eq(false), isNull());
+            verify(auditoria).registrar(eq(ORGANIZACION), eq(quien), eq("reabrir_evaluacion"),
+                    eq("postulacion"), eq(POSTULACION), anyMap(), anyMap(),
+                    eq("el correo no le llegó"));
+        }
+
+        @Test
+        @DisplayName("La que ya había empezado vuelve a EN_CURSO y conserva lo respondido")
+        void laEmpezadaConservaLoRespondido() {
+            hayPostulacion(postulacionConEvaluacion(LE_TOCA, 9L));
+            var eva = evaluacion("EN_CURSO", java.time.Instant.parse("2020-01-02T00:00:00Z"));
+            when(evaluaciones.findById(9L)).thenReturn(Optional.of(eva));
+
+            servicio.reabrirEvaluacion(quien, POSTULACION, 3, "se le cayó internet");
+
+            assertThat(eva.getEstado()).isEqualTo("EN_CURSO");
+            // Ya estaba en el estado que le toca: no se le mueve por moverlo, porque cada
+            // transición deja rastro y un rastro falso confunde a quien lo lea después.
+            verify(maquina, never()).transicionar(any(), anyString(), any(), anyString(),
+                    anyBoolean(), anyBoolean(), any());
+        }
+
+        @Test
+        @DisplayName("Sin días, el plazo sale del parámetro de la organización")
+        void sinDiasUsaElParametro() {
+            hayPostulacion(postulacionConEvaluacion(LE_TOCA, 9L));
+            when(evaluaciones.findById(9L)).thenReturn(Optional.of(evaluacion("PENDIENTE", null)));
+            when(parametros.entero(ORGANIZACION, "dias_plazo_evaluacion", 14)).thenReturn(21);
+
+            var salida = servicio.reabrirEvaluacion(quien, POSTULACION, null, "ampliación acordada");
+
+            assertThat(salida.diasDePlazo()).isEqualTo(21);
+        }
+
+        @Test
+        @DisplayName("Un número de días absurdo se ignora y manda el parámetro")
+        void diasNoPositivosCaenAlParametro() {
+            hayPostulacion(postulacionConEvaluacion(LE_TOCA, 9L));
+            when(evaluaciones.findById(9L)).thenReturn(Optional.of(evaluacion("PENDIENTE", null)));
+            when(parametros.entero(ORGANIZACION, "dias_plazo_evaluacion", 14)).thenReturn(14);
+
+            assertThat(servicio.reabrirEvaluacion(quien, POSTULACION, 0, "cero días").diasDePlazo())
+                    .isEqualTo(14);
+        }
+    }
+
+    private static final String LE_TOCA = "PERFIL_TURNO_CANDIDATO";
 }

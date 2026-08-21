@@ -78,6 +78,37 @@ public final class DtosPerfilIntegral {
      * prioridad y no la nota: alguien con 92 y un riesgo crítico no va por delante de
      * alguien con 88 y ninguno, y ordenar solo por número escondería justo eso.
      */
+    /**
+     * Lo que devuelve reabrir una evaluación: hasta cuándo tiene ahora, y en qué estado
+     * quedó la postulación.
+     */
+    public record EvaluacionReabierta(Long postulacionId, String estado,
+                                      java.time.Instant venceEn, int diasDePlazo) {}
+
+    /**
+     * La tanda entera de una vacante, ordenada de más apto a menos.
+     *
+     * <p><b>Antes de usar este orden para decidir, mira {@code conPasadaFina} contra
+     * {@code total}.</b> No es un dato de progreso: es lo que dice si esta lista sirve para
+     * decidir o solo para ordenar.
+     *
+     * <p>Hay dos pasadas y no dan la misma nota. La rápida usa el modelo barato, que no
+     * razona, y existe para contestar «llegaron cien currículums, a quién invito primero».
+     * La fina usa el modelo que razona y pisa las notas provisionales. Una lista donde
+     * {@code conPasadaFina} es mucho menor que {@code total} está ordenada por el modelo que
+     * el propio sistema declara provisional, y en pantalla se ve exactamente igual que una
+     * definitiva. Ya pasó: una vacante se rankeó entera con la rápida y nadie lo notó hasta
+     * que un candidato con nota fina apareció hundido entre diecinueve notas rápidas —no
+     * porque fuera peor, sino porque se le midió con otra vara.
+     *
+     * <p>Quien pinte esta lista <b>tiene que decirlo</b> cuando las dos cifras no coincidan.
+     * Mezclar notas de las dos pasadas en un mismo orden no significa nada.
+     *
+     * <p>Los otros tres números cuentan cómo va la calificación, no su calidad:
+     * {@code calificados} los que ya tienen retrato, {@code enCurso} los que la IA está
+     * mirando ahora, y {@code fallidos} aquellos en los que falló y <b>no se les inventó una
+     * nota</b> —normalmente un currículum escaneado, del que no se puede sacar texto—.
+     */
     public record RankingVacante(
             Long vacanteId,
             String vacante,

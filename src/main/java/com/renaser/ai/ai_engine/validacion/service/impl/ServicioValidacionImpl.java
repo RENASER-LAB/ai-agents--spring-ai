@@ -30,6 +30,8 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -172,14 +174,25 @@ public class ServicioValidacionImpl implements ServicioValidacion {
     @Override
     @Transactional
     public void terminarVencidos() {
-        for (Validacion v : validaciones.findByEstadoAndFinEnBefore("EN_CURSO", Instant.now())) {
+        List<Validacion> vencidas = validaciones.findByEstadoAndFinEnBefore("EN_CURSO", Instant.now());
+        if (vencidas.isEmpty()) {
+            return;
+        }
+        // Las postulaciones de toda la tanda de una vez. Nadie espera delante de esta tarea,
+        // pero la tanda crece con los candidatos que lleguen a validación y cada consulta
+        // suelta retiene el pool un poco más de lo necesario, justo cuando el portal también
+        // lo está usando.
+        Map<Long, Postulacion> porId = postulaciones
+                .findAllById(vencidas.stream().map(Validacion::getPostulacionId).toList()).stream()
+                .collect(Collectors.toMap(Postulacion::getId, Function.identity()));
+
+        for (Validacion v : vencidas) {
             // El periodo se acabó, pero cerrarlo del todo exige las métricas: la postulación
             // pasa a esperar a una persona, no se cierra sola.
-            postulaciones.findById(v.getPostulacionId()).ifPresent(p -> {
-                if (TURNO_CANDIDATO.equals(p.getEstadoCodigo())) {
-                    maquina.transicionar(p, POR_CONFIRMAR, null, null, true, false, null);
-                }
-            });
+            Postulacion p = porId.get(v.getPostulacionId());
+            if (p != null && TURNO_CANDIDATO.equals(p.getEstadoCodigo())) {
+                maquina.transicionar(p, POR_CONFIRMAR, null, null, true, false, null);
+            }
         }
     }
 

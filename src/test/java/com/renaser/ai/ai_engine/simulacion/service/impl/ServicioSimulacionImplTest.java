@@ -51,6 +51,8 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -89,6 +91,8 @@ class ServicioSimulacionImplTest {
     private static final Long USUARIO = 12L;
     private static final Long OTRO_USUARIO = 99L;
     private static final Long VACANTE = 5L;
+    private static final java.util.UUID UUID_POSTULACION =
+            java.util.UUID.fromString("11111111-2222-3333-4444-555555555555");
 
     private static final ContextoUsuario QUIEN = new ContextoUsuario(
             USUARIO, 3L, ORGANIZACION, "EQUIPO", List.of(2L), Map.of());
@@ -119,6 +123,70 @@ class ServicioSimulacionImplTest {
         servicio = new ServicioSimulacionImpl(sesiones, sesionesVacante, responsables, tramos,
                 informacionCritica, inscripciones, marcas, preguntas, postulaciones, vacantes,
                 cola, roles, usuarioRoles, maquina, disponibilidad, parametros, auditoria, permisos);
+    }
+
+    // ============ Las fechas que ve el candidato ============
+
+    /**
+     * Un candidato solo debe ver las fechas cuando de verdad le toca elegir una.
+     *
+     * <p>Antes se listaban siempre, y quien iba por el Perfil Integral veía la sesión de
+     * simulación en su pantalla. No podía inscribirse —eso sí estaba comprobado— pero eso lo
+     * hace peor, no mejor: se le enseña algo sobre lo que no puede actuar, y lo que aprende es
+     * que la pantalla miente.
+     */
+    private void suPostulacionEstaEn(String estado) {
+        when(postulaciones.findByUuid(UUID_POSTULACION)).thenReturn(Optional.of(
+                Postulacion.builder().id(POSTULACION).uuid(UUID_POSTULACION)
+                        .usuarioId(USUARIO).organizacionId(ORGANIZACION).vacanteId(VACANTE)
+                        .estadoCodigo(estado).build()));
+    }
+
+    @Test
+    @DisplayName("cuando le toca elegir fecha, ve las sesiones con sus plazas libres")
+    void veLasFechasCuandoLeToca() {
+        suPostulacionEstaEn(PUEDE_ELEGIR);
+        when(sesiones.disponiblesPara(ORGANIZACION, VACANTE)).thenReturn(List.of(
+                com.renaser.ai.ai_engine.simulacion.entity.SesionSimulacion.builder().id(SESION).fechaHora(Instant.now().plusSeconds(86400))
+                        .duracionMinutos(120).modalidad("GRUPAL").lugar("Sala 1").cupo(6).build()));
+        when(inscripciones.countBySesionSimulacionIdAndEsVigenteTrue(SESION)).thenReturn(2L);
+
+        var fechas = servicio.sesionesDisponibles(QUIEN, UUID_POSTULACION);
+
+        assertThat(fechas).hasSize(1);
+        assertThat(fechas.get(0).plazasLibres())
+                .as("seis de cupo menos dos ya inscritos")
+                .isEqualTo(4);
+    }
+
+    @Test
+    @DisplayName("mientras va por el Perfil Integral no ve ninguna fecha")
+    void noVeFechasAntesDeTiempo() {
+        suPostulacionEstaEn("PERFIL_TURNO_CANDIDATO");
+
+        assertThat(servicio.sesionesDisponibles(QUIEN, UUID_POSTULACION))
+                .as("ensenar una fecha que no puede elegir solo confunde")
+                .isEmpty();
+
+        verifyNoInteractions(sesiones);
+    }
+
+    @Test
+    @DisplayName("ni cuando la simulación aún no se le ha habilitado")
+    void noVeFechasSiTodaviaNoSeLeHabilito() {
+        suPostulacionEstaEn(ESPERANDO);
+
+        assertThat(servicio.sesionesDisponibles(QUIEN, UUID_POSTULACION)).isEmpty();
+        verifyNoInteractions(sesiones);
+    }
+
+    @Test
+    @DisplayName("y una vez pasada la simulación, tampoco")
+    void noVeFechasDespues() {
+        suPostulacionEstaEn(POR_CONFIRMAR);
+
+        assertThat(servicio.sesionesDisponibles(QUIEN, UUID_POSTULACION)).isEmpty();
+        verifyNoInteractions(sesiones);
     }
 
     // ============ Pedirle a la IA las preguntas de la conversación final ============
@@ -378,5 +446,90 @@ class ServicioSimulacionImplTest {
     private void alcanceDeDecidir(FiltroAlcance.Tipo tipo) {
         when(permisos.alcanceDe("decidir_sobre_ausente"))
                 .thenReturn(new FiltroAlcance(tipo, USUARIO));
+    }
+
+    // ============ La lista de sesiones del panel ============
+
+    @org.junit.jupiter.api.Nested
+    @DisplayName("Al listar las sesiones en el panel")
+    class ListarSesiones {
+
+        private com.renaser.ai.ai_engine.simulacion.entity.SesionSimulacion sesion(long id) {
+            return com.renaser.ai.ai_engine.simulacion.entity.SesionSimulacion.builder()
+                    .id(id).organizacionId(ORGANIZACION)
+                    .fechaHora(Instant.parse("2026-09-01T15:00:00Z"))
+                    .duracionMinutos(120).modalidad("GRUPAL").lugar("Sala 1").cupo(6)
+                    .estado("PUBLICADA")
+                    .build();
+        }
+
+        @Test
+        @DisplayName("Sin ninguna sesión devuelve la lista vacía y no consulta nada más")
+        void sinSesionesNoConsultaLoQueCuelga() {
+            when(sesiones.findByOrganizacionIdOrderByFechaHora(ORGANIZACION))
+                    .thenReturn(List.of());
+
+            assertThat(servicio.listarSesiones(QUIEN)).isEmpty();
+
+            // Si preguntara igual, serían cuatro consultas con una lista de ids vacía: no
+            // devuelven nada y en algunos motores ni siquiera son SQL válido.
+            verifyNoInteractions(inscripciones, sesionesVacante, responsables, tramos);
+        }
+
+        @Test
+        @DisplayName("Con sesiones, cada una llega con sus inscritos, vacantes, responsables y tramos")
+        void cadaSesionLlegaCompleta() {
+            var una = sesion(1L);
+            var otra = sesion(2L);
+            when(sesiones.findByOrganizacionIdOrderByFechaHora(ORGANIZACION))
+                    .thenReturn(List.of(una, otra));
+            // La primera tiene dos inscritos; de la segunda la consulta no devuelve fila.
+            when(inscripciones.contarVigentesPorSesion(List.of(1L, 2L)))
+                    .thenReturn(java.util.List.<Object[]>of(new Object[]{1L, 2L}));
+            when(sesionesVacante.findBySesionSimulacionIdIn(List.of(1L, 2L))).thenReturn(List.of(
+                    com.renaser.ai.ai_engine.simulacion.entity.SesionVacante.builder()
+                            .sesionSimulacionId(1L).vacanteId(70L).build()));
+            when(responsables.findBySesionSimulacionIdIn(List.of(1L, 2L))).thenReturn(List.of(
+                    com.renaser.ai.ai_engine.simulacion.entity.SesionResponsable.builder()
+                            .sesionSimulacionId(1L).usuarioId(USUARIO).build()));
+            when(tramos.findBySesionSimulacionIdInOrderByMinutoInicio(List.of(1L, 2L)))
+                    .thenReturn(List.of());
+
+            var lista = servicio.listarSesiones(QUIEN);
+
+            assertThat(lista).hasSize(2);
+            assertThat(lista.get(0).inscritos()).isEqualTo(2L);
+            assertThat(lista.get(0).vacanteIds()).containsExactly(70L);
+            assertThat(lista.get(0).responsableIds()).containsExactly(USUARIO);
+
+            // Y la que no aparece en ninguna de las cuatro consultas no se cae de la lista:
+            // una sesión recién creada, sin nadie inscrito ni nada colgando, existe igual.
+            assertThat(lista.get(1).inscritos()).isZero();
+            assertThat(lista.get(1).vacanteIds()).isEmpty();
+            assertThat(lista.get(1).responsableIds()).isEmpty();
+            assertThat(lista.get(1).tramos()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("Lo que cuelga se pide de una vez para todas, no una consulta por sesión")
+        void unaConsultaPorTablaYNoPorFila() {
+            when(sesiones.findByOrganizacionIdOrderByFechaHora(ORGANIZACION))
+                    .thenReturn(List.of(sesion(1L), sesion(2L), sesion(3L)));
+            when(inscripciones.contarVigentesPorSesion(anyList())).thenReturn(List.of());
+            when(sesionesVacante.findBySesionSimulacionIdIn(anyList())).thenReturn(List.of());
+            when(responsables.findBySesionSimulacionIdIn(anyList())).thenReturn(List.of());
+            when(tramos.findBySesionSimulacionIdInOrderByMinutoInicio(anyList()))
+                    .thenReturn(List.of());
+
+            servicio.listarSesiones(QUIEN);
+
+            // Esta lista no se pagina ni se filtra por fecha: son todas las sesiones que la
+            // organización creó nunca. Con una consulta por fila, el día que haya un año de
+            // sesiones dentro la pantalla se cae sola.
+            verify(inscripciones, times(1)).contarVigentesPorSesion(anyList());
+            verify(sesionesVacante, times(1)).findBySesionSimulacionIdIn(anyList());
+            verify(responsables, times(1)).findBySesionSimulacionIdIn(anyList());
+            verify(tramos, times(1)).findBySesionSimulacionIdInOrderByMinutoInicio(anyList());
+        }
     }
 }

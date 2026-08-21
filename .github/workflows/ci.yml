@@ -3,8 +3,9 @@
 #   build    compila, corre los tests unitarios y los de integración (Testcontainers),
 #            y manda la cobertura a SonarCloud, que vigila el código NUEVO del PR.
 #   estatico Semgrep (patrones prohibidos, reglas en .semgrep/) y Gitleaks (secretos).
-#   desplegar solo cuando main cambia y los otros dos quedaron en verde: avisa a Render
-#            y espera a que la URL de pruebas conteste.
+#   desplegar solo cuando main cambia y los otros dos quedaron en verde: construye la
+#            imagen, la sube a ECR y le dice a la maquina de EC2 que se actualice. Sin
+#            ninguna clave de AWS guardada: se usa OIDC.
 #
 # La prueba que llama a DeepSeek de verdad (CalificacionIaRealIT) NO corre aquí: se
 # apaga sola si no existe la variable RENASER_IA_REAL. Ver docs/CI-CD.md.
@@ -91,43 +92,87 @@ jobs:
             git /repo --redact --verbose
 
   desplegar:
-    name: desplegar a pruebas
+    name: desplegar a AWS
     needs: [build, estatico]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    steps:
-      # Render construye la imagen con el Dockerfile del repositorio; aquí solo se le avisa.
-      # El auto-deploy de Render está apagado a propósito: si desplegara solo, lo haría
-      # también con el CI en rojo, y este pipeline no serviría de nada.
-      - name: Avisar a Render
-        env:
-          HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
-        run: |
-          if [ -z "$HOOK" ]; then
-            echo "Falta el secreto RENDER_DEPLOY_HOOK: no se despliega." >&2
-            exit 1
-          fi
-          curl --fail --silent --show-error "$HOOK"
 
-      # El plan gratuito duerme a los 15 minutos y tarda ~1 minuto en despertar,
-      # y encima hay que esperar a que Render construya la imagen: se reintenta
-      # hasta 10 minutos antes de dar el despliegue por muerto.
-      - name: Esperar a que la aplicación conteste (smoke test)
-        env:
-          URL: ${{ vars.PRUEBAS_URL }}
+    # Lo que hace posible que aquí no haya ninguna clave de AWS guardada. GitHub firma un
+    # token de un solo uso, AWS lo verifica y devuelve credenciales que caducan en minutos.
+    # Una clave de acceso guardada como secreto no caduca nunca: si se filtra, sigue valiendo.
+    permissions:
+      id-token: write
+      contents: read
+
+    env:
+      REGION: us-east-1
+      REGISTRO: 526338061654.dkr.ecr.us-east-1.amazonaws.com
+      REPOSITORIO: ai-engine
+      INSTANCIA: i-05fc037e853d07264
+      URL: https://18-204-177-210.nip.io
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Fijada por SHA y no por «@v4», que es una etiqueta y se puede mover. Esta accion
+      # es la que pide las credenciales de AWS: si alguien se hiciera con el repositorio de
+      # la accion y reapuntara la etiqueta, ese codigo correria aqui con permiso para subir
+      # imagenes y lanzar comandos en el servidor. El SHA no se puede reapuntar.
+      #
+      # El SHA es el de v4 (7474bc4). Para subir de version: mirar el commit de la etiqueta
+      # nueva con «gh api repos/aws-actions/configure-aws-credentials/git/ref/tags/vN» y
+      # cambiar los dos, el hash y el comentario.
+      - name: Pedirle permiso a AWS
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
+        with:
+          role-to-assume: arn:aws:iam::526338061654:role/github-despliegue
+          aws-region: us-east-1
+
+      - name: Entrar al registro
+        run: aws ecr get-login-password --region "$REGION" | docker login --username AWS --password-stdin "$REGISTRO"
+
+      # Dos etiquetas a propósito. «latest» es la que despliega, y el SHA del commit es la
+      # que permite volver atrás: sin ella, «la versión anterior» no tiene nombre y para
+      # revertir hay que reconstruir desde el código.
+      - name: Construir y subir la imagen
         run: |
-          if [ -z "$URL" ]; then
-            echo "Falta la variable PRUEBAS_URL: no hay contra qué probar." >&2
-            exit 1
-          fi
+          docker build             -t "$REGISTRO/$REPOSITORIO:${{ github.sha }}"             -t "$REGISTRO/$REPOSITORIO:latest" .
+          docker push "$REGISTRO/$REPOSITORIO:${{ github.sha }}"
+          docker push "$REGISTRO/$REPOSITORIO:latest"
+
+      # Por SSM y no por SSH: no hay ninguna llave que guardar ni rotar, y el puerto 22 de la
+      # máquina está cerrado. El servidor baja la imagen con su propio rol.
+      - name: Desplegar en la máquina
+        run: |
+          ID=$(aws ssm send-command --region "$REGION"             --instance-ids "$INSTANCIA"             --document-name AWS-RunShellScript             --comment "despliegue ${{ github.sha }}"             --parameters 'commands=["cd /opt/renaser && ./desplegar.sh"]'             --query "Command.CommandId" --output text)
+          echo "comando $ID"
+
           for i in $(seq 1 60); do
-            if curl --fail --silent --output /dev/null "$URL/v3/api-docs" \
-               && curl --fail --silent --output /dev/null "$URL/api/v1/portal/vacantes"; then
-              echo "La aplicación contesta."
-              exit 0
-            fi
-            echo "Intento $i/60: todavía no contesta, se espera 10s..."
+            ESTADO=$(aws ssm get-command-invocation --region "$REGION"               --command-id "$ID" --instance-id "$INSTANCIA"               --query Status --output text 2>/dev/null || echo Pending)
+            case "$ESTADO" in
+              Success) echo "Desplegado."; exit 0 ;;
+              Failed|Cancelled|TimedOut)
+                echo "El despliegue falló ($ESTADO). Salida de la máquina:" >&2
+                aws ssm get-command-invocation --region "$REGION" --command-id "$ID"                   --instance-id "$INSTANCIA" --query StandardErrorContent --output text >&2
+                aws ssm get-command-invocation --region "$REGION" --command-id "$ID"                   --instance-id "$INSTANCIA" --query StandardOutputContent --output text >&2
+                exit 1 ;;
+            esac
             sleep 10
           done
-          echo "La aplicación no contestó en 10 minutos." >&2
+          echo "El despliegue no terminó en 10 minutos." >&2
+          exit 1
+
+      # El paso anterior ya comprueba desde dentro que la aplicación contesta. Este comprueba
+      # lo que le importa a quien la usa: que se llega desde internet y con el certificado bien.
+      - name: Comprobar desde fuera
+        run: |
+          for i in $(seq 1 30); do
+            if curl --fail --silent --output /dev/null "$URL/api/v1/portal/vacantes"; then
+              echo "Contesta por HTTPS desde internet."
+              exit 0
+            fi
+            echo "Intento $i/30..."
+            sleep 10
+          done
+          echo "No contestó desde fuera." >&2
           exit 1

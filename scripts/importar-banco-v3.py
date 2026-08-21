@@ -17,6 +17,8 @@ Las comprobaciones son lo importante de este script. El documento declara sus pr
 totales en la sección 0.3, y aquí se recalculan desde lo parseado: si el parser se
 equivoca al leer un peso o una clave, los totales dejan de cuadrar y salta. Son cuatro
 independientes: número de ítems, cuántos puntúan, cuántos son clave y el puntaje máximo.
+Y una quinta que no sale del documento sino del sentido común: ningún ítem que se
+responda eligiendo puede quedarse sin opciones que enseñar.
 
 Hace falta `pdftotext` (paquete poppler-utils). Se usa con -layout porque las claves
 viven en tablas y sin esa opción las columnas se mezclan.
@@ -45,8 +47,12 @@ FORMATOS = ('EF-4', 'SJT-R', 'SEC', 'INV', 'DE', 'CD', 'V', 'PC')
 
 # \f es el salto de página: pdftotext lo pega al código del primer ítem de cada página,
 # y sin contemplarlo se pierden justo esos (aquí eran cuatro).
+# El ⛔ y el ★ pueden ir DELANTE del código, no solo detrás: depende de dónde caiga el ítem
+# en la página. Sin admitirlos delante, los nueve ítems eliminatorios (D52, D70, C33, C44,
+# O19, O39...) no se reconocen como cabecera, su texto se pega al ítem anterior y el banco
+# sale con nueve ítems de menos.
 CABECERA = re.compile(
-    r'^[ \t\f]*(?P<cod>[DCO]\d{2})[ \t]*(?P<marcas>[\u2605\u26d4 \t]*)'
+    r'^(?P<antes>[ \t\f\u2605\u26d4]*)(?P<cod>[DCO]\d{2})[ \t]*(?P<marcas>[\u2605\u26d4 \t]*)'
     r'(?:·[ \t]*(?P<fmt>EF-4|SJT-R|SEC|INV|DE|CD|V|PC)[ \t]*)?'
     r'·[ \t]*peso[ \t]*(?P<peso>\d)(?P<resto>.*)$')
 BLOQUE = re.compile(r'^[ \t\f]*BLOQUE[ \t]+(?P<id>[A-C]\d?)[ \t]*·[ \t]*(?P<nombre>.*?)[ \t]*\(?$')
@@ -54,6 +60,30 @@ BLOQUE = re.compile(r'^[ \t\f]*BLOQUE[ \t]+(?P<id>[A-C]\d?)[ \t]*·[ \t]*(?P<nom
 CIRCULOS = '\u2460\u2461\u2462\u2463\u2464\u2465\u2466\u2467\u2468\u2469'
 BANDERA = '\u2691'   # ⚑ marca los elementos falsos de INV
 CORRECTA, INCORRECTA = '\u2714', '\u2718'   # ✔ ✘ en DE
+
+# --- lo que NO es enunciado, aunque pdftotext lo deje como una línea más del cuerpo ---
+# El rótulo de la tabla de opciones ("Opción    Valor", "#    Afirmación") y la columna de
+# la derecha cuando cae suelta. Sin esto acabaron en producción cuatro ítems preguntando
+# literalmente «Opción                Valor»: eso es el rótulo del PDF, no la pregunta.
+CABECERA_TABLA = re.compile(
+    r'^\s*(?:#|Opci[oó]n|Rasgo|Afirmaci[oó]n|Paso|Clave|Valor|Puntaje|N[uú]mero|Condici[oó]n)'
+    r'(?:\s{2,}\S.*)?\s*$')
+SOLO_NUMERO = re.compile(r'^\s*[+\u2212-]?\d+(?:[.,]\d+)?\s*$')
+INICIO_OPCION = re.compile(r'^\s*(?:[a-h]\)|[' + CIRCULOS + r'])')
+# Dos espacios o más separan columnas en la salida de -layout: lo que va detrás es el valor
+# o el rótulo de la columna derecha, no la continuación de la frase.
+COLA_COLUMNA = re.compile(r'\s{2,}(?:[+\u2212-]?\d+|Valor|Clave|Puntaje|Ajuste|Orden)\s*$')
+
+# La regla de un PC ("Contradicción: ...", «"No" = eliminatorio») dice cómo penaliza, y eso
+# es para dentro: ni se le enseña al candidato ni forma parte de lo que se le pregunta.
+REGLA_INTERNA = re.compile(
+    r'^(?:Contradicci[oó]n|No suma puntaje|Responder\s|Cruce\s*:|"No"|\u201cNo\u201d)')
+
+# El "Ninguno formal" / "Nada en particular" / "No aplicaban..." con el que cierran las
+# listas de un INV. No es un elemento real ni uno inventado: el ítem declara cuántos hay de
+# cada clase y ese no entra en ninguna de las dos cuentas. Ver elementos_inv.
+ESCAPE_INV = re.compile('^(?:Nada|Ning\u00fan|Ningun|Ninguno|Ninguna|No aplica)',
+                        re.IGNORECASE)
 
 avisos = []
 
@@ -67,9 +97,15 @@ def texto_del_pdf():
         sys.exit(f'No está {PDF}. Es el insumo del cliente y debe estar en el repositorio.')
     if not shutil.which('pdftotext'):
         sys.exit('Falta pdftotext. En Debian/Ubuntu: sudo apt install poppler-utils')
-    with tempfile.NamedTemporaryFile(suffix='.txt') as tmp:
-        subprocess.run(['pdftotext', '-layout', str(PDF), tmp.name], check=True)
-        return Path(tmp.name).read_text(encoding='utf-8')
+    # Un directorio temporal y no un fichero temporal: en Windows el fichero se queda
+    # abierto y pdftotext no puede escribir dentro. Y '-enc UTF-8' explícito porque el
+    # valor por omisión depende de la compilación de poppler, y en algunas sale latin-1:
+    # el acento se convierte en basura sin que nada falle.
+    with tempfile.TemporaryDirectory() as dir_tmp:
+        salida = Path(dir_tmp) / 'banco.txt'
+        subprocess.run(['pdftotext', '-layout', '-enc', 'UTF-8', str(PDF), str(salida)],
+                       check=True)
+        return salida.read_text(encoding='utf-8')
 
 
 def trocear(lineas):
@@ -171,7 +207,145 @@ def tabla_rangos(cuerpo):
     return filas
 
 
-def parsear_contenido(codigo, formato, cuerpo):
+def enunciado_de(cuerpo):
+    """El texto de la pregunta. Casi nunca cabe en una línea, y no siempre es la primera.
+
+    Dos cosas hay que saltarse. Una: pdftotext deja el rótulo de la tabla («Opción   Valor»,
+    «#   Afirmación») y la columna de valores sueltos como si fueran líneas del cuerpo. Dos:
+    el enunciado viene partido por el ancho de la página, y quedarse solo con la primera
+    línea lo deja a medias («...que has aplicado tú», sin el «mismo»).
+
+    Se juntan las líneas de texto hasta que empieza otra cosa: una línea en blanco, la
+    primera opción, la lista de elementos de un INV (que va separada por ' · ') o la regla
+    interna de un PC.
+
+    Devuelve '' si no encuentra ninguna. Eso no es un fallo del que haya que recuperarse
+    inventando texto: es un ítem que en el documento no trae enunciado, y sale por aviso.
+    """
+    partes = []
+    for linea in cuerpo:
+        limpia = linea.strip()
+        if not limpia:
+            if partes:
+                break
+            continue
+        if CABECERA_TABLA.match(linea) or SOLO_NUMERO.match(linea):
+            continue                                  # rótulo o columna, no pregunta
+        if INICIO_OPCION.match(linea) or REGLA_INTERNA.match(limpia):
+            break
+        if partes and ' · ' in limpia:
+            break                                     # empezó la lista de un INV
+        partes.append(COLA_COLUMNA.sub('', linea).strip())
+    return ' '.join(x for x in partes if x)
+
+
+def letra_por_orden(n):
+    """a, b, c... y de la z en adelante z1, z2. Las listas de un INV llegan a 14 elementos."""
+    return chr(ord('a') + n) if n < 26 else 'z%d' % (n - 25)
+
+
+def elementos_inv(cuerpo, enunciado):
+    """La lista de un INV: los elementos, y cuáles son inventados.
+
+    Están entre el enunciado y la línea del total («T = 7 reales · 3 falsos»), escritos
+    corridos y separados por '·', partidos por el ancho de la página. Por eso se pega todo
+    primero y se corta después: cortar línea a línea parte los elementos largos por la mitad.
+
+    El «Ninguno formal» del final NO se devuelve como elemento. El puntaje del formato es
+    (reales marcados ÷ reales totales), así que guardarlo como real subiría el denominador
+    de todos y nadie podría sacar el máximo; y guardarlo como inventado castigaría a quien
+    dice la verdad. Quien no hace nada de la lista responde no marcando nada, que da lo mismo.
+
+    Devuelve (elementos, declarado) — declarado es el (reales, falsos) que dice el ítem.
+    """
+    texto = ' '.join(l.strip() for l in cuerpo if l.strip())
+    total = re.search(r'T\s*=\s*(\d+)\s*reales?\s*·\s*(\d+)\s*falsos?', texto)
+    lista = texto[:total.start()] if total else texto
+    if enunciado and lista.startswith(enunciado):
+        lista = lista[len(enunciado):]
+    elementos = []
+    for trozo in lista.split('·'):
+        inventado = BANDERA in trozo
+        limpio = trozo.replace(BANDERA, '').strip(' .')
+        if not limpio or ESCAPE_INV.match(limpio):
+            continue
+        # La letra la pone el orden en que están escritos, porque el documento no se las da.
+        # Sin ella la fila no tiene llave: (pregunta, letra) es única en la tabla opcion.
+        elementos.append({'letra': letra_por_orden(len(elementos)),
+                          'texto': limpio, 'es_distractor': inventado})
+    declarado = (int(total.group(1)), int(total.group(2))) if total else None
+    return elementos, declarado
+
+
+def afirmaciones_de(cuerpo):
+    """Las ocho afirmaciones de un DE, cada una con su ✔ o su ✘.
+
+    Van en una tabla de dos columnas: el número en círculo y la frase, con la marca al final
+    de la fila. Una frase larga se parte en dos líneas y la segunda queda indentada, así que
+    hay que absorberla; lo que empieza en el margen izquierdo, en cambio, ya es el comentario
+    que va debajo de la tabla. Se paran a las ocho, que es el número que el formato fija.
+    """
+    filas = []
+    for linea in cuerpo:
+        if not linea.strip() or CABECERA_TABLA.match(linea):
+            continue
+        cabeza = re.match(r'\s*([' + CIRCULOS + r'])\s*(.*)$', linea)
+        if cabeza:
+            if len(filas) >= 8:
+                break
+            marca = next((c for c in (CORRECTA, INCORRECTA) if c in cabeza.group(2)), None)
+            filas.append({'numero': CIRCULOS.index(cabeza.group(1)) + 1,
+                          'textos': [cabeza.group(2)], 'marca': marca})
+        elif (filas and len(filas) < 8 and linea[:1] in (' ', '\t')
+                and CORRECTA not in linea and INCORRECTA not in linea):
+            filas[-1]['textos'].append(linea.strip())
+    for fila in filas:
+        junto = ' '.join(x.strip() for x in fila.pop('textos') if x.strip())
+        fila['texto'] = re.sub(r'\s+', ' ', junto.replace(CORRECTA, '')
+                               .replace(INCORRECTA, '').strip())
+    return filas
+
+
+def opciones_pc(cuerpo):
+    """Lo que el candidato elige en un par de consistencia.
+
+    El documento lo escribe de tres maneras y las tres se leen aquí, porque en las tres hay
+    algo que marcar: la lista «a) ... · b) ...», la autorización «Sí / No» y las alternativas
+    entre paréntesis «(nunca / una vez / algunas veces)». Hay un cuarto caso que no tiene
+    nada que elegir —el que pide escribir un número en un hueco «___»— y para ese se devuelve
+    la lista vacía con forma 'escrita': es correcto que no tenga opciones.
+
+    Solo se mira la parte de arriba, la que ve el candidato. Debajo va la regla («Contradicción:
+    opción (d) + frecuencia...»), y leerla como si fuera contenido fue lo que metió en la base
+    una opción «d2» con el texto de la penalización dentro.
+    """
+    utiles = []
+    for linea in cuerpo:
+        limpia = linea.strip()
+        if not limpia:
+            continue
+        if REGLA_INTERNA.match(limpia):
+            break
+        if CABECERA_TABLA.match(linea) or SOLO_NUMERO.match(linea):
+            continue
+        utiles.append(COLA_COLUMNA.sub('', linea).strip())
+    texto = ' '.join(utiles)
+
+    letras = re.findall(r'(?:^|\s)([a-h])\)\s*([^·\n]+)', texto)
+    if letras and letras[0][0] == 'a':
+        return [{'letra': l, 'texto': t.strip(' .')} for l, t in letras], 'lista'
+    if re.search(r'\bS[ií]\s*/\s*No\b', texto):
+        return [{'letra': 'a', 'texto': 'Sí'}, {'letra': 'b', 'texto': 'No'}], 'si/no'
+    entre_parentesis = re.search(r'\(([^()]*\s/\s[^()]*)\)', texto)
+    if entre_parentesis:
+        trozos = [t.strip() for t in entre_parentesis.group(1).split('/') if t.strip()]
+        if len(trozos) >= 2:
+            return ([{'letra': chr(ord('a') + n), 'texto': t}
+                     for n, t in enumerate(trozos)], 'parentesis')
+    return [], 'escrita'
+
+
+def parsear_contenido(codigo, formato, cuerpo, enunciado):
     """Lo propio de cada formato. Devuelve (dato, cuadra) — cuadra=False saca un aviso."""
     texto = '\n'.join(cuerpo)
     circulados = [l.strip() for l in cuerpo if l.strip() and l.strip()[0] in CIRCULOS]
@@ -198,20 +372,27 @@ def parsear_contenido(codigo, formato, cuerpo):
                 len(circulados) == 5 and sorted(clave) == [1, 2, 3, 4, 5])
 
     if formato == 'INV':
-        m = re.search(r'T\s*=\s*(\d+)\s*reales?\s*·\s*(\d+)\s*falsos?', texto)
-        if not m:
+        elementos, declarado = elementos_inv(cuerpo, enunciado)
+        if not declarado:
             return {'texto': texto.strip()}, False
-        # La propia línea del total lleva una bandera de leyenda: no es un elemento.
-        elementos = texto[:m.start()]
-        marcados = elementos.count(BANDERA)
-        falsos = int(m.group(2))
-        return ({'reales': int(m.group(1)), 'falsos': falsos, 'falsos_marcados': marcados},
-                marcados == falsos)
+        reales = [e for e in elementos if not e['es_distractor']]
+        falsos = [e for e in elementos if e['es_distractor']]
+        # La comprobación de verdad: el ítem declara cuántos reales y cuántos inventados
+        # tiene, así que si el troceo se comió uno o partió una frase en dos, las cuentas
+        # no cuadran y salta. Sin esto no habría forma de saber si la lista se leyó entera.
+        return ({'opciones': elementos, 'reales': len(reales), 'falsos': len(falsos)},
+                (len(reales), len(falsos)) == declarado)
 
     if formato == 'DE':
-        return ({'correctas': texto.count(CORRECTA), 'distractores': texto.count(INCORRECTA),
-                 'afirmaciones': circulados},
-                texto.count(CORRECTA) == 4 and texto.count(INCORRECTA) == 4)
+        filas = afirmaciones_de(cuerpo)
+        correctas = [f for f in filas if f['marca'] == CORRECTA]
+        distractores = [f for f in filas if f['marca'] == INCORRECTA]
+        opciones = [{'letra': chr(ord('a') + n), 'texto': f['texto'],
+                     'es_distractor': f['marca'] == INCORRECTA}
+                    for n, f in enumerate(filas)]
+        return ({'opciones': opciones, 'correctas': len(correctas),
+                 'distractores': len(distractores)},
+                len(filas) == 8 and len(correctas) == 4 and len(distractores) == 4)
 
     if formato == 'CD':
         # Dos formas en el documento: lista numerada (1. 2. 3.) o los campos descritos
@@ -250,8 +431,8 @@ def parsear_contenido(codigo, formato, cuerpo):
         # Lo que siempre está es su efecto, y por ahí se reconoce.
         m = (re.search(r'Contradicci[oó]n\s*:?\s*(.+)$', texto, re.M | re.S)
              or re.search(r'^(.*\u2212\s*5\s*%.*?bandera.*?)$', texto, re.M | re.S))
-        opciones = re.findall(r'([a-h])\)\s*([^·\n]+)', texto)
-        return ({'opciones': [{'letra': l, 'texto': t.strip()} for l, t in opciones],
+        opciones, forma = opciones_pc(cuerpo)
+        return ({'opciones': opciones, 'forma_respuesta': forma,
                  'contradiccion': m.group(1).strip() if m else None},
                 m is not None)
 
@@ -318,7 +499,9 @@ def emitir_sql(items):
             '         es_eliminatorio, orden, casos_pedidos, rangos_de, formula)\n'
             f' WHERE vb.etiqueta = {lit(etiqueta)};')
 
-    # Las opciones con clave: EF-4 guarda su valor oculto, SJT-R la calificación esperada.
+    # Las opciones de todos los formatos que se responden eligiendo. EF-4 guarda su valor
+    # oculto y SJT-R la calificación esperada; INV y DE no esconden número pero sí cuáles de
+    # sus elementos son inventados, y PC solo guarda el texto porque no puntúa.
     opciones = []
     for it in items:
         # Varios SJT-R plantean el mismo escenario para tres personas distintas (08a, 08b,
@@ -329,27 +512,28 @@ def emitir_sql(items):
         for o in it['contenido'].get('opciones', []):
             if o.get('clave') is None and o.get('texto') is None:
                 continue
-            letra = o.get('letra')
+            letra = o.get('letra') or letra_por_orden(len(vistas))
             vistas[letra] = vistas.get(letra, 0) + 1
             if vistas[letra] > 1:
                 letra = f'{letra}{vistas[letra]}'
             columna = 'valor' if it['formato'] == 'EF-4' else 'puntaje'
             opciones.append((it['codigo'], letra, o.get('texto', ''),
-                             o.get('clave'), columna))
+                             o.get('clave'), columna, bool(o.get('es_distractor'))))
     if opciones:
         out += ['', '-- Opciones. EF-4 esconde un valor de −2 a +2 (columna valor); en SJT-R el',
-                '-- número es la calificación correcta de 1 a 5 (columna puntaje).']
+                '-- número es la calificación correcta de 1 a 5 (columna puntaje). En INV y DE',
+                '-- lo que se esconde es es_distractor: cuál de los elementos no existe.']
         filas = [f'    ({lit(c)}, {lit(l)}, {lit(txt)}, '
                  f'{lit(cl) if col == "valor" else "NULL"}, '
-                 f'{lit(cl) if col == "puntaje" else "NULL"})'
-                 for c, l, txt, cl, col in opciones]
+                 f'{lit(cl) if col == "puntaje" else "NULL"}, {lit(dis)})'
+                 for c, l, txt, cl, col, dis in opciones]
         out.append(
-            'INSERT INTO opcion (pregunta_id, letra, texto, valor, puntaje)\n'
-            'SELECT p.id, v.letra, v.texto, v.valor, v.puntaje\n'
+            'INSERT INTO opcion (pregunta_id, letra, texto, valor, puntaje, es_distractor)\n'
+            'SELECT p.id, v.letra, v.texto, v.valor, v.puntaje, v.es_distractor\n'
             '  FROM pregunta p\n'
             '  JOIN version_banco vb ON vb.id = p.version_banco_id, (VALUES\n'
             + ',\n'.join(filas) + '\n'
-            '  ) AS v(codigo, letra, texto, valor, puntaje)\n'
+            '  ) AS v(codigo, letra, texto, valor, puntaje, es_distractor)\n'
             " WHERE p.codigo = v.codigo AND vb.etiqueta LIKE 'Banco RENASER v3%';")
 
     # Los pasos de SEC van como opciones también, pero lo que importa es su orden correcto.
@@ -433,11 +617,20 @@ def main():
     for mc, bloque, cuerpo in trocear(lineas):
         codigo = mc.group('cod')
         marcas, resto = mc.group('marcas'), mc.group('resto') or ''
+        antes = mc.group('antes') or ''
         formato = mc.group('fmt')
-        eliminatorio = '\u26d4' in marcas or '\u26d4' in resto
+        # El ⛔ puede ir antes del código, detrás, o dentro del texto de la derecha.
+        eliminatorio = '\u26d4' in antes or '\u26d4' in marcas or '\u26d4' in resto
+        # Un ítem eliminatorio no escribe su formato: el ⛔ ocupa ese sitio. Es un par de
+        # consistencia, que es además como se guardaba ya en la base.
+        if not formato and eliminatorio:
+            formato = 'PC'
 
-        enunciado = next((l.strip() for l in cuerpo if l.strip()), '')
-        contenido, ok = ({}, True) if not formato else parsear_contenido(codigo, formato, cuerpo)
+        enunciado = enunciado_de(cuerpo)
+        contenido, ok = ({}, True) if not formato else parsear_contenido(
+            codigo, formato, cuerpo, enunciado)
+        if not enunciado:
+            aviso(codigo, "sin enunciado: en el documento el ítem arranca directo en su tabla")
         if not ok:
             aviso(codigo, f'el contenido de {formato} no cuadra con su forma esperada')
         if not formato and not eliminatorio:
@@ -458,7 +651,8 @@ def main():
             'texto_bruto': '\n'.join(cuerpo).strip(),
         })
 
-    # --- las cuatro comprobaciones contra lo que el documento declara de sí mismo ---
+    # --- las comprobaciones: cuatro contra lo que el documento declara de sí mismo, y
+    # una quinta contra lo que hace falta para poder contestar ---
     print(f'{"banco":26}{"ítems":>7}{"puntúan":>9}{"clave ★":>9}{"máximo":>8}', file=sys.stderr)
     todo_cuadra = True
     for pref, esp in BANCOS.items():
@@ -471,6 +665,28 @@ def main():
         detalle = ''.join(f'{r:>{a}}' for r, a in zip(real, (7, 9, 9, 8)))
         print(f'{esp["nombre"]:26}{detalle}'
               f'{"" if cuadra else "   <-- NO CUADRA, esperado " + str(quiere)}', file=sys.stderr)
+
+    # --- la quinta: nadie se queda sin nada que marcar ---
+    # Las cuatro de arriba cuentan ítems y puntos, y por eso dejaron pasar el fallo que
+    # llegó a producción: 28 ítems cargados, contados y publicados, y sin una sola opción
+    # que enseñar. Un INV que dice "marca lo que haces siempre" y no trae lista no se puede
+    # responder, y como la pantalla exige la evaluación completa, el candidato se atasca.
+    # El único formato que puede quedarse sin opciones es el PC que se contesta escribiendo
+    # (un número en un hueco), y eso lo dice el propio parseo, no una lista de códigos.
+    CON_OPCIONES = ('EF-4', 'SJT-R', 'SEC', 'INV', 'DE', 'PC')
+    mudos = []
+    for x in items:
+        if x['formato'] not in CON_OPCIONES:
+            continue
+        if x['formato'] == 'SEC':
+            tiene = bool(x['contenido'].get('pasos'))
+        else:
+            tiene = bool(x['contenido'].get('opciones'))
+        if not tiene and x['contenido'].get('forma_respuesta') != 'escrita':
+            mudos.append(f'{x["codigo"]} ({x["formato"]})')
+    if mudos:
+        aviso('varios', 'se quedan sin opciones y así no se pueden responder: '
+                        + ', '.join(mudos))
 
     repes = {c for c in (x['codigo'] for x in items)
              if [y['codigo'] for y in items].count(c) > 1}

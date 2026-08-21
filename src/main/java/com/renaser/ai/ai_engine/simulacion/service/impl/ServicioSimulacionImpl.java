@@ -27,9 +27,11 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -123,8 +125,44 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
     @Override
     public List<SesionPanel> listarSesiones(ContextoUsuario quien) {
         permisos.alcanceDe("crear_sesiones_simulacion");
-        return sesiones.findByOrganizacionIdOrderByFechaHora(quien.organizacionId()).stream()
-                .map(this::comoPanel).toList();
+        List<SesionSimulacion> todas = sesiones.findByOrganizacionIdOrderByFechaHora(
+                quien.organizacionId());
+        if (todas.isEmpty()) {
+            return List.of();
+        }
+
+        // Las cuatro cosas que cuelgan de cada sesión, para la lista entera de una vez.
+        //
+        // Esta lista no se filtra por fecha ni se pagina: son todas las sesiones que la
+        // organización haya creado nunca, así que solo crece. Cuatro consultas por fila
+        // sobre una lista que solo crece es un problema que se nota tarde, cuando ya hay
+        // un año de sesiones dentro.
+        List<Long> ids = todas.stream().map(SesionSimulacion::getId).toList();
+        Map<Long, Long> inscritos = new HashMap<>();
+        for (Object[] fila : inscripciones.contarVigentesPorSesion(ids)) {
+            inscritos.put((Long) fila[0], (Long) fila[1]);
+        }
+        Map<Long, List<Long>> vacantesPorSesion = sesionesVacante.findBySesionSimulacionIdIn(ids)
+                .stream().collect(Collectors.groupingBy(SesionVacante::getSesionSimulacionId,
+                        Collectors.mapping(SesionVacante::getVacanteId, Collectors.toList())));
+        Map<Long, List<Long>> responsablesPorSesion = responsables.findBySesionSimulacionIdIn(ids)
+                .stream().collect(Collectors.groupingBy(SesionResponsable::getSesionSimulacionId,
+                        Collectors.mapping(SesionResponsable::getUsuarioId, Collectors.toList())));
+        Map<Long, List<TramoResponse>> tramosPorSesion =
+                tramos.findBySesionSimulacionIdInOrderByMinutoInicio(ids).stream()
+                        .collect(Collectors.groupingBy(TramoSimulacion::getSesionSimulacionId,
+                                Collectors.mapping(ServicioSimulacionImpl::comoTramo,
+                                        Collectors.toList())));
+
+        return todas.stream()
+                .map(s -> comoPanel(s,
+                        // Una sesión sin nadie inscrito no sale de la consulta de conteo: eso
+                        // es cero inscritos, no una sesión sin dato.
+                        inscritos.getOrDefault(s.getId(), 0L),
+                        vacantesPorSesion.getOrDefault(s.getId(), List.of()),
+                        responsablesPorSesion.getOrDefault(s.getId(), List.of()),
+                        tramosPorSesion.getOrDefault(s.getId(), List.of())))
+                .toList();
     }
 
     @Override
@@ -210,6 +248,20 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
     @Override
     public List<SesionDisponible> sesionesDisponibles(ContextoUsuario quien, UUID uuidPostulacion) {
         Postulacion postulacion = laMia(quien, uuidPostulacion);
+
+        // Solo se ven las fechas cuando de verdad toca elegir una.
+        //
+        // Antes se listaban siempre, y un candidato que iba por el Perfil Integral veía la
+        // sesión de simulación en su pantalla. No podía inscribirse —`inscribirse` sí mira el
+        // estado y contesta «todavía no te toca»— pero eso es peor, no mejor: se le enseña
+        // algo sobre lo que no puede actuar, y lo que aprende es que la pantalla miente.
+        //
+        // La comprobación es la misma que la de inscribirse, a propósito: si las dos no dicen
+        // lo mismo, vuelve a aparecer el hueco por otro lado.
+        if (!PUEDE_ELEGIR.equals(postulacion.getEstadoCodigo())) {
+            return List.of();
+        }
+
         return sesiones.disponiblesPara(postulacion.getOrganizacionId(), postulacion.getVacanteId()).stream()
                 .map(s -> new SesionDisponible(s.getId(), s.getFechaHora(), s.getDuracionMinutos(),
                         s.getModalidad(), s.getLugar(), s.getEnlace(),
@@ -485,16 +537,26 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
         return p;
     }
 
+    /** Una sola sesión: se piden sus cuatro cosas sueltas porque no hay tanda con la que ir. */
     private SesionPanel comoPanel(SesionSimulacion s) {
-        return new SesionPanel(s.getId(), s.getFechaHora(), s.getDuracionMinutos(), s.getModalidad(),
-                s.getLugar(), s.getEnlace(), s.getCupo(),
+        return comoPanel(s,
                 inscripciones.countBySesionSimulacionIdAndEsVigenteTrue(s.getId()),
-                s.getEstado(), s.getEnunciado(),
                 sesionesVacante.findBySesionSimulacionId(s.getId()).stream()
                         .map(SesionVacante::getVacanteId).toList(),
                 responsables.findBySesionSimulacionId(s.getId()).stream()
                         .map(SesionResponsable::getUsuarioId).toList(),
                 tramosDe(s.getId()));
+    }
+
+    private SesionPanel comoPanel(SesionSimulacion s, long inscritos, List<Long> vacanteIds,
+                                  List<Long> responsableIds, List<TramoResponse> susTramos) {
+        return new SesionPanel(s.getId(), s.getFechaHora(), s.getDuracionMinutos(), s.getModalidad(),
+                s.getLugar(), s.getEnlace(), s.getCupo(), inscritos,
+                s.getEstado(), s.getEnunciado(), vacanteIds, responsableIds, susTramos);
+    }
+
+    private static TramoResponse comoTramo(TramoSimulacion t) {
+        return new TramoResponse(t.getCodigo(), t.getNombre(), t.getMinutoInicio(), t.getMinutoFin());
     }
 
     private MiSesion comoMiSesion(InscripcionSesion i, SesionSimulacion s) {
@@ -505,7 +567,7 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
 
     private List<TramoResponse> tramosDe(Long sesionId) {
         return tramos.findBySesionSimulacionIdOrderByMinutoInicio(sesionId).stream()
-                .map(t -> new TramoResponse(t.getCodigo(), t.getNombre(), t.getMinutoInicio(), t.getMinutoFin()))
+                .map(ServicioSimulacionImpl::comoTramo)
                 .toList();
     }
 }

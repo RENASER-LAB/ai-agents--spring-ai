@@ -1,6 +1,7 @@
 package com.renaser.ai.ai_engine.ai.service.impl;
 
 import com.renaser.ai.ai_engine.ai.dto.RespuestaModelo;
+import com.renaser.ai.ai_engine.ai.prompt.ChatOptionsFactory;
 import com.renaser.ai.ai_engine.ai.service.ClienteModelo;
 
 import lombok.extern.slf4j.Slf4j;
@@ -8,8 +9,7 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.metadata.ChatGenerationMetadata;
 import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.ai.chat.model.ChatResponse;
-import org.springframework.ai.deepseek.DeepSeekChatOptions;
-import org.springframework.ai.deepseek.api.ResponseFormat;
+import org.springframework.ai.deepseek.api.DeepSeekApi;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -38,26 +38,33 @@ import org.springframework.stereotype.Component;
  *   <li><b>Tiempo agotado.</b> Tardó más de lo que espera el cliente HTTP.
  *   <li><b>Error del proveedor.</b> Todo lo demás.
  * </ul>
+ *
+ * <p><b>Las opciones de la llamada ya no se arman aquí.</b> Se piden a
+ * {@link ChatOptionsFactory}, que es el mismo sitio del que las saca el motor de agentes.
+ * Mientras cada camino construía las suyas, la temperatura podía quedar fijada en uno y
+ * suelta en el otro sin que nada fallara —y eso era justo lo que pasaba: ninguno la fijaba—.
+ * Ver {@link com.renaser.ai.ai_engine.ai.prompt.impl.PoliticaDeterminismoImpl} para qué
+ * temperatura le toca a cada agente y hasta dónde llega eso.
  */
 @Component
 @Slf4j
 public class ClienteModeloDeepSeek implements ClienteModelo {
 
     private static final String PROVEEDOR = "deepseek";
-    private static final ResponseFormat JSON = ResponseFormat.builder()
-            .type(ResponseFormat.Type.JSON_OBJECT)
-            .build();
 
     private final ChatClient chatClient;
+    private final ChatOptionsFactory opciones;
     private final String modelo;
     private final String modeloRapido;
     private final Integer maxTokens;
 
     public ClienteModeloDeepSeek(ChatClient chatClient,
+                                 ChatOptionsFactory opciones,
                                  @Value("${renaser.ai.chat.default-model}") String modelo,
                                  @Value("${renaser.ai.chat.modelo-rapido}") String modeloRapido,
                                  @Value("${renaser.ai.chat.max-tokens}") Integer maxTokens) {
         this.chatClient = chatClient;
+        this.opciones = opciones;
         this.modelo = modelo;
         this.modeloRapido = modeloRapido;
         this.maxTokens = maxTokens;
@@ -83,6 +90,7 @@ public class ClienteModeloDeepSeek implements ClienteModelo {
         String texto = respuesta.getResult().getOutput().getText();
         String motivoCierre = motivoCierre(respuesta);
         Usage uso = respuesta.getMetadata() == null ? null : respuesta.getMetadata().getUsage();
+        medirCache(agenteCodigo, uso);
 
         if (texto == null || texto.isBlank()) {
             throw new IllegalStateException(explicarVacio(agenteCodigo, motivoCierre, uso));
@@ -111,13 +119,15 @@ public class ClienteModeloDeepSeek implements ClienteModelo {
     private ChatResponse llamar(String agenteCodigo, String instruccion, String contenido,
                                 String queModelo) {
         try {
+            // El orden importa y no es casual: primero el mensaje de sistema —la instrucción
+            // del agente y su formato, que no cambian de un candidato a otro— y después los
+            // datos. DeepSeek cachea el prefijo repetido y solo acierta si coincide desde el
+            // primer token, así que meter el currículum antes tiraría la caché en cada
+            // llamada. Ver medirCache().
             return chatClient.prompt()
                     .system(instruccion)
                     .user(contenido)
-                    .options(DeepSeekChatOptions.builder()
-                            .responseFormat(JSON)
-                            .model(queModelo)
-                            .maxTokens(maxTokens))
+                    .options(opciones.paraAgenteDeSeleccion(agenteCodigo, queModelo))
                     .call()
                     .chatResponse();
         } catch (RuntimeException e) {
@@ -173,6 +183,46 @@ public class ClienteModeloDeepSeek implements ClienteModelo {
         return ("El agente %s recibió una respuesta vacía de %s (motivo de cierre «%s»). "
                 + "Puede ser un tropiezo puntual del proveedor: el reintento tiene sentido.")
                 .formatted(agenteCodigo, PROVEEDOR, motivoCierre == null ? "sin motivo" : motivoCierre);
+    }
+
+    /**
+     * Anota cuántos tokens de la entrada los puso la caché de DeepSeek y cuántos se pagaron.
+     *
+     * <p><b>Por qué se mide.</b> DeepSeek guarda en disco los prefijos que se repiten: lo que
+     * entra por caché cuesta $0,014 por millón de tokens en vez de $0,14 —diez veces menos— y
+     * además el primer token tarda mucho menos en llegar. No hay nada que encender: es
+     * automático, y por eso mismo es fácil que deje de acertar sin que nadie se entere. Una
+     * calificación con acierto cero significa que el prefijo dejó de coincidir, casi siempre
+     * porque alguien metió algo variable delante de la instrucción.
+     *
+     * <p><b>Dónde queda.</b> Hoy solo en el registro. En {@code ejecucion_ia} se guardan
+     * {@code tokens_entrada} y {@code tokens_salida}, pero no hay columnas para el reparto
+     * entre acierto y fallo, y añadirlas es una migración. Mientras tanto el registro alcanza
+     * para saber si la caché acierta, que es la pregunta que había que poder contestar.
+     *
+     * <p>El dato viene en {@code prompt_tokens_details.cached_tokens} y hay que sacarlo del
+     * uso nativo del proveedor: es el {@code prompt_cache_hit_tokens} de la documentación de
+     * DeepSeek. Los fallos son el resto de la entrada.
+     */
+    private void medirCache(String agenteCodigo, Usage uso) {
+        if (uso == null || uso.getPromptTokens() == null) {
+            return;
+        }
+        Integer aciertos = null;
+        if (uso.getNativeUsage() instanceof DeepSeekApi.Usage nativo
+                && nativo.promptTokensDetails() != null) {
+            aciertos = nativo.promptTokensDetails().cachedTokens();
+        }
+        if (aciertos == null) {
+            log.debug("El agente {} usó {} tokens de entrada; el proveedor no informó del "
+                    + "reparto de caché", agenteCodigo, uso.getPromptTokens());
+            return;
+        }
+        int fallos = Math.max(0, uso.getPromptTokens() - aciertos);
+        log.info("Caché de prefijo del agente {}: {} tokens de entrada acertaron y {} se "
+                        + "pagaron enteros ({}% de acierto)",
+                agenteCodigo, aciertos, fallos,
+                uso.getPromptTokens() == 0 ? 0 : (aciertos * 100) / uso.getPromptTokens());
     }
 
     private String motivoCierre(ChatResponse respuesta) {

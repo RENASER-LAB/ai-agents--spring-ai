@@ -68,9 +68,9 @@ Perfil Integral → prueba del puesto → simulacion → validacion → decision
 
 | | |
 |---|---|
-| Base de datos | **Flyway es el dueno del esquema**: V1-V24 en `src/main/resources/db/migration`, **91 tablas de este modulo** (94 en la base contando `flyway_schema_history` y las dos del motor de agentes, `agent_run` y `vector_store`). `ddl-auto: validate` |
+| Base de datos | **Flyway es el dueno del esquema**: V1-V26 en `src/main/resources/db/migration`, **85 tablas de este modulo** (88 en la base contando `flyway_schema_history` y las dos del motor de agentes, `agent_run` y `vector_store`). `ddl-auto: validate` |
 | Codigo | Veintiun paquetes de dominio bajo `ai_engine` (ver «Como esta organizado el codigo») |
-| Tests | **381, todos en verde (20/08/2026)**: 331 unitarios y 50 de integracion. Ver «Correr los tests»: unitarios de la maquina y del anonimizador, migraciones contra Postgres real (Testcontainers) y flujos de punta a punta: hito 1, evaluacion, prueba, simulacion/validacion y calificacion con IA |
+| Tests | **394 unitarios, todos en verde (20/08/2026)**, mas los de integracion con `verify`. Ver «Correr los tests»: unitarios de la maquina y del anonimizador, migraciones contra Postgres real (Testcontainers) y flujos de punta a punta: hito 1, evaluacion, prueba, simulacion/validacion y calificacion con IA |
 | IA que califica | **Seis de los diez agentes del catalogo estan implementados**: datos del curriculum, evidencia, evaluador, potencial/riesgo, prueba del puesto y las preguntas de la conversacion final. Todos corren por cola de RabbitMQ contra DeepSeek. Ver [Calificacion con IA](docs/CALIFICACION-CON-IA.md) |
 | Correo | **Ya sabe salir de verdad** (`EnviadorCorreoSmtp`), pero **por defecto no sale**: `renaser.correo.transporte` vale `log` salvo que se ponga `smtp`, y entonces solo se registra en `correo_enviado`. Para encenderlo hacen falta `CORREO_TRANSPORTE=smtp`, `CORREO_REMITENTE` y una cuenta que autentique. El RNF-65 pide que salga **desde el dominio propio de Renaser**: confirmar con ellos si ya lo tienen antes de encenderlo |
 | Acceso del candidato | Entra al portal **con un enlace, sin contrasena** (`EnlaceAcceso`, `ServicioEnlaceAcceso`). El enlace se le manda por correo, asi que depende de lo de arriba |
@@ -116,6 +116,43 @@ parametro editable y Renaser no los ha confirmado.
 Conocido y aceptado: `FiltroAlcance.responsableOFiltroNulo()` trata el alcance `PROPIO` igual que
 `TODO` —devuelve nulo y no filtra—. Hoy no es alcanzable porque ninguna semilla da un permiso de
 panel con ese alcance, pero si alguien configura un rol asi, veria de mas.
+
+**Los agentes de la calificacion ya NO corren en fila** (20/08/2026): los tres que no
+dependen de nadie —datos del CV, evidencia y evaluador— van a la vez, y el que arma el
+Perfil de Talento espera a los tres. Si uno falla, los demas siguen: antes un curriculum
+escaneado dejaba sin calificar un examen de 50 preguntas, para siempre.
+
+**El aviso de que la postulacion avanza lleva un enlace de acceso** (V26). Antes decia
+«entra a tu panel» sin dar ni la direccion ni la forma, y los candidatos cargados desde
+una carpeta de curriculums no tienen contrasena: recibian un correo que no podian atender.
+
+⚠️ **El correo exige `starttls` y va en `application.yaml`.** Sin eso Gmail rechaza todo
+con «530-5.7.0 Must issue a STARTTLS command first», que no nombra ni el TLS ni la
+propiedad que falta.
+
+Conocido y sin arreglar: **una ruta que no existe devuelve 500, no 404.** Se ve con cualquier
+direccion inventada:
+
+```
+GET /no-existe  ->  500
+{"detail":"Ha ocurrido un error inesperado...",
+ "type":"https://api.motoragentes.com/errors/internal"}
+```
+
+Ese `motoragentes.com` delata la causa: no lo contesta nuestro `ManejadorErrores`, sino el
+`@ExceptionHandler(Exception.class)` del motor de agentes, que atrapa lo que cae fuera de
+nuestros controladores. El commit «una direccion que no existe es un 404, no una averia del
+sistema» arreglo los casos que pasan por los nuestros; este no.
+
+**Por que importa mas de lo que parece.** Desde que el backend esta en una IP publica lo
+escanean bots todo el rato —se vieron intentos contra `/trace.axd`, `/.vscode/sftp.json` y
+`/?rest_route=/wp/v2/users/` a los pocos minutos de levantarlo—. Cada uno deja un 500 en el
+registro, asi que un 500 **de verdad** se pierde entre el ruido. Y un 500 le dice a quien
+escanea que ahi hay algo que revienta, en vez de un 404 aburrido.
+
+**Como se arregla**: un `@ExceptionHandler(NoResourceFoundException.class)` en
+`comun/exception/ManejadorErrores` que devuelva 404, y que se registre antes que el generico
+del otro paquete.
 
 ### La criba de curriculums (18/08/2026)
 Contesta «llegaron cien curriculums, a quien invito primero». Antes la IA solo arrancaba
@@ -169,12 +206,12 @@ Las dos consultan el mismo backend, asi que ensenan el mismo orden.
 - Nada se recalcula hacia atras: cada nota queda atada a la version de pesos de su vacante.
 
 ### Correr los tests
-**381 tests, todos en verde (20/08/2026).** Son dos tandas y el comando decide cual corre:
+**394 unitarios en verde (20/08/2026).** Son dos tandas y el comando decide cual corre:
 
 | Comando | Que corre | Cuantos | Necesita |
 |---|---|---:|---|
-| `./mvnw test` | unitarias con dobles y las de arquitectura | 331 | nada |
-| `./mvnw verify` | lo anterior mas las de integracion | 381 | Docker |
+| `./mvnw test` | unitarias con dobles y las de arquitectura | 394 | nada |
+| `./mvnw verify` | lo anterior mas las de integracion | 444 | Docker |
 
 Las de integracion levantan su propio PostgreSQL y su propio RabbitMQ con Testcontainers: hace
 falta el demonio de Docker encendido. El desglose completo esta en
@@ -206,8 +243,21 @@ documento. Ese orden importa — separa cada par de consistencia de su pareja al
 items — asi que **no se baraja**.
 
 El insumo es `docs/insumos/banco-renaser-v3-completo.pdf` y lo convierte
-`scripts/importar-banco-v3.py`, que comprueba cuatro totales que el propio documento declara y
-no genera nada si alguno no cuadra. **No transcribir items a mano.**
+`scripts/importar-banco-v3.py`, que comprueba cuatro totales que el propio documento declara,
+mas una quinta: **ningun item que se responda eligiendo puede quedarse sin opciones**. Si algo
+no cuadra, no genera nada. **No transcribir items a mano.**
+
+**Lo que arreglo la migracion `V25` (20/08/2026).** La carga original dejo 28 items sin una
+sola fila en `opcion` —los 13 `INV`, los 6 `DE` y 9 de los 10 `PC`— porque su contenido esta
+maquetado distinto en el PDF y el importador no lo reconocia: la lista de un `INV` va corrida
+y separada por `·`, la de un `DE` en una tabla de numeros en circulo, y un `PC` dice sus
+alternativas dentro de la frase (`Si / No`). La quinta comprobacion existe para que no vuelva
+a pasar.
+
+**Decision pendiente de Renaser:** cuatro items `EF-4` (`D51`, `D60`, `C40`, `O37`) **no
+tienen enunciado propio en el documento**: arrancan directos en su tabla de opciones. La `V25`
+les pone la instruccion del formato que el propio documento define en su seccion 0.2. Si
+Renaser quiere una pregunta propia para alguno, se cambia desde el panel.
 
 ### PENDIENTE · el detalle de las respuestas tiene que pasar a tabla
 Los formatos nuevos no se responden con una sola opcion: un `SJT-R` califica cada opcion del 1
@@ -261,7 +311,7 @@ fusiona.** El detalle esta en [docs/CI-CD.md](docs/CI-CD.md); aqui lo que hay qu
 
 | Cuando | Que corre |
 |---|---|
-| En cada PR y en cada push a `main` | `./mvnw verify` (los 381 tests), Semgrep, Gitleaks y la cobertura del codigo nuevo en SonarCloud |
+| En cada PR y en cada push a `main` | `./mvnw verify` (los 444 tests), Semgrep, Gitleaks y la cobertura del codigo nuevo en SonarCloud |
 | Al fusionar a `main`, si todo quedo verde | Se avisa a Render por su Deploy Hook, que construye la imagen con el `Dockerfile` y publica en Pruebas |
 | De noche, sin bloquear a nadie | PIT (mutation testing) y fuzzing de la API con Schemathesis |
 
@@ -371,7 +421,7 @@ Todo vive en `docs/`. Empezar por [docs/README.md](docs/README.md).
   ultimas etapas y sus tres reglas automaticas de disponibilidad.
 - [CI/CD](docs/CI-CD.md) — que se comprueba solo en cada cambio, como se despliega a Pruebas y
   que variables de entorno pide Render. **Leerlo antes de tocar `.github/workflows/`.**
-- [Comprobaciones automaticas](docs/COMPROBACIONES-AUTOMATICAS.md) — las 381 pruebas y las siete
+- [Comprobaciones automaticas](docs/COMPROBACIONES-AUTOMATICAS.md) — las 444 pruebas y las siete
   reglas de arquitectura, una por una. Que se mira solo y que no.
 - `docs/diagramas/` — HTML autocontenidos, se abren en el navegador.
 - `docs/mockups/` — prototipos de pantalla. **Los mantiene otra persona, no editarlos.**

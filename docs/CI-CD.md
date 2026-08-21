@@ -23,19 +23,20 @@ RENASER_IA_REAL=si ./mvnw verify -Dit.test=CalificacionIaRealIT
 ## Qué pasa al fusionar a main
 
 1. La misma tubería corre otra vez.
-2. Si todo queda en verde, se le avisa a Render con el *Deploy Hook* y Render
-   construye la imagen con el `Dockerfile` y la publica en **Pruebas**.
-3. Un *smoke test* espera hasta 10 minutos (el plan gratuito arranca en frío) a que
-   la aplicación conteste. Si no contesta, el despliegue queda marcado en rojo.
+2. Si todo queda en verde, se construye la imagen con el `Dockerfile`, se sube a ECR y
+   se le dice a la máquina de EC2 que se actualice. El servidor baja la imagen él solo,
+   con su propio rol: desde GitHub no sale ninguna credencial de la aplicación.
+3. Un *smoke test* comprueba que se llega desde internet. Si no contesta, el despliegue
+   queda marcado en rojo.
 
-Render **no** despliega solo: su auto-deploy está apagado a propósito. Si desplegara
-con cada push, lo haría también con la tubería en rojo, y todo esto no serviría de nada.
+**Nada se despliega sin pasar la tubería**: el trabajo de despliegue lleva
+`needs: [build, estatico]`, así que con cualquiera de los dos en rojo no llega a correr.
 
 ## Qué corre de noche (no bloquea a nadie)
 
 | Trabajo | Qué hace |
 |---|---|
-| Fuzzing | Schemathesis lee el contrato OpenAPI y bombardea los endpoints con entradas raras. Un 500 es un bug: a la basura se contesta 400. Corre contra una aplicación local del runner con la IA apagada y claves de mentira — nunca contra Render |
+| Fuzzing | Schemathesis lee el contrato OpenAPI y bombardea los endpoints con entradas raras. Un 500 es un bug: a la basura se contesta 400. Corre contra una aplicación local del runner con la IA apagada y claves de mentira — nunca contra el servidor de Pruebas |
 | PIT | Mutation testing: mete fallos a propósito en los cuatro paquetes de reglas (`postulacion`, `perfilintegral`, `pesos`, `seguridad`) y comprueba que algún test los cace. Tarda ~40 segundos. El reporte queda como artefacto de la corrida |
 
 Si el nocturno sale rojo, alguien lo revisa por la mañana. No bloquea PRs.
@@ -45,24 +46,40 @@ Si el nocturno sale rojo, alguien lo revisa por la mañana. No bloquea PRs.
 | Nombre | Tipo | Qué es |
 |---|---|---|
 | `SONAR_TOKEN` | Secreto | Lo genera SonarCloud al importar el repositorio |
-| `RENDER_DEPLOY_HOOK` | Secreto | La URL del Deploy Hook del servicio en Render |
-| `PRUEBAS_URL` | Variable | La URL pública de la aplicación en Render (ej. `https://ai-engine-xxxx.onrender.com`) |
+| ~~`RENDER_DEPLOY_HOOK`~~ | — | **Ya no hace falta.** El despliegue va a AWS |
 
-## Las variables de entorno del servicio en Render
+**Y no hay ninguna clave de AWS guardada en GitHub**, a propósito. Se usa OIDC: GitHub firma
+un token de un solo uso, AWS lo verifica y devuelve credenciales que caducan en minutos. Una
+clave de acceso guardada como secreto no caduca nunca — si se filtra, sigue valiendo.
 
-| Variable | Valor |
+Lo que lo hace posible, ya creado en la cuenta:
+
+| Qué | Cuál |
 |---|---|
-| `SPRING_PROFILES_ACTIVE` | `pruebas` |
-| `SPRING_DATASOURCE_URL` | La cadena **directa** de Supabase, puerto **5432** — no la del pooler (6543), que rompe las migraciones de Flyway |
-| `SPRING_DATASOURCE_USERNAME` | `postgres` |
-| `SPRING_DATASOURCE_PASSWORD` | La contraseña de la base de Supabase |
-| `RABBITMQ_HOST` | El host de CloudAMQP |
-| `RABBITMQ_VHOST` | El vhost de CloudAMQP (lleva el nombre del usuario) |
-| `RABBITMQ_USERNAME` | El usuario de CloudAMQP |
-| `RABBITMQ_PASSWORD` | La contraseña de CloudAMQP |
-| `DEEPSEEK_API_KEY` | La clave de DeepSeek |
-| `GOOGLE_GEMINI_API_KEY` | La clave de Gemini (embeddings) |
-| `JWT_SECRETO` | Una clave nueva de 32+ caracteres, **distinta** de la local |
+| Proveedor OIDC | `token.actions.githubusercontent.com` |
+| Rol que asume GitHub | `github-despliegue` |
+| Quién puede asumirlo | **Solo este repositorio**, por la condición `sub` del token |
+| Qué puede hacer | Subir a `ai-engine` en ECR, y `SendCommand` **solo** sobre `i-05fc037e853d07264` |
+
+La imagen se sube con **dos etiquetas**: `latest`, que es la que despliega, y el SHA del
+commit. Esa segunda es la que permite volver atrás: sin ella «la versión anterior» no tiene
+nombre y revertir obliga a reconstruir desde el código.
+| ~~`PRUEBAS_URL`~~ | — | **Ya no hace falta.** La dirección de Pruebas está escrita en el propio `ci.yml` |
+
+## Las variables de entorno de la aplicación
+
+**Ya no se cargan en ninguna pantalla web**: viven en el archivo `.env` de la máquina, en
+`/opt/renaser`, y no salen de ahí. GitHub nunca las ve — el runner solo sube una imagen y
+lanza un comando; quien lee el `.env` es el propio servidor.
+
+La lista completa, con de qué clave sale cada valor, está en
+[`despliegue/.env.example`](../despliegue/.env.example). Las tres que más se copian mal:
+
+| Variable | Cuidado |
+|---|---|
+| `SPRING_DATASOURCE_URL` | La cadena **directa** de Supabase, puerto **5432** — la del pooler de transacciones (6543) rompe las migraciones de Flyway |
+| `RABBITMQ_HOST` | El host de Amazon MQ **sin `amqps://` y sin puerto**. Y el puerto es el **5671**, con `SPRING_RABBITMQ_SSL_ENABLED=true` |
+| `JWT_SECRETO` | Una clave nueva de 32+ caracteres, **distinta** de la local: si se reutiliza, un token emitido en la máquina de cualquiera vale en producción |
 
 ## Configuración que se hace una sola vez
 
@@ -84,11 +101,12 @@ Si el nocturno sale rojo, alguien lo revisa por la mañana. No bloquea PRs.
    ```
 2. **Supabase** (el proyecto de Pruebas ya existe): en el SQL Editor, ejecutar
    `create extension if not exists vector;`. Copiar la cadena de conexión directa.
-3. **CloudAMQP**: crear una instancia gratuita y copiar host, vhost, usuario y contraseña.
-4. **Render**: crear un Web Service desde el repositorio con runtime **Docker**,
-   apagar el auto-deploy, cargar las variables de la tabla de arriba, y copiar la URL
-   del Deploy Hook (Settings → Deploy Hook) al secreto `RENDER_DEPLOY_HOOK` y la URL
-   pública a la variable `PRUEBAS_URL`.
+3. **La cola**: ya está creada en **Amazon MQ** (`renaser-mq`, RabbitMQ 4.2). El usuario y
+   la contraseña se pusieron al crear el broker y **no se pueden recuperar desde AWS**: los
+   guarda el propio RabbitMQ.
+4. **AWS**: la instancia, el repositorio de imágenes y el rol `github-despliegue` ya existen.
+   El paso a paso, con lo que cuesta al mes y por qué se eligió cada cosa, está en
+   [`despliegue/README.md`](../despliegue/README.md).
 5. **Protección de la rama main** (solo puede hacerlo el dueño del repositorio, con
    permisos de administrador): Settings → Branches → Add branch protection rule →
    rama `main`, marcar «Require a pull request before merging» y «Require status
@@ -105,10 +123,10 @@ el esquema y volver a desplegar.
 
 ## Limitaciones conocidas de esta fase
 
-- **El disco de Render es efímero, y ya no importa**: los currículums viven en el
+- **El disco de la máquina no guarda nada que importe**: los currículums viven en el
   bucket privado de Supabase (ver `docs/ARCHIVOS-EN-BUCKET.md`), así que un despliegue
-  no pierde nada. Lo único que muere con el contenedor es lo que nadie debería guardar
-  en su disco.
+  no pierde nada. Lo único que muere al recrear el contenedor es lo que nadie debería
+  guardar en su disco.
 - **Supabase gratuito se pausa a los 7 días sin uso** y despierta en ~30 segundos.
   El smoke test ya lo tolera. En cuanto entre el primer candidato real, Producción
   necesita plan de pago.

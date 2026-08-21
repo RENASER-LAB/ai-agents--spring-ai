@@ -22,6 +22,20 @@ public interface ServicioPostulacionesPanel {
     // Aplica el estado siguiente calculado por la máquina
     void confirmarAvance(ContextoUsuario quien, Long postulacionId, String motivo);
 
+    /**
+     * Corrige el contacto de la ficha que saco la IA del curriculum.
+     *
+     * <p>Existe porque no habia ninguna otra forma: el unico sitio del codigo que escribe
+     * `dato_cv` es el propio agente, asi que un correo mal leido solo se podia arreglar
+     * entrando a la base a mano. Y un correo mal leido deja al candidato fuera del proceso
+     * sin que nadie lo note: el aviso se registra como NO_ENVIADO y el sistema lo da por
+     * avisado.
+     *
+     * @return el contacto como queda despues
+     */
+    ContactoDelCandidato corregirContacto(ContextoUsuario quien, Long postulacionId,
+                                          CorregirContacto datos);
+
     byte[] descargarArchivo(ContextoUsuario quien, Long archivoId, StringBuilder nombreSalida);
 
     /**

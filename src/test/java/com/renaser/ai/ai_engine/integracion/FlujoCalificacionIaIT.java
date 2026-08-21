@@ -316,8 +316,14 @@ public class FlujoCalificacionIaIT {
             assertThat(fila.get("es_exitosa")).isEqualTo(true);
             assertThat(fila.get("tokens_entrada")).isNotNull();
         });
-        assertThat(ejecuciones.stream().map(f -> f.get("agente_codigo")).toList())
-                .containsExactly("DATOS_CV", "EVIDENCIA_CV", "EVALUADOR", "POTENCIAL_RIESGO");
+        // Los cuatro llamaron, y el que arma el retrato llamó el último. En qué orden lo
+        // hicieron los otros tres NO se comprueba, y es a propósito: corren a la vez, cada
+        // uno tarda lo que tarde el proveedor, y exigir un orden entre ellos sería exigir
+        // que dejaran de correr a la vez.
+        List<Object> codigos = ejecuciones.stream().map(f -> f.get("agente_codigo")).toList();
+        assertThat(codigos.subList(0, 3))
+                .containsExactlyInAnyOrder("DATOS_CV", "EVIDENCIA_CV", "EVALUADOR");
+        assertThat(codigos.get(3)).isEqualTo("POTENCIAL_RIESGO");
 
         // 4 · Los ocho criterios del currículum, ni uno más. El noveno que devolvió el modelo
         // no existe y el décimo venía sin explicación: los dos se descartan (RF-150).
@@ -390,42 +396,55 @@ public class FlujoCalificacionIaIT {
         responderYEntregar(codigoFallido);
         long postulacionId = idDe(codigoFallido);
 
+        // Los tres que van a la vez se crearon y los tres fallaron: aquí el doble del modelo
+        // dice que no a todo. Que se creen los tres es la mitad del cambio: si uno solo
+        // hubiera podido leerse, su parte estaría hecha.
         esperarA(() -> contar("""
                 select count(*) from trabajo_ia
-                where postulacion_id = %d and estado = 'FALLIDO'""".formatted(postulacionId)) == 1,
-                "el trabajo se dé por fallido tras agotar los intentos");
+                where postulacion_id = %d and estado = 'FALLIDO'""".formatted(postulacionId)) == 3,
+                "los tres trabajos se den por fallidos tras agotar los intentos");
 
-        // Se intentó dos veces, que es el tope configurado
-        assertThat(contar("select intentos from trabajo_ia where postulacion_id = " + postulacionId))
-                .isEqualTo(2);
+        assertThat(contar("select count(*) from trabajo_ia where postulacion_id = " + postulacionId))
+                .isEqualTo(3);
 
-        // Los dos intentos quedaron en la bitácora, con su error. Un fallo sin rastro es lo
+        // Cada uno se intentó dos veces, que es el tope configurado
+        assertThat(contar("""
+                select count(*) from trabajo_ia
+                where postulacion_id = %d and intentos = 2""".formatted(postulacionId)))
+                .isEqualTo(3);
+
+        // Los seis intentos quedaron en la bitácora, con su error. Un fallo sin rastro es lo
         // que impide después saber si la IA está rota o si el candidato no dio para más.
         List<Map<String, Object>> fallos = jdbc.queryForList("""
                 select es_exitosa, error from ejecucion_ia
                 where trabajo_ia_id in (select id from trabajo_ia where postulacion_id = %d)"""
                 .formatted(postulacionId));
-        assertThat(fallos).hasSize(2);
+        assertThat(fallos).hasSize(6);
         assertThat(fallos).allSatisfy(fila -> {
             assertThat(fila.get("es_exitosa")).isEqualTo(false);
             assertThat((String) fila.get("error")).contains("no responde");
         });
 
-        // Y lo que importa: NO se inventó ninguna nota, y la postulación sigue esperando
+        // Y lo que importa: NO se inventó ninguna nota, y la postulación sigue esperando.
+        //
+        // Un fallo suelto ya no para al retrato —para eso están los otros dos—, pero este es
+        // el límite de esa regla: aquí no salió bien NI UNO de los pasos que lo alimentan, y
+        // sobre la nada no hay retrato que armar. Pedirle uno al modelo sería inventarse una
+        // nota, que es justo lo que la Regla 3 prohíbe.
         assertThat(contar("select count(*) from nota_criterio where postulacion_id = " + postulacionId))
                 .isZero();
         assertThat(contar("select count(*) from perfil_talento where postulacion_id = " + postulacionId))
                 .isZero();
+        assertThat(contar("""
+                select count(*) from trabajo_ia
+                where postulacion_id = %d and agente_codigo = 'POTENCIAL_RIESGO'"""
+                .formatted(postulacionId))).isZero();
         assertThat(jdbc.queryForObject(
                 "select estado_codigo from postulacion where id = ?", String.class, postulacionId))
                 .isEqualTo("PERFIL_CALIFICANDO");
         assertThat(jdbc.queryForObject(
                 "select grupo_prioridad from postulacion where id = ?", String.class, postulacionId))
                 .isNull();
-
-        // El segundo y el tercer agente ni se crearon: la fila se corta donde falla
-        assertThat(contar("select count(*) from trabajo_ia where postulacion_id = " + postulacionId))
-                .isEqualTo(1);
 
         ModeloDePrueba.falla = false;
     }
