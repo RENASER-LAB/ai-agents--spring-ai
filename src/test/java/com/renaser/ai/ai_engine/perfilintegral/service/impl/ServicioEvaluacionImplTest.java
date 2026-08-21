@@ -36,11 +36,14 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import com.renaser.ai.ai_engine.perfilintegral.dto.DtosEvaluacion.Responder;
+import static org.mockito.ArgumentMatchers.any;
 
 /**
  * Lo que ve el candidato cuando vuelve a entrar a su examen.
@@ -243,4 +246,64 @@ class ServicioEvaluacionImplTest {
         when(opciones.findByPreguntaIdIn(anyList())).thenReturn(List.<Opcion>of());
         when(respuestas.findByEvaluacionId(60L)).thenReturn(dadas);
     }
+
+    @org.junit.jupiter.api.Nested
+    @DisplayName("Dos guardados de la misma pregunta a la vez")
+    class DosALaVez {
+
+        /**
+         * El portal reintenta lo que no confirmo, y ademas manda lo escrito al cambiar de
+         * pregunta. Asi que dos peticiones de la misma respuesta se cruzan de verdad: le paso
+         * a una candidata en la pregunta 49 de 50.
+         */
+        private void examenAbierto() {
+            when(postulaciones.findByUuid(CODIGO)).thenReturn(Optional.of(
+                    Postulacion.builder().id(50L).uuid(CODIGO).usuarioId(9L).evaluacionId(60L).build()));
+            when(evaluaciones.findById(60L)).thenReturn(Optional.of(
+                    Evaluacion.builder().id(60L).usuarioId(9L).estado("EN_CURSO")
+                            .iniciadaEn(java.time.Instant.now())
+                            .vigenteHasta(java.time.Instant.now().plusSeconds(3600))
+                            .plantillaEvaluacionId(3L).build()));
+            when(ordenes.findByEvaluacionIdOrderByPosicion(60L)).thenReturn(List.of(
+                    OrdenPregunta.builder().evaluacionId(60L).preguntaId(1L).posicion(1).build()));
+            when(preguntas.findById(1L)).thenReturn(Optional.of(
+                    Pregunta.builder().id(1L).tipo("PC").enunciado("¿Si o no?").build()));
+        }
+
+        @Test
+        @DisplayName("la segunda no revienta: relee la fila del otro y escribe encima")
+        void laSegundaActualiza() {
+            examenAbierto();
+            Respuesta laDelOtro = Respuesta.builder().id(70L).evaluacionId(60L).preguntaId(1L).build();
+            // Primero no existe —los dos miraron a la vez— y despues si: la creo el otro.
+            when(respuestas.findByEvaluacionIdAndPreguntaId(60L, 1L))
+                    .thenReturn(Optional.empty())
+                    .thenReturn(Optional.of(laDelOtro));
+            when(respuestas.saveAndFlush(any()))
+                    .thenThrow(new org.springframework.dao.DataIntegrityViolationException("clave repetida"))
+                    .thenReturn(laDelOtro);
+
+            // Lo que importa: el candidato NO ve un error. Su respuesta ya estaba guardada.
+            servicio.responder(CANDIDATA, CODIGO, 1L, new Responder(5L, null, null, 12));
+
+            verify(respuestas, times(2)).saveAndFlush(any());
+            assertThat(laDelOtro.getOpcionId()).isEqualTo(5L);
+        }
+
+        @Test
+        @DisplayName("si al releer sigue sin haber fila, el fallo se propaga y no se traga")
+        void siNoHayFilaSeCuenta() {
+            examenAbierto();
+            var choque = new org.springframework.dao.DataIntegrityViolationException("otra cosa");
+            when(respuestas.findByEvaluacionIdAndPreguntaId(60L, 1L)).thenReturn(Optional.empty());
+            when(respuestas.saveAndFlush(any())).thenThrow(choque);
+
+            // Un fallo de integridad que NO es la carrera —otra restriccion cualquiera— tiene
+            // que verse. Tragarselo dejaria una respuesta sin guardar y a nadie enterado.
+            assertThatThrownBy(() -> servicio.responder(CANDIDATA, CODIGO, 1L,
+                    new Responder(5L, null, null, 12)))
+                    .isSameAs(choque);
+        }
+    }
+
 }

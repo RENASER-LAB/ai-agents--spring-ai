@@ -34,6 +34,7 @@ import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -199,19 +200,56 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
             throw new IllegalArgumentException("Hay que elegir una opción o escribir una respuesta");
         }
 
-        Respuesta respuesta = respuestas
-                .findByEvaluacionIdAndPreguntaId(evaluacion.getId(), preguntaId)
-                .orElseGet(() -> Respuesta.builder()
-                        .evaluacionId(evaluacion.getId())
-                        .preguntaId(preguntaId)
-                        .creadoEn(Instant.now())
-                        .build());
+        guardarLaRespuesta(evaluacion.getId(), preguntaId, datos);
+    }
+
+    /**
+     * Guarda la respuesta, exista ya o no.
+     *
+     * <p>Se busca y, si no esta, se crea. Eso funciona hasta que llegan dos peticiones de la
+     * misma pregunta a la vez: las dos miran, las dos no encuentran nada, las dos insertan, y
+     * la segunda choca contra la clave unica de {@code (evaluacion_id, pregunta_id)}.
+     *
+     * <p><b>Y llegan a la vez.</b> El portal reintenta los guardados que no confirmo, y ademas
+     * manda lo escrito al cambiar de pregunta sin esperar al temporizador. Le paso a una
+     * candidata en la pregunta 49 de 50: su respuesta estaba guardada —por eso la clave estaba
+     * repetida— pero ella veia un error, que en ese momento del examen invita a recargar o a
+     * insistir en bucle.
+     *
+     * <p>Se resuelve dejando que la base decida quien gana y releyendo despues. Reintentar es
+     * seguro porque el segundo guardado escribe exactamente lo mismo que el primero: es la
+     * misma respuesta del mismo candidato a la misma pregunta.
+     */
+    private void guardarLaRespuesta(Long evaluacionId, Long preguntaId, Responder datos) {
+        try {
+            respuestas.saveAndFlush(conLoQueMando(
+                    respuestas.findByEvaluacionIdAndPreguntaId(evaluacionId, preguntaId)
+                            .orElseGet(() -> Respuesta.builder()
+                                    .evaluacionId(evaluacionId)
+                                    .preguntaId(preguntaId)
+                                    .creadoEn(Instant.now())
+                                    .build()),
+                    datos));
+        } catch (DataIntegrityViolationException carrera) {
+            // Otra peticion la creo entre nuestro «no existe» y nuestro insert. La fila que
+            // vale es la suya: se relee y se escribe encima.
+            log.debug("Dos guardados a la vez de la pregunta {} en la evaluacion {}; se actualiza",
+                    preguntaId, evaluacionId);
+            Respuesta suya = respuestas
+                    .findByEvaluacionIdAndPreguntaId(evaluacionId, preguntaId)
+                    .orElseThrow(() -> carrera);
+            respuestas.saveAndFlush(conLoQueMando(suya, datos));
+        }
+    }
+
+    /** Lo que el candidato acaba de mandar, puesto sobre la fila que toque. */
+    private Respuesta conLoQueMando(Respuesta respuesta, Responder datos) {
         respuesta.setOpcionId(datos.opcionId());
         respuesta.setTexto(datos.texto());
         respuesta.setDetalle(comoJson(datos.detalle()));
         respuesta.setSegundos(datos.segundos());
         respuesta.setRespondidaEn(Instant.now());
-        respuestas.save(respuesta);
+        return respuesta;
     }
 
     @Override
