@@ -117,4 +117,38 @@ public class MigracionesIT {
                 where p.codigo = 'porcentaje_criba_fina' and o.codigo = 'RENASER'""",
                 String.class)).isEqualTo("50");
     }
+
+    /**
+     * Ningún texto del banco v3 con un paréntesis a medio cerrar.
+     *
+     * <p>Así se veían los textos que la V20 dejó cortados por el ancho de página del PDF
+     * —«medio día / un día o» sin el «más)»— y que la V28 completó: las alternativas viven
+     * entre paréntesis, y un corte casi siempre deja uno abierto. Las comprobaciones del
+     * importador cuentan ítems y puntos, y por eso no lo vieron; esta lee. Vigila desde CI
+     * que una migración futura no vuelva a cargar texto cortado, que es algo que el
+     * comparador de scripts/ no puede hacer porque CI no lo ejecuta.
+     */
+    @Test
+    void losTextosDelBancoV3NoQuedanCortados() {
+        // La resta de longitudes cuenta apariciones: length(x) - length(replace(x,'(',''))
+        // es cuántos '(' hay. Un texto sano tiene los mismos '(' que ')'.
+        String desbalance = """
+                length(%1$s) - length(replace(%1$s, '(', ''))
+                <> length(%1$s) - length(replace(%1$s, ')', ''))""";
+
+        List<String> enunciados = jdbc.queryForList("""
+                select p.codigo from pregunta p
+                join version_banco vb on vb.id = p.version_banco_id
+                where vb.etiqueta like 'Banco RENASER v3%'
+                  and """ + " " + desbalance.formatted("p.enunciado"), String.class);
+        assertThat(enunciados).as("enunciados con paréntesis sin pareja").isEmpty();
+
+        List<String> campos = jdbc.queryForList("""
+                select p.codigo || '.' || cc.orden from campo_caso cc
+                join pregunta p on p.id = cc.pregunta_id
+                join version_banco vb on vb.id = p.version_banco_id
+                where vb.etiqueta like 'Banco RENASER v3%'
+                  and """ + " " + desbalance.formatted("cc.etiqueta"), String.class);
+        assertThat(campos).as("etiquetas de campo con paréntesis sin pareja").isEmpty();
+    }
 }
