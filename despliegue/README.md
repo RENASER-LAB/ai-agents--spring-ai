@@ -15,6 +15,7 @@ volver a crear sin perder nada más que los certificados, que Caddy saca otra ve
 | Broker | `renaser-mq` · RabbitMQ 4.2 · `amqps://…:5671` |
 | Grupo de seguridad | `sg-0fe61167414449546` — solo 80 y 443 |
 | Rol | `renaser-ec2` — ECR de lectura y SSM |
+| Rol que asume GitHub | `github-despliegue` — ECR de escritura y `SendCommand`; su política de confianza solo acepta `main`, y el `sub` va con identificadores numéricos (ver [CI-CD.md](../docs/CI-CD.md)) |
 
 ---
 
@@ -22,10 +23,12 @@ volver a crear sin perder nada más que los certificados, que Caddy saca otra ve
 
 | Contenedor | Para qué | Puertos al mundo |
 |---|---|---|
-| `aplicacion` | El backend | ninguno |
+| `aplicacion` | El backend | ninguno — el 8080 solo en `127.0.0.1` |
 | `caddy` | HTTPS y reparto | 80 y 443 |
 
-Solo Caddy mira a internet; la aplicación no publica ningún puerto. **Y el 22 está cerrado**:
+Solo Caddy mira a internet. La aplicación publica su 8080 **únicamente en loopback**, que es
+por donde le pregunta el chequeo de `desplegar.sh`; desde fuera de la máquina ese puerto no
+existe, y el grupo de seguridad tampoco lo dejaría pasar. **Y el 22 está cerrado**:
 se entra por SSM Session Manager, así que no hay ninguna llave que perder ni rotar.
 
 ## Lo que cuesta
