@@ -14,6 +14,14 @@ set -euo pipefail
 REGION="${REGION:-us-east-1}"
 CUENTA="$(aws sts get-caller-identity --query Account --output text)"
 
+# La configuracion se baja de Parameter Store en cada despliegue: es donde se edita ahora,
+# desde la consola de AWS. Si el script no esta —una maquina recien creada, por ejemplo— se
+# sigue con el .env que ya haya, que es como funcionaba antes y arranca igual.
+if [ -f traer-env.sh ]; then
+  echo "==> Trayendo la configuracion de Parameter Store"
+  bash traer-env.sh
+fi
+
 echo "==> Entrando al registro"
 aws ecr get-login-password --region "$REGION" \
   | docker login --username AWS --password-stdin "$CUENTA.dkr.ecr.$REGION.amazonaws.com"
