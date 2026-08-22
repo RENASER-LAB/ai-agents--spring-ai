@@ -39,7 +39,24 @@ public final class DtosDecision {
             @Pattern(regexp = "VERDE|AMBAR|ROJO|SIN_DATOS|RESERVA",
                     message = "semaforo debe ser VERDE, AMBAR, ROJO, SIN_DATOS o RESERVA")
             String semaforo,
-            @NotBlank String motivo) {}
+            @NotBlank String motivo,
+
+            // Contratar sabiendo que faltan notas de etapas que la vacante pesa.
+            //
+            // Hay puestos que se saltan simulación o validación a propósito, y sus notas no
+            // van a existir nunca: sin esta casilla, exigir todas las etapas dejaría a esos
+            // candidatos sin poder ser contratados jamás. Pero contratar con media evidencia
+            // tampoco puede pasar en silencio, así que se pide decirlo — y queda registrado
+            // qué etapas faltaban.
+            //
+            // Ausente o false significa «no lo he considerado», que es lo correcto por
+            // defecto: quien no sabe que faltan notas no está reconociendo nada.
+            Boolean aunqueFaltenEtapas) {
+
+        public boolean reconoceQueFaltanEtapas() {
+            return Boolean.TRUE.equals(aunqueFaltenEtapas);
+        }
+    }
 
     public record PedirEvidencia(@NotBlank String motivo, @NotBlank String enunciado) {}
 

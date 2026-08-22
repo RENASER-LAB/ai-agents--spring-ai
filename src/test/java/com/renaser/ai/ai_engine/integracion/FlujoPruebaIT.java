@@ -341,6 +341,12 @@ public class FlujoPruebaIT {
     @Test
     @Order(6)
     void seSaltaLoQueNoAplicaYSeDecide() throws Exception {
+        // Antes de llegar a la decisión no se decide. Hasta el 22/08/2026 bastaba el permiso:
+        // se podía contratar a quien todavía estaba en la prueba del puesto.
+        conToken(post("/api/v1/panel/postulaciones/" + postulacionId + "/decision"), tokenTalento,
+                "{\"semaforo\":\"VERDE\",\"motivo\":\"Me adelanto a la etapa\"}")
+                .andExpect(status().isConflict());
+
         // Simulación y validación se pueden saltar cuando el puesto no las necesita: es una
         // transición manual con motivo, que RF-121 permite para cualquier salto. Lo que ya no
         // hace falta es saltárselas por obligación, que era el parche de antes.
@@ -368,8 +374,40 @@ public class FlujoPruebaIT {
                 .andExpect(status().isForbidden());
 
         tokenArea = crearResponsableDeArea(vacanteId);
+
+        // Contratar con etapas sin nota ya no pasa en silencio. El mensaje nombra cuáles, que
+        // es la diferencia entre poder arreglarlo y tener que adivinar.
+        List<String> faltan = new java.util.ArrayList<>();
+        semaforo.get("etapasQueFaltan").forEach(e -> faltan.add(e.asText()));
+        String rechazo = conToken(post("/api/v1/panel/postulaciones/" + postulacionId + "/decision"), tokenArea,
+                        "{\"semaforo\":\"VERDE\",\"motivo\":\"Prueba sólida y Perfil Integral consistente\"}")
+                .andExpect(status().isConflict())
+                .andReturn().getResponse().getContentAsString();
+        assertThat(rechazo).contains(faltan.toArray(new String[0]));
+
+        // Y una barrera crítica confirmada no la levanta ni reconociendo lo que falta:
+        // "ningún promedio alto la tapa" (RF-115). Manda sobre todo lo demás.
+        long barreraId = json.readTree(
+                conToken(post("/api/v1/panel/vacantes/" + vacanteId + "/barreras-criticas"), tokenTalento,
+                                "{\"descripcion\":\"No puede viajar y el puesto lo exige\"}")
+                        .andExpect(status().isCreated())
+                        .andReturn().getResponse().getContentAsString()).get("id").asLong();
+        conToken(post("/api/v1/panel/postulaciones/" + postulacionId + "/barreras-detectadas"), tokenTalento,
+                "{\"barreraCriticaId\":" + barreraId + ",\"explicacion\":\"Lo dijo en la entrevista\"}")
+                .andExpect(status().isCreated());
+
+        String porLaBarrera = conToken(post("/api/v1/panel/postulaciones/" + postulacionId + "/decision"), tokenArea,
+                        "{\"semaforo\":\"VERDE\",\"motivo\":\"Aun así lo quiero\",\"aunqueFaltenEtapas\":true}")
+                .andExpect(status().isConflict())
+                .andReturn().getResponse().getContentAsString();
+        assertThat(porLaBarrera).contains("barrera");
+
+        // Se descarta por SQL porque todavía no hay ruta para hacerlo: queda anotado en T4.
+        jdbc.update("update barrera_detectada set descartada_en = now() where postulacion_id = ?", postulacionId);
+
+        // Ahora sí: reconociendo que faltan notas, se contrata.
         conToken(post("/api/v1/panel/postulaciones/" + postulacionId + "/decision"), tokenArea,
-                "{\"semaforo\":\"VERDE\",\"motivo\":\"Prueba sólida y Perfil Integral consistente\"}")
+                "{\"semaforo\":\"VERDE\",\"motivo\":\"Prueba sólida y Perfil Integral consistente\",\"aunqueFaltenEtapas\":true}")
                 .andExpect(status().isOk());
 
         conTokenGet("/api/v1/portal/postulaciones", tokenCandidato)
@@ -379,6 +417,13 @@ public class FlujoPruebaIT {
                 "select semaforo, decidida_por_usuario_id from decision where postulacion_id = ?", postulacionId);
         assertThat(decision.get("semaforo")).isEqualTo("VERDE");
         assertThat(decision.get("decidida_por_usuario_id")).isNotNull();
+
+        // Y el registro guarda las dos cosas: lo que propuso el servidor y qué faltaba. Sin
+        // eso, dentro de seis meses nadie puede responder por qué se contrató así.
+        String registro = jdbc.queryForObject(
+                "select valor_nuevo::text from auditoria where accion = 'decidir_postulacion' order by id desc limit 1",
+                String.class);
+        assertThat(registro).contains("propuestaDelServidor", "etapasSinNota");
     }
 
     @DisplayName("Un intento vencido se entrega solo")

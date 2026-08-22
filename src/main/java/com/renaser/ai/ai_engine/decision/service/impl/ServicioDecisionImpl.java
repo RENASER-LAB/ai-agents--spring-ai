@@ -55,12 +55,26 @@ import java.util.Map;
  * prioridad del hito 2, y conviene que Renaser los confirme. {@code RESERVA} no se calcula
  * nunca solo: es un juicio de la persona que decide (RF-117), disponible como una de las
  * cinco opciones al decidir.
+ *
+ * <p><b>Qué manda al decidir.</b> El cálculo no sustituye a la persona: pone un techo. Quien
+ * decide puede elegir cualquiera de las cinco opciones <i>salvo contratar</i> cuando el
+ * servidor no propone {@code VERDE} — porque las dos razones por las que no lo propone son
+ * que faltan notas o que hay una barrera crítica confirmada, y ninguna de las dos la puede
+ * levantar una petición. Bajar el listón sigue siendo suyo; subirlo, no. Y la propuesta del
+ * servidor queda en el registro junto a la decisión, para que después se pueda ver si una y
+ * otra coincidieron.
  */
 @Service
 @RequiredArgsConstructor
 public class ServicioDecisionImpl implements ServicioDecision {
 
     private static final BigDecimal CIEN = BigDecimal.valueOf(100);
+
+    // Los dos momentos de la etapa DECISION. «Por confirmar» es la entrada normal; «turno del
+    // candidato» es donde queda tras un ámbar, mientras trae la evidencia que se le pidió, y
+    // desde ahí se vuelve a decidir. De los demás estados no se decide: se llega antes.
+    private static final List<String> ESTADOS_QUE_ADMITEN_DECISION =
+            List.of("DECISION_POR_CONFIRMAR", "DECISION_TURNO_CANDIDATO");
 
     private final PostulacionRepository postulaciones;
     private final VacanteRepository vacantes;
@@ -139,7 +153,32 @@ public class ServicioDecisionImpl implements ServicioDecision {
                 ? "cambiar_decision" : "decidir_contratacion";
         permisos.alcanceDe(permisoNecesario);
 
+        // Se decide en la etapa de decisión, y en ninguna otra. Sin esta comprobación bastaba
+        // el permiso para contratar a quien todavía estaba respondiendo su evaluación.
+        if (!ESTADOS_QUE_ADMITEN_DECISION.contains(postulacion.getEstadoCodigo())) {
+            throw new IllegalStateException(
+                    "Esta postulación está en «%s» y todavía no ha llegado a la decisión: solo se decide desde %s"
+                            .formatted(postulacion.getEstadoCodigo(),
+                                    String.join(" o ", ESTADOS_QUE_ADMITEN_DECISION)));
+        }
+
         SemaforoResponse propuesta = calcular(postulacion);
+
+        // Contratar ya no lo decide el cliente por su cuenta.
+        //
+        // Hasta el 22/08/2026 el semáforo se calculaba y luego se guardaba y se actuaba con el
+        // que mandaba el cliente: `propuesta` solo sobrevivía en la nota global. Un
+        // {"semaforo":"VERDE"} contrataba aunque faltaran etapas por calificar o hubiera una
+        // barrera crítica confirmada — las dos cosas que el cálculo existe para impedir.
+        //
+        // No se exige que coincidan del todo, y es a propósito: RESERVA es una de las cinco
+        // opciones y el servidor no la calcula nunca —es un juicio de la persona (RF-117)—, así
+        // que pedir igualdad la volvería imposible. Bajar el listón sigue siendo de quien
+        // decide; subirlo por encima de lo que sostienen los datos, no.
+        if ("VERDE".equals(datos.semaforo())) {
+            impedirContratacionSinSustento(propuesta, datos);
+        }
+
         Vacante vacante = vacantes.findById(postulacion.getVacanteId())
                 .orElseThrow(() -> new IllegalStateException("La vacante de esta postulación ya no existe"));
 
@@ -153,10 +192,21 @@ public class ServicioDecisionImpl implements ServicioDecision {
         fila.setDecididaEn(Instant.now());
         decisiones.save(fila);
 
+        // La propuesta del servidor viaja al registro junto a la decisión de la persona. Sin
+        // los dos valores no se puede saber después si alguien decidió en contra del cálculo,
+        // que es justo lo que un candidato podría venir a preguntar. Y si se contrató sin
+        // alguna nota, se anota cuál: «faltaban etapas» sin decir cuáles no sirve de nada seis
+        // meses después.
+        Map<String, String> despues = new java.util.LinkedHashMap<>();
+        despues.put("semaforo", datos.semaforo());
+        despues.put("propuestaDelServidor", String.valueOf(propuesta.semaforo()));
+        if (!propuesta.etapasQueFaltan().isEmpty()) {
+            despues.put("etapasSinNota", String.join(", ", propuesta.etapasQueFaltan()));
+        }
         auditoria.registrar(quien.organizacionId(), quien, "decidir_postulacion",
                 "decision", fila.getId(),
                 existente == null ? null : Map.of("semaforo", String.valueOf(existente.getSemaforo())),
-                Map.of("semaforo", datos.semaforo()), datos.motivo());
+                despues, datos.motivo());
 
         aplicarTransicion(postulacion, datos.semaforo(), quien, datos.motivo());
     }
@@ -186,6 +236,37 @@ public class ServicioDecisionImpl implements ServicioDecision {
                 "Se pidió evidencia adicional: " + datos.motivo(), false, false, null);
         auditoria.registrar(quien.organizacionId(), quien, "pedir_evidencia_adicional",
                 "evidencia_adicional", fila.getId(), null, Map.of("numero", fila.getNumero()), datos.motivo());
+    }
+
+    /**
+     * Las tres razones por las que el servidor no sostiene una contratación, y qué hacer con
+     * cada una. Un «no se puede contratar» a secas obliga a adivinar cuál de las tres es.
+     *
+     * <p>Solo una admite seguir adelante: que falten notas. Hay puestos que se saltan
+     * simulación o validación a propósito y esas notas no van a llegar nunca, así que
+     * bloquearlo sin más dejaría a esos candidatos sin poder ser contratados. Se permite
+     * <b>reconociéndolo</b>, y entonces las etapas que faltaban quedan en el registro. Una
+     * barrera crítica confirmada no admite nada: se descarta primero o no se contrata.
+     */
+    private void impedirContratacionSinSustento(SemaforoResponse propuesta, Decidir datos) {
+        if (!propuesta.barrerasConfirmadas().isEmpty()) {
+            throw new IllegalStateException(
+                    "No se puede contratar: hay %d barrera(s) crítica(s) confirmada(s), y ningún promedio alto las tapa (RF-115). Para contratar hay que descartar la barrera primero"
+                            .formatted(propuesta.barrerasConfirmadas().size()));
+        }
+        if (!propuesta.etapasQueFaltan().isEmpty()) {
+            if (!datos.reconoceQueFaltanEtapas()) {
+                throw new IllegalStateException(
+                        "No se puede contratar sin la nota de %s. Si este puesto no las necesita, repite la decisión con \"aunqueFaltenEtapas\": true y quedará registrado que se contrató sin ellas"
+                                .formatted(String.join(", ", propuesta.etapasQueFaltan())));
+            }
+            return;
+        }
+        if (!"VERDE".equals(propuesta.semaforo())) {
+            throw new IllegalStateException(
+                    "No se puede contratar: con la Puntuación Global de esta postulación el servidor propone «%s», no VERDE"
+                            .formatted(propuesta.semaforo()));
+        }
     }
 
     // ============ El cálculo ============
