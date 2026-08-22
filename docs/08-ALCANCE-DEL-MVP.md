@@ -180,8 +180,9 @@ Estas **no las decidimos nosotros**: están en «Decisiones», más abajo.
 
 ## Decisiones
 
-Cinco cosas que había que consultar. Dos ya están resueltas;
-las demás están en su documento nuevo, así que apartarse de ellas es decisión suya.
+Seis cosas que había que consultar. Dos ya están resueltas y otras tres están en su documento
+nuevo, así que apartarse de ellas es decisión suya. La sexta no sale de ningún documento: la
+encontramos mirando el código, y no tiene respuesta del cliente todavía.
 
 **1 · ~~¿Se puede crear una vacante directamente en el MVP?~~ RESUELTO EL 15/08: no.** Se
 respeta el flujo completo del cliente desde el día 1: la Solicitud de Talento entra en el MVP
@@ -216,6 +217,48 @@ Sin eso el hito 3 no tiene contenido que ejecutar.
 **repartir**, porque lo que se está midiendo es si el orden que sale coincide con el que pondría
 una persona, y para eso hace falta una escala completa. Queda apuntado en la versión de pesos, así
 que cuando entren las dos etapas que faltan es un cambio de datos, no de código.
+
+**6 · ¿Hace falta un ranking general por vacante, y rankings por etapa?** Apuntado el 21/08. Hoy
+hay **un solo ranking y es el de la etapa 2**: `GET /panel/vacantes/{id}/ranking` ordena la tanda
+por grupo de prioridad y, dentro de cada grupo, por la nota del Perfil Integral. Nadie lo ha
+pedido distinto —en toda la documentación el ranking aparece una vez, y es ese—, pero es lo
+primero que pregunta cualquiera que ve la pantalla: *¿y el orden con todo lo demás dentro?*
+
+La Puntuación Global de RF-113 **ya está calculada**: la nota ponderada de las etapas que pese la
+versión de la vacante —cuatro en la v1, dos en la v3— sale en
+`GET /panel/postulaciones/{id}/semaforo`. Lo que no existe es una lista ordenada por ella. El
+trabajo de código es pequeño; lo que falta son tres decisiones que no son nuestras.
+
+*Qué hay que decidir:*
+
+- **Qué se muestra de quien va a mitad del proceso.** `notaGlobal` viene vacía mientras falte
+  cualquier etapa: hoy, un ranking general sería una lista de huecos, porque casi nadie ha
+  terminado todas las que pesan. Es el mismo problema del punto 5, visto desde la lista en vez de desde
+  el candidato. Si allí se decide repartir, aquí se resuelve solo.
+- **Si ordena por nota o por grupo.** El de la etapa 2 manda el grupo por delante del número, a
+  propósito: quien saca 92 con un riesgo crítico no va por delante de quien saca 88 sin ninguno.
+  Un ranking general que ordene por Puntuación Global pelada pierde justo eso.
+- **Quién lo ve.** `/ranking` pide `ver_embudo` y `/semaforo` pide `ver_semaforo_decision`. Una
+  lista que junte las dos cosas mezcla dos ámbitos de permiso, y el Jefe del área no debería
+  verla igual que Dirección.
+
+*Dos límites que no se negocian:*
+
+- **Tiene que ser por vacante, nunca transversal.** Cada vacante fija su versión de pesos, y dos
+  versiones no son comparables: la v1 reparte 40/30/15/15 sobre cuatro etapas y la v3 reparte
+  57.14/42.86 sobre dos, porque una etapa no aplicaba (RF-114). Las dos suman 100. Ordenar en una
+  misma lista a alguien medido con la v1 y a alguien medido con la v3 es medir con dos varas
+  distintas, el mismo fallo que ya nos pasó al mezclar notas de la criba rápida con las finas.
+- **Los rankings de la prueba, la simulación y la validación ordenarían notas escritas a mano.**
+  Esas tres las califica una persona, criterio por criterio. Un ranking de esas
+  etapas no es «lo que dijo la IA»: es lo que teclearon los evaluadores, y estará casi vacío
+  mientras el embudo no baje gente hasta ahí.
+
+*Nuestra recomendación:* el ranking general por vacante sí, ordenado igual que el de la etapa 2
+—grupo primero, nota después— y en cuanto el punto 5 esté resuelto. Los rankings por etapa
+suelta, no: para comparar a dos personas en la prueba o en la simulación ya está el expediente
+(A13–A18), y una lista ordenada por notas manuales escasas invita a decidir con menos evidencia
+de la que parece.
 
 ---
 
