@@ -60,10 +60,12 @@ valores = {
   "SPRING_DATASOURCE_USERNAME": exigir(leer("spring","datasource","username"), "spring.datasource.username"),
   "SPRING_DATASOURCE_PASSWORD": exigir(leer("spring","datasource","password"), "spring.datasource.password"),
 
-  # El broker no esta en el yaml: no se usa en local. Se rellena a mano.
-  "RABBITMQ_HOST": "b-f83a4881-fd75-4908-a634-5f5fabd46090.mq.us-east-1.on.aws",
-  "RABBITMQ_USERNAME": "",
-  "RABBITMQ_PASSWORD": "",
+  # La cola corre como contenedor en el propio compose: el host es el nombre del servicio.
+  # Las credenciales se generan aqui, como el JWT: el broker crea ese usuario la primera
+  # vez que arranca con el volumen vacio, asi que en una maquina nueva siempre casan.
+  "RABBITMQ_HOST": "rabbitmq",
+  "RABBITMQ_USERNAME": "renaser",
+  "RABBITMQ_PASSWORD": base64.b64encode(secrets.token_bytes(32)).decode(),
   "RABBITMQ_VHOST": "/",
 
   "DEEPSEEK_API_KEY":      exigir(leer("spring","ai","deepseek","api-key"), "spring.ai.deepseek.api-key"),
@@ -81,7 +83,9 @@ valores = {
   "SPRING_MAIL_PASSWORD":leer("spring","mail","password"),
 
   "PORTAL_URL": "https://renaser-os-postulantes.vercel.app",
-  "MEMORIA_APP": "3g",
+  # 2g y no mas: la aplicacion usa ~755 MB reales, y el broker y el sistema tambien viven
+  # en los mismos 4 GB de la maquina.
+  "MEMORIA_APP": "2g",
   "DOMINIO": "",
 }
 
@@ -96,14 +100,12 @@ if faltan:
     print("AVISO · estas claves no estan en tu yaml y quedan vacias:", file=sys.stderr)
     for c in faltan:
         print("   -", c, file=sys.stderr)
-print("PENDIENTE-BROKER" if not valores["RABBITMQ_USERNAME"] else "OK")
+print("OK")
 PY
 
-echo "==> .env armado. Rellena a mano el usuario y la contrasena del broker:"
-echo "    RABBITMQ_USERNAME= y RABBITMQ_PASSWORD="
-echo "    (se pusieron al crear renaser-mq y no se pueden sacar de la API de AWS)"
+echo "==> .env armado. Las credenciales del broker y el JWT se generaron nuevos."
 echo
-read -r -p "¿Abro el archivo para rellenarlos? [s/N] " abrir
+read -r -p "¿Abro el archivo para revisarlo? [s/N] " abrir
 if [[ "${abrir:-}" =~ ^[sS]$ ]]; then
   "${EDITOR:-nano}" "$SALIDA"
 fi
