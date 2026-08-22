@@ -134,6 +134,13 @@ la postulación en el acto (`NO_CONTINUA`), con la regla exacta escrita en su hi
 | POST `/postulaciones/{id}/cv` | Reemplazar el currículum desde el panel | `ajustar_nota` |
 | GET `/archivos/{id}/descarga` | Descargar el CV | `descargar_entregables` |
 
+> **Este es el único ranking que existe, y es el de la etapa 2.** Ordena por grupo de prioridad y,
+> dentro de cada grupo, por la nota del Perfil Integral. No hay ranking general con las cuatro
+> etapas dentro, ni rankings de la prueba, la simulación o la validación: esas notas se consultan
+> de una en una por candidato. La Puntuación Global sí está calculada —sale en
+> `/postulaciones/{id}/semaforo`—, pero nunca como lista ordenada. Está apuntado como decisión 6
+> en [Alcance del MVP](08-ALCANCE-DEL-MVP.md), con lo que habría que decidir antes de montarlo.
+
 ### La prueba del puesto (hito 3)
 
 | Método y ruta | Qué hace | Permiso |
