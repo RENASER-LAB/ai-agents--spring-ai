@@ -143,6 +143,26 @@ public class ServicioPostulacionesPanelImpl implements ServicioPostulacionesPane
     @Transactional
     public void transicionar(ContextoUsuario quien, Long postulacionId, Transicionar datos) {
         Postulacion p = laVisible(quien, postulacionId, "mover_postulacion");
+
+        // A CONTRATADO no se llega moviendo la ficha: se llega decidiendo.
+        //
+        // Los 18 estados son destino manual a propósito —saltarse etapas hacia adelante es
+        // legítimo, y hay puestos que no necesitan simulación ni validación—, pero contratar
+        // no es moverse una casilla más: es el único estado que compromete a la empresa con
+        // una persona, y tiene servicio propio con sus reglas. Por esta ruta se llegaba con
+        // el permiso `mover_postulacion` y nada más, saltándose de un golpe que la
+        // postulación esté en la etapa de decisión, que no haya barreras críticas
+        // confirmadas, que estén las notas, y el propio registro de la decisión.
+        //
+        // NO_CONTINUA y CERRADA sí se quedan: cerrar a mano es un camino previsto —de ahí los
+        // motivos de cierre de más abajo— y no promete nada a nadie.
+        if ("CONTRATADO".equals(datos.estadoDestino())) {
+            throw new IllegalStateException(
+                    "A CONTRATADO no se llega moviendo la postulación: se contrata desde la "
+                            + "decisión, en POST /api/v1/panel/postulaciones/" + postulacionId
+                            + "/decision, que es donde se comprueba que haya con qué sostenerla");
+        }
+
         // Si el destino es un cierre, hace falta decir de qué clase
         String motivoCierre = datos.motivoCierre();
         if ("CERRADA".equals(datos.estadoDestino()) && motivoCierre == null) {

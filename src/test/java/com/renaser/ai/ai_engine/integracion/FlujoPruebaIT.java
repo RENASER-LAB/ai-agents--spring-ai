@@ -347,9 +347,18 @@ public class FlujoPruebaIT {
                 "{\"semaforo\":\"VERDE\",\"motivo\":\"Me adelanto a la etapa\"}")
                 .andExpect(status().isConflict());
 
-        // Simulación y validación se pueden saltar cuando el puesto no las necesita: es una
-        // transición manual con motivo, que RF-121 permite para cualquier salto. Lo que ya no
-        // hace falta es saltárselas por obligación, que era el parche de antes.
+        // Mover la ficha nunca contrata. Con `mover_postulacion` se llegaba a CONTRATADO desde
+        // cualquier etapa, saltándose de un golpe la decisión entera y todo lo que comprueba.
+        String saltoACONTRATADO = conToken(
+                        post("/api/v1/panel/postulaciones/" + postulacionId + "/transiciones"), tokenTalento,
+                        "{\"estadoDestino\":\"CONTRATADO\",\"motivo\":\"Me lo llevo ya\"}")
+                .andExpect(status().isConflict())
+                .andReturn().getResponse().getContentAsString();
+        assertThat(saltoACONTRATADO).contains("/decision");
+
+        // Simulación y validación sí se pueden saltar cuando el puesto no las necesita: es una
+        // transición manual con motivo, que RF-121 permite para cualquier salto. Saltar hacia
+        // adelante sigue siendo legítimo; lo que se cerró es la puerta trasera a contratar.
         conToken(post("/api/v1/panel/postulaciones/" + postulacionId + "/transiciones"), tokenTalento, """
                 {"estadoDestino":"DECISION_POR_CONFIRMAR",
                  "motivo":"Este puesto no requiere simulación ni periodo de validación"}""")

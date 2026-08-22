@@ -235,9 +235,13 @@ public class ServicioDecisionImpl implements ServicioDecision {
         // que es justo lo que un candidato podría venir a preguntar. Y si se contrató sin
         // alguna nota, se anota cuál: «faltaban etapas» sin decir cuáles no sirve de nada seis
         // meses después.
+        // «SIN_DATOS» y no «null»: es uno de los cinco valores del dominio, y quien lea el
+        // registro dentro de un año no tiene por qué saber que un null del cálculo significa
+        // que faltaban notas.
         Map<String, String> despues = new java.util.LinkedHashMap<>();
         despues.put("semaforo", datos.semaforo());
-        despues.put("propuestaDelServidor", String.valueOf(propuesta.semaforo()));
+        despues.put("propuestaDelServidor",
+                propuesta.semaforo() == null ? "SIN_DATOS" : propuesta.semaforo());
         if (!propuesta.etapasQueFaltan().isEmpty()) {
             despues.put("etapasSinNota", String.join(", ", propuesta.etapasQueFaltan()));
         }
