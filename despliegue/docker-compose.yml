@@ -58,6 +58,22 @@ services:
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
       GOOGLE_GEMINI_API_KEY: ${GOOGLE_GEMINI_API_KEY}
       JWT_SECRETO: ${JWT_SECRETO}
+
+      # La puerta del equipo, encendida A PROPOSITO y a la vista.
+      #
+      # Desde el 22/08/2026 el codigo la trae APAGADA por defecto, para que un entorno nuevo
+      # nazca cerrado. Aqui hay que volver a encenderla porque hoy dev-login es la UNICA
+      # forma de entrar al panel: seleccionApi.js:194 es el unico sitio donde el frontend
+      # pide un token, PanelAuthController no expone ninguna otra ruta, y cinco scripts
+      # (cargar-convocatoria, invitar, lista-para-rrhh, exportar-para-demo y
+      # sembrar-datos-de-prueba) entran por ahi. Apagarla sin sustituta deja al equipo fuera
+      # de su propio panel.
+      #
+      # ⚠️ Esto NO cierra el agujero, lo hace explicito: quien tenga la direccion puede
+      # sacar un token con TALENTO, DIRECCION y ADMINISTRADOR. Se pone en false el dia que
+      # RENASER OS emita la identidad del equipo — es la tarea T2 de
+      # docs/SUBSANACION-SPRINT-1.md, y hasta entonces sigue abierta a sabiendas.
+      APP_SEGURIDAD_DEV_LOGIN_ACTIVO: ${DEV_LOGIN_ACTIVO:-true}
       SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
 
       # La clave del bucket donde viven los curriculums. Sin esto la aplicacion arranca
