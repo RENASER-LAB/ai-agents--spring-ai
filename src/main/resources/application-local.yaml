@@ -30,6 +30,17 @@ app:
     # navegador no abre; la descarga normal, la que sirve los bytes, funciona igual.
     tipo: memoria
 
+  seguridad:
+    # Las dos llaves que en el codigo estan apagadas por defecto. Se encienden AQUI y solo
+    # aqui: este perfil es el de tu maquina, y ademas es el que se aplica cuando nadie dice
+    # nada, asi que es tambien el de los tests —seis pruebas de integracion entran por el
+    # dev-login para armar su sesion de equipo—.
+    #
+    # Ningun entorno remoto hereda esto: despliegue/docker-compose.yml activa «pruebas», y
+    # un perfil explicito gana siempre sobre el «default: local» de application.yaml.
+    dev-login-activo: true
+    documentacion-publica: true
+
 # ⚠️ Aqui NO se apaga la calificacion con IA, y es a proposito. Este perfil es el que se
 # aplica cuando nadie dice nada —incluidos los tests—, asi que solo puede cambiar DONDE se
 # guardan las cosas, nunca lo que el sistema HACE. Apagarla aqui dejaba a FlujoCalificacionIaIT
