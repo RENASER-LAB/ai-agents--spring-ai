@@ -70,3 +70,7 @@ __pycache__/
 # El .env del despliegue lleva las mismas claves que application-secrets.yaml
 .env
 despliegue/.env
+
+# El candado que LibreOffice deja mientras tienes un .xlsx o un .docx abierto. Lleva
+# dentro tu usuario y el nombre de tu maquina, y desaparece solo al cerrar el archivo.
+.~lock.*#
