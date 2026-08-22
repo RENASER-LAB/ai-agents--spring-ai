@@ -1,13 +1,19 @@
-# El entorno de Pruebas: la aplicación en Render, la base en Supabase y la cola en
-# CloudAMQP. Se activa con SPRING_PROFILES_ACTIVE=pruebas.
+# El entorno de Pruebas: la aplicación en una máquina EC2 de AWS detrás de Caddy, la base
+# en Supabase y la cola en Amazon MQ. Se activa con SPRING_PROFILES_ACTIVE=pruebas, y quien
+# lo hace es despliegue/docker-compose.yml. Nadie lo arranca a mano en su máquina.
 #
-# Aquí solo está lo que cambia respecto del desarrollo local. Los valores sensibles
-# llegan por variables de entorno de Render (la lista completa está en docs/CI-CD.md);
+# Hasta agosto de 2026 esto corría en Render, y por eso puede quedar alguna referencia
+# suelta por ahí. La tubería y el servidor de verdad están descritos en docs/CI-CD.md.
+#
+# Aquí solo está lo que cambia respecto del desarrollo local. Los valores sensibles llegan
+# por variables de entorno del .env del servidor (la lista completa está en docs/CI-CD.md);
 # los que no tienen valor por defecto son obligatorios a propósito: si faltan, la
 # aplicación no arranca y lo dice, en vez de arrancar apuntando a localhost.
 
 server:
-  # El puerto lo decide Render y lo pasa en PORT
+  # Caddy habla con el contenedor por el 8080 y no pasa ningún PORT, así que en la práctica
+  # manda el valor por defecto. La variable se respeta por si algún día vuelve a mandarlo
+  # quien hospede la aplicación.
   port: ${PORT:8080}
 
 spring:
@@ -23,7 +29,7 @@ spring:
     # primero, así que el reparto se escribe.
     hikari:
       # El aviso de Hikari empieza por el nombre del pool. Con el de fábrica
-      # («HikariPool-1») el registro de Render no dice si el que se quedó sin conexiones
+      # («HikariPool-1») el registro del servidor no dice si el que se quedó sin conexiones
       # es este backend o cualquier otra cosa que arranque al lado.
       pool-name: renaser-pruebas
       # Doce de las treinta, contando UNA instancia de la aplicación. Las otras dieciocho
@@ -72,12 +78,13 @@ spring:
     show-sql: false
 
   rabbitmq:
-    # CloudAMQP va con TLS por el 5671, no el 5672 plano del compose local
+    # Amazon MQ va con TLS por el 5671, no el 5672 plano del compose local: solo habla
+    # AMQPS. El host va sin «amqps://» y sin puerto — Spring arma la url él solo.
     host: ${RABBITMQ_HOST}
     port: ${RABBITMQ_PORT:5671}
     username: ${RABBITMQ_USERNAME}
     password: ${RABBITMQ_PASSWORD}
-    # En CloudAMQP el vhost lleva el nombre del usuario, no «/»
+    # El vhost del broker. En Amazon MQ es «/» salvo que se haya creado otro.
     virtual-host: ${RABBITMQ_VHOST}
     ssl:
       enabled: true
@@ -92,5 +99,10 @@ spring:
         # Con cuatro de techo, los consumidores nunca pueden pedir más de un tercio del
         # pool y al portal le quedan ocho pase lo que pase. Calificar una tanda tarda el
         # doble; postularse sigue tardando lo mismo. Ese es el cambio que se acepta.
+        #
+        # ⚠️ Hoy el servidor NO usa estos dos números: despliegue/docker-compose.yml los
+        # pisa con SPRING_RABBITMQ_LISTENER_SIMPLE_CONCURRENCY (8 por defecto), porque
+        # arreglado el N+1 de la bandeja el razonamiento de arriba ya no se sostiene y a
+        # 2/4 la criba iba a un quinto de su ritmo. Estos quedan como suelo prudente.
         concurrency: 2
         max-concurrency: 4

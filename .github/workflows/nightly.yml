@@ -2,7 +2,7 @@
 #
 #   fuzzing  Schemathesis lee el contrato OpenAPI y bombardea los 158 endpoints con
 #            entradas raras. Cualquier 500 es un bug: la API debe contestar 4xx a la
-#            basura. Corre contra una aplicación LOCAL del runner, nunca contra Render:
+#            basura. Corre contra una aplicación LOCAL del runner, nunca contra el servidor:
 #            la calificación con IA va apagada y las claves son de mentira, así que
 #            ningún currículum falso llega a DeepSeek ni ensucia la base de pruebas.
 #   pit      Mutation testing: mete fallos a propósito en los cuatro paquetes de reglas

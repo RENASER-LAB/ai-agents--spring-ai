@@ -312,30 +312,47 @@ fusiona.** El detalle esta en [docs/CI-CD.md](docs/CI-CD.md); aqui lo que hay qu
 | Cuando | Que corre |
 |---|---|
 | En cada PR y en cada push a `main` | `./mvnw verify` (los 444 tests), Semgrep, Gitleaks y la cobertura del codigo nuevo en SonarCloud |
-| Al fusionar a `main`, si todo quedo verde | Se avisa a Render por su Deploy Hook, que construye la imagen con el `Dockerfile` y publica en Pruebas |
+| Al fusionar a `main`, si todo quedo verde | Se construye la imagen con el `Dockerfile`, se sube a ECR y se le dice por SSM a la maquina de EC2 que se actualice. Un smoke test comprueba que responde desde internet |
 | De noche, sin bloquear a nadie | PIT (mutation testing) y fuzzing de la API con Schemathesis |
 
-**Render no despliega solo**: su auto-deploy esta apagado a proposito, para que no publique con
-la tuberia en rojo.
+**Nada se despliega sin pasar la tuberia**: el trabajo de despliegue lleva `needs: [build,
+estatico]`, asi que con cualquiera de los dos en rojo no llega a correr. Y en GitHub no hay
+ninguna clave de AWS guardada: se usa OIDC.
+
+**Hasta agosto de 2026 esto iba a Render.** Si encuentras una referencia suelta a Render o a
+CloudAMQP en algun comentario, esta desfasada: hoy es EC2 + ECR + Amazon MQ.
 
 **Semgrep** corre con las reglas de serie de Java mas tres propias en `.semgrep/`: que la IA no
 lea el curriculum sin anonimizar, que no aparezcan rutas publicas fuera de
 `ConfiguracionSeguridad`, y que ningun error se trague por consola.
 
-### Los tres perfiles de configuracion
+### Los perfiles de configuracion
 | Archivo | Cuando se usa | Que lo activa |
 |---|---|---|
 | `application.yaml` | siempre, es la base: Postgres local en el 5433, RabbitMQ sin TLS | nada |
-| `application-pruebas.yaml` | la aplicacion corriendo en Render (Supabase + CloudAMQP) | `SPRING_PROFILES_ACTIVE=pruebas` |
-| `application-supabase.yaml` | tu backend local apuntando a Supabase | `-Dspring-boot.run.profiles=supabase` |
+| `application-secrets.yaml` | siempre que exista; son tus claves y no se versiona | lo importa `application.yaml` |
+| `application-local.yaml` | trabajar en tu maquina sin tocar nada compartido: cola local y archivos en memoria | **nada: es el de por defecto** (`spring.profiles.default`) |
+| `application-pruebas.yaml` | la aplicacion corriendo en EC2 (Supabase + Amazon MQ) | `SPRING_PROFILES_ACTIVE=pruebas`, lo pone `despliegue/docker-compose.yml` |
 
-Los perfiles son aditivos: cada uno solo escribe encima lo que cambia.
+Los perfiles son aditivos: cada uno solo escribe encima lo que cambia. Quien manda, de menos a
+mas fuerza: `application.yaml` -> `application-secrets.yaml` -> el perfil activo -> los
+argumentos del comando. La tabla completa con lo que cambia cada uno esta en el
+[README](README.md#los-perfiles); esta es solo la lista de archivos.
 
-**Cuidado con el nombre**: el perfil `pruebas` es el entorno de Pruebas, **no** los tests. Los
-tests no usan ningun perfil — cada uno se inyecta sus valores con `@DynamicPropertySource`.
+**Si nadie nombra un perfil se aplica `local`.** Antes «ninguno» era una mezcla peligrosa: base
+local, pero la cola la ponia `application-secrets.yaml` —el broker compartido— y los curriculums
+iban al bucket de verdad.
 
-En Render **no existe `application-secrets.yaml`**: el `Dockerfile` no lo copia y el import es
-`optional:`, asi que alli todo llega por variable de entorno. La lista completa esta en
+⚠️ Eso incluye a los **tests**, que no nombran perfil: ahora corren con `local` encima. Por eso
+`application-local.yaml` solo puede cambiar DONDE se guardan las cosas, nunca lo que el sistema
+HACE. Apagar ahi `renaser.ai.calificacion.habilitada` rompe `FlujoCalificacionIaIT` y
+`CalificacionIaRealIT`, que dan por hecho que esta encendida.
+
+**Cuidado con el nombre**: el perfil `pruebas` es el entorno de Pruebas, **no** los tests. Cada
+test se inyecta ademas sus propios valores con `@DynamicPropertySource`, que gana sobre todo.
+
+En el servidor **no existe `application-secrets.yaml`**: el `Dockerfile` no lo copia y el import
+es `optional:`, asi que alli todo llega por variable de entorno. La lista completa esta en
 [docs/CI-CD.md](docs/CI-CD.md).
 
 ## Como esta organizado el codigo
@@ -419,8 +436,8 @@ Todo vive en `docs/`. Empezar por [docs/README.md](docs/README.md).
   abierto y arma el Perfil de Talento. Y que pasa cuando falla.
 - [Avance de simulacion y validacion](docs/AVANCE-SIMULACION-VALIDACION-2026-08-18.md) — las dos
   ultimas etapas y sus tres reglas automaticas de disponibilidad.
-- [CI/CD](docs/CI-CD.md) — que se comprueba solo en cada cambio, como se despliega a Pruebas y
-  que variables de entorno pide Render. **Leerlo antes de tocar `.github/workflows/`.**
+- [CI/CD](docs/CI-CD.md) — que se comprueba solo en cada cambio, como se despliega a AWS y que
+  variables de entorno pide el servidor. **Leerlo antes de tocar `.github/workflows/`.**
 - [Comprobaciones automaticas](docs/COMPROBACIONES-AUTOMATICAS.md) — las 444 pruebas y las siete
   reglas de arquitectura, una por una. Que se mira solo y que no.
 - `docs/diagramas/` — HTML autocontenidos, se abren en el navegador.

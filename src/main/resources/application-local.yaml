@@ -1,0 +1,39 @@
+# Perfil "local": todo lo que guarda estado se queda en tu maquina.
+#
+#   ./mvnw spring-boot:test-run -Dspring-boot.run.profiles=local
+#
+# Es test-run y no run a proposito: el unico almacen de archivos del codigo de produccion
+# es el bucket de Supabase, y el doble en memoria vive en src/test. test-run arranca la
+# aplicacion de siempre con el classpath de pruebas, que es donde ese doble esta.
+
+server:
+  # El 8080 suele estar ocupado por otras cosas (Adminer, otro proyecto).
+  port: 8081
+
+spring:
+  rabbitmq:
+    # ⚠️ La razon de ser de este bloque. Sin el manda application-secrets.yaml, que apunta
+    # a CloudAMQP: la MISMA cola que usa el entorno de Pruebas. Un backend local conectado
+    # ahi consume trabajos de verdad y escribe los resultados de vuelta.
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+    virtual-host: /
+    ssl:
+      enabled: false
+
+app:
+  archivos:
+    # Los curriculums viven en un mapa y mueren al parar la aplicacion. Nada sale a ningun
+    # bucket. El endpoint de enlaces firmados devuelve una url «memoria://» que el
+    # navegador no abre; la descarga normal, la que sirve los bytes, funciona igual.
+    tipo: memoria
+
+# ⚠️ Aqui NO se apaga la calificacion con IA, y es a proposito. Este perfil es el que se
+# aplica cuando nadie dice nada —incluidos los tests—, asi que solo puede cambiar DONDE se
+# guardan las cosas, nunca lo que el sistema HACE. Apagarla aqui dejaba a FlujoCalificacionIaIT
+# y a CalificacionIaRealIT esperando una calificacion que ya no se encolaba.
+#
+# Para no gastar en DeepSeek durante una sesion de trabajo, apagala al arrancar y no aqui:
+#   ./mvnw spring-boot:test-run -Dspring-boot.run.arguments=--renaser.ai.calificacion.habilitada=false
