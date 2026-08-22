@@ -3,6 +3,7 @@ package com.renaser.ai.ai_engine.integracion;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.renaser.ai.ai_engine.comun.programado.SondeoVencimientos;
+import com.renaser.ai.ai_engine.integracion.soporte.ImagenesDeContenedores;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.DisplayName;
@@ -57,7 +58,7 @@ public class FlujoSimulacionValidacionIT {
 
     @Container
     @ServiceConnection
-    static RabbitMQContainer rabbit = new RabbitMQContainer("rabbitmq:3-management-alpine");
+    static RabbitMQContainer rabbit = new RabbitMQContainer(ImagenesDeContenedores.RABBITMQ);
 
     @DynamicPropertySource
     static void propiedades(DynamicPropertyRegistry registro) {
