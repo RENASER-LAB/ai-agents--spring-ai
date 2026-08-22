@@ -142,7 +142,7 @@ quedarse a medias por un objeto que no se dejó borrar—.
 
 ## Enlaces
 
-- [Conectar la base de datos a Supabase](CONEXION-SUPABASE.md) — el otro cambio del mismo
-  proyecto de Supabase, independiente de este
+- [Conectar la base de datos a Supabase](CONEXION-SUPABASE.md) — retirado: el perfil que hacía
+  eso se borró el 21/08. Queda por qué
 - [Requisitos no funcionales](02-REQUISITOS-NO-FUNCIONALES.md) — lo que el sistema tiene que
   cumplir además de funcionar
