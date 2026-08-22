@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.renaser.ai.ai_engine.ai.dto.RespuestaModelo;
 import com.renaser.ai.ai_engine.ai.service.ClienteModelo;
 
+import com.renaser.ai.ai_engine.integracion.soporte.ImagenesDeContenedores;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
@@ -88,7 +89,7 @@ public class FlujoCalificacionIaIT {
 
     @Container
     @ServiceConnection
-    static RabbitMQContainer rabbit = new RabbitMQContainer("rabbitmq:3-management-alpine");
+    static RabbitMQContainer rabbit = new RabbitMQContainer(ImagenesDeContenedores.RABBITMQ);
 
     @DynamicPropertySource
     static void propiedades(DynamicPropertyRegistry registro) {
