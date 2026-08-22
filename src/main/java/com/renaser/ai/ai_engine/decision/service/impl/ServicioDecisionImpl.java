@@ -135,6 +135,44 @@ public class ServicioDecisionImpl implements ServicioDecision {
     }
 
     @Override
+    @Transactional
+    public void descartarBarreraDetectada(ContextoUsuario quien, Long postulacionId,
+                                          Long barreraDetectadaId, DescartarBarrera datos) {
+        // El mismo permiso que registrarla, y a propósito: quien puede poner el bloqueo puede
+        // quitarlo. Inventar aquí un permiso aparte obligaría a repartirlo entre roles sin que
+        // nadie lo haya pedido, y dejaría el caso más probable —me equivoqué al registrarla—
+        // dependiendo de encontrar a otra persona.
+        Postulacion postulacion = laVisible(quien, postulacionId, "decidir_contratacion");
+
+        BarreraDetectada fila = barrerasDetectadas.findById(barreraDetectadaId)
+                .filter(b -> b.getPostulacionId().equals(postulacion.getId()))
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Barrera detectada", "id", barreraDetectadaId));
+
+        // Descartar dos veces no es un error del que haya que avisar a gritos, pero tampoco
+        // puede pisar el motivo y la firma del primero: el registro se quedaría con la última
+        // versión y sin rastro de la anterior.
+        if (fila.getDescartadaEn() != null) {
+            throw new IllegalStateException(
+                    "Esta barrera ya se descartó el %s: no hace falta volver a hacerlo"
+                            .formatted(fila.getDescartadaEn()));
+        }
+
+        fila.setDescartadaEn(Instant.now());
+        fila.setDescartadaPorUsuarioId(quien.usuarioId());
+        fila.setMotivoDescarte(datos.motivo());
+        barrerasDetectadas.save(fila);
+
+        auditoria.registrar(quien.organizacionId(), quien, "descartar_barrera_detectada",
+                "barrera_detectada", fila.getId(),
+                Map.of("barreraCriticaId", String.valueOf(fila.getBarreraCriticaId()),
+                        "estado", "CONFIRMADA"),
+                Map.of("barreraCriticaId", String.valueOf(fila.getBarreraCriticaId()),
+                        "estado", "DESCARTADA"),
+                datos.motivo());
+    }
+
+    @Override
     public SemaforoResponse verSemaforo(ContextoUsuario quien, Long postulacionId) {
         Postulacion postulacion = laVisible(quien, postulacionId, "ver_semaforo_decision");
         return calcular(postulacion);

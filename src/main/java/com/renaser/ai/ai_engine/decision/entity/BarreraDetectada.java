@@ -22,7 +22,13 @@ public class BarreraDetectada {
     private Long ejecucionIaId;
     private Long confirmadaPorUsuarioId;
     private Instant confirmadaEn;
-    // Si la persona dice que no aplica
+
+    // Si la persona dice que no aplica. Los tres van juntos o ninguno: descartar levanta el
+    // único bloqueo que el sistema no deja saltarse, así que sin autor y motivo la barrera
+    // desaparecida es indistinguible de una que nunca existió. La base lo exige con un CHECK.
     private Instant descartadaEn;
+    private Long descartadaPorUsuarioId;
+    private String motivoDescarte;
+
     private Instant creadoEn;
 }

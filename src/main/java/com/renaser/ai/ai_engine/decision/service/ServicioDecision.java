@@ -22,6 +22,17 @@ public interface ServicioDecision {
     /** Una persona la reporta y confirma en el mismo paso: no hay agente todavía que la detecte antes. */
     Long registrarBarreraDetectada(ContextoUsuario quien, Long postulacionId, RegistrarBarrera datos);
 
+    /**
+     * Deshacer una barrera confirmada por error. Misma audiencia que registrarla: quien puede
+     * poner el bloqueo puede quitarlo, y el registro guarda quién y con qué argumento.
+     *
+     * <p>Existe porque desde que contratar exige que no haya barreras confirmadas, una puesta
+     * por equivocación deja al candidato sin salida: no era un hueco molesto, era un candidato
+     * bloqueado sin forma de desbloquearlo.
+     */
+    void descartarBarreraDetectada(ContextoUsuario quien, Long postulacionId,
+                                   Long barreraDetectadaId, DescartarBarrera datos);
+
     SemaforoResponse verSemaforo(ContextoUsuario quien, Long postulacionId);
 
     /** RF-119: toda decisión guarda quién, cuándo y por qué. */

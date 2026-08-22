@@ -53,6 +53,16 @@ public class DecisionPanelController {
         return Map.of("id", servicio.registrarBarreraDetectada(permisos.actual(), postulacionId, datos));
     }
 
+    @PostMapping("/api/v1/panel/postulaciones/{postulacionId}/barreras-detectadas/{barreraDetectadaId}/descarte")
+    @PreAuthorize("@permisos.tiene('decidir_contratacion')")
+    @Operation(summary = "Deshacer una barrera confirmada por error. El motivo es obligatorio: "
+            + "descartarla levanta el único bloqueo que no se puede saltar al contratar")
+    public void descartarBarrera(@PathVariable Long postulacionId,
+                                 @PathVariable Long barreraDetectadaId,
+                                 @Valid @RequestBody DescartarBarrera datos) {
+        servicio.descartarBarreraDetectada(permisos.actual(), postulacionId, barreraDetectadaId, datos);
+    }
+
     @GetMapping("/api/v1/panel/postulaciones/{postulacionId}/semaforo")
     @PreAuthorize("@permisos.tiene('ver_semaforo_decision')")
     public SemaforoResponse verSemaforo(@PathVariable Long postulacionId) {

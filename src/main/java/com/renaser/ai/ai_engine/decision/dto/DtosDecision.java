@@ -25,6 +25,10 @@ public final class DtosDecision {
     // "detección pendiente de confirmar" — quien la registra ya la está confirmando.
     public record RegistrarBarrera(@NotNull Long barreraCriticaId, @NotBlank String explicacion) {}
 
+    // El motivo no es cortesía: descartar una barrera levanta el único bloqueo que el
+    // sistema no deja saltarse, y la base rechaza un descarte sin él.
+    public record DescartarBarrera(@NotBlank String motivo) {}
+
     public record SemaforoResponse(
             String semaforo,               // null si todavía no se puede calcular
             BigDecimal notaGlobal,

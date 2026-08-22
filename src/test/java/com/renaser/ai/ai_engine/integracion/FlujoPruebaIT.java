@@ -392,9 +392,11 @@ public class FlujoPruebaIT {
                                 "{\"descripcion\":\"No puede viajar y el puesto lo exige\"}")
                         .andExpect(status().isCreated())
                         .andReturn().getResponse().getContentAsString()).get("id").asLong();
-        conToken(post("/api/v1/panel/postulaciones/" + postulacionId + "/barreras-detectadas"), tokenTalento,
-                "{\"barreraCriticaId\":" + barreraId + ",\"explicacion\":\"Lo dijo en la entrevista\"}")
-                .andExpect(status().isCreated());
+        long detectadaId = json.readTree(
+                conToken(post("/api/v1/panel/postulaciones/" + postulacionId + "/barreras-detectadas"), tokenTalento,
+                                "{\"barreraCriticaId\":" + barreraId + ",\"explicacion\":\"Lo dijo en la entrevista\"}")
+                        .andExpect(status().isCreated())
+                        .andReturn().getResponse().getContentAsString()).get("id").asLong();
 
         String porLaBarrera = conToken(post("/api/v1/panel/postulaciones/" + postulacionId + "/decision"), tokenArea,
                         "{\"semaforo\":\"VERDE\",\"motivo\":\"Aun así lo quiero\",\"aunqueFaltenEtapas\":true}")
@@ -402,8 +404,24 @@ public class FlujoPruebaIT {
                 .andReturn().getResponse().getContentAsString();
         assertThat(porLaBarrera).contains("barrera");
 
-        // Se descarta por SQL porque todavía no hay ruta para hacerlo: queda anotado en T4.
-        jdbc.update("update barrera_detectada set descartada_en = now() where postulacion_id = ?", postulacionId);
+        // Se puso por error y se deshace: sin motivo no se puede, y descartar dos veces tampoco.
+        String descarte = "/api/v1/panel/postulaciones/" + postulacionId
+                + "/barreras-detectadas/" + detectadaId + "/descarte";
+        conToken(post(descarte), tokenTalento, "{\"motivo\":\"\"}")
+                .andExpect(status().isBadRequest());
+        conToken(post(descarte), tokenTalento,
+                "{\"motivo\":\"Se confundió de candidato: quien no puede viajar es otro\"}")
+                .andExpect(status().isOk());
+        conToken(post(descarte), tokenTalento, "{\"motivo\":\"Otra vez\"}")
+                .andExpect(status().isConflict());
+
+        // Y queda quién lo hizo y por qué: una barrera que desaparece sin firma es
+        // indistinguible de una que nunca existió.
+        Map<String, Object> descartada = jdbc.queryForMap(
+                "select descartada_por_usuario_id, motivo_descarte from barrera_detectada where id = ?",
+                detectadaId);
+        assertThat(descartada.get("descartada_por_usuario_id")).isNotNull();
+        assertThat((String) descartada.get("motivo_descarte")).contains("Se confundió de candidato");
 
         // Ahora sí: reconociendo que faltan notas, se contrata.
         conToken(post("/api/v1/panel/postulaciones/" + postulacionId + "/decision"), tokenArea,
