@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "ai-engine-local",
+      "runtimeExecutable": "./mvnw",
+      "runtimeArgs": ["spring-boot:test-run"],
+      "port": 8081
+    }
+  ]
+}
