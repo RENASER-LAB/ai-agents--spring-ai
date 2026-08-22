@@ -19,6 +19,7 @@ import com.renaser.ai.ai_engine.perfilintegral.dto.DtosCalificacionIa.ResultadoC
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosCalificacionIa.ResultadoEvaluador;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosCalificacionIa.ResultadoPerfil;
 
+import com.renaser.ai.ai_engine.integracion.soporte.ImagenesDeContenedores;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.DisplayName;
@@ -94,7 +95,7 @@ public class CalificacionIaRealIT {
 
     @Container
     @ServiceConnection
-    static RabbitMQContainer rabbit = new RabbitMQContainer("rabbitmq:3-management-alpine");
+    static RabbitMQContainer rabbit = new RabbitMQContainer(ImagenesDeContenedores.RABBITMQ);
 
     /**
      * Aquí <b>no</b> se toca {@code spring.ai.deepseek.api-key}, al revés que en las demás

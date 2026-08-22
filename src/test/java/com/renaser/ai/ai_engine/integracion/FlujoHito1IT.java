@@ -2,6 +2,7 @@ package com.renaser.ai.ai_engine.integracion;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.renaser.ai.ai_engine.integracion.soporte.ImagenesDeContenedores;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.DisplayName;
@@ -63,7 +64,7 @@ public class FlujoHito1IT {
 
     @Container
     @ServiceConnection
-    static RabbitMQContainer rabbit = new RabbitMQContainer("rabbitmq:3-management-alpine");
+    static RabbitMQContainer rabbit = new RabbitMQContainer(ImagenesDeContenedores.RABBITMQ);
 
     // Sigue haciendo falta un sitio temporal, pero ya no para guardar curriculums: solo
     // para fabricar el archivo de 13 MB con el que se comprueba que el limite de subida
