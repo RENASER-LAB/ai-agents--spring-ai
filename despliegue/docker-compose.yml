@@ -1,8 +1,11 @@
 # Lo que corre en el servidor de AWS.
 #
-# Son dos contenedores y ninguno guarda nada: la base es Supabase, los curriculums viven en
-# su bucket y la cola es Amazon MQ. Esta maquina se puede tirar y volver a crear sin perder
-# nada mas que los certificados, que Caddy vuelve a sacar solo.
+# Son tres contenedores: la aplicacion, Caddy y la cola. Lo pesado sigue fuera —la base es
+# Supabase y los curriculums viven en su bucket— asi que esta maquina se puede tirar y
+# volver a crear sin perder nada que importe: los certificados los saca Caddy otra vez
+# solo, y los mensajes que hubiera en la cola los reencola la propia aplicacion, que apunta
+# los trabajos en la tabla trabajo_ia antes de avisar por el broker y tiene un sondeo que
+# rescata lo pendiente cada cinco minutos.
 #
 # Se levanta con:
 #   docker compose --env-file .env up -d
@@ -16,6 +19,11 @@ services:
     image: ${IMAGEN}
     container_name: renaser-backend
     restart: always
+    # La cola primero, y sana: sin esto la aplicacion arranca contra un broker que aun
+    # esta levantando y quema sus reintentos de conexion antes de tiempo.
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
     environment:
       SPRING_PROFILES_ACTIVE: pruebas
 
@@ -26,22 +34,29 @@ services:
       SPRING_DATASOURCE_USERNAME: ${SPRING_DATASOURCE_USERNAME}
       SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD}
 
-      # La cola es Amazon MQ (broker renaser-mq, RabbitMQ 4.2, us-east-1).
+      # La cola es el contenedor rabbitmq de aqui abajo. El HOST llega del .env y vale
+      # «rabbitmq», el nombre del servicio: lo resuelve la red interna del compose. Antes
+      # esto apuntaba a Amazon MQ (~119 dolares al mes medidos, el 77% de la factura, por
+      # un broker que este mismo servidor puede correr gratis); si hiciera falta volver,
+      # basta revertir en Parameter Store el HOST, el usuario y la contrasena, y en este
+      # archivo el puerto a 5671 y el ssl a true — Amazon MQ solo habla AMQPS.
       #
-      # Tres cosas que no son como en local y rompen el arranque si se copian mal:
-      #   - el puerto es 5671, no 5672: Amazon MQ solo habla AMQPS, cifrado
-      #   - por lo mismo, ssl.enabled tiene que ir en true
-      #   - el HOST va sin «amqps://» y sin puerto. Spring arma la url el solo; pegar el
+      # Dos cosas que rompen el arranque si se copian mal:
+      #   - el HOST va sin esquema y sin puerto. Spring arma la url el solo; pegar un
       #     endpoint entero da un fallo de resolucion de nombre que no menciona el esquema
-      # Los nombres son los que espera application-pruebas.yaml, y NO llevan el prefijo
-      # SPRING_: ese archivo hace `host: ${RABBITMQ_HOST}` sin valor por defecto, asi que si
-      # se ponen como SPRING_RABBITMQ_* el marcador se queda sin resolver y la aplicacion no
-      # arranca — con un error que habla de un placeholder, no de la cola.
+      #   - estos nombres NO llevan el prefijo SPRING_: application-pruebas.yaml hace
+      #     `host: ${RABBITMQ_HOST}` sin valor por defecto, asi que como SPRING_RABBITMQ_*
+      #     el marcador se queda sin resolver y la aplicacion no arranca — con un error
+      #     que habla de un placeholder, no de la cola.
       RABBITMQ_HOST: ${RABBITMQ_HOST}
-      RABBITMQ_PORT: 5671
+      RABBITMQ_PORT: 5672
       RABBITMQ_USERNAME: ${RABBITMQ_USERNAME}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
       RABBITMQ_VHOST: ${RABBITMQ_VHOST:-/}
+      # application-pruebas.yaml trae ssl.enabled=true escrito, de la epoca de Amazon MQ.
+      # Esta variable lo pisa sin reconstruir la imagen; dentro de la red del compose el
+      # TLS no compra nada y el broker no lo tiene configurado.
+      SPRING_RABBITMQ_SSL_ENABLED: "false"
 
       # Cuantos candidatos se califican a la vez.
       #
@@ -102,6 +117,44 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  # ---------------------------------------------------------------- la cola
+  #
+  # RabbitMQ como un contenedor mas, y no Amazon MQ: el broker gestionado costaba ~119
+  # dolares al mes —mas que todo el resto de la infraestructura junta— por hacer lo que
+  # este proceso hace gratis. La durabilidad no descansa en el: cada trabajo se guarda en
+  # trabajo_ia antes de publicarse, y el sondeo de la aplicacion reencola lo que se pierda.
+  #
+  # La imagen es 4.2 sin «-management»: misma version que corria en Amazon MQ, y el panel
+  # web no pinta nada en produccion. Sin bloque ports a proposito — solo la red interna
+  # del compose habla con el; desde fuera de la maquina este broker no existe.
+  rabbitmq:
+    image: rabbitmq:4.2-alpine
+    container_name: renaser-rabbitmq
+    restart: always
+    environment:
+      # Las MISMAS variables que lee la aplicacion mas arriba: el usuario se crea al
+      # inicializarse el volumen y los dos lados no se pueden desincronizar. Ojo: solo la
+      # PRIMERA vez — si algun dia se cambia la contrasena en Parameter Store, al broker
+      # hay que cambiarsela por dentro (rabbitmqctl change_password), no le llega sola.
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USERNAME}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD}
+    volumes:
+      - rabbitmq_datos:/var/lib/rabbitmq
+      # El consumer_timeout de 60 min y el techo de memoria. Ver los porques en el archivo.
+      - ./rabbitmq.conf:/etc/rabbitmq/conf.d/20-renaser.conf:ro
+    # Techo de proceso. Con la aplicacion en 2g y esto en 768m, a la maquina de 4 GB le
+    # queda cerca de un giga para Caddy y el sistema, con el swap de reserva.
+    mem_limit: 768m
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      # Levantar de cero tarda mas que un ping: sin este margen el primer arranque puede
+      # marcarse unhealthy antes de terminar y tirar el depends_on de la aplicacion.
+      start_period: 30s
+    logging: *registro
+
   # ---------------------------------------------------------------- la puerta
   #
   # Caddy y no un balanceador: un ALB son 16 dolares al mes para repartir trafico entre UNA
@@ -132,3 +185,6 @@ services:
 volumes:
   caddy_datos:
   caddy_config:
+  # Colas y mensajes del broker. Perderlo no pierde trabajo: la verdad vive en trabajo_ia
+  # y el sondeo de la aplicacion reencola lo pendiente en el siguiente ciclo.
+  rabbitmq_datos:
