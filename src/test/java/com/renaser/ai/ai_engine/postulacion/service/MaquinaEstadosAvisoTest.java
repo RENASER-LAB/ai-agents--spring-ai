@@ -1,6 +1,8 @@
 package com.renaser.ai.ai_engine.postulacion.service;
 
 import com.renaser.ai.ai_engine.auditoria.service.ServicioAuditoria;
+import com.renaser.ai.ai_engine.notificacion.entity.PlantillaCorreoVacante;
+import com.renaser.ai.ai_engine.notificacion.repository.PlantillaCorreoVacanteRepository;
 import com.renaser.ai.ai_engine.notificacion.service.DireccionDelCandidato;
 import com.renaser.ai.ai_engine.notificacion.service.ServicioCorreo;
 import com.renaser.ai.ai_engine.parametro.service.ServicioParametros;
@@ -66,6 +68,7 @@ class MaquinaEstadosAvisoTest {
     @Mock private ServicioCorreo correo;
     @Mock private DireccionDelCandidato direcciones;
     @Mock private ServicioEnlaceAcceso enlaces;
+    @Mock private PlantillaCorreoVacanteRepository plantillasPorVacante;
     @Mock private VersionPlantillaPruebaRepository versionesDePrueba;
     @Mock private ServicioParametros parametros;
 
@@ -77,7 +80,8 @@ class MaquinaEstadosAvisoTest {
     @BeforeEach
     void montar() {
         maquina = new MaquinaEstados(estados, postulaciones, transiciones, usuarios, personas,
-                vacantes, auditoria, correo, direcciones, enlaces, versionesDePrueba, parametros);
+                vacantes, auditoria, correo, direcciones, enlaces, plantillasPorVacante,
+                versionesDePrueba, parametros);
 
         when(usuarios.findById(anyLong())).thenReturn(Optional.of(usuarioCon(7L)));
         when(personas.findById(anyLong())).thenReturn(Optional.of(personaCon("Ana")));
@@ -154,6 +158,71 @@ class MaquinaEstadosAvisoTest {
 
         assertThat(plantillaAlMover(p, "PRUEBA_TURNO_CANDIDATO", "CANDIDATO"))
                 .isEqualTo("PRUEBA_DISPONIBLE");
+    }
+
+    // ============ Cuando la vacante tiene texto propio (V31) ============
+
+    @Test
+    @DisplayName("si la vacante eligio su propio texto, sale el suyo y no el de todos")
+    void laVacanteConTextoPropioMandaElSuyo() {
+        Postulacion p = vacanteCon(20L, 22L, null, 7);
+        when(plantillasPorVacante.findByVacanteIdAndAvisoCodigo(20L, "PRUEBA_DISPONIBLE"))
+                .thenReturn(Optional.of(PlantillaCorreoVacante.builder()
+                        .vacanteId(20L).avisoCodigo("PRUEBA_DISPONIBLE")
+                        .plantillaCodigo("PRUEBA_DISPONIBLE_ADMINISTRADOR")
+                        .build()));
+
+        assertThat(plantillaAlMover(p, "PRUEBA_TURNO_CANDIDATO", "CANDIDATO"))
+                .isEqualTo("PRUEBA_DISPONIBLE_ADMINISTRADOR");
+    }
+
+    @Test
+    @DisplayName("con texto propio, las variables de la prueba se siguen rellenando")
+    void conTextoPropioLasVariablesSeRellenanIgual() {
+        Postulacion p = vacanteCon(20L, 22L, PDF_ARQ, 5);
+        when(plantillasPorVacante.findByVacanteIdAndAvisoCodigo(20L, "PRUEBA_DISPONIBLE"))
+                .thenReturn(Optional.of(PlantillaCorreoVacante.builder()
+                        .vacanteId(20L).avisoCodigo("PRUEBA_DISPONIBLE")
+                        .plantillaCodigo("PRUEBA_DISPONIBLE_ADMINISTRADOR")
+                        .build()));
+
+        Map<String, String> v = avisoAlMover(p, "PRUEBA_TURNO_CANDIDATO", "CANDIDATO");
+
+        // Lo que decide qué variables se rellenan es el momento del recorrido, no cómo se
+        // llame la plantilla. Sin esto salió un correo con «{{plazo}}» y «{{whatsapp}}» a la
+        // vista, y la plantilla era la correcta: el fallo no se veía por el código.
+        assertThat(v).containsEntry("plazo", "5 dias")
+                     .containsEntry("whatsapp", "982255360")
+                     .containsEntry("enlacePrueba", PDF_ARQ);
+    }
+
+    @Test
+    @DisplayName("y a las demas vacantes no les cambia nada")
+    void alasDemasNoLesCambiaNada() {
+        Postulacion p = vacanteCon(15L, 17L, PDF_ARQ, 3);
+        // Solo la 20 tiene texto propio; esta es la 15
+        when(plantillasPorVacante.findByVacanteIdAndAvisoCodigo(15L, "PRUEBA_DISPONIBLE"))
+                .thenReturn(Optional.empty());
+
+        assertThat(plantillaAlMover(p, "PRUEBA_TURNO_CANDIDATO", "CANDIDATO"))
+                .as("una vacante que no configura nada sigue con el aviso de siempre")
+                .isEqualTo("PRUEBA_DISPONIBLE");
+    }
+
+    @Test
+    @DisplayName("el reemplazo vale para cualquier aviso, no solo el de la prueba")
+    void elReemplazoValeParaCualquierAviso() {
+        Postulacion p = vacanteCon(20L, 22L, null, 7);
+        when(plantillasPorVacante.findByVacanteIdAndAvisoCodigo(20L, "POSTULACION_NO_CONTINUA"))
+                .thenReturn(Optional.of(PlantillaCorreoVacante.builder()
+                        .vacanteId(20L).avisoCodigo("POSTULACION_NO_CONTINUA")
+                        .plantillaCodigo("NO_CONTINUA_ADMINISTRADOR")
+                        .build()));
+        when(estados.findById("NO_CONTINUA"))
+                .thenReturn(Optional.of(estado("NO_CONTINUA", "NADIE")));
+
+        assertThat(plantillaAlMover(p, "NO_CONTINUA", "NADIE"))
+                .isEqualTo("NO_CONTINUA_ADMINISTRADOR");
     }
 
     @Test

@@ -2,6 +2,7 @@ package com.renaser.ai.ai_engine.prueba.service.impl;
 
 import com.renaser.ai.ai_engine.ai.exception.ResourceNotFoundException;
 import com.renaser.ai.ai_engine.ai.service.ColaCalificacionIa;
+import com.renaser.ai.ai_engine.auditoria.service.ServicioAuditoria;
 import com.renaser.ai.ai_engine.perfilintegral.entity.Criterio;
 import com.renaser.ai.ai_engine.perfilintegral.entity.NotaCriterio;
 import com.renaser.ai.ai_engine.perfilintegral.repository.CriterioRepository;
@@ -12,7 +13,9 @@ import com.renaser.ai.ai_engine.pesos.repository.VersionPesosRepository;
 import com.renaser.ai.ai_engine.postulacion.entity.Postulacion;
 import com.renaser.ai.ai_engine.postulacion.repository.PostulacionRepository;
 import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.CalificacionIaEncolada;
+import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.DefinirPlazoPrueba;
 import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.NotaCriterioResponse;
+import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.PlazoPrueba;
 import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.PonerNotaCriterio;
 import com.renaser.ai.ai_engine.prueba.entity.IntentoPrueba;
 import com.renaser.ai.ai_engine.prueba.repository.IntentoPruebaRepository;
@@ -47,6 +50,7 @@ public class ServicioCalificacionPruebaImpl implements ServicioCalificacionPrueb
     private final VersionPesosRepository versionesPesos;
     private final ColaCalificacionIa cola;
     private final Permisos permisos;
+    private final ServicioAuditoria auditoria;
 
     @Override
     public List<NotaCriterioResponse> verNotas(ContextoUsuario quien, Long postulacionId) {
@@ -174,6 +178,42 @@ public class ServicioCalificacionPruebaImpl implements ServicioCalificacionPrueb
         fila.setCalculadaEn(Instant.now());
         notasEtapa.save(fila);
         return nota;
+    }
+
+    @Override
+    @Transactional
+    public PlazoPrueba definirPlazo(ContextoUsuario quien, Long postulacionId,
+                                    DefinirPlazoPrueba datos) {
+        Postulacion postulacion = laVisible(quien, postulacionId, "mover_postulacion");
+        IntentoPrueba intento = intentos.findByPostulacionId(postulacion.getId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Prueba del puesto", "postulación", postulacionId));
+        if (intento.getEntregadoEn() != null) {
+            throw new IllegalStateException(
+                    "Esta prueba ya se entregó: cambiarle el plazo ahora no cambia nada");
+        }
+        // Una fecha ya pasada se la entregaría sola en el siguiente barrido. Si de verdad se
+        // le quiere cerrar, hay una transición para eso y deja dicho por qué.
+        if (datos.venceEn().isBefore(Instant.now())) {
+            throw new IllegalArgumentException(
+                    "Esa fecha ya pasó: al candidato se le entregaría la prueba sola");
+        }
+
+        Instant anterior = intento.getVenceEn();
+        intento.setVenceEn(datos.venceEn());
+        // Queda marcado como suyo: si después se mueve la fecha de la convocatoria, a esta
+        // persona no se la toca. Sin la marca, «más horas para este candidato» se perdería
+        // en el siguiente cambio de la vacante y nadie lo notaría (V32).
+        intento.setPlazoPropio(true);
+        intentos.save(intento);
+
+        auditoria.registrar(quien.organizacionId(), quien, "definir_plazo_prueba",
+                "intento_prueba", intento.getId(),
+                anterior == null ? null : Map.of("venceEn", anterior.toString()),
+                Map.of("venceEn", datos.venceEn().toString()), datos.motivo());
+
+        return new PlazoPrueba(postulacionId, intento.getVenceEn(),
+                intento.getIniciadoEn() != null);
     }
 
     // ============ Apoyo ============

@@ -300,6 +300,11 @@ public class ServicioPortalImpl implements ServicioPortal {
             String reglas = String.join(" · ", incumplidos.stream().map(RequisitoObjetivo::getRegla).toList());
             maquina.transicionar(postulacion, "NO_CONTINUA", null,
                     "Requisito objetivo no cumplido: " + reglas, true, false, "REQUISITO_OBJETIVO");
+        } else if (!vacante.isAplicaEvaluacion()) {
+            // Esta vacante no lleva banco de preguntas: no hay nada que el candidato deba
+            // responder en el Perfil Integral. Va directo a la bandeja del equipo, que
+            // decide a quién invitar a la prueba del puesto — su única evaluación.
+            maquina.transicionar(postulacion, "PERFIL_POR_CONFIRMAR", null, null, true, false, null);
         } else {
             // Su evaluación se crea aquí, no cuando entre a responderla: así queda atada a la
             // versión del banco que estaba publicada el día que postuló. Sin esto la

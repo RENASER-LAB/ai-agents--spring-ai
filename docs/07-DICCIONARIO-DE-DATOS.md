@@ -448,6 +448,26 @@ Una convocatoria concreta.
 | `version_pesos_id` | bigint | sí | Qué versión de pesos rige |
 | `version_plantilla_prueba_id` | bigint | no | |
 | `plantilla_evaluacion_id` | bigint | no | |
+| `aplica_evaluacion` | boolean | sí | Apagado, quien postula no recibe la evaluación del banco: va directo a la bandeja del equipo y su única evaluación es la prueba del puesto. Por defecto encendido |
+| `prueba_cierra_en` | timestamptz | no | Cuándo cierra la prueba de esta vacante, para todos. Vacío: se cuentan los días de la versión de la plantilla desde que cada uno empieza |
+
+### `plantilla_correo_vacante`
+
+Qué texto de correo usa **esta** vacante en lugar del que el sistema mandaría. Sin fila, sale
+el de siempre.
+
+| Columna | Tipo | Oblig. | Qué guarda |
+|---|---|---|---|
+| `id` | bigint | sí | Clave |
+| `vacante_id` | bigint | sí | |
+| `aviso_codigo` | text | sí | El código que la máquina de estados iba a mandar (`PRUEBA_DISPONIBLE`, `POSTULACION_AVANZA`…) |
+| `plantilla_codigo` | text | sí | El que sale en su lugar |
+| `creado_en` | timestamptz | sí | |
+
+**Único:** `vacante_id` + `aviso_codigo` · **Apunta a:** `vacante`
+
+No hay clave foránea contra `plantilla_correo`: allí el código se repite por versión, así que
+no hay a qué apuntar. Que el código exista y esté activo se comprueba al configurarlo.
 | `responsable_usuario_id` | bigint | sí | Quién se hace cargo de contratar |
 | `publicada_en` | timestamptz | no | |
 | `cerrada_en` | timestamptz | no | |
@@ -1360,7 +1380,8 @@ Cuando un candidato rinde.
 | `postulacion_id` | bigint | sí | |
 | `version_plantilla_prueba_id` | bigint | sí | La versión congelada con que rindió |
 | `iniciado_en` | timestamptz | sí | Desde aquí corre el reloj |
-| `vence_en` | timestamptz | sí | **Se calcula al empezar y se guarda** |
+| `vence_en` | timestamptz | sí | Cuándo se le cierra. Sale de la fecha de la vacante si la tiene; si no, **se calcula al empezar y se guarda** |
+| `plazo_propio` | boolean | sí | A esta persona se le fijó su fecha a mano. Mover la de la vacante no se la toca |
 | `entregado_en` | timestamptz | no | |
 | `es_entrega_automatica` | boolean | sí | Si lo entregó el reloj por él |
 | `variante_cambio_id` | bigint | no | Cuál le tocó |

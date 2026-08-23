@@ -2,6 +2,9 @@ package com.renaser.ai.ai_engine.vacante.service.impl;
 
 import com.renaser.ai.ai_engine.ai.exception.ResourceNotFoundException;
 import com.renaser.ai.ai_engine.auditoria.service.ServicioAuditoria;
+import com.renaser.ai.ai_engine.notificacion.entity.PlantillaCorreoVacante;
+import com.renaser.ai.ai_engine.notificacion.repository.PlantillaCorreoRepository;
+import com.renaser.ai.ai_engine.notificacion.repository.PlantillaCorreoVacanteRepository;
 import com.renaser.ai.ai_engine.vacante.service.ServicioVacantesPanel;
 import com.renaser.ai.ai_engine.vacante.dto.DtosVacante.*;
 import com.renaser.ai.ai_engine.perfilintegral.entity.PlantillaEvaluacion;
@@ -9,6 +12,8 @@ import com.renaser.ai.ai_engine.perfilintegral.repository.PlantillaEvaluacionRep
 import com.renaser.ai.ai_engine.pesos.entity.VersionPesos;
 import com.renaser.ai.ai_engine.pesos.repository.VersionPesosRepository;
 import com.renaser.ai.ai_engine.prueba.entity.VersionPlantillaPrueba;
+import com.renaser.ai.ai_engine.prueba.entity.IntentoPrueba;
+import com.renaser.ai.ai_engine.prueba.repository.IntentoPruebaRepository;
 import com.renaser.ai.ai_engine.prueba.repository.VersionPlantillaPruebaRepository;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
 import com.renaser.ai.ai_engine.solicitud.entity.SolicitudTalento;
@@ -20,6 +25,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 
@@ -34,6 +40,9 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
     private final VersionPesosRepository versionesPesos;
     private final PlantillaEvaluacionRepository plantillas;
     private final VersionPlantillaPruebaRepository versionesPrueba;
+    private final PlantillaCorreoRepository plantillasCorreo;
+    private final PlantillaCorreoVacanteRepository plantillasPorVacante;
+    private final IntentoPruebaRepository intentos;
     private final ServicioAuditoria auditoria;
 
     // ============ Puestos ============
@@ -210,8 +219,9 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
             throw new IllegalStateException("Solo se publica una vacante en borrador; está " + vacante.getEstado());
         }
         // Sin plantilla no hay con qué armar la evaluación de quien postule. El error tiene
-        // que salir aquí, al publicar, y no en la cara del primer candidato.
-        if (vacante.getPlantillaEvaluacionId() == null) {
+        // que salir aquí, al publicar, y no en la cara del primer candidato. Una vacante
+        // con la evaluación apagada no la necesita: su única evaluación es la prueba.
+        if (vacante.isAplicaEvaluacion() && vacante.getPlantillaEvaluacionId() == null) {
             throw new IllegalStateException(
                     "Antes de publicar hay que elegir la plantilla de evaluación de esta vacante");
         }
@@ -281,6 +291,190 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
 
     @Override
     @Transactional
+    public void definirAplicacionEvaluacion(ContextoUsuario quien, Long id, boolean aplica) {
+        Vacante vacante = laDeLaOrganizacion(quien, id);
+        if ("CERRADA".equals(vacante.getEstado())) {
+            throw new IllegalStateException("Una vacante cerrada no se edita");
+        }
+        // Encenderla en una vacante ya publicada y sin plantilla dejaría al siguiente
+        // candidato chocando contra un error al postular: el aviso tiene que salir aquí.
+        if (aplica && "PUBLICADA".equals(vacante.getEstado())
+                && vacante.getPlantillaEvaluacionId() == null) {
+            throw new IllegalStateException(
+                    "Esta vacante está publicada y no tiene plantilla de evaluación: hay que "
+                            + "elegirla antes de volver a encender la evaluación");
+        }
+        boolean anterior = vacante.isAplicaEvaluacion();
+        vacante.setAplicaEvaluacion(aplica);
+        vacantes.save(vacante);
+        auditoria.registrar(quien.organizacionId(), quien, "definir_aplicacion_evaluacion",
+                "vacante", id, Map.of("aplicaEvaluacion", anterior),
+                Map.of("aplicaEvaluacion", aplica), null);
+    }
+
+    @Override
+    @Transactional
+    public void asignarVersionPesos(ContextoUsuario quien, Long id, Long versionPesosId) {
+        Vacante vacante = laDeLaOrganizacion(quien, id);
+        VersionPesos version = versionesPesos
+                .findByIdAndOrganizacionId(versionPesosId, quien.organizacionId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Versión de pesos", "id", versionPesosId));
+        // La misma regla que al crear la vacante (RF-114): rige una versión aprobada.
+        if (!"PUBLICADA".equals(version.getEstado())) {
+            throw new IllegalStateException(
+                    "Esa versión de pesos todavía está en borrador: solo se puede usar una publicada");
+        }
+
+        // Nada se recalcula hacia atrás: cada nota guardada conserva la versión con la que
+        // se calculó. Cambiar esto solo mueve las propuestas de decisión que aún no se toman.
+        Long anterior = vacante.getVersionPesosId();
+        vacante.setVersionPesosId(versionPesosId);
+        vacantes.save(vacante);
+        auditoria.registrar(quien.organizacionId(), quien, "asignar_version_pesos",
+                "vacante", id,
+                anterior == null ? null : Map.of("versionPesosId", String.valueOf(anterior)),
+                Map.of("versionPesosId", String.valueOf(versionPesosId)), null);
+    }
+
+    @Override
+    public List<PlantillaCorreoDeVacante> plantillasCorreo(ContextoUsuario quien, Long vacanteId) {
+        laDeLaOrganizacion(quien, vacanteId);
+        return plantillasPorVacante.findByVacanteIdOrderByAvisoCodigo(vacanteId).stream()
+                .map(p -> new PlantillaCorreoDeVacante(p.getAvisoCodigo(), p.getPlantillaCodigo()))
+                .toList();
+    }
+
+    @Override
+    @Transactional
+    public void asignarPlantillaCorreo(ContextoUsuario quien, Long vacanteId,
+                                       AsignarPlantillaCorreo datos) {
+        laDeLaOrganizacion(quien, vacanteId);
+        if (datos.avisoCodigo().equals(datos.plantillaCodigo())) {
+            throw new IllegalArgumentException(
+                    "Sustituir «" + datos.avisoCodigo() + "» por sí mismo no cambia nada");
+        }
+        // Que el texto exista se comprueba AQUÍ y no al mandarlo: si se dejara pasar un código
+        // equivocado, el fallo aparecería semanas después, cuando un candidato avanzara y su
+        // correo no saliera. Y ese fallo no da señal — la postulación avanza igual.
+        plantillasCorreo
+                .findFirstByOrganizacionIdAndCodigoAndEsActivaTrueOrderByVersionDesc(
+                        quien.organizacionId(), datos.plantillaCodigo())
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "No hay ninguna plantilla de correo activa con el código «"
+                                + datos.plantillaCodigo() + "»"));
+
+        PlantillaCorreoVacante fila = plantillasPorVacante
+                .findByVacanteIdAndAvisoCodigo(vacanteId, datos.avisoCodigo())
+                .orElseGet(() -> PlantillaCorreoVacante.builder()
+                        .vacanteId(vacanteId)
+                        .avisoCodigo(datos.avisoCodigo())
+                        .creadoEn(Instant.now())
+                        .build());
+        String anterior = fila.getPlantillaCodigo();
+        fila.setPlantillaCodigo(datos.plantillaCodigo());
+        plantillasPorVacante.save(fila);
+
+        auditoria.registrar(quien.organizacionId(), quien, "asignar_plantilla_correo_vacante",
+                "vacante", vacanteId,
+                anterior == null ? null : Map.of(datos.avisoCodigo(), anterior),
+                Map.of(datos.avisoCodigo(), datos.plantillaCodigo()), null);
+    }
+
+    @Override
+    @Transactional
+    public void quitarPlantillaCorreo(ContextoUsuario quien, Long vacanteId, String avisoCodigo) {
+        laDeLaOrganizacion(quien, vacanteId);
+        PlantillaCorreoVacante fila = plantillasPorVacante
+                .findByVacanteIdAndAvisoCodigo(vacanteId, avisoCodigo)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Texto propio de la vacante", "aviso", avisoCodigo));
+        plantillasPorVacante.delete(fila);
+        auditoria.registrar(quien.organizacionId(), quien, "quitar_plantilla_correo_vacante",
+                "vacante", vacanteId, Map.of(avisoCodigo, fila.getPlantillaCodigo()), null, null);
+    }
+
+    @Override
+    @Transactional
+    public CierrePruebaResponse definirCierrePrueba(ContextoUsuario quien, Long vacanteId,
+                                                    DefinirCierrePrueba datos) {
+        Vacante vacante = laDeLaOrganizacion(quien, vacanteId);
+        if ("CERRADA".equals(vacante.getEstado())) {
+            throw new IllegalStateException("Una vacante cerrada no se edita");
+        }
+        if (datos.cierraEn() != null) {
+            // Una fecha ya pasada no se rechaza por pedante: el barrido de vencidos la vería
+            // al minuto siguiente y entregaría sola la tanda entera. Un año mal tecleado no
+            // puede costar eso.
+            if (datos.cierraEn().isBefore(Instant.now())) {
+                throw new IllegalArgumentException(
+                        "Esa fecha ya pasó: fijarla entregaría sola la prueba de todos");
+            }
+            // Y no tiene sentido sobre un cronómetro: ahí el plazo son los minutos que corren
+            // desde que cada uno empieza, y una fecha fija los anularía sin decirlo.
+            versionesPrueba.findById(vacante.getVersionPlantillaPruebaId())
+                    .filter(v -> "CRONOMETRADA".equals(v.getModalidad()))
+                    .ifPresent(v -> {
+                        throw new IllegalArgumentException(
+                                "La prueba de esta vacante es cronometrada (" + v.getDuracionMinutos()
+                                        + " minutos desde que cada candidato empieza): una fecha "
+                                        + "de cierre para todos anularía el reloj");
+                    });
+        }
+
+        Instant anterior = vacante.getPruebaCierraEn();
+        vacante.setPruebaCierraEn(datos.cierraEn());
+        vacantes.save(vacante);
+
+        // Y se mueve a los que ya están dentro. Sin esto, la fecha valdría solo para quien
+        // entrara después: la mitad de la tanda cerraría el domingo y la otra mitad a los
+        // siete días de su propio lunes, sin nada que lo explicara.
+        int movidos = 0;
+        int conPlazoPropio = 0;
+        for (IntentoPrueba intento : intentos.abiertosDeLaVacante(vacanteId)) {
+            if (intento.isPlazoPropio()) {
+                conPlazoPropio++;
+                continue;
+            }
+            intento.setVenceEn(fechaDeCierreDe(intento, datos.cierraEn()));
+            intentos.save(intento);
+            movidos++;
+        }
+
+        auditoria.registrar(quien.organizacionId(), quien, "definir_cierre_prueba",
+                "vacante", vacanteId,
+                anterior == null ? null : Map.of("pruebaCierraEn", anterior.toString()),
+                datos.cierraEn() == null ? Map.of() : Map.of("pruebaCierraEn", datos.cierraEn().toString()),
+                datos.motivo());
+
+        return new CierrePruebaResponse(datos.cierraEn(), movidos, conPlazoPropio);
+    }
+
+    /**
+     * Qué fecha de cierre le toca a este intento cuando cambia la de la vacante.
+     *
+     * <p>El caso que obliga a que esto exista es <b>quitar</b> la fecha. A quien todavía no
+     * ha empezado se le deja vacía y se le calculará al empezar, como siempre. Pero a quien
+     * ya está dentro, empezar no vuelve a pasarle: dejársela vacía lo dejaría <b>sin
+     * vencimiento para siempre</b> —podría entregar cuando quisiera y el barrido de vencidos
+     * jamás lo cerraría, porque una comparación contra nulo nunca casa—. A ese se le devuelve
+     * el plazo de su plantilla, contado desde que empezó.
+     */
+    private Instant fechaDeCierreDe(IntentoPrueba intento, Instant cierraEn) {
+        if (cierraEn != null || intento.getIniciadoEn() == null) {
+            return cierraEn;
+        }
+        return versionesPrueba.findById(intento.getVersionPlantillaPruebaId())
+                .map(v -> "CRONOMETRADA".equals(v.getModalidad())
+                        ? intento.getIniciadoEn().plus(v.getDuracionMinutos(), ChronoUnit.MINUTES)
+                        : intento.getIniciadoEn().plus(v.getPlazoDias(), ChronoUnit.DAYS))
+                // Si su versión ya no existe, se le deja la que tenía: quitarle el
+                // vencimiento sería peor que dejarle uno viejo.
+                .orElse(intento.getVenceEn());
+    }
+
+    @Override
+    @Transactional
     public void cerrar(ContextoUsuario quien, Long id, String motivo) {
         Vacante vacante = laDeLaOrganizacion(quien, id);
         if ("CERRADA".equals(vacante.getEstado())) {
@@ -306,6 +500,8 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
     private VacantePanel comoPanel(Vacante v) {
         return new VacantePanel(v.getId(), v.getTitulo(), v.getEstado(), v.getTipoCierre(),
                 v.getPuestoId(), v.getSolicitudTalentoId(), v.getResponsableUsuarioId(),
-                v.getPublicadaEn(), v.getCerradaEn());
+                v.getPublicadaEn(), v.getCerradaEn(), v.isAplicaEvaluacion(),
+                v.getPlantillaEvaluacionId(), v.getVersionPlantillaPruebaId(),
+                v.getVersionPesosId());
     }
 }
