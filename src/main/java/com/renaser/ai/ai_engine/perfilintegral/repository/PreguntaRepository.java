@@ -10,4 +10,7 @@ public interface PreguntaRepository extends JpaRepository<Pregunta, Long> {
     List<Pregunta> findByVersionBancoIdOrderByOrden(Long versionBancoId);
 
     List<Pregunta> findByIdIn(List<Long> ids);
+
+    // Al descartar un borrador entero, después de borrar sus hijas.
+    void deleteByVersionBancoId(Long versionBancoId);
 }

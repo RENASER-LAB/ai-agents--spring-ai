@@ -163,4 +163,149 @@ public class BancoPreguntasController {
                                                     @Valid @RequestBody CrearParConsistencia datos) {
         return Map.of("id", servicio.agregarParConsistencia(permisos.actual(), id, datos));
     }
+
+    // ---------- Editar un borrador ----------
+    // Mientras la versión no se publica se edita entera. En cuanto se publica, estos
+    // endpoints responden 409 y solo quedan los PATCH de corrección de textos.
+
+    @PutMapping("/preguntas/{id}")
+    @PreAuthorize("@permisos.tiene('editar_banco_preguntas')")
+    @Operation(summary = "Reemplazar una pregunta de un borrador")
+    public void actualizarPregunta(@PathVariable Long id,
+                                   @Valid @RequestBody CrearPregunta datos) {
+        servicio.actualizarPregunta(permisos.actual(), id, datos);
+    }
+
+    @DeleteMapping("/preguntas/{id}")
+    @PreAuthorize("@permisos.tiene('editar_banco_preguntas')")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Quitar una pregunta de un borrador, con sus opciones, campos, rangos y pares")
+    public void eliminarPregunta(@PathVariable Long id) {
+        servicio.eliminarPregunta(permisos.actual(), id);
+    }
+
+    @PutMapping("/opciones/{id}")
+    @PreAuthorize("@permisos.tiene('editar_banco_preguntas')")
+    @Operation(summary = "Reemplazar una opción de un borrador")
+    public void actualizarOpcion(@PathVariable Long id, @Valid @RequestBody CrearOpcion datos) {
+        servicio.actualizarOpcion(permisos.actual(), id, datos);
+    }
+
+    @DeleteMapping("/opciones/{id}")
+    @PreAuthorize("@permisos.tiene('editar_banco_preguntas')")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Quitar una opción de un borrador")
+    public void eliminarOpcion(@PathVariable Long id) {
+        servicio.eliminarOpcion(permisos.actual(), id);
+    }
+
+    @PutMapping("/rangos/{id}")
+    @PreAuthorize("@permisos.tiene('editar_banco_preguntas')")
+    @Operation(summary = "Reemplazar un tramo de puntaje de un borrador")
+    public void actualizarRango(@PathVariable Long id, @Valid @RequestBody CrearRango datos) {
+        servicio.actualizarRango(permisos.actual(), id, datos);
+    }
+
+    @DeleteMapping("/rangos/{id}")
+    @PreAuthorize("@permisos.tiene('editar_banco_preguntas')")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Quitar un tramo de puntaje de un borrador")
+    public void eliminarRango(@PathVariable Long id) {
+        servicio.eliminarRango(permisos.actual(), id);
+    }
+
+    @PutMapping("/campos-caso/{id}")
+    @PreAuthorize("@permisos.tiene('editar_banco_preguntas')")
+    @Operation(summary = "Reemplazar un campo de caso de un borrador")
+    public void actualizarCampoCaso(@PathVariable Long id,
+                                    @Valid @RequestBody CrearCampoCaso datos) {
+        servicio.actualizarCampoCaso(permisos.actual(), id, datos);
+    }
+
+    @DeleteMapping("/campos-caso/{id}")
+    @PreAuthorize("@permisos.tiene('editar_banco_preguntas')")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Quitar un campo de caso de un borrador")
+    public void eliminarCampoCaso(@PathVariable Long id) {
+        servicio.eliminarCampoCaso(permisos.actual(), id);
+    }
+
+    @PutMapping("/pares-consistencia/{id}")
+    @PreAuthorize("@permisos.tiene('editar_banco_preguntas')")
+    @Operation(summary = "Reemplazar un par de consistencia de un borrador")
+    public void actualizarParConsistencia(@PathVariable Long id,
+                                          @Valid @RequestBody CrearParConsistencia datos) {
+        servicio.actualizarParConsistencia(permisos.actual(), id, datos);
+    }
+
+    @DeleteMapping("/pares-consistencia/{id}")
+    @PreAuthorize("@permisos.tiene('editar_banco_preguntas')")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Quitar un par de consistencia de un borrador")
+    public void eliminarParConsistencia(@PathVariable Long id) {
+        servicio.eliminarParConsistencia(permisos.actual(), id);
+    }
+
+    @DeleteMapping("/versiones/{id}")
+    @PreAuthorize("@permisos.tiene('editar_banco_preguntas')")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Descartar un borrador entero: se borra con todas sus preguntas. "
+            + "Solo un borrador, que nunca se le asignó a nadie")
+    public void descartarBorrador(@PathVariable Long id) {
+        servicio.descartarBorrador(permisos.actual(), id);
+    }
+
+    // ---------- Corregir textos de una publicada ----------
+    // Una errata en un enunciado que el candidato está leyendo se corrige hoy. La clave
+    // no se toca por aquí: los DTOs Corregir* no la llevan. Es de Dirección, que es
+    // quien publica y asume lo publicado.
+
+    @PatchMapping("/preguntas/{id}/textos")
+    @PreAuthorize("@permisos.tiene('publicar_version_banco')")
+    @Operation(summary = "Corregir el enunciado, la situación o la nota interna de una "
+            + "pregunta ya publicada; la clave y la estructura no se tocan")
+    public void corregirTextoPregunta(@PathVariable Long id,
+                                      @Valid @RequestBody CorregirTextoPregunta datos) {
+        servicio.corregirTextoPregunta(permisos.actual(), id, datos);
+    }
+
+    @PatchMapping("/opciones/{id}/textos")
+    @PreAuthorize("@permisos.tiene('publicar_version_banco')")
+    @Operation(summary = "Corregir el texto de una opción ya publicada; su clave no se toca")
+    public void corregirTextoOpcion(@PathVariable Long id,
+                                    @Valid @RequestBody CorregirTextoOpcion datos) {
+        servicio.corregirTextoOpcion(permisos.actual(), id, datos);
+    }
+
+    @PatchMapping("/campos-caso/{id}/textos")
+    @PreAuthorize("@permisos.tiene('publicar_version_banco')")
+    @Operation(summary = "Corregir la etiqueta o la validación de un campo ya publicado")
+    public void corregirTextoCampoCaso(@PathVariable Long id,
+                                       @Valid @RequestBody CorregirTextoCampoCaso datos) {
+        servicio.corregirTextoCampoCaso(permisos.actual(), id, datos);
+    }
+
+    @PatchMapping("/rangos/{id}/textos")
+    @PreAuthorize("@permisos.tiene('publicar_version_banco')")
+    @Operation(summary = "Corregir la condición de un tramo ya publicado; su puntaje no se toca")
+    public void corregirTextoRango(@PathVariable Long id,
+                                   @Valid @RequestBody CorregirTextoRango datos) {
+        servicio.corregirTextoRango(permisos.actual(), id, datos);
+    }
+
+    @PatchMapping("/pares-consistencia/{id}/textos")
+    @PreAuthorize("@permisos.tiene('publicar_version_banco')")
+    @Operation(summary = "Corregir la condición de un par ya publicado; su penalización no se toca")
+    public void corregirTextoParConsistencia(@PathVariable Long id,
+                                             @Valid @RequestBody CorregirTextoPar datos) {
+        servicio.corregirTextoParConsistencia(permisos.actual(), id, datos);
+    }
+
+    @PatchMapping("/versiones/{id}/etiqueta")
+    @PreAuthorize("@permisos.tiene('publicar_version_banco')")
+    @Operation(summary = "Renombrar una versión ya publicada")
+    public void corregirEtiquetaVersion(@PathVariable Long id,
+                                        @Valid @RequestBody CorregirEtiquetaVersion datos) {
+        servicio.corregirEtiquetaVersion(permisos.actual(), id, datos);
+    }
 }

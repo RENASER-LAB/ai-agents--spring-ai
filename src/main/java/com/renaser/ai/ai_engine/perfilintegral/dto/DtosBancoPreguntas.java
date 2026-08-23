@@ -177,6 +177,30 @@ public final class DtosBancoPreguntas {
             Short separacionMinimaItems,
             String condicion) {}
 
+    // --- La corrección editorial de una versión PUBLICADA ---
+    // Estos records existen para que el candado quede en la firma y no en un if: no
+    // llevan, por construcción, ningún campo de clave (valor, puntaje, ordenCorrecto,
+    // esDistractor, peso, esPuntuable, casosPedidos, tipo, codigo). Corregir la errata
+    // de un texto publicado es legítimo; tocar la puntuación bajo un examen en curso,
+    // jamás (RF-138). Campo en null = no se toca.
+
+    public record CorregirTextoPregunta(
+            String enunciado,
+            String situacion,
+            String logicaInterna) {}
+
+    public record CorregirTextoOpcion(@NotBlank String texto) {}
+
+    public record CorregirTextoCampoCaso(
+            String etiqueta,
+            String validacion) {}
+
+    public record CorregirTextoRango(@NotBlank String condicion) {}
+
+    public record CorregirTextoPar(@NotBlank String condicion) {}
+
+    public record CorregirEtiquetaVersion(@NotBlank String etiqueta) {}
+
     // --- El catálogo de dimensiones ---
     // Lo que una pregunta puede medir. El panel lo necesita para llenar la columna
     // «Qué mide» del Excel con valores que el importador acepte.

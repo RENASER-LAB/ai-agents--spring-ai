@@ -13,4 +13,7 @@ public interface CampoCasoRepository extends JpaRepository<CampoCaso, Long> {
 
     // Los de todo un examen de una vez: 14 CD por evaluación serían 14 consultas sueltas.
     List<CampoCaso> findByPreguntaIdInOrderByPreguntaIdAscOrdenAsc(List<Long> preguntaIds);
+
+    // Al eliminar preguntas de un borrador, o al descartarlo entero.
+    void deleteByPreguntaIdIn(List<Long> preguntaIds);
 }

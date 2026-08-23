@@ -13,4 +13,7 @@ public interface RangoPreguntaRepository extends JpaRepository<RangoPregunta, Lo
 
     // Publicar exige que un V tenga con qué puntuarse: tramos, referencia o fórmula.
     long countByPreguntaId(Long preguntaId);
+
+    // Al eliminar preguntas de un borrador, o al descartarlo entero.
+    void deleteByPreguntaIdIn(List<Long> preguntaIds);
 }
