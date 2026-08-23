@@ -176,4 +176,13 @@ public final class DtosBancoPreguntas {
             BigDecimal penalizacionPorcentaje,
             Short separacionMinimaItems,
             String condicion) {}
+
+    // --- El catálogo de dimensiones ---
+    // Lo que una pregunta puede medir. El panel lo necesita para llenar la columna
+    // «Qué mide» del Excel con valores que el importador acepte.
+    public record DimensionResponse(
+            String codigo,
+            String nombre,
+            String definicion,
+            Integer orden) {}
 }

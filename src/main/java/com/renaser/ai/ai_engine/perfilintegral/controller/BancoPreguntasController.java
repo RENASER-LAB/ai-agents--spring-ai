@@ -1,17 +1,22 @@
 package com.renaser.ai.ai_engine.perfilintegral.controller;
 
 import com.renaser.ai.ai_engine.perfilintegral.service.ServicioBancoPreguntas;
+import com.renaser.ai.ai_engine.perfilintegral.service.ServicioImportacionBanco;
 
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosBancoPreguntas.*;
+import com.renaser.ai.ai_engine.perfilintegral.dto.DtosImportacionBanco.ResultadoImportacion;
 import com.renaser.ai.ai_engine.seguridad.service.Permisos;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
@@ -22,7 +27,30 @@ import java.util.Map;
 public class BancoPreguntasController {
 
     private final ServicioBancoPreguntas servicio;
+    private final ServicioImportacionBanco importacion;
     private final Permisos permisos;
+
+    // ---------- Importar desde Excel ----------
+
+    @PostMapping(value = "/importaciones", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("@permisos.tiene('editar_banco_preguntas')")
+    @ResponseStatus(HttpStatus.CREATED)
+    @Operation(summary = "Importar un banco desde la plantilla Excel: crea una versión en "
+            + "borrador para revisar y publicar; si el archivo tiene problemas, 400 con "
+            + "la lista completa y no se importa nada")
+    public ResultadoImportacion importar(@RequestParam("archivo") MultipartFile archivo,
+                                         @RequestParam String nivelPuestoCodigo,
+                                         @RequestParam String etiqueta) throws IOException {
+        return importacion.importar(permisos.actual(), nivelPuestoCodigo, etiqueta,
+                archivo.getOriginalFilename(), archivo.getBytes());
+    }
+
+    @GetMapping("/dimensiones")
+    @PreAuthorize("@permisos.tiene('ver_banco_preguntas')")
+    @Operation(summary = "El catálogo de dimensiones: lo que vale en la columna «Qué mide»")
+    public List<DimensionResponse> dimensiones() {
+        return importacion.listarDimensiones(permisos.actual());
+    }
 
     // ---------- Versiones ----------
 
