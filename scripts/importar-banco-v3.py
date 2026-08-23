@@ -100,6 +100,14 @@ CIERRA_CAMPOS = re.compile(r'^\s*(?:Rangos?|Validaci[oó]n)\s*:')
 DECLARACION_CAMPOS = re.compile(
     r'\d+\s*campos(?:\s+cada\s+una)?(?:\s*[×x]\s*\d+)?(?:\s*=\s*\d+\s*campos)?\s*\)?\s*:?')
 
+# Los CD multiplicados: «(4 campos × 3)» pide el bloque entero POR CADA caso, así que
+# las casillas reales son base × veces y cada una lleva delante el número de su grupo
+# («Indicador 2 · Nombre…»). El sustantivo del grupo es una decisión editorial, no un
+# parseo: se declara aquí, y un ítem multiplicado que no esté declarado es un aviso.
+# Sin esta expansión, C04 enseñaba 4 casillas para un caso que pide 12 (4 × 3).
+GRUPOS_CD = {'C04': 'Indicador', 'C19': 'Problema', 'C49': 'Iniciativa',
+             'D11': 'Indicador', 'D21': 'Reunión', 'D22': 'Problema', 'D75': 'Iniciativa'}
+
 avisos = []
 
 
@@ -484,7 +492,42 @@ def parsear_contenido(codigo, formato, cuerpo, enunciado):
                 aviso(codigo, 'CD suelto sin declaración de campos reconocible: el primer '
                               'campo puede llevar el enunciado pegado')
             campos, cuadra = sueltos, esperados is not None and len(sueltos) >= 2
+
+        # La multiplicación. Dos formas de declararla: «(N campos × M)» y «Hasta M
+        # reuniones, N campos cada una». En ambas el candidato responde el bloque entero
+        # M veces, así que aquí se repite con el número de grupo delante y el total
+        # esperado pasa a ser N × M.
+        regla_pegada = None
+        veces = None
+        m_mult = re.search(r'\d+\s*campos\s*[×x]\s*(\d+)', texto)
+        m_cada = re.search(r'[Hh]asta\s+(\d+)\s+\S+.{0,40}?\d+\s*campos\s+cada\s+una',
+                           texto, re.S)
+        if m_mult:
+            veces = int(m_mult.group(1))
+        elif m_cada:
+            veces = int(m_cada.group(1))
+        if veces and veces > 1 and campos:
+            sustantivo = GRUPOS_CD.get(codigo)
+            if not sustantivo:
+                aviso(codigo, f'declara campos × {veces} pero no está en GRUPOS_CD: '
+                              'se deja sin multiplicar y hay que revisarlo')
+            else:
+                # La regla de puntaje que el documento escribe a renglón seguido del
+                # último campo no se replica por grupo: se corta y se devuelve aparte,
+                # que es material de lógica interna y el candidato no debe leerla.
+                m_regla = re.search(r'\s*(Regla especial:.*|Solo cuentan las.*)$',
+                                    campos[-1])
+                if m_regla:
+                    regla_pegada = m_regla.group(1).strip()
+                    campos[-1] = campos[-1][:m_regla.start()].strip()
+                campos = [f'{sustantivo} {g} · {c}'
+                          for g in range(1, veces + 1) for c in campos]
+                if esperados is not None:
+                    esperados *= veces
+                cuadra = len(campos) == esperados
+
         return ({'campos_esperados': esperados, 'campos': campos, 'preambulo': preambulo,
+                 'regla_especial': regla_pegada,
                  'rangos': rangos.group(1).strip() if rangos else None}, cuadra)
 
     if formato == 'V':

@@ -196,7 +196,11 @@ def main():
         if senal:
             diferencias.append(f'enunciado {codigo} huele a cortado: {senal}')
     for (codigo, orden), en_db in sorted(campos_db.items()):
-        senal = parece_cortado(en_db, norma(items[codigo]['texto_bruto']))
+        # En los CD multiplicados la etiqueta lleva su grupo delante («Indicador 2 ·
+        # Nombre…») y ese prefijo lo pone el importador, no el PDF: se quita antes de
+        # buscar el texto en el cuerpo del ítem.
+        sin_grupo = re.sub(r'^\S+ \d+ · ', '', en_db)
+        senal = parece_cortado(sin_grupo, norma(items[codigo]['texto_bruto']))
         if senal:
             diferencias.append(f'campo {codigo}.{orden} huele a cortado: {senal}')
 

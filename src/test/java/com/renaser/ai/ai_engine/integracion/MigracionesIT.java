@@ -183,4 +183,41 @@ public class MigracionesIT {
                 .as("etiquetas de campo con caracteres de control o espacios dobles")
                 .isEmpty();
     }
+
+    /**
+     * Cada caso descompuesto tiene tantas filas de campo como casillas declara.
+     *
+     * <p>Siete CD piden su bloque POR CADA caso —«(4 campos × 3)» son 12 casillas— y la
+     * V20 guardó solo el bloque base: el candidato veía 4 casillas para 3 indicadores. La
+     * V34 los expandió. La primera consulta cruza el enunciado contra casos_pedidos; la
+     * segunda, casos_pedidos contra las filas reales: si una migración futura vuelve a
+     * cargar un CD multiplicado a medias, alguna de las dos lo delata.
+     */
+    @Test
+    void losCasosDescompuestosDeclaranYTienenTodasSusCasillas() {
+        List<String> malMultiplicados = jdbc.queryForList("""
+                select p.codigo from pregunta p
+                join version_banco vb on vb.id = p.version_banco_id
+                where vb.etiqueta like 'Banco RENASER v3%'
+                  and p.enunciado ~ 'campos\\s*[×x]\\s*\\d'
+                  and coalesce(p.casos_pedidos, 0) <>
+                      (substring(p.enunciado from '(\\d+)\\s*campos')::int
+                       * substring(p.enunciado from 'campos\\s*[×x]\\s*(\\d+)')::int)""",
+                String.class);
+        assertThat(malMultiplicados)
+                .as("CD cuyo casos_pedidos no es el producto que declara su enunciado")
+                .isEmpty();
+
+        List<String> incompletos = jdbc.queryForList("""
+                select p.codigo from pregunta p
+                join version_banco vb on vb.id = p.version_banco_id
+                where vb.etiqueta like 'Banco RENASER v3%'
+                  and p.tipo = 'CD'
+                  and coalesce(p.casos_pedidos, 0) <>
+                      (select count(*) from campo_caso cc where cc.pregunta_id = p.id)""",
+                String.class);
+        assertThat(incompletos)
+                .as("CD con menos filas de campo que casillas declaradas")
+                .isEmpty();
+    }
 }

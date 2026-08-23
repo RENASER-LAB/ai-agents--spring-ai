@@ -303,3 +303,20 @@ Tres piezas, mismas del arreglo anterior:
 
 Tras la V33, los 175 campos del importador y los de la base son idénticos carácter a
 carácter — ya no solo con la comparación normalizada del comparador.
+
+## Los casos multiplicados · añadido el 23/08/2026
+
+Siete CD piden su bloque de campos POR CADA caso —«Los 3 indicadores que reportabas. Por
+cada uno (4 campos × 3):» son 12 casillas— y la V20 guardó solo el bloque base: el
+candidato veía 4 casillas para declarar 3 indicadores. Son C04 (4×3), C19 (5×3), C49
+(3×2), D11 (6×3), D21 (hasta 5 reuniones × 5), D22 (5×3) y D75 (3×3): 100 casillas
+reales donde había 31.
+
+- El importador expande el bloque con el número de grupo delante («Indicador 2 ·
+  Nombre…»); el sustantivo de cada grupo se declara en `GRUPOS_CD`, no se adivina.
+- La **V34** expande lo cargado, derivando las etiquetas de las filas ya corregidas, y
+  mueve a `logica_interna` las reglas de puntaje que venían pegadas a la última etiqueta
+  (C49, D75, D21) más las que el documento escribe aparte (C19, D11, D22): el candidato
+  no debe leerlas (RF-53). La puntuación fina que describen sigue pendiente del motor.
+- `MigracionesIT` asevera desde CI que todo CD tiene tantas filas de campo como casillas
+  declara, y que los multiplicados declaran el producto correcto.
