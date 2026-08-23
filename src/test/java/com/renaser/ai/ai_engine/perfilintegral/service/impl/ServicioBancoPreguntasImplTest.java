@@ -1,13 +1,24 @@
 package com.renaser.ai.ai_engine.perfilintegral.service.impl;
 
 import com.renaser.ai.ai_engine.auditoria.service.ServicioAuditoria;
+import com.renaser.ai.ai_engine.ai.exception.ResourceNotFoundException;
+import com.renaser.ai.ai_engine.perfilintegral.dto.DtosBancoPreguntas.CorregirEtiquetaVersion;
+import com.renaser.ai.ai_engine.perfilintegral.dto.DtosBancoPreguntas.CorregirTextoCampoCaso;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosBancoPreguntas.CorregirTextoOpcion;
+import com.renaser.ai.ai_engine.perfilintegral.dto.DtosBancoPreguntas.CorregirTextoPar;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosBancoPreguntas.CorregirTextoPregunta;
+import com.renaser.ai.ai_engine.perfilintegral.dto.DtosBancoPreguntas.CorregirTextoRango;
+import com.renaser.ai.ai_engine.perfilintegral.dto.DtosBancoPreguntas.CrearCampoCaso;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosBancoPreguntas.CrearOpcion;
+import com.renaser.ai.ai_engine.perfilintegral.dto.DtosBancoPreguntas.CrearParConsistencia;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosBancoPreguntas.CrearPregunta;
+import com.renaser.ai.ai_engine.perfilintegral.dto.DtosBancoPreguntas.CrearRango;
+import com.renaser.ai.ai_engine.perfilintegral.entity.CampoCaso;
 import com.renaser.ai.ai_engine.perfilintegral.entity.Evaluacion;
 import com.renaser.ai.ai_engine.perfilintegral.entity.Opcion;
+import com.renaser.ai.ai_engine.perfilintegral.entity.ParConsistencia;
 import com.renaser.ai.ai_engine.perfilintegral.entity.Pregunta;
+import com.renaser.ai.ai_engine.perfilintegral.entity.RangoPregunta;
 import com.renaser.ai.ai_engine.perfilintegral.entity.VersionBanco;
 import com.renaser.ai.ai_engine.perfilintegral.mapper.CampoCasoMapper;
 import com.renaser.ai.ai_engine.perfilintegral.mapper.OpcionMapper;
@@ -488,6 +499,96 @@ class ServicioBancoPreguntasImplTest {
         }
 
         @Test
+        @DisplayName("cada pieza se reemplaza o se quita, y todas exigen que siga en borrador")
+        void cadaPiezaSeReemplazaOSeQuita() {
+            when(versiones.findById(VERSION)).thenReturn(Optional.of(version("BORRADOR")));
+            when(preguntas.findById(PREGUNTA)).thenReturn(Optional.of(pregunta("V").build()));
+
+            Opcion opcion = Opcion.builder().id(50L).preguntaId(PREGUNTA).letra("a")
+                    .texto("La vieja").build();
+            when(opciones.findById(50L)).thenReturn(Optional.of(opcion));
+            servicio.actualizarOpcion(quien, 50L, new CrearOpcion("b", "La nueva", 4.0,
+                    new BigDecimal("1"), true, (short) 2));
+            assertThat(opcion.getLetra()).isEqualTo("b");
+            assertThat(opcion.getTexto()).isEqualTo("La nueva");
+            assertThat(opcion.getPuntaje()).isEqualByComparingTo("4");
+            servicio.eliminarOpcion(quien, 50L);
+            verify(opciones).delete(opcion);
+
+            RangoPregunta rango = RangoPregunta.builder().id(60L).preguntaId(PREGUNTA)
+                    .orden(1).condicion("La vieja").puntaje(new BigDecimal("1")).build();
+            when(rangos.findById(60L)).thenReturn(Optional.of(rango));
+            servicio.actualizarRango(quien, 60L, new CrearRango(2, "La nueva",
+                    new BigDecimal("3"), true));
+            assertThat(rango.getOrden()).isEqualTo(2);
+            assertThat(rango.getPuntaje()).isEqualByComparingTo("3");
+            assertThat(rango.isGeneraBandera()).isTrue();
+            servicio.eliminarRango(quien, 60L);
+            verify(rangos).delete(rango);
+
+            CampoCaso campo = CampoCaso.builder().id(70L).preguntaId(PREGUNTA)
+                    .orden(1).etiqueta("La vieja").build();
+            when(camposCaso.findById(70L)).thenReturn(Optional.of(campo));
+            servicio.actualizarCampoCaso(quien, 70L, new CrearCampoCaso(3, "La nueva", "regla"));
+            assertThat(campo.getOrden()).isEqualTo(3);
+            assertThat(campo.getValidacion()).isEqualTo("regla");
+            servicio.eliminarCampoCaso(quien, 70L);
+            verify(camposCaso).delete(campo);
+
+            verify(auditoria).registrar(eq(ORGANIZACION), eq(quien), eq("editar_opcion"),
+                    eq("opcion"), eq(50L), any(), any(), eq((String) null));
+            verify(auditoria).registrar(eq(ORGANIZACION), eq(quien), eq("eliminar_campo_caso"),
+                    eq("campo_caso"), eq(70L), any(), any(), eq((String) null));
+        }
+
+        @Test
+        @DisplayName("un par se reemplaza solo por preguntas de su misma versión")
+        void unParSoloPorPreguntasDeSuVersion() {
+            ParConsistencia par = ParConsistencia.builder().id(80L).versionBancoId(VERSION)
+                    .preguntaAId(1L).preguntaBId(2L).build();
+            when(pares.findById(80L)).thenReturn(Optional.of(par));
+            when(versiones.findById(VERSION)).thenReturn(Optional.of(version("BORRADOR")));
+            when(preguntas.findById(3L)).thenReturn(Optional.of(
+                    pregunta("EF-4").id(3L).build()));
+            when(preguntas.findById(4L)).thenReturn(Optional.of(
+                    pregunta("EF-4").id(4L).versionBancoId(999L).codigo("Z99").build()));
+
+            assertThatThrownBy(() -> servicio.actualizarParConsistencia(quien, 80L,
+                    new CrearParConsistencia(3L, 4L, null, new BigDecimal("5"),
+                            (short) 15, "se contradicen")))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("no es de esta versión");
+            assertThat(par.getPreguntaAId()).isEqualTo(1L);
+
+            servicio.actualizarParConsistencia(quien, 80L,
+                    new CrearParConsistencia(3L, 3L, null, new BigDecimal("5"),
+                            (short) 15, "se contradicen"));
+            assertThat(par.getPreguntaAId()).isEqualTo(3L);
+            assertThat(par.getCondicion()).isEqualTo("se contradicen");
+
+            servicio.eliminarParConsistencia(quien, 80L);
+            verify(pares).delete(par);
+        }
+
+        @Test
+        @DisplayName("editar una pieza que no existe es un 404, no un 500 ni un silencio")
+        void editarUnaPiezaQueNoExiste() {
+            when(opciones.findById(99L)).thenReturn(Optional.empty());
+            when(rangos.findById(99L)).thenReturn(Optional.empty());
+            when(camposCaso.findById(99L)).thenReturn(Optional.empty());
+            when(pares.findById(99L)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> servicio.eliminarOpcion(quien, 99L))
+                    .isInstanceOf(ResourceNotFoundException.class);
+            assertThatThrownBy(() -> servicio.eliminarRango(quien, 99L))
+                    .isInstanceOf(ResourceNotFoundException.class);
+            assertThatThrownBy(() -> servicio.eliminarCampoCaso(quien, 99L))
+                    .isInstanceOf(ResourceNotFoundException.class);
+            assertThatThrownBy(() -> servicio.eliminarParConsistencia(quien, 99L))
+                    .isInstanceOf(ResourceNotFoundException.class);
+        }
+
+        @Test
         @DisplayName("una versión publicada no se descarta: para eso está archivar")
         void unaPublicadaNoSeDescarta() {
             when(versiones.findById(VERSION)).thenReturn(Optional.of(version("PUBLICADA")));
@@ -532,6 +633,13 @@ class ServicioBancoPreguntasImplTest {
 
             assertThat(laPublicada.getSituacion()).isEqualTo("La situación de siempre");
             assertThat(laPublicada.getLogicaInterna()).isEqualTo("La clave secreta");
+
+            // Y lo que sí llega, se cambia: los tres campos a la vez
+            servicio.corregirTextoPregunta(quien, PREGUNTA,
+                    new CorregirTextoPregunta("Otro enunciado", "Otra situación", "Otra clave"));
+            assertThat(laPublicada.getEnunciado()).isEqualTo("Otro enunciado");
+            assertThat(laPublicada.getSituacion()).isEqualTo("Otra situación");
+            assertThat(laPublicada.getLogicaInterna()).isEqualTo("Otra clave");
         }
 
         @Test
@@ -557,6 +665,51 @@ class ServicioBancoPreguntasImplTest {
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("ya no se toca");
             verify(preguntas, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("campos, tramos, pares y la etiqueta también se corrigen, y solo su texto")
+        void lasDemasPiezasTambienSeCorrigen() {
+            when(versiones.findById(VERSION)).thenReturn(Optional.of(version("PUBLICADA")));
+            when(preguntas.findById(PREGUNTA)).thenReturn(Optional.of(pregunta("CD").build()));
+
+            CampoCaso campo = CampoCaso.builder().id(70L).preguntaId(PREGUNTA).orden(1)
+                    .etiqueta("Nombre de la tarea (texo ≤ 40 car.)").build();
+            when(camposCaso.findById(70L)).thenReturn(Optional.of(campo));
+            servicio.corregirTextoCampoCaso(quien, 70L,
+                    new CorregirTextoCampoCaso("Nombre de la tarea (texto ≤ 40 car.)", null));
+            assertThat(campo.getEtiqueta()).contains("texto ≤ 40");
+            assertThat(campo.getOrden()).isEqualTo(1);   // su sitio no se mueve
+            // Y la regla de validación, cuando viene, también es texto corregible
+            servicio.corregirTextoCampoCaso(quien, 70L,
+                    new CorregirTextoCampoCaso(null, "si queda vacío → campo inválido"));
+            assertThat(campo.getValidacion()).isEqualTo("si queda vacío → campo inválido");
+            assertThat(campo.getEtiqueta()).contains("texto ≤ 40");   // lo otro, intacto
+
+            RangoPregunta rango = RangoPregunta.builder().id(60L).preguntaId(PREGUNTA)
+                    .orden(1).condicion("Directos 5-20").puntaje(new BigDecimal("3")).build();
+            when(rangos.findById(60L)).thenReturn(Optional.of(rango));
+            servicio.corregirTextoRango(quien, 60L,
+                    new CorregirTextoRango("Directos 5–20 y niveles ≥ 2"));
+            assertThat(rango.getCondicion()).isEqualTo("Directos 5–20 y niveles ≥ 2");
+            assertThat(rango.getPuntaje()).isEqualByComparingTo("3");   // el puntaje, intacto
+
+            ParConsistencia par = ParConsistencia.builder().id(80L).versionBancoId(VERSION)
+                    .penalizacionPorcentaje(new BigDecimal("5")).condicion(null).build();
+            when(pares.findById(80L)).thenReturn(Optional.of(par));
+            servicio.corregirTextoParConsistencia(quien, 80L,
+                    new CorregirTextoPar("dice una cosa y hace otra"));
+            assertThat(par.getCondicion()).isEqualTo("dice una cosa y hace otra");
+            assertThat(par.getPenalizacionPorcentaje()).isEqualByComparingTo("5");
+
+            VersionBanco laVersion = version("PUBLICADA");
+            when(versiones.findById(VERSION)).thenReturn(Optional.of(laVersion));
+            servicio.corregirEtiquetaVersion(quien, VERSION,
+                    new CorregirEtiquetaVersion("Banco RENASER v3 · Directivo"));
+            assertThat(laVersion.getEtiqueta()).isEqualTo("Banco RENASER v3 · Directivo");
+            verify(auditoria).registrar(eq(ORGANIZACION), eq(quien),
+                    eq("corregir_etiqueta_version"), eq("version_banco"), eq(VERSION),
+                    eq(Map.of("etiqueta", "Banco de prueba")), any(), eq((String) null));
         }
 
         @Test

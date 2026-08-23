@@ -372,6 +372,141 @@ class LectorPlantillaBancoTest {
         }
 
         @Test
+        @DisplayName("cada clave se rechaza en el formato que no es suyo, y fuera de su rango")
+        void cadaClaveEnSuFormatoYEnSuRango() {
+            XSSFWorkbook libro = new XSSFWorkbook();
+            hojaLlena(libro, "Preguntas", "Código", new String[][]{
+                    {"X01", "EF-4", "Un elige más y menos.", null, "1", "no"},
+                    {"X02", "SJT-R", "Un califica cada acción.", null, "1", "no"},
+                    {"X03", "SEC", "Un ordena los pasos.", null, "1", "no"},
+                    {"X04", "INV", "Un inventario.", null, "1", "no"},
+            });
+            hojaLlena(libro, "Opciones", "Código de la pregunta", new String[][]{
+                    {"X01", "Valor fuera de rango", null, "5"},
+                    {"X01", "Nota esperada en un EF-4", "4"},
+                    {"X02", "Nota fuera de 1..5", "0"},
+                    {"X02", "Valor oculto en un SJT-R", null, "1"},
+                    {"X03", "Posición cero", null, null, null, "0"},
+                    {"X03", "Trampa en un SEC", null, null, "sí"},
+                    {"X04", "Posición correcta en un inventario", null, null, null, "2"},
+                    {"X04", null},
+            });
+            BancoLeido leido = leer(bytesDe(libro));
+
+            assertThat(mensajes(leido))
+                    .anySatisfy(m -> assertThat(m).contains("valor oculto va de −2 a +2"))
+                    .anySatisfy(m -> assertThat(m).contains("«Respuesta esperada» es solo para SJT-R"))
+                    .anySatisfy(m -> assertThat(m).contains("respuesta esperada va de 1 a 5"))
+                    .anySatisfy(m -> assertThat(m).contains("«Valor oculto» es solo para EF-4"))
+                    .anySatisfy(m -> assertThat(m).contains("posición correcta empieza en 1"))
+                    .anySatisfy(m -> assertThat(m).contains("«¿Es trampa?» es solo para INV y DE"))
+                    .anySatisfy(m -> assertThat(m).contains("«Posición correcta» es solo para SEC"))
+                    .anySatisfy(m -> assertThat(m).contains("falta el texto de la opción"));
+            assertThat(leido.opciones()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("un tramo sin condición, con puntos fuera de 0..3 o en un ítem que no es V")
+        void unTramoTorcido() {
+            XSSFWorkbook libro = new XSSFWorkbook();
+            hojaLlena(libro, "Preguntas", "Código", new String[][]{
+                    {"X01", "V", "Un dato verificable:", null, "1", "no"},
+                    {"X02", "EF-4", "Un elige más y menos.", null, "1", "no"},
+            });
+            hojaLlena(libro, "Rangos (V)", "Código de la pregunta", new String[][]{
+                    {"X01", null, "2", "no"},
+                    {"X01", "Puntos de más", "7", "no"},
+                    {"X01", "Puntos que no son número", "mucho", "no"},
+                    {"X02", "En un EF-4", "1", "no"},
+                    {"X99", "De una pregunta fantasma", "1", "no"},
+            });
+            BancoLeido leido = leer(bytesDe(libro));
+
+            assertThat(mensajes(leido))
+                    .anySatisfy(m -> assertThat(m).contains("falta la condición"))
+                    .anySatisfy(m -> assertThat(m).contains("puntos van de 0 a 3"))
+                    .anySatisfy(m -> assertThat(m).contains("debe ser un número"))
+                    .anySatisfy(m -> assertThat(m).contains("solo para V"))
+                    .anySatisfy(m -> assertThat(m).contains("X99"));
+            assertThat(leido.rangos()).isEmpty();
+        }
+
+        @Test
+        @DisplayName("un par repetido, con penalización imposible o distancia de cero")
+        void unParRepetidoOImposible() {
+            XSSFWorkbook libro = new XSSFWorkbook();
+            hojaLlena(libro, "Preguntas", "Código", new String[][]{
+                    {"X01", "EF-4", "La primera.", null, "1", "no"},
+                    {"X02", "EF-4", "La segunda.", null, "1", "no"},
+            });
+            hojaLlena(libro, "Pares", "Pregunta A", new String[][]{
+                    {"X01", "X02", "5", "3", "el bueno"},
+                    {"X02", "X01", "5", "3", "el mismo del revés"},
+                    {"X01", "X02", "300", "0", "penalización y distancia imposibles"},
+                    {"X01", null, "5", "3", "sin la segunda"},
+            });
+            BancoLeido leido = leer(bytesDe(libro));
+
+            assertThat(leido.pares()).hasSize(1);
+            assertThat(mensajes(leido))
+                    .anySatisfy(m -> assertThat(m).contains("ya está declarado"))
+                    .anySatisfy(m -> assertThat(m).contains("porcentaje de 0 a 100"))
+                    .anySatisfy(m -> assertThat(m).contains("al menos 1 pregunta"))
+                    .anySatisfy(m -> assertThat(m).contains("(vacía)"));
+        }
+
+        @Test
+        @DisplayName("los números escritos como número se leen sin el decimal fantasma de Excel")
+        void losNumerosEscritosComoNumero() {
+            XSSFWorkbook libro = new XSSFWorkbook();
+            XSSFSheet hoja = libro.createSheet("Preguntas");
+            hoja.createRow(0).createCell(0).setCellValue("Preguntas");
+            hoja.createRow(2).createCell(0).setCellValue("Código");
+            hoja.createRow(3).createCell(0).setCellValue("guía");
+            XSSFRow fila = hoja.createRow(4);
+            fila.createCell(0).setCellValue("X01");
+            fila.createCell(1).setCellValue("CD");
+            fila.createCell(2).setCellValue("Tu caso. (2 campos)");
+            fila.createCell(4).setCellValue(2);      // peso, como número
+            fila.createCell(5).setCellValue(true);   // ¿eliminatoria?, como booleano
+            fila.createCell(7).setCellValue(2);      // N° de campos, como número
+            // Y una fila que solo tiene formato, sin un solo valor: se salta sin ruido
+            hoja.createRow(5);
+            XSSFSheet campos = libro.createSheet("Campos de caso (CD)");
+            campos.createRow(0).createCell(0).setCellValue("Campos");
+            campos.createRow(2).createCell(0).setCellValue("Código de la pregunta");
+            campos.createRow(3).createCell(0).setCellValue("guía");
+            for (int i = 0; i < 2; i++) {
+                XSSFRow c = campos.createRow(4 + i);
+                c.createCell(0).setCellValue("X01");
+                c.createCell(1).setCellValue("Campo " + (i + 1));
+            }
+            BancoLeido leido = leer(bytesDe(libro));
+
+            assertThat(leido.errores()).isEmpty();
+            assertThat(leido.preguntas()).singleElement().satisfies(p -> {
+                assertThat(p.peso()).isEqualTo((short) 2);
+                assertThat(p.casosPedidos()).isEqualTo((short) 2);
+                assertThat(p.esEliminatoria()).isTrue();
+            });
+        }
+
+        @Test
+        @DisplayName("un peso que no es un número entero se dice con su valor a la vista")
+        void unPesoQueNoEsNumero() {
+            XSSFWorkbook libro = new XSSFWorkbook();
+            hojaLlena(libro, "Preguntas", "Código", new String[][]{
+                    {"X01", "EF-4", "Con el peso escrito a mano.", null, "uno y medio", "no"},
+                    {"X02", "EF-4", "Con el peso decimal.", null, "1,5", "no"},
+            });
+            BancoLeido leido = leer(bytesDe(libro));
+
+            assertThat(mensajes(leido))
+                    .anySatisfy(m -> assertThat(m).contains("«Peso»", "uno y medio"))
+                    .anySatisfy(m -> assertThat(m).contains("1,5"));
+        }
+
+        @Test
         @DisplayName("la fórmula y la tabla prestada son solo de los ítems V, y nunca las dos")
         void laFormulaYLaTablaPrestadaSonSoloDeLosV() {
             XSSFWorkbook libro = new XSSFWorkbook();

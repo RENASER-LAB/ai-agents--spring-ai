@@ -168,7 +168,7 @@ public class FlujoImportadorBancoIT {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"codigo":"X03","tipo":"CD","enunciado":"Tu caso, mejor contado.",
-                                 "esPuntuable":true,"orden":3,"peso":1,"casosPedidos":2}"""))
+                                 "esPuntuable":true,"orden":3,"peso":1,"casosPedidos":1}"""))
                 .andExpect(status().isOk());
         assertThat(jdbc.queryForObject("select enunciado from pregunta where id = ?",
                 String.class, preguntaCd)).isEqualTo("Tu caso, mejor contado.");
@@ -176,6 +176,113 @@ public class FlujoImportadorBancoIT {
 
     @Test
     @Order(4)
+    @DisplayName("En el borrador se corrige cada pieza: opciones, campos, tramos y pares")
+    void enElBorradorSeCorrigeCadaPieza() throws Exception {
+        // Una opción: se reemplaza entera, clave incluida — sigue siendo un borrador
+        long opcionId = jdbc.queryForObject("""
+                select o.id from opcion o join pregunta p on p.id = o.pregunta_id
+                where p.version_banco_id = ? and p.codigo = 'X01' order by o.letra limit 1""",
+                Long.class, versionImportada);
+        conToken(put("/api/v1/panel/banco-preguntas/opciones/" + opcionId), """
+                {"letra":"a","texto":"Digo lo que hay que decir, aunque incomode","valor":2}""")
+                .andExpect(status().isOk());
+        assertThat(jdbc.queryForObject("select texto from opcion where id = ?",
+                String.class, opcionId)).endsWith("aunque incomode");
+
+        // Un campo de caso: se reemplaza y el sobrante se quita
+        long campoId = jdbc.queryForObject("""
+                select cc.id from campo_caso cc join pregunta p on p.id = cc.pregunta_id
+                where p.version_banco_id = ? and p.codigo = 'X03' order by cc.orden limit 1""",
+                Long.class, versionImportada);
+        conToken(put("/api/v1/panel/banco-preguntas/campos-caso/" + campoId),
+                "{\"orden\":1,\"etiqueta\":\"Nombre de la tarea (texto ≤ 40 car.)\"}")
+                .andExpect(status().isOk());
+        long campoSobrante = jdbc.queryForObject("""
+                select cc.id from campo_caso cc join pregunta p on p.id = cc.pregunta_id
+                where p.version_banco_id = ? and p.codigo = 'X03' order by cc.orden desc limit 1""",
+                Long.class, versionImportada);
+        mvc.perform(delete("/api/v1/panel/banco-preguntas/campos-caso/" + campoSobrante)
+                        .header("Authorization", "Bearer " + tokenEquipo))
+                .andExpect(status().isNoContent());
+        assertThat(contar("""
+                select count(*) from campo_caso cc join pregunta p on p.id = cc.pregunta_id
+                where p.version_banco_id = %d and p.codigo = 'X03'""".formatted(versionImportada)))
+                .isEqualTo(1);
+
+        // Un tramo de un ítem V: se reemplaza uno y se quita otro, y al ítem le queda tabla
+        long rangoId = jdbc.queryForObject("""
+                select r.id from rango_pregunta r join pregunta p on p.id = r.pregunta_id
+                where p.version_banco_id = ? and p.codigo = 'X05' order by r.orden limit 1""",
+                Long.class, versionImportada);
+        conToken(put("/api/v1/panel/banco-preguntas/rangos/" + rangoId),
+                "{\"orden\":1,\"condicion\":\"6 o más\",\"puntaje\":3,\"generaBandera\":false}")
+                .andExpect(status().isOk());
+        assertThat(jdbc.queryForObject("select condicion from rango_pregunta where id = ?",
+                String.class, rangoId)).isEqualTo("6 o más");
+        long rangoSobrante = jdbc.queryForObject("""
+                select r.id from rango_pregunta r join pregunta p on p.id = r.pregunta_id
+                where p.version_banco_id = ? and p.codigo = 'X05' order by r.orden desc limit 1""",
+                Long.class, versionImportada);
+        mvc.perform(delete("/api/v1/panel/banco-preguntas/rangos/" + rangoSobrante)
+                        .header("Authorization", "Bearer " + tokenEquipo))
+                .andExpect(status().isNoContent());
+
+        // Y el par: se reemplaza y luego se quita del todo
+        long parId = jdbc.queryForObject(
+                "select id from par_consistencia where version_banco_id = ?",
+                Long.class, versionImportada);
+        long a = jdbc.queryForObject("""
+                select id from pregunta where version_banco_id = ? and codigo = 'X01'""",
+                Long.class, versionImportada);
+        long b = jdbc.queryForObject("""
+                select id from pregunta where version_banco_id = ? and codigo = 'X05'""",
+                Long.class, versionImportada);
+        conToken(put("/api/v1/panel/banco-preguntas/pares-consistencia/" + parId), """
+                {"preguntaAId":%d,"preguntaBId":%d,"penalizacionPorcentaje":10,
+                 "separacionMinimaItems":2,"condicion":"se contradicen en el número"}"""
+                .formatted(a, b)).andExpect(status().isOk());
+        assertThat(jdbc.queryForObject(
+                "select pregunta_b_id from par_consistencia where id = ?", Long.class, parId))
+                .isEqualTo(b);
+        mvc.perform(delete("/api/v1/panel/banco-preguntas/pares-consistencia/" + parId)
+                        .header("Authorization", "Bearer " + tokenEquipo))
+                .andExpect(status().isNoContent());
+        assertThat(contar("select count(*) from par_consistencia where version_banco_id = "
+                + versionImportada)).isZero();
+
+        // De paso, lo que el panel lee para pintar todo esto
+        mvc.perform(get("/api/v1/panel/banco-preguntas/versiones")
+                        .header("Authorization", "Bearer " + tokenEquipo))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].estado").exists());
+        mvc.perform(get("/api/v1/panel/banco-preguntas/versiones/" + versionImportada + "/preguntas")
+                        .header("Authorization", "Bearer " + tokenEquipo))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(5))
+                // La lógica interna entra por el Excel y no sale nunca (RF-53)
+                .andExpect(content().string(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("logicaInterna"))));
+        mvc.perform(get("/api/v1/panel/banco-preguntas/preguntas/" + preguntaCd + "/campos-caso")
+                        .header("Authorization", "Bearer " + tokenEquipo))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1));
+        mvc.perform(get("/api/v1/panel/banco-preguntas/preguntas/"
+                        + jdbc.queryForObject("""
+                                select id from pregunta where version_banco_id = ? and codigo = 'X01'""",
+                                Long.class, versionImportada) + "/opciones")
+                        .header("Authorization", "Bearer " + tokenEquipo))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2));
+        // El catálogo con que el panel llenará la columna «Qué mide»
+        mvc.perform(get("/api/v1/panel/banco-preguntas/dimensiones")
+                        .header("Authorization", "Bearer " + tokenEquipo))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(22))
+                .andExpect(jsonPath("$[0].codigo").exists());
+    }
+
+    @Test
+    @Order(5)
     @DisplayName("Publicar el borrador importado pasa la aduana de coherencia de siempre")
     void publicarElBorradorImportado() throws Exception {
         mvc.perform(post("/api/v1/panel/banco-preguntas/versiones/" + versionImportada + "/publicacion")
@@ -193,7 +300,7 @@ public class FlujoImportadorBancoIT {
     }
 
     @Test
-    @Order(5)
+    @Order(6)
     @DisplayName("Sobre lo publicado se corrige una errata, pero la clave no se toca")
     void sobreLoPublicadoSoloElTexto() throws Exception {
         long preguntaId = jdbc.queryForObject("""
@@ -224,10 +331,50 @@ public class FlujoImportadorBancoIT {
         // El peso no se movió: por el PATCH no hay manera de tocarlo
         assertThat(jdbc.queryForObject("select peso from pregunta where id = ?",
                 Short.class, preguntaId)).isEqualTo((short) 1);
+
+        // La misma corrección, pieza por pieza, sin que ninguna clave se mueva
+        long opcionId = jdbc.queryForObject("""
+                select o.id from opcion o join pregunta p on p.id = o.pregunta_id
+                where p.id = ? order by o.letra limit 1""", Long.class, preguntaId);
+        conToken(patch("/api/v1/panel/banco-preguntas/opciones/" + opcionId + "/textos"),
+                "{\"texto\":\"Digo lo que hay que decir\"}").andExpect(status().isOk());
+        assertThat(jdbc.queryForObject("select texto from opcion where id = ?",
+                String.class, opcionId)).isEqualTo("Digo lo que hay que decir");
+        assertThat(jdbc.queryForObject("select valor from opcion where id = ?",
+                java.math.BigDecimal.class, opcionId)).isEqualByComparingTo("2");
+
+        long campoId = jdbc.queryForObject("""
+                select cc.id from campo_caso cc join pregunta p on p.id = cc.pregunta_id
+                where p.version_banco_id = ? and p.codigo = 'X03' limit 1""",
+                Long.class, versionImportada);
+        conToken(patch("/api/v1/panel/banco-preguntas/campos-caso/" + campoId + "/textos"),
+                "{\"etiqueta\":\"Nombre de la tarea (texto ≤ 40 caracteres)\"}")
+                .andExpect(status().isOk());
+        assertThat(jdbc.queryForObject("select etiqueta from campo_caso where id = ?",
+                String.class, campoId)).endsWith("(texto ≤ 40 caracteres)");
+
+        long rangoId = jdbc.queryForObject("""
+                select r.id from rango_pregunta r join pregunta p on p.id = r.pregunta_id
+                where p.version_banco_id = ? and p.codigo = 'X05' limit 1""",
+                Long.class, versionImportada);
+        conToken(patch("/api/v1/panel/banco-preguntas/rangos/" + rangoId + "/textos"),
+                "{\"condicion\":\"Seis o más personas a cargo\"}").andExpect(status().isOk());
+        assertThat(jdbc.queryForObject("select condicion from rango_pregunta where id = ?",
+                String.class, rangoId)).isEqualTo("Seis o más personas a cargo");
+        // El puntaje del tramo, que sí puntúa, sigue donde estaba
+        assertThat(jdbc.queryForObject("select puntaje from rango_pregunta where id = ?",
+                java.math.BigDecimal.class, rangoId)).isEqualByComparingTo("3");
+
+        // Y renombrar la versión: lo único que se corrige de la versión misma
+        conToken(patch("/api/v1/panel/banco-preguntas/versiones/" + versionImportada + "/etiqueta"),
+                "{\"etiqueta\":\"Banco importado v1 · Ejecutivo y Operativo\"}")
+                .andExpect(status().isOk());
+        assertThat(jdbc.queryForObject("select etiqueta from version_banco where id = ?",
+                String.class, versionImportada)).endsWith("Ejecutivo y Operativo");
     }
 
     @Test
-    @Order(6)
+    @Order(7)
     @DisplayName("Un borrador que no sirve se descarta entero y no deja huérfanas")
     void unBorradorQueNoSirveSeDescarta() throws Exception {
         long paraTirar = json.readTree(importar(bancoDePrueba(), "otro.xlsx", "EJECUCION",
@@ -249,7 +396,7 @@ public class FlujoImportadorBancoIT {
     }
 
     @Test
-    @Order(7)
+    @Order(8)
     @DisplayName("El banco v3 del cliente entra entero desde su Excel, con sus 85 preguntas")
     void elBancoRealEntraEntero() throws Exception {
         Path archivo = Path.of("docs/insumos/banco-v3-directivo.xlsx");
@@ -293,7 +440,7 @@ public class FlujoImportadorBancoIT {
      * `validarCoherencia` lo frenaba al publicar y el viaje se quedaba a medias.
      */
     @Test
-    @Order(8)
+    @Order(9)
     @DisplayName("El banco Ejecutivo, con sus fórmulas y sus tablas prestadas, llega a publicarse")
     void elBancoEjecutivoLlegaAPublicarse() throws Exception {
         Path archivo = Path.of("docs/insumos/banco-v3-ejecutivo-y-operativo.xlsx");
@@ -335,6 +482,15 @@ public class FlujoImportadorBancoIT {
 
     private int contar(String consulta) {
         return jdbc.queryForObject(consulta, Integer.class);
+    }
+
+    private org.springframework.test.web.servlet.ResultActions conToken(
+            org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder peticion,
+            String cuerpo) throws Exception {
+        return mvc.perform(peticion
+                .header("Authorization", "Bearer " + tokenEquipo)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(cuerpo));
     }
 
     private String leer(String cuerpoRespuesta, String campo) throws Exception {
