@@ -4,18 +4,21 @@ import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 import com.renaser.ai.ai_engine.ai.exception.ResourceNotFoundException;
 import com.renaser.ai.ai_engine.ai.service.ColaCalificacionIa;
+import com.renaser.ai.ai_engine.perfilintegral.dto.DtosEvaluacion.CampoCandidato;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosEvaluacion.EntregaResponse;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosEvaluacion.EvaluacionCandidato;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosEvaluacion.OpcionCandidato;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosEvaluacion.PreguntaCandidato;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosEvaluacion.Responder;
 import com.renaser.ai.ai_engine.perfilintegral.entity.Evaluacion;
+import com.renaser.ai.ai_engine.perfilintegral.entity.CampoCaso;
 import com.renaser.ai.ai_engine.perfilintegral.entity.Opcion;
 import com.renaser.ai.ai_engine.perfilintegral.entity.OrdenPregunta;
 import com.renaser.ai.ai_engine.perfilintegral.entity.PlantillaEvaluacion;
 import com.renaser.ai.ai_engine.perfilintegral.entity.Pregunta;
 import com.renaser.ai.ai_engine.perfilintegral.entity.Respuesta;
 import com.renaser.ai.ai_engine.perfilintegral.entity.VersionBanco;
+import com.renaser.ai.ai_engine.perfilintegral.repository.CampoCasoRepository;
 import com.renaser.ai.ai_engine.perfilintegral.repository.EvaluacionRepository;
 import com.renaser.ai.ai_engine.perfilintegral.repository.OpcionRepository;
 import com.renaser.ai.ai_engine.perfilintegral.repository.OrdenPreguntaRepository;
@@ -91,6 +94,7 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
     private final OpcionRepository opciones;
     private final OrdenPreguntaRepository ordenes;
     private final RespuestaRepository respuestas;
+    private final CampoCasoRepository campos;
     private final PostulacionRepository postulaciones;
     private final MaquinaEstados maquina;
     private final ServicioCalificacion calificacion;
@@ -382,6 +386,13 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
                 .collect(Collectors.toMap(Pregunta::getId, Function.identity()));
         Map<Long, List<Opcion>> opcionesPorPregunta = opciones.findByPreguntaIdIn(ids).stream()
                 .collect(Collectors.groupingBy(Opcion::getPreguntaId));
+        // Los campos de cada CD, agrupados conservando su orden. Solo orden y etiqueta
+        // viajan: la regla de validación se queda dentro, como la lógica interna.
+        Map<Long, List<CampoCandidato>> camposPorPregunta = campos
+                .findByPreguntaIdInOrderByPreguntaIdAscOrdenAsc(ids).stream()
+                .collect(Collectors.groupingBy(CampoCaso::getPreguntaId,
+                        Collectors.mapping(c -> new CampoCandidato(c.getOrden(), c.getEtiqueta()),
+                                Collectors.toList())));
         Map<Long, Respuesta> respuestaPorPregunta = respuestas
                 .findByEvaluacionId(evaluacion.getId()).stream()
                 .collect(Collectors.toMap(Respuesta::getPreguntaId, Function.identity()));
@@ -393,8 +404,9 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
             Respuesta r = respuestaPorPregunta.get(o.getPreguntaId());
             lista.add(new PreguntaCandidato(
                     p.getId(), o.getPosicion(), p.getTipo(), p.getEnunciado(), p.getSituacion(),
-                    // Solo los CD lo traen; en el resto va en nulo y el portal lo ignora.
+                    // Solo los CD los traen; en el resto van en nulo o vacío y el portal los ignora.
                     p.getCasosPedidos(),
+                    camposPorPregunta.getOrDefault(p.getId(), List.of()),
                     enSuOrden(opcionesPorPregunta.getOrDefault(p.getId(), List.of()),
                             o.getOrdenOpciones()),
                     r == null ? null : r.getTexto(),

@@ -215,6 +215,25 @@ public class FlujoEvaluacionIT {
         assertThat(primera.get("posicion").asInt()).isEqualTo(1);
         assertThat(primera.get("enunciado").asText()).isNotBlank();
 
+        // Y cada caso descompuesto llega con la etiqueta de cada campo, tantas como casillas
+        // declara. Sin ellas el portal pintaba «Campo 1 de 6» y el candidato tenía que
+        // adivinar qué dato iba en cada caja.
+        int casosVistos = 0;
+        for (JsonNode p : evaluacion.get("preguntas")) {
+            if (!"CD".equals(p.get("tipo").asText())) {
+                continue;
+            }
+            casosVistos++;
+            assertThat(p.get("campos").size())
+                    .as("campos de «%s»", p.get("enunciado").asText())
+                    .isEqualTo(p.get("casosPedidos").asInt());
+            p.get("campos").forEach(campo -> {
+                assertThat(campo.get("orden").asInt()).isPositive();
+                assertThat(campo.get("etiqueta").asText()).isNotBlank();
+            });
+        }
+        assertThat(casosVistos).as("el banco Ejecutivo trae casos descompuestos").isPositive();
+
         // El orden quedó guardado: es lo que permite reproducir el examen tal como lo vio
         Long evaluacionId = evaluacion.get("id").asLong();
         assertThat(jdbc.queryForObject(
