@@ -281,3 +281,25 @@ python3 scripts/comparar-banco-v3-con-base.py --emitir-v28   # las tuplas, si hi
 Diez enunciados no los sabe leer enteros el parser (rompen en un «·» de la línea de
 continuación, o absorberían la fórmula): su texto se decidió leyendo el PDF y vive por
 duplicado en la V28 §3 y en `ENUNCIADOS_A_MANO` del comparador, que vigila que no se separen.
+
+## El salto de página invisible · añadido el 22/08/2026
+
+Al volcar el banco a Excel, la librería se negó a escribir cinco etiquetas de campo: dentro
+del texto viajaba el salto de página del PDF (`\f`, 0x0c), invisible en pantalla desde la
+V20. Eran D41.3, D74.4, C48.3, O21.2 y O41.2 —campos de la rama suelta que cruzaban de
+página a media frase— y con ellos, diez campos con un espacio doble dejado por el mismo
+cruce (el salto de línea más la sangría de la página siguiente).
+
+Tres piezas, mismas del arreglo anterior:
+
+- `scripts/importar-banco-v3.py` vuelve el `\f` un espacio al leer el PDF (un solo punto,
+  no en cada lector) y aplana toda corrida de blancos en la rama suelta. Además avisa si
+  algún carácter de control llegara a un texto: no debería saltar nunca, está para el día
+  en que alguien cambie la extracción.
+- La **V33** limpia lo que ya estaba en la base: 14 filas de `campo_caso`, con un WHERE que
+  solo alcanza filas aún sucias (re-ejecutable, y respeta ediciones del panel).
+- `MigracionesIT` asevera desde CI que ningún texto del banco v3 trae caracteres de
+  control ni espacios dobles.
+
+Tras la V33, los 175 campos del importador y los de la base son idénticos carácter a
+carácter — ya no solo con la comparación normalizada del comparador.

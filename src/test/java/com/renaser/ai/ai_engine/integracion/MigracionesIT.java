@@ -151,4 +151,36 @@ public class MigracionesIT {
                   and """ + " " + desbalance.formatted("cc.etiqueta"), String.class);
         assertThat(campos).as("etiquetas de campo con paréntesis sin pareja").isEmpty();
     }
+
+    /**
+     * Ni caracteres de control ni espacios dobles dentro de un texto del banco v3.
+     *
+     * <p>El salto de página del PDF (0x0c) viajó invisible dentro de cinco etiquetas desde
+     * la V20 hasta que la V33 lo limpió: no se ve en pantalla, pero rompe cualquier
+     * comparación exacta y hasta la escritura a un Excel. Los espacios dobles son la otra
+     * huella del mismo accidente. El importador ya no deja pasar ninguna de las dos cosas;
+     * esto vigila que ninguna migración futura las vuelva a colar.
+     */
+    @Test
+    void losTextosDelBancoV3NoTraenBasuraInvisible() {
+        List<String> conControl = jdbc.queryForList("""
+                select p.codigo from pregunta p
+                join version_banco vb on vb.id = p.version_banco_id
+                where vb.etiqueta like 'Banco RENASER v3%'
+                  and (p.enunciado ~ '[\\x01-\\x08\\x0b\\x0c\\x0e-\\x1f]'
+                       or coalesce(p.situacion, '') ~ '[\\x01-\\x08\\x0b\\x0c\\x0e-\\x1f]')""",
+                String.class);
+        assertThat(conControl).as("enunciados con caracteres de control").isEmpty();
+
+        List<String> camposSucios = jdbc.queryForList("""
+                select p.codigo || '.' || cc.orden from campo_caso cc
+                join pregunta p on p.id = cc.pregunta_id
+                join version_banco vb on vb.id = p.version_banco_id
+                where vb.etiqueta like 'Banco RENASER v3%'
+                  and (cc.etiqueta ~ '[\\x01-\\x08\\x0b\\x0c\\x0e-\\x1f]'
+                       or cc.etiqueta ~ '  ')""", String.class);
+        assertThat(camposSucios)
+                .as("etiquetas de campo con caracteres de control o espacios dobles")
+                .isEmpty();
+    }
 }
