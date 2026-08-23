@@ -320,3 +320,17 @@ reales donde había 31.
   no debe leerlas (RF-53). La puntuación fina que describen sigue pendiente del motor.
 - `MigracionesIT` asevera desde CI que todo CD tiene tantas filas de campo como casillas
   declara, y que los multiplicados declaran el producto correcto.
+
+## La auditoría integral · añadido el 23/08/2026
+
+Primera pasada que revisa TODO contra el PDF: 190 enunciados, 244 campos, 708 opciones,
+61 rangos y 5 pares. Lo que ya estaba corregido salió limpio; lo nuevo que encontró:
+
+- **Diez opciones terminaban en el rótulo de la tabla** («… Opción Clave»): C07.a,
+  C20.b, C28.b, D15.c2, D20.a, D31.c, D38.a, D80.c, O17.c, O45.d. Las revisiones
+  anteriores cubrían enunciados y campos; las opciones nunca se habían comparado contra
+  el PDF. El importador ya salta las cabeceras dentro de una tabla, la **V35** limpió lo
+  guardado y `MigracionesIT` lo vigila desde CI.
+- Las claves de los 76 EF-4 y los 63 SJT-R coinciden una a una con el PDF; los SEC
+  cubren su orden completo; los INV/DE declaran las cuentas exactas de reales y
+  distractores; los 18 V tienen tabla, referencia o fórmula. Sin más hallazgos.

@@ -183,6 +183,13 @@ def tabla_opciones(cuerpo):
             if grupos and grupos[-1]['clave'] is not None:
                 cerrado = True
             continue
+        # El rótulo de la sub-tabla siguiente («Opción      Clave») no es texto de nadie.
+        # Sin este salto se pegaba al final de la última opción de la tabla anterior, y
+        # así llegaron a producción diez opciones terminando en «… Opción Clave».
+        if CABECERA_TABLA.match(l):
+            if grupos and grupos[-1]['clave'] is not None:
+                cerrado = True
+            continue
         m = re.match(r'\s*([a-h])\)\s*(.*)$', l)
         if m:
             grupos.append({'letra': m.group(1), 'textos': [], 'clave': None})
@@ -857,6 +864,17 @@ def main():
     if con_control:
         aviso('varios', 'caracteres de control invisibles dentro del texto: '
                         + ', '.join(con_control))
+
+    # Y ningún texto terminando en el rótulo de una tabla («… Opción Clave»): es la
+    # firma de haber absorbido la cabecera de la sub-tabla siguiente.
+    con_rotulo = [
+        f'{x["codigo"]} (opción {o.get("letra", "?")})'
+        for x in items
+        for o in x['contenido'].get('opciones') or []
+        if re.search(r'\b(?:Opci[oó]n|Clave|Valor|Puntaje|Afirmaci[oó]n)\s*$',
+                     o.get('texto') or '')]
+    if con_rotulo:
+        aviso('varios', 'texto terminando en rótulo de tabla: ' + ', '.join(con_rotulo))
 
     repes = {c for c in (x['codigo'] for x in items)
              if [y['codigo'] for y in items].count(c) > 1}

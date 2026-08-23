@@ -182,6 +182,22 @@ public class MigracionesIT {
         assertThat(camposSucios)
                 .as("etiquetas de campo con caracteres de control o espacios dobles")
                 .isEmpty();
+
+        // Y ninguna opción con basura ni terminando en el rótulo de la tabla del PDF
+        // («… Opción Clave»), que es la firma de haber absorbido la cabecera de la
+        // sub-tabla siguiente: así llegaron diez opciones hasta que la V35 las limpió.
+        List<String> opcionesSucias = jdbc.queryForList("""
+                select p.codigo || '.' || o.letra from opcion o
+                join pregunta p on p.id = o.pregunta_id
+                join version_banco vb on vb.id = p.version_banco_id
+                where vb.etiqueta like 'Banco RENASER v3%'
+                  and (o.texto ~ '[\\x01-\\x08\\x0b\\x0c\\x0e-\\x1f]'
+                       or o.texto ~ '  '
+                       or o.texto ~ '\\s(Opci[oó]n|Clave|Valor|Puntaje)\\s*$')""",
+                String.class);
+        assertThat(opcionesSucias)
+                .as("opciones con basura o rótulo de tabla pegado")
+                .isEmpty();
     }
 
     /**
