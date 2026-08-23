@@ -34,8 +34,17 @@ que volcamos** traen los encabezados en la 3 y los datos desde la 5. El lector n
 ninguna fila: busca el encabezado por su primera columna, salta siempre la guía que le
 sigue, y si hay centinela empieza después de ella —lo de en medio son los ejemplos—.
 
+Vale la **primera** centinela y solo esa. Buscar la última —que fue el primer intento—
+tenía una trampa fea: quien copiara a su hoja un bloque de la plantilla y arrastrara el
+«⬇» al medio habría perdido en silencio todo lo escrito encima, con un 201 diciendo que
+fue bien. Una segunda centinela ahora se rechaza nombrando su fila.
+
 Límite conocido: si alguien borra la centinela pero deja los ejemplos grises, entran como
 datos. Los códigos duplicados los delatan casi siempre.
+
+Y un archivo del que no sale ni una pregunta —la plantilla subida sin llenar— es un error,
+no un banco vacío: crear la versión y responder 201 sería decirle a quien sube que
+funcionó.
 
 ## Lo que la plantilla no pregunta y se deriva
 
@@ -49,8 +58,20 @@ datos. Los códigos duplicados los delatan casi siempre.
 | Qué mide | `pregunta_dimension` | Códigos o nombres del catálogo, sin distinguir mayúsculas ni acentos |
 | Pares (códigos) | `pregunta_a_id`, `pregunta_b_id` | Segunda pasada, cuando las preguntas ya tienen id |
 
-`bloque`, `es_clave`, `rangos_de_pregunta_codigo` y `formula_puntaje` no viajan en el
-Excel: quedan vacíos y se completan desde el panel si hacen falta.
+`bloque` y `es_clave` no viajan en el Excel: quedan vacíos y se completan desde el panel
+si hacen falta.
+
+## Dos columnas que la plantilla no tenía
+
+La primera versión de la plantilla no preguntaba por la fórmula de un ítem V ni por la
+tabla de tramos prestada, y eso rompía el viaje justo al final: los bancos de Supervisión
+y de Ejecutivo se importaban bien pero **no se podían publicar**, porque
+`validarCoherencia` exige que todo ítem V tenga tramos, fórmula o referencia — y seis
+ítems (O02, O07 con fórmula; C36, C54, O32, O48 apuntando a D57 y D84) no tenían ninguna.
+
+La hoja Preguntas suma por eso **«Fórmula de puntaje (solo V)»** y **«Usa los rangos de
+(solo V)»**. Los tres archivos volcados se regeneraron con esos valores, y el flujo
+importar → publicar está probado de punta a punta con el banco Ejecutivo real.
 
 ## La edición, y dónde está la frontera
 

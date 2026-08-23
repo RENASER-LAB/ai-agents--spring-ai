@@ -78,9 +78,9 @@ class ServicioImportacionBancoImplTest {
     private static BancoLeido leidoSano() {
         return new BancoLeido(
                 List.of(new FilaPregunta(5, "X01", "CD", "Tu caso. (1 campo)", null,
-                                (short) 1, false, List.of("INT"), (short) 1, "nota"),
+                                (short) 1, false, List.of("INT"), (short) 1, null, null, "nota"),
                         new FilaPregunta(6, "X02", "PC", "¿Autorizas?", null,
-                                (short) 0, true, List.of(), null, null)),
+                                (short) 0, true, List.of(), null, null, null, null)),
                 List.of(new FilaOpcion(5, "X02", "Sí", null, null, false, null),
                         new FilaOpcion(6, "X02", "No", null, null, false, null)),
                 List.of(new FilaCampoCaso(5, "X01", "Nombre de la tarea", null)),

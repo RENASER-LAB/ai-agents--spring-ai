@@ -30,6 +30,10 @@ public final class DtosImportacionBanco {
             /** Los códigos de dimensión ya resueltos contra el catálogo («Qué mide»). */
             List<String> dimensiones,
             Short casosPedidos,
+            /** Solo V: la fórmula escrita, cuando el ítem no se puntúa por tramos. */
+            String formulaPuntaje,
+            /** Solo V: el código del ítem cuya tabla de tramos se reutiliza. */
+            String rangosDePreguntaCodigo,
             String logicaInterna) {}
 
     /** Una fila de la hoja Opciones. La letra no viene: se sintetiza a, b, c… al insertar. */

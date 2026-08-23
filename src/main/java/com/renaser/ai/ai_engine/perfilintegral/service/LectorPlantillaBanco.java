@@ -95,16 +95,23 @@ public class LectorPlantillaBanco {
         }
 
         private BancoLeido leer(InputStream archivo) {
-            try (XSSFWorkbook libro = new XSSFWorkbook(archivo)) {
-                return leerLibro(libro);
+            XSSFWorkbook libro;
+            try {
+                // Solo la apertura va dentro del try: POI lanza de todo ante un archivo
+                // corrupto o que no es un xlsx (un .docx renombrado), y eso es un error
+                // del archivo, no del servidor. Envolver también la lectura escondería
+                // un fallo nuestro detrás de «revisa tu archivo», que está bien.
+                libro = new XSSFWorkbook(archivo);
             } catch (Exception e) {
-                // POI lanza de todo ante un archivo corrupto o que no es un xlsx de
-                // verdad (un .docx renombrado, por ejemplo). Es un error del archivo,
-                // no del servidor: a la lista, nunca un 500.
                 error("(archivo)", 0, "no se pudo leer como .xlsx: ¿es la plantilla "
                         + "del banco guardada desde Excel o LibreOffice?");
                 return new BancoLeido(List.of(), List.of(), List.of(), List.of(),
                         List.of(), List.copyOf(errores));
+            }
+            try (libro) {
+                return leerLibro(libro);
+            } catch (java.io.IOException e) {
+                throw new IllegalStateException("No se pudo cerrar el libro leído", e);
             }
         }
 
@@ -173,6 +180,15 @@ public class LectorPlantillaBanco {
                 }
             }
 
+            // Un archivo del que no sale ni una pregunta es la plantilla sin llenar, o
+            // una hoja con los ejemplos borrados y nada escrito. Crear un borrador vacío
+            // y responder 201 sería decirle a quien sube que fue bien.
+            if (preguntas.isEmpty() && errores.isEmpty()) {
+                error(HOJA_PREGUNTAS, 0, "la hoja «Preguntas» no tiene ninguna pregunta "
+                        + "debajo de la fila de ejemplos: ¿guardaste el archivo con lo "
+                        + "tuyo escrito?");
+            }
+
             comprobarCruces(preguntas, opciones, filaPorCodigo, campos);
 
             return new BancoLeido(List.copyOf(preguntas), List.copyOf(opciones),
@@ -189,6 +205,11 @@ public class LectorPlantillaBanco {
          * salta la fila de guía que siempre la sigue, y si hay una fila centinela «⬇»
          * empieza después de ella: lo de en medio son los ejemplos grises. Las filas
          * totalmente vacías (la zona amarilla tiene estilo pero no valores) se saltan.
+         *
+         * <p>Vale la <b>primera</b> centinela y solo esa. Buscar la última sería peor que
+         * inútil: quien copie a su hoja un bloque de la plantilla y arrastre el «⬇» al
+         * medio perdería en silencio todo lo escrito encima, con un 201 que dice que fue
+         * bien. Una segunda centinela es señal de eso mismo y se rechaza con su fila.
          */
         private List<Row> filasDeDatos(Sheet hoja, String nombre) {
             int filaEncabezado = -1;
@@ -207,9 +228,9 @@ public class LectorPlantillaBanco {
 
             int desde = filaEncabezado + 2;   // encabezado + fila de guía
             for (int i = desde; i <= hoja.getLastRowNum(); i++) {
-                String a = textoDe(celda(hoja.getRow(i), 0));
-                if (a != null && a.startsWith("⬇")) {
+                if (esCentinela(hoja.getRow(i))) {
                     desde = i + 1;
+                    break;
                 }
             }
 
@@ -219,6 +240,12 @@ public class LectorPlantillaBanco {
                 if (fila == null || filaVacia(fila)) {
                     continue;
                 }
+                if (esCentinela(fila)) {
+                    error(nombre, i + 1, "aquí hay otra fila «⬇ Escribe aquí lo tuyo…» "
+                            + "en medio de los datos: bórrala, o lo que está encima de "
+                            + "ella se quedaría fuera sin que nadie lo note");
+                    continue;
+                }
                 if (textoDe(celda(fila, 0)) == null) {
                     error(nombre, i + 1, "falta el código en la primera columna");
                     continue;
@@ -226,6 +253,11 @@ public class LectorPlantillaBanco {
                 filas.add(fila);
             }
             return filas;
+        }
+
+        private boolean esCentinela(Row fila) {
+            String a = textoDe(celda(fila, 0));
+            return a != null && a.startsWith("⬇");
         }
 
         // ============ Una fila de cada hoja ============
@@ -242,6 +274,11 @@ public class LectorPlantillaBanco {
             String queMide = textoDe(celda(fila, 6));
             Integer nCampos = enteroDe(HOJA_PREGUNTAS, n, "N° de campos", celda(fila, 7));
             String notaInterna = textoDe(celda(fila, 8));
+            // Las dos últimas son para los ítems V que no se puntúan por tramos: o traen
+            // la fórmula escrita, o remiten a la tabla de otro ítem (C36 usa la de D57).
+            // Sin ellas, un banco con ítems así se importa pero no se puede publicar.
+            String formula = textoDe(celda(fila, 9));
+            String rangosDe = textoDe(celda(fila, 10));
 
             if (tipoPorCodigo.containsKey(codigo)) {
                 error(HOJA_PREGUNTAS, n, "el código " + codigo + " ya apareció en la fila "
@@ -270,6 +307,16 @@ public class LectorPlantillaBanco {
                 error(HOJA_PREGUNTAS, n, "un CD declara cuántos campos tiene (columna H)");
                 bien = false;
             }
+            if ((formula != null || rangosDe != null) && !"V".equals(tipo)) {
+                error(HOJA_PREGUNTAS, n, "la fórmula y la tabla prestada son solo del "
+                        + "tipo V (dato verificable), y " + codigo + " es " + tipo);
+                bien = false;
+            }
+            if (formula != null && rangosDe != null) {
+                error(HOJA_PREGUNTAS, n, "elige una: o la fórmula escrita, o la tabla de "
+                        + "otra pregunta, no las dos");
+                bien = false;
+            }
 
             List<String> dimensiones = dimensionesDe(n, queMide);
 
@@ -284,7 +331,8 @@ public class LectorPlantillaBanco {
             }
             return new FilaPregunta(n, codigo, tipo, enunciado, situacion,
                     peso.shortValue(), eliminatoria, dimensiones,
-                    nCampos == null ? null : nCampos.shortValue(), notaInterna);
+                    nCampos == null ? null : nCampos.shortValue(),
+                    formula, rangosDe, notaInterna);
         }
 
         private FilaOpcion leerOpcion(Row fila, Map<String, String> tipoPorCodigo) {

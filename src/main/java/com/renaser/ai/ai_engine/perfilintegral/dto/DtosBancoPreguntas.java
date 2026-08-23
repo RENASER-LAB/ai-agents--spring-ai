@@ -195,8 +195,15 @@ public final class DtosBancoPreguntas {
             String etiqueta,
             String validacion) {}
 
+    // ⚠ La condición de un tramo («Directos 5–20 y niveles ≥ 2») es texto para el ojo
+    // humano mientras el motor no sepa puntuar los ítems V: hoy nadie la lee para
+    // calcular nada (ServicioCalificacionImpl los deja sin puntuar a propósito). El día
+    // que ese motor aterrice y empiece a interpretarla, esta corrección deja de ser
+    // editorial y pasa a mover la nota: entonces hay que sacarla de aquí.
     public record CorregirTextoRango(@NotBlank String condicion) {}
 
+    // ⚠ Lo mismo con la condición de un par: describe la contradicción en palabras y
+    // hoy nada la interpreta. Su penalización, que sí puntúa, no viaja en este record.
     public record CorregirTextoPar(@NotBlank String condicion) {}
 
     public record CorregirEtiquetaVersion(@NotBlank String etiqueta) {}

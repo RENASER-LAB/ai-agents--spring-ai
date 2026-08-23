@@ -337,5 +337,62 @@ class LectorPlantillaBancoTest {
             assertThat(mensajes(leido)).singleElement()
                     .satisfies(m -> assertThat(m).contains(".xlsx"));
         }
+
+        @Test
+        @DisplayName("un «⬇» en medio de los datos se rechaza: si no, se tragaría lo de encima")
+        void unCentinelaEnMedioSeRechaza() {
+            XSSFWorkbook libro = new XSSFWorkbook();
+            hojaConCentinela(libro, "Preguntas", "Código",
+                    new String[][]{{"D51", "EF-4", "Ejemplo gris.", null, "1", "no"}},
+                    new String[][]{
+                            {"Z01", "PC", "La primera.", null, "0", "no"},
+                            {"⬇  otra centinela copiada sin querer"},
+                            {"Z02", "PC", "La segunda.", null, "0", "no"},
+                    });
+            BancoLeido leido = leer(bytesDe(libro));
+
+            // Lo escrito ANTES del intruso sigue ahí: nada se pierde en silencio
+            assertThat(leido.preguntas()).extracting("codigo").containsExactly("Z01", "Z02");
+            assertThat(mensajes(leido)).singleElement()
+                    .satisfies(m -> assertThat(m).contains("en medio de los datos"));
+        }
+
+        @Test
+        @DisplayName("la plantilla sin llenar no crea un banco vacío: lo dice")
+        void laPlantillaSinLlenarNoCreaUnBancoVacio() {
+            XSSFWorkbook libro = new XSSFWorkbook();
+            hojaConCentinela(libro, "Preguntas", "Código",
+                    new String[][]{{"D51", "EF-4", "Solo el ejemplo gris.", null, "1", "no"}},
+                    new String[][]{});
+            BancoLeido leido = leer(bytesDe(libro));
+
+            assertThat(leido.preguntas()).isEmpty();
+            assertThat(mensajes(leido)).singleElement()
+                    .satisfies(m -> assertThat(m).contains("no tiene ninguna pregunta"));
+        }
+
+        @Test
+        @DisplayName("la fórmula y la tabla prestada son solo de los ítems V, y nunca las dos")
+        void laFormulaYLaTablaPrestadaSonSoloDeLosV() {
+            XSSFWorkbook libro = new XSSFWorkbook();
+            hojaLlena(libro, "Preguntas", "Código", new String[][]{
+                    {"X01", "V", "Con fórmula.", null, "1", "no", null, null, null,
+                            "(campos llenos ÷ 5) × 3"},
+                    {"X02", "V", "Con tabla prestada.", null, "1", "no", null, null, null,
+                            null, "X01"},
+                    {"X03", "V", "Con las dos cosas.", null, "1", "no", null, null, null,
+                            "una fórmula", "X01"},
+                    {"X04", "EF-4", "Con fórmula sin ser V.", null, "1", "no", null, null,
+                            null, "una fórmula"},
+            });
+            BancoLeido leido = leer(bytesDe(libro));
+
+            assertThat(leido.preguntas()).extracting("codigo").containsExactly("X01", "X02");
+            assertThat(leido.preguntas().get(0).formulaPuntaje()).isEqualTo("(campos llenos ÷ 5) × 3");
+            assertThat(leido.preguntas().get(1).rangosDePreguntaCodigo()).isEqualTo("X01");
+            assertThat(mensajes(leido))
+                    .anySatisfy(m -> assertThat(m).contains("elige una"))
+                    .anySatisfy(m -> assertThat(m).contains("solo del tipo V"));
+        }
     }
 }

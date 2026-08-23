@@ -286,6 +286,40 @@ public class FlujoImportadorBancoIT {
                 .isEqualTo("Indicador 1 · Nombre (texto ≤ 40 car.)");
     }
 
+    /**
+     * El banco Ejecutivo tiene cuatro ítems V que no se puntúan por tramos: dos con la
+     * fórmula escrita (O02, O07) y dos que usan la tabla de otro ítem (O32→D57,
+     * O48→D84). Sin columnas para eso en la plantilla, el archivo se importaba pero
+     * `validarCoherencia` lo frenaba al publicar y el viaje se quedaba a medias.
+     */
+    @Test
+    @Order(8)
+    @DisplayName("El banco Ejecutivo, con sus fórmulas y sus tablas prestadas, llega a publicarse")
+    void elBancoEjecutivoLlegaAPublicarse() throws Exception {
+        Path archivo = Path.of("docs/insumos/banco-v3-ejecutivo-y-operativo.xlsx");
+        long version = json.readTree(importar(Files.readAllBytes(archivo),
+                        archivo.getFileName().toString(), "EJECUCION",
+                        "Banco RENASER v3 desde Excel · Ejecutivo")
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString())
+                .get("versionBancoId").asLong();
+
+        assertThat(jdbc.queryForObject("""
+                select formula_puntaje from pregunta
+                where version_banco_id = ? and codigo = 'O02'""", String.class, version))
+                .isEqualTo("(campos llenos ÷ 5) × 3");
+        assertThat(jdbc.queryForObject("""
+                select rangos_de_pregunta_codigo from pregunta
+                where version_banco_id = ? and codigo = 'O32'""", String.class, version))
+                .isEqualTo("D57");
+
+        mvc.perform(post("/api/v1/panel/banco-preguntas/versiones/" + version + "/publicacion")
+                        .header("Authorization", "Bearer " + tokenEquipo))
+                .andExpect(status().isOk());
+        assertThat(jdbc.queryForObject("select estado from version_banco where id = ?",
+                String.class, version)).isEqualTo("PUBLICADA");
+    }
+
     // ============ Helpers ============
 
     private org.springframework.test.web.servlet.ResultActions importar(

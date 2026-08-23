@@ -49,6 +49,11 @@ import java.util.Map;
  * sin ganar nada — lo que esas guardas comprueban ya lo comprobó el lector sobre el
  * archivo completo. Aquí se inserta con {@code saveAll} por familia y se deja UNA fila
  * de auditoría con el resumen: quién importó qué archivo y cuánto trajo.
+ *
+ * <p>Que conste lo que {@code saveAll} <b>no</b> hace: agrupar los INSERT. Los ids son
+ * IDENTITY y con eso Hibernate desactiva el batching, así que siguen siendo tantas
+ * sentencias como filas. Lo que se ahorra son las guardas repetidas y las 600 filas de
+ * auditoría, y eso ya vale el camino aparte.
  */
 @Service
 @RequiredArgsConstructor
@@ -132,6 +137,8 @@ public class ServicioImportacionBancoImpl implements ServicioImportacionBanco {
                     .esClave(false)
                     .esEliminatorio(p.esEliminatoria())
                     .casosPedidos(p.casosPedidos())
+                    .formulaPuntaje(p.formulaPuntaje())
+                    .rangosDePreguntaCodigo(p.rangosDePreguntaCodigo())
                     .creadoEn(ahora)
                     .build());
         }

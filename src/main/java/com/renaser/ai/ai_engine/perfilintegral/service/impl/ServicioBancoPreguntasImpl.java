@@ -544,9 +544,12 @@ public class ServicioBancoPreguntasImpl implements ServicioBancoPreguntas {
      *
      * <p>Es la única cosa del banco que se borra, y puede serlo porque un BORRADOR nunca
      * llegó a nadie: solo una versión PUBLICADA se le asigna a un candidato. Lo que el
-     * append-only protege es lo que alguien pudo ver, y aquí no hay nada de eso. Aun así
-     * se comprueba que ninguna evaluación lo apunte antes de tocarlo: si algún día algo
-     * cambiara, mejor un 409 que una FK rota.
+     * append-only protege es lo que alguien pudo ver, y aquí no hay nada de eso.
+     *
+     * <p>Aun así se mira antes si alguna evaluación sin empezar lo apunta: si algún día
+     * algo cambiara, mejor un 409 que una FK rota. La comprobación no cubre las ya
+     * iniciadas —no hay consulta para eso y en un borrador no pueden existir—; si las
+     * hubiera, la FK sería la que hablase.
      */
     @Override
     @Transactional
