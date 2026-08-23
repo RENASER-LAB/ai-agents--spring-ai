@@ -1,7 +1,9 @@
 package com.renaser.ai.ai_engine.prueba.service;
 
 import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.CalificacionIaEncolada;
+import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.DefinirPlazoPrueba;
 import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.NotaCriterioResponse;
+import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.PlazoPrueba;
 import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.PonerNotaCriterio;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
 
@@ -51,4 +53,20 @@ public interface ServicioCalificacionPrueba {
      * @throws IllegalStateException si falta la nota de algún criterio de la rúbrica
      */
     BigDecimal calcularNotaEtapa(ContextoUsuario quien, Long postulacionId);
+
+    /**
+     * Le fija a UN candidato la fecha en que se le cierra la prueba.
+     *
+     * <p>Hasta ahora el plazo solo se podía decir en la plantilla, en días, y contados desde
+     * que cada uno empieza: dos personas invitadas el mismo día terminaban con dos fechas
+     * distintas, y no había forma de decir «todos hasta el domingo». Esto la fija.
+     *
+     * <p>Se puede poner <b>antes o después</b> de que empiece. Si se pone antes, empezar ya
+     * no la recalcula — la fecha puesta a mano manda—; si se pone después, reemplaza a la que
+     * el reloj había calculado, que es como se le dan más horas a quien las pide.
+     *
+     * @throws IllegalStateException si la prueba ya está entregada: mover el plazo de algo
+     *                               que ya se entregó no cambia nada y engaña al que lo mira
+     */
+    PlazoPrueba definirPlazo(ContextoUsuario quien, Long postulacionId, DefinirPlazoPrueba datos);
 }

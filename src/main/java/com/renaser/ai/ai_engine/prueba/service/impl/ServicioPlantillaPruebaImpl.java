@@ -270,9 +270,22 @@ public class ServicioPlantillaPruebaImpl implements ServicioPlantillaPrueba {
     }
 
     // RF-83: entre 8 y 10 universales, entre 3 y 5 específicas. No hay tope de previas.
+    //
+    // La cuota rige solo cuando la prueba pide entregables: sus preguntas existen para que
+    // el candidato defienda lo que produjo. Una versión sin entregables es un cuestionario
+    // —las preguntas SON la prueba, como el técnico de Administrador— y ahí la cuota no
+    // tiene sentido; basta con que haya al menos una pregunta que responder.
     private void validarCuotaPreguntas(Long versionId) {
         List<Long> ids = preguntasElegidas.findByVersionPlantillaPruebaIdOrderByOrden(versionId).stream()
                 .map(PreguntaVersionPlantilla::getPreguntaPruebaId).toList();
+
+        if (entregablesRequeridos.findByVersionPlantillaPruebaIdOrderByOrden(versionId).isEmpty()) {
+            if (ids.isEmpty()) {
+                throw new IllegalArgumentException(
+                        "Una prueba sin entregables es un cuestionario: necesita al menos una pregunta");
+            }
+            return;
+        }
         Map<String, Long> porTipo = preguntasCatalogo.findByIdIn(ids).stream()
                 .collect(java.util.stream.Collectors.groupingBy(PreguntaPrueba::getTipo, java.util.stream.Collectors.counting()));
 

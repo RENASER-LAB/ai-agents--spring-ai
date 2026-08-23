@@ -15,7 +15,14 @@ import java.util.UUID;
 public interface ServicioPrueba {
 
     /** La crea el sistema al confirmar el avance a PRUEBA_TURNO_CANDIDATO. No arranca el reloj. */
-    Long crearAlEntrar(Long organizacionId, Long postulacionId, Long versionPlantillaPruebaId);
+    /**
+     * Le crea el intento al candidato que entra en su turno de la prueba.
+     *
+     * @param cierraEn cuándo cierra la prueba de su vacante, o {@code null} para contar los
+     *                 días de la plantilla desde que empiece (V32)
+     */
+    Long crearAlEntrar(Long organizacionId, Long postulacionId, Long versionPlantillaPruebaId,
+                       java.time.Instant cierraEn);
 
     MiPrueba ver(ContextoUsuario quien, UUID uuidPostulacion);
 

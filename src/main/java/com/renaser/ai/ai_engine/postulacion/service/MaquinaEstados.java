@@ -8,6 +8,8 @@ import com.renaser.ai.ai_engine.postulacion.repository.PostulacionRepository;
 import com.renaser.ai.ai_engine.postulacion.repository.TransicionEstadoRepository;
 
 import com.renaser.ai.ai_engine.auditoria.service.ServicioAuditoria;
+import com.renaser.ai.ai_engine.notificacion.entity.PlantillaCorreoVacante;
+import com.renaser.ai.ai_engine.notificacion.repository.PlantillaCorreoVacanteRepository;
 import com.renaser.ai.ai_engine.notificacion.service.DireccionDelCandidato;
 import com.renaser.ai.ai_engine.postulacion.service.ServicioEnlaceAcceso;
 import com.renaser.ai.ai_engine.prueba.repository.VersionPlantillaPruebaRepository;
@@ -54,6 +56,7 @@ public class MaquinaEstados {
     private final ServicioCorreo correo;
     private final DireccionDelCandidato direcciones;
     private final ServicioEnlaceAcceso enlaces;
+    private final PlantillaCorreoVacanteRepository plantillasPorVacante;
     private final VersionPlantillaPruebaRepository versionesDePrueba;
     private final ServicioParametros parametros;
 
@@ -194,6 +197,23 @@ public class MaquinaEstados {
         avisarAlCandidato(postulacion, nuevo, motivoCierre);
     }
 
+    /**
+     * El texto que usa esta vacante para este aviso, o el de siempre.
+     *
+     * <p>No comprueba que la plantilla elegida exista: eso se valida al configurarla, y si
+     * aun así faltara, {@code ServicioCorreo} lo anota y la postulación sigue — que es lo
+     * mismo que ya hace cuando falta cualquier plantilla. Un aviso perdido es malo; frenar
+     * una transición por un texto es peor.
+     */
+    private String plantillaDeLaVacante(Long vacanteId, String porDefecto) {
+        if (vacanteId == null) {
+            return porDefecto;
+        }
+        return plantillasPorVacante.findByVacanteIdAndAvisoCodigo(vacanteId, porDefecto)
+                .map(PlantillaCorreoVacante::getPlantillaCodigo)
+                .orElse(porDefecto);
+    }
+
     private void avisarAlCandidato(Postulacion postulacion, EstadoPostulacion nuevo, String motivoCierre) {
         String plantilla;
         if ("NO_CONTINUA".equals(nuevo.getCodigo())) {
@@ -212,6 +232,16 @@ public class MaquinaEstados {
         } else {
             return;
         }
+
+        // Y si ESTA vacante eligió otro texto para este aviso, sale el suyo. Sin fila, el de
+        // siempre: una plantilla es una por organización, y hasta que existió esto cambiar el
+        // texto de una convocatoria se lo cambiaba a todas (V31).
+        //
+        // Se guardan las DOS: `plantilla` sigue siendo el aviso que toca —de él dependen las
+        // variables que hay que rellenar— y `plantillaAUsar` es el texto que sale. Mezclarlas
+        // costó un correo con «{{plazo}}» y «{{whatsapp}}» a la vista: al sustituir el código
+        // antes de mirarlo, la prueba dejaba de reconocerse como tal.
+        String plantillaAUsar = plantillaDeLaVacante(postulacion.getVacanteId(), plantilla);
 
         Usuario usuario = usuarios.findById(postulacion.getUsuarioId()).orElse(null);
         if (usuario == null) return;
@@ -251,11 +281,14 @@ public class MaquinaEstados {
                 "enlace", enlace,
                 "codigo", String.valueOf(postulacion.getUuid())));
 
+        // Se mira el aviso que TOCABA, no el texto elegido: lo que decide qué variables hay
+        // que rellenar es el momento del recorrido, no cómo se llame la plantilla.
         if ("PRUEBA_DISPONIBLE".equals(plantilla)) {
             variables.putAll(loDeLaPrueba(postulacion));
         }
 
-        correo.enviar(postulacion.getOrganizacionId(), usuario.getId(), destino, plantilla, variables);
+        correo.enviar(postulacion.getOrganizacionId(), usuario.getId(), destino,
+                plantillaAUsar, variables);
     }
 
     /**

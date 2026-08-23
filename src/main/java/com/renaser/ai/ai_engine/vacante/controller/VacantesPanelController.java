@@ -87,6 +87,61 @@ public class VacantesPanelController {
         servicio.asignarPlantillaPrueba(permisos.actual(), id, datos.versionPlantillaPruebaId());
     }
 
+    @PostMapping("/vacantes/{id}/aplicacion-evaluacion")
+    @PreAuthorize("@permisos.tiene('elegir_plantilla_evaluacion')")
+    @Operation(summary = "Encender o apagar la evaluación del banco en esta vacante. Apagada, "
+            + "quien postule va directo a la bandeja del equipo y su única evaluación es la prueba")
+    public void definirAplicacionEvaluacion(@PathVariable Long id,
+                                            @Valid @RequestBody AplicarEvaluacion datos) {
+        servicio.definirAplicacionEvaluacion(permisos.actual(), id, datos.aplica());
+    }
+
+    @PostMapping("/vacantes/{id}/version-pesos")
+    @PreAuthorize("@permisos.tiene('publicar_version_pesos')")
+    @Operation(summary = "Elegir qué versión de pesos rige la decisión de esta vacante. "
+            + "No recalcula nada hacia atrás")
+    public void asignarVersionPesos(@PathVariable Long id,
+                                    @Valid @RequestBody AsignarVersionPesos datos) {
+        servicio.asignarVersionPesos(permisos.actual(), id, datos.versionPesosId());
+    }
+
+    @PostMapping("/vacantes/{id}/cierre-prueba")
+    @PreAuthorize("@permisos.tiene('elegir_plantilla_prueba')")
+    @Operation(summary = "Fijar cuándo cierra la prueba de esta vacante, para todos. Mueve "
+            + "también los intentos ya abiertos, salvo los de quien tenga fecha propia. "
+            + "Con «cierraEn» vacío se quita y se vuelven a contar los días de la plantilla")
+    public CierrePruebaResponse definirCierrePrueba(@PathVariable Long id,
+                                                    @Valid @RequestBody DefinirCierrePrueba datos) {
+        return servicio.definirCierrePrueba(permisos.actual(), id, datos);
+    }
+
+    // ---------- Los textos de correo de esta vacante ----------
+
+    @GetMapping("/vacantes/{id}/plantillas-correo")
+    @PreAuthorize("@permisos.tiene('ver_vacantes')")
+    @Operation(summary = "Los avisos que esta vacante manda con un texto propio. Vacío "
+            + "significa que usa los de siempre")
+    public List<PlantillaCorreoDeVacante> plantillasCorreo(@PathVariable Long id) {
+        return servicio.plantillasCorreo(permisos.actual(), id);
+    }
+
+    @PostMapping("/vacantes/{id}/plantillas-correo")
+    @PreAuthorize("@permisos.tiene('editar_textos_correo')")
+    @Operation(summary = "Hacer que esta vacante mande otro texto en lugar del aviso que le "
+            + "tocaba. Sin esto, una plantilla es una para toda la organización y cambiarla "
+            + "se la cambia a todas las convocatorias")
+    public void asignarPlantillaCorreo(@PathVariable Long id,
+                                       @Valid @RequestBody AsignarPlantillaCorreo datos) {
+        servicio.asignarPlantillaCorreo(permisos.actual(), id, datos);
+    }
+
+    @DeleteMapping("/vacantes/{id}/plantillas-correo/{avisoCodigo}")
+    @PreAuthorize("@permisos.tiene('editar_textos_correo')")
+    @Operation(summary = "Devolver ese aviso al texto por defecto")
+    public void quitarPlantillaCorreo(@PathVariable Long id, @PathVariable String avisoCodigo) {
+        servicio.quitarPlantillaCorreo(permisos.actual(), id, avisoCodigo);
+    }
+
     @PostMapping("/vacantes/{id}/publicacion")
     @PreAuthorize("@permisos.tiene('publicar_vacante')")
     @Operation(summary = "Publicar: la vacante aparece en el portal")

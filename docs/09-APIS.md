@@ -114,6 +114,11 @@ la postulación en el acto (`NO_CONTINUA`), con la regla exacta escrita en su hi
 | GET/POST `/vacantes/{id}/requisitos` · DELETE `/{requisitoId}` | Los requisitos indispensables. No se borran: se desactivan | `definir_requisitos_objetivos` |
 | POST `/vacantes/{id}/plantilla-evaluacion` | Qué evaluación responderá quien postule. **Hace falta antes de publicar** | `elegir_plantilla_evaluacion` |
 | POST `/vacantes/{id}/plantilla-prueba` | Qué prueba del puesto rendirá quien llegue a esa etapa. **Hace falta antes de publicar** | `elegir_plantilla_prueba` |
+| POST `/vacantes/{id}/aplicacion-evaluacion` | Encender o apagar la evaluación del banco en esta vacante. Apagada, quien postule cae directo en la bandeja del equipo y su única evaluación es la prueba; publicar deja de exigir plantilla de evaluación | `elegir_plantilla_evaluacion` |
+| POST `/vacantes/{id}/version-pesos` | Qué versión de pesos (publicada) rige la decisión de esta vacante. No recalcula nada hacia atrás | `publicar_version_pesos` |
+| POST `/vacantes/{id}/cierre-prueba` | Fijar cuándo cierra la prueba de esta vacante, para todos. **Mueve también los intentos ya abiertos**, salvo los de quien tenga fecha propia. Con `cierraEn` vacío se quita y se vuelven a contar los días de la plantilla | `elegir_plantilla_prueba` |
+| GET `/vacantes/{id}/plantillas-correo` | Qué avisos manda esta vacante con texto propio. Vacío = los de siempre | `ver_vacantes` |
+| POST `/vacantes/{id}/plantillas-correo` · DELETE `/{avisoCodigo}` | Hacer que esta vacante mande otro texto en lugar del aviso que le tocaba, y devolverlo al de siempre. **Una plantilla es una por organización**: sin esto, cambiar el texto de una convocatoria se lo cambia a todas | `editar_textos_correo` |
 | GET/POST `/vacantes/{id}/barreras-criticas` | Las capacidades que ningún promedio alto compensa | `definir_barreras_criticas` |
 | POST `/vacantes/{id}/publicacion` | Publicar: aparece en el portal | `publicar_vacante` |
 | POST `/vacantes/{id}/cierre` | Cerrar: frena postulaciones nuevas, **no arrastra las que van en marcha** | `cerrar_vacante` |
@@ -146,7 +151,8 @@ la postulación en el acto (`NO_CONTINUA`), con la regla exacta escrita en su hi
 | Método y ruta | Qué hace | Permiso |
 |---|---|---|
 | POST `/plantillas-prueba` · `/{id}/versiones` | Crear la plantilla y una versión en borrador | `editar_plantillas_prueba` |
-| POST `/plantillas-prueba/versiones/{id}/publicacion` | Publicar: exige 8-10 preguntas universales, 3-5 específicas, y la rúbrica sumando 100 | `editar_plantillas_prueba` |
+| POST `/plantillas-prueba/versiones/{id}/publicacion` | Publicar: exige 8-10 preguntas universales, 3-5 específicas, y la rúbrica sumando 100. **Una versión sin entregables es un cuestionario**: la cuota no rige y basta con una pregunta | `editar_plantillas_prueba` |
+| POST `/postulaciones/{id}/prueba/plazo` | Fijarle a ESE candidato su fecha de cierre, normalmente para darle más horas. **Queda marcada como suya**: mover después la fecha de la vacante no se la toca. Antes de empezar, la fecha puesta manda sobre el cálculo por días | `mover_postulacion` |
 | POST `/postulaciones/{id}/prueba/criterios/{criterioId}/nota` | Poner la nota de un criterio, con explicación obligatoria | `ajustar_nota` |
 | POST `/postulaciones/{id}/prueba/calificacion` | Ponderar las notas ya puestas. Exige que estén todos los criterios | `ajustar_nota` |
 

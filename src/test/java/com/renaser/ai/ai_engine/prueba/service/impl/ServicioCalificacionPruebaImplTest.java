@@ -9,6 +9,8 @@ import com.renaser.ai.ai_engine.perfilintegral.repository.NotaEtapaRepository;
 import com.renaser.ai.ai_engine.pesos.repository.VersionPesosRepository;
 import com.renaser.ai.ai_engine.postulacion.entity.Postulacion;
 import com.renaser.ai.ai_engine.postulacion.repository.PostulacionRepository;
+import com.renaser.ai.ai_engine.auditoria.service.ServicioAuditoria;
+import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.DefinirPlazoPrueba;
 import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.CalificacionIaEncolada;
 import com.renaser.ai.ai_engine.prueba.entity.IntentoPrueba;
 import com.renaser.ai.ai_engine.prueba.repository.IntentoPruebaRepository;
@@ -34,6 +36,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -80,13 +83,14 @@ class ServicioCalificacionPruebaImplTest {
     @Mock private VersionPesosRepository versionesPesos;
     @Mock private ColaCalificacionIa cola;
     @Mock private Permisos permisos;
+    @Mock private ServicioAuditoria auditoria;
 
     private ServicioCalificacionPruebaImpl servicio;
 
     @BeforeEach
     void crearElServicio() {
         servicio = new ServicioCalificacionPruebaImpl(postulaciones, vacantes, intentos, criterios,
-                notasCriterio, notasEtapa, versionesPesos, cola, permisos);
+                notasCriterio, notasEtapa, versionesPesos, cola, permisos, auditoria);
     }
 
     // ============ Quién puede pedirlo ============
@@ -254,6 +258,70 @@ class ServicioCalificacionPruebaImplTest {
                         .versionPlantillaPruebaId(VERSION_PLANTILLA)
                         .iniciadoEn(Instant.now()).entregadoEn(entregadoEn)
                         .build()));
+    }
+
+    // ============ La fecha de cierre de UN candidato ============
+
+    @Test
+    @DisplayName("le fija la fecha y deja escrito de qué fecha venía")
+    void fijaLaFechaYAudita() {
+        Instant antes = Instant.parse("2026-08-29T21:00:00Z");
+        Instant nueva = Instant.parse("2026-08-24T05:00:00Z");
+        when(postulaciones.findByIdAndOrganizacionId(POSTULACION, ORGANIZACION))
+                .thenReturn(Optional.of(Postulacion.builder()
+                        .id(POSTULACION).organizacionId(ORGANIZACION).vacanteId(VACANTE).build()));
+        when(permisos.alcanceDe("mover_postulacion"))
+                .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.TODO, USUARIO));
+        IntentoPrueba intento = IntentoPrueba.builder()
+                .id(9L).postulacionId(POSTULACION).versionPlantillaPruebaId(VERSION_PLANTILLA)
+                .iniciadoEn(Instant.now()).venceEn(antes)
+                .build();
+        when(intentos.findByPostulacionId(POSTULACION)).thenReturn(Optional.of(intento));
+
+        var salida = servicio.definirPlazo(QUIEN, POSTULACION,
+                new DefinirPlazoPrueba(nueva, "Todos cierran el domingo"));
+
+        assertThat(intento.getVenceEn()).isEqualTo(nueva);
+        assertThat(salida.yaEmpezo()).isTrue();
+        verify(intentos).save(intento);
+        verify(auditoria).registrar(ORGANIZACION, QUIEN, "definir_plazo_prueba",
+                "intento_prueba", 9L, Map.of("venceEn", antes.toString()),
+                Map.of("venceEn", nueva.toString()), "Todos cierran el domingo");
+    }
+
+    @Test
+    @DisplayName("una prueba ya entregada no cambia de plazo")
+    void unaEntregadaNoCambiaDePlazo() {
+        when(postulaciones.findByIdAndOrganizacionId(POSTULACION, ORGANIZACION))
+                .thenReturn(Optional.of(Postulacion.builder()
+                        .id(POSTULACION).organizacionId(ORGANIZACION).vacanteId(VACANTE).build()));
+        when(permisos.alcanceDe("mover_postulacion"))
+                .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.TODO, USUARIO));
+        when(intentos.findByPostulacionId(POSTULACION)).thenReturn(Optional.of(
+                IntentoPrueba.builder().id(9L).postulacionId(POSTULACION)
+                        .iniciadoEn(Instant.now()).entregadoEn(Instant.now())
+                        .build()));
+
+        assertThatThrownBy(() -> servicio.definirPlazo(QUIEN, POSTULACION,
+                new DefinirPlazoPrueba(Instant.parse("2026-08-24T05:00:00Z"), "tarde")))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("ya se entregó");
+        verify(intentos, never()).save(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    @DisplayName("sin intento creado no hay plazo que fijar")
+    void sinIntentoNoHayPlazo() {
+        when(postulaciones.findByIdAndOrganizacionId(POSTULACION, ORGANIZACION))
+                .thenReturn(Optional.of(Postulacion.builder()
+                        .id(POSTULACION).organizacionId(ORGANIZACION).vacanteId(VACANTE).build()));
+        when(permisos.alcanceDe("mover_postulacion"))
+                .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.TODO, USUARIO));
+        when(intentos.findByPostulacionId(POSTULACION)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> servicio.definirPlazo(QUIEN, POSTULACION,
+                new DefinirPlazoPrueba(Instant.parse("2026-08-24T05:00:00Z"), "aún no le toca")))
+                .isInstanceOf(ResourceNotFoundException.class);
     }
 
     /** La rúbrica publicada, con el método de verificación de cada criterio. */

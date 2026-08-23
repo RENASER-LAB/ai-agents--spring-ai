@@ -68,9 +68,9 @@ Perfil Integral → prueba del puesto → simulacion → validacion → decision
 
 | | |
 |---|---|
-| Base de datos | **Flyway es el dueno del esquema**: V1-V26 en `src/main/resources/db/migration`, **85 tablas de este modulo** (88 en la base contando `flyway_schema_history` y las dos del motor de agentes, `agent_run` y `vector_store`). `ddl-auto: validate` |
+| Base de datos | **Flyway es el dueno del esquema**: V1-V32 en `src/main/resources/db/migration`, **86 tablas de este modulo** (89 en la base contando `flyway_schema_history` y las dos del motor de agentes, `agent_run` y `vector_store`). `ddl-auto: validate` |
 | Codigo | Veintiun paquetes de dominio bajo `ai_engine` (ver «Como esta organizado el codigo») |
-| Tests | **394 unitarios, todos en verde (20/08/2026)**, mas los de integracion con `verify`. Ver «Correr los tests»: unitarios de la maquina y del anonimizador, migraciones contra Postgres real (Testcontainers) y flujos de punta a punta: hito 1, evaluacion, prueba, simulacion/validacion y calificacion con IA |
+| Tests | **444 unitarios, todos en verde (22/08/2026)**, mas los de integracion con `verify`. Ver «Correr los tests»: unitarios de la maquina y del anonimizador, migraciones contra Postgres real (Testcontainers) y flujos de punta a punta: hito 1, evaluacion, prueba, simulacion/validacion, calificacion con IA y la vacante sin banco |
 | IA que califica | **Seis de los diez agentes del catalogo estan implementados**: datos del curriculum, evidencia, evaluador, potencial/riesgo, prueba del puesto y las preguntas de la conversacion final. Todos corren por cola de RabbitMQ contra DeepSeek. Ver [Calificacion con IA](docs/CALIFICACION-CON-IA.md) |
 | Correo | **Ya sabe salir de verdad** (`EnviadorCorreoSmtp`), pero **por defecto no sale**: `renaser.correo.transporte` vale `log` salvo que se ponga `smtp`, y entonces solo se registra en `correo_enviado`. Para encenderlo hacen falta `CORREO_TRANSPORTE=smtp`, `CORREO_REMITENTE` y una cuenta que autentique. El RNF-65 pide que salga **desde el dominio propio de Renaser**: confirmar con ellos si ya lo tienen antes de encenderlo |
 | Acceso del candidato | Entra al portal **con un enlace, sin contrasena** (`EnlaceAcceso`, `ServicioEnlaceAcceso`). El enlace se le manda por correo, asi que depende de lo de arriba |
@@ -154,6 +154,45 @@ escanea que ahi hay algo que revienta, en vez de un 404 aburrido.
 `comun/exception/ManejadorErrores` que devuelva 404, y que se registre antes que el generico
 del otro paquete.
 
+### La vacante sin banco de preguntas (22/08/2026)
+Renaser pidio que en la vacante de **Administrador** el cuestionario tecnico de 20 preguntas
+valga por las dos etapas de preguntas: se carga como prueba del puesto, lo califica el agente
+`PRUEBA_PUESTO`, y el banco queda apagado **solo en esa vacante**. Lo que existe para eso:
+
+- `vacante.aplica_evaluacion` (V30). Apagado, quien postula **no recibe evaluacion** y cae
+  directo en `PERFIL_POR_CONFIRMAR`: el equipo criba los curriculums y confirma el avance,
+  que crea el intento y manda el correo con el enlace de acceso.
+- Endpoints nuevos: `POST /panel/vacantes/{id}/aplicacion-evaluacion` y
+  `POST /panel/vacantes/{id}/version-pesos` (los pesos de UNA vacante; no recalcula nada).
+- **Una version de prueba sin entregables es un cuestionario**: al publicarla no rige la cuota
+  de 8-10 universales y 3-5 especificas, basta una pregunta. Con entregables la cuota sigue.
+- **La fecha de cierre de la prueba se fija en dos niveles** (V32). El plazo de la plantilla
+  se cuenta en dias y desde que cada uno empieza, asi que no servia para decir «esta
+  convocatoria cierra el domingo».
+  - **Por vacante**: `POST /panel/vacantes/{id}/cierre-prueba`. Ademas de fijarla, **mueve
+    los intentos ya abiertos**; si no, valdria solo para quien entrara despues y la tanda
+    quedaria partida en dos.
+  - **Por candidato**: `POST /panel/postulaciones/{id}/prueba/plazo`, para dar mas horas a
+    quien las pide. Marca `intento_prueba.plazo_propio`, y **a esos no les afecta mover la
+    fecha de la vacante**: perder esa excepcion habria sido silencioso.
+  - Empezar la prueba no recalcula una fecha ya puesta.
+- **El correo de la prueba es el de Ricardo** (`PRUEBA_DISPONIBLE`, migracion V29): lleva el
+  PDF del enunciado por vacante, el plazo segun la modalidad y el WhatsApp como parametro.
+- **Cada vacante puede elegir sus textos de correo** (V31, tabla `plantilla_correo_vacante`).
+  Una fila dice «para esta vacante, donde ibas a mandar el aviso X manda la plantilla Y»;
+  sin fila, sale el de siempre. Vale para cualquier aviso, no solo el de la prueba. Antes una
+  plantilla era una por organizacion y cambiar el texto de una convocatoria se lo cambiaba a
+  todas — que es lo que obligaba a publicar, mandar y restaurar a mano.
+  Se configura con `POST /panel/vacantes/{id}/plantillas-correo`.
+- El guion `scripts/cargar-prueba-administrador.py` deja todo montado por la API: preguntas
+  ADMIN_Q01..Q20, plantilla publicada con rubrica 100% de agente, pesos "la prueba vale todo"
+  asignados solo a esa vacante (y re-publica el reparto estandar para que las vacantes nuevas
+  no hereden el especial), el texto del correo de invitacion a la prueba, y el banco apagado.
+  Invitar en lote: `scripts/invitar.py --a prueba` (el correo sale del backend, con la cuenta
+  de la empresa que ya esta en sus variables de entorno).
+
+El flujo entero esta cubierto por `FlujoSinBancoIT`.
+
 ### La criba de curriculums (18/08/2026)
 Contesta «llegaron cien curriculums, a quien invito primero». Antes la IA solo arrancaba
 cuando el candidato entregaba su evaluacion, asi que con una carpeta recien llegada no habia
@@ -206,18 +245,18 @@ Las dos consultan el mismo backend, asi que ensenan el mismo orden.
 - Nada se recalcula hacia atras: cada nota queda atada a la version de pesos de su vacante.
 
 ### Correr los tests
-**394 unitarios en verde (20/08/2026).** Son dos tandas y el comando decide cual corre:
+**444 unitarios en verde (22/08/2026).** Son dos tandas y el comando decide cual corre:
 
 | Comando | Que corre | Cuantos | Necesita |
 |---|---|---:|---|
-| `./mvnw test` | unitarias con dobles y las de arquitectura | 394 | nada |
-| `./mvnw verify` | lo anterior mas las de integracion | 444 | Docker |
+| `./mvnw test` | unitarias con dobles y las de arquitectura | 444 | nada |
+| `./mvnw verify` | lo anterior mas las de integracion | 500 | Docker |
 
 Las de integracion levantan su propio PostgreSQL y su propio RabbitMQ con Testcontainers: hace
 falta el demonio de Docker encendido. El desglose completo esta en
 [docs/COMPROBACIONES-AUTOMATICAS.md](docs/COMPROBACIONES-AUTOMATICAS.md).
 
-Entre las 331 hay **8 reglas de arquitectura con ArchUnit** (la frontera del motor, las capas y
+Entre las unitarias hay **8 reglas de arquitectura con ArchUnit** (la frontera del motor, las capas y
 que el estado solo lo mueva la maquina — las mismas reglas que este archivo tiene en prosa).
 
 **El test que gasta dinero no corre solo**: `CalificacionIaRealIT` esta detras de

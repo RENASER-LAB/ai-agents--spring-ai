@@ -52,6 +52,16 @@ public class CalificacionPruebaController {
         servicio.ponerNota(permisos.actual(), postulacionId, criterioId, datos);
     }
 
+    @PostMapping("/plazo")
+    @PreAuthorize("@permisos.tiene('mover_postulacion')")
+    @Operation(summary = "Fijarle a ESTE candidato la fecha en que se le cierra la prueba. "
+            + "Sirve para dar la misma fecha a toda una tanda —«hasta el domingo»— y para "
+            + "darle más horas a quien las pide. El motivo es obligatorio y queda auditado")
+    public PlazoPrueba definirPlazo(@PathVariable Long postulacionId,
+                                    @Valid @RequestBody DefinirPlazoPrueba datos) {
+        return servicio.definirPlazo(permisos.actual(), postulacionId, datos);
+    }
+
     @PostMapping("/calificacion")
     @PreAuthorize("@permisos.tiene('ajustar_nota')")
     @Operation(summary = "Ponderar las notas ya puestas. Exige que estén todos los criterios de la rúbrica")
