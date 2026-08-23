@@ -242,6 +242,14 @@ el banco v4 que venga no necesitará una migración. El ciclo es
 | GET/POST `/banco-preguntas/preguntas/{id}/rangos` | Los tramos de puntaje de los ítems V | `ver` / `editar_banco_preguntas` |
 | GET/POST `/banco-preguntas/preguntas/{id}/campos-caso` | Los campos de los casos descompuestos (CD) | `ver` / `editar_banco_preguntas` |
 | GET/POST `/banco-preguntas/versiones/{id}/pares-consistencia` | Emparejar dos preguntas de la versión para vigilar contradicciones | `ver` / `editar_banco_preguntas` |
+| POST `/banco-preguntas/importaciones` | **Subir la plantilla Excel** (multipart: `archivo`, `nivelPuestoCodigo`, `etiqueta`). Crea una versión en borrador con todo el archivo; si algo no cuadra, 400 con la lista `{hoja, fila, mensaje}` y no se importa nada | `editar_banco_preguntas` |
+| GET `/banco-preguntas/dimensiones` | El catálogo de dimensiones: lo que vale escribir en la columna «Qué mide» | `ver_banco_preguntas` |
+| PUT/DELETE `/banco-preguntas/preguntas/{id}` | Reemplazar o quitar una pregunta **de un borrador**; borrarla se lleva sus opciones, campos, rangos y pares | `editar_banco_preguntas` |
+| PUT/DELETE `/banco-preguntas/opciones/{id}`, `/rangos/{id}`, `/campos-caso/{id}`, `/pares-consistencia/{id}` | Lo mismo para cada pieza de un borrador | `editar_banco_preguntas` |
+| DELETE `/banco-preguntas/versiones/{id}` | Descartar un borrador entero: se borra de verdad, con sus preguntas. Solo un borrador, que nunca se le asignó a nadie | `editar_banco_preguntas` |
+| PATCH `/banco-preguntas/preguntas/{id}/textos` | **Corregir una errata de lo ya publicado**: enunciado, situación o nota interna. La clave, el peso y la estructura no se tocan por aquí (RF-138) | `publicar_version_banco` |
+| PATCH `/banco-preguntas/opciones/{id}/textos`, `/campos-caso/{id}/textos`, `/rangos/{id}/textos`, `/pares-consistencia/{id}/textos` | Igual para el texto de cada pieza publicada; su clave nunca viaja en el cuerpo | `publicar_version_banco` |
+| PATCH `/banco-preguntas/versiones/{id}/etiqueta` | Renombrar una versión publicada | `publicar_version_banco` |
 
 ### Administración
 

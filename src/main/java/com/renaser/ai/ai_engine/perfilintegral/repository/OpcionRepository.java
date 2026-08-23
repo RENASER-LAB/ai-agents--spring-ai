@@ -12,4 +12,7 @@ public interface OpcionRepository extends JpaRepository<Opcion, Long> {
     // Todas las opciones de un lote de preguntas, para no hacer una consulta por pregunta
     // al pintar una evaluación de 30.
     List<Opcion> findByPreguntaIdIn(List<Long> preguntaIds);
+
+    // Al eliminar preguntas de un borrador, o al descartarlo entero.
+    void deleteByPreguntaIdIn(List<Long> preguntaIds);
 }

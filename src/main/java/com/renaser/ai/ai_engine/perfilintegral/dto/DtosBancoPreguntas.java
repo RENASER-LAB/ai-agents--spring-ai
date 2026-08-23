@@ -176,4 +176,44 @@ public final class DtosBancoPreguntas {
             BigDecimal penalizacionPorcentaje,
             Short separacionMinimaItems,
             String condicion) {}
+
+    // --- La corrección editorial de una versión PUBLICADA ---
+    // Estos records existen para que el candado quede en la firma y no en un if: no
+    // llevan, por construcción, ningún campo de clave (valor, puntaje, ordenCorrecto,
+    // esDistractor, peso, esPuntuable, casosPedidos, tipo, codigo). Corregir la errata
+    // de un texto publicado es legítimo; tocar la puntuación bajo un examen en curso,
+    // jamás (RF-138). Campo en null = no se toca.
+
+    public record CorregirTextoPregunta(
+            String enunciado,
+            String situacion,
+            String logicaInterna) {}
+
+    public record CorregirTextoOpcion(@NotBlank String texto) {}
+
+    public record CorregirTextoCampoCaso(
+            String etiqueta,
+            String validacion) {}
+
+    // ⚠ La condición de un tramo («Directos 5–20 y niveles ≥ 2») es texto para el ojo
+    // humano mientras el motor no sepa puntuar los ítems V: hoy nadie la lee para
+    // calcular nada (ServicioCalificacionImpl los deja sin puntuar a propósito). El día
+    // que ese motor aterrice y empiece a interpretarla, esta corrección deja de ser
+    // editorial y pasa a mover la nota: entonces hay que sacarla de aquí.
+    public record CorregirTextoRango(@NotBlank String condicion) {}
+
+    // ⚠ Lo mismo con la condición de un par: describe la contradicción en palabras y
+    // hoy nada la interpreta. Su penalización, que sí puntúa, no viaja en este record.
+    public record CorregirTextoPar(@NotBlank String condicion) {}
+
+    public record CorregirEtiquetaVersion(@NotBlank String etiqueta) {}
+
+    // --- El catálogo de dimensiones ---
+    // Lo que una pregunta puede medir. El panel lo necesita para llenar la columna
+    // «Qué mide» del Excel con valores que el importador acepte.
+    public record DimensionResponse(
+            String codigo,
+            String nombre,
+            String definicion,
+            Integer orden) {}
 }
