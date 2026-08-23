@@ -10,6 +10,7 @@ import com.renaser.ai.ai_engine.perfilintegral.entity.OrdenPregunta;
 import com.renaser.ai.ai_engine.perfilintegral.entity.PlantillaEvaluacion;
 import com.renaser.ai.ai_engine.perfilintegral.entity.Pregunta;
 import com.renaser.ai.ai_engine.perfilintegral.entity.Respuesta;
+import com.renaser.ai.ai_engine.perfilintegral.repository.CampoCasoRepository;
 import com.renaser.ai.ai_engine.perfilintegral.repository.EvaluacionRepository;
 import com.renaser.ai.ai_engine.perfilintegral.repository.OpcionRepository;
 import com.renaser.ai.ai_engine.perfilintegral.repository.OrdenPreguntaRepository;
@@ -68,6 +69,7 @@ class ServicioEvaluacionImplTest {
     @Mock private OpcionRepository opciones;
     @Mock private OrdenPreguntaRepository ordenes;
     @Mock private RespuestaRepository respuestas;
+    @Mock private CampoCasoRepository campos;
     @Mock private PostulacionRepository postulaciones;
     @Mock private MaquinaEstados maquina;
     @Mock private ServicioCalificacion calificacion;

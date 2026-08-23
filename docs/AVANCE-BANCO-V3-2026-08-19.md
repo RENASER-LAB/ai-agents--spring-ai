@@ -281,3 +281,56 @@ python3 scripts/comparar-banco-v3-con-base.py --emitir-v28   # las tuplas, si hi
 Diez enunciados no los sabe leer enteros el parser (rompen en un «·» de la línea de
 continuación, o absorberían la fórmula): su texto se decidió leyendo el PDF y vive por
 duplicado en la V28 §3 y en `ENUNCIADOS_A_MANO` del comparador, que vigila que no se separen.
+
+## El salto de página invisible · añadido el 22/08/2026
+
+Al volcar el banco a Excel, la librería se negó a escribir cinco etiquetas de campo: dentro
+del texto viajaba el salto de página del PDF (`\f`, 0x0c), invisible en pantalla desde la
+V20. Eran D41.3, D74.4, C48.3, O21.2 y O41.2 —campos de la rama suelta que cruzaban de
+página a media frase— y con ellos, diez campos con un espacio doble dejado por el mismo
+cruce (el salto de línea más la sangría de la página siguiente).
+
+Tres piezas, mismas del arreglo anterior:
+
+- `scripts/importar-banco-v3.py` vuelve el `\f` un espacio al leer el PDF (un solo punto,
+  no en cada lector) y aplana toda corrida de blancos en la rama suelta. Además avisa si
+  algún carácter de control llegara a un texto: no debería saltar nunca, está para el día
+  en que alguien cambie la extracción.
+- La **V33** limpia lo que ya estaba en la base: 14 filas de `campo_caso`, con un WHERE que
+  solo alcanza filas aún sucias (re-ejecutable, y respeta ediciones del panel).
+- `MigracionesIT` asevera desde CI que ningún texto del banco v3 trae caracteres de
+  control ni espacios dobles.
+
+Tras la V33, los 175 campos del importador y los de la base son idénticos carácter a
+carácter — ya no solo con la comparación normalizada del comparador.
+
+## Los casos multiplicados · añadido el 23/08/2026
+
+Siete CD piden su bloque de campos POR CADA caso —«Los 3 indicadores que reportabas. Por
+cada uno (4 campos × 3):» son 12 casillas— y la V20 guardó solo el bloque base: el
+candidato veía 4 casillas para declarar 3 indicadores. Son C04 (4×3), C19 (5×3), C49
+(3×2), D11 (6×3), D21 (hasta 5 reuniones × 5), D22 (5×3) y D75 (3×3): 100 casillas
+reales donde había 31.
+
+- El importador expande el bloque con el número de grupo delante («Indicador 2 ·
+  Nombre…»); el sustantivo de cada grupo se declara en `GRUPOS_CD`, no se adivina.
+- La **V34** expande lo cargado, derivando las etiquetas de las filas ya corregidas, y
+  mueve a `logica_interna` las reglas de puntaje que venían pegadas a la última etiqueta
+  (C49, D75, D21) más las que el documento escribe aparte (C19, D11, D22): el candidato
+  no debe leerlas (RF-53). La puntuación fina que describen sigue pendiente del motor.
+- `MigracionesIT` asevera desde CI que todo CD tiene tantas filas de campo como casillas
+  declara, y que los multiplicados declaran el producto correcto.
+
+## La auditoría integral · añadido el 23/08/2026
+
+Primera pasada que revisa TODO contra el PDF: 190 enunciados, 244 campos, 708 opciones,
+61 rangos y 5 pares. Lo que ya estaba corregido salió limpio; lo nuevo que encontró:
+
+- **Diez opciones terminaban en el rótulo de la tabla** («… Opción Clave»): C07.a,
+  C20.b, C28.b, D15.c2, D20.a, D31.c, D38.a, D80.c, O17.c, O45.d. Las revisiones
+  anteriores cubrían enunciados y campos; las opciones nunca se habían comparado contra
+  el PDF. El importador ya salta las cabeceras dentro de una tabla, la **V35** limpió lo
+  guardado y `MigracionesIT` lo vigila desde CI.
+- Las claves de los 76 EF-4 y los 63 SJT-R coinciden una a una con el PDF; los SEC
+  cubren su orden completo; los INV/DE declaran las cuentas exactas de reales y
+  distractores; los 18 V tienen tabla, referencia o fórmula. Sin más hallazgos.
