@@ -5,9 +5,9 @@ spring:
   # Si nadie dice lo contrario, «local»: todo lo que guarda estado se queda en tu maquina.
   #
   # Antes el valor por defecto era «ningun perfil», y esa era justo la combinacion peligrosa:
-  # la base salia local, pero la cola la ponia application-secrets.yaml —que apunta al broker
-  # compartido— y los curriculums iban al bucket de verdad. Arrancar sin pensar te metia a
-  # medias en un entorno compartido.
+  # la base salia local, pero la cola la ponia application-secrets.yaml —que entonces
+  # apuntaba a un broker compartido— y los curriculums iban al bucket de verdad. Arrancar
+  # sin pensar te metia a medias en un entorno compartido.
   #
   # El servidor no se ve afectado: despliegue/docker-compose.yml pone SPRING_PROFILES_ACTIVE
   # =pruebas, y un perfil activo explicito gana siempre sobre este.
@@ -79,8 +79,9 @@ spring:
       "mail.smtp.writetimeout": 10000
 
   rabbitmq:
-    # El broker de desarrollo, el del docker-compose. Para apuntar a otro —Amazon MQ, o el
-    # que haya en produccion— se sobreescriben host, puerto, usuario, contrasena, vhost y
+    # El broker de desarrollo, el del docker-compose. El servidor usa el suyo propio, otro
+    # contenedor igual, y lo configura application-pruebas.yaml con variables de entorno.
+    # Para apuntar a un tercero se sobreescriben host, puerto, usuario, contrasena, vhost y
     # ssl en application-secrets.yaml, que no se versiona. Aqui nunca va una credencial de
     # verdad: este archivo esta en git.
     host: localhost

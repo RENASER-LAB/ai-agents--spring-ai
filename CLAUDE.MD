@@ -359,7 +359,10 @@ estatico]`, asi que con cualquiera de los dos en rojo no llega a correr. Y en Gi
 ninguna clave de AWS guardada: se usa OIDC.
 
 **Hasta agosto de 2026 esto iba a Render.** Si encuentras una referencia suelta a Render o a
-CloudAMQP en algun comentario, esta desfasada: hoy es EC2 + ECR + Amazon MQ.
+CloudAMQP en algun comentario, esta desfasada: hoy es EC2 + ECR, con la cola como un
+contenedor mas de la propia maquina. **Tambien hubo un broker de Amazon MQ** (`renaser-mq`),
+retirado el 23 de agosto de 2026 porque costaba ~$119 al mes —el 77% de la factura— por algo
+que el mismo servidor hace gratis; cualquier mencion suya tambien esta desfasada.
 
 **Semgrep** corre con las reglas de serie de Java mas tres propias en `.semgrep/`: que la IA no
 lea el curriculum sin anonimizar, que no aparezcan rutas publicas fuera de
@@ -371,7 +374,7 @@ lea el curriculum sin anonimizar, que no aparezcan rutas publicas fuera de
 | `application.yaml` | siempre, es la base: Postgres local en el 5433, RabbitMQ sin TLS | nada |
 | `application-secrets.yaml` | siempre que exista; son tus claves y no se versiona | lo importa `application.yaml` |
 | `application-local.yaml` | trabajar en tu maquina sin tocar nada compartido: cola local y archivos en memoria | **nada: es el de por defecto** (`spring.profiles.default`) |
-| `application-pruebas.yaml` | la aplicacion corriendo en EC2 (Supabase + Amazon MQ) | `SPRING_PROFILES_ACTIVE=pruebas`, lo pone `despliegue/docker-compose.yml` |
+| `application-pruebas.yaml` | la aplicacion corriendo en EC2 (Supabase + la cola de la propia maquina) | `SPRING_PROFILES_ACTIVE=pruebas`, lo pone `despliegue/docker-compose.yml` |
 
 Los perfiles son aditivos: cada uno solo escribe encima lo que cambia. Quien manda, de menos a
 mas fuerza: `application.yaml` -> `application-secrets.yaml` -> el perfil activo -> los
@@ -379,8 +382,8 @@ argumentos del comando. La tabla completa con lo que cambia cada uno esta en el
 [README](README.md#los-perfiles); esta es solo la lista de archivos.
 
 **Si nadie nombra un perfil se aplica `local`.** Antes «ninguno» era una mezcla peligrosa: base
-local, pero la cola la ponia `application-secrets.yaml` —el broker compartido— y los curriculums
-iban al bucket de verdad.
+local, pero la cola la ponia `application-secrets.yaml` —que entonces apuntaba a un broker
+compartido— y los curriculums iban al bucket de verdad.
 
 ⚠️ Eso incluye a los **tests**, que no nombran perfil: ahora corren con `local` encima. Por eso
 `application-local.yaml` solo puede cambiar DONDE se guardan las cosas, nunca lo que el sistema
