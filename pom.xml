@@ -34,7 +34,7 @@
 		<springdoc.version>3.1.0</springdoc.version>
 		<testcontainers.version>2.0.5</testcontainers.version>
 		<!-- La misma que ya traia spring-ai-pdf-document-reader: no baja nada nuevo -->
-		<pdfbox.version>3.0.7</pdfbox.version>
+		<pdfbox.version>3.0.8</pdfbox.version>
 		<poi.version>5.4.1</poi.version>
 		<archunit.version>1.4.1</archunit.version>
 		<!-- 0.8.13+ es la primera que entiende los .class de Java 25 -->
