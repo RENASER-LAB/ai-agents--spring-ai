@@ -35,11 +35,9 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${SPRING_DATASOURCE_PASSWORD}
 
       # La cola es el contenedor rabbitmq de aqui abajo. El HOST llega del .env y vale
-      # «rabbitmq», el nombre del servicio: lo resuelve la red interna del compose. Antes
-      # esto apuntaba a Amazon MQ (~119 dolares al mes medidos, el 77% de la factura, por
-      # un broker que este mismo servidor puede correr gratis); si hiciera falta volver,
-      # basta revertir en Parameter Store el HOST, el usuario y la contrasena, y en este
-      # archivo el puerto a 5671 y el ssl a true — Amazon MQ solo habla AMQPS.
+      # «rabbitmq», el nombre del servicio: lo resuelve la red interna del compose. El
+      # puerto y el TLS no van aqui — application-pruebas.yaml ya trae los valores buenos
+      # (5672 en claro); solo harian falta para volver a un broker gestionado.
       #
       # Dos cosas que rompen el arranque si se copian mal:
       #   - el HOST va sin esquema y sin puerto. Spring arma la url el solo; pegar un
@@ -49,14 +47,9 @@ services:
       #     el marcador se queda sin resolver y la aplicacion no arranca — con un error
       #     que habla de un placeholder, no de la cola.
       RABBITMQ_HOST: ${RABBITMQ_HOST}
-      RABBITMQ_PORT: 5672
       RABBITMQ_USERNAME: ${RABBITMQ_USERNAME}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD}
       RABBITMQ_VHOST: ${RABBITMQ_VHOST:-/}
-      # application-pruebas.yaml trae ssl.enabled=true escrito, de la epoca de Amazon MQ.
-      # Esta variable lo pisa sin reconstruir la imagen; dentro de la red del compose el
-      # TLS no compra nada y el broker no lo tiene configurado.
-      SPRING_RABBITMQ_SSL_ENABLED: "false"
 
       # Cuantos candidatos se califican a la vez.
       #
