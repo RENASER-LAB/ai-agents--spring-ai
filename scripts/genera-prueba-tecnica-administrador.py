@@ -25,7 +25,7 @@ from reportlab.platypus import (BaseDocTemplate, Frame, HRFlowable,
 
 # ------------------------------------------------------------------ entrega
 
-PLAZO_ENTREGA = ("Plazo de entrega: domingo 23 de agosto de 2026, "
+PLAZO_ENTREGA = ("Plazo de entrega: lunes 24 de agosto de 2026, "
                  "hasta las 11:59 p. m.")
 WHATSAPP = "982 255 360"
 

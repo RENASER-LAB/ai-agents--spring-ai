@@ -68,9 +68,9 @@ Perfil Integral → prueba del puesto → simulacion → validacion → decision
 
 | | |
 |---|---|
-| Base de datos | **Flyway es el dueno del esquema**: V1-V32 en `src/main/resources/db/migration`, **86 tablas de este modulo** (89 en la base contando `flyway_schema_history` y las dos del motor de agentes, `agent_run` y `vector_store`). `ddl-auto: validate` |
+| Base de datos | **Flyway es el dueno del esquema**: V1-V35 en `src/main/resources/db/migration`, **92 tablas de este modulo** (95 en la base contando `flyway_schema_history` y las dos del motor de agentes, `agent_run` y `vector_store`). `ddl-auto: validate` |
 | Codigo | Veintiun paquetes de dominio bajo `ai_engine` (ver «Como esta organizado el codigo») |
-| Tests | **444 unitarios, todos en verde (22/08/2026)**, mas los de integracion con `verify`. Ver «Correr los tests»: unitarios de la maquina y del anonimizador, migraciones contra Postgres real (Testcontainers) y flujos de punta a punta: hito 1, evaluacion, prueba, simulacion/validacion, calificacion con IA y la vacante sin banco |
+| Tests | **480 unitarios, todos en verde (23/08/2026)**, mas los de integracion con `verify`. Ver «Correr los tests»: unitarios de la maquina y del anonimizador, migraciones contra Postgres real (Testcontainers) y flujos de punta a punta: hito 1, evaluacion, prueba, simulacion/validacion, calificacion con IA y la vacante sin banco |
 | IA que califica | **Seis de los diez agentes del catalogo estan implementados**: datos del curriculum, evidencia, evaluador, potencial/riesgo, prueba del puesto y las preguntas de la conversacion final. Todos corren por cola de RabbitMQ contra DeepSeek. Ver [Calificacion con IA](docs/CALIFICACION-CON-IA.md) |
 | Correo | **Ya sabe salir de verdad** (`EnviadorCorreoSmtp`), pero **por defecto no sale**: `renaser.correo.transporte` vale `log` salvo que se ponga `smtp`, y entonces solo se registra en `correo_enviado`. Para encenderlo hacen falta `CORREO_TRANSPORTE=smtp`, `CORREO_REMITENTE` y una cuenta que autentique. El RNF-65 pide que salga **desde el dominio propio de Renaser**: confirmar con ellos si ya lo tienen antes de encenderlo |
 | Acceso del candidato | Entra al portal **con un enlace, sin contrasena** (`EnlaceAcceso`, `ServicioEnlaceAcceso`). El enlace se le manda por correo, asi que depende de lo de arriba |
@@ -157,7 +157,15 @@ del otro paquete.
 ### La vacante sin banco de preguntas (22/08/2026)
 Renaser pidio que en la vacante de **Administrador** el cuestionario tecnico de 20 preguntas
 valga por las dos etapas de preguntas: se carga como prueba del puesto, lo califica el agente
-`PRUEBA_PUESTO`, y el banco queda apagado **solo en esa vacante**. Lo que existe para eso:
+`PRUEBA_PUESTO`, y el banco queda apagado **solo en esa vacante**.
+
+⚠️ **La convocatoria esta EN MARCHA.** El 23/08/2026 salieron 93 invitaciones a la prueba
+(vacante 14 en el servidor de pruebas), con cierre el **lunes 24 a las 23:59 de Lima**.
+Quedaron fuera once: tres CV cargados dos veces, tres con el correo mal escrito en el propio
+curriculum, y cinco sin contacto legible —a esos hay que llamarlos—. Antes de tocar nada de
+esta vacante, mirar en que estado esta la gente.
+
+Lo que existe para eso:
 
 - `vacante.aplica_evaluacion` (V30). Apagado, quien postula **no recibe evaluacion** y cae
   directo en `PERFIL_POR_CONFIRMAR`: el equipo criba los curriculums y confirma el avance,
@@ -189,9 +197,20 @@ valga por las dos etapas de preguntas: se carga como prueba del puesto, lo calif
   asignados solo a esa vacante (y re-publica el reparto estandar para que las vacantes nuevas
   no hereden el especial), el texto del correo de invitacion a la prueba, y el banco apagado.
   Invitar en lote: `scripts/invitar.py --a prueba` (el correo sale del backend, con la cuenta
-  de la empresa que ya esta en sus variables de entorno).
+  de la empresa que ya esta en sus variables de entorno). Admite `--saltar 1,2,3` para dejar
+  fuera a alguien concreto: un CV cargado dos veces es la misma persona y recibiria dos
+  enlaces, y un correo mal escrito en el curriculum solo sirve para que rebote.
+- Calificar en lote: `scripts/calificar-pruebas.py --vacante N --de-verdad`. Pide la
+  calificacion de todas las pruebas **entregadas** y enseña la tabla de notas al terminar.
+  Sin `--de-verdad` solo dice a quien se le pediria: cada una cuesta una llamada al modelo.
+  `--cuantos N` limita la tanda, que sirve para probar con una antes de lanzar noventa.
 
 El flujo entero esta cubierto por `FlujoSinBancoIT`.
+
+**Un cuestionario sin entregables SI se puede calificar** (comprobado el 23/08/2026 contra
+DeepSeek de verdad): el agente puntuo los siete criterios leyendo solo las respuestas, sin
+ningun archivo que mirar, y con notas bajas y justificadas donde el texto no decia nada. La
+duda era razonable —su instruccion habla de «la entrega»— pero no se cumplio.
 
 ### La criba de curriculums (18/08/2026)
 Contesta «llegaron cien curriculums, a quien invito primero». Antes la IA solo arrancaba
@@ -245,12 +264,12 @@ Las dos consultan el mismo backend, asi que ensenan el mismo orden.
 - Nada se recalcula hacia atras: cada nota queda atada a la version de pesos de su vacante.
 
 ### Correr los tests
-**444 unitarios en verde (22/08/2026).** Son dos tandas y el comando decide cual corre:
+**480 unitarios en verde (23/08/2026).** Son dos tandas y el comando decide cual corre:
 
 | Comando | Que corre | Cuantos | Necesita |
 |---|---|---:|---|
-| `./mvnw test` | unitarias con dobles y las de arquitectura | 444 | nada |
-| `./mvnw verify` | lo anterior mas las de integracion | 500 | Docker |
+| `./mvnw test` | unitarias con dobles y las de arquitectura | 480 | nada |
+| `./mvnw verify` | lo anterior mas las de integracion | 547 | Docker |
 
 Las de integracion levantan su propio PostgreSQL y su propio RabbitMQ con Testcontainers: hace
 falta el demonio de Docker encendido. El desglose completo esta en

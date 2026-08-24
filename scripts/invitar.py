@@ -132,6 +132,11 @@ def main():
     opciones.add_argument("--a", choices=("examen", "prueba"), required=True,
                           help="a que etapa se les invita")
     opciones.add_argument("--cuantos", type=int, default=20)
+    opciones.add_argument("--saltar", default="",
+                          help="ids de postulacion que NO se invitan, separados por comas. "
+                               "Para dejar fuera una carga duplicada —dos veces el mismo CV "
+                               "es la misma persona y recibiria dos enlaces— o un correo mal "
+                               "escrito en el curriculum, que solo serviria para que rebote")
     opciones.add_argument("--usuario", default="andy-dev",
                           help="quien queda como responsable en la auditoria")
     opciones.add_argument("--motivo")
@@ -154,6 +159,10 @@ def main():
         return 1
 
     filas = ranking["filas"] if isinstance(ranking, dict) and "filas" in ranking else ranking
+
+    saltar = {int(x) for x in args.saltar.replace(" ", "").split(",") if x}
+    saltados = [f for f in filas if f["postulacionId"] in saltar]
+    filas = [f for f in filas if f["postulacionId"] not in saltar]
     elegidos = filas[:args.cuantos]
     con_correo = [f for f in elegidos if direccion(f)]
     sin_correo = [f for f in elegidos if not direccion(f)]
@@ -165,6 +174,11 @@ def main():
         print(f"{numero:>3}  {fila['postulacionId']:>5}  {str(fila.get('notaEtapa')):>6}  "
               f"{str(fila.get('grupoPrioridad')):<22} {str(fila.get('estado')):<24} "
               f"{correo if correo else '· SIN CORREO ·'}")
+
+    if saltados:
+        print("\nFUERA a proposito (--saltar):")
+        for f in saltados:
+            print(f"   {f['postulacionId']:>5}  {f.get('candidato')}  {direccion(f) or '· sin correo ·'}")
 
     if sin_correo:
         print("\nQuedan fuera por no tener correo: "
