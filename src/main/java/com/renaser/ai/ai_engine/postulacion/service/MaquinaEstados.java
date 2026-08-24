@@ -192,7 +192,15 @@ public class MaquinaEstados {
 
     private void avisarAlCandidato(Postulacion postulacion, EstadoPostulacion nuevo, String motivoCierre) {
         String plantilla;
-        if ("NO_CONTINUA".equals(nuevo.getCodigo())) {
+        if ("CONTRATADO".equals(nuevo.getCodigo())) {
+            // El único al que no se le avisaba, y era justo el que decía que sí.
+            //
+            // Los tres casos de abajo dejaban fuera a CONTRATADO por construcción: no es
+            // NO_CONTINUA, no es CERRADA, y su `esperaA` no es CANDIDATO porque no espera nada
+            // de él. Así que caía en el `return` del final y salía sin correo. Al que se le
+            // dice que no, se entera; al que se le dice que sí, no.
+            plantilla = "POSTULACION_CONTRATADA";
+        } else if ("NO_CONTINUA".equals(nuevo.getCodigo())) {
             plantilla = "POSTULACION_NO_CONTINUA";
         } else if ("CERRADA".equals(nuevo.getCodigo())) {
             plantilla = "RETIRO_CANDIDATO".equals(motivoCierre) ? "RETIRO_CONFIRMADO" : "POSTULACION_CERRADA";

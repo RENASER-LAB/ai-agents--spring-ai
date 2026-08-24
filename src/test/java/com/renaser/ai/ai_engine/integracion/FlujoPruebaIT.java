@@ -451,6 +451,43 @@ public class FlujoPruebaIT {
                 "select valor_nuevo::text from auditoria where accion = 'decidir_postulacion' order by id desc limit 1",
                 String.class);
         assertThat(registro).contains("propuestaDelServidor", "etapasSinNota");
+
+        // Al contratado también se le avisa. Era el único candidato que no recibía nada: no
+        // es NO_CONTINUA, no es CERRADA, y no espera nada de él, así que se quedaba fuera de
+        // los tres casos que generan correo.
+        Long usuarioContratado = jdbc.queryForObject(
+                "select usuario_id from postulacion where id = ?", Long.class, postulacionId);
+        Integer avisos = jdbc.queryForObject("""
+                select count(*) from correo_enviado
+                 where usuario_id = ? and plantilla_correo_codigo = 'POSTULACION_CONTRATADA'
+                """, Integer.class, usuarioContratado);
+        assertThat(avisos).as("al contratado se le avisa una vez, ni cero ni dos").isEqualTo(1);
+
+        // Y el cuerpo lleva su nombre y la vacante resueltos, no los marcadores en crudo:
+        // una plantilla sin sustituir se envía igual y nadie se entera hasta que la lee él.
+        String cuerpo = jdbc.queryForObject("""
+                select cuerpo from correo_enviado
+                 where usuario_id = ? and plantilla_correo_codigo = 'POSTULACION_CONTRATADA'
+                """, String.class, usuarioContratado);
+        assertThat(cuerpo).doesNotContain("{{").contains("Renaser");
+    }
+
+    @DisplayName("Una dirección que no existe es un 404, no una avería")
+    @Test
+    @Order(8)
+    void unaDireccionQueNoExisteEsUn404() throws Exception {
+        // El catch-all de GlobalControllerAdvice se quedaba con NoResourceFoundException y
+        // devolvía «Ha ocurrido un error inesperado» con 500. ManejadorErrores ya lo hacía
+        // bien, pero está acotado a los controladores del portal y del panel: una ruta sin
+        // controlador no cae en ninguno y llegaba al catch-all.
+        //
+        // Con token, porque sin él la cadena responde 401 antes de llegar al enrutado — y eso
+        // también es lo correcto: a quien no se ha identificado no se le dice qué rutas hay.
+        String cuerpo = conTokenGet("/api/v1/panel/esta-ruta-no-existe", tokenTalento)
+                .andExpect(status().isNotFound())
+                .andReturn().getResponse().getContentAsString();
+        assertThat(cuerpo).contains("ruta-inexistente");
+        assertThat(cuerpo).doesNotContain("error inesperado");
     }
 
     @DisplayName("Un intento vencido se entrega solo")
