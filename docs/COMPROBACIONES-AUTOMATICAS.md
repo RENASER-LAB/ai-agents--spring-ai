@@ -47,19 +47,28 @@ demás de la calificación se prueba con un doble del modelo y no gasta nada.
 
 ---
 
-## 547 pruebas
+## 565 pruebas
 
 Contadas de correrlas el 24/08/2026, no de recordarlas: el desglose sale de los
 informes de surefire y failsafe, y suma exacto.
 
 | Qué | Cuántas | Necesita |
 |---|---:|---|
-| Unitarias, con dobles | 438 | nada |
+| Unitarias, con dobles | 439 | nada |
 | Arquitectura | 8 | nada |
-| Las fórmulas del banco v3 | 20 | nada |
-| El validador de las respuestas v3 | 14 | nada |
-| Integración, de punta a punta | 61 | Docker |
+| Las fórmulas del banco v3 | 22 | nada |
+| El validador de las respuestas v3 | 21 | nada |
+| Integración, de punta a punta | 69 | Docker |
 | Contra el proveedor de verdad, y el envío de correo | 6 | Docker o SMTP, y su bandera |
+
+⚠️ Al recontar, **no sirve el atributo `tests=`** de los XML de surefire: con clases anidadas
+(`@Nested`) subcuenta, y por eso dos filas de esta tabla llevaban tiempo mal —las fórmulas
+ponían 20 cuando son 22, y el validador 14 cuando son 21— aunque el total cuadrase por
+compensación. Lo que hay que contar son los elementos `<testcase>`:
+
+```bash
+grep -ho "<testcase" target/surefire-reports/*.xml | wc -l
+```
 
 Las tres filas del medio se listan aparte porque se prueban solas, sin contexto de Spring:
 son las que deciden la nota de una persona y las que impiden que una respuesta con mala
