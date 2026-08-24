@@ -36,7 +36,7 @@ jobs:
       # sembrar-datos-de-prueba.py. Se fija aquí para no repetir el número en cuatro sitios.
       SERVER_PORT: '8080'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-java@v4
         with:
@@ -97,7 +97,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: actions/setup-java@v4
         with:
