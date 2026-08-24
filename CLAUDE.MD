@@ -430,9 +430,10 @@ cualquier otra parte. Lo que **si** sigue en pie es la separacion entre los dos 
 regla de ArchUnit que solo deja cruzar la frontera por las clases de la lista `ACORDADAS`
 sigue valiendo, porque es una decision de diseno y no de reparto de trabajo.
 
-Nuestro codigo usa una sola clase suya, `ai/exception/ResourceNotFoundException`, en cinco
-servicios. Es la unica dependencia que cruza la frontera, y conviene saberlo: si el la mueve
-otra vez, esos cinco imports se rompen.
+Lo que cruza la frontera esta enumerado en la lista `ACORDADAS` de `ArquitecturaTest`, y la
+regla falla si aparece algo que no este ahi. La mas usada es
+`ai/exception/ResourceNotFoundException`, en cinco servicios. Antes esta frase decia «una sola
+clase» y hoy son varias: mirar la lista, que es la que manda.
 
 **La seleccion de personal** vive en un paquete por dominio, cada uno con sus capas dentro:
 

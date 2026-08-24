@@ -4,6 +4,7 @@ import com.renaser.ai.ai_engine.ai.exception.IngestaNoPermitidaException;
 import com.renaser.ai.ai_engine.ai.rag.DocumentIngestionService;
 import com.renaser.ai.ai_engine.ai.rag.PropiedadesRag;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.reader.pdf.PagePdfDocumentReader;
 import org.springframework.ai.transformer.splitter.TokenTextSplitter;
@@ -21,6 +22,7 @@ import java.util.function.Supplier;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class DocumentIngestionServiceImpl implements DocumentIngestionService {
 
     /** Un solo mensaje para todos los rechazos: distinguirlos delata qué ficheros hay. */
@@ -34,12 +36,23 @@ public class DocumentIngestionServiceImpl implements DocumentIngestionService {
     public void ingestPdf(String rutaRelativa) {
         Path pdf = resolverDentroDelDirectorioPermitido(rutaRelativa);
 
-        // Extract -> Transform -> Load, expresado como composición de funciones,
-        // no como pasos imperativos sueltos.
-        Supplier<List<Document>> extract = new PagePdfDocumentReader(new FileSystemResource(pdf));
-        Function<List<Document>, List<Document>> transform = tokenTextSplitter;
+        List<Document> paginas;
+        try {
+            // Extract -> Transform -> Load, expresado como composición de funciones,
+            // no como pasos imperativos sueltos.
+            Supplier<List<Document>> extract = new PagePdfDocumentReader(new FileSystemResource(pdf));
+            Function<List<Document>, List<Document>> transform = tokenTextSplitter;
+            paginas = transform.apply(extract.get());
+        } catch (RuntimeException e) {
+            // Un fichero que está donde debe pero no es un PDF legible es entrada mala del
+            // cliente, no avería nuestra: tiene que salir 400. Sin este catch subía a
+            // GlobalControllerAdvice y se convertía en un 500, que es justo lo que este
+            // trabajo venía a quitar. El motivo real va al registro, no a la respuesta.
+            log.warn("No se pudo leer como PDF el documento pedido: {}", e.getMessage());
+            throw new IngestaNoPermitidaException(RECHAZO);
+        }
 
-        vectorStore.accept(transform.apply(extract.get()));
+        vectorStore.accept(paginas);
     }
 
     /**
@@ -59,6 +72,14 @@ public class DocumentIngestionServiceImpl implements DocumentIngestionService {
      *   <li>Comprobar la existencia antes que el encierro convierte el endpoint en un detector
      *       de ficheros del servidor. Por eso el encierro va primero, y el mensaje es único.
      * </ol>
+     *
+     * <p><b>Lo que esta guarda NO cubre</b>, y conviene saberlo: autentica la <i>ruta</i>, no el
+     * inodo. Un enlace duro dentro del directorio apuntando a un fichero de fuera pasa, porque
+     * {@code toRealPath()} no tiene nada que resolver en un enlace duro; y entre la comprobación
+     * y la lectura hay una ventana en la que el último elemento podría cambiar. Las dos exigen
+     * poder escribir <b>dentro</b> del directorio permitido, y quien pueda hacer eso ya puede
+     * poner ahí el contenido que quiera. Son límites estructurales, no agujeros que tape más
+     * código: el que decide de verdad es quién tiene escritura en ese directorio.
      */
     private Path resolverDentroDelDirectorioPermitido(String rutaRelativa) {
         String configurado = propiedades.getDirectorioBase();
@@ -75,6 +96,12 @@ public class DocumentIngestionServiceImpl implements DocumentIngestionService {
             // Configuración mala, no petición mala: que se vea como avería y no como un 400
             throw new IllegalStateException(
                     "El directorio de documentos del RAG no existe: " + configurado, e);
+        }
+
+        if (rutaRelativa == null || rutaRelativa.isBlank()) {
+            // @NotBlank ya lo para por HTTP, pero la guarda promete valer para «cualquier otro
+            // llamador» y Path.of(null) lanza NPE, que acabaría en un 500
+            throw new IngestaNoPermitidaException(RECHAZO);
         }
 
         Path candidato;

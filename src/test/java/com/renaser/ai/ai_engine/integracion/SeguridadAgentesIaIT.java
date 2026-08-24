@@ -17,8 +17,14 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.rabbitmq.RabbitMQContainer;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
+import static org.hamcrest.Matchers.containsString;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -56,6 +62,26 @@ public class SeguridadAgentesIaIT {
     @ServiceConnection
     static RabbitMQContainer rabbit = new RabbitMQContainer(ImagenesDeContenedores.RABBITMQ);
 
+    /**
+     * El directorio permitido, creado de verdad.
+     *
+     * <p>Sin esto la prueba se engaña sola: con {@code directorio-base} vacío, la ingesta está
+     * apagada y <b>cualquier</b> ruta devuelve 400 por esa rama, incluida una de recorrido. El
+     * test pasaría en verde aunque se borrase entero el cerco de rutas. Se descubrió al
+     * revisarlo, y por eso se configura un directorio real.
+     */
+    static Path directorioPermitido;
+
+    static {
+        try {
+            directorioPermitido = Files.createTempDirectory("rag-permitido");
+            directorioPermitido.toFile().deleteOnExit();
+            Files.writeString(directorioPermitido.resolve("dentro.pdf"), "no es un pdf de verdad");
+        } catch (IOException e) {
+            throw new IllegalStateException("No se pudo preparar el directorio de la prueba", e);
+        }
+    }
+
     @DynamicPropertySource
     static void propiedades(DynamicPropertyRegistry registro) {
         registro.add("spring.rabbitmq.ssl.enabled", () -> "false");
@@ -65,6 +91,7 @@ public class SeguridadAgentesIaIT {
                 () -> "clave-de-pruebas-suficientemente-larga-para-hmac-256-bits");
         registro.add("spring.ai.deepseek.api-key", () -> "clave-de-pruebas-no-se-usa");
         registro.add("renaser.ai.calificacion.habilitada", () -> "false");
+        registro.add("renaser.rag.directorio-base", () -> directorioPermitido.toString());
     }
 
     @Autowired MockMvc mvc;
@@ -110,15 +137,51 @@ public class SeguridadAgentesIaIT {
         mvc.perform(get("/v3/api-docs")).andExpect(status().isOk());
     }
 
+    /**
+     * Se afirma también el {@code detail}, y no solo el 400, a propósito: es lo único que
+     * distingue «lo paró el cerco de rutas» de «la ingesta estaba apagada». Sin esa aserción
+     * la prueba pasaba por la rama equivocada y no probaba nada del recorrido de directorios.
+     */
     @Test
-    @DisplayName("con token, una ruta de fuera del directorio es 400 y no una avería")
-    void conTokenUnaRutaDeFueraEsCuatrocientos() throws Exception {
+    @DisplayName("con token, una ruta de fuera del directorio la para el cerco, no el interruptor")
+    void conTokenUnaRutaDeFueraLaParaElCerco() throws Exception {
         String token = tokenDeEquipo();
 
         mvc.perform(post("/api/v1/rag/ingest")
                         .header("Authorization", "Bearer " + token)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"path\":\"../../etc/passwd\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value(containsString("no apunta a un documento")));
+    }
+
+    @Test
+    @DisplayName("una ruta absoluta tampoco entra, aunque el fichero exista")
+    void unaRutaAbsolutaTampocoEntra() throws Exception {
+        String token = tokenDeEquipo();
+
+        mvc.perform(post("/api/v1/rag/ingest")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"path\":\"/etc/hostname\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value(containsString("no apunta a un documento")));
+    }
+
+    /**
+     * Un fichero que está donde debe pero no es un PDF legible es entrada mala del cliente, no
+     * avería nuestra. Antes esto salía 500 y contradecía lo que promete el propio javadoc del
+     * manejador.
+     */
+    @Test
+    @DisplayName("un fichero de dentro que no es un PDF es 400, no una avería")
+    void unFicheroDeDentroQueNoEsPdfEsCuatrocientos() throws Exception {
+        String token = tokenDeEquipo();
+
+        mvc.perform(post("/api/v1/rag/ingest")
+                        .header("Authorization", "Bearer " + token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"path\":\"dentro.pdf\"}"))
                 .andExpect(status().isBadRequest());
     }
 

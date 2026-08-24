@@ -211,11 +211,16 @@ class ArquitecturaTest {
      * que sumarlo aquí, o sus endpoints saldrán en Swagger sin candado». Un aviso en prosa
      * dura hasta el primer despiste; esta prueba lo convierte en compilación rota.
      *
-     * <p>El motor de agentes ({@code ai/}) queda fuera de <b>esta comprobación</b>, no del
-     * candado: desde el 24/08/2026 sus rutas piden token de equipo en la cadena
-     * {@code @Order(3)} de {@code ConfiguracionSeguridad}, y sus controladores están en la
-     * lista de {@code ConfiguracionSwagger}. La regla sigue mirando solo fuera de {@code ai/}
-     * porque es ahí donde nacen controladores nuevos a diario.
+     * <p>El motor de agentes ({@code ai/}) queda fuera de esta comprobación. Desde el
+     * 24/08/2026 sus rutas piden token de equipo, y {@code ConfiguracionSwagger} les pone el
+     * candado reconociéndolas por el <b>nombre del paquete</b> {@code ai.controller} — no por
+     * clase, porque importarlas allí rompería la regla de la frontera de aquí arriba.
+     *
+     * <p><b>Ese reconocimiento no lo comprueba nadie</b>, y conviene decirlo en vez de
+     * suponerlo: un controlador nuevo del motor colocado fuera de {@code ai.controller} se
+     * quedaría sin candado en Swagger sin que falle ninguna prueba. Se acepta a sabiendas
+     * porque ahí no nacen controladores casi nunca; si eso cambia, esta regla tendrá que
+     * cubrir también {@code ai/}.
      */
     @Test
     void todoControladorNuevoEstaEnLaListaDelCandadoDeSwagger() {

@@ -9,6 +9,8 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.api.condition.EnabledOnOs;
 import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPage;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.ai.transformer.splitter.TokenTextSplitter;
@@ -20,6 +22,8 @@ import java.nio.file.Path;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 /**
@@ -116,6 +120,16 @@ class DocumentIngestionServiceImplTest {
     }
 
     @Test
+    @DisplayName("una ruta nula se rechaza, y no revienta en NullPointerException")
+    void unaRutaNulaSeRechaza() {
+        // Por HTTP lo para @NotBlank, pero la guarda promete valer para cualquier llamador y
+        // Path.of(null) lanza NPE, que habría acabado en un 500
+        assertThatThrownBy(() -> servicio.ingestPdf(null))
+                .isInstanceOf(IngestaNoPermitidaException.class);
+        verifyNoInteractions(vectorStore);
+    }
+
+    @Test
     @DisplayName("un directorio no es un documento")
     void unDirectorioNoEsUnDocumento() throws IOException {
         Files.createDirectory(permitido.resolve("carpeta"));
@@ -125,18 +139,30 @@ class DocumentIngestionServiceImplTest {
         verifyNoInteractions(vectorStore);
     }
 
-    /**
-     * Un fichero legítimo pasa la guarda. Falla después, al leerlo como PDF, y eso basta:
-     * lo que se prueba aquí es que la comprobación de ruta lo deja pasar, no que PDFBox
-     * sepa leer un fichero de mentira.
-     */
     @Test
-    @DisplayName("un documento de dentro del directorio sí pasa la guarda")
-    void unDocumentoDeDentroPasaLaGuarda() throws IOException {
-        Files.writeString(permitido.resolve("bueno.pdf"), "no es un pdf de verdad");
+    @DisplayName("un PDF de dentro del directorio se ingiere")
+    void unPdfDeDentroSeIngiere() throws IOException {
+        try (PDDocument documento = new PDDocument()) {
+            documento.addPage(new PDPage());
+            documento.save(permitido.resolve("bueno.pdf").toFile());
+        }
 
-        assertThatThrownBy(() -> servicio.ingestPdf("bueno.pdf"))
-                .isNotInstanceOf(IngestaNoPermitidaException.class);
+        servicio.ingestPdf("bueno.pdf");
+
+        // El camino feliz completo: la guarda deja pasar y lo leído llega al almacén
+        verify(vectorStore).accept(any());
+    }
+
+    @Test
+    @DisplayName("un fichero de dentro que no es un PDF es un rechazo, no una avería")
+    void unFicheroDeDentroQueNoEsPdfEsUnRechazo() throws IOException {
+        Files.writeString(permitido.resolve("disfrazado.pdf"), "esto no es un pdf");
+
+        // Está donde debe, así que el cerco lo deja pasar; lo para el lector. Tiene que salir
+        // como rechazo (400) y no subir a GlobalControllerAdvice, que lo convertiría en 500
+        assertThatThrownBy(() -> servicio.ingestPdf("disfrazado.pdf"))
+                .isInstanceOf(IngestaNoPermitidaException.class);
+        verifyNoInteractions(vectorStore);
     }
 
     private String mensajeDe(Runnable accion) {
