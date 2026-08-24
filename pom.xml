@@ -286,11 +286,31 @@
 				<version>${sonar-maven-plugin.version}</version>
 			</plugin>
 			<plugin>
-				<!-- Mide qué líneas ejecutan los tests y deja el XML que SonarCloud lee.
-				     No impone umbral: la puerta la pone SonarCloud, y solo sobre lo nuevo. -->
+				<!-- Mide qué líneas ejecutan los tests, deja el XML que SonarCloud lee, y
+				     ROMPE LA CONSTRUCCIÓN por debajo del 70 % del núcleo.
+				     Ver la ejecución «umbral» de abajo para el porqué de cada decisión. -->
 				<groupId>org.jacoco</groupId>
 				<artifactId>jacoco-maven-plugin</artifactId>
 				<version>${jacoco.version}</version>
+				<configuration>
+					<!-- Qué NO cuenta como núcleo. No es una lista elegida para llegar al
+					     número: es código sin lógica que probar. Los DTO son records, las
+					     entidades son Lombok, los repositorios son interfaces de Spring Data
+					     sin implementación nuestra, y los mappers copian campos. Medirlos
+					     mezcla el ruido con lo que de verdad decide.
+
+					     Medido el 24/08/2026: con esta lista el núcleo está en 73,7 % de
+					     líneas; contándolo todo, en 70,8 %. La diferencia son los mappers,
+					     que están entre el 1 % y el 3 %. -->
+					<excludes>
+						<exclude>**/mapper/**</exclude>
+						<exclude>**/dto/**</exclude>
+						<exclude>**/entity/**</exclude>
+						<exclude>**/model/**</exclude>
+						<exclude>**/config/**</exclude>
+						<exclude>**/repository/**</exclude>
+					</excludes>
+				</configuration>
 				<executions>
 					<execution>
 						<goals>
@@ -303,6 +323,40 @@
 						<goals>
 							<goal>report</goal>
 						</goals>
+					</execution>
+					<execution>
+						<!-- La puerta que el Sprint 1 pide como criterio de salida: «cobertura
+						     del núcleo ≥ 70 %, con la construcción fallando si no se cumple».
+						     Hasta el 24/08/2026 JaCoCo solo generaba informe, y un informe no
+						     es una puerta: la única barrera real era SonarCloud sobre código
+						     nuevo, y aún no es obligatoria.
+
+						     Se mide LINE y no INSTRUCTION —el contador por defecto de
+						     JaCoCo— a propósito, y conviene ser honesto: hoy estamos en
+						     73,7 % de líneas y en 68,9 % de instrucciones, así que exigir
+						     instrucciones dejaría el proyecto en rojo desde el primer día.
+						     LINE es además lo que cuenta el criterio del sprint. Cuando
+						     instrucciones pase del 70 se sube esta puerta, no antes: un
+						     umbral que nadie puede cumplir se acaba desactivando. -->
+						<id>umbral</id>
+						<phase>verify</phase>
+						<goals>
+							<goal>check</goal>
+						</goals>
+						<configuration>
+							<rules>
+								<rule>
+									<element>BUNDLE</element>
+									<limits>
+										<limit>
+											<counter>LINE</counter>
+											<value>COVEREDRATIO</value>
+											<minimum>0.70</minimum>
+										</limit>
+									</limits>
+								</rule>
+							</rules>
+						</configuration>
 					</execution>
 				</executions>
 			</plugin>
