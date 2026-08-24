@@ -286,8 +286,19 @@ punta a punta hoy mismo, con personas poniendo las notas.
 candidato y lo que viaja en sus rutas.
 
 **El módulo de agentes IA** (`/api/v1/agent-runs`, `/flows`, `/rag`, `/supabase`) es otra zona,
-del proyecto original de agentes, y hoy queda abierta como estaba. Se endurecerá cuando gane
-autenticación propia.
+del proyecto original de agentes. **Desde el 24/08/2026 pide token de equipo**, el mismo del
+panel; antes estaba abierta a cualquiera.
+
+Lo que obligó a cerrarla: `POST /api/v1/rag/ingest` recibía una ruta del sistema de ficheros
+del servidor, la leía, y su texto quedaba consultable por `GET /api/v1/rag/search`. Sin token.
+Cualquier PDF de la máquina se podía sacar desde internet.
+
+Ahora la ingesta pide además que la ruta caiga dentro de `renaser.rag.directorio-base`, y esa
+propiedad **viene vacía a propósito**: mientras nadie la configure, la ingesta por ruta está
+apagada. No hay ningún cliente que la use.
+
+El contrato (`/v3/api-docs`) y Swagger siguen siendo públicos: el fuzzing nocturno los lee
+antes de tener token.
 
 ---
 

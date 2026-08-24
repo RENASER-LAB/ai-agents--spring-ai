@@ -21,7 +21,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 // Tres puertas, tres reglas:
 //   /api/v1/portal/**  -> candidatos: público lo de mirar y registrarse, el resto con token CANDIDATO
 //   /api/v1/panel/**   -> equipo de Renaser: todo con token EQUIPO
-//   el resto           -> módulo de agentes IA y Swagger, abiertos COMO HASTA AHORA (ver TODO)
+//   el resto           -> módulo de agentes IA con token EQUIPO; Swagger y el contrato, abiertos
 @Configuration
 @EnableMethodSecurity
 @RequiredArgsConstructor
@@ -70,12 +70,26 @@ public class ConfiguracionSeguridad {
     @Bean
     @Order(3)
     SecurityFilterChain agentesYDocumentacion(HttpSecurity http) throws Exception {
-        // TODO: el módulo de agentes IA corría sin seguridad propia (Boot lo tapaba con la
-        // contraseña aleatoria del starter). Esta cadena hace explícito el estado real y lo
-        // deja funcionando. Cuando el módulo gane autenticación, se endurece aquí.
+        // El módulo de agentes IA corrió mucho tiempo sin seguridad propia, abierto a
+        // cualquiera. Lo que obligó a cerrarlo fue POST /api/v1/rag/ingest: aceptaba una ruta
+        // del sistema de ficheros del servidor, la leía, y su texto quedaba consultable por
+        // GET /api/v1/rag/search. Sin token, eso era leer cualquier fichero de la máquina
+        // desde internet.
+        //
+        // Ahora pide identidad de equipo, la misma que el panel. No se pierde el fuzzing
+        // nocturno: entra con un token de dev-login, que es TIPO_EQUIPO.
+        //
+        // Swagger y /v3/api-docs siguen abiertos: son el contrato, no datos, y el nocturno
+        // los lee antes de tener token.
         http.csrf(csrf -> csrf.disable())
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
+            .addFilterBefore(filtroIdentidad, UsernamePasswordAuthenticationFilter.class)
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/api/v1/rag/**", "/api/v1/agent-runs/**",
+                        "/api/v1/flows/**", "/api/v1/supabase/**")
+                    .hasAuthority("TIPO_EQUIPO")
+                .anyRequest().permitAll())
+            .exceptionHandling(e -> e.authenticationEntryPoint(entradaSinIdentidad()));
         return http.build();
     }
 

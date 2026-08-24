@@ -47,18 +47,18 @@ demás de la calificación se prueba con un doble del modelo y no gasta nada.
 
 ---
 
-## 547 pruebas
+## 561 pruebas
 
 Contadas de correrlas el 24/08/2026, no de recordarlas: el desglose sale de los
 informes de surefire y failsafe, y suma exacto.
 
 | Qué | Cuántas | Necesita |
 |---|---:|---|
-| Unitarias, con dobles | 438 | nada |
+| Unitarias, con dobles | 446 | nada |
 | Arquitectura | 8 | nada |
 | Las fórmulas del banco v3 | 20 | nada |
 | El validador de las respuestas v3 | 14 | nada |
-| Integración, de punta a punta | 61 | Docker |
+| Integración, de punta a punta | 67 | Docker |
 | Contra el proveedor de verdad, y el envío de correo | 6 | Docker o SMTP, y su bandera |
 
 Las tres filas del medio se listan aparte porque se prueban solas, sin contexto de Spring:

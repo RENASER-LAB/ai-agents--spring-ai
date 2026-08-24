@@ -144,6 +144,16 @@ spring:
 server:
   port: 8080
 renaser:
+  # De dónde puede leer PDFs la ingesta del RAG (POST /api/v1/rag/ingest).
+  #
+  # Vacío a propósito: así la ingesta por ruta queda APAGADA mientras nadie la configure.
+  # Antes no había directorio ninguno y la ruta del cuerpo se usaba tal cual, de modo que
+  # el endpoint leía cualquier PDF del servidor y su texto quedaba consultable por
+  # /api/v1/rag/search. Hoy la ruta tiene que caer dentro de este directorio, y encima el
+  # endpoint pide token de equipo.
+  rag:
+    directorio-base: ${RENASER_RAG_DIRECTORIO_BASE:}
+
   ai:
     chat:
       default-model: deepseek-v4-flash

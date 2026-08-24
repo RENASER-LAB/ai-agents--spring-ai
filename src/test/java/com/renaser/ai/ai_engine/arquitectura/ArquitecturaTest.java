@@ -211,9 +211,11 @@ class ArquitecturaTest {
      * que sumarlo aquí, o sus endpoints saldrán en Swagger sin candado». Un aviso en prosa
      * dura hasta el primer despiste; esta prueba lo convierte en compilación rota.
      *
-     * <p>El motor de agentes ({@code ai/}) queda fuera a propósito: sus endpoints van sin
-     * candado hoy, y así lo declara la cadena {@code @Order(3)} de {@code
-     * ConfiguracionSeguridad}. Cuando el módulo gane autenticación, se quita la excepción.
+     * <p>El motor de agentes ({@code ai/}) queda fuera de <b>esta comprobación</b>, no del
+     * candado: desde el 24/08/2026 sus rutas piden token de equipo en la cadena
+     * {@code @Order(3)} de {@code ConfiguracionSeguridad}, y sus controladores están en la
+     * lista de {@code ConfiguracionSwagger}. La regla sigue mirando solo fuera de {@code ai/}
+     * porque es ahí donde nacen controladores nuevos a diario.
      */
     @Test
     void todoControladorNuevoEstaEnLaListaDelCandadoDeSwagger() {
