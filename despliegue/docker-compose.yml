@@ -1,8 +1,12 @@
 # Lo que corre en el servidor de AWS.
 #
-# Son dos contenedores y ninguno guarda nada: la base es Supabase, los curriculums viven en
+# Son tres contenedores y ninguno guarda nada: la base es Supabase, los curriculums viven en
 # su bucket y la cola es Amazon MQ. Esta maquina se puede tirar y volver a crear sin perder
 # nada mas que los certificados, que Caddy vuelve a sacar solo.
+#
+# El tercero es «talento» y se sumo el 24/08/2026: hasta entonces el modulo de Capacidad,
+# Desempeno y Human Gate estaba escrito y probado pero no corria en ningun entorno, asi que
+# la mitad del checklist del Sprint 1 no se podia verificar «llamando directo a la API».
 #
 # Se levanta con:
 #   docker compose --env-file .env up -d
@@ -118,6 +122,67 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  # ---------------------------------------------------------------- talento
+  #
+  # El modulo de Capacidad, Desempeno y Human Gate (repositorio renaser-os-talent-backend).
+  #
+  # POR QUE AQUI Y NO EN RENDER. Su render.yaml existe pero apunta al plan gratuito, que
+  # suspende la instancia a los 15 minutos sin trafico y tarda cerca de un minuto en
+  # despertar; y el motor ya se mudo de Render a AWS en agosto, asi que mantenerlo alli
+  # serian dos proveedores para dos mitades del mismo producto. Esta maquina ya esta pagada
+  # y ya tiene HTTPS.
+  #
+  # LA MEMORIA ES EL LIMITE REAL, no el CPU. La maquina es una t3.medium: 4 GB, mas los 2 GB
+  # de swap que crea user-data.sh. El motor toma hasta 2 GB, este 1 GB, Caddy unos 50 MB, y
+  # el resto es para el sistema y Docker. Sale justo y por eso el techo va escrito: sin
+  # mem_limit, la primera tanda de calificacion con IA se come la maquina y el contenedor de
+  # talento desaparece sin dejar nada en su propio log.
+  #
+  # 1 GB alcanza porque este modulo no llama a ningun modelo ni consume de la cola: son
+  # consultas, reglas y formulas. Sus 133 pruebas corren en menos de un minuto.
+  talento:
+    # DETRAS DE UN PERFIL, y esto no es un detalle de estilo.
+    #
+    # Sin el, añadir este servicio rompe el despliegue del motor: `docker compose up -d`
+    # intentaria levantarlo, IMAGEN_TALENTO estaria vacia en el .env que ya existe en la
+    # maquina, y el arranque fallaria entero — llevandose por delante un backend que
+    # funcionaba. Con el perfil, lo de hoy sigue igual hasta que alguien lo encienda.
+    #
+    # Se enciende poniendo COMPOSE_PROFILES=talento en el .env del servidor.
+    profiles:
+      - talento
+    image: ${IMAGEN_TALENTO}
+    container_name: renaser-talento
+    restart: always
+    environment:
+      # La misma base que el motor, la cadena DIRECTA de Supabase (5432, no el pooler).
+      # Nombres distintos a los del motor porque este modulo los lee con su propio prefijo.
+      RENASER_DB_URL: ${SPRING_DATASOURCE_URL}
+      RENASER_DB_USER: ${SPRING_DATASOURCE_USERNAME}
+      RENASER_DB_PASSWORD: ${SPRING_DATASOURCE_PASSWORD}
+      # Cinco conexiones de las treinta del proyecto. El motor ya reserva doce y las
+      # personas necesitan las suyas: psql, el panel de Supabase, la rama de otro.
+      RENASER_DB_POOL_MAX: ${RENASER_DB_POOL_MAX:-5}
+
+      # ⚠️ La identidad la emite Supabase Auth, no este backend. Sin el JWKS el modulo
+      # arranca DENEGANDO todo Talento —falla cerrado, no abierto—, asi que un despliegue
+      # sin esta variable levanta un servicio que responde 401 a todo y parece roto.
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: ${TALENTO_JWKS_URI}
+      RENASER_JWT_ISSUER: ${TALENTO_JWT_ISSUER}
+      RENASER_JWT_AUDIENCE: ${TALENTO_JWT_AUDIENCE:-authenticated}
+
+      RENASER_ORG_CODIGO: ${RENASER_ORG_CODIGO:-RENASER}
+      # Nunca «*»: son los origenes del panel que puede llamarle.
+      RENASER_WEB_ORIGENES_PERMITIDOS: ${TALENTO_ORIGENES}
+
+      JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=70.0
+    mem_limit: ${MEMORIA_TALENTO:-1g}
+    # Solo red interna: quien habla con el mundo es Caddy. No se publica en loopback
+    # porque el chequeo de desplegar.sh pregunta por el motor, no por este.
+    expose:
+      - "8080"
+    logging: *registro
+
   # ---------------------------------------------------------------- la puerta
   #
   # Caddy y no un balanceador: un ALB son 16 dolares al mes para repartir trafico entre UNA
@@ -127,6 +192,9 @@ services:
     image: caddy:2-alpine
     container_name: renaser-caddy
     restart: always
+    # Sin «talento» a proposito: Compose rechaza que un servicio dependa de otro que
+    # esta en un perfil apagado. Si talento no corre, Caddy devuelve 502 en sus rutas y
+    # el resto del sitio sigue en pie, que es el comportamiento que se quiere.
     depends_on:
       - aplicacion
     ports:

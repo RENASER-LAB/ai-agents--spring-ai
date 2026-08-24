@@ -29,6 +29,17 @@ aws ecr get-login-password --region "$REGION" \
 echo "==> Bajando la imagen"
 docker compose --env-file .env pull aplicacion
 
+# El modulo de Talento solo si esta encendido en el .env (COMPOSE_PROFILES=talento).
+# Se pregunta antes de bajar nada porque con `set -e` un pull de un servicio que no
+# esta en ningun perfil activo aborta el despliegue entero — y se llevaria por delante
+# un motor que funcionaba.
+if docker compose --env-file .env config --services | grep -qx talento; then
+  echo "==> Bajando la imagen de talento"
+  docker compose --env-file .env pull talento
+else
+  echo "==> Talento apagado (sin COMPOSE_PROFILES=talento en .env): no se toca"
+fi
+
 echo "==> Reiniciando"
 docker compose --env-file .env up -d
 

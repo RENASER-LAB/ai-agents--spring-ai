@@ -6,13 +6,31 @@
 {$DOMINIO} {
 	encode gzip
 
-	# Todo va al backend. El portal del candidato vive en Vercel, asi que aqui solo
+	# El modulo de Talento —Capacidad, Desempeno y Human Gate— es otro servicio, y se
+	# reparte por la ruta: /api/talento/** va a el, todo lo demas al motor.
+	#
+	# Se reparte aqui y no por subdominio a proposito: un subdominio nuevo pide otro
+	# certificado y otra entrada de DNS, y hoy el dominio es una IP con nip.io. Por ruta
+	# funciona con el certificado que ya hay, y el dia que Renaser tenga dominio propio
+	# esto sigue valiendo igual.
+	#
+	# Los dos van en «handle», y el segundo SIN matcher hace de resto. Mezclar un handle
+	# con un reverse_proxy suelto tambien funciona, pero deja el reparto dependiendo del
+	# orden en que Caddy ordena las directivas en vez de del orden escrito aqui: dos
+	# bloques handle lo hacen explicito y se lee de arriba abajo.
+	handle /api/talento/* {
+		reverse_proxy talento:8080
+	}
+
+	# Todo lo demas va al motor. El portal del candidato vive en Vercel, asi que aqui solo
 	# hay API: no se sirve ningun archivo estatico.
-	reverse_proxy aplicacion:8080 {
-		# La calificacion con IA puede tardar. Sin esto Caddy corta a los 30 segundos y
-		# el candidato ve un error mientras el trabajo sigue corriendo por dentro.
-		transport http {
-			read_timeout 120s
+	handle {
+		reverse_proxy aplicacion:8080 {
+			# La calificacion con IA puede tardar. Sin esto Caddy corta a los 30 segundos
+			# y el candidato ve un error mientras el trabajo sigue corriendo por dentro.
+			transport http {
+				read_timeout 120s
+			}
 		}
 	}
 
