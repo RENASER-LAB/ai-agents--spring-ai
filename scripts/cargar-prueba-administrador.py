@@ -67,7 +67,7 @@ Pasaste a la prueba del puesto para «{{vacante}}». Enhorabuena.
 RESPONDE AQUI, SIN CONTRASENA:
 {{enlace}}
 
-Tienes {{plazo}} desde este correo. Lo que escribas se guarda solo.
+{{PLAZO_REAL}} Lo que escribas se guarda solo.
 
 Responde con experiencias reales: cantidades, personas a cargo, volumenes,
 herramientas utilizadas y resultados obtenidos.
@@ -376,15 +376,41 @@ def asignar_pesos(api, vacante):
              "siguen tomando el reparto de siempre")
 
 
-def cargar_plantilla_correo(api, vacante_id):
+MESES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto",
+         "septiembre", "octubre", "noviembre", "diciembre"]
+DIAS = ["lunes", "martes", "miercoles", "jueves", "viernes", "sabado", "domingo"]
+
+
+def texto_del_plazo(cierra_en):
+    """«Tienes hasta el lunes 24 de agosto a las 11:59 p. m.», en hora de Lima.
+
+    Se calcula aqui y se escribe DENTRO del texto en vez de usar la variable {{plazo}} del
+    sistema: esa dice los dias que trae la plantilla —siete—, no la fecha en que cierra la
+    vacante. Con las dos cosas puestas, el correo decia «tienes 7 dias» y el sistema cerraba
+    al dia siguiente.
+    """
+    if not cierra_en:
+        return "Tienes {{plazo}} desde este correo."
+    from datetime import datetime, timedelta
+    utc = datetime.strptime(cierra_en.replace("Z", "+0000"), "%Y-%m-%dT%H:%M:%S%z")
+    lima = utc - timedelta(hours=5)          # Lima es UTC-5 todo el año
+    hora = lima.strftime("%I:%M %p").lstrip("0").replace("AM", "a. m.").replace("PM", "p. m.")
+    return (f"Tienes hasta el {DIAS[lima.weekday()]} {lima.day} de {MESES[lima.month - 1]} "
+            f"a las {hora}")
+
+
+def cargar_plantilla_correo(api, vacante_id, cierra_en):
     """El texto propio de esta vacante, sin tocar el de las demás."""
+    plantilla = dict(PLANTILLA_ADMINISTRADOR)
+    plantilla["cuerpo"] = plantilla["cuerpo"].replace("{{PLAZO_REAL}}",
+                                                      texto_del_plazo(cierra_en))
     activas = [p for p in api.get("/panel/plantillas-correo")
-               if p["codigo"] == PLANTILLA_ADMINISTRADOR["codigo"] and p["esActiva"]]
-    if activas and activas[0]["cuerpo"] == PLANTILLA_ADMINISTRADOR["cuerpo"]:
+               if p["codigo"] == plantilla["codigo"] and p["esActiva"]]
+    if activas and activas[0]["cuerpo"] == plantilla["cuerpo"]:
         paso(f"El texto «{PLANTILLA_ADMINISTRADOR['codigo']}» ya estaba escrito igual")
     else:
-        api.post("/panel/plantillas-correo", PLANTILLA_ADMINISTRADOR)
-        paso(f"Texto «{PLANTILLA_ADMINISTRADOR['codigo']}» "
+        api.post("/panel/plantillas-correo", plantilla)
+        paso(f"Texto «{plantilla['codigo']}» "
              f"{'actualizado' if activas else 'creado'}: responde en el portal, con el "
              f"WhatsApp de alternativa")
 
@@ -395,7 +421,7 @@ def cargar_plantilla_correo(api, vacante_id):
         return
     api.post(f"/panel/vacantes/{vacante_id}/plantillas-correo", {
         "avisoCodigo": "PRUEBA_DISPONIBLE",
-        "plantillaCodigo": PLANTILLA_ADMINISTRADOR["codigo"],
+        "plantillaCodigo": plantilla["codigo"],
     })
     paso(f"Solo la vacante {vacante_id} manda ese texto. Arquitecto e Ingeniero Civil "
          f"siguen con el suyo, intacto")
@@ -439,7 +465,7 @@ def main():
     asignar_pesos(api, vacante)
 
     print("\n5 · El texto del correo con que se invita a la prueba")
-    cargar_plantilla_correo(api, vacante['id'])
+    cargar_plantilla_correo(api, vacante['id'], args.cierra_en)
 
     if args.cierra_en:
         print("\n5b · La fecha en que cierra la prueba, para toda la vacante")
