@@ -265,8 +265,11 @@ class ServicioCalificacionPruebaImplTest {
     @Test
     @DisplayName("le fija la fecha y deja escrito de qué fecha venía")
     void fijaLaFechaYAudita() {
-        Instant antes = Instant.parse("2026-08-29T21:00:00Z");
-        Instant nueva = Instant.parse("2026-08-24T05:00:00Z");
+        // Relativas al reloj: definirPlazo rechaza una fecha ya pasada, así que un literal
+        // futuro es una bomba de tiempo — pasa hasta el día que llega y revienta sin que
+        // nadie haya tocado el código. «antes» es el valor que TENÍA, no el más temprano.
+        Instant nueva = Instant.now().plus(3, java.time.temporal.ChronoUnit.DAYS);
+        Instant antes = nueva.plus(5, java.time.temporal.ChronoUnit.DAYS);
         when(postulaciones.findByIdAndOrganizacionId(POSTULACION, ORGANIZACION))
                 .thenReturn(Optional.of(Postulacion.builder()
                         .id(POSTULACION).organizacionId(ORGANIZACION).vacanteId(VACANTE).build()));

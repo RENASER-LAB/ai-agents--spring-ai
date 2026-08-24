@@ -199,9 +199,12 @@ class ServicioVacantesPanelImplTest {
     @DisplayName("fijar la fecha mueve a los que ya están dentro, no solo a los que entren")
     void laFechaMueveALosQueYaEstanDentro() {
         Vacante v = vacante("PUBLICADA", false, null);
-        Instant domingo = Instant.parse("2026-08-24T05:00:00Z");
+        // Relativa al reloj y no escrita a mano: definirCierrePrueba rechaza una fecha ya
+        // pasada, así que un literal futuro caduca solo y revienta el día que le llega.
+        Instant domingo = Instant.now().plus(3, java.time.temporal.ChronoUnit.DAYS);
         IntentoPrueba heredado = IntentoPrueba.builder()
-                .id(1L).postulacionId(11L).venceEn(Instant.parse("2026-08-29T00:00:00Z"))
+                .id(1L).postulacionId(11L)
+                .venceEn(domingo.plus(5, java.time.temporal.ChronoUnit.DAYS))
                 .plazoPropio(false).build();
         when(intentos.abiertosDeLaVacante(VACANTE)).thenReturn(List.of(heredado));
 
@@ -220,13 +223,17 @@ class ServicioVacantesPanelImplTest {
     @DisplayName("a quien le dieron más horas a mano no se le tocan")
     void aQuienTienePlazoPropioNoSeLeToca() {
         vacante("PUBLICADA", false, null);
-        Instant suya = Instant.parse("2026-08-26T05:00:00Z");
+        // La suya vence más tarde que el cierre de la convocatoria: eso es exactamente lo que
+        // significa «más horas a mano». Las dos relativas al reloj, que la fecha que entra a
+        // definirCierrePrueba tiene que ser futura y un literal deja de serlo con el tiempo.
+        Instant cierre = Instant.now().plus(3, java.time.temporal.ChronoUnit.DAYS);
+        Instant suya = cierre.plus(2, java.time.temporal.ChronoUnit.DAYS);
         IntentoPrueba conLoSuyo = IntentoPrueba.builder()
                 .id(2L).postulacionId(12L).venceEn(suya).plazoPropio(true).build();
         when(intentos.abiertosDeLaVacante(VACANTE)).thenReturn(List.of(conLoSuyo));
 
         var salida = servicio.definirCierrePrueba(QUIEN, VACANTE,
-                new DefinirCierrePrueba(Instant.parse("2026-08-24T05:00:00Z"), "Cierre único"));
+                new DefinirCierrePrueba(cierre, "Cierre único"));
 
         assertThat(conLoSuyo.getVenceEn())
                 .as("perder «más horas para esta persona» al mover la convocatoria sería silencioso")
