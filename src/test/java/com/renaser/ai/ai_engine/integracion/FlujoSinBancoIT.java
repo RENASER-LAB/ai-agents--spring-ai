@@ -23,6 +23,9 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.rabbitmq.RabbitMQContainer;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -288,7 +291,12 @@ public class FlujoSinBancoIT {
     @Test
     @Order(5)
     void laVacanteFijaCuandoCierraSuPrueba() throws Exception {
-        String domingo = "2026-08-24T05:00:00Z";
+        // Relativas al reloj: los dos endpoints rechazan con 400 una fecha ya pasada, así que
+        // un literal futuro aguanta hasta el día que llega y luego revienta sin que nadie haya
+        // tocado el código. Truncadas al segundo porque más abajo se comparan como texto
+        // contra lo que devuelve la API, e Instant.toString() escribe los nanos si los hay.
+        Instant base = Instant.now().truncatedTo(ChronoUnit.SECONDS);
+        String domingo = base.plus(3, ChronoUnit.DAYS).toString();
         conToken(post("/api/v1/panel/vacantes/" + vacanteId + "/cierre-prueba"), tokenTalento,
                 "{\"cierraEn\":\"%s\",\"motivo\":\"Cierre único de la convocatoria\"}".formatted(domingo))
                 .andExpect(status().isOk());
@@ -303,13 +311,14 @@ public class FlujoSinBancoIT {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.venceEn").value(domingo));
 
-        String suya = "2026-08-26T05:00:00Z";
+        // La suya, más tarde que el cierre de la convocatoria: eso es «más horas a mano».
+        String suya = base.plus(5, ChronoUnit.DAYS).toString();
         conToken(post("/api/v1/panel/postulaciones/" + conLoSuyo.id() + "/prueba/plazo"), tokenTalento,
                 "{\"venceEn\":\"%s\",\"motivo\":\"Pidió más horas por viaje\"}".formatted(suya))
                 .andExpect(status().isOk());
 
         // Se mueve la fecha de la convocatoria: el primero la sigue, el segundo conserva la suya
-        String lunes = "2026-08-25T05:00:00Z";
+        String lunes = base.plus(4, ChronoUnit.DAYS).toString();
         conToken(post("/api/v1/panel/vacantes/" + vacanteId + "/cierre-prueba"), tokenTalento,
                 "{\"cierraEn\":\"%s\",\"motivo\":\"Se amplía un día\"}".formatted(lunes))
                 .andExpect(status().isOk())
