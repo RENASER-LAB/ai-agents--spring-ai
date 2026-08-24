@@ -268,6 +268,52 @@ public class FlujoHito1IT {
                 .andReturn().getResponse().getContentAsString();
         codigoPostulacion = leer(respuesta, "codigo");
 
+        // CP-04 · quien NO confirma un requisito activo se descarta solo, con el motivo escrito.
+        //
+        // El caso estaba implementado desde hacia meses y sin ninguna prueba: se ejercitaba
+        // solo el camino feliz —el de arriba, que si confirma— asi que nadie sabia si la
+        // rama del descarte seguia funcionando. Es el punto CP-04 del checklist del Sprint 1.
+        mvc.perform(post("/api/v1/portal/cuentas")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"nombre": "Bruno", "apellidos": "Quispe",
+                                 "correo": "no.cumple@ejemplo.pe", "contrasena": "Demo12345!",
+                                 "aceptaProceso": true, "aceptaFuturosContactos": false}"""))
+                .andExpect(status().isCreated());
+        String tokenSinRequisito = leer(mvc.perform(post("/api/v1/portal/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"correo\":\"no.cumple@ejemplo.pe\",\"contrasena\":\"Demo12345!\"}"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString(), "token");
+
+        mvc.perform(multipart("/api/v1/portal/postulaciones")
+                        .file(new MockMultipartFile("cv", "cv.pdf", "application/pdf", "x".getBytes()))
+                        .param("vacanteId", String.valueOf(vacanteId))
+                        .param("resultadoOrgulloso", "Algo de lo que estoy orgulloso")
+                        // Sin requisitosConfirmados: no confirma el que la vacante exige
+                        .header("Authorization", "Bearer " + tokenSinRequisito))
+                .andExpect(status().isCreated());
+
+        // Se descarta sola, sin que nadie del equipo intervenga
+        mvc.perform(get("/api/v1/portal/postulaciones")
+                        .header("Authorization", "Bearer " + tokenSinRequisito))
+                .andExpect(jsonPath("$[0].estado").value("NO_CONTINUA"));
+
+        // Y el motivo queda escrito y es legible: «descartado» sin decir por que obliga al
+        // candidato a preguntar y al equipo a reconstruirlo.
+        Long idDescartada = jdbc.queryForObject("""
+                select p.id from postulacion p join usuario u on u.id = p.usuario_id
+                 where u.correo = 'no.cumple@ejemplo.pe'
+                """, Long.class);
+        assertThat(jdbc.queryForObject(
+                "select motivo_cierre from postulacion where id = ?", String.class, idDescartada))
+                .isEqualTo("REQUISITO_OBJETIVO");
+        assertThat(jdbc.queryForObject("""
+                select motivo from transicion_estado
+                 where postulacion_id = ? and estado_nuevo_codigo = 'NO_CONTINUA'
+                """, String.class, idDescartada))
+                .contains("Requisito objetivo no cumplido");
+
         // Cumplió el requisito: pasó de POSTULADA a PERFIL_TURNO_CANDIDATO (dos
         // transiciones del sistema) y el CV quedó en disco
         mvc.perform(get("/api/v1/portal/postulaciones")

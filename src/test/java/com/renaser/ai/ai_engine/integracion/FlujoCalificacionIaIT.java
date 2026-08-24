@@ -386,7 +386,7 @@ public class FlujoCalificacionIaIT {
         assertThat(nota.get("version_pesos_id")).isEqualTo(versionDeLaVacante);
     }
 
-    @DisplayName("Si la IA falla se reintenta, y no se inventa ninguna nota")
+    @DisplayName("CP-12 · Si la IA falla se reintenta, y no se inventa ninguna nota")
     @Test
     @Order(2)
     void siLaIaFallaSeReintentaYNoSeInventaNingunaNota() throws Exception {

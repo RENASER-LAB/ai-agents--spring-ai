@@ -111,7 +111,7 @@ class PuertasCerradasIT {
     }
 
     @Test
-    @DisplayName("Y el panel sigue cerrado, que es lo que ya funcionaba")
+    @DisplayName("CP-11 · Y el panel sigue cerrado, que es lo que ya funcionaba")
     void elPanelSigueCerrado() throws Exception {
         mvc.perform(get("/api/v1/panel/bandeja").param("espera_a", "TALENTO"))
                 .andExpect(status().isUnauthorized());
