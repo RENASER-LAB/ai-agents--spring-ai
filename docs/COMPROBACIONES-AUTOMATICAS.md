@@ -47,22 +47,23 @@ demás de la calificación se prueba con un doble del modelo y no gasta nada.
 
 ---
 
-## 381 pruebas
+## 547 pruebas
 
-Contadas de correrlas el 20/08/2026, no de recordarlas: el desglose sale de los
-informes de surefire y failsafe.
+Contadas de correrlas el 24/08/2026, no de recordarlas: el desglose sale de los
+informes de surefire y failsafe, y suma exacto.
 
 | Qué | Cuántas | Necesita |
 |---|---:|---|
-| Unitarias, con dobles | 171 | nada |
+| Unitarias, con dobles | 438 | nada |
 | Arquitectura | 8 | nada |
 | Las fórmulas del banco v3 | 20 | nada |
 | El validador de las respuestas v3 | 14 | nada |
-| Los dos agentes nuevos y sus puentes | 92 | nada |
-| El enlace de acceso y el correo | 26 | nada |
-| Integración, de punta a punta | 41 | Docker |
-| Migraciones contra Postgres real | 3 | Docker |
+| Integración, de punta a punta | 61 | Docker |
 | Contra el proveedor de verdad, y el envío de correo | 6 | Docker o SMTP, y su bandera |
+
+Las tres filas del medio se listan aparte porque se prueban solas, sin contexto de Spring:
+son las que deciden la nota de una persona y las que impiden que una respuesta con mala
+forma llegue a puntuarse.
 
 Entre las de integración hay dos que no se parecen al resto y conviene conocer: la del **banco
 por el panel** (`FlujoBancoPreguntasIT`), donde un administrador construye, publica y archiva un
