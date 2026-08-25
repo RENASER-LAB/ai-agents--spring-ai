@@ -325,6 +325,21 @@ public class FlujoPruebaIT {
                 "{\"puntaje\":35,\"explicacion\":\"Código limpio, faltó cubrir un caso borde\"}")
                 .andExpect(status().isOk());
 
+        // Una nota de criterio que NO es de esta rúbrica, como la que deja la criba o el
+        // perfil integral: `nota_criterio` es una sola tabla para las tres etapas que
+        // puntúan por criterio. La nota de la prueba tiene que seguir siendo 85.
+        //
+        // Sin esto el fallo no se veía: aquí se sumaban TODAS las notas de la postulación,
+        // y como en las pruebas de antes solo existían las dos de la rúbrica, el total
+        // coincidía por casualidad. En producción no: un candidato de 50 sobre 100 salió
+        // con 675 porque se le pegaron las siete del perfil.
+        Long criterioAjeno = jdbc.queryForObject(
+                "insert into criterio (codigo, nombre, etapa_codigo, puntos, metodo_verificacion, orden) "
+                        + "values ('DE_OTRA_ETAPA', 'Criterio de otra etapa', 'PERFIL_INTEGRAL', "
+                        + "590, 'AGENTE', 99) returning id", Long.class);
+        jdbc.update("insert into nota_criterio (postulacion_id, criterio_id, puntaje, explicacion, origen) "
+                + "values (?, ?, 590, 'De otra etapa', 'AGENTE')", postulacionId, criterioAjeno);
+
         String cuerpo = conToken(post("/api/v1/panel/postulaciones/" + postulacionId + "/prueba/calificacion"),
                         tokenTalento, null)
                 .andExpect(status().isOk())

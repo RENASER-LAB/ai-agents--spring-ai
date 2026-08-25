@@ -36,6 +36,13 @@ public class CalificacionPruebaController {
         return servicio.verNotas(permisos.actual(), postulacionId);
     }
 
+    @GetMapping("/respuestas")
+    @PreAuthorize("@permisos.tiene('abrir_ficha_candidato')")
+    @Operation(summary = "Lo que contestó el candidato, pregunta a pregunta")
+    public List<RespuestaDePrueba> verRespuestas(@PathVariable Long postulacionId) {
+        return servicio.verRespuestas(permisos.actual(), postulacionId);
+    }
+
     @PostMapping("/calificacion-ia")
     @PreAuthorize("@permisos.tiene('ajustar_nota')")
     @Operation(summary = "Pedirle al agente PRUEBA_PUESTO que califique los criterios que la "

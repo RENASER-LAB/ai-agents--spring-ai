@@ -5,6 +5,7 @@ import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.DefinirPlazoPr
 import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.NotaCriterioResponse;
 import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.PlazoPrueba;
 import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.PonerNotaCriterio;
+import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.RespuestaDePrueba;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
 
 import java.math.BigDecimal;
@@ -29,6 +30,19 @@ import java.util.List;
 public interface ServicioCalificacionPrueba {
 
     List<NotaCriterioResponse> verNotas(ContextoUsuario quien, Long postulacionId);
+
+    /**
+     * Lo que el candidato contestó, pregunta a pregunta y en el orden en que las vio.
+     *
+     * <p>Hasta ahora sus respuestas solo las podían leer dos: el propio candidato en su
+     * portal, y el agente al calificar. Quien revisaba veía la nota y la justificación, pero
+     * no el texto que las originó — y una nota que no se puede contrastar con lo que la
+     * persona escribió no se puede discutir, solo creer.
+     *
+     * <p>Salen todas las preguntas de su versión de la plantilla, también las que dejó en
+     * blanco: que alguien no contestara la cuarta es justo lo que hay que poder ver.
+     */
+    List<RespuestaDePrueba> verRespuestas(ContextoUsuario quien, Long postulacionId);
 
     /**
      * Le pide al agente que califique la parte de la rúbrica que le toca.
