@@ -263,4 +263,161 @@ class ArquitecturaTest {
 
         regla.check(codigo);
     }
+
+    // ========================================================================
+    // El aislamiento entre empresas (pieza B del multiempresa)
+    // ========================================================================
+
+    /**
+     * Los repositorios de agregados «con dueño»: sus filas pertenecen a una organización,
+     * directamente o a través de su padre. Buscar en ellos por id suelto desde un servicio
+     * del panel es la fuga típica entre empresas — invisible mientras solo exista una.
+     */
+    private static final Set<String> REPOSITORIOS_CON_DUENO = Set.of(
+            RAIZ + ".vacante.repository.VacanteRepository",
+            RAIZ + ".vacante.repository.PuestoRepository",
+            RAIZ + ".postulacion.repository.PostulacionRepository",
+            RAIZ + ".solicitud.repository.SolicitudTalentoRepository",
+            RAIZ + ".pesos.repository.VersionPesosRepository",
+            RAIZ + ".perfilintegral.repository.PlantillaEvaluacionRepository",
+            RAIZ + ".prueba.repository.PlantillaPruebaRepository",
+            RAIZ + ".prueba.repository.VersionPlantillaPruebaRepository",
+            RAIZ + ".archivo.repository.ArchivoRepository",
+            RAIZ + ".simulacion.repository.SesionSimulacionRepository",
+            RAIZ + ".simulacion.repository.InscripcionSesionRepository",
+            RAIZ + ".decision.repository.BarreraCriticaRepository",
+            RAIZ + ".consentimiento.repository.SolicitudBorradoRepository",
+            RAIZ + ".usuario.repository.InvitacionRepository");
+
+    /**
+     * Las llamadas {@code findById} sobre esos repositorios que SÍ están bien, una por una
+     * y con su porqué. La lista es la aduana: una llamada nueva falla esta prueba hasta que
+     * alguien la escriba aquí, y escribirla obliga a mirar si de verdad no filtra.
+     *
+     * <p>Casi todas se salvan por el mismo patrón — <b>derivar al padre</b>: la fila se
+     * busca por id suelto, pero su id no vino del cliente sino de una fila ya validada
+     * (la postulación de la organización, la inscripción de una sesión propia), o la
+     * organización se comprueba acto seguido a través del padre. Lo ajeno termina en 404
+     * igual. Los otros dos motivos, señalados en su grupo: el portal filtra por persona,
+     * no por organización; y el borrado 29733 es de la plataforma y ya pasó su aduana.
+     */
+    private static final Set<String> LLAMADAS_SIN_DUENO_ACORDADAS = Set.of(
+            // El guardián laVisible de cada panel: la postulación ya se resolvió con
+            // findByIdAndOrganizacionId; su vacante se pide por id solo para comprobar el
+            // alcance SUS_VACANTES. Derivar al padre en su forma más pura.
+            "ServicioPostulacionesPanelImpl#laVisible",
+            "ServicioPerfilIntegralPanelImpl#laVisible",
+            "ServicioPerfilPanelImpl#laVisible",
+            "ServicioCalificacionPruebaImpl#laVisible",
+            "ServicioCalificacionSimulacion#laVisible",
+            "ServicioSimulacionImpl#laVisible",
+            "ServicioDecisionImpl#laVisible",
+            "ServicioValidacionImpl#laVisible",
+            // Derivan de una postulación o vacante ya validada por su guardián: la
+            // vacante de la postulación, el puesto de la vacante, la plantilla que la
+            // vacante tiene asignada (y que se validó contra el dueño al asignarla).
+            "ServicioPostulacionesPanelImpl#confirmarAvance",
+            "ServicioPostulacionesPanelImpl#ficha",
+            "ServicioPerfilIntegralPanelImpl#pesosDe",
+            "ServicioPerfilIntegralPanelImpl#ranking",
+            "ServicioPerfilIntegralPanelImpl#vacanteVisible",
+            "ServicioDecisionImpl#calcular",
+            "ServicioDecisionImpl#decidir",
+            "ServicioEvaluacionImpl#crearAlPostular",
+            "ServicioEvaluacionImpl#pintar",
+            "ServicioVacantesPanelImpl#asignarPlantillaEvaluacion",
+            "ServicioVacantesPanelImpl#definirCierrePrueba",
+            "ServicioVacantesPanelImpl#fechaDeCierreDe",
+            "ServicioPruebaImpl#laVersion",
+            "CalificacionPorCriterio#calcularNotaEtapa",
+            "CalificacionPorCriterio#maximosDe",
+            "MaquinaEstados#avisarAlCandidato",
+            "MaquinaEstados#loDeLaPrueba",
+            // Buscan por id suelto Y COMPRUEBAN al dueño en la línea siguiente: son la
+            // implementación misma del patrón, no una excepción a él.
+            "ServicioSimulacionImpl#laInscripcion",
+            "ServicioSimulacionImpl#inscribirse",
+            "ServicioSimulacionImpl#marcarAsistencia",
+            "ServicioSimulacionImpl#miSesion",
+            "ServicioPlantillaPruebaImpl#laVersionVisible",
+            "ServicioPlantillaPruebaImpl#laVersionEnBorrador",
+            "ServicioVacantesPanelImpl#asignarPlantillaPrueba",
+            "ServicioDecisionImpl#registrarBarreraDetectada",
+            // El portal: el candidato es de la plataforma y sus cosas se filtran por
+            // persona, no por organización. Y el tablón de vacantes publicadas es LA
+            // excepción deliberada del spec B: se ve el de todas las empresas.
+            "ServicioPortalImpl#vacante",
+            "ServicioPortalImpl#postular",
+            "ServicioPortalImpl#comoResumen",
+            // El borrado 29733 es de la plataforma: exigirPlataforma ya cerró la puerta
+            // antes de estas búsquedas, y la solicitud cruza empresas a propósito.
+            "ServicioAdministracionImpl#ejecutarBorrado");
+
+    /**
+     * Ningún servicio del panel busca por id suelto en un agregado con dueño.
+     *
+     * <p>La regla de la pieza B: toda consulta del panel entra por la organización de quien
+     * pregunta ({@code findByIdAndOrganizacionId} o un guardián que derive al padre), y lo
+     * ajeno responde 404. Esta prueba convierte el olvido en compilación rota: con una sola
+     * empresa una consulta sin filtrar funciona idéntico, y nadie lo nota hasta que la
+     * segunda empresa ve los datos de la primera.
+     *
+     * <p>Se vigilan los servicios que reciben {@link com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario}:
+     * ahí hay un usuario de una organización concreta preguntando. Los procesos sin nadie
+     * conectado (cola, barridos) toman la organización de cada trabajo y quedan fuera.
+     *
+     * <p><b>Lo que esta regla no ve</b>, dicho para que nadie lo suponga cubierto: escribir
+     * una clave foránea ajena sin buscarla antes (no hay llamada que inspeccionar), y las
+     * consultas derivadas con nombre distinto de {@code findById}. La prueba de las dos
+     * empresas ({@code FlujoDosEmpresasIT}) es la otra mitad del vigilante.
+     */
+    @Test
+    void ningunServicioDelPanelBuscaPorIdSueltoEnUnAgregadoConDueno() {
+        ArchRule regla = classes()
+                .that().resideInAPackage("..service..")
+                .should(new ArchCondition<>("pasar por el guardián de organización al buscar por id") {
+                    @Override
+                    public void check(JavaClass clase, ConditionEvents eventos) {
+                        boolean recibeContexto = clase.getMethods().stream()
+                                .anyMatch(m -> m.getRawParameterTypes().stream()
+                                        .anyMatch(t -> t.getName()
+                                                .equals(RAIZ + ".seguridad.dto.ContextoUsuario")));
+                        if (!recibeContexto) {
+                            return;
+                        }
+                        for (var llamada : clase.getMethodCallsFromSelf()) {
+                            // Se compara el dueño de la llamada porque findById vive en
+                            // CrudRepository: lo que identifica al repositorio es el tipo
+                            // sobre el que se invoca, no dónde está declarado el método.
+                            if (!"findById".equals(llamada.getName())
+                                    || !REPOSITORIOS_CON_DUENO.contains(
+                                            llamada.getTargetOwner().getName())) {
+                                continue;
+                            }
+                            String donde = clase.getSimpleName() + "#"
+                                    + sinEnvoltorioDeLambda(llamada.getOrigin().getName());
+                            if (LLAMADAS_SIN_DUENO_ACORDADAS.contains(donde)) {
+                                continue;
+                            }
+                            eventos.add(SimpleConditionEvent.violated(clase, donde
+                                    + " llama a " + llamada.getTargetOwner().getSimpleName()
+                                    + ".findById sin pasar por la organización: con dos "
+                                    + "empresas, eso lee datos de la otra"));
+                        }
+                    }
+                })
+                .because("toda consulta del panel entra por la organización de quien pregunta, "
+                        + "y lo que no es suyo responde 404; el findById suelto es la fuga que "
+                        + "una sola empresa jamás delata");
+
+        regla.check(codigo);
+    }
+
+    /** Una llamada dentro de una lambda llega como {@code lambda$metodo$0}: se firma con el método. */
+    private static String sinEnvoltorioDeLambda(String nombreDeOrigen) {
+        if (nombreDeOrigen.startsWith("lambda$")) {
+            return nombreDeOrigen.substring("lambda$".length(), nombreDeOrigen.lastIndexOf('$'));
+        }
+        return nombreDeOrigen;
+    }
 }
