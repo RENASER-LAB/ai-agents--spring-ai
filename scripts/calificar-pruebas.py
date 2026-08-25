@@ -30,15 +30,18 @@ LO QUE HAY QUE SABER
 - **Volver a lanzarlo no cobra dos veces.** El backend contesta SIN_CAMBIOS si esa prueba
   ya la califico el agente o si hay un trabajo suyo en marcha.
 
-- La nota de la etapa (el numero sobre 100) solo se puede calcular cuando **todos** los
-  criterios de la rubrica tienen nota. Si alguno se quedo para una persona, aqui sale
-  «pendiente» y el numero aparecera cuando alguien lo complete desde el panel.
+- La nota de la etapa (el numero sobre 100) solo sale cuando **todos** los criterios de la
+  rubrica tienen nota. Si alguno se quedo para una persona, aqui sale «—»: media rubrica
+  sumada da un numero bajo que parece un juicio y es un hueco.
 
 USO
 ---
     python scripts/calificar-pruebas.py --vacante 16                  # solo mira
     python scripts/calificar-pruebas.py --vacante 16 --de-verdad      # lo pide
     python scripts/calificar-pruebas.py --vacante 16 --solo-notas     # ya calificadas
+
+NO ESCRIBE NADA salvo las calificaciones que se piden con --de-verdad. La nota sobre 100 se
+calcula aqui a partir de la rubrica; no se le pide al backend, que al calcularla la guarda.
 """
 import argparse
 import json
@@ -105,13 +108,24 @@ def notas_de(identificador, token):
     }
 
 
-def nota_de_etapa(identificador, token):
-    """El numero sobre 100, si la rubrica esta completa. Si falta alguna, None."""
-    codigo, respuesta = llamar(
-        "POST", f"/api/v1/panel/postulaciones/{identificador}/prueba/calificacion", token)
-    if codigo in (200, 201) and isinstance(respuesta, dict):
-        return respuesta.get("nota")
-    return None
+def nota_de(notas):
+    """
+    La nota sobre 100, o None si la rubrica no esta entera.
+
+    Se calcula AQUI y no se le pide al backend. El endpoint POST .../prueba/calificacion
+    sumaba todas las notas de criterio de la postulacion en vez de las de esta rubrica, y
+    como `nota_criterio` es una sola tabla para las tres etapas que puntuan por criterio,
+    a la prueba se le pegaban las del perfil: un candidato de 50 sobre 100 salio con 675.
+    Ya esta arreglado en el backend, pero ese endpoint ademas GUARDA lo que calcula, asi
+    que mientras el arreglo no este desplegado llamarlo escribe la nota mala.
+
+    Sumar los puntajes basta porque cada criterio.puntos ya es su peso dentro de 100: la
+    rubrica publicada suma 100. Se divide igualmente entre el maximo, que es lo que hace
+    cierto el «sobre 100» aunque una rubrica futura no sume exactamente eso.
+    """
+    if not notas or notas["puestas"] != notas["total"] or not notas["maximo"]:
+        return None
+    return round(notas["suma"] * 100.0 / notas["maximo"], 2)
 
 
 def esperar(vacante, token, pedidas, minutos):
@@ -148,8 +162,7 @@ def imprimir(filas, token):
         if notas is None:
             print(f"{(fila['candidato'] or '')[:32]:32}  {'—':>6}  {'—':>9}  sin prueba")
             continue
-        completa = notas["puestas"] == notas["total"] and notas["total"] > 0
-        nota = nota_de_etapa(fila["postulacionId"], token) if completa else None
+        nota = nota_de(notas)
         resumen.append((fila, notas))
         print(f"{(fila['candidato'] or '')[:32]:32}  "
               f"{(f'{float(nota):6.2f}' if nota is not None else '     —')}  "

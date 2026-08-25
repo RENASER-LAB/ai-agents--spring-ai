@@ -17,6 +17,20 @@ public final class DtosCalificacionPrueba {
             Long criterioId, String nombre, Double puntosMaximos,
             Double puntaje, String explicacion, String origen) {}
 
+    /**
+     * Una pregunta del cuestionario con lo que contestó el candidato.
+     *
+     * <p>No lleva {@code revela}, que es la señal interna de qué mide cada pregunta: quien
+     * revisa juzga la respuesta, y saber qué se buscaba la condiciona. Tampoco el id del
+     * intento: desde el panel se entra por la postulación.
+     *
+     * <p>{@code respuesta} es null si dejó esa pregunta en blanco, que no es lo mismo que
+     * haberla contestado vacía y hay que poder distinguirlo.
+     */
+    public record RespuestaDePrueba(
+            Long preguntaId, String codigo, Integer orden, String tipo,
+            String enunciado, String respuesta, Instant respondidaEn) {}
+
     /** Lo que se contesta al pedirle al agente que califique. */
     public record CalificacionIaEncolada(String estado, String mensaje) {}
 

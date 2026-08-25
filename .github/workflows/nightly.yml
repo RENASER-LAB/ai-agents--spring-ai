@@ -30,6 +30,11 @@ jobs:
       DEEPSEEK_API_KEY: clave-de-mentira-el-fuzzing-no-califica
       # Apaga la calificación con IA: postular no encola ningún trabajo
       RENASER_AI_CALIFICACION_HABILITADA: 'false'
+      # El perfil «local» —el que se aplica aquí, porque nadie nombra otro— mueve el puerto
+      # al 8081, que en una máquina de trabajo evita el 8080 ya ocupado. En el runner el 8080
+      # está libre, y es el que dan por hecho las tres URL de abajo y el valor por defecto de
+      # sembrar-datos-de-prueba.py. Se fija aquí para no repetir el número en cuatro sitios.
+      SERVER_PORT: '8080'
     steps:
       - uses: actions/checkout@v4
 
@@ -42,9 +47,17 @@ jobs:
       - name: Levantar Postgres y RabbitMQ
         run: docker compose up -d --wait
 
+      # Es «test-run» y no «run» a propósito, por lo mismo que lo es en el README. El perfil
+      # «local» pide app.archivos.tipo=memoria, y ese almacén es un doble que vive en
+      # src/test: en producción no puede existir un almacén que se traga los currículums en
+      # silencio. «run» solo carga el classpath de main, donde la única implementación de
+      # AlmacenArchivos es la de Supabase y está condicionada a tipo=supabase, así que no
+      # quedaba ningún bean que inyectar y la aplicación no arrancaba —«Parameter 16 of
+      # constructor in ServicioAdministracionImpl required a bean of type AlmacenArchivos»—.
+      # «test-run» arranca la misma aplicación con el classpath de pruebas, que sí lo trae.
       - name: Arrancar la aplicación
         run: |
-          nohup ./mvnw -B spring-boot:run > app.log 2>&1 &
+          nohup ./mvnw -B spring-boot:test-run > app.log 2>&1 &
           for i in $(seq 1 36); do
             if curl --fail --silent --output /dev/null http://localhost:8080/v3/api-docs; then
               echo "La aplicación contesta."

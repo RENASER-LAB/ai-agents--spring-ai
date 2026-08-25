@@ -420,13 +420,20 @@ es `optional:`, asi que alli todo llega por variable de entorno. La lista comple
 Un solo proyecto para dos cosas: el modulo de seleccion de personal y el motor de agentes de
 IA. **Los mantienen dos personas distintas**, asi que no comparten paquetes.
 
-**El motor de agentes** (lo lleva Ricardo) vive entero bajo `ai_engine/ai/`, organizado por
-capa: `config`, `controller`, `service`, `repository`, `dto`, `model`, `mapper`, `exception`,
-`context`, `flow`, `messaging`, `prompt`, `rag`, `supabase`. **No tocar nada de ahi dentro.**
+**El motor de agentes** vive entero bajo `ai_engine/ai/`, organizado por capa: `config`,
+`controller`, `service`, `repository`, `dto`, `model`, `mapper`, `exception`, `context`,
+`flow`, `messaging`, `prompt`, `rag`, `supabase`.
 
-Nuestro codigo usa una sola clase suya, `ai/exception/ResourceNotFoundException`, en cinco
-servicios. Es la unica dependencia que cruza la frontera, y conviene saberlo: si el la mueve
-otra vez, esos cinco imports se rompen.
+Hasta el 24/08/2026 lo llevaba Ricardo y aqui ponia **«No tocar nada de ahi dentro»**. Ya no:
+Ricardo dejo de trabajar en el motor y ahora es responsabilidad nuestra, asi que se toca como
+cualquier otra parte. Lo que **si** sigue en pie es la separacion entre los dos modulos: la
+regla de ArchUnit que solo deja cruzar la frontera por las clases de la lista `ACORDADAS`
+sigue valiendo, porque es una decision de diseno y no de reparto de trabajo.
+
+Lo que cruza la frontera esta enumerado en la lista `ACORDADAS` de `ArquitecturaTest`, y la
+regla falla si aparece algo que no este ahi. La mas usada es
+`ai/exception/ResourceNotFoundException`, en cinco servicios. Antes esta frase decia «una sola
+clase» y hoy son varias: mirar la lista, que es la que manda.
 
 **La seleccion de personal** vive en un paquete por dominio, cada uno con sus capas dentro:
 

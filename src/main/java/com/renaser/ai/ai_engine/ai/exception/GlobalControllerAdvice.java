@@ -52,6 +52,14 @@ public class GlobalControllerAdvice {
         return problemDetail;
     }
 
+    @ExceptionHandler(IngestaNoPermitidaException.class)
+    public ProblemDetail handleIngestaNoPermitida(IngestaNoPermitidaException ex, WebRequest request) {
+        log.warn("Ingesta rechazada - Path: {}, Message: {}", request.getDescription(false), ex.getMessage());
+
+        return buildProblemDetail(HttpStatus.BAD_REQUEST, "Ingesta no permitida",
+                "ingesta-no-permitida", ex.getMessage());
+    }
+
     @ExceptionHandler(Exception.class)
     public ProblemDetail handleException(Exception ex, WebRequest request) {
         log.warn("Ha ocurrido un error inesperado - Path: {}, Message: {}",

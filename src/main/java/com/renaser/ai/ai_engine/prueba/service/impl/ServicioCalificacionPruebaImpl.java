@@ -7,8 +7,6 @@ import com.renaser.ai.ai_engine.perfilintegral.entity.Criterio;
 import com.renaser.ai.ai_engine.perfilintegral.entity.NotaCriterio;
 import com.renaser.ai.ai_engine.perfilintegral.repository.CriterioRepository;
 import com.renaser.ai.ai_engine.perfilintegral.repository.NotaCriterioRepository;
-import com.renaser.ai.ai_engine.perfilintegral.repository.NotaEtapaRepository;
-import com.renaser.ai.ai_engine.perfilintegral.entity.NotaEtapa;
 import com.renaser.ai.ai_engine.pesos.repository.VersionPesosRepository;
 import com.renaser.ai.ai_engine.postulacion.entity.Postulacion;
 import com.renaser.ai.ai_engine.postulacion.repository.PostulacionRepository;
@@ -17,6 +15,14 @@ import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.DefinirPlazoPr
 import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.NotaCriterioResponse;
 import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.PlazoPrueba;
 import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.PonerNotaCriterio;
+import com.renaser.ai.ai_engine.perfilintegral.service.CalificacionPorCriterio;
+import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.RespuestaDePrueba;
+import com.renaser.ai.ai_engine.prueba.entity.PreguntaPrueba;
+import com.renaser.ai.ai_engine.prueba.entity.PreguntaVersionPlantilla;
+import com.renaser.ai.ai_engine.prueba.entity.RespuestaPrueba;
+import com.renaser.ai.ai_engine.prueba.repository.PreguntaPruebaRepository;
+import com.renaser.ai.ai_engine.prueba.repository.PreguntaVersionPlantillaRepository;
+import com.renaser.ai.ai_engine.prueba.repository.RespuestaPruebaRepository;
 import com.renaser.ai.ai_engine.prueba.entity.IntentoPrueba;
 import com.renaser.ai.ai_engine.prueba.repository.IntentoPruebaRepository;
 import com.renaser.ai.ai_engine.prueba.service.ServicioCalificacionPrueba;
@@ -32,6 +38,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -41,16 +48,21 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ServicioCalificacionPruebaImpl implements ServicioCalificacionPrueba {
 
+    private static final String ETAPA = "PRUEBA_PUESTO";
+
     private final PostulacionRepository postulaciones;
     private final VacanteRepository vacantes;
     private final IntentoPruebaRepository intentos;
     private final CriterioRepository criterios;
+    private final PreguntaVersionPlantillaRepository preguntasElegidas;
+    private final PreguntaPruebaRepository preguntasCatalogo;
+    private final RespuestaPruebaRepository respuestas;
     private final NotaCriterioRepository notasCriterio;
-    private final NotaEtapaRepository notasEtapa;
     private final VersionPesosRepository versionesPesos;
     private final ColaCalificacionIa cola;
     private final Permisos permisos;
     private final ServicioAuditoria auditoria;
+    private final CalificacionPorCriterio calificacion;
 
     @Override
     public List<NotaCriterioResponse> verNotas(ContextoUsuario quien, Long postulacionId) {
@@ -67,6 +79,41 @@ public class ServicioCalificacionPruebaImpl implements ServicioCalificacionPrueb
                     n == null ? null : n.getExplicacion(),
                     n == null ? null : n.getOrigen());
         }).toList();
+    }
+
+    @Override
+    public List<RespuestaDePrueba> verRespuestas(ContextoUsuario quien, Long postulacionId) {
+        Postulacion postulacion = laVisible(quien, postulacionId, "abrir_ficha_candidato");
+        IntentoPrueba intento = intentos.findByPostulacionId(postulacion.getId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Prueba del puesto", "postulación", postulacionId));
+
+        // Las preguntas de SU versión de la plantilla, en el orden en que las vio. Salen de
+        // ahí y no del catálogo entero: una versión publicada después puede llevar otras, y
+        // lo que hay que enseñar es lo que se le puso delante a esta persona.
+        List<Long> ids = preguntasElegidas
+                .findByVersionPlantillaPruebaIdOrderByOrden(intento.getVersionPlantillaPruebaId())
+                .stream().map(PreguntaVersionPlantilla::getPreguntaPruebaId).toList();
+        Map<Long, PreguntaPrueba> porId = preguntasCatalogo.findByIdIn(ids).stream()
+                .collect(Collectors.toMap(PreguntaPrueba::getId, Function.identity()));
+        Map<Long, RespuestaPrueba> suyas = respuestas.findByIntentoPruebaId(intento.getId())
+                .stream().collect(Collectors.toMap(RespuestaPrueba::getPreguntaPruebaId,
+                        Function.identity(), (a, b) -> a));
+
+        List<RespuestaDePrueba> salida = new ArrayList<>();
+        for (Long id : ids) {
+            PreguntaPrueba pregunta = porId.get(id);
+            if (pregunta == null) continue;
+            RespuestaPrueba respuesta = suyas.get(id);
+            // Se emite también la que dejó en blanco: saber que no contestó la cuarta es
+            // parte de lo que se revisa, y omitirla la haría invisible.
+            salida.add(new RespuestaDePrueba(
+                    pregunta.getId(), pregunta.getCodigo(), pregunta.getOrden(),
+                    pregunta.getTipo(), pregunta.getEnunciado(),
+                    respuesta == null ? null : respuesta.getTexto(),
+                    respuesta == null ? null : respuesta.getRespondidaEn()));
+        }
+        return salida;
     }
 
     @Override
@@ -145,39 +192,13 @@ public class ServicioCalificacionPruebaImpl implements ServicioCalificacionPrueb
     @Transactional
     public BigDecimal calcularNotaEtapa(ContextoUsuario quien, Long postulacionId) {
         Postulacion postulacion = laVisible(quien, postulacionId, "ajustar_nota");
-        List<Criterio> rubrica = laRubricaDe(postulacion);
-        Map<Long, NotaCriterio> notasPorCriterio = notasCriterio.findByPostulacionId(postulacionId).stream()
-                .collect(Collectors.toMap(NotaCriterio::getCriterioId, Function.identity()));
-
-        List<String> faltan = rubrica.stream()
-                .filter(c -> !notasPorCriterio.containsKey(c.getId()))
-                .map(Criterio::getNombre)
-                .toList();
-        if (!faltan.isEmpty()) {
-            throw new IllegalStateException(
-                    "Todavía faltan notas por poner: " + String.join(", ", faltan));
-        }
-
-        // Cada criterio.puntos ya es su peso dentro de 100 (la rúbrica publicada suma
-        // 100), así que sumar los puntajes obtenidos da directamente la nota de la etapa.
-        BigDecimal nota = notasPorCriterio.values().stream()
-                .map(NotaCriterio::getPuntaje)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        Vacante vacante = vacantes.findById(postulacion.getVacanteId())
-                .orElseThrow(() -> new IllegalStateException("La vacante de esta postulación ya no existe"));
-
-        NotaEtapa fila = notasEtapa.findByPostulacionIdAndEtapaCodigo(postulacionId, "PRUEBA_PUESTO")
-                .orElseGet(() -> NotaEtapa.builder()
-                        .postulacionId(postulacionId)
-                        .etapaCodigo("PRUEBA_PUESTO")
-                        .creadoEn(Instant.now())
-                        .build());
-        fila.setPuntaje(nota);
-        fila.setVersionPesosId(vacante.getVersionPesosId());
-        fila.setCalculadaEn(Instant.now());
-        notasEtapa.save(fila);
-        return nota;
+        // Se delega en la versión compartida a propósito. Aquí hubo una copia de la misma
+        // suma, y la copia se desvió: sumaba TODAS las notas de criterio de la postulación
+        // en vez de las de esta rúbrica. Como `nota_criterio` es una sola tabla para las tres
+        // etapas que puntúan por criterio, a la nota de la prueba se le pegaban las del
+        // perfil: un candidato con 50 sobre 100 salió con 675. Una rúbrica bien acotada no
+        // basta si quien suma no la mira.
+        return calificacion.calcularNotaEtapa(postulacion, ETAPA, laRubricaDe(postulacion));
     }
 
     @Override
