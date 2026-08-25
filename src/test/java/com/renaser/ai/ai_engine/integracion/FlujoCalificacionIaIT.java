@@ -109,6 +109,9 @@ public class FlujoCalificacionIaIT {
         registro.add("app.archivos.tipo", () -> "memoria");
         registro.add("app.seguridad.jwt-secreto",
                 () -> "clave-de-pruebas-suficientemente-larga-para-hmac-256-bits");
+        // El dev-login quedo apagado por defecto en application.yaml: aqui se enciende
+        // explicitamente, porque estas pruebas entran al panel por el.
+        registro.add("app.seguridad.dev-login-activo", () -> "true");
         registro.add("spring.ai.deepseek.api-key", () -> "clave-de-pruebas-no-se-usa");
         // Dos intentos y no tres: la prueba del fallo tiene que agotarlos, y cada intento
         // vuelve a publicar el mensaje al momento.

@@ -248,7 +248,9 @@ public class ServicioAdministracionImpl implements ServicioAdministracion {
 
     @Override
     public List<UsuarioPanel> usuariosEquipo(ContextoUsuario quien) {
-        return usuarios.findByOrganizacionIdAndUsuarioRenaserOsIdIsNotNull(quien.organizacionId()).stream()
+        // Por es_equipo y no por el id de RENASER OS: con RENASER OS dormido, la mayoría
+        // del equipo nace por invitación y jamás tendrá ese id.
+        return usuarios.findByOrganizacionIdAndEsEquipoTrue(quien.organizacionId()).stream()
                 .map(this::comoPanel)
                 .toList();
     }
@@ -268,6 +270,7 @@ public class ServicioAdministracionImpl implements ServicioAdministracion {
                 .correo(datos.correo().trim().toLowerCase())
                 .usuarioRenaserOsId(datos.usuarioRenaserOsId())
                 .areaId(datos.areaId())
+                .esEquipo(true)
                 .esActivo(true)
                 .creadoEn(Instant.now())
                 .build());

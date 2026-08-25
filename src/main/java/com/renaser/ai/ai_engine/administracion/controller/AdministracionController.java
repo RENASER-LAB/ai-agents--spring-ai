@@ -3,7 +3,11 @@ package com.renaser.ai.ai_engine.administracion.controller;
 import com.renaser.ai.ai_engine.administracion.service.ServicioAdministracion;
 
 import com.renaser.ai.ai_engine.administracion.dto.DtosAdministracion.*;
+import com.renaser.ai.ai_engine.seguridad.dto.DtosSeguridad.CrearInvitacion;
+import com.renaser.ai.ai_engine.seguridad.dto.DtosSeguridad.InvitacionCreada;
+import com.renaser.ai.ai_engine.seguridad.dto.DtosSeguridad.InvitacionPanel;
 import com.renaser.ai.ai_engine.seguridad.service.Permisos;
+import com.renaser.ai.ai_engine.seguridad.service.ServicioInvitaciones;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -23,6 +27,7 @@ import java.util.Map;
 public class AdministracionController {
 
     private final ServicioAdministracion servicio;
+    private final ServicioInvitaciones invitaciones;
     private final Permisos permisos;
 
     // ---------- Parámetros ----------
@@ -108,6 +113,31 @@ public class AdministracionController {
     @Operation(summary = "Reemplazar los roles de un usuario. El último administrador no se puede quitar")
     public void asignarRoles(@PathVariable Long id, @Valid @RequestBody AsignarRoles datos) {
         servicio.asignarRoles(permisos.actual(), id, datos.roles());
+    }
+
+    // ---------- Invitaciones al panel ----------
+
+    @GetMapping("/usuarios/invitaciones")
+    @PreAuthorize("@permisos.tiene('crear_usuarios_y_asignar_roles')")
+    @Operation(summary = "Las invitaciones de la organización, canjeadas o no")
+    public List<InvitacionPanel> invitaciones() {
+        return invitaciones.listar(permisos.actual());
+    }
+
+    @PostMapping("/usuarios/invitaciones")
+    @PreAuthorize("@permisos.tiene('crear_usuarios_y_asignar_roles')")
+    @ResponseStatus(HttpStatus.CREATED)
+    @Operation(summary = "Invitar a alguien al equipo: manda el correo con el enlace de un "
+            + "solo uso y devuelve ese enlace a quien invita")
+    public InvitacionCreada invitar(@Valid @RequestBody CrearInvitacion datos) {
+        return invitaciones.crear(permisos.actual(), datos.correo(), datos.roles());
+    }
+
+    @DeleteMapping("/usuarios/invitaciones/{id}")
+    @PreAuthorize("@permisos.tiene('crear_usuarios_y_asignar_roles')")
+    @Operation(summary = "Revocar una invitación que aún no se canjeó")
+    public void revocarInvitacion(@PathVariable Long id) {
+        invitaciones.revocar(permisos.actual(), id);
     }
 
     @GetMapping("/areas")

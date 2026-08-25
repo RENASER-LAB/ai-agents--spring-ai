@@ -27,8 +27,10 @@ public final class DtosAdministracion {
     public record SolicitudBorradoPanel(Long id, Long personaId, String motivo,
                                         Instant solicitadoEn, Instant ejecutadoEn) {}
 
+    // usuarioRenaserOsId pasó a opcional con RENASER OS dormido: hoy una cuenta de equipo
+    // se crea con correo y entra por invitación o contraseña, no por RENASER OS.
     public record CrearUsuarioEquipo(@NotBlank String nombre, @NotBlank String apellidos,
-                                     @NotBlank String correo, @NotBlank String usuarioRenaserOsId,
+                                     @NotBlank String correo, String usuarioRenaserOsId,
                                      Long areaId, @NotNull List<String> roles) {}
 
     public record UsuarioPanel(Long id, String correo, String usuarioRenaserOsId,
