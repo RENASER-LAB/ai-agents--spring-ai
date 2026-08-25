@@ -37,6 +37,7 @@ requisitos nuevos el 14 de agosto y cambian bastante.
 | [09 · Las APIs](09-APIS.md) | Las dos puertas, cómo entrar y qué hace cada endpoint. La referencia viva es Swagger |
 | [Curso del backend](CURSO-BACKEND.md) | Ruta para entender el código que existe, en orden. Para quien entra al proyecto |
 | [Calificación con IA](CALIFICACION-CON-IA.md) | Cómo la IA lee el currículum, califica lo abierto y arma el Perfil de Talento. Y qué pasa si falla |
+| [La rúbrica de la prueba](RUBRICA-DE-LA-PRUEBA.md) | Cómo se reparten los 100 puntos de una prueba y **quién pone cada nota**: el sistema, un agente o una persona |
 | [Criba de currículums](CRIBA-DE-CURRICULUMS.md) | Cargar una convocatoria con una carpeta de currículums, pedir que la IA los lea y ver quién es el más apto |
 | [Fallos corregidos de la criba](FALLOS-CORREGIDOS-CRIBA.md) | Los cinco fallos que salieron al pasar 190 currículums reales. Cuatro no daban error |
 | [Los siete fallos de la auditoría](FALLOS-CORREGIDOS-AUDITORIA.md) | Lo que encontró la revisión del 18/08: cuatro que tocaban dinero o decisiones de contratación, y ninguno daba error |
@@ -47,7 +48,7 @@ requisitos nuevos el 14 de agosto y cambian bastante.
 | [El perfil, para Renaser](PARA-RENASER-EL-PERFIL-DEL-CANDIDATO.md) | La explicación sin tecnicismos, para decidir si merece la pena |
 | [CI/CD](CI-CD.md) | Qué corre en cada cambio, cómo se despliega a Pruebas en AWS y qué variables de entorno hacen falta |
 | [Conectar la base a Supabase](CONEXION-SUPABASE.md) | **Retirado.** El perfil `supabase` se borró el 21/08: apuntaba tu máquina a la única base que hay, la de producción. Queda la explicación de por qué |
-- [Los curriculums dejan de vivir en el backend](ARCHIVOS-EN-BUCKET.md) — el bucket, los dos enlaces firmados, y por que un PDF en el disco del backend se pierde en el primer despliegue
+| [Los currículums dejan de vivir en el backend](ARCHIVOS-EN-BUCKET.md) | El bucket, los dos enlaces firmados, y por qué un PDF en el disco del backend se pierde en el primer despliegue |
 
 ### Diagramas
 

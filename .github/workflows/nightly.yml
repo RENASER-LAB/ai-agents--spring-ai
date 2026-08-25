@@ -1,7 +1,9 @@
 # La corrida nocturna: lo lento y lo exploratorio, que no puede bloquear un PR.
 #
-#   fuzzing  Schemathesis lee el contrato OpenAPI y bombardea los 158 endpoints con
-#            entradas raras. Cualquier 500 es un bug: la API debe contestar 4xx a la
+#   fuzzing  Schemathesis lee el contrato OpenAPI y bombardea con entradas raras todos los
+#            endpoints que salgan en él —cuántos son no se escribe aquí: el contrato se
+#            genera del código y el número caduca con el primer endpoint nuevo—. Cualquier
+#            500 es un bug: la API debe contestar 4xx a la
 #            basura. Corre contra una aplicación LOCAL del runner, nunca contra el servidor:
 #            la calificación con IA va apagada y las claves son de mentira, así que
 #            ningún currículum falso llega a DeepSeek ni ensucia la base de pruebas.

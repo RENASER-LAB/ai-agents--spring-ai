@@ -1,7 +1,7 @@
 # Las APIs del sistema
 
 Sistema de selección de personal — Renaser Consulting
-Versión 1.4 · 2026-08-19 · Cubre **las cinco etapas del embudo**: postulación, Perfil Integral,
+Versión 1.5 · 2026-08-25 · Cubre **las cinco etapas del embudo**: postulación, Perfil Integral,
 prueba del puesto, simulación de trabajo, validación práctica y decisión final
 
 Este documento explica las APIs para quien las va a consumir: el frontend de RENASER OS y el
@@ -153,8 +153,11 @@ la postulación en el acto (`NO_CONTINUA`), con la regla exacta escrita en su hi
 | POST `/plantillas-prueba` · `/{id}/versiones` | Crear la plantilla y una versión en borrador | `editar_plantillas_prueba` |
 | POST `/plantillas-prueba/versiones/{id}/publicacion` | Publicar: exige 8-10 preguntas universales, 3-5 específicas, y la rúbrica sumando 100. **Una versión sin entregables es un cuestionario**: la cuota no rige y basta con una pregunta | `editar_plantillas_prueba` |
 | POST `/postulaciones/{id}/prueba/plazo` | Fijarle a ESE candidato su fecha de cierre, normalmente para darle más horas. **Queda marcada como suya**: mover después la fecha de la vacante no se la toca. Antes de empezar, la fecha puesta manda sobre el cálculo por días | `mover_postulacion` |
+| GET `/postulaciones/{id}/prueba/respuestas` | Lo que contestó, pregunta a pregunta. Las preguntas son **las de la versión que él vio**, en su orden, no las del catálogo de hoy: una versión publicada después puede llevar otras | `abrir_ficha_candidato` |
+| GET `/postulaciones/{id}/prueba/notas` | La rúbrica entera con lo que lleva puesto cada criterio: puntaje, explicación y **de quién viene la nota**, si de la IA o de una persona. Lo que aún no tiene nota sale en nulo | `ajustar_nota` |
 | POST `/postulaciones/{id}/prueba/criterios/{criterioId}/nota` | Poner la nota de un criterio, con explicación obligatoria | `ajustar_nota` |
-| POST `/postulaciones/{id}/prueba/calificacion` | Ponderar las notas ya puestas. Exige que estén todos los criterios | `ajustar_nota` |
+| POST `/postulaciones/{id}/prueba/calificacion-ia` | Pedirle al agente `PRUEBA_PUESTO` los criterios que la rúbrica le reserva. Tarda decenas de segundos y **no pisa ningún ajuste hecho a mano** | `ajustar_nota` |
+| POST `/postulaciones/{id}/prueba/calificacion` | Ponderar las notas ya puestas. Exige que estén todos los criterios. **Escribe**: deja la nota guardada, no es una consulta | `ajustar_nota` |
 
 **El portal del candidato es `/api/v1/portal/prueba/{codigo}`**: ver, iniciar (arranca el
 reloj), responder, subir entregables y entregar. Mismas reglas que la evaluación: nada de

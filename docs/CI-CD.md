@@ -47,6 +47,7 @@ Si el nocturno sale rojo, alguien lo revisa por la mañana. No bloquea PRs.
 |---|---|---|
 | `SONAR_TOKEN` | Secreto | Lo genera SonarCloud al importar el repositorio |
 | ~~`RENDER_DEPLOY_HOOK`~~ | — | **Ya no hace falta.** El despliegue va a AWS |
+| ~~`PRUEBAS_URL`~~ | — | **Ya no hace falta.** La dirección de Pruebas está escrita en el propio `ci.yml` |
 
 **Y no hay ninguna clave de AWS guardada en GitHub**, a propósito. Se usa OIDC: GitHub firma
 un token de un solo uso, AWS lo verifica y devuelve credenciales que caducan en minutos. Una
@@ -79,7 +80,6 @@ sts:AssumeRoleWithWebIdentity*, el `sub` real se lee en CloudTrail, buscando el 
 La imagen se sube con **dos etiquetas**: `latest`, que es la que despliega, y el SHA del
 commit. Esa segunda es la que permite volver atrás: sin ella «la versión anterior» no tiene
 nombre y revertir obliga a reconstruir desde el código.
-| ~~`PRUEBAS_URL`~~ | — | **Ya no hace falta.** La dirección de Pruebas está escrita en el propio `ci.yml` |
 
 ## Las variables de entorno de la aplicación
 
