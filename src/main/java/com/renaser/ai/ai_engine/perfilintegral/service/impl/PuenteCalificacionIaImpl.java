@@ -95,6 +95,7 @@ public class PuenteCalificacionIaImpl implements PuenteCalificacionIa {
     private static final List<String> TIPOS_ALERTA = List.of("CONTRADICCION", "DEMASIADO_IDEAL");
 
     private final PostulacionRepository postulaciones;
+    private final com.renaser.ai.ai_engine.perfil.service.ServicioPropuestaPerfil propuestaPerfil;
     private final VacanteRepository vacantes;
     private final PuestoRepository puestos;
     private final CvRepository cvs;
@@ -183,6 +184,12 @@ public class PuenteCalificacionIaImpl implements PuenteCalificacionIa {
         fila.setEjecucionIaId(ejecucionIaId);
         fila.setActualizadoEn(Instant.now());
         datosCv.save(fila);
+
+        // Lo mismo que se guardo aqui se PROPONE al perfil del candidato. Propone, no
+        // escribe encima: lo que la persona corrigio o confirmo no se toca (RF-159).
+        // Misma transaccion a proposito — si el perfil fallara, la ficha tampoco se
+        // daria por guardada y el trabajo se reintentaria entero.
+        propuestaPerfil.proponer(postulacionId, resultado);
 
         log.info("DATOS_CV: ficha de la postulación {} guardada ({})",
                 postulacionId, fila.getNombre() == null ? "sin nombre" : fila.getNombre());

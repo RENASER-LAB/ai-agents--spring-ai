@@ -21,6 +21,10 @@ public class Archivo {
     private String nombreOriginal;
     private Long tamano;
     private String tipo;
+    // SHA-256 del contenido en hexadecimal. Es lo que permite saber que un curriculum
+    // identico ya fue leido por la IA y no volver a pagar la lectura. Nullable: los
+    // archivos anteriores a la columna no lo tienen, y eso solo significa «leer de nuevo».
+    private String contenidoHash;
     private Instant subidoEn;
     private Instant borradoEn;
     private Instant creadoEn;

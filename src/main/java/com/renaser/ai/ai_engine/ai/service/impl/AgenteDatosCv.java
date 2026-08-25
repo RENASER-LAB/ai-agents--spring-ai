@@ -49,10 +49,24 @@ public class AgenteDatosCv implements AgenteSeleccion {
               "ultimoPuesto": "<el puesto mas reciente, o null>",
               "ultimaEmpresa": "<la empresa mas reciente, o null>",
               "ultimaMesesDuracion": <cuantos meses duro, o null>,
-              "educacionMaxima": "<el nivel mas alto alcanzado, o null>"
+              "educacionMaxima": "<el nivel mas alto alcanzado, o null>",
+              "experiencia": [{"puesto": "<puesto>", "empresa": "<empresa>",
+                "desde": "<AAAA-MM>", "hasta": "<AAAA-MM, o null si sigue ahi>",
+                "descripcion": "<una oracion, o null>"}],
+              "educacion": [{"titulo": "<titulo o estudio>", "institucion": "<institucion>",
+                "nivel": "<SECUNDARIA|TECNICA|UNIVERSITARIA|TITULADO|MAESTRIA|DOCTORADO, o null>",
+                "desde": "<AAAA-MM, o null>", "hasta": "<AAAA-MM, o null>"}],
+              "idiomas": [{"idioma": "<idioma>", "nivel": "<A1|A2|B1|B2|C1|C2|NATIVO>"}],
+              "certificaciones": [{"nombre": "<nombre>", "entidad": "<entidad, o null>",
+                "emitidaEn": "<AAAA-MM, o null>", "venceEn": "<AAAA-MM, o null>"}]
             }
+            La experiencia del mas reciente al mas antiguo; si el curriculum no da la fecha
+            de inicio de un empleo, omite ese empleo. Si da el año sin mes, usa enero.
+            Los idiomas solo si el curriculum los declara: «basico» es A2, «intermedio» B1,
+            «avanzado» C1; sin nivel declarado, omite el idioma.
             Si un dato no esta en el curriculum, pon null. No lo deduzcas y no lo inventes.
-            No agregues ningun campo mas, ni explicaciones, ni comentarios.
+            Las listas pueden ir vacias. No agregues ningun campo mas, ni explicaciones,
+            ni comentarios.
             """;
 
     private final PuenteCalificacionIa puente;

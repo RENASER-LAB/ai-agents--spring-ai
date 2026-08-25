@@ -44,6 +44,7 @@ public class ServicioAdministracionImpl implements ServicioAdministracion {
     private final AuditoriaRepository auditorias;
     private final SolicitudBorradoRepository solicitudesBorrado;
     private final PersonaRepository personas;
+    private final com.renaser.ai.ai_engine.perfil.service.ServicioCicloVidaPerfil cicloVidaPerfil;
     private final UsuarioRepository usuarios;
     private final AreaRepository areas;
     private final RolRepository roles;
@@ -215,6 +216,11 @@ public class ServicioAdministracionImpl implements ServicioAdministracion {
             c.setNombreRegistrado(null);
             consentimientos.save(c);
         });
+
+        // 5b · El perfil del candidato se borra entero, y de verdad — no se anonimiza.
+        // No sostiene ninguna decisión (no puntúa), así que no hay nada que conservar.
+        // Antes de vaciar la persona, porque se localiza por persona_id.
+        cicloVidaPerfil.borrarPorPersona(persona.getId());
 
         // 6 · La persona queda vacía, la cuenta sin correo y desactivada
         persona.setNombre(null);

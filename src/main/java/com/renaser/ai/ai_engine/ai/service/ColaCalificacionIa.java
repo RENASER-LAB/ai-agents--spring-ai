@@ -104,6 +104,16 @@ public interface ColaCalificacionIa {
      *
      * @return true si quedó algo en la cola; false si ya está calificada o hay un trabajo vivo
      */
+    /**
+     * Pide SOLO la lectura de datos del currículum (agente DATOS_CV), sin calificar nada.
+     *
+     * <p>Existe para el perfil del candidato: al postular se lee el currículum para
+     * proponerle sus datos, y calificar sigue siendo una decisión aparte (y de pago) que
+     * toma el panel. Idempotente como los demás: si esa postulación ya tiene su ficha
+     * leída, no se paga otra lectura.
+     */
+    boolean encolarDatosCv(Long postulacionId);
+
     boolean encolarPruebaPuesto(Long postulacionId);
 
     /**

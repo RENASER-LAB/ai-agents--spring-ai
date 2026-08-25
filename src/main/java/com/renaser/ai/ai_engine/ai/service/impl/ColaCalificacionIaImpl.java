@@ -367,6 +367,13 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
      * <p>Cada uno atiende una etapa posterior y se pide a mano. Se mira igual que los demás
      * para no pagarlos dos veces, pero detrás de ellos no va nadie.
      */
+    @Override
+    public boolean encolarDatosCv(Long postulacionId) {
+        // El mismo camino de los sueltos: se mira antes de crear para no pagar dos veces,
+        // y seSalta ya sabe que una postulacion con ficha leida no vuelve a leerse.
+        return encolarSuelto(postulacionId, AgenteDatosCv.CODIGO_AGENTE);
+    }
+
     private boolean encolarSuelto(Long postulacionId, String agente) {
         if (situacionDe(postulacionId, agente, FINA, null) != Situacion.HAY_QUE_ENCOLARLO) {
             return false;

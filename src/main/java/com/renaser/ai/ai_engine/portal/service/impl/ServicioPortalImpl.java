@@ -66,6 +66,8 @@ public class ServicioPortalImpl implements ServicioPortal {
     private final CvRepository cvs;
     private final EnlaceCvRepository enlaces;
     private final MaquinaEstados maquina;
+    private final com.renaser.ai.ai_engine.perfil.service.ServicioPropuestaPerfil propuestaPerfil;
+    private final com.renaser.ai.ai_engine.perfil.service.ServicioLecturaCv lecturaCv;
     private final AlmacenArchivos almacen;
     private final ServicioCorreo correo;
     private final ServicioAuditoria auditoria;
@@ -278,6 +280,13 @@ public class ServicioPortalImpl implements ServicioPortal {
         guardarEnlace(curriculum.getId(), portafolio, "PORTAFOLIO");
         guardarEnlace(curriculum.getId(), linkedin, "OTRO");
         guardarEnlace(curriculum.getId(), github, "REPOSITORIO");
+
+        // El perfil del candidato se alimenta de lo que acaba de pasar: los enlaces del
+        // formulario se le proponen, y el curriculum se manda a leer — o se reutiliza la
+        // lectura ya pagada, si esta persona ya postulo con el mismo archivo (RF-161).
+        // Nada de esto puede tumbar la postulacion: la lectura traga sus propios errores.
+        propuestaPerfil.proponerEnlaces(quien.personaId(), linkedin, github, portafolio);
+        lecturaCv.trasPostular(quien.personaId(), postulacion.getId());
 
         Usuario usuario = usuarios.findById(quien.usuarioId()).orElseThrow();
         String nombre = personas.findById(quien.personaId()).map(Persona::getNombre).orElse("");

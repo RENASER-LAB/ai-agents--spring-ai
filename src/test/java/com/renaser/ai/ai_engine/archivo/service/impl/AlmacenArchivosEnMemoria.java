@@ -3,6 +3,7 @@ package com.renaser.ai.ai_engine.archivo.service.impl;
 import com.renaser.ai.ai_engine.archivo.entity.Archivo;
 import com.renaser.ai.ai_engine.archivo.repository.ArchivoRepository;
 import com.renaser.ai.ai_engine.archivo.service.AlmacenArchivos;
+import com.renaser.ai.ai_engine.archivo.service.HashContenido;
 import com.renaser.ai.ai_engine.archivo.service.TiposDeArchivo;
 
 import lombok.RequiredArgsConstructor;
@@ -50,11 +51,13 @@ public class AlmacenArchivosEnMemoria implements AlmacenArchivos {
 
         String ruta = organizacionId + "/" + UUID.randomUUID() + "."
                 + TiposDeArchivo.extensionDe(nombreOriginal);
+        byte[] contenido;
         try {
-            contenidos.put(ruta, archivo.getBytes());
+            contenido = archivo.getBytes();
         } catch (IOException e) {
             throw new UncheckedIOException("No se pudo leer el archivo que llegó", e);
         }
+        contenidos.put(ruta, contenido);
 
         return archivos.save(Archivo.builder()
                 .organizacionId(organizacionId)
@@ -62,6 +65,8 @@ public class AlmacenArchivosEnMemoria implements AlmacenArchivos {
                 .nombreOriginal(nombreOriginal)
                 .tamano(archivo.getSize())
                 .tipo(archivo.getContentType())
+                // Igual que el almacen de verdad: la huella permite no releer el mismo CV.
+                .contenidoHash(HashContenido.sha256(contenido))
                 .subidoEn(Instant.now())
                 .creadoEn(Instant.now())
                 .build());
