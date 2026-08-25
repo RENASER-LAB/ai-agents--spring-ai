@@ -103,11 +103,17 @@ pantalla siempre tiene algo que pintar.
 PUT /api/v1/portal/perfil
 ```
 
-Manda solo lo que cambia: `titular`, `resumen`, `habilidades`, `experienciaMeses`, `ubicacion`,
+Campos: `titular`, `resumen`, `habilidades`, `experienciaMeses`, `ubicacion`,
 `disponibilidad`, `pretension`.
 
+⚠️ **Es un PUT: reemplaza la cabecera entera.** Un campo que no mandes se guarda vacío, no se
+conserva. Manda siempre el objeto completo — lo más simple es partir de lo que devolvió el
+`GET` y cambiar encima.
+
 La pretensión es **todo o nada**: o mandas `min`, `max` y `moneda`, o mandas `null`. Un mínimo
-suelto sin moneda da **400**.
+suelto sin moneda da **400**. Para borrarla, `"pretension": null`.
+
+`experienciaMeses` va entre 0 y 720 (sesenta años de carrera). Fuera de ahí, **400**.
 
 ### Las listas
 
@@ -169,10 +175,13 @@ El campo `lecturaCv.estado` dice en qué punto está:
 | `SIN_CV` | Aún no ha subido ninguno |
 | `EN_CURSO` | «Estamos leyendo tu currículum» — conviene refrescar cada pocos segundos |
 | `LISTA` | Ya está: si aparecieron datos nuevos sin confirmar, invítale a revisarlos |
-| `NO_LEGIBLE` | **El archivo no se pudo leer** (escaneado, una imagen). El perfil se queda como estaba |
+| `NO_LEGIBLE` | **Del archivo no salió nada.** Puede ser un PDF escaneado, que la lectura se agotara en reintentos, o que nadie llegara a pedirla. El perfil se queda como estaba y en los tres casos lo que toca ofrecer es lo mismo: llenarlo a mano |
 
 `NO_LEGIBLE` **no es un error**: el sistema prefiere no leer nada antes que inventarse datos. La
 pantalla debe decirlo sin alarmar y sugerir llenarlo a mano.
+
+**`EN_CURSO` solo aparece mientras la lectura corre de verdad**, así que es seguro sondear
+contra él: no hay estado que se quede girando para siempre.
 
 ---
 
@@ -211,7 +220,11 @@ GET /api/v1/panel/postulaciones/{id}/perfil
 ```
 
 Solo lectura, con el permiso `ver_perfil_candidato`. Devuelve lo mismo que el portal **menos la
-pretensión salarial**, salvo que además se tenga `ver_pretension`.
+pretensión salarial**, salvo que además se tenga `ver_pretension` — y sin ese permiso el campo
+no aparece en el JSON **ni como `null`**.
+
+El permiso respeta su alcance: si está limitado a «sus vacantes», el candidato de una
+convocatoria ajena responde **404**, igual que en el resto del panel.
 
 **Un candidato sin perfil devuelve 200 con todo vacío**, no 404: la ficha no puede romperse por
 eso.

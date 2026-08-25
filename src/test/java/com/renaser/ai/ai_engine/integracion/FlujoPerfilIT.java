@@ -136,6 +136,12 @@ public class FlujoPerfilIT {
                  where c.postulacion_id = ?""", String.class, postulacionId);
         assertThat(hash).hasSize(64);
 
+        // Hay archivo pero nadie lo ha leido (la calificacion va apagada en esta prueba):
+        // NO_LEGIBLE, no «leyendo». Antes este caso dejaba a la pantalla dando vueltas para
+        // siempre, porque el estado se sacaba del retrato entero y no de la lectura.
+        conTokenGet("/api/v1/portal/perfil", tokenCandidato)
+                .andExpect(jsonPath("$.lecturaCv.estado").value("NO_LEGIBLE"));
+
         // Los enlaces del formulario ya estan en el perfil, con su tipo de verdad
         conTokenGet("/api/v1/portal/perfil", tokenCandidato)
                 .andExpect(jsonPath("$.enlaces[?(@.tipo=='LINKEDIN')]").exists())

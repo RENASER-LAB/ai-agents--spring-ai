@@ -47,7 +47,7 @@ demás de la calificación se prueba con un doble del modelo y no gasta nada.
 
 ---
 
-## 622 pruebas
+## 633 pruebas
 
 Contadas de correrlas el 25/08/2026, no de recordarlas: el desglose sale de los
 informes de surefire y failsafe, y suma exacto.
@@ -58,7 +58,7 @@ informes de surefire y failsafe, y suma exacto.
 | Arquitectura | 8 | nada |
 | Las fórmulas del banco v3 | 22 | nada |
 | El validador de las respuestas v3 | 21 | nada |
-| El perfil del candidato (merge, lectura, CRUD, retención, borrado) | 53 | nada |
+| El perfil del candidato (merge, lectura, CRUD, estados, retención, borrado) | 64 | nada |
 | Integración, de punta a punta | 78 | Docker |
 | Contra el proveedor de verdad, y el envío de correo | 6 | Docker o SMTP, y su bandera |
 

@@ -115,13 +115,18 @@ public class PintorDePerfil {
         }
         // Se pregunta por la interfaz acordada de la cola, no por sus tablas: la frontera
         // con el motor de agentes se cruza solo por las clases pactadas.
-        String comoVa = cola.estadoDe(List.of(ultima.getId()))
-                .get(ultima.getId()).comoVa();
-        if ("FALLIDA".equals(comoVa)) {
-            // No es un error: se prefirio no leer nada antes que inventar datos.
-            return new LecturaCv("NO_LEGIBLE", actualizadoEn);
+        //
+        // Y se pregunta por LA LECTURA, no por el retrato: `comoVa` mira los cuatro agentes
+        // juntos, asi que un evaluador caido decia «no se pudo leer» de un curriculum bien
+        // leido, y un retrato terminado sin ficha se quedaba en «leyendo» para siempre.
+        if ("EN_CURSO".equals(cola.comoVaLaLectura(ultima.getId()))) {
+            return new LecturaCv("EN_CURSO", actualizadoEn);
         }
-        return new LecturaCv("EN_CURSO", actualizadoEn);
+        // Hay archivo, no hay ficha y no queda nada corriendo. Da igual si el PDF estaba
+        // escaneado, si se agoto en reintentos o si nadie llego a pedir la lectura: de ese
+        // archivo no salio nada, y lo que la pantalla ofrece en los tres casos es lo mismo,
+        // llenarlo a mano. No es un error: se prefirio no leer nada antes que inventar datos.
+        return new LecturaCv("NO_LEGIBLE", actualizadoEn);
     }
 
     private static List<String> habilidadesDe(PerfilCandidato p) {

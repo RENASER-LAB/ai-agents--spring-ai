@@ -55,8 +55,11 @@ public class ServicioLecturaCvImpl implements ServicioLecturaCv {
         try {
             decidir(personaId, postulacionId);
         } catch (RuntimeException e) {
-            // Postular no puede fallar por esto: en el peor caso el curriculum se queda
-            // sin leer y la criba lo leera cuando alguien la pida, como siempre.
+            // Un fallo al DECIDIR no deja al candidato sin postular: en el peor caso el
+            // curriculum se queda sin leer y la criba lo leera cuando alguien la pida, como
+            // siempre. Ojo con lo que esto NO cubre: comparte transaccion con postular, asi
+            // que un error de la propia base (no de esta logica) la tumba igual.
+            // Deliberado: la lectura necesita ver la postulacion recien insertada.
             log.error("No se pudo decidir la lectura del CV de la postulación {}: {}",
                     postulacionId, e.getMessage(), e);
         }

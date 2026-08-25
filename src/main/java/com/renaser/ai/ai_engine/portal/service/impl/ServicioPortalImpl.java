@@ -284,7 +284,13 @@ public class ServicioPortalImpl implements ServicioPortal {
         // El perfil del candidato se alimenta de lo que acaba de pasar: los enlaces del
         // formulario se le proponen, y el curriculum se manda a leer — o se reutiliza la
         // lectura ya pagada, si esta persona ya postulo con el mismo archivo (RF-161).
-        // Nada de esto puede tumbar la postulacion: la lectura traga sus propios errores.
+        //
+        // Van DENTRO de la transaccion de postular, y eso es una decision con precio: la
+        // lectura tiene que ver la postulacion recien insertada (sus trabajos y su ficha
+        // apuntan a ella por clave foranea), asi que aislarla en una transaccion aparte la
+        // dejaria sin nada a lo que apuntar. El precio es que un fallo de base aqui —una
+        // carrera por el UNIQUE del perfil entre dos postulaciones a la vez— si tumbaria la
+        // postulacion; el try/catch de dentro atrapa el error de logica, no ese.
         propuestaPerfil.proponerEnlaces(quien.personaId(), linkedin, github, portafolio);
         lecturaCv.trasPostular(quien.personaId(), postulacion.getId());
 

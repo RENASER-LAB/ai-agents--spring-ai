@@ -250,16 +250,21 @@ SELECT DISTINCT ON (u.persona_id)
 -- La experiencia: dato_cv guarda UN empleo y sin fechas, solo cuantos meses duro. La fecha
 -- de inicio se reconstruye hacia atras desde la fecha del dato — es una aproximacion, y por
 -- eso entra sin confirmar.
+--
+-- Sin esos meses NO se migra el empleo, aunque se sepan puesto y empresa: `desde` es NOT NULL
+-- y rellenarlo con la fecha de hoy diria «empece hoy y sigo aqui», que es una trayectoria
+-- inventada. Mejor un hueco que un dato falso — la misma regla que aplica el resto del perfil.
 INSERT INTO experiencia_perfil (perfil_candidato_id, puesto, empresa, desde, origen, orden)
 SELECT DISTINCT ON (pc.id)
        pc.id, d.ultimo_puesto, d.ultima_empresa,
-       (d.actualizado_en - make_interval(months => coalesce(d.ultima_meses_duracion, 0)))::date,
+       (d.actualizado_en - make_interval(months => d.ultima_meses_duracion))::date,
        'CURRICULUM', 1
   FROM dato_cv d
   JOIN postulacion p       ON p.id = d.postulacion_id
   JOIN usuario     u       ON u.id = p.usuario_id
   JOIN perfil_candidato pc ON pc.persona_id = u.persona_id
  WHERE d.ultimo_puesto IS NOT NULL AND d.ultima_empresa IS NOT NULL
+   AND d.ultima_meses_duracion IS NOT NULL
  ORDER BY pc.id, d.actualizado_en DESC;
 
 -- Los enlaces que ya se mandaron al postular. enlace_cv no distingue LinkedIn (entro como
@@ -274,7 +279,11 @@ SELECT DISTINCT t.perfil_id, t.tipo_nuevo, t.url
            CASE
                WHEN e.tipo = 'REPOSITORIO' THEN 'GITHUB'
                WHEN e.tipo = 'OTRO' AND e.url ILIKE '%linkedin.com%' THEN 'LINKEDIN'
-               ELSE e.tipo
+               -- enlace_cv.tipo ADMITE NULL (V7) y esta columna es NOT NULL: sin el
+               -- coalesce, una sola fila sin tipo impedia que esta migracion aplicara.
+               -- Los demas valores de aquel CHECK —PORTAFOLIO, PUBLICACION, PRODUCTO,
+               -- OTRO— existen igual en el nuevo, asi que pasan tal cual.
+               ELSE COALESCE(e.tipo, 'OTRO')
            END AS tipo_nuevo,
            e.url
       FROM enlace_cv e

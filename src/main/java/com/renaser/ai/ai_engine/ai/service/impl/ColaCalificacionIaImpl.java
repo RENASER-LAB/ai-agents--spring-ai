@@ -236,6 +236,25 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
     }
 
     /** La cuenta, ya con los trabajos delante. La comparten el uno y la tanda entera. */
+    @Override
+    public String comoVaLaLectura(Long postulacionId) {
+        // Solo el ULTIMO trabajo de lectura: quien fallo y luego salio bien al reintentar
+        // arrastra su fila fallida para siempre, y mirar todas diria «no se pudo leer» de un
+        // curriculum que si esta leido.
+        Optional<TrabajoIa> ultimo = trabajos.findByPostulacionIdOrderByIdAsc(postulacionId)
+                .stream()
+                .filter(t -> AgenteDatosCv.CODIGO_AGENTE.equals(t.getAgenteCodigo()))
+                .reduce((a, b) -> b);
+        if (ultimo.isEmpty()) {
+            return "SIN_EMPEZAR";
+        }
+        return switch (ultimo.get().getEstado()) {
+            case "PENDIENTE", "EN_CURSO" -> "EN_CURSO";
+            case "FALLIDO" -> "FALLIDA";
+            default -> "TERMINADA";
+        };
+    }
+
     private String comoVan(List<TrabajoIa> todos) {
         // Solo los del retrato. Desde que existen los agentes de la prueba y de la
         // conversación final, una misma postulación puede tener trabajos de tres etapas

@@ -86,6 +86,10 @@ public final class DtosPerfil {
             @Size(max = 200) String titular,
             @Size(max = 2000) String resumen,
             List<String> habilidades,
+            // El mismo tope que aplica la lectura del curriculum: sesenta anos de carrera
+            // se creen, setenta y cinco no. Sin esto, el portal aceptaba meses negativos.
+            @jakarta.validation.constraints.Min(0)
+            @jakarta.validation.constraints.Max(720)
             Integer experienciaMeses,
             @Size(max = 200) String ubicacion,
             @Size(max = 200) String disponibilidad,

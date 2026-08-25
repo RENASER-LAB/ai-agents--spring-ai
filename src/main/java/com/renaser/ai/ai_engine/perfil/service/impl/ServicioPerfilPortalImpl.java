@@ -23,6 +23,7 @@ import com.renaser.ai.ai_engine.perfil.repository.IdiomaPerfilRepository;
 import com.renaser.ai.ai_engine.perfil.repository.NivelEducativoRepository;
 import com.renaser.ai.ai_engine.perfil.repository.NivelIdiomaRepository;
 import com.renaser.ai.ai_engine.perfil.repository.PerfilCandidatoRepository;
+import com.renaser.ai.ai_engine.perfil.service.ClaveNatural;
 import com.renaser.ai.ai_engine.perfil.service.ServicioPerfilPortal;
 import com.renaser.ai.ai_engine.perfil.service.ValidacionEnlaces;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
@@ -144,6 +145,7 @@ public class ServicioPerfilPortalImpl implements ServicioPerfilPortal {
     @Transactional
     public void borrarExperiencia(ContextoUsuario quien, Long id) {
         experiencias.delete(miExperiencia(quien, id));
+        tocar(elDe(quien));
     }
 
     @Override
@@ -152,6 +154,7 @@ public class ServicioPerfilPortalImpl implements ServicioPerfilPortal {
         ExperienciaPerfil fila = miExperiencia(quien, id);
         fila.setConfirmadoEn(Instant.now());   // el origen CURRICULUM se conserva a proposito
         experiencias.save(fila);
+        tocar(elDe(quien));
     }
 
     @Override
@@ -165,6 +168,7 @@ public class ServicioPerfilPortalImpl implements ServicioPerfilPortal {
             fila.setOrden(ids.indexOf(fila.getId()) + 1);
         }
         experiencias.saveAll(filas);
+        tocar(perfil);
     }
 
     // ==================== Educacion ====================
@@ -202,12 +206,14 @@ public class ServicioPerfilPortalImpl implements ServicioPerfilPortal {
         fila.setEnCurso(datos.enCurso());
         hacerloSuyo(fila::setOrigen, fila::setConfirmadoEn);
         educaciones.save(fila);
+        tocar(elDe(quien));
     }
 
     @Override
     @Transactional
     public void borrarEducacion(ContextoUsuario quien, Long id) {
         educaciones.delete(miEducacion(quien, id));
+        tocar(elDe(quien));
     }
 
     @Override
@@ -216,6 +222,7 @@ public class ServicioPerfilPortalImpl implements ServicioPerfilPortal {
         EducacionPerfil fila = miEducacion(quien, id);
         fila.setConfirmadoEn(Instant.now());
         educaciones.save(fila);
+        tocar(elDe(quien));
     }
 
     @Override
@@ -229,6 +236,7 @@ public class ServicioPerfilPortalImpl implements ServicioPerfilPortal {
             fila.setOrden(ids.indexOf(fila.getId()) + 1);
         }
         educaciones.saveAll(filas);
+        tocar(perfil);
     }
 
     // ==================== Idiomas ====================
@@ -238,8 +246,11 @@ public class ServicioPerfilPortalImpl implements ServicioPerfilPortal {
     public Long crearIdioma(ContextoUsuario quien, EditarIdioma datos) {
         exigirNivelIdioma(datos.nivelCodigo());
         PerfilCandidato perfil = elDe(quien);
+        // Misma normalizacion que el merge del curriculum: sin ella «ingles» entraba como
+        // un idioma distinto de «Ingles» y la lista acababa con el mismo dos veces.
+        String buscada = ClaveNatural.de(datos.idioma());
         boolean repetido = idiomas.findByPerfilCandidatoIdOrderByIdioma(perfil.getId()).stream()
-                .anyMatch(i -> i.getIdioma().equalsIgnoreCase(datos.idioma().trim()));
+                .anyMatch(i -> ClaveNatural.de(i.getIdioma()).equals(buscada));
         if (repetido) {
             throw new IllegalStateException("Ese idioma ya está en el perfil: edítalo");
         }
@@ -262,12 +273,14 @@ public class ServicioPerfilPortalImpl implements ServicioPerfilPortal {
         fila.setNivelCodigo(datos.nivelCodigo());
         hacerloSuyo(fila::setOrigen, fila::setConfirmadoEn);
         idiomas.save(fila);
+        tocar(elDe(quien));
     }
 
     @Override
     @Transactional
     public void borrarIdioma(ContextoUsuario quien, Long id) {
         idiomas.delete(miIdioma(quien, id));
+        tocar(elDe(quien));
     }
 
     @Override
@@ -276,6 +289,7 @@ public class ServicioPerfilPortalImpl implements ServicioPerfilPortal {
         IdiomaPerfil fila = miIdioma(quien, id);
         fila.setConfirmadoEn(Instant.now());
         idiomas.save(fila);
+        tocar(elDe(quien));
     }
 
     // ==================== Certificaciones ====================
@@ -307,12 +321,14 @@ public class ServicioPerfilPortalImpl implements ServicioPerfilPortal {
         fila.setVenceEn(datos.venceEn());
         hacerloSuyo(fila::setOrigen, fila::setConfirmadoEn);
         certificaciones.save(fila);
+        tocar(elDe(quien));
     }
 
     @Override
     @Transactional
     public void borrarCertificacion(ContextoUsuario quien, Long id) {
         certificaciones.delete(miCertificacion(quien, id));
+        tocar(elDe(quien));
     }
 
     @Override
@@ -321,6 +337,7 @@ public class ServicioPerfilPortalImpl implements ServicioPerfilPortal {
         CertificacionPerfil fila = miCertificacion(quien, id);
         fila.setConfirmadoEn(Instant.now());
         certificaciones.save(fila);
+        tocar(elDe(quien));
     }
 
     // ==================== Enlaces ====================
@@ -359,6 +376,7 @@ public class ServicioPerfilPortalImpl implements ServicioPerfilPortal {
                 .filter(e -> esMio(quien, e.getPerfilCandidatoId()))
                 .orElseThrow(() -> new ResourceNotFoundException("Enlace", "id", id));
         enlaces.delete(fila);
+        tocar(elDe(quien));
     }
 
     // ==================== Lo comun ====================
@@ -410,6 +428,11 @@ public class ServicioPerfilPortalImpl implements ServicioPerfilPortal {
         confirmado.accept(Instant.now());
     }
 
+    /**
+     * Toda escritura cuenta como actividad, no solo las altas: el barrido de retencion mira
+     * `actualizado_en`, y sin esto el perfil de quien lleva meses confirmando, ordenando y
+     * borrando se veria abandonado y se borraria solo.
+     */
     private void tocar(PerfilCandidato perfil) {
         perfil.setActualizadoEn(Instant.now());
         perfiles.save(perfil);

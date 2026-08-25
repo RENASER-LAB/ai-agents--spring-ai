@@ -14,6 +14,7 @@ import com.renaser.ai.ai_engine.perfil.repository.NivelEducativoRepository;
 import com.renaser.ai.ai_engine.perfil.repository.NivelIdiomaRepository;
 import com.renaser.ai.ai_engine.perfil.repository.EnlacePerfilRepository;
 import com.renaser.ai.ai_engine.perfil.repository.PerfilCandidatoRepository;
+import com.renaser.ai.ai_engine.perfil.service.ClaveNatural;
 import com.renaser.ai.ai_engine.perfil.service.ServicioPropuestaPerfil;
 import com.renaser.ai.ai_engine.perfil.service.ValidacionEnlaces;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosCalificacionIa.CertificacionLeida;
@@ -30,11 +31,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.text.Normalizer;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Locale;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Function;
@@ -363,12 +362,7 @@ public class ServicioPropuestaPerfilImpl implements ServicioPropuestaPerfil {
 
     /** Sin mayusculas, sin tildes y sin espacios de mas: «Analista Senior» = «analista senior». */
     static String clave(String texto) {
-        if (texto == null) {
-            return "";
-        }
-        String plano = Normalizer.normalize(texto, Normalizer.Form.NFD)
-                .replaceAll("\\p{M}", "");
-        return plano.trim().toLowerCase(Locale.ROOT).replaceAll("\\s+", " ");
+        return ClaveNatural.de(texto);
     }
 
     /** «AAAA-MM» o «AAAA» al primer dia del mes; null si no cuadra. No se adivina. */
