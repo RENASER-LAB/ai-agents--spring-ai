@@ -236,6 +236,25 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
     }
 
     /** La cuenta, ya con los trabajos delante. La comparten el uno y la tanda entera. */
+    @Override
+    public String comoVaLaLectura(Long postulacionId) {
+        // Solo el ULTIMO trabajo de lectura: quien fallo y luego salio bien al reintentar
+        // arrastra su fila fallida para siempre, y mirar todas diria «no se pudo leer» de un
+        // curriculum que si esta leido.
+        Optional<TrabajoIa> ultimo = trabajos.findByPostulacionIdOrderByIdAsc(postulacionId)
+                .stream()
+                .filter(t -> AgenteDatosCv.CODIGO_AGENTE.equals(t.getAgenteCodigo()))
+                .reduce((a, b) -> b);
+        if (ultimo.isEmpty()) {
+            return "SIN_EMPEZAR";
+        }
+        return switch (ultimo.get().getEstado()) {
+            case "PENDIENTE", "EN_CURSO" -> "EN_CURSO";
+            case "FALLIDO" -> "FALLIDA";
+            default -> "TERMINADA";
+        };
+    }
+
     private String comoVan(List<TrabajoIa> todos) {
         // Solo los del retrato. Desde que existen los agentes de la prueba y de la
         // conversación final, una misma postulación puede tener trabajos de tres etapas
@@ -367,6 +386,18 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
      * <p>Cada uno atiende una etapa posterior y se pide a mano. Se mira igual que los demás
      * para no pagarlos dos veces, pero detrás de ellos no va nadie.
      */
+    @Override
+    public boolean encolarDatosCv(Long postulacionId) {
+        // El interruptor manda tambien aqui: apagada la calificacion, postular no encola
+        // nada — ni en las pruebas ni cuando el proveedor este caido.
+        if (!habilitada) {
+            return false;
+        }
+        // El mismo camino de los sueltos: se mira antes de crear para no pagar dos veces,
+        // y seSalta ya sabe que una postulacion con ficha leida no vuelve a leerse.
+        return encolarSuelto(postulacionId, AgenteDatosCv.CODIGO_AGENTE);
+    }
+
     private boolean encolarSuelto(Long postulacionId, String agente) {
         if (situacionDe(postulacionId, agente, FINA, null) != Situacion.HAY_QUE_ENCOLARLO) {
             return false;
@@ -390,6 +421,20 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
         if (!aLaVezDe(acabado.getModo()).contains(acabado.getAgenteCodigo())) {
             // El que cierra la etapa y los dos sueltos no tienen a nadie detrás.
             return;
+        }
+        // La lectura de datos que dispara postular (el perfil del candidato) va SOLA: si al
+        // terminar no hay ningún hermano de la tanda —ni vivo ni terminado—, nadie pidió
+        // calificar todavía y armar el retrato aquí sería pagarlo antes de tiempo y sin
+        // evaluación. Cuando una criba o una entrega encolen a los demás, la barrera de
+        // siempre hará su trabajo.
+        if (AgenteDatosCv.CODIGO_AGENTE.equals(acabado.getAgenteCodigo())) {
+            boolean sinHermanos = trabajos
+                    .findByPostulacionIdOrderByIdAsc(acabado.getPostulacionId()).stream()
+                    .noneMatch(t -> !t.getId().equals(acabado.getId())
+                            && aLaVezDe(acabado.getModo()).contains(t.getAgenteCodigo()));
+            if (sinHermanos) {
+                return;
+            }
         }
         dispararElRetrato(acabado.getPostulacionId(), acabado.getModo(), acabado.getId());
     }

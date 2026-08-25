@@ -99,6 +99,11 @@ public class FlujoCalificacionIaIT {
         // puede pasar a una prueba.
         registro.add("spring.rabbitmq.ssl.enabled", () -> "false");
         registro.add("spring.rabbitmq.virtual-host", () -> "/");
+        // El perfil dispara la lectura del CV al postular (RF-158). Aqui va apagado: esta
+        // prueba mide CUANDO corre DATOS_CV dentro de la criba y la calificacion, y
+        // adelantarlo al postular le cambiaria todos los conteos sin probar nada nuevo.
+        // El disparo tiene su propia prueba en FlujoPerfilIT.
+        registro.add("renaser.perfil.lectura-al-postular", () -> "false");
         // El almacen de las pruebas vive en un mapa, no en disco: no hay ningun
         // sitio donde un curriculum pueda quedarse olvidado despues de correrlas.
         registro.add("app.archivos.tipo", () -> "memoria");

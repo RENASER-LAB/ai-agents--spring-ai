@@ -70,7 +70,8 @@ public class ConfiguracionSwagger {
             DecisionPanelController.class,
             SimulacionPanelController.class,
             SimulacionPortalController.class,
-            ValidacionPanelController.class);
+            ValidacionPanelController.class,
+            com.renaser.ai.ai_engine.perfil.controller.PerfilPortalController.class);
 
     /**
      * El motor de agentes, por nombre de paquete y no por clase.

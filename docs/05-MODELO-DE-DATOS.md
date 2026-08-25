@@ -23,11 +23,19 @@ Sirve para tres cosas:
 - **Entender el sistema.** Un modelo de datos bien contado explica el negocio mejor que
   cualquier otro documento.
 
-**La base ya está construida.** Las migraciones `V1` a `V28` viven en
-`src/main/resources/db/migration` —**91 tablas de este módulo**, 94 en la base contando la de
+**La base ya está construida.** Las migraciones `V1` a `V36` viven en
+`src/main/resources/db/migration` —**100 tablas de este módulo**, 103 en la base contando la de
 Flyway y las dos del motor de agentes— y Flyway es el dueño del esquema. Cambiar algo de aquí
 ya cuesta una migración nueva, y **una migración aplicada no se edita nunca**: se escribe otra
 encima.
+
+La `V36` trae **el perfil del candidato**: seis tablas que cuelgan de `persona` —no de
+`usuario`, porque el usuario existe una vez por organización y el perfil es de la persona—
+(`perfil_candidato`, `experiencia_perfil`, `educacion_perfil`, `idioma_perfil`,
+`certificacion_perfil`, `enlace_perfil`), dos catálogos (`nivel_educativo`, `nivel_idioma`),
+la columna `archivo.contenido_hash` (la huella que evita pagar dos lecturas del mismo
+currículum) y los permisos `ver_perfil_candidato` y `ver_pretension`. Ver
+[PROPUESTA-PERFIL-DEL-CANDIDATO.md](PROPUESTA-PERFIL-DEL-CANDIDATO.md).
 
 Cuatro son del banco de preguntas v3: `V20` reemplaza el banco entero y añade cinco
 tablas (`rango_pregunta`, `campo_caso`, `multiplicador_bloque`, `umbral_nivel` y

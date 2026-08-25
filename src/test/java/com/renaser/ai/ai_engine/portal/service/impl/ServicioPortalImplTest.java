@@ -91,6 +91,8 @@ class ServicioPortalImplTest {
     @Mock private CvRepository cvs;
     @Mock private EnlaceCvRepository enlaces;
     @Mock private MaquinaEstados maquina;
+    @Mock private com.renaser.ai.ai_engine.perfil.service.ServicioPropuestaPerfil propuestaPerfil;
+    @Mock private com.renaser.ai.ai_engine.perfil.service.ServicioLecturaCv lecturaCv;
     @Mock private AlmacenArchivos almacen;
     @Mock private ServicioCorreo correo;
     @Mock private ServicioAuditoria auditoria;
@@ -107,7 +109,8 @@ class ServicioPortalImplTest {
         servicio = new ServicioPortalImpl(organizaciones, personas, usuarios, roles, usuarioRoles,
                 textosConsentimiento, consentimientos, solicitudesBorrado, vacantes, puestos,
                 requisitos, evaluaciones, postulaciones, transiciones, estados, cvs, enlaces,
-                maquina, almacen, correo, auditoria, parametros, tokens, intentos, codificador);
+                maquina, propuestaPerfil, lecturaCv,
+                almacen, correo, auditoria, parametros, tokens, intentos, codificador);
     }
 
     @Test

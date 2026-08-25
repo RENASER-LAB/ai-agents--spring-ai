@@ -262,6 +262,19 @@ el banco v4 que venga no necesitará una migración. El ciclo es
 | GET `/solicitudes-borrado` · POST `/{id}/ejecucion` | Ver y ejecutar los borrados: la persona queda vacía, la trazabilidad queda | `ejecutar_borrado_datos` |
 | GET/POST `/usuarios` · POST `/{id}/roles` · GET `/roles` | El equipo y sus roles. El último administrador no se puede quitar | `crear_usuarios_y_asignar_roles` |
 
+### El perfil del candidato
+
+Nuevo desde el 25/08/2026. El candidato tiene un perfil único —de la persona, no de la
+postulación— que se llena solo con su currículum y que él corrige. **El contrato completo,
+con las reglas que Swagger no cuenta, está en
+[APIS-PERFIL-DEL-CANDIDATO.md](APIS-PERFIL-DEL-CANDIDATO.md).** En corto:
+
+| Método y ruta | Qué hace | Permiso |
+|---|---|---|
+| GET/PUT `/portal/perfil` · POST/PUT/DELETE `/portal/perfil/{lista}[/{id}]` · POST `…/{id}/confirmacion` · PUT `…/orden` · GET `…/descarga` | El dueño ve, edita, confirma, reordena y descarga lo suyo. Vacío responde 200, nunca 404 | El propio token; lo ajeno es 404 |
+| GET `/portal/catalogos/niveles-educativos` · `/niveles-idioma` | Los desplegables, para no escribirlos a mano | Token de candidato |
+| GET `/panel/postulaciones/{id}/perfil` | La trayectoria del candidato sin abrir su archivo. **No puntúa** | `ver_perfil_candidato`; la pretensión solo con `ver_pretension` |
+
 ---
 
 ## Lo que conviene saber antes de consumirlas

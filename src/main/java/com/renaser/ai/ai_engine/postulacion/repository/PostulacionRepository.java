@@ -12,6 +12,17 @@ import java.util.UUID;
 
 public interface PostulacionRepository extends JpaRepository<Postulacion, Long> {
 
+    /** Las postulaciones de una persona, en cualquiera de sus cuentas. Para el perfil. */
+    @org.springframework.data.jpa.repository.Query("""
+            select p from Postulacion p
+              join Usuario u on u.id = p.usuarioId
+             where u.personaId = :personaId
+             order by p.creadoEn desc
+            """)
+    java.util.List<Postulacion> deLaPersona(
+            @org.springframework.data.repository.query.Param("personaId") Long personaId);
+
+
     Optional<Postulacion> findByUuid(UUID uuid);
     List<Postulacion> findByUsuarioIdOrderByCreadoEnDesc(Long usuarioId);
     boolean existsByUsuarioIdAndVacanteId(Long usuarioId, Long vacanteId);

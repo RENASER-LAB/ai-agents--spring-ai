@@ -66,6 +66,8 @@ public class ServicioPortalImpl implements ServicioPortal {
     private final CvRepository cvs;
     private final EnlaceCvRepository enlaces;
     private final MaquinaEstados maquina;
+    private final com.renaser.ai.ai_engine.perfil.service.ServicioPropuestaPerfil propuestaPerfil;
+    private final com.renaser.ai.ai_engine.perfil.service.ServicioLecturaCv lecturaCv;
     private final AlmacenArchivos almacen;
     private final ServicioCorreo correo;
     private final ServicioAuditoria auditoria;
@@ -278,6 +280,19 @@ public class ServicioPortalImpl implements ServicioPortal {
         guardarEnlace(curriculum.getId(), portafolio, "PORTAFOLIO");
         guardarEnlace(curriculum.getId(), linkedin, "OTRO");
         guardarEnlace(curriculum.getId(), github, "REPOSITORIO");
+
+        // El perfil del candidato se alimenta de lo que acaba de pasar: los enlaces del
+        // formulario se le proponen, y el curriculum se manda a leer — o se reutiliza la
+        // lectura ya pagada, si esta persona ya postulo con el mismo archivo (RF-161).
+        //
+        // Van DENTRO de la transaccion de postular, y eso es una decision con precio: la
+        // lectura tiene que ver la postulacion recien insertada (sus trabajos y su ficha
+        // apuntan a ella por clave foranea), asi que aislarla en una transaccion aparte la
+        // dejaria sin nada a lo que apuntar. El precio es que un fallo de base aqui —una
+        // carrera por el UNIQUE del perfil entre dos postulaciones a la vez— si tumbaria la
+        // postulacion; el try/catch de dentro atrapa el error de logica, no ese.
+        propuestaPerfil.proponerEnlaces(quien.personaId(), linkedin, github, portafolio);
+        lecturaCv.trasPostular(quien.personaId(), postulacion.getId());
 
         Usuario usuario = usuarios.findById(quien.usuarioId()).orElseThrow();
         String nombre = personas.findById(quien.personaId()).map(Persona::getNombre).orElse("");
