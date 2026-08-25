@@ -29,9 +29,12 @@ public final class DtosPortal {
 
     // ---------- lo que sale ----------
 
-    public record VacantePublica(Long id, String titulo, String descripcion, String proposito,
-                                 String responsabilidades, String requisitos, String modalidad,
-                                 String horario, String ubicacion, String compensacionPublica,
+    // nombreEmpresa existe porque el tablón mezcla vacantes de todas las empresas: sin
+    // él, el candidato no sabría a quién le está mandando su currículum.
+    public record VacantePublica(Long id, String titulo, String nombreEmpresa, String descripcion,
+                                 String proposito, String responsabilidades, String requisitos,
+                                 String modalidad, String horario, String ubicacion,
+                                 String compensacionPublica,
                                  List<RequisitoPublico> requisitosObjetivos) {}
 
     public record RequisitoPublico(Long id, String descripcion) {}

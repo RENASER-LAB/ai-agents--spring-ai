@@ -74,6 +74,7 @@ class ServicioVacantesPanelImplTest {
     @Mock private VersionPesosRepository versionesPesos;
     @Mock private PlantillaEvaluacionRepository plantillas;
     @Mock private VersionPlantillaPruebaRepository versionesPrueba;
+    @Mock private com.renaser.ai.ai_engine.prueba.repository.PlantillaPruebaRepository plantillasPrueba;
     @Mock private PlantillaCorreoRepository plantillasCorreo;
     @Mock private PlantillaCorreoVacanteRepository plantillasPorVacante;
     @Mock private IntentoPruebaRepository intentos;
@@ -85,7 +86,7 @@ class ServicioVacantesPanelImplTest {
     @BeforeEach
     void crearElServicio() {
         servicio = new ServicioVacantesPanelImpl(vacantes, puestos, requisitos, solicitudes,
-                versionesPesos, plantillas, versionesPrueba, plantillasCorreo,
+                versionesPesos, plantillas, versionesPrueba, plantillasPrueba, plantillasCorreo,
                 plantillasPorVacante, intentos, auditoria, dueno);
         // En estas pruebas la organizacion no personaliza nada: el resolutor contesta
         // que el dueño de todo instrumento es ella misma (aqui hace de plataforma).

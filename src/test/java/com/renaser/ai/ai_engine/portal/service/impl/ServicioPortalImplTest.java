@@ -116,7 +116,9 @@ class ServicioPortalImplTest {
     @Test
     @DisplayName("sin banco no se crea evaluación y la postulación va directa a la bandeja del equipo")
     void sinBancoVaDirectaALaBandeja() {
-        when(vacantes.findByIdAndOrganizacionId(VACANTE, ORGANIZACION))
+        // La vacante se busca en el tablón entero (findById): el candidato es de la
+        // plataforma y postula a la vacante de cualquier empresa.
+        when(vacantes.findById(VACANTE))
                 .thenReturn(Optional.of(Vacante.builder()
                         .id(VACANTE).organizacionId(ORGANIZACION).estado("PUBLICADA")
                         .titulo("Administrador").puestoId(5L)

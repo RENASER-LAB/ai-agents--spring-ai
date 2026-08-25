@@ -46,6 +46,7 @@ public class ServicioAdministracionImpl implements ServicioAdministracion {
     private final PersonaRepository personas;
     private final com.renaser.ai.ai_engine.perfil.service.ServicioCicloVidaPerfil cicloVidaPerfil;
     private final UsuarioRepository usuarios;
+    private final OrganizacionRepository organizaciones;
     private final AreaRepository areas;
     private final RolRepository roles;
     private final UsuarioRolRepository usuarioRoles;
@@ -148,9 +149,14 @@ public class ServicioAdministracionImpl implements ServicioAdministracion {
     }
 
     // ============ Borrado de datos ============
+    // El borrado de la ley 29733 es DE LA PLATAFORMA: los candidatos son cuentas de la
+    // plataforma y sus postulaciones cruzan empresas, así que la anonimización toca datos
+    // de varias. Una empresa que pudiera ejecutarlo estaría borrando candidatos ajenos —
+    // era la peor de las fugas: destructiva, no de lectura.
 
     @Override
     public List<SolicitudBorradoPanel> solicitudesBorradoPendientes(ContextoUsuario quien) {
+        exigirPlataforma(quien);
         return solicitudesBorrado.findByEjecutadoEnIsNullOrderBySolicitadoEnAsc().stream()
                 .map(s -> new SolicitudBorradoPanel(s.getId(), s.getPersonaId(), s.getMotivo(),
                         s.getSolicitadoEn(), s.getEjecutadoEn()))
@@ -162,6 +168,7 @@ public class ServicioAdministracionImpl implements ServicioAdministracion {
     @Override
     @Transactional
     public void ejecutarBorrado(ContextoUsuario quien, Long solicitudId) {
+        exigirPlataforma(quien);
         SolicitudBorrado solicitud = solicitudesBorrado.findById(solicitudId)
                 .orElseThrow(() -> new ResourceNotFoundException("Solicitud de borrado", "id", solicitudId));
         if (solicitud.getEjecutadoEn() != null) {
@@ -349,6 +356,18 @@ public class ServicioAdministracionImpl implements ServicioAdministracion {
                     .asignadoPorUsuarioId(quien.usuarioId())
                     .creadoEn(Instant.now())
                     .build());
+        }
+    }
+
+    // 403 y no 404: estos endpoints no piden un recurso concreto que fingir inexistente,
+    // piden una capacidad — y la capacidad es de la dueña de la plataforma.
+    private void exigirPlataforma(ContextoUsuario quien) {
+        Organizacion plataforma = organizaciones.findByEsPlataformaTrue()
+                .orElseThrow(() -> new IllegalStateException(
+                        "Ninguna organización está marcada como plataforma"));
+        if (!plataforma.getId().equals(quien.organizacionId())) {
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "El borrado de datos de candidatos lo ejecuta la plataforma");
         }
     }
 

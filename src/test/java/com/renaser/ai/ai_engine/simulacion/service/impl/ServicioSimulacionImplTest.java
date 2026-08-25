@@ -16,6 +16,7 @@ import com.renaser.ai.ai_engine.simulacion.dto.DtosSimulacion.PreguntaResponse;
 import com.renaser.ai.ai_engine.simulacion.dto.DtosSimulacion.PreguntasEncoladas;
 import com.renaser.ai.ai_engine.simulacion.entity.InscripcionSesion;
 import com.renaser.ai.ai_engine.simulacion.entity.PreguntaGenerada;
+import com.renaser.ai.ai_engine.simulacion.entity.SesionSimulacion;
 import com.renaser.ai.ai_engine.simulacion.repository.InformacionCriticaRepository;
 import com.renaser.ai.ai_engine.simulacion.repository.InscripcionSesionRepository;
 import com.renaser.ai.ai_engine.simulacion.repository.MarcaTiempoSimulacionRepository;
@@ -105,6 +106,7 @@ class ServicioSimulacionImplTest {
     @Mock private InscripcionSesionRepository inscripciones;
     @Mock private MarcaTiempoSimulacionRepository marcas;
     @Mock private PreguntaGeneradaRepository preguntas;
+    @Mock private com.renaser.ai.ai_engine.perfilintegral.repository.AlertaRepository alertas;
     @Mock private PostulacionRepository postulaciones;
     @Mock private VacanteRepository vacantes;
     @Mock private ColaCalificacionIa cola;
@@ -121,8 +123,9 @@ class ServicioSimulacionImplTest {
     @BeforeEach
     void crearElServicio() {
         servicio = new ServicioSimulacionImpl(sesiones, sesionesVacante, responsables, tramos,
-                informacionCritica, inscripciones, marcas, preguntas, postulaciones, vacantes,
-                cola, roles, usuarioRoles, maquina, disponibilidad, parametros, auditoria, permisos);
+                informacionCritica, inscripciones, marcas, preguntas, alertas, postulaciones,
+                vacantes, cola, roles, usuarioRoles, maquina, disponibilidad, parametros,
+                auditoria, permisos);
     }
 
     // ============ Las fechas que ve el candidato ============
@@ -358,6 +361,9 @@ class ServicioSimulacionImplTest {
                 .id(INSCRIPCION).sesionSimulacionId(SESION).postulacionId(POSTULACION)
                 .esVigente(true).inscritaEn(Instant.now()).build();
         when(inscripciones.findById(INSCRIPCION)).thenReturn(Optional.of(inscripcion));
+        when(sesiones.findByIdAndOrganizacionId(SESION, ORGANIZACION)).thenReturn(
+                Optional.of(SesionSimulacion.builder()
+                        .id(SESION).organizacionId(ORGANIZACION).estado("PUBLICADA").build()));
         when(postulaciones.findById(POSTULACION)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> servicio.marcarAsistencia(QUIEN, INSCRIPCION, new MarcarAsistencia(true)))
@@ -434,6 +440,11 @@ class ServicioSimulacionImplTest {
                 .esVigente(true).inscritaEn(Instant.now())
                 .build();
         when(inscripciones.findById(INSCRIPCION)).thenReturn(Optional.of(inscripcion));
+        // La inscripción se deriva ahora a su sesión, que es la que tiene organización:
+        // sin esta fila, marcar cualquier cosa sobre ella respondería 404.
+        when(sesiones.findByIdAndOrganizacionId(SESION, ORGANIZACION)).thenReturn(
+                Optional.of(SesionSimulacion.builder()
+                        .id(SESION).organizacionId(ORGANIZACION).estado("PUBLICADA").build()));
         when(postulaciones.findById(POSTULACION)).thenReturn(Optional.of(postulacion));
         return inscripcion;
     }

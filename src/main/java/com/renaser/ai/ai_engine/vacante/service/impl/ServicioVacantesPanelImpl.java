@@ -14,6 +14,7 @@ import com.renaser.ai.ai_engine.pesos.repository.VersionPesosRepository;
 import com.renaser.ai.ai_engine.prueba.entity.VersionPlantillaPrueba;
 import com.renaser.ai.ai_engine.prueba.entity.IntentoPrueba;
 import com.renaser.ai.ai_engine.prueba.repository.IntentoPruebaRepository;
+import com.renaser.ai.ai_engine.prueba.repository.PlantillaPruebaRepository;
 import com.renaser.ai.ai_engine.prueba.repository.VersionPlantillaPruebaRepository;
 import com.renaser.ai.ai_engine.organizacion.service.DuenoDelInstrumento;
 import com.renaser.ai.ai_engine.organizacion.service.Instrumento;
@@ -42,6 +43,7 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
     private final VersionPesosRepository versionesPesos;
     private final PlantillaEvaluacionRepository plantillas;
     private final VersionPlantillaPruebaRepository versionesPrueba;
+    private final PlantillaPruebaRepository plantillasPrueba;
     private final PlantillaCorreoRepository plantillasCorreo;
     private final PlantillaCorreoVacanteRepository plantillasPorVacante;
     private final IntentoPruebaRepository intentos;
@@ -282,6 +284,13 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
     public void asignarPlantillaPrueba(ContextoUsuario quien, Long id, Long versionPlantillaPruebaId) {
         Vacante vacante = laDeLaOrganizacion(quien, id);
         VersionPlantillaPrueba version = versionesPrueba.findById(versionPlantillaPruebaId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Versión de prueba", "id", versionPlantillaPruebaId));
+        // La versión no sabe de organizaciones: se deriva a su plantilla y se valida
+        // contra el dueño resuelto. Sin esto, una vacante podía colgarse la prueba de
+        // otra empresa — y ese examen se le sirve al candidato al postular.
+        plantillasPrueba.findByIdAndOrganizacionId(version.getPlantillaPruebaId(),
+                        dueno.duenoDe(quien.organizacionId(), Instrumento.PRUEBA))
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Versión de prueba", "id", versionPlantillaPruebaId));
         if (!"PUBLICADA".equals(version.getEstado())) {

@@ -76,37 +76,56 @@ public class ServicioPortalImpl implements ServicioPortal {
     private final IntentosLogin intentos;
     private final PasswordEncoder codificador;
 
-    // El portal es de una organización: la única que existe hoy. Cuando entren los
-    // clientes de consultoría, la organización saldrá del dominio o de la ruta.
-    private Organizacion organizacion() {
-        return organizaciones.findByCodigo("RENASER")
-                .orElseThrow(() -> new IllegalStateException("Falta la organización semilla RENASER"));
+    // El candidato es DE LA PLATAFORMA: una sola cuenta, y con ella postula a la vacante
+    // de cualquier empresa. Su cuenta, sus consentimientos y su login cuelgan de la
+    // organización plataforma; lo único del portal que cruza empresas es el tablón de
+    // vacantes, y su postulación nace en la empresa de la vacante.
+    private Organizacion plataforma() {
+        return organizaciones.findByEsPlataformaTrue()
+                .orElseThrow(() -> new IllegalStateException(
+                        "Ninguna organización está marcada como plataforma"));
     }
 
     // ============ Vacantes públicas ============
 
     @Override
     public List<VacantePublica> vacantesPublicadas() {
-        List<Vacante> publicadas = vacantes.findByOrganizacionIdAndEstadoOrderByPublicadaEnDesc(
-                organizacion().getId(), "PUBLICADA");
+        // Las publicadas de TODAS las empresas juntas: la excepción deliberada de la
+        // pieza B, con nombre y apellido — el tablón es lo que hace plataforma a la
+        // plataforma. Cada vacante dice de qué empresa es, porque el candidato tiene que
+        // saber a quién le manda su currículum.
+        List<Vacante> publicadas = vacantes.findByEstadoOrderByPublicadaEnDesc("PUBLICADA");
 
         // Los requisitos de todas de una vez. Este es el tablón de empleo: la única pantalla
         // que se sirve sin haber entrado y, por eso, la que más veces se pide. Una consulta
         // por vacante aquí no la paga un candidato, la paga cada visita.
         Map<Long, List<RequisitoObjetivo>> porVacante = requisitosDe(
                 publicadas.stream().map(Vacante::getId).toList());
+        Map<Long, String> nombrePorOrganizacion = nombresDeOrganizacion(publicadas);
 
         return publicadas.stream()
-                .map(v -> comoPublica(v, porVacante.getOrDefault(v.getId(), List.of())))
+                .map(v -> comoPublica(v, porVacante.getOrDefault(v.getId(), List.of()),
+                        nombrePorOrganizacion.getOrDefault(v.getOrganizacionId(), "")))
                 .toList();
     }
 
     @Override
     public VacantePublica vacante(Long id) {
-        Vacante vacante = vacantes.findByIdAndOrganizacionId(id, organizacion().getId())
+        // Sin filtro de organización a propósito: el tablón es de todas las empresas.
+        // Lo que sí se exige es que esté PUBLICADA — un borrador no existe para nadie.
+        Vacante vacante = vacantes.findById(id)
                 .filter(v -> "PUBLICADA".equals(v.getEstado()))
                 .orElseThrow(() -> new ResourceNotFoundException("Vacante", "id", id));
-        return comoPublica(vacante, requisitos.findByVacanteIdAndEsActivoTrue(vacante.getId()));
+        String nombreEmpresa = organizaciones.findById(vacante.getOrganizacionId())
+                .map(Organizacion::getNombre).orElse("");
+        return comoPublica(vacante, requisitos.findByVacanteIdAndEsActivoTrue(vacante.getId()),
+                nombreEmpresa);
+    }
+
+    private Map<Long, String> nombresDeOrganizacion(List<Vacante> deVacantes) {
+        List<Long> ids = deVacantes.stream().map(Vacante::getOrganizacionId).distinct().toList();
+        return organizaciones.findAllById(ids).stream()
+                .collect(Collectors.toMap(Organizacion::getId, Organizacion::getNombre));
     }
 
     /**
@@ -125,20 +144,20 @@ public class ServicioPortalImpl implements ServicioPortal {
                 .collect(Collectors.groupingBy(RequisitoObjetivo::getVacanteId));
     }
 
-    private VacantePublica comoPublica(Vacante v, List<RequisitoObjetivo> suyos) {
+    private VacantePublica comoPublica(Vacante v, List<RequisitoObjetivo> suyos, String nombreEmpresa) {
         List<RequisitoPublico> reqs = suyos.stream()
                 .map(r -> new RequisitoPublico(r.getId(), r.getDescripcion()))
                 .toList();
-        return new VacantePublica(v.getId(), v.getTitulo(), v.getDescripcion(), v.getProposito(),
-                v.getResponsabilidades(), v.getRequisitos(), v.getModalidad(), v.getHorario(),
-                v.getUbicacion(), v.getCompensacionPublica(), reqs);
+        return new VacantePublica(v.getId(), v.getTitulo(), nombreEmpresa, v.getDescripcion(),
+                v.getProposito(), v.getResponsabilidades(), v.getRequisitos(), v.getModalidad(),
+                v.getHorario(), v.getUbicacion(), v.getCompensacionPublica(), reqs);
     }
 
     // ============ Cuenta y consentimientos ============
 
     @Override
     public List<TextoConsentimientoPublico> textosDeConsentimiento() {
-        Long org = organizacion().getId();
+        Long org = plataforma().getId();
         return List.of("PROCESO", "FUTUROS_CONTACTOS").stream()
                 .map(tipo -> textosConsentimiento
                         .findFirstByOrganizacionIdAndTipoAndPublicadoEnIsNotNullOrderByPublicadoEnDesc(org, tipo))
@@ -154,7 +173,7 @@ public class ServicioPortalImpl implements ServicioPortal {
         if (!Boolean.TRUE.equals(datos.aceptaProceso())) {
             throw new IllegalArgumentException("Hay que aceptar el tratamiento de datos personales para crear la cuenta");
         }
-        Organizacion org = organizacion();
+        Organizacion org = plataforma();
         usuarios.buscarPorCorreo(org.getId(), datos.correo()).ifPresent(u -> {
             throw new IllegalStateException("Ya existe una cuenta con ese correo");
         });
@@ -208,7 +227,7 @@ public class ServicioPortalImpl implements ServicioPortal {
 
     @Override
     public Sesion entrar(Login datos) {
-        Organizacion org = organizacion();
+        Organizacion org = plataforma();
         long esperaPendiente = intentos.segundosDeBloqueo(datos.correo());
         if (esperaPendiente > 0) {
             throw new DemasiadosIntentosException(esperaPendiente);
@@ -241,7 +260,9 @@ public class ServicioPortalImpl implements ServicioPortal {
     public UUID postular(ContextoUsuario quien, Long vacanteId, MultipartFile cv,
                          String resultadoOrgulloso, String portafolio, String linkedin, String github,
                          List<Long> requisitosConfirmados) {
-        Vacante vacante = vacantes.findByIdAndOrganizacionId(vacanteId, quien.organizacionId())
+        // El candidato postula a la vacante de cualquier empresa: la vacante se busca en
+        // el tablón entero, no en la organización del candidato (que es la plataforma).
+        Vacante vacante = vacantes.findById(vacanteId)
                 .filter(v -> "PUBLICADA".equals(v.getEstado()))
                 .orElseThrow(() -> new ResourceNotFoundException("Vacante", "id", vacanteId));
         if (postulaciones.existsByUsuarioIdAndVacanteId(quien.usuarioId(), vacanteId)) {
@@ -251,10 +272,16 @@ public class ServicioPortalImpl implements ServicioPortal {
             throw new IllegalArgumentException("Cuéntanos un resultado del que te sientas orgulloso: es obligatorio");
         }
 
+        // La postulación nace en la organización DE LA VACANTE, no en la del candidato:
+        // es lo que hace que el panel de cada empresa vea a sus candidatos y que el
+        // aislamiento signifique algo. El mismo criterio arrastra todo lo que el panel de
+        // la empresa debe ver: el CV archivado, la evaluación y sus avisos.
+        Long organizacionDeLaVacante = vacante.getOrganizacionId();
+
         // Nace en POSTULADA: el único tramo donde el sistema decide solo, y únicamente
         // contra los requisitos objetivos configurados de antemano
         Postulacion postulacion = postulaciones.save(Postulacion.builder()
-                .organizacionId(quien.organizacionId())
+                .organizacionId(organizacionDeLaVacante)
                 .uuid(UUID.randomUUID())
                 .usuarioId(quien.usuarioId())
                 .vacanteId(vacanteId)
@@ -270,7 +297,7 @@ public class ServicioPortalImpl implements ServicioPortal {
                 .ocurridaEn(Instant.now()).creadoEn(Instant.now())
                 .build());
 
-        Archivo archivo = almacen.guardar(quien.organizacionId(), cv);
+        Archivo archivo = almacen.guardar(organizacionDeLaVacante, cv);
         Cv curriculum = cvs.save(Cv.builder()
                 .postulacionId(postulacion.getId())
                 .archivoOriginalId(archivo.getId())
@@ -296,7 +323,7 @@ public class ServicioPortalImpl implements ServicioPortal {
 
         Usuario usuario = usuarios.findById(quien.usuarioId()).orElseThrow();
         String nombre = personas.findById(quien.personaId()).map(Persona::getNombre).orElse("");
-        correo.enviar(quien.organizacionId(), usuario.getId(), usuario.getCorreo(), "POSTULACION_RECIBIDA",
+        correo.enviar(organizacionDeLaVacante, usuario.getId(), usuario.getCorreo(), "POSTULACION_RECIBIDA",
                 Map.of("nombre", nombre == null ? "" : nombre,
                        "vacante", vacante.getTitulo(),
                        "codigo", postulacion.getUuid().toString()));
@@ -328,7 +355,7 @@ public class ServicioPortalImpl implements ServicioPortal {
                     .orElseThrow(() -> new IllegalStateException(
                             "La vacante apunta a un puesto que no existe"));
             postulacion.setEvaluacionId(evaluaciones.crearAlPostular(
-                    quien.organizacionId(), quien.usuarioId(),
+                    organizacionDeLaVacante, quien.usuarioId(),
                     vacante.getPlantillaEvaluacionId(), puesto.getNivelPuestoCodigo()));
             postulaciones.save(postulacion);
 

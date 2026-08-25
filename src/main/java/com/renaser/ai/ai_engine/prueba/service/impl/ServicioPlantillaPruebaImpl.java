@@ -81,7 +81,7 @@ public class ServicioPlantillaPruebaImpl implements ServicioPlantillaPrueba {
     @Override
     @Transactional
     public Long crearVersion(ContextoUsuario quien, Long plantillaId, CrearVersion datos) {
-        PlantillaPrueba plantilla = laPlantillaVisible(quien, plantillaId);
+        PlantillaPrueba plantilla = laPlantillaPropia(quien, plantillaId);
         Integer siguiente = versiones.findByPlantillaPruebaIdOrderByVersionDesc(plantillaId).stream()
                 .findFirst().map(v -> v.getVersion() + 1).orElse(1);
 
@@ -134,8 +134,11 @@ public class ServicioPlantillaPruebaImpl implements ServicioPlantillaPrueba {
 
     @Override
     public VersionCompleta verVersion(ContextoUsuario quien, Long versionId) {
-        VersionPlantillaPrueba v = versiones.findById(versionId)
-                .orElseThrow(() -> new ResourceNotFoundException("Versión de prueba", "id", versionId));
+        // La versión completa lleva la rúbrica y sus puntos: el examen entero de una
+        // convocatoria. Antes se servía por id suelto — cualquier empresa podía leer la
+        // prueba de otra. Se deriva a su plantilla y se valida contra el dueño resuelto:
+        // con la bandera apagada se VEN las versiones de la plataforma, ninguna más.
+        VersionPlantillaPrueba v = laVersionVisible(quien, versionId);
 
         List<VarianteResponse> vs = variantes.findByVersionPlantillaPruebaId(versionId).stream()
                 .map(x -> new VarianteResponse(x.getId(), x.getTexto(), x.getOrden())).toList();
@@ -260,15 +263,33 @@ public class ServicioPlantillaPruebaImpl implements ServicioPlantillaPrueba {
 
     // ============ Apoyo ============
 
+    // Leer resuelve, editar no: con la bandera apagada la organización VE las pruebas de
+    // la plataforma —eso contesta el resolutor— pero solo edita las suyas.
+
     private PlantillaPrueba laPlantillaVisible(ContextoUsuario quien, Long id) {
         return plantillas.findByIdAndOrganizacionId(id, quien.organizacionId())
+                .or(() -> plantillas.findByIdAndOrganizacionId(
+                        id, dueno.duenoDe(quien.organizacionId(), Instrumento.PRUEBA)))
                 .orElseThrow(() -> new ResourceNotFoundException("Plantilla de prueba", "id", id));
+    }
+
+    private PlantillaPrueba laPlantillaPropia(ContextoUsuario quien, Long id) {
+        return plantillas.findByIdAndOrganizacionId(id, quien.organizacionId())
+                .orElseThrow(() -> new ResourceNotFoundException("Plantilla de prueba", "id", id));
+    }
+
+    /** Derivar al padre: la versión no sabe de organizaciones, su plantilla sí. */
+    private VersionPlantillaPrueba laVersionVisible(ContextoUsuario quien, Long id) {
+        VersionPlantillaPrueba version = versiones.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Versión de prueba", "id", id));
+        laPlantillaVisible(quien, version.getPlantillaPruebaId());
+        return version;
     }
 
     private VersionPlantillaPrueba laVersionEnBorrador(ContextoUsuario quien, Long id) {
         VersionPlantillaPrueba version = versiones.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Versión de prueba", "id", id));
-        laPlantillaVisible(quien, version.getPlantillaPruebaId());
+        laPlantillaPropia(quien, version.getPlantillaPruebaId());
         if (!"BORRADOR".equals(version.getEstado())) {
             throw new IllegalStateException("Solo se edita una versión en borrador; esta está " + version.getEstado());
         }
