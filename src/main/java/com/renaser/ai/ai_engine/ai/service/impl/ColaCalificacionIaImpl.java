@@ -369,6 +369,11 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
      */
     @Override
     public boolean encolarDatosCv(Long postulacionId) {
+        // El interruptor manda tambien aqui: apagada la calificacion, postular no encola
+        // nada — ni en las pruebas ni cuando el proveedor este caido.
+        if (!habilitada) {
+            return false;
+        }
         // El mismo camino de los sueltos: se mira antes de crear para no pagar dos veces,
         // y seSalta ya sabe que una postulacion con ficha leida no vuelve a leerse.
         return encolarSuelto(postulacionId, AgenteDatosCv.CODIGO_AGENTE);
