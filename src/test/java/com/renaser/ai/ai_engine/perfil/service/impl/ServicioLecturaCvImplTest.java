@@ -47,7 +47,7 @@ class ServicioLecturaCvImplTest {
 
     @BeforeEach
     void crearElServicio() {
-        servicio = new ServicioLecturaCvImpl(cvs, archivos, datosCv, cola);
+        servicio = new ServicioLecturaCvImpl(cvs, archivos, datosCv, cola, true);
         lenient().when(cvs.findByPostulacionId(POSTULACION)).thenReturn(Optional.of(
                 Cv.builder().id(1L).postulacionId(POSTULACION).archivoOriginalId(100L).build()));
         lenient().when(archivos.findById(100L)).thenReturn(Optional.of(

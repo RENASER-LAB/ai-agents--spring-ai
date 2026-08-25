@@ -403,6 +403,20 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
             // El que cierra la etapa y los dos sueltos no tienen a nadie detrás.
             return;
         }
+        // La lectura de datos que dispara postular (el perfil del candidato) va SOLA: si al
+        // terminar no hay ningún hermano de la tanda —ni vivo ni terminado—, nadie pidió
+        // calificar todavía y armar el retrato aquí sería pagarlo antes de tiempo y sin
+        // evaluación. Cuando una criba o una entrega encolen a los demás, la barrera de
+        // siempre hará su trabajo.
+        if (AgenteDatosCv.CODIGO_AGENTE.equals(acabado.getAgenteCodigo())) {
+            boolean sinHermanos = trabajos
+                    .findByPostulacionIdOrderByIdAsc(acabado.getPostulacionId()).stream()
+                    .noneMatch(t -> !t.getId().equals(acabado.getId())
+                            && aLaVezDe(acabado.getModo()).contains(t.getAgenteCodigo()));
+            if (sinHermanos) {
+                return;
+            }
+        }
         dispararElRetrato(acabado.getPostulacionId(), acabado.getModo(), acabado.getId());
     }
 

@@ -6,7 +6,6 @@ import com.renaser.ai.ai_engine.perfil.service.ServicioLecturaCv;
 import com.renaser.ai.ai_engine.postulacion.entity.DatoCv;
 import com.renaser.ai.ai_engine.postulacion.repository.CvRepository;
 import com.renaser.ai.ai_engine.postulacion.repository.DatoCvRepository;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,7 +23,6 @@ import java.util.List;
  * tocarla. Solo un archivo distinto dispara una lectura nueva.
  */
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class ServicioLecturaCvImpl implements ServicioLecturaCv {
 
@@ -32,10 +30,28 @@ public class ServicioLecturaCvImpl implements ServicioLecturaCv {
     private final ArchivoRepository archivos;
     private final DatoCvRepository datosCv;
     private final ColaCalificacionIa cola;
+    // El interruptor de RF-158. Encendido, postular dispara la lectura (o la copia); las
+    // pruebas de la calificacion lo apagan porque alli el tiempo de DATOS_CV es parte de
+    // lo que se prueba, y adelantarlo les cambiaria todos los conteos.
+    private final boolean activa;
+
+    public ServicioLecturaCvImpl(CvRepository cvs, ArchivoRepository archivos,
+            DatoCvRepository datosCv, ColaCalificacionIa cola,
+            @org.springframework.beans.factory.annotation.Value(
+                    "${renaser.perfil.lectura-al-postular:true}") boolean activa) {
+        this.cvs = cvs;
+        this.archivos = archivos;
+        this.datosCv = datosCv;
+        this.cola = cola;
+        this.activa = activa;
+    }
 
     @Override
     @Transactional
     public void trasPostular(Long personaId, Long postulacionId) {
+        if (!activa) {
+            return;
+        }
         try {
             decidir(personaId, postulacionId);
         } catch (RuntimeException e) {
