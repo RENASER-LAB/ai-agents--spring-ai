@@ -185,7 +185,8 @@ public class ServicioPerfilPortalImpl implements ServicioPerfilPortal {
                 .perfilCandidatoId(perfil.getId())
                 .titulo(datos.titulo().trim()).institucion(datos.institucion().trim())
                 .nivelCodigo(datos.nivelCodigo())
-                .desde(datos.desde()).hasta(datos.hasta()).enCurso(datos.enCurso())
+                .desde(datos.desde()).hasta(datos.hasta())
+                .enCurso(Boolean.TRUE.equals(datos.enCurso()))
                 .origen(PERSONA).confirmadoEn(Instant.now())
                 .orden(orden).creadoEn(Instant.now())
                 .build());
@@ -203,7 +204,7 @@ public class ServicioPerfilPortalImpl implements ServicioPerfilPortal {
         fila.setNivelCodigo(datos.nivelCodigo());
         fila.setDesde(datos.desde());
         fila.setHasta(datos.hasta());
-        fila.setEnCurso(datos.enCurso());
+        fila.setEnCurso(Boolean.TRUE.equals(datos.enCurso()));
         hacerloSuyo(fila::setOrigen, fila::setConfirmadoEn);
         educaciones.save(fila);
         tocar(elDe(quien));

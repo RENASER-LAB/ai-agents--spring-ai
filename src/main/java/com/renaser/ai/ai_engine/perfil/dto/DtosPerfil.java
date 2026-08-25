@@ -110,7 +110,10 @@ public final class DtosPerfil {
             String nivelCodigo,
             LocalDate desde,
             LocalDate hasta,
-            boolean enCurso) {
+            // Objeto y no `boolean`: en el cuerpo de una peticion un primitivo obliga a
+            // mandar el campo, y omitirlo —que el contrato permite, porque aqui nada es
+            // obligatorio— reventaba con un 500 antes de llegar al servicio. Ausente = false.
+            Boolean enCurso) {
     }
 
     public record EditarIdioma(

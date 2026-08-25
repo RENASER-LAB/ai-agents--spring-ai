@@ -47,7 +47,7 @@ demás de la calificación se prueba con un doble del modelo y no gasta nada.
 
 ---
 
-## 633 pruebas
+## 634 pruebas
 
 Contadas de correrlas el 25/08/2026, no de recordarlas: el desglose sale de los
 informes de surefire y failsafe, y suma exacto.
@@ -59,7 +59,7 @@ informes de surefire y failsafe, y suma exacto.
 | Las fórmulas del banco v3 | 22 | nada |
 | El validador de las respuestas v3 | 21 | nada |
 | El perfil del candidato (merge, lectura, CRUD, estados, retención, borrado) | 64 | nada |
-| Integración, de punta a punta | 78 | Docker |
+| Integración, de punta a punta | 79 | Docker |
 | Contra el proveedor de verdad, y el envío de correo | 6 | Docker o SMTP, y su bandera |
 
 ⚠️ Al recontar, **no sirve el atributo `tests=`** de los XML de surefire: con clases anidadas

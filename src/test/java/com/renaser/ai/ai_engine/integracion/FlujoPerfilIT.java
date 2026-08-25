@@ -221,9 +221,135 @@ public class FlujoPerfilIT {
                 .andExpect(status().isConflict());
     }
 
-    @DisplayName("El mismo archivo no se lee dos veces, y lo corregido queda intacto")
+    @DisplayName("Las cinco listas se llenan, se editan, se reordenan y se borran")
     @Test
     @Order(5)
+    void elCrudEnteroDeLasCincoListas() throws Exception {
+        // El recorrido que hará de verdad quien llene su perfil a mano. Va por los
+        // endpoints y no por el servicio a propósito: así se comprueba también que las
+        // rutas, la validación del cuerpo y los códigos de respuesta son los del contrato.
+
+        // --- experiencia: una segunda, para poder reordenar
+        long otraExperiencia = idDe(conToken(post("/api/v1/portal/perfil/experiencia"),
+                tokenCandidato, """
+                {"puesto":"Practicante","empresa":"Municipalidad","desde":"2017-01-01",
+                 "hasta":"2017-12-01","descripcion":"Mis primeras prácticas"}""")
+                .andExpect(status().isCreated()));
+        // Reordenar exige TODOS los ids, y aquí ya hay tres: los dos que salieron del
+        // currículum y el que se acaba de añadir. Se mandan del revés.
+        List<Long> alReves = new java.util.ArrayList<>(idsDe("experiencia"));
+        java.util.Collections.reverse(alReves);
+        conToken(put("/api/v1/portal/perfil/experiencia/orden"), tokenCandidato,
+                "{\"ids\":%s}".formatted(alReves)).andExpect(status().isOk());
+        assertThat(idsDe("experiencia")).isEqualTo(alReves);
+        // Un orden al que le falte alguien no se aplica
+        conToken(put("/api/v1/portal/perfil/experiencia/orden"), tokenCandidato,
+                "{\"ids\":[%d]}".formatted(otraExperiencia))
+                .andExpect(status().isBadRequest());
+
+        // --- educación
+        long educacion = idDe(conToken(post("/api/v1/portal/perfil/educacion"), tokenCandidato,
+                """
+                {"titulo":"Diplomado en Gestión","institucion":"ESAN",
+                 "nivelCodigo":"TECNICA","desde":"2020-03-01","enCurso":true}""")
+                .andExpect(status().isCreated()));
+        conToken(put("/api/v1/portal/perfil/educacion/" + educacion), tokenCandidato, """
+                {"titulo":"Diplomado en Gestión de Operaciones","institucion":"ESAN",
+                 "nivelCodigo":"TECNICA","desde":"2020-03-01","hasta":"2021-03-01",
+                 "enCurso":false}""").andExpect(status().isOk());
+        List<Long> educacionAlReves = new java.util.ArrayList<>(idsDe("educacion"));
+        java.util.Collections.reverse(educacionAlReves);
+        conToken(put("/api/v1/portal/perfil/educacion/orden"), tokenCandidato,
+                "{\"ids\":%s}".formatted(educacionAlReves)).andExpect(status().isOk());
+        // Un nivel que no está en el catálogo no entra
+        conToken(post("/api/v1/portal/perfil/educacion"), tokenCandidato, """
+                {"titulo":"X","institucion":"Y","nivelCodigo":"POSDOCTORADO"}""")
+                .andExpect(status().isBadRequest());
+        // Y omitir enCurso —que es opcional— entra sin problema: si fuera un primitivo,
+        // Jackson reventaria antes de llegar al servicio y saldria un 500.
+        long sinEnCurso = idDe(conToken(post("/api/v1/portal/perfil/educacion"),
+                tokenCandidato, """
+                {"titulo":"Curso suelto","institucion":"Coursera"}""")
+                .andExpect(status().isCreated()));
+        conToken(delete("/api/v1/portal/perfil/educacion/" + sinEnCurso), tokenCandidato, null)
+                .andExpect(status().isOk());
+
+        // --- idiomas
+        long idioma = idDe(conToken(post("/api/v1/portal/perfil/idiomas"), tokenCandidato,
+                "{\"idioma\":\"Portugués\",\"nivelCodigo\":\"A2\"}")
+                .andExpect(status().isCreated()));
+        conToken(put("/api/v1/portal/perfil/idiomas/" + idioma), tokenCandidato,
+                "{\"idioma\":\"Portugués\",\"nivelCodigo\":\"B1\"}")
+                .andExpect(status().isOk());
+        conToken(post("/api/v1/portal/perfil/idiomas/" + idioma + "/confirmacion"),
+                tokenCandidato, null).andExpect(status().isOk());
+        // Sin tildes y en minúscula sigue siendo el mismo idioma: no entra dos veces
+        conToken(post("/api/v1/portal/perfil/idiomas"), tokenCandidato,
+                "{\"idioma\":\"portugues\",\"nivelCodigo\":\"C1\"}")
+                .andExpect(status().isConflict());
+        // Y un nivel inventado tampoco
+        conToken(post("/api/v1/portal/perfil/idiomas"), tokenCandidato,
+                "{\"idioma\":\"Alemán\",\"nivelCodigo\":\"FLUIDO\"}")
+                .andExpect(status().isBadRequest());
+
+        // --- certificaciones
+        long certificacion = idDe(conToken(post("/api/v1/portal/perfil/certificaciones"),
+                tokenCandidato, """
+                {"nombre":"Auditor interno ISO 9001","entidad":"Bureau Veritas",
+                 "emitidaEn":"2024-05-01","venceEn":"2027-05-01"}""")
+                .andExpect(status().isCreated()));
+        conToken(put("/api/v1/portal/perfil/certificaciones/" + certificacion), tokenCandidato,
+                """
+                {"nombre":"Auditor interno ISO 9001:2015","entidad":"Bureau Veritas",
+                 "emitidaEn":"2024-05-01","venceEn":"2027-05-01"}""")
+                .andExpect(status().isOk());
+        conToken(post("/api/v1/portal/perfil/certificaciones/" + certificacion
+                + "/confirmacion"), tokenCandidato, null).andExpect(status().isOk());
+        // No puede vencer antes de emitirse
+        conToken(post("/api/v1/portal/perfil/certificaciones"), tokenCandidato, """
+                {"nombre":"BLS","emitidaEn":"2024-05-01","venceEn":"2023-01-01"}""")
+                .andExpect(status().isBadRequest());
+
+        // --- enlaces: uno más y se borra
+        long enlace = idDe(conToken(post("/api/v1/portal/perfil/enlaces"), tokenCandidato,
+                "{\"tipo\":\"PORTAFOLIO\",\"url\":\"https://camila.dev\"}")
+                .andExpect(status().isCreated()));
+        conToken(delete("/api/v1/portal/perfil/enlaces/" + enlace), tokenCandidato, null)
+                .andExpect(status().isOk());
+        // Un tipo que no existe en el catálogo del CHECK
+        conToken(post("/api/v1/portal/perfil/enlaces"), tokenCandidato,
+                "{\"tipo\":\"MASTODON\",\"url\":\"https://social.dev/@camila\"}")
+                .andExpect(status().isBadRequest());
+
+        // --- y lo que se borra, desaparece
+        conToken(delete("/api/v1/portal/perfil/educacion/" + educacion), tokenCandidato, null)
+                .andExpect(status().isOk());
+        conToken(delete("/api/v1/portal/perfil/idiomas/" + idioma), tokenCandidato, null)
+                .andExpect(status().isOk());
+        conToken(delete("/api/v1/portal/perfil/certificaciones/" + certificacion),
+                tokenCandidato, null).andExpect(status().isOk());
+        conToken(delete("/api/v1/portal/perfil/experiencia/" + otraExperiencia),
+                tokenCandidato, null).andExpect(status().isOk());
+
+        // Quedan las dos del curriculum y la que se propuso en (3); lo añadido a mano se fue
+        conTokenGet("/api/v1/portal/perfil", tokenCandidato)
+                .andExpect(jsonPath("$.experiencia.length()").value(2))
+                .andExpect(jsonPath("$.educacion.length()").value(1))
+                .andExpect(jsonPath("$.idiomas.length()").value(1))
+                .andExpect(jsonPath("$.certificaciones").isEmpty());
+
+        // Lo de otro responde 404 aunque exista: no se dice «prohibido», que ya confirmaría
+        String deOtro = crearCandidatoYEntrar("otro-candidato@correo.pe");
+        conToken(delete("/api/v1/portal/perfil/experiencia/" + experienciaPropuestaId),
+                deOtro, null).andExpect(status().isNotFound());
+        conToken(put("/api/v1/portal/perfil/educacion/" + educacionPropuestaId), deOtro,
+                "{\"titulo\":\"Mio\",\"institucion\":\"Mia\"}")
+                .andExpect(status().isNotFound());
+    }
+
+    @DisplayName("El mismo archivo no se lee dos veces, y lo corregido queda intacto")
+    @Test
+    @Order(6)
     void elMismoArchivoNoSePagaDosVeces() throws Exception {
         long vacante2 = new PreparadorDeVacante().publicada();
         MockMultipartFile cv = new MockMultipartFile("cv", "cv.pdf", "application/pdf", PDF);
@@ -248,16 +374,20 @@ public class FlujoPerfilIT {
                 "select count(*) from trabajo_ia where agente_codigo = 'DATOS_CV'",
                 Integer.class)).isZero();
 
-        // Y lo que el candidato corrigio en (4) sigue exactamente igual (RF-159)
+        // Y lo que el candidato corrigio en (4) sigue exactamente igual (RF-159). Se busca
+        // por contenido y no por posicion: el paso anterior reordeno la lista.
         conTokenGet("/api/v1/portal/perfil", tokenCandidato)
-                .andExpect(jsonPath("$.experiencia[0].puesto")
-                        .value("Analista senior de procesos"))
-                .andExpect(jsonPath("$.experiencia[0].origen").value("PERSONA"));
+                .andExpect(jsonPath(
+                        "$.experiencia[?(@.puesto=='Analista senior de procesos')].origen")
+                        .value("PERSONA"))
+                .andExpect(jsonPath(
+                        "$.experiencia[?(@.puesto=='Analista senior de procesos')].descripcion")
+                        .value("Lo que de verdad hice"));
     }
 
     @DisplayName("Descargar mis datos: el derecho de acceso con un archivo de verdad")
     @Test
-    @Order(6)
+    @Order(7)
     void descargarMisDatos() throws Exception {
         conTokenGet("/api/v1/portal/perfil/descarga", tokenCandidato)
                 .andExpect(status().isOk())
@@ -268,7 +398,7 @@ public class FlujoPerfilIT {
 
     @DisplayName("La pretensión no viaja al panel sin su permiso — ni como nombre de campo")
     @Test
-    @Order(7)
+    @Order(8)
     void laPretensionNoViajaSinPermiso() throws Exception {
         // El primer usuario del equipo entra con todos los roles, asi que para probar el
         // caso SIN permiso se le quita a todos los roles y se restaura despues: los permisos
@@ -301,7 +431,7 @@ public class FlujoPerfilIT {
 
     @DisplayName("Sin ver_perfil_candidato, la sección entera es un 403")
     @Test
-    @Order(8)
+    @Order(9)
     void sinPermisoDePerfilEs403() throws Exception {
         jdbc.update("""
                 delete from rol_permiso where permiso_id =
@@ -319,7 +449,7 @@ public class FlujoPerfilIT {
 
     @DisplayName("El borrado de la ley 29733 se lleva el perfil entero; dato_cv se queda")
     @Test
-    @Order(9)
+    @Order(10)
     void elBorradoSeLlevaElPerfil() throws Exception {
         conToken(post("/api/v1/portal/solicitudes-borrado"), tokenCandidato,
                 "{\"motivo\":\"Ya no quiero participar\"}").andExpect(status().isCreated());
@@ -475,6 +605,20 @@ public class FlujoPerfilIT {
 
     private ResultActions conTokenGet(String ruta, String token) throws Exception {
         return mvc.perform(get(ruta).header("Authorization", "Bearer " + token));
+    }
+
+    /** El id que devuelve un alta, para encadenar la edicion y el borrado. */
+    private long idDe(ResultActions alta) throws Exception {
+        return Long.parseLong(leer(alta.andReturn().getResponse().getContentAsString(), "id"));
+    }
+
+    /** Los ids de una lista del perfil, en el orden en que los pinta el portal. */
+    private List<Long> idsDe(String lista) throws Exception {
+        var nodo = json.readTree(conTokenGet("/api/v1/portal/perfil", tokenCandidato)
+                .andReturn().getResponse().getContentAsString()).get(lista);
+        List<Long> ids = new java.util.ArrayList<>();
+        nodo.forEach(e -> ids.add(e.get("id").asLong()));
+        return ids;
     }
 
     private String leer(String cuerpoRespuesta, String campo) throws Exception {
