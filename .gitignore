@@ -78,3 +78,8 @@ despliegue/.env
 # La cache que deja schemathesis al fuzzear en local. Se regenera sola y guarda las
 # entradas que hicieron fallar un endpoint, que no son fuente de nada.
 .schemathesis/
+
+# Los registros de correr las pruebas: se generan en cada ejecucion y ademas
+# llevan tokens de las pruebas dentro, que hacen saltar al detector de secretos.
+verify*.log
+*.log
