@@ -47,20 +47,24 @@ demás de la calificación se prueba con un doble del modelo y no gasta nada.
 
 ---
 
-## 634 pruebas
+## 673 pruebas
 
-Contadas de correrlas el 25/08/2026, no de recordarlas: el desglose sale de los
-informes de surefire y failsafe, y suma exacto.
+Contadas de correrlas el 25/08/2026 (tras el multiempresa), no de recordarlas: el desglose
+sale de los informes de surefire y failsafe, y suma exacto.
 
 | Qué | Cuántas | Necesita |
 |---|---:|---|
-| Unitarias, con dobles | 434 | nada |
-| Arquitectura | 8 | nada |
+| Unitarias, con dobles | 477 | nada |
+| Arquitectura | 9 | nada |
 | Las fórmulas del banco v3 | 22 | nada |
 | El validador de las respuestas v3 | 21 | nada |
-| El perfil del candidato (merge, lectura, CRUD, estados, retención, borrado) | 64 | nada |
-| Integración, de punta a punta | 79 | Docker |
+| El perfil del candidato (paquete `perfil`: merge, lectura, CRUD, retención, borrado) | 52 | nada |
+| Integración, de punta a punta | 86 | Docker |
 | Contra el proveedor de verdad, y el envío de correo | 6 | Docker o SMTP, y su bandera |
+
+El multiempresa (25/08) sumó 31 unitarias —el login del panel, las invitaciones, el alta de
+empresas, el resolutor de dueño de instrumento, el copiador y la personalización—, una regla
+de arquitectura nueva y `FlujoDosEmpresasIT`: dos empresas de verdad, de punta a punta.
 
 ⚠️ Al recontar, **no sirve el atributo `tests=`** de los XML de surefire: con clases anidadas
 (`@Nested`) subcuenta, y por eso dos filas de esta tabla llevaban tiempo mal —las fórmulas
@@ -73,7 +77,8 @@ grep -ho "<testcase" target/surefire-reports/*.xml | wc -l
 
 Las tres filas del medio se listan aparte porque se prueban solas, sin contexto de Spring:
 son las que deciden la nota de una persona y las que impiden que una respuesta con mala
-forma llegue a puntuarse.
+forma llegue a puntuarse. La fila del perfil cuenta las del paquete `perfil`; antes esta
+tabla decía 64 porque sumaba pruebas de otros paquetes que tocan el perfil de pasada.
 
 Entre las de integración hay dos que no se parecen al resto y conviene conocer: la del **banco
 por el panel** (`FlujoBancoPreguntasIT`), donde un administrador construye, publica y archiva un
@@ -97,12 +102,12 @@ no sirve para nada.
 
 ---
 
-## Las ocho reglas de arquitectura
+## Las nueve reglas de arquitectura
 
 Están en `ArquitecturaTest` y no inventan nada: son las reglas que el `CLAUDE.md` ya tenía
 escritas en prosa. **Una regla en prosa se rompe sin que nadie se entere** —alguien añade un
 import, el código compila, las pruebas pasan y la frontera ya no existe— y eso es lo que
-estas ocho impiden.
+estas nueve impiden.
 
 | Regla | Por qué importa |
 |---|---|
@@ -114,6 +119,7 @@ estas ocho impiden.
 | Las entidades no salen por un endpoint | Una entidad publicada convierte cualquier columna nueva en un cambio de contrato |
 | Todo controlador nuevo está en la lista del candado de Swagger | Un endpoint que nadie apuntó ahí queda fuera del candado, y se publica sin que nadie lo haya decidido |
 | Nadie escribe en la consola a pelo | Lo que se imprime así no aparece en el registro, y el registro es lo único que queda cuando algo falla en producción |
+| **Ningún servicio del panel busca por id suelto en un agregado con dueño** | La del multiempresa (25/08). Con una sola empresa un `findById` sin filtrar funciona idéntico y nadie lo nota; con dos, lee datos de la competencia. Las llamadas legítimas —casi todas «derivar al padre»— están enumeradas en `LLAMADAS_SIN_DUENO_ACORDADAS` con su porqué: añadir una nueva falla hasta que alguien la escriba ahí. Corrida contra el código anterior a los arreglos, denunció las fugas una por una |
 
 ### Las dos desviaciones que había, y ya no
 
@@ -125,7 +131,9 @@ tras un patrón genérico. Eso es lo que hizo que se arreglaran: una desviación
 decide, una escondida se olvida. Hoy los catálogos salen de `ServicioCatalogo` y el arranque
 del primer usuario del equipo de `ServicioAccesoEquipo`.
 
-**Las ocho reglas no tienen excepciones.**
+**Las ocho primeras reglas no tienen excepciones.** La novena enumera las suyas una por
+una, con su motivo escrito — que es distinto de no tenerlas: una excepción a la vista se
+decide, una escondida se olvida.
 
 ---
 

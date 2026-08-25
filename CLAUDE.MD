@@ -68,14 +68,14 @@ Perfil Integral → prueba del puesto → simulacion → validacion → decision
 
 | | |
 |---|---|
-| Base de datos | **Flyway es el dueno del esquema**: V1-V36 en `src/main/resources/db/migration`, **100 tablas de este modulo** (103 en la base contando `flyway_schema_history` y las dos del motor de agentes, `agent_run` y `vector_store`). `ddl-auto: validate` |
+| Base de datos | **Flyway es el dueno del esquema**: V1-V37 en `src/main/resources/db/migration`, **101 tablas de este modulo** (104 en la base contando `flyway_schema_history` y las dos del motor de agentes, `agent_run` y `vector_store`). `ddl-auto: validate` |
 | Codigo | Veintiun paquetes de dominio bajo `ai_engine` (ver «Como esta organizado el codigo») |
-| Tests | **634, todos en verde (25/08/2026)**: 549 unitarios y 85 de integracion (6 saltados, los que gastan saldo o mandan correo de verdad). Ver «Correr los tests»: unitarios de la maquina y del anonimizador, migraciones contra Postgres real (Testcontainers) y flujos de punta a punta: hito 1, evaluacion, prueba, simulacion/validacion, calificacion con IA y la vacante sin banco |
+| Tests | **673, todos en verde (25/08/2026)**: 581 unitarios y 92 de integracion (6 saltados, los que gastan saldo o mandan correo de verdad). Ver «Correr los tests»: unitarios de la maquina y del anonimizador, migraciones contra Postgres real (Testcontainers) y flujos de punta a punta: hito 1, evaluacion, prueba, simulacion/validacion, calificacion con IA, la vacante sin banco y las dos empresas |
 | IA que califica | **Seis de los diez agentes del catalogo estan implementados**: datos del curriculum, evidencia, evaluador, potencial/riesgo, prueba del puesto y las preguntas de la conversacion final. Todos corren por cola de RabbitMQ contra DeepSeek. Ver [Calificacion con IA](docs/CALIFICACION-CON-IA.md) |
 | Correo | **Ya sabe salir de verdad** (`EnviadorCorreoSmtp`), pero **por defecto no sale**: `renaser.correo.transporte` vale `log` salvo que se ponga `smtp`, y entonces solo se registra en `correo_enviado`. Para encenderlo hacen falta `CORREO_TRANSPORTE=smtp`, `CORREO_REMITENTE` y una cuenta que autentique. El RNF-65 pide que salga **desde el dominio propio de Renaser**: confirmar con ellos si ya lo tienen antes de encenderlo |
 | Acceso del candidato | Entra al portal **con un enlace, sin contrasena** (`EnlaceAcceso`, `ServicioEnlaceAcceso`). El enlace se le manda por correo, asi que depende de lo de arriba |
 | Lo configurable | El plazo para responder la evaluacion dejo de estar en el codigo: es el parametro `dias_plazo_evaluacion` (14 por defecto, migracion `V22`). Se cuenta desde que sale la invitacion, no desde que se creo la evaluacion |
-| Identidad equipo | `dev-login` de desarrollo; el contrato de RENASER OS no existe aun (`ProveedorIdentidadEquipo`) |
+| Identidad equipo | **Correo y contrasena** (`POST /panel/auth/login`), cuentas solo por invitacion; RENASER OS quedo dormido y el `dev-login` esta **apagado por defecto** (lo encienden `application-local.yaml` y las pruebas). Ver «Multiempresa» |
 | Frontend | **Dos, y hacen cosas distintas.** Ver «Las dos pantallas» mas abajo |
 | Mockups | Los mantiene otra persona y **describen la version anterior** |
 
@@ -264,19 +264,20 @@ Las dos consultan el mismo backend, asi que ensenan el mismo orden.
 - Nada se recalcula hacia atras: cada nota queda atada a la version de pesos de su vacante.
 
 ### Correr los tests
-**480 unitarios en verde (23/08/2026).** Son dos tandas y el comando decide cual corre:
+**581 unitarios en verde (25/08/2026).** Son dos tandas y el comando decide cual corre:
 
 | Comando | Que corre | Cuantos | Necesita |
 |---|---|---:|---|
-| `./mvnw test` | unitarias con dobles y las de arquitectura | 480 | nada |
-| `./mvnw verify` | lo anterior mas las de integracion | 547 | Docker |
+| `./mvnw test` | unitarias con dobles y las de arquitectura | 581 | nada |
+| `./mvnw verify` | lo anterior mas las de integracion | 673 | Docker |
 
 Las de integracion levantan su propio PostgreSQL y su propio RabbitMQ con Testcontainers: hace
 falta el demonio de Docker encendido. El desglose completo esta en
 [docs/COMPROBACIONES-AUTOMATICAS.md](docs/COMPROBACIONES-AUTOMATICAS.md).
 
-Entre las unitarias hay **8 reglas de arquitectura con ArchUnit** (la frontera del motor, las capas y
-que el estado solo lo mueva la maquina — las mismas reglas que este archivo tiene en prosa).
+Entre las unitarias hay **9 reglas de arquitectura con ArchUnit** (la frontera del motor, las capas,
+que el estado solo lo mueva la maquina, y que ningun servicio del panel busque por id suelto en un
+agregado con dueno — las mismas reglas que este archivo tiene en prosa).
 
 **El test que gasta dinero no corre solo**: `CalificacionIaRealIT` esta detras de
 `@EnabledIfEnvironmentVariable`, asi que se salta sola si no esta la variable. Ni `test` ni
@@ -319,6 +320,43 @@ y el diseño en [docs/PROPUESTA-PERFIL-DEL-CANDIDATO.md](docs/PROPUESTA-PERFIL-D
 
 ⚠️ **No encender con candidatos reales sin el texto de consentimiento nuevo**: el vigente
 cubre una postulacion concreta, no un perfil que se conserva entre convocatorias (RF-169).
+
+## Multiempresa (25/08/2026)
+El sistema paso de «Renaser contrata para Renaser» a plataforma tipo Indeed: cada empresa
+se registra por invitacion de Renaser, publica sus vacantes y ve solo a sus candidatos.
+Los tres specs con el porque de cada decision estan en `docs/superpowers/specs/2026-08-25-*.md`.
+Lo que hay que saber para tocar codigo:
+
+- **La plataforma es un dato, no un literal**: `organizacion.es_plataforma` (solo una puede
+  serlo). El `findByCodigo("RENASER")` quemado ya no existe: se resuelve con
+  `findByEsPlataformaTrue`.
+- **Cuatro banderas de personalizacion** por organizacion (banco, pesos, plantillas de
+  evaluacion, pruebas), apagadas por defecto = leer el instrumento de la plataforma;
+  encender = copiarlo (`POST /panel/organizacion/personalizacion`). El UNICO punto que las
+  interpreta es `organizacion/service/DuenoDelInstrumento`: toda consulta de instrumentos
+  pasa por el. **Leer resuelve, editar no**: con la bandera apagada se VE el metodo de la
+  plataforma en solo lectura; mutar algo ajeno responde 404. Apagar archiva el banco
+  propio, nunca lo borra (RF-138).
+- **Dos logins separados**: el portal del candidato (registro publico, como siempre) y el
+  panel de empresas (`POST /panel/auth/login`), que solo autentica cuentas con
+  `usuario.es_equipo` — un candidato con su contrasena correcta recibe el mismo 401 que un
+  correo inexistente. Las cuentas del panel nacen SOLO por invitacion (tabla `invitacion`,
+  token de un solo uso, se guarda el hash). El candidato es de la plataforma: una cuenta,
+  postula a cualquier empresa, y **su postulacion nace en la organizacion de la vacante**.
+- **El alta de empresas** (`POST /panel/plataforma/empresas`, permiso
+  `administrar_plataforma` + ser la plataforma) siembra roles y matriz de permisos (sin
+  `administrar_plataforma`), parametros, textos legales en borrador y correos activos, e
+  invita al primer administrador.
+- **El aislamiento tiene dos vigilantes**: la regla de ArchUnit que prohibe `findById`
+  suelto sobre repositorios de agregados con dueno (lista `LLAMADAS_SIN_DUENO_ACORDADAS`
+  en `ArquitecturaTest`; al anadir una llamada legitima hay que escribirla ahi con su
+  porque) y `FlujoDosEmpresasIT`, que recorre el alta, el aislamiento en ambos sentidos,
+  el metodo compartido y el borrado de punta a punta. La unica pantalla que mezcla
+  empresas es el tablon publico de vacantes, a proposito.
+- **El borrado 29733 es de la plataforma**: los candidatos son cuentas de plataforma y la
+  anonimizacion cruza empresas. Desde una empresa responde 403.
+- Pendiente (piezas D/E/F): el candidato ante varias empresas, el coste de la IA por
+  empresa, y Renaser supervisando empresas (suspension, encender banderas desde arriba).
 
 ## El banco de preguntas v3 (19/08/2026)
 El cliente reemplazo el banco entero. Son **190 items** (85 directivo, 55 coordinacion, 50
@@ -479,7 +517,7 @@ com.renaser.ai.ai_engine.<dominio>
 | Dominio | Que guarda |
 |---|---|
 | `usuario` | Persona, usuario del equipo, roles y permisos |
-| `organizacion` | La organizacion y sus areas |
+| `organizacion` | La organizacion, sus areas, la plataforma (alta de empresas) y la personalizacion de instrumentos |
 | `solicitud` | La Solicitud de Talento y sus resultados esperados |
 | `vacante` | Vacante, puesto, catalogos y requisitos objetivos |
 | `postulacion` | La postulacion, su historial, el CV y **la maquina de estados** |

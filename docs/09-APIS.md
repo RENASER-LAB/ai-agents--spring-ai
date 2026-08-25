@@ -19,7 +19,7 @@ Todo vive bajo `/api/v1/`, en dos zonas con reglas distintas:
 | Puerta | Quién la usa | Cómo se identifica |
 |---|---|---|
 | `/api/v1/portal/**` | El candidato | Token propio, de crear cuenta y entrar con correo y contraseña |
-| `/api/v1/panel/**` | El equipo de Renaser | Token de equipo. Lo emitirá RENASER OS; mientras no exista ese contrato, el login de desarrollo |
+| `/api/v1/panel/**` | El equipo de cada empresa, Renaser incluida | Token de equipo, con correo y contraseña. Las cuentas nacen **solo por invitación**: el panel no tiene registro público |
 
 El token va en cada llamada, en la cabecera `Authorization: Bearer <token>`.
 
@@ -38,10 +38,22 @@ la lista de correos registrados. Tras varios intentos fallidos seguidos (configu
 en 5), la entrada se bloquea unos minutos y responde **429** con la cabecera `Retry-After` y el
 campo `segundosDeEspera`, para que la pantalla pueda decir cuánto falta en vez de adivinarlo.
 
-**El equipo, mientras no hay RENASER OS:** `POST /panel/auth/dev-login` con el id de RENASER OS.
-El primer id que entre en una base recién creada se registra solo, con los roles completos del
-equipo — es el arranque de desarrollo. En producción este login se apaga con
-`app.seguridad.dev-login-activo: false`.
+**El equipo:** `POST /panel/auth/login` con correo y contraseña. Solo entran cuentas de
+equipo: un candidato con su contraseña correcta recibe el mismo 401 que un correo que no
+existe — la contraseña del portal no abre el panel. El bloqueo por intentos es el mismo que
+el del candidato. RENASER OS quedó dormido: cuando se retome será añadir un proveedor de
+identidad, no rehacer este login.
+
+**La cuenta de equipo nace por invitación.** Un administrador invita
+(`POST /panel/usuarios/invitaciones`) y el invitado abre el enlace del correo y canjea el
+token en `POST /panel/auth/invitacion`, poniendo su nombre y su contraseña — mínimo doce
+caracteres, porque una cuenta de panel ve los datos de muchas personas. El token es de un
+solo uso y caduca (parámetro `dias_invitacion`, 7 por defecto); una invitación vencida,
+revocada o ya canjeada responde siempre el mismo 401.
+
+**El login de desarrollo** (`POST /panel/auth/dev-login`) sigue existiendo para local y para
+las pruebas, y está **apagado por defecto** (`app.seguridad.dev-login-activo: false`): solo
+`application-local.yaml` y las pruebas de integración lo encienden.
 
 ## Los errores hablan claro
 
@@ -64,7 +76,7 @@ en lenguaje normal.
 
 | Método y ruta | Qué hace | Quién |
 |---|---|---|
-| GET `/vacantes` | Las vacantes publicadas | Cualquiera, sin token |
+| GET `/vacantes` | Las vacantes publicadas **de todas las empresas**, cada una con el nombre de la suya | Cualquiera, sin token |
 | GET `/vacantes/{id}` | El detalle público, con los requisitos indispensables | Cualquiera |
 | GET `/consentimientos/textos` | Los textos vigentes de los dos consentimientos | Cualquiera |
 | POST `/cuentas` | Crear la cuenta y registrar los consentimientos | Cualquiera |
@@ -79,6 +91,10 @@ en lenguaje normal.
 | POST `/evaluacion/{uuid}/inicio` | Empezar. La primera vez elige qué preguntas le tocan | Candidato |
 | PUT `/evaluacion/{uuid}/respuestas/{preguntaId}` | Guardar una respuesta | Candidato |
 | POST `/evaluacion/{uuid}/entrega` | Entregar. Ya no se cambia, y pasa a calificarse | Candidato |
+
+**El candidato es de la plataforma.** Una sola cuenta, y con ella postula a la vacante de
+cualquier empresa: su postulación nace en la empresa de la vacante, que es la que la ve en su
+panel. El tablón de vacantes es la única pantalla que mezcla empresas — a propósito.
 
 **La evaluación es de quien la responde.** Todo entra por el código de la postulación, no por
 el id de la evaluación, y una que no es suya responde 404 — un 403 ya confirmaría que existe.
@@ -259,8 +275,27 @@ el banco v4 que venga no necesitará una migración. El ciclo es
 | GET/PUT `/parametros` | Los valores que Renaser cambia sin programar | `editar_parametros` |
 | GET/POST `/plantillas-correo` | Los textos de correo. Editar = crear versión nueva | `editar_textos_correo` |
 | GET `/auditoria` | El registro, paginado. No se puede modificar ni borrar | `ver_auditoria` |
-| GET `/solicitudes-borrado` · POST `/{id}/ejecucion` | Ver y ejecutar los borrados: la persona queda vacía, la trazabilidad queda | `ejecutar_borrado_datos` |
+| GET `/solicitudes-borrado` · POST `/{id}/ejecucion` | Ver y ejecutar los borrados: la persona queda vacía, la trazabilidad queda. **Solo desde la plataforma**: los candidatos son cuentas de plataforma y la anonimización cruza empresas | `ejecutar_borrado_datos`, y ser la plataforma |
 | GET/POST `/usuarios` · POST `/{id}/roles` · GET `/roles` | El equipo y sus roles. El último administrador no se puede quitar | `crear_usuarios_y_asignar_roles` |
+| GET/POST `/usuarios/invitaciones` · DELETE `/{id}` | Invitar a alguien al equipo, ver las invitaciones y revocar una sin canjear. La respuesta del POST devuelve el enlace a quien invita | `crear_usuarios_y_asignar_roles` |
+
+### La plataforma y las empresas
+
+Desde el 25/08/2026 el sistema es multiempresa: cada empresa se registra por invitación de
+Renaser, publica sus vacantes y ve solo a sus candidatos. El porqué de cada decisión está en
+`docs/superpowers/specs/2026-08-25-*.md`.
+
+| Método y ruta | Qué hace | Permiso |
+|---|---|---|
+| GET/POST `/plataforma/empresas` | Dar de alta una empresa: nace con roles, parámetros, textos legales en borrador y correos activos copiados de la plataforma, y con la invitación de su primer administrador ya enviada | `administrar_plataforma`, y ser la plataforma |
+| GET `/organizacion/personalizacion` | Qué instrumentos tiene propios esta organización, bandera por bandera | `personalizar_instrumentos` |
+| POST `/organizacion/personalizacion` | Encender una bandera (`BANCO`, `PESOS`, `PLANTILLA_EVALUACION`, `PRUEBA`): copia el instrumento publicado de la plataforma y desde ahí se lee y edita lo propio | `personalizar_instrumentos` |
+| DELETE `/organizacion/personalizacion/{instrumento}` | Apagarla: se vuelve a leer el de la plataforma. La copia propia se archiva, nunca se borra | `personalizar_instrumentos` |
+
+Con la bandera apagada la empresa **lee** el instrumento de la plataforma —los listados del
+panel enseñan el método de Renaser en solo lectura, y una mejora de Renaser llega sola— pero
+no lo edita: mutar algo ajeno responde 404. Lo operativo (vacantes, solicitudes,
+postulaciones, sesiones) jamás se comparte: lo de otra empresa responde «no existe».
 
 ### El perfil del candidato
 

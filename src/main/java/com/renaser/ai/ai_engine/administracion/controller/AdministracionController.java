@@ -103,7 +103,8 @@ public class AdministracionController {
     @PostMapping("/usuarios")
     @PreAuthorize("@permisos.tiene('crear_usuarios_y_asignar_roles')")
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Dar de alta a alguien del equipo, con su id de RENASER OS y sus roles")
+    @Operation(summary = "Dar de alta a alguien del equipo a mano, con sus roles. El camino "
+            + "normal es la invitación; este queda para cargas administrativas")
     public Map<String, Long> crearUsuario(@Valid @RequestBody CrearUsuarioEquipo datos) {
         return Map.of("id", servicio.crearUsuarioEquipo(permisos.actual(), datos));
     }

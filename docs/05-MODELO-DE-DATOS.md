@@ -23,8 +23,8 @@ Sirve para tres cosas:
 - **Entender el sistema.** Un modelo de datos bien contado explica el negocio mejor que
   cualquier otro documento.
 
-**La base ya está construida.** Las migraciones `V1` a `V36` viven en
-`src/main/resources/db/migration` —**100 tablas de este módulo**, 103 en la base contando la de
+**La base ya está construida.** Las migraciones `V1` a `V37` viven en
+`src/main/resources/db/migration` —**101 tablas de este módulo**, 104 en la base contando la de
 Flyway y las dos del motor de agentes— y Flyway es el dueño del esquema. Cambiar algo de aquí
 ya cuesta una migración nueva, y **una migración aplicada no se edita nunca**: se escribe otra
 encima.
@@ -36,6 +36,19 @@ La `V36` trae **el perfil del candidato**: seis tablas que cuelgan de `persona` 
 la columna `archivo.contenido_hash` (la huella que evita pagar dos lecturas del mismo
 currículum) y los permisos `ver_perfil_candidato` y `ver_pretension`. Ver
 [PROPUESTA-PERFIL-DEL-CANDIDATO.md](PROPUESTA-PERFIL-DEL-CANDIDATO.md).
+
+La `V37` convierte el esquema en **multiempresa**: `organizacion.es_plataforma` marca a la
+dueña de la plataforma (solo una puede serlo) y reemplaza al código `'RENASER'` que estaba
+quemado en el código; cuatro banderas por organización dicen qué instrumento es propio y
+cuál se lee de la plataforma (`banco_propio`, `pesos_propios`,
+`plantillas_evaluacion_propias`, `pruebas_puesto_propias`); `usuario.es_equipo` separa las
+cuentas del panel de las del portal —cae el CHECK que distinguía por el id de RENASER OS—;
+la tabla nueva `invitacion` es la única puerta de entrada al panel (se guarda el hash del
+token, nunca el token, y es de un solo uso); el banco pierde el modelo «`organizacion_id`
+vacío = biblioteca global» (esas filas pasan a la plataforma y la columna queda
+obligatoria); y `copiada_de_version_id` en los cuatro instrumentos dice de qué versión de
+la plataforma salió cada copia. El porqué de cada decisión está en
+`docs/superpowers/specs/2026-08-25-*.md`.
 
 Cuatro son del banco de preguntas v3: `V20` reemplaza el banco entero y añade cinco
 tablas (`rango_pregunta`, `campo_caso`, `multiplicador_bloque`, `umbral_nivel` y
@@ -937,9 +950,12 @@ es lo de arriba.
 
 Datos que se cargan con la primera migración, no a mano:
 
-- La **organización** Renaser
+- La **organización** Renaser, marcada como **dueña de la plataforma** (`es_plataforma`)
 - Los **18 estados** de la postulación, con su etapa y su momento
-- Los **73 permisos**, con su etiqueta y su grupo
+- Los **69 permisos** que las migraciones siembran, con su etiqueta y su grupo — contados
+  de las migraciones, no de los documentos de diseño. Los dos últimos son de la V37:
+  `personalizar_instrumentos` para el administrador de cada empresa y
+  `administrar_plataforma` solo para el de la plataforma
 - Los **cinco roles** iniciales con sus permisos: candidato, equipo de talento, responsable del
   área, dirección y administrador. Es como arranca el sistema, no cómo queda para siempre
 - Las **22 dimensiones**, con cuáles de ellas son obligatorias
@@ -948,7 +964,9 @@ Datos que se cargan con la primera migración, no a mano:
   de la validación
 - Las **preguntas de la prueba**: las previas, las diez universales y las del puesto
 - Los **nueve agentes**, con su versión inicial
-- Las **236 preguntas** del banco, como primera versión publicada de la biblioteca global
+- Las **236 preguntas** del banco, como primera versión publicada del banco de la
+  plataforma — desde la `V37` no hay filas «globales» sin dueño: compartir es leer las de
+  la plataforma
 - Las **once plantillas de prueba**, con sus tiempos y sus variantes de cambio
 - Una **plantilla de evaluación** por nivel y familia
 - Una primera **versión de pesos** con 40 / 30 / 15 / 15
