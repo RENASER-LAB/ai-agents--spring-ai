@@ -218,10 +218,12 @@ Sin eso el hito 3 no tiene contenido que ejecutar.
 una persona, y para eso hace falta una escala completa. Queda apuntado en la versión de pesos, así
 que cuando entren las dos etapas que faltan es un cambio de datos, no de código.
 
-**6 · ¿Hace falta un ranking general por vacante, y rankings por etapa?** Apuntado el 21/08. Hoy
-hay **un solo ranking y es el de la etapa 2**: `GET /panel/vacantes/{id}/ranking` ordena la tanda
-por grupo de prioridad y, dentro de cada grupo, por la nota del Perfil Integral. Nadie lo ha
-pedido distinto —en toda la documentación el ranking aparece una vez, y es ese—, pero es lo
+**6 · ¿Hace falta un ranking general por vacante?** Apuntado el 21/08, y desde el 25/08 medio
+respondido. Los **rankings por etapa ya existen**: `GET /panel/vacantes/{id}/ranking?etapa=`
+cambia la nota con la que se ordena, sin tocar las ocho notas del currículum de cada fila. Lo
+que sigue sin existir es el ranking **general**, el que ordena por la Puntuación Global con las
+cuatro etapas dentro. Es lo primero que pregunta cualquiera que ve la pantalla: ¿y el orden con
+todo lo demás dentro?
 primero que pregunta cualquiera que ve la pantalla: *¿y el orden con todo lo demás dentro?*
 
 La Puntuación Global de RF-113 **ya está calculada**: la nota ponderada de las etapas que pese la
@@ -255,10 +257,16 @@ trabajo de código es pequeño; lo que falta son tres decisiones que no son nues
   mientras el embudo no baje gente hasta ahí.
 
 *Nuestra recomendación:* el ranking general por vacante sí, ordenado igual que el de la etapa 2
-—grupo primero, nota después— y en cuanto el punto 5 esté resuelto. Los rankings por etapa
-suelta, no: para comparar a dos personas en la prueba o en la simulación ya está el expediente
-(A13–A18), y una lista ordenada por notas manuales escasas invita a decidir con menos evidencia
-de la que parece.
+—grupo primero, nota después— y en cuanto el punto 5 esté resuelto.
+
+Sobre los rankings por etapa suelta **recomendábamos que no, y se construyeron igual** el 25/08,
+porque el equipo necesitaba ordenar por la nota vigente de cada candidato y no por una que para
+él ya era vieja. La razón de la recomendación sigue en pie, y pasa de ser un motivo para no
+hacerlo a una advertencia para quien monte la pantalla: `?etapa=PRUEBA_PUESTO`, `SIMULACION` y
+`VALIDACION` ordenan **notas escritas a mano por los evaluadores**, no de la IA, y estarán casi
+vacías mientras el embudo no baje gente hasta ahí. Una lista corta ordenada por notas escasas
+invita a decidir con menos evidencia de la que parece. Para comparar a dos personas a fondo
+sigue estando el expediente (A13–A18).
 
 ---
 

@@ -1310,6 +1310,11 @@ El semáforo de cada uno de los tres bloques.
 
 **Un rojo no descarta a nadie.** Genera hipótesis y preguntas de validación.
 
+⚠️ **Esta tabla está vacía y nadie la llena todavía.** Ningún agente escribe los semáforos: el
+catálogo de agentes tiene el de alineación pendiente. Desde el 25/08 el panel **sí la lee** —
+`GET /panel/postulaciones/{id}/evaluacion` devuelve `alineacion`—, así que hoy esa lista sale
+vacía siempre. Vacía significa «no calculado», no «todo en verde».
+
 ## `alerta`
 
 Contradicciones y respuestas demasiado ideales.

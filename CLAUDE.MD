@@ -70,7 +70,7 @@ Perfil Integral → prueba del puesto → simulacion → validacion → decision
 |---|---|
 | Base de datos | **Flyway es el dueno del esquema**: V1-V36 en `src/main/resources/db/migration`, **100 tablas de este modulo** (103 en la base contando `flyway_schema_history` y las dos del motor de agentes, `agent_run` y `vector_store`). `ddl-auto: validate` |
 | Codigo | Veintiun paquetes de dominio bajo `ai_engine` (ver «Como esta organizado el codigo») |
-| Tests | **634, todos en verde (25/08/2026)**: 549 unitarios y 85 de integracion (6 saltados, los que gastan saldo o mandan correo de verdad). Ver «Correr los tests»: unitarios de la maquina y del anonimizador, migraciones contra Postgres real (Testcontainers) y flujos de punta a punta: hito 1, evaluacion, prueba, simulacion/validacion, calificacion con IA y la vacante sin banco |
+| Tests | **645, todos en verde (25/08/2026)**: 560 unitarios y 85 de integracion (6 saltados, los que gastan saldo o mandan correo de verdad). Ver «Correr los tests»: unitarios de la maquina y del anonimizador, migraciones contra Postgres real (Testcontainers) y flujos de punta a punta: hito 1, evaluacion, prueba, simulacion/validacion, calificacion con IA y la vacante sin banco |
 | IA que califica | **Seis de los diez agentes del catalogo estan implementados**: datos del curriculum, evidencia, evaluador, potencial/riesgo, prueba del puesto y las preguntas de la conversacion final. Todos corren por cola de RabbitMQ contra DeepSeek. Ver [Calificacion con IA](docs/CALIFICACION-CON-IA.md) |
 | Correo | **Ya sabe salir de verdad** (`EnviadorCorreoSmtp`), pero **por defecto no sale**: `renaser.correo.transporte` vale `log` salvo que se ponga `smtp`, y entonces solo se registra en `correo_enviado`. Para encenderlo hacen falta `CORREO_TRANSPORTE=smtp`, `CORREO_REMITENTE` y una cuenta que autentique. El RNF-65 pide que salga **desde el dominio propio de Renaser**: confirmar con ellos si ya lo tienen antes de encenderlo |
 | Acceso del candidato | Entra al portal **con un enlace, sin contrasena** (`EnlaceAcceso`, `ServicioEnlaceAcceso`). El enlace se le manda por correo, asi que depende de lo de arriba |
@@ -219,7 +219,7 @@ forma de pedirla. Cuatro endpoints en `PostulacionesPanelController`:
 
 | Para que | Llamada |
 |---|---|
-| La tanda entera, ordenada de mas apto a menos | `GET /api/v1/panel/vacantes/{id}/ranking` |
+| La tanda entera, ordenada de mas apto a menos | `GET /api/v1/panel/vacantes/{id}/ranking?etapa=` · sin `etapa`, la nota de la preseleccion |
 | Primera pasada sobre todos los que no tienen nota | `POST /api/v1/panel/vacantes/{id}/criba-rapida` |
 | Segunda pasada, solo sobre la parte alta | `POST /api/v1/panel/vacantes/{id}/criba-fina` |
 | Releer un curriculum suelto | `POST /api/v1/panel/postulaciones/{id}/criba-cv` |
@@ -241,6 +241,42 @@ lo deja fallido en vez de inventar una nota. Los CVs de las semillas son de ese 
 en una base recien sembrada la criba los marca como fallidos: es correcto, no es un fallo.
 
 Ver [La criba de curriculums](docs/CRIBA-DE-CURRICULUMS.md).
+
+### El ranking por etapa y el desglose de la evaluacion (25/08/2026)
+
+Dos endpoints mas en `PostulacionesPanelController`:
+
+| Para que | Llamada |
+|---|---|
+| Ordenar la tanda por la nota de otra etapa | `GET /panel/vacantes/{id}/ranking?etapa=PRUEBA_PUESTO` |
+| Abrir la evaluacion del banco por dentro | `GET /panel/postulaciones/{id}/evaluacion` |
+
+- **`?etapa=` cambia solo con que nota se ordena.** Las ocho notas del curriculum de cada fila
+  siguen siendo las del Perfil Integral, porque son de esa etapa siempre. Los codigos salen del
+  catalogo `etapa`; uno que no este da 400. Quien no tenga nota en esa etapa sale al final, sin
+  heredar la de otra.
+- **Es una sobrecarga, no un cambio de firma, a proposito**: `cribaFina()` decide a quien
+  recalificar por la nota de preseleccion y tenia que seguir haciendolo. Sin el parametro el
+  camino es el de antes, sin una consulta de mas.
+- **El desglose es de solo lectura y nunca da 404.** Sin evaluacion asignada devuelve vacios: una
+  vacante publicada con el banco apagado es un caso normal. Lo guarda
+  `ver_respuestas_evaluacion`, que estaba en el catalogo desde V12 y **no lo comprobaba nadie**;
+  este es el primer endpoint que lo usa.
+- ⚠️ **`alineacion` sale vacia siempre**: la tabla `resultado_alineacion` existe, el panel ya la
+  lee y **ningun agente la escribe todavia**. Vacia significa «no calculado», no «todo en verde».
+- **La cuenta de la nota de la evaluacion vive en un solo sitio**,
+  `ServicioCalificacion.notaCombinada`. Estaba copiada en `PuenteCalificacionIaImpl`. Como
+  mezclar lo cerrado con lo abierto **es una interpretacion sin confirmar con el cliente**: el dia
+  que cambie tiene que cambiar a la vez para la nota de la etapa y para lo que ve el panel. No
+  volver a copiarla.
+
+Dos guiones para mirar el panel con datos y no con tablas vacias. **Escriben en la base local** y
+se pueden relanzar:
+
+| Guion | Que hace |
+|---|---|
+| `scripts/sembrar-evaluacion-local.py` | Postula, responde los ocho formatos y entrega, y deja que la IA califique. Cada abierta se responde **segun lo que pide su enunciado**: contestar lo mismo a todo daba ceros, y con razon |
+| `scripts/escenario-etapas-local.py` | Reparte candidatos por las cinco etapas calificando a mano por el camino, para que ninguna pestaña del panel se vea vacia |
 
 ### Las dos pantallas
 Ninguna vive en este repositorio: el `frontend/` de demostracion que habia aqui se borro a proposito (2e7b176) cuando el panel de verdad quedo en RENASER OS.
@@ -264,12 +300,12 @@ Las dos consultan el mismo backend, asi que ensenan el mismo orden.
 - Nada se recalcula hacia atras: cada nota queda atada a la version de pesos de su vacante.
 
 ### Correr los tests
-**549 unitarios en verde (25/08/2026).** Son dos tandas y el comando decide cual corre:
+**560 unitarios en verde (25/08/2026).** Son dos tandas y el comando decide cual corre:
 
 | Comando | Que corre | Cuantos | Necesita |
 |---|---|---:|---|
-| `./mvnw test` | unitarias con dobles y las de arquitectura | 549 | nada |
-| `./mvnw verify` | lo anterior mas las de integracion | 634 | Docker |
+| `./mvnw test` | unitarias con dobles y las de arquitectura | 560 | nada |
+| `./mvnw verify` | lo anterior mas las de integracion | 645 | Docker |
 
 Las de integracion levantan su propio PostgreSQL y su propio RabbitMQ con Testcontainers: hace
 falta el demonio de Docker encendido. El desglose completo esta en
@@ -399,7 +435,7 @@ fusiona.** El detalle esta en [docs/CI-CD.md](docs/CI-CD.md); aqui lo que hay qu
 
 | Cuando | Que corre |
 |---|---|
-| En cada PR y en cada push a `main` | `./mvnw verify` (las 634 pruebas), Semgrep, Gitleaks y la cobertura del codigo nuevo en SonarCloud |
+| En cada PR y en cada push a `main` | `./mvnw verify` (las 645 pruebas), Semgrep, Gitleaks y la cobertura del codigo nuevo en SonarCloud |
 | Al fusionar a `main`, si todo quedo verde | Se construye la imagen con el `Dockerfile`, se sube a ECR y se le dice por SSM a la maquina de EC2 que se actualice. Un smoke test comprueba que responde desde internet |
 | De noche, sin bloquear a nadie | PIT (mutation testing) y fuzzing de la API con Schemathesis |
 
@@ -536,7 +572,7 @@ Todo vive en `docs/`. Empezar por [docs/README.md](docs/README.md).
   ultimas etapas y sus tres reglas automaticas de disponibilidad.
 - [CI/CD](docs/CI-CD.md) — que se comprueba solo en cada cambio, como se despliega a AWS y que
   variables de entorno pide el servidor. **Leerlo antes de tocar `.github/workflows/`.**
-- [Comprobaciones automaticas](docs/COMPROBACIONES-AUTOMATICAS.md) — las 634 pruebas y las ocho
+- [Comprobaciones automaticas](docs/COMPROBACIONES-AUTOMATICAS.md) — las 645 pruebas y las ocho
   reglas de arquitectura, una por una. Que se mira solo y que no.
 - `docs/diagramas/` — HTML autocontenidos, se abren en el navegador.
 - `docs/mockups/` — prototipos de pantalla. **Los mantiene otra persona, no editarlos.**

@@ -87,6 +87,15 @@ public interface ServicioPerfilIntegralPanel {
     RankingVacante ranking(ContextoUsuario quien, Long vacanteId);
 
     /**
+     * El mismo ranking, pero con la nota de otra etapa.
+     *
+     * <p>Las ocho notas del currículum no cambian con la etapa: son del Perfil
+     * Integral siempre. Lo que cambia es {@code notaEtapa}, que pasa a ser la de
+     * la etapa pedida — quien no la tiene queda al final, como hasta ahora.
+     */
+    RankingVacante ranking(ContextoUsuario quien, Long vacanteId, String etapaCodigo);
+
+    /**
      * Primera pasada sobre la tanda entera: rápida, para ordenar.
      *
      * <p>Encola a todos los que aún no tienen retrato. Diez currículums tardan medio minuto
