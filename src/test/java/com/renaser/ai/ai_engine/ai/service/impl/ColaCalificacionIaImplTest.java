@@ -417,6 +417,11 @@ class ColaCalificacionIaImplTest {
         when(registro.tomar(1L)).thenReturn(Optional.of(suyo));
         doThrowEn(datosCv);
         when(registro.fallar(eq(1L), anyInt(), anyString())).thenReturn(false);
+        // La calificacion esta en marcha: el evaluador existe como hermano de la tanda. Sin
+        // hermanos, un DATOS_CV que termina solo (la lectura del perfil al postular) NO debe
+        // armar el retrato — ese caso tiene su propia prueba abajo.
+        when(trabajos.findByPostulacionIdOrderByIdAsc(POSTULACION)).thenReturn(List.of(suyo,
+                trabajo(2L, AgenteEvaluador.CODIGO_AGENTE, "TERMINADO", "FINA")));
         when(registro.crearElRetratoSiLosDemasAcabaron(eq(1L), eq(POSTULACION), anyList(),
                 eq(AgentePotencialRiesgo.CODIGO_AGENTE), eq("FINA"), eq(1L)))
                 .thenReturn(Optional.of(
@@ -427,6 +432,21 @@ class ColaCalificacionIaImplTest {
         verify(publicador).publicar(9L);
         // Y el que se agotó no vuelve a la cola: ya no queda intento que gastar.
         verify(publicador, never()).publicar(1L);
+    }
+
+    @Test
+    void laLecturaDelPerfilSolaNoArmaElRetrato() {
+        // El disparo de postular (el perfil del candidato) manda a DATOS_CV sin nadie mas en
+        // la tanda. Si al terminar armara el retrato, cada postulacion pagaria un
+        // POTENCIAL_RIESGO sin evaluacion y sin que nadie lo pidiera. Sin hermanos, nada.
+        TrabajoIa solo = trabajo(1L, AgenteDatosCv.CODIGO_AGENTE, "EN_CURSO", "FINA");
+        when(registro.tomar(1L)).thenReturn(Optional.of(solo));
+        when(trabajos.findByPostulacionIdOrderByIdAsc(POSTULACION)).thenReturn(List.of(solo));
+
+        cola.ejecutar(1L);
+
+        verify(registro, never()).crearElRetratoSiLosDemasAcabaron(any(), any(), anyList(),
+                anyString(), anyString(), any());
     }
 
     @Test

@@ -1,11 +1,8 @@
 # APIs del perfil del candidato · para quien construya las pantallas
 
-> ⚠️ **Nada de esto existe todavía.** Es el contrato acordado, no código en marcha: si llamas a
-> estos endpoints hoy, responden 404. Sirve para diseñar las pantallas en paralelo mientras se
-> construye el backend, y para avisar **antes** si algo no cuadra con lo que la pantalla necesita.
->
-> Cuando exista, la referencia viva será **Swagger** (`/swagger-ui.html`), que se genera del
-> código y siempre está al día. Este documento cuenta lo que Swagger no cuenta: las reglas.
+> ✅ **Implementado desde el 25/08/2026.** La referencia viva es **Swagger**
+> (`/swagger-ui.html`), que se genera del código y siempre está al día. Este documento cuenta
+> lo que Swagger no cuenta: las reglas.
 
 El diseño completo —requisitos, historias de usuario y tablas— está en
 [PROPUESTA-PERFIL-DEL-CANDIDATO.md](PROPUESTA-PERFIL-DEL-CANDIDATO.md).

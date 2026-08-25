@@ -68,9 +68,9 @@ Perfil Integral → prueba del puesto → simulacion → validacion → decision
 
 | | |
 |---|---|
-| Base de datos | **Flyway es el dueno del esquema**: V1-V35 en `src/main/resources/db/migration`, **92 tablas de este modulo** (95 en la base contando `flyway_schema_history` y las dos del motor de agentes, `agent_run` y `vector_store`). `ddl-auto: validate` |
+| Base de datos | **Flyway es el dueno del esquema**: V1-V36 en `src/main/resources/db/migration`, **100 tablas de este modulo** (103 en la base contando `flyway_schema_history` y las dos del motor de agentes, `agent_run` y `vector_store`). `ddl-auto: validate` |
 | Codigo | Veintiun paquetes de dominio bajo `ai_engine` (ver «Como esta organizado el codigo») |
-| Tests | **547, todos en verde (24/08/2026)**: 480 unitarios y 67 de integracion (6 saltados, los que gastan saldo o mandan correo de verdad). Ver «Correr los tests»: unitarios de la maquina y del anonimizador, migraciones contra Postgres real (Testcontainers) y flujos de punta a punta: hito 1, evaluacion, prueba, simulacion/validacion, calificacion con IA y la vacante sin banco |
+| Tests | **622, todos en verde (25/08/2026)**: 538 unitarios y 84 de integracion (6 saltados, los que gastan saldo o mandan correo de verdad). Ver «Correr los tests»: unitarios de la maquina y del anonimizador, migraciones contra Postgres real (Testcontainers) y flujos de punta a punta: hito 1, evaluacion, prueba, simulacion/validacion, calificacion con IA y la vacante sin banco |
 | IA que califica | **Seis de los diez agentes del catalogo estan implementados**: datos del curriculum, evidencia, evaluador, potencial/riesgo, prueba del puesto y las preguntas de la conversacion final. Todos corren por cola de RabbitMQ contra DeepSeek. Ver [Calificacion con IA](docs/CALIFICACION-CON-IA.md) |
 | Correo | **Ya sabe salir de verdad** (`EnviadorCorreoSmtp`), pero **por defecto no sale**: `renaser.correo.transporte` vale `log` salvo que se ponga `smtp`, y entonces solo se registra en `correo_enviado`. Para encenderlo hacen falta `CORREO_TRANSPORTE=smtp`, `CORREO_REMITENTE` y una cuenta que autentique. El RNF-65 pide que salga **desde el dominio propio de Renaser**: confirmar con ellos si ya lo tienen antes de encenderlo |
 | Acceso del candidato | Entra al portal **con un enlace, sin contrasena** (`EnlaceAcceso`, `ServicioEnlaceAcceso`). El enlace se le manda por correo, asi que depende de lo de arriba |
@@ -289,6 +289,36 @@ RENASER_IA_REAL=si ./mvnw verify -Dit.test=CalificacionIaRealIT
 **Ruido esperado que NO es un fallo**: `Failed to check/redeclare auto-delete queue(s)` de
 RabbitMQ, y los cinco tests saltados de `CalificacionIaRealIT`. Si termina en `BUILD SUCCESS`,
 esta bien.
+
+## El perfil del candidato (25/08/2026)
+Cada persona tiene **un perfil, unico y transversal a organizaciones**: cuelga de `persona`,
+no de `usuario` (el usuario existe una vez por organizacion). Se llena solo con lo que el
+agente `DATOS_CV` lee del curriculum, el candidato lo corrige, y se reutiliza en cada
+postulacion. Paquete `perfil/` completo (V36: 6 tablas + 2 catalogos), CRUD en
+`/api/v1/portal/perfil/**`, lectura en el panel con el permiso `ver_perfil_candidato`.
+
+Reglas que no se negocian:
+- **La IA propone, nunca pisa** (RF-159): lo leido entra `origen=CURRICULUM` sin confirmar;
+  lo escrito o confirmado por la persona no se toca. El merge vive en
+  `ServicioPropuestaPerfilImpl` y sus tests son la especificacion.
+- **Una lectura por archivo** (RF-161): `archivo.contenido_hash` (SHA-256). Postular con el
+  mismo PDF copia la ficha `dato_cv` en vez de pagar otra llamada. El disparo al postular se
+  apaga con `renaser.perfil.lectura-al-postular=false` (las pruebas de calificacion lo usan).
+- **El perfil NO puntua**: no entra en notas ni rankings.
+- **La pretension salarial** va detras del permiso `ver_pretension` y sin el **no viaja ni el
+  nombre del campo** en el JSON del panel. Nunca en listas ni rankings.
+- **El borrado 29733 se lleva el perfil entero** (paso 5b de `ejecutarBorrado`); `dato_cv` se
+  queda porque sostiene lo ya evaluado. Retencion: parametro `meses_conservar_perfil` (24) y
+  el barrido diario `BarridoRetencionPerfil`.
+- Una lectura de `DATOS_CV` **sin hermanos en la tanda no arma el retrato**: la barrera de la
+  cola lo ignora hasta que una criba o una entrega encolen a los demas.
+
+El contrato para el frontend esta en [docs/APIS-PERFIL-DEL-CANDIDATO.md](docs/APIS-PERFIL-DEL-CANDIDATO.md)
+y el diseño en [docs/PROPUESTA-PERFIL-DEL-CANDIDATO.md](docs/PROPUESTA-PERFIL-DEL-CANDIDATO.md).
+**Los RF-155..170 no entran en `01-REQUISITOS-FUNCIONALES.md` hasta que Renaser los valide.**
+
+⚠️ **No encender con candidatos reales sin el texto de consentimiento nuevo**: el vigente
+cubre una postulacion concreta, no un perfil que se conserva entre convocatorias (RF-169).
 
 ## El banco de preguntas v3 (19/08/2026)
 El cliente reemplazo el banco entero. Son **190 items** (85 directivo, 55 coordinacion, 50
