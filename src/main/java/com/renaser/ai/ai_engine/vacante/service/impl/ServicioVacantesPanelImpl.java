@@ -15,6 +15,8 @@ import com.renaser.ai.ai_engine.prueba.entity.VersionPlantillaPrueba;
 import com.renaser.ai.ai_engine.prueba.entity.IntentoPrueba;
 import com.renaser.ai.ai_engine.prueba.repository.IntentoPruebaRepository;
 import com.renaser.ai.ai_engine.prueba.repository.VersionPlantillaPruebaRepository;
+import com.renaser.ai.ai_engine.organizacion.service.DuenoDelInstrumento;
+import com.renaser.ai.ai_engine.organizacion.service.Instrumento;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
 import com.renaser.ai.ai_engine.solicitud.entity.SolicitudTalento;
 import com.renaser.ai.ai_engine.solicitud.repository.SolicitudTalentoRepository;
@@ -44,6 +46,7 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
     private final PlantillaCorreoVacanteRepository plantillasPorVacante;
     private final IntentoPruebaRepository intentos;
     private final ServicioAuditoria auditoria;
+    private final DuenoDelInstrumento dueno;
 
     // ============ Puestos ============
 
@@ -92,8 +95,11 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                 .orElseThrow(() -> new ResourceNotFoundException("Puesto", "id", datos.puestoId()));
 
         // La versión de pesos publicada vigente. Elegir otra es de Dirección (hito 2).
+        // De quién son los pesos lo contesta el resolutor: los de la plataforma mientras
+        // la empresa no personalice, los suyos en cuanto encienda la bandera.
         VersionPesos pesos = versionesPesos
-                .findFirstByOrganizacionIdAndEstadoOrderByPublicadaEnDesc(quien.organizacionId(), "PUBLICADA")
+                .findFirstByOrganizacionIdAndEstadoOrderByPublicadaEnDesc(
+                        dueno.duenoDe(quien.organizacionId(), Instrumento.PESOS), "PUBLICADA")
                 .orElseThrow(() -> new IllegalStateException("No hay una versión de pesos publicada"));
 
         Vacante vacante = vacantes.save(Vacante.builder()
@@ -241,8 +247,11 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
     @Transactional
     public void asignarPlantillaEvaluacion(ContextoUsuario quien, Long id, Long plantillaEvaluacionId) {
         Vacante vacante = laDeLaOrganizacion(quien, id);
+        // Del dueño resuelto: con la bandera apagada la vacante usa las plantillas de la
+        // plataforma; encendida, solo las propias. Cualquier otra es un «no existe».
         PlantillaEvaluacion plantilla = plantillas
-                .findByIdAndOrganizacionId(plantillaEvaluacionId, quien.organizacionId())
+                .findByIdAndOrganizacionId(plantillaEvaluacionId,
+                        dueno.duenoDe(quien.organizacionId(), Instrumento.PLANTILLA_EVALUACION))
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Plantilla de evaluación", "id", plantillaEvaluacionId));
         if (!"PUBLICADA".equals(plantilla.getEstado())) {
@@ -317,7 +326,8 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
     public void asignarVersionPesos(ContextoUsuario quien, Long id, Long versionPesosId) {
         Vacante vacante = laDeLaOrganizacion(quien, id);
         VersionPesos version = versionesPesos
-                .findByIdAndOrganizacionId(versionPesosId, quien.organizacionId())
+                .findByIdAndOrganizacionId(versionPesosId,
+                        dueno.duenoDe(quien.organizacionId(), Instrumento.PESOS))
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Versión de pesos", "id", versionPesosId));
         // La misma regla que al crear la vacante (RF-114): rige una versión aprobada.

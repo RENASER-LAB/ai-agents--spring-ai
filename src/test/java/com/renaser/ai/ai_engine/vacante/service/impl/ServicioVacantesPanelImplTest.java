@@ -78,6 +78,7 @@ class ServicioVacantesPanelImplTest {
     @Mock private PlantillaCorreoVacanteRepository plantillasPorVacante;
     @Mock private IntentoPruebaRepository intentos;
     @Mock private ServicioAuditoria auditoria;
+    @Mock private com.renaser.ai.ai_engine.organizacion.service.DuenoDelInstrumento dueno;
 
     private ServicioVacantesPanelImpl servicio;
 
@@ -85,7 +86,13 @@ class ServicioVacantesPanelImplTest {
     void crearElServicio() {
         servicio = new ServicioVacantesPanelImpl(vacantes, puestos, requisitos, solicitudes,
                 versionesPesos, plantillas, versionesPrueba, plantillasCorreo,
-                plantillasPorVacante, intentos, auditoria);
+                plantillasPorVacante, intentos, auditoria, dueno);
+        // En estas pruebas la organizacion no personaliza nada: el resolutor contesta
+        // que el dueño de todo instrumento es ella misma (aqui hace de plataforma).
+        org.mockito.Mockito.lenient()
+                .when(dueno.duenoDe(org.mockito.ArgumentMatchers.eq(ORGANIZACION),
+                        org.mockito.ArgumentMatchers.any()))
+                .thenReturn(ORGANIZACION);
     }
 
     private Vacante vacante(String estado, boolean aplicaEvaluacion, Long plantillaEvaluacionId) {

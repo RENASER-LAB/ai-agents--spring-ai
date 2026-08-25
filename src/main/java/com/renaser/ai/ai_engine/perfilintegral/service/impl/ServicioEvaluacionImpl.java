@@ -29,6 +29,8 @@ import com.renaser.ai.ai_engine.perfilintegral.repository.VersionBancoRepository
 import com.renaser.ai.ai_engine.perfilintegral.service.ServicioCalificacion;
 import com.renaser.ai.ai_engine.perfilintegral.service.ServicioEvaluacion;
 import com.renaser.ai.ai_engine.perfilintegral.service.ValidadorDetalleV3;
+import com.renaser.ai.ai_engine.organizacion.service.DuenoDelInstrumento;
+import com.renaser.ai.ai_engine.organizacion.service.Instrumento;
 import com.renaser.ai.ai_engine.postulacion.entity.Postulacion;
 import com.renaser.ai.ai_engine.postulacion.repository.PostulacionRepository;
 import com.renaser.ai.ai_engine.postulacion.service.MaquinaEstados;
@@ -100,6 +102,7 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
     private final ServicioCalificacion calificacion;
     private final ColaCalificacionIa colaIa;
     private final ServicioParametros parametros;
+    private final DuenoDelInstrumento dueno;
 
     private final SecureRandom azar = new SecureRandom();
 
@@ -128,10 +131,12 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
                         "La vacante apunta a una plantilla de evaluación que no existe"));
 
         // La versión del banco se fija AHORA. Si mañana se publica otra, este candidato sigue
-        // atado a la suya: su nota nunca cambia sola después (RF-138).
+        // atado a la suya: su nota nunca cambia sola después (RF-138). De quién es el banco
+        // lo contesta el resolutor: sin él, una empresa evaluaría con el banco de cualquiera
+        // — el selector viejo elegía la publicada más reciente SIN mirar la organización.
         VersionBanco banco = versionesBanco
-                .findFirstByTipoBancoAndNivelPuestoCodigoAndEstadoOrderByPublicadaEnDesc(
-                        "NIVEL", nivelPuestoCodigo, "PUBLICADA")
+                .laPublicadaDelNivel(dueno.duenoDe(organizacionId, Instrumento.BANCO),
+                        "NIVEL", nivelPuestoCodigo)
                 .orElseThrow(() -> new IllegalStateException(
                         "No hay un banco de preguntas publicado para el nivel " + nivelPuestoCodigo));
 

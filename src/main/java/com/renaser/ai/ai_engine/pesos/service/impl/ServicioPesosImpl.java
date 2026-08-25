@@ -17,6 +17,8 @@ import com.renaser.ai.ai_engine.pesos.repository.PesoComponentePerfilRepository;
 import com.renaser.ai.ai_engine.pesos.repository.PesoEtapaRepository;
 import com.renaser.ai.ai_engine.pesos.repository.VersionPesosRepository;
 import com.renaser.ai.ai_engine.pesos.service.ServicioPesos;
+import com.renaser.ai.ai_engine.organizacion.service.DuenoDelInstrumento;
+import com.renaser.ai.ai_engine.organizacion.service.Instrumento;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
 
 import lombok.RequiredArgsConstructor;
@@ -43,6 +45,7 @@ public class ServicioPesosImpl implements ServicioPesos {
     private final CriterioRepository criterios;
     private final PesosMapper mapper;
     private final ServicioAuditoria auditoria;
+    private final DuenoDelInstrumento dueno;
 
     @Override
     @Transactional
@@ -60,14 +63,17 @@ public class ServicioPesosImpl implements ServicioPesos {
 
     @Override
     public List<VersionPesosResponse> listar(ContextoUsuario quien) {
-        return versiones.findByOrganizacionIdOrderByCreadoEnDesc(quien.organizacionId()).stream()
+        // El resolutor decide de quién son los pesos que esta organización ve: los suyos
+        // si personalizó, los de la plataforma si no.
+        return versiones.findByOrganizacionIdOrderByCreadoEnDesc(
+                        dueno.duenoDe(quien.organizacionId(), Instrumento.PESOS)).stream()
                 .map(mapper::toResponse).toList();
     }
 
     @Override
     @Transactional
     public void publicarVersion(ContextoUsuario quien, Long id) {
-        VersionPesos version = laVisible(quien, id);
+        VersionPesos version = laPropia(quien, id);
         if (!"BORRADOR".equals(version.getEstado())) {
             throw new IllegalStateException("Solo se publica una versión en borrador; esta está " + version.getEstado());
         }
@@ -83,7 +89,7 @@ public class ServicioPesosImpl implements ServicioPesos {
     @Override
     @Transactional
     public void agregarPesoEtapa(ContextoUsuario quien, Long versionId, CrearPesoEtapa datos) {
-        laVisibleEnBorrador(quien, versionId);
+        laPropiaEnBorrador(quien, versionId);
         pesosEtapa.save(PesoEtapa.builder().versionPesosId(versionId).etapaCodigo(datos.etapaCodigo())
                 .peso(BigDecimal.valueOf(datos.peso())).creadoEn(Instant.now()).build());
     }
@@ -91,7 +97,7 @@ public class ServicioPesosImpl implements ServicioPesos {
     @Override
     @Transactional
     public void agregarPesoComponente(ContextoUsuario quien, Long versionId, CrearPesoComponente datos) {
-        laVisibleEnBorrador(quien, versionId);
+        laPropiaEnBorrador(quien, versionId);
         pesosComponente.save(PesoComponentePerfil.builder().versionPesosId(versionId).componente(datos.componente())
                 .peso(BigDecimal.valueOf(datos.peso())).creadoEn(Instant.now()).build());
     }
@@ -99,7 +105,7 @@ public class ServicioPesosImpl implements ServicioPesos {
     @Override
     @Transactional
     public void agregarPesoDimension(ContextoUsuario quien, Long versionId, CrearPesoDimension datos) {
-        laVisibleEnBorrador(quien, versionId);
+        laPropiaEnBorrador(quien, versionId);
         pesosDimension.save(PesoDimension.builder().versionPesosId(versionId)
                 .nivelPuestoCodigo(datos.nivelPuestoCodigo()).dimensionCodigo(datos.dimensionCodigo())
                 .peso(BigDecimal.valueOf(datos.peso())).creadoEn(Instant.now()).build());
@@ -108,7 +114,7 @@ public class ServicioPesosImpl implements ServicioPesos {
     @Override
     @Transactional
     public void agregarPesoCriterio(ContextoUsuario quien, Long versionId, CrearPesoCriterio datos) {
-        laVisibleEnBorrador(quien, versionId);
+        laPropiaEnBorrador(quien, versionId);
         pesosCriterio.save(PesoCriterio.builder().versionPesosId(versionId)
                 .nivelPuestoCodigo(datos.nivelPuestoCodigo()).criterioId(datos.criterioId())
                 .peso(BigDecimal.valueOf(datos.peso())).creadoEn(Instant.now()).build());
@@ -180,13 +186,23 @@ public class ServicioPesosImpl implements ServicioPesos {
         }
     }
 
+    // Leer resuelve, editar no: con la bandera apagada la organización VE los pesos de
+    // la plataforma —eso contesta el resolutor— pero solo edita los suyos.
+
     private VersionPesos laVisible(ContextoUsuario quien, Long id) {
+        return versiones.findByIdAndOrganizacionId(id, quien.organizacionId())
+                .or(() -> versiones.findByIdAndOrganizacionId(
+                        id, dueno.duenoDe(quien.organizacionId(), Instrumento.PESOS)))
+                .orElseThrow(() -> new ResourceNotFoundException("Versión de pesos", "id", id));
+    }
+
+    private VersionPesos laPropia(ContextoUsuario quien, Long id) {
         return versiones.findByIdAndOrganizacionId(id, quien.organizacionId())
                 .orElseThrow(() -> new ResourceNotFoundException("Versión de pesos", "id", id));
     }
 
-    private VersionPesos laVisibleEnBorrador(ContextoUsuario quien, Long id) {
-        VersionPesos version = laVisible(quien, id);
+    private VersionPesos laPropiaEnBorrador(ContextoUsuario quien, Long id) {
+        VersionPesos version = laPropia(quien, id);
         if (!"BORRADOR".equals(version.getEstado())) {
             throw new IllegalStateException("No se pueden agregar pesos a una versión ya publicada");
         }

@@ -18,6 +18,8 @@ import com.renaser.ai.ai_engine.prueba.repository.PreguntaVersionPlantillaReposi
 import com.renaser.ai.ai_engine.prueba.repository.VarianteCambioRepository;
 import com.renaser.ai.ai_engine.prueba.repository.VersionPlantillaPruebaRepository;
 import com.renaser.ai.ai_engine.prueba.service.ServicioPlantillaPrueba;
+import com.renaser.ai.ai_engine.organizacion.service.DuenoDelInstrumento;
+import com.renaser.ai.ai_engine.organizacion.service.Instrumento;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
 
 import lombok.RequiredArgsConstructor;
@@ -49,6 +51,7 @@ public class ServicioPlantillaPruebaImpl implements ServicioPlantillaPrueba {
     private final EntregableRequeridoRepository entregablesRequeridos;
     private final CriterioRepository criterios;
     private final ServicioAuditoria auditoria;
+    private final DuenoDelInstrumento dueno;
 
     @Override
     @Transactional
@@ -67,7 +70,10 @@ public class ServicioPlantillaPruebaImpl implements ServicioPlantillaPrueba {
 
     @Override
     public List<PlantillaResponse> listarPlantillas(ContextoUsuario quien) {
-        return plantillas.findByOrganizacionIdOrderByCreadoEnDesc(quien.organizacionId()).stream()
+        // El resolutor decide de quién son las pruebas que esta organización ve: las
+        // suyas si personalizó, las de la plataforma si no.
+        return plantillas.findByOrganizacionIdOrderByCreadoEnDesc(
+                        dueno.duenoDe(quien.organizacionId(), Instrumento.PRUEBA)).stream()
                 .map(p -> new PlantillaResponse(p.getId(), p.getNombre(), p.getPuestoId(), p.isEsActiva()))
                 .toList();
     }

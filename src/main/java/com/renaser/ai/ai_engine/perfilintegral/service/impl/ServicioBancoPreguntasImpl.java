@@ -25,6 +25,8 @@ import com.renaser.ai.ai_engine.perfilintegral.repository.PreguntaRepository;
 import com.renaser.ai.ai_engine.perfilintegral.repository.RangoPreguntaRepository;
 import com.renaser.ai.ai_engine.perfilintegral.repository.VersionBancoRepository;
 import com.renaser.ai.ai_engine.perfilintegral.service.ServicioBancoPreguntas;
+import com.renaser.ai.ai_engine.organizacion.service.DuenoDelInstrumento;
+import com.renaser.ai.ai_engine.organizacion.service.Instrumento;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
 import com.renaser.ai.ai_engine.seguridad.service.Permisos;
 
@@ -66,6 +68,7 @@ public class ServicioBancoPreguntasImpl implements ServicioBancoPreguntas {
     private final ParConsistenciaMapper parMapper;
     private final ServicioAuditoria auditoria;
     private final Permisos permisos;
+    private final DuenoDelInstrumento dueno;
 
     @Override
     @Transactional
@@ -87,7 +90,10 @@ public class ServicioBancoPreguntasImpl implements ServicioBancoPreguntas {
     @Override
     public List<VersionBancoResponse> listarVersiones(ContextoUsuario quien) {
         permisos.alcanceDe("ver_banco_preguntas");
-        return versiones.findVisibles(quien.organizacionId()).stream()
+        // El resolutor decide de quién es el banco que esta organización ve: el suyo si
+        // personalizó, el de la plataforma si no. Ya no existen filas «globales» sin dueño.
+        return versiones.findByOrganizacionIdOrderByCreadoEnDesc(
+                        dueno.duenoDe(quien.organizacionId(), Instrumento.BANCO)).stream()
                 .map(versionBancoMapper::toResponse)
                 .toList();
     }
@@ -95,7 +101,7 @@ public class ServicioBancoPreguntasImpl implements ServicioBancoPreguntas {
     @Override
     @Transactional
     public void publicarVersion(ContextoUsuario quien, Long id) {
-        VersionBanco version = laVersionVisible(quien, id);
+        VersionBanco version = laVersionPropia(quien, id);
         if (!"BORRADOR".equals(version.getEstado())) {
             throw new IllegalStateException("Solo se publica una versión en borrador; esta está " + version.getEstado());
         }
@@ -124,7 +130,7 @@ public class ServicioBancoPreguntasImpl implements ServicioBancoPreguntas {
     @Override
     @Transactional
     public void archivarVersion(ContextoUsuario quien, Long id) {
-        VersionBanco version = laVersionVisible(quien, id);
+        VersionBanco version = laVersionPropia(quien, id);
         if (!"PUBLICADA".equals(version.getEstado())) {
             // Un BORRADOR no circula: abandonarlo no necesita endpoint. Y una ARCHIVADA ya está.
             throw new IllegalStateException("Solo se archiva una versión publicada; esta está " + version.getEstado());
@@ -177,7 +183,7 @@ public class ServicioBancoPreguntasImpl implements ServicioBancoPreguntas {
     @Override
     @Transactional
     public Long crearPregunta(ContextoUsuario quien, Long versionBancoId, CrearPregunta datos) {
-        VersionBanco version = laVersionVisible(quien, versionBancoId);
+        VersionBanco version = laVersionPropia(quien, versionBancoId);
         exigirBorrador(version, "agregar preguntas");
 
         // Campos que solo tienen sentido en su formato: rechazarlos temprano evita que el
@@ -226,10 +232,10 @@ public class ServicioBancoPreguntasImpl implements ServicioBancoPreguntas {
     @Override
     @Transactional
     public Long agregarOpcion(ContextoUsuario quien, Long preguntaId, CrearOpcion datos) {
-        Pregunta pregunta = laPreguntaVisible(quien, preguntaId);
+        Pregunta pregunta = laPreguntaPropia(quien, preguntaId);
         // El mismo candado que crearPregunta. Sin él, la clave de una pregunta publicada se
         // podía alterar por debajo de un examen ya en curso.
-        exigirBorrador(laVersionVisible(quien, pregunta.getVersionBancoId()), "agregar opciones");
+        exigirBorrador(laVersionPropia(quien, pregunta.getVersionBancoId()), "agregar opciones");
 
         Opcion opcion = opciones.save(Opcion.builder()
                 .preguntaId(pregunta.getId())
@@ -260,8 +266,8 @@ public class ServicioBancoPreguntasImpl implements ServicioBancoPreguntas {
     @Override
     @Transactional
     public Long agregarRango(ContextoUsuario quien, Long preguntaId, CrearRango datos) {
-        Pregunta pregunta = laPreguntaVisible(quien, preguntaId);
-        exigirBorrador(laVersionVisible(quien, pregunta.getVersionBancoId()), "agregar rangos");
+        Pregunta pregunta = laPreguntaPropia(quien, preguntaId);
+        exigirBorrador(laVersionPropia(quien, pregunta.getVersionBancoId()), "agregar rangos");
         if (!"V".equals(pregunta.getTipo())) {
             throw new IllegalArgumentException("los rangos de puntaje son solo de los ítems V");
         }
@@ -293,8 +299,8 @@ public class ServicioBancoPreguntasImpl implements ServicioBancoPreguntas {
     @Override
     @Transactional
     public Long agregarCampoCaso(ContextoUsuario quien, Long preguntaId, CrearCampoCaso datos) {
-        Pregunta pregunta = laPreguntaVisible(quien, preguntaId);
-        exigirBorrador(laVersionVisible(quien, pregunta.getVersionBancoId()), "agregar campos");
+        Pregunta pregunta = laPreguntaPropia(quien, preguntaId);
+        exigirBorrador(laVersionPropia(quien, pregunta.getVersionBancoId()), "agregar campos");
         if (!"CD".equals(pregunta.getTipo())) {
             throw new IllegalArgumentException("los campos de caso son solo de los casos descompuestos (CD)");
         }
@@ -325,7 +331,7 @@ public class ServicioBancoPreguntasImpl implements ServicioBancoPreguntas {
     @Override
     @Transactional
     public Long agregarParConsistencia(ContextoUsuario quien, Long versionBancoId, CrearParConsistencia datos) {
-        VersionBanco version = laVersionVisible(quien, versionBancoId);
+        VersionBanco version = laVersionPropia(quien, versionBancoId);
         exigirBorrador(version, "agregar pares de consistencia");
 
         // La FK solo exige que las preguntas existan; que sean de ESTA versión hay que
@@ -367,8 +373,8 @@ public class ServicioBancoPreguntasImpl implements ServicioBancoPreguntas {
     @Override
     @Transactional
     public void actualizarPregunta(ContextoUsuario quien, Long preguntaId, CrearPregunta datos) {
-        Pregunta pregunta = laPreguntaVisible(quien, preguntaId);
-        exigirBorrador(laVersionVisible(quien, pregunta.getVersionBancoId()), "editar preguntas");
+        Pregunta pregunta = laPreguntaPropia(quien, preguntaId);
+        exigirBorrador(laVersionPropia(quien, pregunta.getVersionBancoId()), "editar preguntas");
         // Las mismas guardas por formato que al crear: editar no es una puerta trasera.
         if (datos.casosPedidos() != null && !"CD".equals(datos.tipo())) {
             throw new IllegalArgumentException("casosPedidos es solo de los casos descompuestos (CD)");
@@ -405,8 +411,8 @@ public class ServicioBancoPreguntasImpl implements ServicioBancoPreguntas {
     @Override
     @Transactional
     public void eliminarPregunta(ContextoUsuario quien, Long preguntaId) {
-        Pregunta pregunta = laPreguntaVisible(quien, preguntaId);
-        exigirBorrador(laVersionVisible(quien, pregunta.getVersionBancoId()), "eliminar preguntas");
+        Pregunta pregunta = laPreguntaPropia(quien, preguntaId);
+        exigirBorrador(laVersionPropia(quien, pregunta.getVersionBancoId()), "eliminar preguntas");
 
         // De fuera hacia dentro: primero lo que la apunta, o la FK no deja borrarla.
         pares.deleteByPreguntaAIdOrPreguntaBId(preguntaId, preguntaId);
@@ -554,7 +560,7 @@ public class ServicioBancoPreguntasImpl implements ServicioBancoPreguntas {
     @Override
     @Transactional
     public void descartarBorrador(ContextoUsuario quien, Long versionBancoId) {
-        VersionBanco version = laVersionVisible(quien, versionBancoId);
+        VersionBanco version = laVersionPropia(quien, versionBancoId);
         exigirBorrador(version, "descartar la versión");
         int apuntando = evaluaciones.findByVersionBancoNivelIdAndIniciadaEnIsNull(versionBancoId).size();
         if (apuntando > 0) {
@@ -591,8 +597,8 @@ public class ServicioBancoPreguntasImpl implements ServicioBancoPreguntas {
     @Transactional
     public void corregirTextoPregunta(ContextoUsuario quien, Long preguntaId,
                                       CorregirTextoPregunta datos) {
-        Pregunta pregunta = laPreguntaVisible(quien, preguntaId);
-        exigirPublicada(laVersionVisible(quien, pregunta.getVersionBancoId()));
+        Pregunta pregunta = laPreguntaPropia(quien, preguntaId);
+        exigirPublicada(laVersionPropia(quien, pregunta.getVersionBancoId()));
         Map<String, Object> antes = Map.of("enunciado", pregunta.getEnunciado());
         if (datos.enunciado() != null) {
             pregunta.setEnunciado(datos.enunciado());
@@ -615,8 +621,8 @@ public class ServicioBancoPreguntasImpl implements ServicioBancoPreguntas {
                                     CorregirTextoOpcion datos) {
         Opcion opcion = opciones.findById(opcionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Opción", "id", opcionId));
-        Pregunta pregunta = laPreguntaVisible(quien, opcion.getPreguntaId());
-        exigirPublicada(laVersionVisible(quien, pregunta.getVersionBancoId()));
+        Pregunta pregunta = laPreguntaPropia(quien, opcion.getPreguntaId());
+        exigirPublicada(laVersionPropia(quien, pregunta.getVersionBancoId()));
         Map<String, Object> antes = Map.of("texto", opcion.getTexto());
         opcion.setTexto(datos.texto());
         opciones.save(opcion);
@@ -630,8 +636,8 @@ public class ServicioBancoPreguntasImpl implements ServicioBancoPreguntas {
                                        CorregirTextoCampoCaso datos) {
         CampoCaso campo = camposCaso.findById(campoId)
                 .orElseThrow(() -> new ResourceNotFoundException("Campo de caso", "id", campoId));
-        Pregunta pregunta = laPreguntaVisible(quien, campo.getPreguntaId());
-        exigirPublicada(laVersionVisible(quien, pregunta.getVersionBancoId()));
+        Pregunta pregunta = laPreguntaPropia(quien, campo.getPreguntaId());
+        exigirPublicada(laVersionPropia(quien, pregunta.getVersionBancoId()));
         Map<String, Object> antes = Map.of("etiqueta", campo.getEtiqueta());
         if (datos.etiqueta() != null) {
             campo.setEtiqueta(datos.etiqueta());
@@ -651,8 +657,8 @@ public class ServicioBancoPreguntasImpl implements ServicioBancoPreguntas {
                                    CorregirTextoRango datos) {
         RangoPregunta rango = rangos.findById(rangoId)
                 .orElseThrow(() -> new ResourceNotFoundException("Rango", "id", rangoId));
-        Pregunta pregunta = laPreguntaVisible(quien, rango.getPreguntaId());
-        exigirPublicada(laVersionVisible(quien, pregunta.getVersionBancoId()));
+        Pregunta pregunta = laPreguntaPropia(quien, rango.getPreguntaId());
+        exigirPublicada(laVersionPropia(quien, pregunta.getVersionBancoId()));
         Map<String, Object> antes = Map.of("condicion", rango.getCondicion());
         rango.setCondicion(datos.condicion());
         rangos.save(rango);
@@ -667,7 +673,7 @@ public class ServicioBancoPreguntasImpl implements ServicioBancoPreguntas {
                                              CorregirTextoPar datos) {
         ParConsistencia par = pares.findById(parId)
                 .orElseThrow(() -> new ResourceNotFoundException("Par de consistencia", "id", parId));
-        exigirPublicada(laVersionVisible(quien, par.getVersionBancoId()));
+        exigirPublicada(laVersionPropia(quien, par.getVersionBancoId()));
         Map<String, Object> antes = Map.of("condicion",
                 par.getCondicion() == null ? "" : par.getCondicion());
         par.setCondicion(datos.condicion());
@@ -681,7 +687,7 @@ public class ServicioBancoPreguntasImpl implements ServicioBancoPreguntas {
     @Transactional
     public void corregirEtiquetaVersion(ContextoUsuario quien, Long versionBancoId,
                                         CorregirEtiquetaVersion datos) {
-        VersionBanco version = laVersionVisible(quien, versionBancoId);
+        VersionBanco version = laVersionPropia(quien, versionBancoId);
         exigirPublicada(version);
         Map<String, Object> antes = Map.of("etiqueta", version.getEtiqueta());
         version.setEtiqueta(datos.etiqueta());
@@ -818,31 +824,31 @@ public class ServicioBancoPreguntasImpl implements ServicioBancoPreguntas {
     private Opcion laOpcionEditable(ContextoUsuario quien, Long opcionId, String accion) {
         Opcion opcion = opciones.findById(opcionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Opción", "id", opcionId));
-        Pregunta pregunta = laPreguntaVisible(quien, opcion.getPreguntaId());
-        exigirBorrador(laVersionVisible(quien, pregunta.getVersionBancoId()), accion);
+        Pregunta pregunta = laPreguntaPropia(quien, opcion.getPreguntaId());
+        exigirBorrador(laVersionPropia(quien, pregunta.getVersionBancoId()), accion);
         return opcion;
     }
 
     private RangoPregunta elRangoEditable(ContextoUsuario quien, Long rangoId, String accion) {
         RangoPregunta rango = rangos.findById(rangoId)
                 .orElseThrow(() -> new ResourceNotFoundException("Rango", "id", rangoId));
-        Pregunta pregunta = laPreguntaVisible(quien, rango.getPreguntaId());
-        exigirBorrador(laVersionVisible(quien, pregunta.getVersionBancoId()), accion);
+        Pregunta pregunta = laPreguntaPropia(quien, rango.getPreguntaId());
+        exigirBorrador(laVersionPropia(quien, pregunta.getVersionBancoId()), accion);
         return rango;
     }
 
     private CampoCaso elCampoEditable(ContextoUsuario quien, Long campoId, String accion) {
         CampoCaso campo = camposCaso.findById(campoId)
                 .orElseThrow(() -> new ResourceNotFoundException("Campo de caso", "id", campoId));
-        Pregunta pregunta = laPreguntaVisible(quien, campo.getPreguntaId());
-        exigirBorrador(laVersionVisible(quien, pregunta.getVersionBancoId()), accion);
+        Pregunta pregunta = laPreguntaPropia(quien, campo.getPreguntaId());
+        exigirBorrador(laVersionPropia(quien, pregunta.getVersionBancoId()), accion);
         return campo;
     }
 
     private ParConsistencia elParEditable(ContextoUsuario quien, Long parId, String accion) {
         ParConsistencia par = pares.findById(parId)
                 .orElseThrow(() -> new ResourceNotFoundException("Par de consistencia", "id", parId));
-        exigirBorrador(laVersionVisible(quien, par.getVersionBancoId()), accion);
+        exigirBorrador(laVersionPropia(quien, par.getVersionBancoId()), accion);
         return par;
     }
 
@@ -855,12 +861,30 @@ public class ServicioBancoPreguntasImpl implements ServicioBancoPreguntas {
         }
     }
 
-    // organizacionId nulo = biblioteca global: visible para cualquiera. Si tiene
-    // organización, tiene que ser la del usuario.
+    // ---------- Las dos guardas: leer resuelve, editar no ----------
+    // Con la bandera apagada, la empresa LEE el banco de la plataforma —eso contesta el
+    // resolutor— pero no lo toca: la guarda de mutación exige que la versión sea de la
+    // propia organización. Antes de la V37 el «banco global» (organizacion_id nulo) era
+    // editable desde cualquier organización; esa puerta quedó cerrada.
+
+    /** Visible para leer: la propia, o la del dueño que el resolutor contesta. */
     private VersionBanco laVersionVisible(ContextoUsuario quien, Long id) {
         VersionBanco version = versiones.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Versión del banco", "id", id));
-        if (version.getOrganizacionId() != null && !version.getOrganizacionId().equals(quien.organizacionId())) {
+        boolean propia = version.getOrganizacionId().equals(quien.organizacionId());
+        if (!propia && !version.getOrganizacionId().equals(
+                dueno.duenoDe(quien.organizacionId(), Instrumento.BANCO))) {
+            // Lo ajeno responde «no existe»: decir «prohibido» ya confirma que existe
+            throw new ResourceNotFoundException("Versión del banco", "id", id);
+        }
+        return version;
+    }
+
+    /** Editable: solo la de la propia organización. El banco compartido se lee, no se edita. */
+    private VersionBanco laVersionPropia(ContextoUsuario quien, Long id) {
+        VersionBanco version = versiones.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Versión del banco", "id", id));
+        if (!version.getOrganizacionId().equals(quien.organizacionId())) {
             throw new ResourceNotFoundException("Versión del banco", "id", id);
         }
         return version;
@@ -870,6 +894,13 @@ public class ServicioBancoPreguntasImpl implements ServicioBancoPreguntas {
         Pregunta pregunta = preguntas.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Pregunta", "id", id));
         laVersionVisible(quien, pregunta.getVersionBancoId());
+        return pregunta;
+    }
+
+    private Pregunta laPreguntaPropia(ContextoUsuario quien, Long id) {
+        Pregunta pregunta = preguntas.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Pregunta", "id", id));
+        laVersionPropia(quien, pregunta.getVersionBancoId());
         return pregunta;
     }
 }
