@@ -110,6 +110,13 @@ Talento. La versión de pesos es de Dirección: define qué valora Renaser.
 | Abrir la ficha completa | ◐ | ● | ◐ | ● | ○ |
 | Ver el currículum sin ocultar datos | ◐ | ● | ◐ | ● | ○ |
 | Ver respuesta por respuesta | ○ | ● | ◐ | ● | ○ |
+
+⚠️ **«Ver respuesta por respuesta» tiene por fin un endpoint que la comprueba.**
+`GET /panel/postulaciones/{id}/evaluacion`, desde el 25/08, la guarda con
+`ver_respuestas_evaluacion`. Ese permiso estaba en el catálogo desde `V12` y **no lo miraba
+nadie**: quitárselo a un rol no le quitaba nada. Ahora sí, incluido el alcance —a un
+`RESPONSABLE_AREA` acotado a sus vacantes, el desglose de una postulación ajena le sale como
+un 404, no como un 403 que confirmaría que existe.
 | Ver por qué la IA puso cada nota | ○ | ● | ◐ | ● | ○ |
 | **Ver las claves de puntuación** | ○ | ● | ○ | ● | ○ |
 | Descargar entregables | ○ | ● | ◐ | ● | ○ |

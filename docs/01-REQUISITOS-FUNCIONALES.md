@@ -912,7 +912,7 @@ avanzar.
 | Sección | Qué muestra |
 |---|---|
 | Identidad y proceso | Puesto, etapa, origen, fechas |
-| Perfil Integral | El 40%, dimensiones, potencial, adecuación, alineación |
+| Perfil Integral | El 40%, dimensiones, potencial, adecuación, alineación (⚠️ los semáforos de alineación todavía no los calcula nadie: esa sección sale vacía) |
 | Prueba del puesto | Puntaje, entregables, tiempos, explicación, cambio |
 | Simulación | Eventos, puntaje, preguntas humanas y respuestas |
 | Validación práctica | Métricas y de dónde salió cada una |

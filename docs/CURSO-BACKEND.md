@@ -3,14 +3,15 @@
 Los archivos del backend en el orden en que conviene abrirlos: del más fácil al más difícil.
 Cada uno se entiende con lo que viste en los anteriores. No hace falta leer nada más.
 
-Contado sobre `main`, commit `09fbbf9` (25/08/2026):
+Contado sobre la rama `panel/notas-por-etapa`, commit `6bc1f3e` (25/08/2026). Las líneas
+de los archivos se recontaron aquí: algunas llevaban tiempo desfasadas y se atribuían mal.
 
 | | |
 |---|---|
-| Clases Java | **477**: 136 del motor de agentes y 341 de selección de personal |
+| Clases Java | **480**: 136 del motor de agentes y 344 de selección de personal |
 | Migraciones | V1 a V36, **101 tablas** (100 de selección más `agent_run`, que es del motor) |
 | Controladores | 21 de selección, 5 del motor de agentes |
-| Tests | 65 archivos de prueba —68 `.java`, tres son ayudantes—, **634 pruebas** |
+| Tests | 66 archivos de prueba —69 `.java`, tres son ayudantes—, **645 pruebas** |
 
 Este censo estaba antes atado a `feat/talentov3`, commit `c7c095a`. **Ese commit ya no cuelga
 de `main`**: la historia se rehizo y quien clone hoy no lo tiene, así que el ancla no servía
@@ -228,7 +229,7 @@ etapa 3, repetido con más volumen.
 
 ## Etapa 12 · Hito 2 · el Perfil Integral
 
-85 clases en `perfilintegral`. Las etapas 1 y 2 del embudo —currículum, psicométrico y
+88 clases en `perfilintegral`. Las etapas 1 y 2 del embudo —currículum, psicométrico y
 evaluación— leídas juntas y con un 40% del total. Migraciones V10 a V14.
 
 | | Archivo | Líneas | Qué vas a ver |
@@ -238,7 +239,9 @@ evaluación— leídas juntas y con un 40% del total. Migraciones V10 a V14.
 | 54 | `perfilintegral/controller/EvaluacionPortalController.java` | 67 | Lo que responde el candidato |
 | 55 | `perfilintegral/service/impl/ServicioEvaluacionImpl.java` | 384 | Armar el cuestionario y recibirlo |
 | 56 | `perfilintegral/service/impl/ServicioCalificacionImpl.java` | 240 | Calificar lo cerrado, sin IA |
-| 57 | `perfilintegral/service/impl/ServicioPerfilIntegralPanelImpl.java` | 207 | El perfil terminado, como lo ve el equipo |
+| 56b | `perfilintegral/service/ServicioCalificacion.java` | 69 | La nota de lo cerrado, y `notaCombinada`: la única cuenta que mezcla lo cerrado con lo abierto |
+| 57 | `perfilintegral/service/impl/ServicioPerfilIntegralPanelImpl.java` | 811 | El perfil terminado y el ranking, que desde el 25/08 se puede pedir por etapa |
+| 57b | `perfilintegral/service/impl/ServicioDesgloseEvaluacionImpl.java` | 153 | La evaluación del banco abierta por dentro, para el panel |
 
 Al terminar sabrás: **por qué las preguntas están versionadas.**
 
@@ -253,7 +256,7 @@ delante y la migración `V16__cv_anonimizado_y_cola_ia.sql` al lado.
 | 59 | `test/postulacion/service/AnonimizadorCvTest.java` | 63 | Qué se considera dato sensible, con ejemplos |
 | 60 | `perfilintegral/dto/DtosCalificacionIa.java` | 116 | El contrato con el modelo |
 | 61 | `perfilintegral/service/CalificacionPorCriterio.java` | 197 | Cómo la nota de la IA se vuelve puntos |
-| 62 | `perfilintegral/service/impl/PuenteCalificacionIaImpl.java` | 653 | **El archivo más grande de selección.** La cola, el reintento y qué pasa si la IA falla |
+| 62 | `perfilintegral/service/impl/PuenteCalificacionIaImpl.java` | 752 | **El archivo más grande de selección.** La cola, el reintento y qué pasa si la IA falla |
 
 Al terminar sabrás: **qué le pasa a un candidato cuando DeepSeek no responde.**
 

@@ -109,7 +109,10 @@ public class PostulacionesPanelController {
     }
 
     @GetMapping("/postulaciones/{id}/evaluacion")
-    @PreAuthorize("@permisos.tiene('ver_perfil_integral')")
+    // «Ver respuesta por respuesta» es una accion con permiso propio desde V12, y este es
+    // el primer endpoint que la implementa. Usar el del perfil integral haria que quitarle
+    // ese permiso a un rol no le quitara nada.
+    @PreAuthorize("@permisos.tiene('ver_respuestas_evaluacion')")
     @Operation(summary = "La evaluación del banco, abierta por dentro: cada respuesta abierta "
             + "con la nota y la evidencia que citó la IA, el promedio de lo cerrado, y los "
             + "semáforos de alineación. Sin calificar aún, las notas vienen vacías")

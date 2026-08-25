@@ -130,11 +130,16 @@ public class ServicioDesgloseEvaluacionImpl implements ServicioDesgloseEvaluacio
                 abiertas.stream().map(RespuestaAbiertaVista::puntaje).toList());
     }
 
-    /** El mismo control de visibilidad que el resto del panel: organización y alcance. */
+    /**
+     * El mismo control de visibilidad que el resto del panel: organización y alcance.
+     *
+     * <p>El alcance se pide de {@code ver_respuestas_evaluacion}, el mismo permiso que guarda
+     * la ruta: si un rol lo tiene acotado a sus vacantes, aquí también.
+     */
     private Postulacion laVisible(ContextoUsuario quien, Long postulacionId) {
         Postulacion p = postulaciones.findByIdAndOrganizacionId(postulacionId, quien.organizacionId())
                 .orElseThrow(() -> new ResourceNotFoundException("Postulación", "id", postulacionId));
-        FiltroAlcance alcance = permisos.alcanceDe("ver_perfil_integral");
+        FiltroAlcance alcance = permisos.alcanceDe("ver_respuestas_evaluacion");
         if (alcance.tipo() == FiltroAlcance.Tipo.SUS_VACANTES) {
             boolean esSuya = vacantes.findById(p.getVacanteId())
                     .map(v -> quien.usuarioId().equals(v.getResponsableUsuarioId()))

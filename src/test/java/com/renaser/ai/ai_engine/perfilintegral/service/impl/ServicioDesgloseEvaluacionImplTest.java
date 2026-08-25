@@ -68,7 +68,7 @@ class ServicioDesgloseEvaluacionImplTest {
     @BeforeEach
     void quienMira() {
         quien = new ContextoUsuario(10L, 20L, ORGANIZACION, "EQUIPO", List.of(1L),
-                Map.of("ver_perfil_integral", "TODO"));
+                Map.of("ver_respuestas_evaluacion", "TODO"));
         lenient().when(permisos.alcanceDe(anyString()))
                 .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.TODO, 10L));
     }
@@ -186,7 +186,7 @@ class ServicioDesgloseEvaluacionImplTest {
         // El mismo control que el resto del panel: para quien solo ve sus vacantes,
         // una postulación ajena no es un 403 que confirma que existe — es un 404.
         conPostulacion(EVALUACION);
-        when(permisos.alcanceDe("ver_perfil_integral"))
+        when(permisos.alcanceDe("ver_respuestas_evaluacion"))
                 .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.SUS_VACANTES, 10L));
         when(vacantes.findById(3L)).thenReturn(Optional.of(
                 Vacante.builder().id(3L).responsableUsuarioId(99L).build()));
