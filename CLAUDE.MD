@@ -264,12 +264,12 @@ Las dos consultan el mismo backend, asi que ensenan el mismo orden.
 - Nada se recalcula hacia atras: cada nota queda atada a la version de pesos de su vacante.
 
 ### Correr los tests
-**480 unitarios en verde (23/08/2026).** Son dos tandas y el comando decide cual corre:
+**549 unitarios en verde (25/08/2026).** Son dos tandas y el comando decide cual corre:
 
 | Comando | Que corre | Cuantos | Necesita |
 |---|---|---:|---|
-| `./mvnw test` | unitarias con dobles y las de arquitectura | 480 | nada |
-| `./mvnw verify` | lo anterior mas las de integracion | 547 | Docker |
+| `./mvnw test` | unitarias con dobles y las de arquitectura | 549 | nada |
+| `./mvnw verify` | lo anterior mas las de integracion | 634 | Docker |
 
 Las de integracion levantan su propio PostgreSQL y su propio RabbitMQ con Testcontainers: hace
 falta el demonio de Docker encendido. El desglose completo esta en
@@ -399,7 +399,7 @@ fusiona.** El detalle esta en [docs/CI-CD.md](docs/CI-CD.md); aqui lo que hay qu
 
 | Cuando | Que corre |
 |---|---|
-| En cada PR y en cada push a `main` | `./mvnw verify` (los 444 tests), Semgrep, Gitleaks y la cobertura del codigo nuevo en SonarCloud |
+| En cada PR y en cada push a `main` | `./mvnw verify` (las 634 pruebas), Semgrep, Gitleaks y la cobertura del codigo nuevo en SonarCloud |
 | Al fusionar a `main`, si todo quedo verde | Se construye la imagen con el `Dockerfile`, se sube a ECR y se le dice por SSM a la maquina de EC2 que se actualice. Un smoke test comprueba que responde desde internet |
 | De noche, sin bloquear a nadie | PIT (mutation testing) y fuzzing de la API con Schemathesis |
 
@@ -536,7 +536,7 @@ Todo vive en `docs/`. Empezar por [docs/README.md](docs/README.md).
   ultimas etapas y sus tres reglas automaticas de disponibilidad.
 - [CI/CD](docs/CI-CD.md) — que se comprueba solo en cada cambio, como se despliega a AWS y que
   variables de entorno pide el servidor. **Leerlo antes de tocar `.github/workflows/`.**
-- [Comprobaciones automaticas](docs/COMPROBACIONES-AUTOMATICAS.md) — las 444 pruebas y las siete
+- [Comprobaciones automaticas](docs/COMPROBACIONES-AUTOMATICAS.md) — las 634 pruebas y las ocho
   reglas de arquitectura, una por una. Que se mira solo y que no.
 - `docs/diagramas/` — HTML autocontenidos, se abren en el navegador.
 - `docs/mockups/` — prototipos de pantalla. **Los mantiene otra persona, no editarlos.**

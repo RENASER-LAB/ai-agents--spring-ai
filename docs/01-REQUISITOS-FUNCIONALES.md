@@ -1110,4 +1110,16 @@ versión anterior está en
 **Ninguno frena el desarrollo.** El sistema arranca con valores razonables y Renaser los ajusta
 desde la pantalla cuando lo tenga claro. Esa es la razón de hacerlos editables: el cliente
 todavía no tiene la respuesta, y probablemente la cambie más de una vez.
+
+---
+
+# Documentos relacionados
+
+| Documento | Qué contiene |
+|---|---|
+| [Qué hace el sistema](00-QUE-HACE-EL-SISTEMA.md) | El sistema entero, sin nada técnico. **Empieza por aquí** |
+| [Requisitos no funcionales](02-REQUISITOS-NO-FUNCIONALES.md) | Tecnología, seguridad, rendimiento |
+| [Estados de la postulación](03-ESTADOS-POSTULACION.md) | Los 18 estados y cómo se pasa de uno a otro |
+| [Roles y permisos](04-ROLES-Y-PERMISOS.md) | Quién puede hacer qué, acción por acción |
+| [Modelo de datos](05-MODELO-DE-DATOS.md) | Las tablas por área y por qué existe cada una |
 | [Alcance del MVP](08-ALCANCE-DEL-MVP.md) | Qué se construye primero, en qué orden y por qué |

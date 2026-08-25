@@ -1,10 +1,13 @@
 # Diccionario de datos
 
 Sistema de selección de personal — Renaser Consulting
-Versión 2.0 · 2026-08-15
+Versión 2.1 · 2026-08-25 · Puesto al día con las migraciones hasta la `V36`
 
 Cada tabla con todas sus columnas, tipos y claves. **Este documento se consulta**, no se lee de
 corrido: es la base para escribir las migraciones de Flyway.
+
+Lo que llegó después de la versión 2.0 va marcado con su migración entre paréntesis. La única
+tabla de la base que no está aquí es `agent_run`, que es del motor de agentes y no de selección.
 
 Para entender *por qué* el modelo es así, está el [Modelo de datos](05-MODELO-DE-DATOS.md).
 
@@ -195,6 +198,31 @@ Qué permisos tiene un rol y con qué alcance.
 
 El alcance va aquí y no en el permiso porque es **el mismo permiso** el que tienen el responsable
 del área y el Equipo de Talento: lo que cambia es hasta dónde llega.
+
+## `enlace_acceso`
+
+Cómo entra el candidato al portal **sin contraseña**: se le manda un enlace por correo. Llegó
+con la `V24`.
+
+| Columna | Tipo | Oblig. | Qué guarda |
+|---|---|---|---|
+| `id` | bigint | sí | Clave |
+| `postulacion_id` | bigint | sí | |
+| `token_hash` | text | sí | El SHA-256 del token en hexadecimal, 64 caracteres |
+| `vence_en` | timestamptz | sí | |
+| `primer_uso_en` | timestamptz | no | |
+| `ultimo_uso_en` | timestamptz | no | |
+| `usos` | integer | sí | Por defecto 0 |
+| `revocado_en` | timestamptz | no | Se llena para invalidarlo antes de tiempo, **sin borrar la fila** |
+| `creado_en` | timestamptz | sí | |
+
+**Clave primaria:** `id` · **Único:** `token_hash` · **Apunta a:** `postulacion`
+
+Se guarda **la huella del token, no el token**: quien lea la base no puede entrar como el
+candidato.
+
+Las dos fechas de uso no son adorno: un enlace mandado y nunca usado señala **a un candidato al
+que hay que llamar**, y sin ellas no hay forma de distinguirlo de uno que entró y se fue.
 
 ---
 
@@ -450,8 +478,22 @@ Una convocatoria concreta.
 | `plantilla_evaluacion_id` | bigint | no | |
 | `aplica_evaluacion` | boolean | sí | Apagado, quien postula no recibe la evaluación del banco: va directo a la bandeja del equipo y su única evaluación es la prueba del puesto. Por defecto encendido |
 | `prueba_cierra_en` | timestamptz | no | Cuándo cierra la prueba de esta vacante, para todos. Vacío: se cuentan los días de la versión de la plantilla desde que cada uno empieza |
+| `responsable_usuario_id` | bigint | sí | Quién se hace cargo de contratar |
+| `publicada_en` | timestamptz | no | |
+| `cerrada_en` | timestamptz | no | |
 
-### `plantilla_correo_vacante`
+**Clave primaria:** `id`
+**Apunta a:** `organizacion`, `solicitud_talento`, `puesto`, `version_pesos`,
+`version_plantilla_prueba`, `plantilla_evaluacion`, `usuario`
+
+⚠️ **Hay una referencia circular** entre `vacante` y `version_plantilla_prueba`: la vacante apunta
+a la versión que usa, y una versión puede ser una copia privada de una vacante. Flyway no puede
+crear las dos a la vez: se crean las tablas primero y una de las dos claves foráneas se añade
+después.
+
+Cerrar una vacante **detiene las postulaciones nuevas pero no cierra las que van a mitad**.
+
+## `plantilla_correo_vacante`
 
 Qué texto de correo usa **esta** vacante en lugar del que el sistema mandaría. Sin fila, sale
 el de siempre.
@@ -468,20 +510,6 @@ el de siempre.
 
 No hay clave foránea contra `plantilla_correo`: allí el código se repite por versión, así que
 no hay a qué apuntar. Que el código exista y esté activo se comprueba al configurarlo.
-| `responsable_usuario_id` | bigint | sí | Quién se hace cargo de contratar |
-| `publicada_en` | timestamptz | no | |
-| `cerrada_en` | timestamptz | no | |
-
-**Clave primaria:** `id`
-**Apunta a:** `organizacion`, `solicitud_talento`, `puesto`, `version_pesos`,
-`version_plantilla_prueba`, `plantilla_evaluacion`, `usuario`
-
-⚠️ **Hay una referencia circular** entre `vacante` y `version_plantilla_prueba`: la vacante apunta
-a la versión que usa, y una versión puede ser una copia privada de una vacante. Flyway no puede
-crear las dos a la vez: se crean las tablas primero y una de las dos claves foráneas se añade
-después.
-
-Cerrar una vacante **detiene las postulaciones nuevas pero no cierra las que van a mitad**.
 
 ## `requisito_objetivo`
 
@@ -774,6 +802,8 @@ El currículum de una postulación, en sus dos versiones.
 | `archivo_anonimizado_id` | bigint | no | Lo único que ve la máquina |
 | `texto_extraido` | text | no | Ya sin los datos ocultos |
 | `resultado_orgulloso` | text | no | El texto obligatorio del formulario de postular. Se vacía al anonimizar |
+| `texto_anonimizado` | text | no | El texto que **de verdad** viaja al proveedor, sin edad, sexo ni estado civil (`V16`) |
+| `anonimizado_en` | timestamptz | no | Cuándo se anonimizó. Vacío significa que todavía no ha pasado por ahí |
 
 **Clave primaria:** `id` · **Único:** `postulacion_id`
 
@@ -811,6 +841,34 @@ Algo que el currículum dice, con su clasificación.
 
 Cuatro valores y no dos. **«Declarada» nunca equivale a mentira**: es algo que hace falta
 repreguntar, y por eso la columna de al lado guarda la pregunta.
+
+## `dato_cv`
+
+La ficha que la IA saca del currículum: los datos sueltos, ya ordenados. Llegó con la `V19`.
+
+| Columna | Tipo | Oblig. | Qué guarda |
+|---|---|---|---|
+| `id` | bigint | sí | Clave |
+| `postulacion_id` | bigint | sí | |
+| `nombre` | text | no | |
+| `email` | text | no | |
+| `telefono` | text | no | |
+| `perfil_resumen` | text | no | |
+| `habilidades` | text | no | Separadas por `\|`, **no en su propia tabla**: no se consultan por habilidad, se enseñan. Una tabla aparte solo añadiría un JOIN |
+| `experiencia_meses_total` | integer | no | |
+| `ultimo_puesto` | text | no | |
+| `ultima_empresa` | text | no | |
+| `ultima_meses_duracion` | integer | no | |
+| `educacion_maxima` | text | no | |
+| `ejecucion_ia_id` | bigint | no | De qué llamada salió. Es lo que permite **abrir una ficha de hace seis meses y ver qué se le mandó al modelo y qué contestó** |
+| `actualizado_en` | timestamptz | sí | |
+| `creado_en` | timestamptz | sí | |
+
+**Clave primaria:** `id` · **Único:** `postulacion_id` · **Apunta a:** `postulacion`, `ejecucion_ia`
+
+Una fila por postulación. Cuando el candidato postula a tres vacantes su currículum se lee tres
+veces y quedan tres filas sin relación entre sí: eso es lo que vino a resolver el
+[perfil del candidato](#20--el-perfil-del-candidato), que cuelga de la persona.
 
 ---
 
@@ -878,6 +936,12 @@ Una pregunta dentro de una versión.
 | `logica_interna` | text | no | Qué se espera. **Nunca llega al portal** |
 | `es_puntuable` | boolean | sí | Falso en estilo y consistencia |
 | `orden` | integer | sí | |
+| `peso` | smallint | no | De 0 a 2 (`V20`). **Vacío en las 200 preguntas del v0.1, y eso es lo correcto**: aquel banco no tenía pesos, y ponerle uno inventado cambiaría notas ya dadas |
+| `es_clave` | boolean | sí | El ítem clave (★ del documento). En el v3 siempre coincide con peso 2, pero se guarda aparte porque son dos cosas: una dice cuánto vale y la otra que hay que preguntar por ella en la entrevista |
+| `es_eliminatorio` | boolean | sí | Descarta aunque el puntaje sea alto. Marcarla **no basta para aplicar el filtro** —la condición vive en `filtro_eliminatorio`—, pero evita mostrarla como si sumara |
+| `formula_puntaje` | text | no | La fórmula escrita, en los ítems V que no dan tramos |
+| `rangos_de_pregunta_codigo` | text | no | Remite a los tramos de otra pregunta («Misma tabla que D57»). Se guarda la remisión, no una copia: si cambia la de origen, no quedan dos versiones |
+| `casos_pedidos` | smallint | no | Cuántos casos se piden. Un «5 campos x 3» son 15 casillas pero **cinco preguntas repetidas tres veces** |
 
 **Clave primaria:** `id` · **Único:** `version_banco_id` + `codigo`
 
@@ -895,6 +959,9 @@ Las opciones de respuesta.
 | `letra` | text | sí | `A`, `B`, `C`, `D` |
 | `texto` | text | sí | |
 | `puntaje` | numeric(5,2) | no | **Admite vacío** |
+| `valor` | numeric(5,2) | no | El valor de −2 a +2 que EF-4 esconde detrás de cada afirmación (`V20`) |
+| `es_distractor` | boolean | sí | Los elementos inventados que INV y DE mezclan, y que el candidato no distingue |
+| `orden_correcto` | smallint | no | En SEC, que pide ordenar cinco pasos: el lugar que le toca a este |
 
 **Clave primaria:** `id` · **Único:** `pregunta_id` + `letra`
 
@@ -936,12 +1003,105 @@ Dos preguntas que miden lo mismo y deberían responderse parecido.
 | `version_banco_id` | bigint | sí | |
 | `pregunta_a_id` | bigint | sí | |
 | `pregunta_b_id` | bigint | sí | |
-| `diferencia_maxima` | numeric(5,2) | sí | A partir de aquí se genera alerta |
+| `diferencia_maxima` | numeric(5,2) | no | A partir de aquí se genera alerta. **Dejó de ser obligatoria en la `V20`**: los pares del v3 no la usan |
+| `penalizacion_porcentaje` | numeric(5,2) | no | Cuánto descuenta la contradicción, en los pares del v3 (`V20`) |
+| `separacion_minima_items` | smallint | no | Cuántos ítems tienen que mediar entre las dos preguntas para que el candidato no las vea juntas |
+| `condicion` | text | no | Cuándo cuenta como contradicción, cuando no basta con la diferencia |
 
 **Clave primaria:** `id` · **Único:** `pregunta_a_id` + `pregunta_b_id`
 
 **Arranca vacía.** Los documentos del cliente dicen que hay preguntas que se comparan entre sí,
 pero nunca dicen cuáles con cuáles.
+
+## `campo_caso`
+
+Los campos que hay que llenar en un caso descompuesto (CD). Llegó con la `V20`.
+
+| Columna | Tipo | Oblig. | Qué guarda |
+|---|---|---|---|
+| `id` | bigint | sí | Clave |
+| `pregunta_id` | bigint | sí | |
+| `orden` | integer | sí | |
+| `etiqueta` | text | sí | El rótulo de la casilla |
+| `validacion` | text | no | Qué se acepta: la lista de valores, el rango o el límite de caracteres |
+| `creado_en` | timestamptz | sí | |
+
+**Clave primaria:** `id` · **Único:** `pregunta_id` + `orden` · **Apunta a:** `pregunta`
+
+## `rango_pregunta`
+
+Los tramos de puntaje de los ítems V: según en qué tramo caiga la respuesta, ese es el puntaje.
+
+| Columna | Tipo | Oblig. | Qué guarda |
+|---|---|---|---|
+| `id` | bigint | sí | Clave |
+| `pregunta_id` | bigint | sí | |
+| `orden` | integer | sí | |
+| `condicion` | text | sí | El tramo, tal como lo escribe el documento |
+| `puntaje` | numeric(5,2) | sí | Lo que vale caer ahí |
+| `genera_bandera` | boolean | sí | Algunos tramos no solo dan 0: además **levantan una bandera para la entrevista** |
+| `creado_en` | timestamptz | sí | |
+
+**Clave primaria:** `id` · **Único:** `pregunta_id` + `orden` · **Apunta a:** `pregunta`
+
+## `multiplicador_bloque`
+
+Cuánto pesa cada bloque según la familia del puesto: el mismo bloque no vale igual para un
+cargo de dirección que para uno de ejecución.
+
+| Columna | Tipo | Oblig. | Qué guarda |
+|---|---|---|---|
+| `id` | bigint | sí | Clave |
+| `version_banco_id` | bigint | sí | |
+| `familia_documento` | text | sí | El nombre de familia **tal como lo escribe el documento del cliente** |
+| `familia_codigo` | text | no | La familia del catálogo, cuando se ha podido casar |
+| `bloque` | text | sí | |
+| `multiplicador` | numeric(4,2) | sí | |
+| `creado_en` | timestamptz | sí | |
+
+**Clave primaria:** `id` · **Único:** `version_banco_id` + `familia_documento` + `bloque`
+**Apunta a:** `version_banco`, `familia`
+
+Se guardan **las dos** formas de nombrar la familia a propósito: la del documento no siempre
+coincide con el catálogo, y perder la original impediría rastrear de dónde salió el número.
+
+## `umbral_nivel`
+
+A partir de qué porcentaje se considera cada resultado.
+
+| Columna | Tipo | Oblig. | Qué guarda |
+|---|---|---|---|
+| `id` | bigint | sí | Clave |
+| `version_banco_id` | bigint | sí | |
+| `porcentaje_min` | numeric(5,2) | sí | Desde cuánto aplica |
+| `resultado` | text | sí | Lo que se concluye |
+| `nivel` | text | no | La etiqueta del nivel, si la hay |
+| `creado_en` | timestamptz | sí | |
+
+**Clave primaria:** `id` · **Único:** `version_banco_id` + `porcentaje_min`
+**Apunta a:** `version_banco`
+
+Cuelgan de la **versión** y no de la configuración general: cambiar un umbral no puede mover la
+nota de quien ya se evaluó.
+
+## `filtro_eliminatorio`
+
+Los cinco filtros de la sección 0.4 del documento: descartan al candidato **aunque su puntaje
+sea alto**.
+
+| Columna | Tipo | Oblig. | Qué guarda |
+|---|---|---|---|
+| `id` | bigint | sí | Clave |
+| `version_banco_id` | bigint | sí | |
+| `codigo` | text | sí | |
+| `descripcion` | text | sí | |
+| `preguntas` | text | sí | Los códigos a los que mira, separados por coma. Son varios porque **la misma regla aplica al ítem equivalente de cada banco** (D70, C44, O39) |
+| `creado_en` | timestamptz | sí | |
+
+**Clave primaria:** `id` · **Único:** `version_banco_id` + `codigo` · **Apunta a:** `version_banco`
+
+Aquí vive la condición; `pregunta.es_eliminatorio` solo sirve para no mostrar la pregunta como
+si sumara.
 
 ---
 
@@ -1073,6 +1233,7 @@ Lo que contestó.
 | `texto` | text | no | En las abiertas. Se vacía al anonimizar |
 | `segundos` | integer | no | Cuánto tardó |
 | `respondida_en` | timestamptz | sí | |
+| `detalle` | jsonb | no | La respuesta de los formatos del banco v3, que no caben en una opción ni en un texto: el orden de una secuencia, los campos de un caso, la matriz (`V21`). Los ítems V siguen usando `texto` |
 
 **Clave primaria:** `id` · **Único:** `evaluacion_id` + `pregunta_id`
 **Restricción:** la pregunta tiene que estar en `orden_pregunta` de esa evaluación
@@ -1266,6 +1427,7 @@ Una versión concreta. Si tiene vacante, es una copia privada de esa vacante.
 | `vacante_id` | bigint | no | Si está, es una variante de esa vacante |
 | `version` | integer | sí | |
 | `enunciado` | text | sí | |
+| `url_consigna` | text | no | Dónde vive el enunciado completo, para que **el aviso al candidato lo lleve** (`V29`) |
 | `materiales` | text | no | |
 | `herramientas_permitidas` | text | no | De dónde puede sacar información, **incluida la IA** |
 | `modalidad` | text | sí | `CRONOMETRADA` (lo normal) o `PLAZO_ABIERTO` (solo para cargar las viejas) |
@@ -1461,6 +1623,19 @@ Una fecha con cupo. No hay límite de cuántas se crean.
 `modalidad` arranca en grupal y es configurable: antes el modelo daba por hecho que siempre era
 grupal y presencial.
 
+## `sesion_responsable`
+
+Quién conduce cada sesión. Son varios, así que va en su propia tabla.
+
+| Columna | Tipo | Oblig. | Qué guarda |
+|---|---|---|---|
+| `sesion_simulacion_id` | bigint | sí | |
+| `usuario_id` | bigint | sí | |
+| `creado_en` | timestamptz | sí | |
+
+**Clave primaria:** `sesion_simulacion_id` + `usuario_id` · **Sin columna `id`**
+**Apunta a:** `sesion_simulacion`, `usuario`
+
 ## `sesion_vacante`
 
 Para qué vacantes sirve esa sesión: una, varias o todas.
@@ -1572,6 +1747,7 @@ Las 3 a 5 preguntas para la conversación final, y qué se respondió.
 | `observacion` | text | no | |
 | `registrada_por_usuario_id` | bigint | no | |
 | `orden` | integer | sí | |
+| `motivo` | text | no | Por qué se le hace esa pregunta (`V23`). **Una pregunta cuyo motivo no se ve no se puede repreguntar bien.** Las que se registran a mano entran sin él |
 
 **Clave primaria:** `id`
 
@@ -1902,6 +2078,8 @@ El encargo pendiente. Se procesa en segundo plano; el candidato no espera.
 | `estado` | text | sí | `PENDIENTE`, `EN_CURSO`, `TERMINADO`, `FALLIDO` |
 | `intentos` | integer | sí | Por defecto 0 |
 | `terminado_en` | timestamptz | no | |
+| `tomado_en` | timestamptz | no | Cuándo lo tomó un trabajador (`V16`). Sin esto, un trabajo que murió a mitad se queda `EN_CURSO` **para siempre**, sin que nadie lo reintente |
+| `modo` | text | sí | `RAPIDA` o `FINA`, por defecto `FINA` (`V19`). Decide si el modelo razona, y es lo que hace que pedir la criba dos veces no cueste el doble |
 
 **Clave primaria:** `id`
 
@@ -1995,6 +2173,7 @@ Los archivos viven fuera de la base; aquí solo está su ruta.
 | `tipo` | text | no | |
 | `subido_en` | timestamptz | sí | |
 | `borrado_en` | timestamptz | no | |
+| `contenido_hash` | text | no | La huella del contenido, que **evita pagar dos veces la lectura del mismo currículum** (`V36`). Vacío en los archivos ya subidos: significa «leer de nuevo», que es lo de siempre |
 
 **Clave primaria:** `id`
 
@@ -2074,6 +2253,170 @@ Cada una de las diez medidas de ese corte.
 **Clave primaria:** `seguimiento_desempeno_id` + `metrica` · **Sin columna `id`**
 
 `origen` es lo que permite mostrar de dónde salió cada dato, que el cliente pide expresamente.
+
+---
+
+# 20 · El perfil del candidato
+
+Llegó con la `V36`. Hasta entonces todo lo que se sabía de una persona colgaba de **una**
+postulación: quien postulaba a tres vacantes veía su currículum leído —y pagado— tres veces, y
+sus datos quedaban en tres filas de `dato_cv` sin relación entre sí.
+
+Cuelga de `persona` y **no de `usuario`**, y es una decisión de fondo: el usuario existe una vez
+por organización, así que un perfil por usuario obligaría al candidato a llenarlo una vez por
+empresa. Colgando de la persona sale el modelo de los portales de empleo: una persona, un
+perfil, muchas empresas.
+
+Tres reglas que el esquema hace cumplir:
+
+- **Cada dato sabe de dónde vino** (`origen`) y si la persona lo confirmó (`confirmado_en`). Lo
+  que la IA lee del currículum se **propone**; nunca pisa lo que puso o confirmó la persona.
+- **El perfil no puntúa.** Ninguna de estas tablas participa en notas ni en rankings.
+- **La pretensión salarial es un rango con moneda, o nada.** Un mínimo suelto no significa nada
+  y una cifra exacta se lee como ultimátum.
+
+El diseño completo está en [PROPUESTA-PERFIL-DEL-CANDIDATO.md](PROPUESTA-PERFIL-DEL-CANDIDATO.md).
+
+## `nivel_educativo`
+
+| Columna | Tipo | Oblig. | Qué guarda |
+|---|---|---|---|
+| `codigo` | text | sí | Clave |
+| `nombre` | text | sí | |
+| `orden` | integer | sí | |
+| `creado_en` | timestamptz | sí | |
+
+**Clave primaria:** `codigo` · **Sin columna `id`**
+
+⚠️ **No confundir con `nivel_puesto`**, que es el nivel del *puesto* —dirección, supervisión,
+ejecución—, no el de estudios.
+
+Es un catálogo cerrado **en tabla y no en un `CHECK`**: lo amplía el negocio, no una migración.
+
+## `nivel_idioma`
+
+| Columna | Tipo | Oblig. | Qué guarda |
+|---|---|---|---|
+| `codigo` | text | sí | Clave |
+| `nombre` | text | sí | |
+| `orden` | integer | sí | |
+| `creado_en` | timestamptz | sí | |
+
+**Clave primaria:** `codigo` · **Sin columna `id`**
+
+## `perfil_candidato`
+
+La ficha de la persona. Una por persona, para siempre.
+
+| Columna | Tipo | Oblig. | Qué guarda |
+|---|---|---|---|
+| `id` | bigint | sí | Clave |
+| `persona_id` | bigint | sí | **De la persona, no del usuario** |
+| `titular` | text | no | Cómo se presenta en una línea |
+| `resumen` | text | no | |
+| `habilidades` | text | no | Separadas por `\|`, como en `dato_cv`. El día que haya que buscar «quién sabe Excel», esto pasa a su propia tabla |
+| `experiencia_meses` | integer | no | **Lo declara la persona**; no se calcula sumando la experiencia de abajo, porque los periodos se solapan y restarlos bien no paga la pena |
+| `ubicacion` | text | no | |
+| `disponibilidad` | text | no | |
+| `pretension_min` | numeric(12,2) | no | |
+| `pretension_max` | numeric(12,2) | no | |
+| `pretension_moneda` | text | no | `PEN` o `USD` |
+| `actualizado_en` | timestamptz | sí | |
+| `creado_en` | timestamptz | sí | |
+
+**Clave primaria:** `id` · **Único:** `persona_id` · **Apunta a:** `persona`
+**Restricciones:** `pretension_max` ≥ `pretension_min`; y de los tres campos de pretensión, **o
+los tres o ninguno**
+
+La pretensión solo la ve quien tenga el permiso `ver_pretension`, y **nunca viaja en listas ni
+en rankings**.
+
+## `experiencia_perfil`
+
+| Columna | Tipo | Oblig. | Qué guarda |
+|---|---|---|---|
+| `id` | bigint | sí | Clave |
+| `perfil_candidato_id` | bigint | sí | |
+| `puesto` | text | sí | |
+| `empresa` | text | sí | |
+| `desde` | date | sí | |
+| `hasta` | date | no | **Vacío significa «sigo aquí»**, sin una bandera aparte que pueda contradecir a la fecha |
+| `descripcion` | text | no | |
+| `origen` | text | sí | `PERSONA` o `CURRICULUM` |
+| `confirmado_en` | timestamptz | no | |
+| `orden` | integer | sí | |
+| `creado_en` | timestamptz | sí | |
+
+**Clave primaria:** `id` · **Apunta a:** `perfil_candidato` · **Restricción:** `hasta` ≥ `desde`
+
+## `educacion_perfil`
+
+| Columna | Tipo | Oblig. | Qué guarda |
+|---|---|---|---|
+| `id` | bigint | sí | Clave |
+| `perfil_candidato_id` | bigint | sí | |
+| `titulo` | text | sí | |
+| `institucion` | text | sí | |
+| `nivel_codigo` | text | no | |
+| `desde` | date | no | |
+| `hasta` | date | no | |
+| `en_curso` | boolean | sí | |
+| `origen` | text | sí | `PERSONA` o `CURRICULUM` |
+| `confirmado_en` | timestamptz | no | |
+| `orden` | integer | sí | |
+| `creado_en` | timestamptz | sí | |
+
+**Clave primaria:** `id` · **Apunta a:** `perfil_candidato`, `nivel_educativo`
+
+## `idioma_perfil`
+
+| Columna | Tipo | Oblig. | Qué guarda |
+|---|---|---|---|
+| `id` | bigint | sí | Clave |
+| `perfil_candidato_id` | bigint | sí | |
+| `idioma` | text | sí | |
+| `nivel_codigo` | text | sí | |
+| `origen` | text | sí | `PERSONA` o `CURRICULUM` |
+| `confirmado_en` | timestamptz | no | |
+| `creado_en` | timestamptz | sí | |
+
+**Clave primaria:** `id` · **Único:** `perfil_candidato_id` + `idioma`
+**Apunta a:** `perfil_candidato`, `nivel_idioma`
+
+El único se apoya en que los nombres se normalizan antes de comparar —sin mayúsculas, sin tildes
+y sin espacios de más—, que es lo que impide que «Inglés» e «ingles» entren como dos idiomas.
+
+## `certificacion_perfil`
+
+| Columna | Tipo | Oblig. | Qué guarda |
+|---|---|---|---|
+| `id` | bigint | sí | Clave |
+| `perfil_candidato_id` | bigint | sí | |
+| `nombre` | text | sí | |
+| `entidad` | text | no | |
+| `emitida_en` | date | no | |
+| `vence_en` | date | no | **Vacío = no caduca.** Muchas sí lo hacen —colegiatura, primeros auxilios, seguridad— y en salud eso decide si alguien puede trabajar o no |
+| `origen` | text | sí | `PERSONA` o `CURRICULUM` |
+| `confirmado_en` | timestamptz | no | |
+| `creado_en` | timestamptz | sí | |
+
+**Clave primaria:** `id` · **Apunta a:** `perfil_candidato`
+**Restricción:** `vence_en` ≥ `emitida_en`
+
+## `enlace_perfil`
+
+| Columna | Tipo | Oblig. | Qué guarda |
+|---|---|---|---|
+| `id` | bigint | sí | Clave |
+| `perfil_candidato_id` | bigint | sí | |
+| `tipo` | text | sí | `LINKEDIN`, `GITHUB`, `PORTAFOLIO`, `PUBLICACION`, `PRODUCTO`, `OTRO` |
+| `url` | text | sí | |
+| `creado_en` | timestamptz | sí | |
+
+**Clave primaria:** `id` · **Único:** `perfil_candidato_id` + `tipo` + `url`
+**Apunta a:** `perfil_candidato`
+
+No lleva `origen` ni `confirmado_en`: los enlaces los pone siempre la persona.
 
 ---
 

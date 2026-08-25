@@ -3,17 +3,27 @@
 Los archivos del backend en el orden en que conviene abrirlos: del más fácil al más difícil.
 Cada uno se entiende con lo que viste en los anteriores. No hace falta leer nada más.
 
-Contado sobre la rama `feat/talentov3`, commit `c7c095a`:
+Contado sobre `main`, commit `09fbbf9` (25/08/2026):
 
 | | |
 |---|---|
-| Clases Java | **400**: 129 del motor de agentes y 271 de selección de personal |
-| Migraciones | V1 a V18, **85 tablas** |
-| Controladores | 18 de selección, 5 del motor de agentes |
-| Tests | 13 archivos |
+| Clases Java | **477**: 136 del motor de agentes y 341 de selección de personal |
+| Migraciones | V1 a V36, **101 tablas** (100 de selección más `agent_run`, que es del motor) |
+| Controladores | 21 de selección, 5 del motor de agentes |
+| Tests | 65 archivos de prueba —68 `.java`, tres son ayudantes—, **634 pruebas** |
+
+Este censo estaba antes atado a `feat/talentov3`, commit `c7c095a`. **Ese commit ya no cuelga
+de `main`**: la historia se rehizo y quien clone hoy no lo tiene, así que el ancla no servía
+para comprobar nada. Por eso ahora apunta a `main`.
 
 ⚠️ Los documentos de `docs/` describen el sistema completo (93 tablas, 73 permisos). El código
 va por detrás y por otro camino en algunos puntos. **Cuando se contradigan, manda el código.**
+
+**La excepción es el [diccionario de datos](07-DICCIONARIO-DE-DATOS.md)**, que desde el
+25/08/2026 sigue al código: están **las 100 tablas de selección que existen de verdad** y las
+columnas que fueron añadiendo las migraciones, cada añadido con la suya marcada. Sigue
+llevando además las que solo están diseñadas, así que ahí es al revés: le sobran, no le
+faltan. Lo demás de `docs/` sigue siendo el diseño.
 
 ---
 
@@ -27,7 +37,8 @@ dominio (`solicitud/`, `seguridad/`, `prueba/`…) y a `src/test/java/com/renase
 si empiezan por `test/` o `integracion/`. Las demás salen de la raíz del repositorio.
 
 Las etapas 0 a 11 son el camino obligatorio y se leen en orden. De la 12 en adelante son los
-tres hitos y lo transversal: ahí ya puedes saltar al que te toque tocar.
+tres hitos, lo transversal y lo que fue llegando después: ahí ya puedes saltar al que te toque
+tocar.
 
 Marca aquí lo que vayas terminando.
 
@@ -217,7 +228,7 @@ etapa 3, repetido con más volumen.
 
 ## Etapa 12 · Hito 2 · el Perfil Integral
 
-74 clases en `perfilintegral`. Las etapas 1 y 2 del embudo —currículum, psicométrico y
+85 clases en `perfilintegral`. Las etapas 1 y 2 del embudo —currículum, psicométrico y
 evaluación— leídas juntas y con un 40% del total. Migraciones V10 a V14.
 
 | | Archivo | Líneas | Qué vas a ver |
@@ -266,7 +277,7 @@ Al terminar sabrás: **qué evidencia exige el sistema antes de dejar decidir.**
 ## Etapa 15 · Las dos últimas etapas del embudo
 
 Simulación de trabajo (15%) y validación práctica (15%), las dos calificadas por personas.
-Migración V18, lo más reciente.
+Migración V18.
 
 | | Archivo | Líneas | Qué vas a ver |
 |---|---|---|---|
@@ -304,27 +315,35 @@ Postgres real levantado por Testcontainers.
 
 | Archivo | Líneas | Qué vas a ver |
 |---|---|---|
-| `integracion/MigracionesIT.java` | 61 | Las 18 migraciones contra un Postgres real |
-| `integracion/FlujoHito1IT.java` | 414 | El hito 1 entero, de una pieza |
-| `integracion/FlujoEvaluacionIT.java` | 397 | El Perfil Integral |
-| `integracion/FlujoPruebaIT.java` | 523 | La prueba del puesto |
-| `integracion/FlujoCalificacionIaIT.java` | 610 | La calificación con IA, con el modelo simulado |
-| `integracion/FlujoSimulacionValidacionIT.java` | 560 | Simulación y validación |
-| `integracion/CalificacionIaRealIT.java` | 291 | Contra DeepSeek de verdad: cuatro llamadas reales |
+| `integracion/MigracionesIT.java` | 239 | No cuenta migraciones: comprueba **lo que dejaron puesto** contra un Postgres real. Que las semillas den los 18 estados, que la V19 deje la ficha del CV sin edad ni sexo, y que los textos del banco v3 no lleguen cortados |
+| `integracion/FlujoHito1IT.java` | 514 | El hito 1 entero, de una pieza |
+| `integracion/FlujoEvaluacionIT.java` | 457 | El Perfil Integral |
+| `integracion/FlujoPruebaIT.java` | 550 | La prueba del puesto |
+| `integracion/FlujoCalificacionIaIT.java` | 1119 | La calificación con IA, con el modelo simulado. El más grande |
+| `integracion/FlujoSimulacionValidacionIT.java` | 576 | Simulación y validación |
+| `integracion/FlujoPerfilIT.java` | 627 | El perfil del candidato de punta a punta (etapa 19) |
+| `integracion/CalificacionIaRealIT.java` | 328 | Contra DeepSeek de verdad: cuatro llamadas reales |
 
-⚠️ `CalificacionIaRealIT` **no está desactivado**: surefire incluye `**/*IT.java` y la clase no
-lleva `@Disabled`, así que `./mvnw test` lo corre y **gasta dinero** (y falla si no tienes
-`application-secrets.yaml`). Para la vuelta normal, sáltalo:
+**Los `*IT` no los corre `./mvnw test`.** Surefire solo toma `*Test.java` y `*Tests.java`; de
+los de integración se encarga failsafe en `./mvnw verify`, que necesita Docker.
+
+Y `CalificacionIaRealIT` es la única que gasta dinero, así que **va apagada salvo que se pida**
+—lleva `@EnabledIfEnvironmentVariable`—. Sin la bandera se salta en milisegundos. Para pedirla
+a propósito, nombrarla basta: al nombrar la clase se salta la lista de arriba, así que la
+corre tanto `test` como `verify`.
 
 ```bash
-./mvnw test -Dtest='!CalificacionIaRealIT'
+RENASER_IA_REAL=si ./mvnw verify -Dit.test=CalificacionIaRealIT
 ```
+
+Se apaga por defecto y no al revés a propósito: olvidarse de encenderla no cuesta nada;
+olvidarse de apagarla, sí.
 
 Empieza por `FlujoHito1IT`: es el recorrido completo de un candidato en un solo archivo.
 
 ## Etapa 18 · El motor de agentes
 
-`ai/`, 129 clases. **No se toca**, pero comparte proceso, base de datos y puerto. Entrada:
+`ai/`, 136 clases. **No se toca**, pero comparte proceso, base de datos y puerto. Entrada:
 `FlowController` (42) → `AgentExecutionServiceImpl` (119) → los prompts en `resources/prompts/`.
 
 Dentro viven los 15 agentes y su respuesta estructurada, el encadenamiento por RabbitMQ con
@@ -332,6 +351,29 @@ Dentro viven los 15 agentes y su respuesta estructurada, el encadenamiento por R
 
 El único punto donde selección y motor se tocan de verdad es
 `ai/controller/perfilintegral/AgentesIaPanelController.java` (62), la puerta que usa la etapa 13.
+
+## Etapa 19 · El perfil del candidato
+
+Migración V36, lo más reciente (25/08/2026). Es de selección, no del motor: se lee después de
+la 18 porque llegó después, no porque dependa de ella.
+
+Hasta aquí, todo lo que sabías de una persona vivía **dentro de su postulación**: volvía a
+postular y volvía a escribirlo todo. El perfil cuelga de `persona`, así que **le sobrevive a
+cada postulación**.
+
+| | Archivo | Líneas | Qué vas a ver |
+|---|---|---|---|
+| 86 | `perfil/entity/PerfilCandidato.java` | 39 | La ficha de la persona, con sus cinco listas colgando |
+| 87 | `perfil/dto/DtosPerfil.java` | 138 | Experiencia, educación, idiomas, certificaciones y enlaces |
+| 88 | `perfil/service/ClaveNatural.java` | 28 | Por qué «Inglés» e «ingles» son el mismo idioma. Pequeño y decide mucho |
+| 89 | `perfil/controller/PerfilPortalController.java` | 209 | El dueño edita lo suyo: alta, baja, orden y confirmación |
+| 90 | `perfil/service/impl/PintorDePerfil.java` | 147 | Un solo armador del DTO para el portal y el panel. **Lo que ve el equipo es lo mismo que ve el candidato** |
+| 91 | `perfil/service/impl/ServicioPerfilPortalImpl.java` | 487 | El CRUD entero, con el 404 de lo ajeno |
+| 92 | `perfil/service/impl/ServicioPropuestaPerfilImpl.java` | 405 | Lo que la IA saca del currículum entra sin confirmar y **nunca pisa lo que puso la persona**. Los dos campos que mandan son `origen` y `confirmadoEn` |
+| 93 | `perfil/service/impl/BarridoRetencionPerfil.java` | 88 | El plazo de conservación de la ley 29733: sin actividad, se borra |
+| 94 | `perfil/controller/PerfilPanelController.java` | 39 | La trayectoria vista por el equipo. **No puntúa**, y la pretensión pide su propio permiso |
+
+Al terminar sabrás: **por qué lo que lee la IA no se guarda directo, sino que espera un sí.**
 
 ---
 
