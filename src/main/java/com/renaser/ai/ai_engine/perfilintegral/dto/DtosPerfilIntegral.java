@@ -153,4 +153,47 @@ public final class DtosPerfilIntegral {
             int alertas,
             Instant actualizadoEn,
             List<NotaCriterioResponse> notasCriterio) {}
+
+    // ============ El desglose de la evaluación del banco ============
+
+    /**
+     * La evaluación del banco, abierta por dentro.
+     *
+     * <p>Puede llegar a medias y eso es información: sin evaluación asignada todo viene
+     * vacío, y una entregada pero aún sin calificar trae las respuestas sin nota. Nunca es
+     * un 404 — una evaluación sin calificar es un estado normal del proceso.
+     *
+     * <p>{@code notaEvaluacion} va sobre 100 y pondera lo cerrado y lo abierto por cuántas
+     * preguntas produjo cada mitad — el mismo cálculo con el que esa nota entra en la etapa.
+     */
+    public record DesgloseEvaluacion(
+            Long postulacionId,
+            String estado,
+            Instant entregadaEn,
+            BigDecimal notaEvaluacion,
+            ResumenCerradas cerradas,
+            List<RespuestaAbiertaVista> abiertas,
+            List<AlineacionVista> alineacion) {}
+
+    /** Lo cerrado no se desglosa por pregunta: se corrige solo y sale como un promedio sobre 100. */
+    public record ResumenCerradas(BigDecimal nota, int preguntas) {}
+
+    /**
+     * Una respuesta abierta con la nota que le puso la IA. {@code puntaje} va de 0 a 4.
+     * {@code motivoAjuste} solo tiene valor si un humano corrigió la nota — y entonces
+     * el porqué es obligatorio, igual que en el resto del sistema.
+     */
+    public record RespuestaAbiertaVista(
+            String pregunta,
+            String formato,
+            String respuesta,
+            BigDecimal puntaje,
+            String explicacion,
+            String evidenciaCitada,
+            BigDecimal confianza,
+            String motivoAjuste) {}
+
+    /** Un bloque de alineación personal con su semáforo. Un rojo no descarta a nadie por sí solo. */
+    public record AlineacionVista(String bloque, String semaforo, String explicacion) {}
+
 }

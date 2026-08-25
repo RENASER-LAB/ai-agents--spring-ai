@@ -129,22 +129,28 @@ la postulación en el acto (`NO_CONTINUA`), con la regla exacta escrita en su hi
 |---|---|---|
 | GET `/bandeja?espera_a=` | La bandeja: todo lo que espera a `CANDIDATO`, `SISTEMA`, `TALENTO` o `AREA` | `ver_candidatos` |
 | GET `/vacantes/{id}/embudo` | Cuántas postulaciones hay en cada estado | `ver_embudo` |
-| GET `/vacantes/{id}/ranking` | La tanda ordenada de más apto a menos, con las ocho notas del currículum de cada uno. **Incluye a quien todavía no tiene nota** | `ver_embudo` |
+| GET `/vacantes/{id}/ranking?etapa=` | La tanda ordenada de más apto a menos, con las ocho notas del currículum de cada uno. **Incluye a quien todavía no tiene nota**. Sin `etapa` ordena por la del Perfil Integral; con ella, por la nota de esa etapa | `ver_embudo` |
 | GET `/postulaciones/{id}` · `/historial` | La ficha completa y el recorrido | `abrir_ficha_candidato` |
 | POST `/postulaciones/{id}/transiciones` | Mover a cualquier estado. **El motivo es obligatorio, sin excepción** | `mover_postulacion` |
 | POST `/postulaciones/{id}/confirmacion-avance` | Confirmar que avanza: el sistema calcula el estado siguiente | `confirmar_avance` |
 | GET `/postulaciones/{id}/perfil-integral` | El retrato de la IA: notas del currículum, hallazgos y avisos | `ver_perfil_integral` |
+| GET `/postulaciones/{id}/evaluacion` | El desglose del banco: cada respuesta abierta con su nota, la explicación y la evidencia que citó la IA, el promedio de lo cerrado y los semáforos de alineación. **Sin evaluación asignada devuelve vacíos, no 404** | `ver_perfil_integral` |
 | POST `/postulaciones/{id}/criba-cv` | Que la IA lea **solo el currículum** y arme el retrato con eso. Es lo que se pide con una tanda recién llegada | `ajustar_nota` |
 | POST `/postulaciones/{id}/calificacion-perfil-integral` | Calificar con todo: currículum y evaluación. Exige evaluación entregada | `ajustar_nota` |
 | POST `/postulaciones/{id}/cv` | Reemplazar el currículum desde el panel | `ajustar_nota` |
 | GET `/archivos/{id}/descarga` | Descargar el CV | `descargar_entregables` |
 
-> **Este es el único ranking que existe, y es el de la etapa 2.** Ordena por grupo de prioridad y,
-> dentro de cada grupo, por la nota del Perfil Integral. No hay ranking general con las cuatro
-> etapas dentro, ni rankings de la prueba, la simulación o la validación: esas notas se consultan
-> de una en una por candidato. La Puntuación Global sí está calculada —sale en
-> `/postulaciones/{id}/semaforo`—, pero nunca como lista ordenada. Está apuntado como decisión 6
-> en [Alcance del MVP](08-ALCANCE-DEL-MVP.md), con lo que habría que decidir antes de montarlo.
+> **Hay un ranking por etapa, y es el mismo endpoint.** `?etapa=PRUEBA_PUESTO`, `SIMULACION`,
+> `VALIDACION` o `DECISION` cambia **solo la nota con la que se ordena**: las ocho notas del
+> currículum de cada fila siguen siendo las del Perfil Integral, porque son de esa etapa siempre.
+> Sin el parámetro se comporta exactamente como antes —así lo llama la criba fina, que decide a
+> quién recalificar por la nota de preselección—, y una etapa que no esté en el catálogo es un 400.
+> Quien no tiene nota en la etapa pedida sale al final, sin heredar la de otra.
+>
+> Sigue sin haber un ranking **general** que mezcle las cuatro etapas en una sola nota. La
+> Puntuación Global está calculada —sale en `/postulaciones/{id}/semaforo`—, pero nunca como lista
+> ordenada. Está apuntado como decisión 6 en [Alcance del MVP](08-ALCANCE-DEL-MVP.md), con lo que
+> habría que decidir antes de montarlo.
 
 ### La prueba del puesto (hito 3)
 
