@@ -35,6 +35,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -131,10 +132,15 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
 
     @Override
     public List<SesionPanel> listarSesiones(ContextoUsuario quien) {
-        permisos.alcanceDe("crear_sesiones_simulacion");
+        FiltroAlcance alcance = alcanceParaVerSesiones(quien);
         List<SesionSimulacion> todas = sesiones.findByOrganizacionIdOrderByFechaHora(
                 quien.organizacionId());
         if (todas.isEmpty()) {
+            return List.of();
+        }
+        // Con PROPIO no hay nada que enseñar: una sesión no es de nadie en particular, y quien
+        // solo alcanza lo suyo mira su sesión por el portal, no por el panel.
+        if (alcance.tipo() == FiltroAlcance.Tipo.PROPIO) {
             return List.of();
         }
 
@@ -145,13 +151,36 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
         // sobre una lista que solo crece es un problema que se nota tarde, cuando ya hay
         // un año de sesiones dentro.
         List<Long> ids = todas.stream().map(SesionSimulacion::getId).toList();
-        Map<Long, Long> inscritos = new HashMap<>();
-        for (Object[] fila : inscripciones.contarVigentesPorSesion(ids)) {
-            inscritos.put((Long) fila[0], (Long) fila[1]);
-        }
         Map<Long, List<Long>> vacantesPorSesion = sesionesVacante.findBySesionSimulacionIdIn(ids)
                 .stream().collect(Collectors.groupingBy(SesionVacante::getSesionSimulacionId,
                         Collectors.mapping(SesionVacante::getVacanteId, Collectors.toList())));
+
+        // Con SUS_VACANTES la lista se queda en las sesiones que tocan alguna vacante suya, y
+        // el conteo cuenta solo a los suyos. Son las dos caras de lo mismo: enseñar una sesión
+        // entera y luego negar a sus inscritos sería peor que no enseñarla.
+        boolean recorta = alcance.tipo() == FiltroAlcance.Tipo.SUS_VACANTES;
+        if (recorta) {
+            Set<Long> suyas = vacantes
+                    .findByOrganizacionIdAndResponsableUsuarioIdOrderByCreadoEnDesc(
+                            quien.organizacionId(), quien.usuarioId())
+                    .stream().map(Vacante::getId).collect(Collectors.toSet());
+            todas = todas.stream()
+                    .filter(s -> vacantesPorSesion.getOrDefault(s.getId(), List.of())
+                            .stream().anyMatch(suyas::contains))
+                    .toList();
+            if (todas.isEmpty()) {
+                return List.of();
+            }
+            ids = todas.stream().map(SesionSimulacion::getId).toList();
+        }
+
+        Map<Long, Long> inscritos = new HashMap<>();
+        List<Object[]> conteo = recorta
+                ? inscripciones.contarVigentesPorSesionDe(ids, quien.usuarioId())
+                : inscripciones.contarVigentesPorSesion(ids);
+        for (Object[] fila : conteo) {
+            inscritos.put((Long) fila[0], (Long) fila[1]);
+        }
         Map<Long, List<Long>> responsablesPorSesion = responsables.findBySesionSimulacionIdIn(ids)
                 .stream().collect(Collectors.groupingBy(SesionResponsable::getSesionSimulacionId,
                         Collectors.mapping(SesionResponsable::getUsuarioId, Collectors.toList())));
@@ -174,7 +203,43 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
 
     @Override
     public SesionPanel verSesion(ContextoUsuario quien, Long sesionId) {
-        return comoPanel(laSesion(quien, sesionId));
+        SesionSimulacion sesion = laSesion(quien, sesionId);
+        FiltroAlcance alcance = alcanceParaVerSesiones(quien);
+        if (alcance.tipo() != FiltroAlcance.Tipo.TODO && !tocaUnaVacanteSuya(quien, sesion)) {
+            // 404 y no 403: un 403 confirmaría que esa sesión existe.
+            throw new ResourceNotFoundException("Sesión", "id", sesionId);
+        }
+        return comoPanel(sesion);
+    }
+
+    /**
+     * Con qué alcance mira las sesiones quien llama.
+     *
+     * <p>Dos permisos abren esta puerta y hay que resolver cuál trae puesto: quien crea las
+     * sesiones —Talento, Dirección— y quien solo necesita ver a los inscritos, que es el
+     * responsable del área. {@code alcanceDe} lanza si el permiso falta, así que preguntar
+     * primero con {@code tiene} es lo que evita que el segundo caso pase la anotación del
+     * controlador y reviente una línea más abajo.
+     *
+     * <p>Se prefiere el de crear sesiones cuando están los dos porque es el más amplio de los
+     * dos repartos de hoy; si mañana alguien invierte eso desde el panel, esto sigue valiendo,
+     * porque lo que manda es el alcance que traiga la fila, no cuál de los dos permisos es.
+     */
+    private FiltroAlcance alcanceParaVerSesiones(ContextoUsuario quien) {
+        return quien.tiene("crear_sesiones_simulacion")
+                ? permisos.alcanceDe("crear_sesiones_simulacion")
+                : permisos.alcanceDe("ver_inscritos_simulacion");
+    }
+
+    /** Si alguna de las vacantes de la sesión es de las que este usuario dirige. */
+    private boolean tocaUnaVacanteSuya(ContextoUsuario quien, SesionSimulacion sesion) {
+        List<Long> deLaSesion = sesionesVacante.findBySesionSimulacionId(sesion.getId())
+                .stream().map(SesionVacante::getVacanteId).toList();
+        if (deLaSesion.isEmpty()) {
+            return false;
+        }
+        return vacantes.findAllById(deLaSesion).stream()
+                .anyMatch(v -> quien.usuarioId().equals(v.getResponsableUsuarioId()));
     }
 
     @Override

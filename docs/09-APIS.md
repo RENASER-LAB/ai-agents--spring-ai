@@ -175,7 +175,8 @@ lo interno viaja, y una prueba ajena responde 404.
 
 | Método y ruta | Qué hace | Permiso |
 |---|---|---|
-| GET/POST `/sesiones-simulacion` | Las sesiones con fecha y cupo. Publicar una mueve a quien estaba esperando | `crear_sesiones_simulacion` |
+| POST `/sesiones-simulacion` | Crear una sesión con fecha y cupo. Publicarla mueve a quien estaba esperando | `crear_sesiones_simulacion` |
+| GET `/sesiones-simulacion` · `/{id}` | Las sesiones. **También entra quien solo puede ver inscritos**, recortado a las que tocan una vacante suya | `crear_sesiones_simulacion` **o** `ver_inscritos_simulacion` |
 | GET `/sesiones-simulacion/{id}/inscritos` | **Quién eligió esta fecha**: nombre, vacante y la `inscripcionId` que piden las marcas y la asistencia. Recortado por el alcance del rol | `ver_inscritos_simulacion` |
 | POST `/sesiones-simulacion/{id}/cupo` · `/cancelacion` | Ampliar o cancelar. Al cancelar se avisa a los inscritos | `crear_sesiones_simulacion` |
 | POST `/sesiones-simulacion/{id}/responsables` | Quién conduce la sesión | `crear_sesiones_simulacion` |
@@ -188,6 +189,14 @@ lo interno viaja, y una prueba ajena responde 404.
 
 **El portal del candidato es `/portal/simulacion/{codigo}`**: ver las fechas de su vacante que
 tengan cupo, elegir una, y consultar la que eligió.
+
+⚠️ **Los dos GET de sesiones admiten dos permisos, y no es una excepción caprichosa.** Quien
+conduce una sesión suele ser el responsable del área, que no crea sesiones: con un solo permiso
+podía leer los inscritos de una sesión pero no había endpoint que le dijera qué sesiones
+existen, así que tenía la lista de un `{id}` que no había forma de averiguar. Con el alcance
+acotado ve solo las sesiones que tocan una vacante suya, y una que no responde **404**, no 403.
+El conteo `inscritos` se recorta con el mismo criterio: decir «6» y luego enseñar dos no se lee
+como un permiso, se lee como que faltan cuatro.
 
 ⚠️ **Tres reglas mueven al candidato solo**, y son el único punto del sistema donde el estado de
 una postulación depende de otra tabla: publicar una sesión o ampliar su cupo mueve a quien
