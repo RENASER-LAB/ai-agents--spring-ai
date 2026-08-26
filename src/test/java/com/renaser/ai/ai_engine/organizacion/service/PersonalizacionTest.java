@@ -53,7 +53,10 @@ class PersonalizacionTest {
     void armar() {
         servicio = new ServicioPersonalizacionImpl(organizaciones, copiador, versionesBanco, auditoria);
         empresa = Organizacion.builder().id(EMPRESA).codigo("ACME").build();
-        when(organizaciones.findById(EMPRESA)).thenReturn(Optional.of(empresa));
+        // lenient: las pruebas de la doble llave de la plataforma cortan antes de llegar
+        // a buscar la empresa, y el modo estricto las tumbaría por este stub sin usar.
+        org.mockito.Mockito.lenient()
+                .when(organizaciones.findById(EMPRESA)).thenReturn(Optional.of(empresa));
     }
 
     @Test
@@ -123,5 +126,61 @@ class PersonalizacionTest {
         assertThatThrownBy(() -> servicio.apagar(ADMIN, Instrumento.PRUEBA))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("ya está apagada");
+    }
+
+    // ============ Sobre otra empresa, desde la plataforma (pieza F) ============
+
+    private static final Long PLATAFORMA = 1L;
+    private static final ContextoUsuario DUENA = new ContextoUsuario(
+            30L, 40L, PLATAFORMA, "EQUIPO", List.of(), Map.of());
+
+    private void hayPlataforma() {
+        when(organizaciones.findByEsPlataformaTrue()).thenReturn(Optional.of(
+                Organizacion.builder().id(PLATAFORMA).esPlataforma(true).build()));
+    }
+
+    @Test
+    @DisplayName("La plataforma enciende la personalización de otra empresa, con el motivo auditado")
+    void laPlataformaEnciendeParaOtraConMotivo() {
+        // Cuando la empresa lo pide fuera del sistema: misma copia y misma auditoría que
+        // si lo hiciera ella — y el POR QUÉ queda escrito, que es lo que protege a Renaser.
+        hayPlataforma();
+        when(copiador.copiarPesos(EMPRESA)).thenReturn(Map.of("version_pesos", 1));
+
+        servicio.encenderPara(DUENA, EMPRESA, Instrumento.PESOS, "Lo pidió ACME por correo");
+
+        assertThat(empresa.isPesosPropios()).isTrue();
+        verify(auditoria).registrar(org.mockito.ArgumentMatchers.eq(PLATAFORMA),
+                org.mockito.ArgumentMatchers.eq(DUENA),
+                org.mockito.ArgumentMatchers.eq("encender_personalizacion"),
+                org.mockito.ArgumentMatchers.eq("organizacion"),
+                org.mockito.ArgumentMatchers.eq(EMPRESA), any(), any(),
+                org.mockito.ArgumentMatchers.eq("Lo pidió ACME por correo"));
+    }
+
+    @Test
+    @DisplayName("Desde una empresa no se toca la personalización de otra, ni con el permiso")
+    void unaEmpresaNoTocaLaPersonalizacionDeOtra() {
+        // La segunda llave del panel de plataforma: el permiso lo mira el controlador, y
+        // aquí se exige además SER la plataforma — una empresa con el permiso copiado no
+        // le enciende (ni apaga) nada a la competencia.
+        hayPlataforma();
+
+        assertThatThrownBy(() -> servicio.encenderPara(ADMIN, 3L, Instrumento.PESOS, "colada"))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        assertThatThrownBy(() -> servicio.apagarPara(ADMIN, 3L, Instrumento.PESOS, "colada"))
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
+        verify(organizaciones, never()).save(any());
+        verify(auditoria, never()).registrar(any(), any(), any(), any(), any(), any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("La empresa objetivo que no existe es un 404, no un fallo raro")
+    void laEmpresaQueNoExisteEsUn404() {
+        hayPlataforma();
+        when(organizaciones.findById(99L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> servicio.encenderPara(DUENA, 99L, Instrumento.PESOS, "typo"))
+                .isInstanceOf(com.renaser.ai.ai_engine.ai.exception.ResourceNotFoundException.class);
     }
 }
