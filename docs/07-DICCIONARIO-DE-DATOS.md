@@ -1,7 +1,7 @@
 # Diccionario de datos
 
 Sistema de selección de personal — Renaser Consulting
-Versión 2.1 · 2026-08-25 · Puesto al día con las migraciones hasta la `V36`
+Versión 2.2 · 2026-08-26 · Puesto al día con las migraciones hasta la `V37`
 
 Cada tabla con todas sus columnas, tipos y claves. **Este documento se consulta**, no se lee de
 corrido: es la base para escribir las migraciones de Flyway.
@@ -150,20 +150,27 @@ Un nombre y una lista de permisos.
 
 ## `permiso`
 
-Una acción suelta que se puede conceder o no. **Son 73.**
+Una acción suelta que se puede conceder o no. **Sembrados hay 69**, contados sobre las
+migraciones. La matriz de [Roles y permisos](04-ROLES-Y-PERMISOS.md) enumera 75: la diferencia
+son los que están diseñados y todavía no existen en la base, y ese documento describe el
+sistema completo mientras este sigue al código.
 
 | Columna | Tipo | Oblig. | Qué guarda |
 |---|---|---|---|
 | `id` | bigint | sí | Clave |
 | `codigo` | text | sí | `cerrar_vacante` |
 | `etiqueta` | text | sí | «Cerrar una vacante». En lenguaje normal |
-| `grupo` | text | sí | `SOLICITUDES`, `VACANTES`, `CANDIDATOS`, `EVALUACION`, `SIMULACION`, `VALIDACION`, `DECISION`, `CIERRE`, `RADAR`, `METRICAS`, `CONFIGURACION` |
+| `grupo` | text | sí | `SOLICITUDES`, `VACANTES`, `CANDIDATOS`, `EVALUACION`, `SESIONES`, `VALIDACION`, `DECISION`, `CIERRE`, `RADAR`, `METRICAS`, `CONFIGURACION` |
 | `orden` | integer | sí | Dentro de su grupo |
 
 **Clave primaria:** `id` · **Único:** `codigo`
 
+Los grupos que existen de verdad hoy son nueve —`DECISION` y `RADAR` están solo diseñados—, y
+la simulación va en `SESIONES`, no en `SIMULACION`.
+
 **No lleva organización:** los permisos son los mismos para todos. Lo que cambia es quién los
-tiene. Solo crece con una migración.
+tiene. Solo crece con una migración: los dos últimos, `ver_inscritos_simulacion` y
+`administrar_permisos`, llegaron con la `V37`.
 
 La etiqueta existe porque la pantalla donde se reparten permisos nunca debe mostrar nombres
 técnicos.
@@ -2494,5 +2501,5 @@ Lo que **no** cabe en una restricción y hay que probar en el código está en
 - [Alcance del MVP](08-ALCANCE-DEL-MVP.md) — qué tablas entran en cada hito
 - [Requisitos funcionales](01-REQUISITOS-FUNCIONALES.md) — qué hace el sistema
 - [Estados de la postulación](03-ESTADOS-POSTULACION.md) — los 18 estados y sus transiciones
-- [Roles y permisos](04-ROLES-Y-PERMISOS.md) — los 73 permisos
+- [Roles y permisos](04-ROLES-Y-PERMISOS.md) — los 75 permisos
 - [Diagrama del modelo](diagramas/modelo-de-datos.html) — se abre en el navegador

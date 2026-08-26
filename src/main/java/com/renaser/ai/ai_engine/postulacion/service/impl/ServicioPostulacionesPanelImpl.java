@@ -13,10 +13,9 @@ import com.renaser.ai.ai_engine.notificacion.service.*;
 import com.renaser.ai.ai_engine.parametro.entity.*;
 import com.renaser.ai.ai_engine.parametro.repository.*;
 import com.renaser.ai.ai_engine.parametro.service.*;
-import com.renaser.ai.ai_engine.usuario.entity.Persona;
-import com.renaser.ai.ai_engine.usuario.repository.PersonaRepository;
 import com.renaser.ai.ai_engine.usuario.entity.Usuario;
 import com.renaser.ai.ai_engine.usuario.repository.UsuarioRepository;
+import com.renaser.ai.ai_engine.usuario.service.NombresDeUsuarios;
 import com.renaser.ai.ai_engine.postulacion.service.ServicioPostulacionesPanel;
 import com.renaser.ai.ai_engine.prueba.service.ServicioPrueba;
 import com.renaser.ai.ai_engine.simulacion.service.ServicioDisponibilidadSimulacion;
@@ -54,7 +53,7 @@ public class ServicioPostulacionesPanelImpl implements ServicioPostulacionesPane
     private final TransicionEstadoRepository transiciones;
     private final VacanteRepository vacantes;
     private final UsuarioRepository usuarios;
-    private final PersonaRepository personas;
+    private final NombresDeUsuarios nombres;
     private final CvRepository cvs;
     private final EnlaceCvRepository enlaces;
     private final ArchivoRepository archivos;
@@ -87,16 +86,14 @@ public class ServicioPostulacionesPanelImpl implements ServicioPostulacionesPane
         // petición retiene una conexión del pool todo ese rato, así que la bandeja no se
         // colgaba sola, se llevaba por delante al resto del panel.
         //
-        // Así son cuatro consultas fijas, haya una fila o quinientas.
-        Map<Long, Usuario> porUsuario = porId(
-                usuarios.findAllById(idsDe(filas, Postulacion::getUsuarioId)), Usuario::getId);
-        Map<Long, Persona> porPersona = porId(
-                personas.findAllById(idsDe(porUsuario.values(), Usuario::getPersonaId)), Persona::getId);
+        // Así son cuatro consultas fijas, haya una fila o quinientas: dos las hace
+        // NombresDeUsuarios por dentro, y sigue siendo por tanda.
+        Map<Long, String> candidatos = nombres.porUsuario(idsDe(filas, Postulacion::getUsuarioId));
         Map<Long, Vacante> porVacante = porId(
                 vacantes.findAllById(idsDe(filas, Postulacion::getVacanteId)), Vacante::getId);
 
         return filas.stream()
-                .map(p -> filaBandeja(p, catalogo, porUsuario, porPersona, porVacante))
+                .map(p -> filaBandeja(p, catalogo, candidatos, porVacante))
                 .toList();
     }
 
@@ -114,8 +111,7 @@ public class ServicioPostulacionesPanelImpl implements ServicioPostulacionesPane
     public FichaPostulacion ficha(ContextoUsuario quien, Long postulacionId) {
         Postulacion p = laVisible(quien, postulacionId, "abrir_ficha_candidato");
         Usuario usuario = usuarios.findById(p.getUsuarioId()).orElseThrow();
-        String candidato = personas.findById(usuario.getPersonaId())
-                .map(per -> nombreCompleto(per)).orElse("(anonimizado)");
+        String candidato = nombres.de(usuario.getId());
         String vacante = vacantes.findById(p.getVacanteId()).map(Vacante::getTitulo).orElse("");
         String nombreEstado = estados.findById(p.getEstadoCodigo())
                 .map(EstadoPostulacion::getNombre).orElse(p.getEstadoCodigo());
@@ -248,30 +244,18 @@ public class ServicioPostulacionesPanelImpl implements ServicioPostulacionesPane
     }
 
     private FilaBandeja filaBandeja(Postulacion p, Map<String, EstadoPostulacion> catalogo,
-                                    Map<Long, Usuario> porUsuario, Map<Long, Persona> porPersona,
-                                    Map<Long, Vacante> porVacante) {
+                                    Map<Long, String> candidatos, Map<Long, Vacante> porVacante) {
         EstadoPostulacion estado = catalogo.get(p.getEstadoCodigo());
-        // Un id que no está en el mapa tiene que dar «(anonimizado)», exactamente igual que
-        // antes lo daba un findById vacío: a quien ejerció su derecho al borrado se le sigue
-        // viendo la fila —la postulación existió y el embudo tiene que cuadrar— pero no el
-        // nombre. Que el mapa no lo traiga y que la base no lo tenga son el mismo caso.
-        String candidato = Optional.ofNullable(porUsuario.get(p.getUsuarioId()))
-                .map(Usuario::getPersonaId)
-                .map(porPersona::get)
-                .map(this::nombreCompleto)
-                .orElse("(anonimizado)");
+        // A quien ejerció su derecho al borrado se le sigue viendo la fila —la postulación
+        // existió y el embudo tiene que cuadrar— pero no el nombre. De eso se ocupa
+        // NombresDeUsuarios; el getOrDefault es solo por si la tanda cambió de tamaño.
+        String candidato = candidatos.getOrDefault(p.getUsuarioId(), NombresDeUsuarios.ANONIMO);
         String vacante = Optional.ofNullable(porVacante.get(p.getVacanteId()))
                 .map(Vacante::getTitulo).orElse("");
         return new FilaBandeja(p.getId(), p.getUuid().toString(), candidato, vacante,
                 p.getEstadoCodigo(), estado == null ? "" : estado.getNombre(),
                 estado == null ? "" : estado.getEsperaA(), p.getGrupoPrioridad(),
                 Duration.between(p.getMovidoEn(), Instant.now()).toDays());
-    }
-
-    private String nombreCompleto(Persona persona) {
-        if (persona.getAnonimizadoEn() != null) return "(anonimizado)";
-        return ((persona.getNombre() == null ? "" : persona.getNombre()) + " "
-                + (persona.getApellidos() == null ? "" : persona.getApellidos())).trim();
     }
 
     // El alcance SUS_VACANTES se comprueba contra el responsable de la vacante:

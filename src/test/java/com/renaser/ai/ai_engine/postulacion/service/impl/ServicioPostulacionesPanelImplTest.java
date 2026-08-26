@@ -12,8 +12,7 @@ import com.renaser.ai.ai_engine.postulacion.entity.Postulacion;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
 import com.renaser.ai.ai_engine.seguridad.dto.FiltroAlcance;
 import com.renaser.ai.ai_engine.seguridad.service.Permisos;
-import com.renaser.ai.ai_engine.usuario.entity.Persona;
-import com.renaser.ai.ai_engine.usuario.entity.Usuario;
+import com.renaser.ai.ai_engine.usuario.service.NombresDeUsuarios;
 import com.renaser.ai.ai_engine.vacante.entity.Vacante;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -71,7 +70,7 @@ class ServicioPostulacionesPanelImplTest {
     @Mock private com.renaser.ai.ai_engine.postulacion.repository.TransicionEstadoRepository transiciones;
     @Mock private com.renaser.ai.ai_engine.vacante.repository.VacanteRepository vacantes;
     @Mock private com.renaser.ai.ai_engine.usuario.repository.UsuarioRepository usuarios;
-    @Mock private com.renaser.ai.ai_engine.usuario.repository.PersonaRepository personas;
+    @Mock private NombresDeUsuarios nombres;
     @Mock private com.renaser.ai.ai_engine.postulacion.repository.CvRepository cvs;
     @Mock private com.renaser.ai.ai_engine.postulacion.repository.EnlaceCvRepository enlaces;
     @Mock private ArchivoRepository archivos;
@@ -168,7 +167,7 @@ class ServicioPostulacionesPanelImplTest {
     // ============ la bandeja ============
 
     @Test
-    @DisplayName("Las 236 filas se resuelven con cuatro consultas, no con tres por fila")
+    @DisplayName("Las 236 filas se resuelven en bloque, no con tres consultas por fila")
     void laBandejaSeResuelveEnBloque() {
         // 236 es el volumen de referencia del módulo. Fila por fila eran 709 consultas
         // encadenadas contra Supabase y la bandeja del grupo grande no llegaba a contestar.
@@ -177,13 +176,14 @@ class ServicioPostulacionesPanelImplTest {
         List<FilaBandeja> filas = servicio.bandeja(quien, "TALENTO");
 
         assertThat(filas).hasSize(236);
-        verify(usuarios, times(1)).findAllById(any());
-        verify(personas, times(1)).findAllById(any());
+        // Los nombres se piden una vez para la tanda entera: cuántos viajes cuesta eso por
+        // dentro es cosa de NombresDeUsuarios, y allí tiene su propia prueba.
+        verify(nombres, times(1)).porUsuario(any());
         verify(vacantes, times(1)).findAllById(any());
         // Lo que de verdad se está comprobando: que no queda ningún findById suelto dentro
         // del map. Si vuelve uno, el conteo de arriba sigue en 1 y solo esto lo delata.
+        verify(nombres, never()).de(any());
         verify(usuarios, never()).findById(any());
-        verify(personas, never()).findById(any());
         verify(vacantes, never()).findById(any());
     }
 
@@ -203,34 +203,33 @@ class ServicioPostulacionesPanelImplTest {
     }
 
     @Test
-    @DisplayName("Sin usuario, sin persona o con la persona borrada sale «(anonimizado)»")
+    @DisplayName("A quien no se puede nombrar se le sigue viendo la fila, sin nombre")
     void aQuienNoSePuedeNombrarSeLeSigueLlamandoAnonimizado() {
         // El caso importa porque el borrado de datos NO borra la postulación: vacía a la
         // persona. La fila tiene que seguir saliendo —si no, el embudo deja de cuadrar— pero
-        // sin nombre. Con mapas hay tres formas de no encontrarlo y las tres son este caso.
-        Postulacion sinUsuario = postulacion(1L, 900L, VACANTE);      // el usuario no existe
-        Postulacion sinPersona = postulacion(2L, 901L, VACANTE);      // existe, su persona no
-        Postulacion borrada = postulacion(3L, 902L, VACANTE);         // existe y está vaciada
-        Postulacion sinVacante = postulacion(4L, 903L, 777L);         // la vacante no existe
+        // sin nombre. Por qué un id acaba sin nombre lo decide NombresDeUsuarios y allí se
+        // prueban las tres formas; lo que se comprueba aquí es que la fila no se cae.
+        Postulacion anonima = postulacion(1L, 900L, VACANTE);
+        Postulacion conNombre = postulacion(2L, 903L, VACANTE);
+        Postulacion sinVacante = postulacion(3L, 904L, 777L);
 
         when(postulaciones.bandeja(ORGANIZACION, "TALENTO", null))
-                .thenReturn(List.of(sinUsuario, sinPersona, borrada, sinVacante));
+                .thenReturn(List.of(anonima, conNombre, sinVacante));
         when(estados.findAll()).thenReturn(List.of(estadoTalento()));
-        when(usuarios.findAllById(any())).thenReturn(List.of(
-                usuario(901L, 501L), usuario(902L, 502L), usuario(903L, 503L)));
-        when(personas.findAllById(any())).thenReturn(List.of(
-                Persona.builder().id(502L).anonimizadoEn(Instant.now()).build(),
-                Persona.builder().id(503L).nombre("Lucía").apellidos("Ortega").build()));
+        when(nombres.porUsuario(any())).thenReturn(Map.of(
+                900L, NombresDeUsuarios.ANONIMO,
+                903L, "Lucía Ortega",
+                904L, "Mario Sosa"));
         when(vacantes.findAllById(any())).thenReturn(List.of(vacante()));
 
         List<FilaBandeja> filas = servicio.bandeja(quien, "TALENTO");
 
         assertThat(filas).extracting(FilaBandeja::candidato).containsExactly(
-                "(anonimizado)", "(anonimizado)", "(anonimizado)", "Lucía Ortega");
+                "(anonimizado)", "Lucía Ortega", "Mario Sosa");
         // Una vacante que ya no está deja el título vacío, no «(anonimizado)»: son dos cosas
         // distintas y el panel las pinta distinto.
         assertThat(filas).extracting(FilaBandeja::vacante)
-                .containsExactly("Vacante de prueba", "Vacante de prueba", "Vacante de prueba", "");
+                .containsExactly("Vacante de prueba", "Vacante de prueba", "");
     }
 
     @Test
@@ -244,9 +243,7 @@ class ServicioPostulacionesPanelImplTest {
 
         when(postulaciones.bandeja(ORGANIZACION, "TALENTO", null)).thenReturn(List.of(p));
         when(estados.findAll()).thenReturn(List.of(estadoTalento()));
-        when(usuarios.findAllById(any())).thenReturn(List.of(usuario(901L, 501L)));
-        when(personas.findAllById(any())).thenReturn(List.of(
-                Persona.builder().id(501L).nombre("Ana").apellidos("Ruiz").build()));
+        when(nombres.porUsuario(any())).thenReturn(Map.of(901L, "Ana Ruiz"));
         when(vacantes.findAllById(any())).thenReturn(List.of(vacante()));
 
         FilaBandeja fila = servicio.bandeja(quien, "TALENTO").get(0);
@@ -267,9 +264,57 @@ class ServicioPostulacionesPanelImplTest {
     void unaBandejaVaciaNoPreguntaPorNadie() {
         when(postulaciones.bandeja(ORGANIZACION, "TALENTO", null)).thenReturn(List.of());
         when(estados.findAll()).thenReturn(List.of(estadoTalento()));
+        when(nombres.porUsuario(any())).thenReturn(Map.of());
 
         assertThat(servicio.bandeja(quien, "TALENTO")).isEmpty();
         verify(usuarios, never()).findById(any());
+    }
+
+    @Test
+    @DisplayName("La ficha trae el nombre resuelto y el correo, que vienen de sitios distintos")
+    void laFichaTraeNombreYCorreo() {
+        // La ficha es el otro sitio que enseña un nombre, y no tenía prueba. Importa que se
+        // separen las dos fuentes: el correo es del usuario, y el nombre pasa por la regla de
+        // anonimización. Antes se pedía la persona a mano y un personaId nulo reventaba con
+        // un error de acceso a datos —un 500 por un candidato sin persona—; ahora no.
+        Postulacion p = postulacion(1L, 901L, VACANTE);
+        when(postulaciones.findByIdAndOrganizacionId(1L, ORGANIZACION)).thenReturn(Optional.of(p));
+        when(permisos.alcanceDe("abrir_ficha_candidato"))
+                .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.TODO, 10L));
+        when(usuarios.findById(901L)).thenReturn(Optional.of(
+                com.renaser.ai.ai_engine.usuario.entity.Usuario.builder()
+                        .id(901L).organizacionId(ORGANIZACION)
+                        .correo("ana@correo.pe").build()));
+        when(nombres.de(901L)).thenReturn("Ana Ruiz");
+        when(vacantes.findById(VACANTE)).thenReturn(Optional.of(vacante()));
+        when(estados.findById("EVALUACION_POR_REVISAR")).thenReturn(Optional.of(estadoTalento()));
+        when(cvs.findByPostulacionId(1L)).thenReturn(Optional.empty());
+
+        var ficha = servicio.ficha(quien, 1L);
+
+        assertThat(ficha.candidato()).isEqualTo("Ana Ruiz");
+        assertThat(ficha.correo()).isEqualTo("ana@correo.pe");
+        assertThat(ficha.vacante()).isEqualTo("Vacante de prueba");
+        // Sin currículum la ficha no se cae: sale con los enlaces vacíos y sin archivo.
+        assertThat(ficha.enlaces()).isEmpty();
+        assertThat(ficha.archivoCvId()).isNull();
+    }
+
+    @Test
+    @DisplayName("La ficha de una postulación que no es suya responde 404, no 403")
+    void laFichaAjenaNoSeAbre() {
+        Postulacion ajena = postulacion(1L, 901L, VACANTE);
+        when(postulaciones.findByIdAndOrganizacionId(1L, ORGANIZACION)).thenReturn(Optional.of(ajena));
+        when(permisos.alcanceDe("abrir_ficha_candidato"))
+                .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.SUS_VACANTES, 10L));
+        when(vacantes.findById(VACANTE)).thenReturn(Optional.of(vacante()));  // sin responsable
+
+        assertThatThrownBy(() -> servicio.ficha(quien, 1L))
+                .as("un 403 confirmaría que esa postulación existe")
+                .isInstanceOf(ResourceNotFoundException.class);
+
+        // Y no se llega a pedir el nombre de alguien que este usuario no puede ver.
+        verify(nombres, never()).de(any());
     }
 
     @Test
@@ -285,18 +330,14 @@ class ServicioPostulacionesPanelImplTest {
     /** Una tanda de {@code cuantas} postulaciones, todas resolubles, sobre la misma vacante. */
     private void bandejaDe(int cuantas) {
         List<Postulacion> tanda = new ArrayList<>();
-        List<Usuario> gente = new ArrayList<>();
-        List<Persona> personasDe = new ArrayList<>();
+        Map<Long, String> comoSeLlaman = new java.util.HashMap<>();
         for (long i = 1; i <= cuantas; i++) {
             tanda.add(postulacion(i, 900L + i, VACANTE));
-            gente.add(usuario(900L + i, 500L + i));
-            personasDe.add(Persona.builder().id(500L + i)
-                    .nombre("Candidata").apellidos("Número " + i).build());
+            comoSeLlaman.put(900L + i, "Candidata Número " + i);
         }
         when(postulaciones.bandeja(ORGANIZACION, "TALENTO", null)).thenReturn(tanda);
         when(estados.findAll()).thenReturn(List.of(estadoTalento()));
-        when(usuarios.findAllById(any())).thenReturn(gente);
-        when(personas.findAllById(any())).thenReturn(personasDe);
+        when(nombres.porUsuario(any())).thenReturn(comoSeLlaman);
         when(vacantes.findAllById(any())).thenReturn(List.of(vacante()));
     }
 
@@ -305,11 +346,6 @@ class ServicioPostulacionesPanelImplTest {
                 .organizacionId(ORGANIZACION).usuarioId(usuarioId).vacanteId(vacanteId)
                 .estadoCodigo("EVALUACION_POR_REVISAR").grupoPrioridad("MEDIA")
                 .movidoEn(Instant.now()).build();
-    }
-
-    private static Usuario usuario(long id, long personaId) {
-        return Usuario.builder().id(id).organizacionId(ORGANIZACION).personaId(personaId)
-                .correo("candidata" + id + "@ejemplo.com").build();
     }
 
     private static Vacante vacante() {

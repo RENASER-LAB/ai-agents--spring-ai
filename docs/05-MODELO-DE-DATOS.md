@@ -23,7 +23,7 @@ Sirve para tres cosas:
 - **Entender el sistema.** Un modelo de datos bien contado explica el negocio mejor que
   cualquier otro documento.
 
-**La base ya está construida.** Las migraciones `V1` a `V36` viven en
+**La base ya está construida.** Las migraciones `V1` a `V37` viven en
 `src/main/resources/db/migration` —**100 tablas de este módulo**, 103 en la base contando la de
 Flyway y las dos del motor de agentes— y Flyway es el dueño del esquema. Cambiar algo de aquí
 ya cuesta una migración nueva, y **una migración aplicada no se edita nunca**: se escribe otra
@@ -36,6 +36,13 @@ La `V36` trae **el perfil del candidato**: seis tablas que cuelgan de `persona` 
 la columna `archivo.contenido_hash` (la huella que evita pagar dos lecturas del mismo
 currículum) y los permisos `ver_perfil_candidato` y `ver_pretension`. Ver
 [PROPUESTA-PERFIL-DEL-CANDIDATO.md](PROPUESTA-PERFIL-DEL-CANDIDATO.md).
+
+La `V37` **no añade ninguna tabla**, y eso es lo interesante: lo que hacía falta —saber quién
+eligió cada fecha de una sesión— ya estaba en `inscripcion_sesion`, solo que no salía por
+ningún endpoint. Lo único que trae son dos permisos, `ver_inscritos_simulacion` y
+`administrar_permisos`, con su reparto inicial en `rol_permiso`. Y ese reparto **es un punto de
+partida, no una decisión grabada en el código**: desde este mismo hito se edita por la API, y
+`FiltroIdentidad` lo relee en cada petición. Ver [Roles y permisos](04-ROLES-Y-PERMISOS.md).
 
 Cuatro son del banco de preguntas v3: `V20` reemplaza el banco entero y añade cinco
 tablas (`rango_pregunta`, `campo_caso`, `multiplicador_bloque`, `umbral_nivel` y
@@ -380,7 +387,7 @@ código. El Administrador puede crear roles nuevos y repartir permisos sin que n
 | `usuario` | Cómo entra al sistema | organizacion_id, persona_id, correo, contrasena_hash, usuario_renaser_os_id, area_id, es_activo |
 | `area` | El departamento que contrata. Hace falta para saber qué ve un responsable y para impedir que alguien sea Evaluador de Estándar de su propia área | organizacion_id, nombre |
 | `rol` | Un nombre y una lista de permisos | organizacion_id, codigo, nombre, descripcion |
-| `permiso` | Una acción suelta que se puede conceder o no. Son 73 | codigo, etiqueta, grupo |
+| `permiso` | Una acción suelta que se puede conceder o no. Son 75 diseñados, 69 sembrados | codigo, etiqueta, grupo |
 | `usuario_rol` | Una persona puede tener varios roles. Puede hacer lo que le permita cualquiera de ellos | usuario_id, rol_id |
 | `rol_permiso` | Qué permisos tiene un rol y **con qué alcance** | rol_id, permiso_id, alcance |
 
@@ -941,7 +948,7 @@ Datos que se cargan con la primera migración, no a mano:
 
 - La **organización** Renaser
 - Los **18 estados** de la postulación, con su etapa y su momento
-- Los **73 permisos**, con su etiqueta y su grupo
+- Los **69 permisos** del catálogo, con su etiqueta y su grupo
 - Los **cinco roles** iniciales con sus permisos: candidato, equipo de talento, responsable del
   área, dirección y administrador. Es como arranca el sistema, no cómo queda para siempre
 - Las **22 dimensiones**, con cuáles de ellas son obligatorias

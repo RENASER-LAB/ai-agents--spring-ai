@@ -68,9 +68,9 @@ Perfil Integral → prueba del puesto → simulacion → validacion → decision
 
 | | |
 |---|---|
-| Base de datos | **Flyway es el dueno del esquema**: V1-V36 en `src/main/resources/db/migration`, **100 tablas de este modulo** (103 en la base contando `flyway_schema_history` y las dos del motor de agentes, `agent_run` y `vector_store`). `ddl-auto: validate` |
+| Base de datos | **Flyway es el dueno del esquema**: V1-V37 en `src/main/resources/db/migration`, **100 tablas de este modulo** (103 en la base contando `flyway_schema_history` y las dos del motor de agentes, `agent_run` y `vector_store`). `ddl-auto: validate` |
 | Codigo | Veintiun paquetes de dominio bajo `ai_engine` (ver «Como esta organizado el codigo») |
-| Tests | **645, todos en verde (25/08/2026)**: 560 unitarios y 85 de integracion (6 saltados, los que gastan saldo o mandan correo de verdad). Ver «Correr los tests»: unitarios de la maquina y del anonimizador, migraciones contra Postgres real (Testcontainers) y flujos de punta a punta: hito 1, evaluacion, prueba, simulacion/validacion, calificacion con IA y la vacante sin banco |
+| Tests | **667, todos en verde (26/08/2026)**: 581 unitarios y 86 de integracion (6 saltados, los que gastan saldo o mandan correo de verdad). Ver «Correr los tests»: unitarios de la maquina y del anonimizador, migraciones contra Postgres real (Testcontainers) y flujos de punta a punta: hito 1, evaluacion, prueba, simulacion/validacion, calificacion con IA y la vacante sin banco |
 | IA que califica | **Seis de los diez agentes del catalogo estan implementados**: datos del curriculum, evidencia, evaluador, potencial/riesgo, prueba del puesto y las preguntas de la conversacion final. Todos corren por cola de RabbitMQ contra DeepSeek. Ver [Calificacion con IA](docs/CALIFICACION-CON-IA.md) |
 | Correo | **Ya sabe salir de verdad** (`EnviadorCorreoSmtp`), pero **por defecto no sale**: `renaser.correo.transporte` vale `log` salvo que se ponga `smtp`, y entonces solo se registra en `correo_enviado`. Para encenderlo hacen falta `CORREO_TRANSPORTE=smtp`, `CORREO_REMITENTE` y una cuenta que autentique. El RNF-65 pide que salga **desde el dominio propio de Renaser**: confirmar con ellos si ya lo tienen antes de encenderlo |
 | Acceso del candidato | Entra al portal **con un enlace, sin contrasena** (`EnlaceAcceso`, `ServicioEnlaceAcceso`). El enlace se le manda por correo, asi que depende de lo de arriba |
@@ -300,12 +300,12 @@ Las dos consultan el mismo backend, asi que ensenan el mismo orden.
 - Nada se recalcula hacia atras: cada nota queda atada a la version de pesos de su vacante.
 
 ### Correr los tests
-**560 unitarios en verde (25/08/2026).** Son dos tandas y el comando decide cual corre:
+**581 unitarios en verde (26/08/2026).** Son dos tandas y el comando decide cual corre:
 
 | Comando | Que corre | Cuantos | Necesita |
 |---|---|---:|---|
-| `./mvnw test` | unitarias con dobles y las de arquitectura | 560 | nada |
-| `./mvnw verify` | lo anterior mas las de integracion | 645 | Docker |
+| `./mvnw test` | unitarias con dobles y las de arquitectura | 581 | nada |
+| `./mvnw verify` | lo anterior mas las de integracion | 667 | Docker |
 
 Las de integracion levantan su propio PostgreSQL y su propio RabbitMQ con Testcontainers: hace
 falta el demonio de Docker encendido. El desglose completo esta en
@@ -435,7 +435,7 @@ fusiona.** El detalle esta en [docs/CI-CD.md](docs/CI-CD.md); aqui lo que hay qu
 
 | Cuando | Que corre |
 |---|---|
-| En cada PR y en cada push a `main` | `./mvnw verify` (las 645 pruebas), Semgrep, Gitleaks y la cobertura del codigo nuevo en SonarCloud |
+| En cada PR y en cada push a `main` | `./mvnw verify` (las 667 pruebas), Semgrep, Gitleaks y la cobertura del codigo nuevo en SonarCloud |
 | Al fusionar a `main`, si todo quedo verde | Se construye la imagen con el `Dockerfile`, se sube a ECR y se le dice por SSM a la maquina de EC2 que se actualice. Un smoke test comprueba que responde desde internet |
 | De noche, sin bloquear a nadie | PIT (mutation testing) y fuzzing de la API con Schemathesis |
 
@@ -554,8 +554,11 @@ Todo vive en `docs/`. Empezar por [docs/README.md](docs/README.md).
   transiciones. Base del backend: ningun estado fuera de esa lista puede existir. Tienen forma
   de rejilla (cinco etapas por cuatro momentos), asi que el siguiente estado se calcula.
   **Ojo: la maquina de estados es propuesta nuestra, no viene de Renaser.**
-- [Roles y permisos](docs/04-ROLES-Y-PERMISOS.md) — los **73** permisos, accion por accion.
-  Un rol es un conjunto de permisos guardado en base de datos, no algo fijo en codigo.
+- [Roles y permisos](docs/04-ROLES-Y-PERMISOS.md) — los **75** permisos, accion por accion.
+  Un rol es un conjunto de permisos guardado en base de datos, no algo fijo en codigo. En la
+  base hay **69** sembrados; el resto solo esta disenado. Desde la V37 el reparto se edita por
+  la API con `administrar_permisos`, y `FiltroIdentidad` lo relee en cada peticion, asi que un
+  cambio vale sin desplegar y sin volver a entrar.
 - [Modelo de datos](docs/05-MODELO-DE-DATOS.md) — las **93** tablas por area, que impide la base
   y que tiene que vivir en el codigo. Se lee para entender el modelo.
 - [Diccionario de datos](docs/07-DICCIONARIO-DE-DATOS.md) — cada tabla con todas sus columnas,
@@ -572,7 +575,7 @@ Todo vive en `docs/`. Empezar por [docs/README.md](docs/README.md).
   ultimas etapas y sus tres reglas automaticas de disponibilidad.
 - [CI/CD](docs/CI-CD.md) — que se comprueba solo en cada cambio, como se despliega a AWS y que
   variables de entorno pide el servidor. **Leerlo antes de tocar `.github/workflows/`.**
-- [Comprobaciones automaticas](docs/COMPROBACIONES-AUTOMATICAS.md) — las 645 pruebas y las ocho
+- [Comprobaciones automaticas](docs/COMPROBACIONES-AUTOMATICAS.md) — las 667 pruebas y las ocho
   reglas de arquitectura, una por una. Que se mira solo y que no.
 - `docs/diagramas/` — HTML autocontenidos, se abren en el navegador.
 - `docs/mockups/` — prototipos de pantalla. **Los mantiene otra persona, no editarlos.**

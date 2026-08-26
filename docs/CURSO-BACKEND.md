@@ -17,8 +17,9 @@ Este censo estaba antes atado a `feat/talentov3`, commit `c7c095a`. **Ese commit
 de `main`**: la historia se rehizo y quien clone hoy no lo tiene, así que el ancla no servía
 para comprobar nada. Por eso ahora apunta a `main`.
 
-⚠️ Los documentos de `docs/` describen el sistema completo (93 tablas, 73 permisos). El código
-va por detrás y por otro camino en algunos puntos. **Cuando se contradigan, manda el código.**
+⚠️ Los documentos de `docs/` describen el sistema completo (93 tablas, 75 permisos). El código
+va por detrás y por otro camino en algunos puntos —de esos 75 permisos hay 69 sembrados en la
+base—. **Cuando se contradigan, manda el código.**
 
 **La excepción es el [diccionario de datos](07-DICCIONARIO-DE-DATOS.md)**, que desde el
 25/08/2026 sigue al código: están **las 100 tablas de selección que existen de verdad** y las
@@ -357,8 +358,10 @@ El único punto donde selección y motor se tocan de verdad es
 
 ## Etapa 19 · El perfil del candidato
 
-Migración V36, lo más reciente (25/08/2026). Es de selección, no del motor: se lee después de
-la 18 porque llegó después, no porque dependa de ella.
+Migración V36 (25/08/2026). Es de selección, no del motor: se lee después de la 18 porque
+llegó después, no porque dependa de ella. Ya no es la última: la `V37` trajo después los
+inscritos de una sesión y los permisos editables, y esa no tiene etapa propia porque no añade
+ninguna tabla.
 
 Hasta aquí, todo lo que sabías de una persona vivía **dentro de su postulación**: volvía a
 postular y volvía a escribirlo todo. El perfil cuelga de `persona`, así que **le sobrevive a

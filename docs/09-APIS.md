@@ -1,7 +1,7 @@
 # Las APIs del sistema
 
 Sistema de selección de personal — Renaser Consulting
-Versión 1.5 · 2026-08-25 · Cubre **las cinco etapas del embudo**: postulación, Perfil Integral,
+Versión 1.6 · 2026-08-26 · Cubre **las cinco etapas del embudo**: postulación, Perfil Integral,
 prueba del puesto, simulación de trabajo, validación práctica y decisión final
 
 Este documento explica las APIs para quien las va a consumir: el frontend de RENASER OS y el
@@ -176,6 +176,7 @@ lo interno viaja, y una prueba ajena responde 404.
 | Método y ruta | Qué hace | Permiso |
 |---|---|---|
 | GET/POST `/sesiones-simulacion` | Las sesiones con fecha y cupo. Publicar una mueve a quien estaba esperando | `crear_sesiones_simulacion` |
+| GET `/sesiones-simulacion/{id}/inscritos` | **Quién eligió esta fecha**: nombre, vacante y la `inscripcionId` que piden las marcas y la asistencia. Recortado por el alcance del rol | `ver_inscritos_simulacion` |
 | POST `/sesiones-simulacion/{id}/cupo` · `/cancelacion` | Ampliar o cancelar. Al cancelar se avisa a los inscritos | `crear_sesiones_simulacion` |
 | POST `/sesiones-simulacion/{id}/responsables` | Quién conduce la sesión | `crear_sesiones_simulacion` |
 | GET/POST `/sesiones-simulacion/{id}/informacion-critica` | Qué debería preguntar un candidato fuerte | `definir_informacion_critica` |
@@ -272,6 +273,21 @@ el banco v4 que venga no necesitará una migración. El ciclo es
 | GET `/auditoria` | El registro, paginado. No se puede modificar ni borrar | `ver_auditoria` |
 | GET `/solicitudes-borrado` · POST `/{id}/ejecucion` | Ver y ejecutar los borrados: la persona queda vacía, la trazabilidad queda | `ejecutar_borrado_datos` |
 | GET/POST `/usuarios` · POST `/{id}/roles` · GET `/roles` | El equipo y sus roles. El último administrador no se puede quitar | `crear_usuarios_y_asignar_roles` |
+| GET `/roles/{id}/permisos` | La matriz de un rol: el catálogo entero, con el alcance de lo concedido y vacío en lo que no | `administrar_permisos` |
+| PUT `/roles/{id}/permisos/{codigo}` · POST `…/revocacion` | Conceder con alcance, o quitar. **Motivo obligatorio** | `administrar_permisos` |
+
+**Qué puede cada rol se edita aquí, no en el código.** El `FiltroIdentidad` relee
+`rol_permiso` en cada petición, así que un cambio surte efecto en la siguiente llamada de
+cada afectado: sin desplegar y sin que nadie tenga que volver a entrar. Por eso mismo
+**`ServicioContexto` no lleva caché**, y ponérsela rompería justo esto.
+
+⚠️ `administrar_permisos` va aparte de `crear_usuarios_y_asignar_roles` a propósito: dar un
+rol a alguien es una cosa, redefinir lo que ese rol significa es otra bastante mayor —quien
+escribe en `rol_permiso` puede concederse todo—. Y **el último rol de la organización que
+conserva `administrar_permisos` no se puede quedar sin él**: revocarlo dejaría el reparto sin
+nadie que pudiera volver a tocarlo, y de ahí solo se sale entrando a la base a mano. El
+candado cuenta por organización y no en total, para que dos organizaciones no se tapen la una
+a la otra.
 
 ### El perfil del candidato
 

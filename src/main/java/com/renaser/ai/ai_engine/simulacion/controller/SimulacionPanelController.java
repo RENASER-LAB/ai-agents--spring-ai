@@ -50,6 +50,14 @@ public class SimulacionPanelController {
         return servicio.verSesion(permisos.actual(), id);
     }
 
+    @GetMapping("/sesiones-simulacion/{id}/inscritos")
+    @PreAuthorize("@permisos.tiene('ver_inscritos_simulacion')")
+    @Operation(summary = "Quién eligió esta fecha. Trae la inscripcion_id que piden marcas y "
+            + "asistencia. Cuánto se ve depende del alcance del rol, que se edita en el panel")
+    public List<InscritoEnSesion> inscritos(@PathVariable Long id) {
+        return servicio.listarInscritos(permisos.actual(), id);
+    }
+
     @PostMapping("/sesiones-simulacion/{id}/cupo")
     @PreAuthorize("@permisos.tiene('crear_sesiones_simulacion')")
     @Operation(summary = "Ampliar el cupo. Si estaba llena, vuelve a ofrecerse")

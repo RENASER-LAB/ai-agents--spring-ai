@@ -19,6 +19,8 @@ import com.renaser.ai.ai_engine.usuario.entity.Rol;
 import com.renaser.ai.ai_engine.usuario.entity.UsuarioRol;
 import com.renaser.ai.ai_engine.usuario.repository.RolRepository;
 import com.renaser.ai.ai_engine.usuario.repository.UsuarioRolRepository;
+import com.renaser.ai.ai_engine.usuario.service.NombresDeUsuarios;
+import com.renaser.ai.ai_engine.vacante.entity.Vacante;
 import com.renaser.ai.ai_engine.vacante.repository.VacanteRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -27,10 +29,14 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -61,6 +67,7 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
     private final PreguntaGeneradaRepository preguntas;
     private final PostulacionRepository postulaciones;
     private final VacanteRepository vacantes;
+    private final NombresDeUsuarios nombres;
     private final ColaCalificacionIa cola;
     private final RolRepository roles;
     private final UsuarioRolRepository usuarioRoles;
@@ -168,6 +175,79 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
     @Override
     public SesionPanel verSesion(ContextoUsuario quien, Long sesionId) {
         return comoPanel(laSesion(quien, sesionId));
+    }
+
+    @Override
+    public List<InscritoEnSesion> listarInscritos(ContextoUsuario quien, Long sesionId) {
+        SesionSimulacion sesion = laSesion(quien, sesionId);
+        FiltroAlcance alcance = permisos.alcanceDe("ver_inscritos_simulacion");
+
+        List<InscripcionSesion> vigentes =
+                inscripciones.findBySesionSimulacionIdAndEsVigenteTrue(sesion.getId());
+        if (vigentes.isEmpty()) {
+            return List.of();
+        }
+
+        // Las postulaciones primero: hacen falta para el alcance —de qué vacante es cada
+        // una— antes de saber qué filas sobreviven, y pedir los nombres de las que se van a
+        // descartar sería traer datos de personas que este usuario no puede ver.
+        Map<Long, Postulacion> porPostulacion = postulaciones.findAllById(
+                        vigentes.stream().map(InscripcionSesion::getPostulacionId)
+                                .filter(Objects::nonNull).collect(Collectors.toSet()))
+                .stream().collect(Collectors.toMap(Postulacion::getId, Function.identity()));
+        Map<Long, Vacante> porVacante = vacantes.findAllById(
+                        porPostulacion.values().stream().map(Postulacion::getVacanteId)
+                                .filter(Objects::nonNull).collect(Collectors.toSet()))
+                .stream().collect(Collectors.toMap(Vacante::getId, Function.identity()));
+
+        List<InscripcionSesion> visibles = vigentes.stream()
+                .filter(i -> alcanzaA(quien, alcance, porPostulacion.get(i.getPostulacionId()),
+                        porVacante))
+                .sorted(Comparator.comparing(InscripcionSesion::getInscritaEn,
+                        Comparator.nullsLast(Comparator.naturalOrder())))
+                .toList();
+        if (visibles.isEmpty()) {
+            return List.of();
+        }
+
+        Map<Long, String> candidatos = nombres.porUsuario(visibles.stream()
+                .map(i -> porPostulacion.get(i.getPostulacionId()))
+                .filter(Objects::nonNull)
+                .map(Postulacion::getUsuarioId)
+                .toList());
+
+        return visibles.stream().map(i -> {
+            Postulacion p = porPostulacion.get(i.getPostulacionId());
+            Vacante v = p == null ? null : porVacante.get(p.getVacanteId());
+            return new InscritoEnSesion(
+                    i.getId(), i.getPostulacionId(),
+                    p == null ? NombresDeUsuarios.ANONIMO
+                            : candidatos.getOrDefault(p.getUsuarioId(), NombresDeUsuarios.ANONIMO),
+                    v == null ? "" : v.getTitulo(),
+                    i.getInscritaEn(), i.getAsistio());
+        }).toList();
+    }
+
+    /**
+     * Si este usuario puede ver esta inscripción, según el alcance que su rol tenga hoy.
+     *
+     * <p>Los tres casos del enum están cubiertos a propósito, y no solo el que hoy se
+     * siembra. El reparto de {@code rol_permiso} se edita desde el panel: si mañana alguien
+     * pone {@code PROPIO} en este permiso, el que falte un caso aquí no daría un error — daría
+     * la lista entera, que es exactamente lo contrario de lo que esa configuración pide.
+     */
+    private boolean alcanzaA(ContextoUsuario quien, FiltroAlcance alcance, Postulacion p,
+                             Map<Long, Vacante> porVacante) {
+        if (p == null) {
+            return false;
+        }
+        return switch (alcance.tipo()) {
+            case TODO -> true;
+            case SUS_VACANTES -> Optional.ofNullable(porVacante.get(p.getVacanteId()))
+                    .map(v -> quien.usuarioId().equals(v.getResponsableUsuarioId()))
+                    .orElse(false);
+            case PROPIO -> quien.usuarioId().equals(p.getUsuarioId());
+        };
     }
 
     @Override

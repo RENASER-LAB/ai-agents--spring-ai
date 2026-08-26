@@ -47,19 +47,19 @@ demás de la calificación se prueba con un doble del modelo y no gasta nada.
 
 ---
 
-## 645 pruebas
+## 667 pruebas
 
-Contadas de correrlas el 25/08/2026, no de recordarlas: el desglose sale de los
+Contadas de correrlas el 26/08/2026, no de recordarlas: el desglose sale de los
 informes de surefire y failsafe, y suma exacto.
 
 | Qué | Cuántas | Necesita |
 |---|---:|---|
-| Unitarias, con dobles | 445 | nada |
+| Unitarias, con dobles | 466 | nada |
 | Arquitectura | 8 | nada |
 | Las fórmulas del banco v3 | 22 | nada |
 | El validador de las respuestas v3 | 21 | nada |
 | El perfil del candidato (merge, lectura, CRUD, estados, retención, borrado) | 64 | nada |
-| Integración, de punta a punta | 79 | Docker |
+| Integración, de punta a punta | 80 | Docker |
 | Contra el proveedor de verdad, y el envío de correo | 6 | Docker o SMTP, y su bandera |
 
 ⚠️ Al recontar, **no sirve el atributo `tests=`** de los XML de surefire: con clases anidadas

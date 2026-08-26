@@ -34,10 +34,14 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class ServicioAdministracionImpl implements ServicioAdministracion {
+
+    /** El permiso que abre la puerta de los permisos: el único que no puede quedarse sin nadie. */
+    private static final String ADMINISTRAR_PERMISOS = "administrar_permisos";
 
     private final ParametroRepository parametros;
     private final PlantillaCorreoRepository plantillas;
@@ -49,6 +53,8 @@ public class ServicioAdministracionImpl implements ServicioAdministracion {
     private final AreaRepository areas;
     private final RolRepository roles;
     private final UsuarioRolRepository usuarioRoles;
+    private final PermisoRepository permisos;
+    private final RolPermisoRepository rolPermisos;
     private final ConsentimientoRepository consentimientos;
     private final PostulacionRepository postulaciones;
     private final EstadoPostulacionRepository estados;
@@ -314,6 +320,98 @@ public class ServicioAdministracionImpl implements ServicioAdministracion {
         return roles.findByOrganizacionIdOrderByCodigo(quien.organizacionId()).stream()
                 .map(r -> new RolPanel(r.getId(), r.getCodigo(), r.getNombre(), r.isEsSistema()))
                 .toList();
+    }
+
+    // ============ Qué puede cada rol ============
+
+    @Override
+    public List<PermisoDelRol> permisosDelRol(ContextoUsuario quien, Long rolId) {
+        Rol rol = elRolDeSuOrganizacion(quien, rolId);
+        Map<Long, String> concedidos = rolPermisos.findByRolId(rol.getId()).stream()
+                .collect(Collectors.toMap(RolPermiso::getPermisoId, RolPermiso::getAlcance));
+
+        return permisos.findAllByOrderByGrupoAscOrdenAsc().stream()
+                .map(p -> new PermisoDelRol(p.getCodigo(), p.getEtiqueta(), p.getGrupo(),
+                        p.getOrden(), concedidos.get(p.getId())))
+                .toList();
+    }
+
+    @Override
+    @Transactional
+    public void concederPermiso(ContextoUsuario quien, Long rolId, String codigoPermiso,
+                                ConcederPermiso datos) {
+        Rol rol = elRolDeSuOrganizacion(quien, rolId);
+        Permiso permiso = elPermiso(codigoPermiso);
+
+        RolPermiso.Clave clave = new RolPermiso.Clave(rol.getId(), permiso.getId());
+        RolPermiso existente = rolPermisos.findById(clave).orElse(null);
+        String anterior = existente == null ? null : existente.getAlcance();
+        if (datos.alcance().equals(anterior)) {
+            return;
+        }
+
+        rolPermisos.save(RolPermiso.builder()
+                .rolId(rol.getId())
+                .permisoId(permiso.getId())
+                .alcance(datos.alcance())
+                // Cambiar el alcance no vuelve a conceder el permiso: si ya estaba, la fecha
+                // de cuando se concedió se queda como estaba. Cuándo cambió lo dice la
+                // auditoría, que es donde vive la historia.
+                .creadoEn(existente == null ? Instant.now() : existente.getCreadoEn())
+                .build());
+
+        auditoria.registrar(quien.organizacionId(), quien, "conceder_permiso",
+                "rol", rol.getId(),
+                anterior == null ? null : Map.of("permiso", codigoPermiso, "alcance", anterior),
+                Map.of("permiso", codigoPermiso, "alcance", datos.alcance()), datos.motivo());
+    }
+
+    @Override
+    @Transactional
+    public void revocarPermiso(ContextoUsuario quien, Long rolId, String codigoPermiso,
+                               String motivo) {
+        Rol rol = elRolDeSuOrganizacion(quien, rolId);
+        Permiso permiso = elPermiso(codigoPermiso);
+
+        RolPermiso.Clave clave = new RolPermiso.Clave(rol.getId(), permiso.getId());
+        RolPermiso actual = rolPermisos.findById(clave).orElse(null);
+        if (actual == null) {
+            return;
+        }
+
+        // La misma regla del último administrador, aplicada al permiso que administra los
+        // permisos: si este es el último rol que lo tiene, quitarlo deja el reparto sin nadie
+        // que pueda volver a tocarlo y de ahí solo se sale entrando a la base a mano.
+        if (ADMINISTRAR_PERMISOS.equals(codigoPermiso)
+                && rolPermisos.contarEnOrganizacion(permiso.getId(), quien.organizacionId()) <= 1) {
+            throw new IllegalStateException("No se puede revocar el último «"
+                    + ADMINISTRAR_PERMISOS + "»: nadie podría volver a cambiar los permisos");
+        }
+
+        rolPermisos.delete(actual);
+
+        auditoria.registrar(quien.organizacionId(), quien, "revocar_permiso",
+                "rol", rol.getId(),
+                Map.of("permiso", codigoPermiso, "alcance", actual.getAlcance()),
+                null, motivo);
+    }
+
+    private Rol elRolDeSuOrganizacion(ContextoUsuario quien, Long rolId) {
+        return roles.findById(rolId)
+                .filter(r -> r.getOrganizacionId().equals(quien.organizacionId()))
+                .orElseThrow(() -> new ResourceNotFoundException("Rol", "id", rolId));
+    }
+
+    /**
+     * El permiso del catálogo, que es global y solo crece con una migración.
+     *
+     * <p>Un código que no existe se rechaza aquí y no en la base: la clave ajena daría un
+     * 500 con el nombre de una restricción dentro, y lo que ha pasado es que alguien pidió
+     * un permiso que no está.
+     */
+    private Permiso elPermiso(String codigo) {
+        return permisos.findByCodigo(codigo)
+                .orElseThrow(() -> new ResourceNotFoundException("Permiso", "código", codigo));
     }
 
     @Override

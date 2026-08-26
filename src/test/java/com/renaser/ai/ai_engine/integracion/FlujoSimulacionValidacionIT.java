@@ -92,6 +92,8 @@ public class FlujoSimulacionValidacionIT {
     static String codigoB;
     static long sesionId;
     static long inscripcionA;
+    // La sesión del @Order(7), que se queda con B dentro: la reaprovecha el @Order(11)
+    static long sesionConInscrito;
 
     @DisplayName("Dos candidatos llegan a esperar una sesión")
     @Test
@@ -261,7 +263,7 @@ public class FlujoSimulacionValidacionIT {
     @Test
     @Order(7)
     void quienNoTieneUnRolDeFacilitadorNoPuedeMarcar() throws Exception {
-        long sesion = crearSesion(2);
+        long sesion = sesionConInscrito = crearSesion(2);
         long inscripcion = Long.parseLong(leer(mvc.perform(
                         post("/api/v1/portal/simulacion/" + codigoB + "/sesiones/" + sesion)
                                 .header("Authorization", "Bearer " + tokenB))
@@ -404,6 +406,73 @@ public class FlujoSimulacionValidacionIT {
                         .andReturn().getResponse().getContentAsString());
         assertThat(semaforo.get("etapasQueFaltan").toString())
                 .contains("PERFIL_INTEGRAL").contains("PRUEBA_PUESTO");
+    }
+
+    /**
+     * Quién eligió cada fecha, y quién puede verlo.
+     *
+     * <p>Lo que se recorre aquí no es la lista: es que <b>quién la ve se cambia desde el
+     * panel</b>. El reparto de {@code rol_permiso} se relee en cada petición, así que quitarle
+     * el permiso a un rol se nota en su siguiente llamada — sin desplegar y sin que nadie
+     * tenga que volver a entrar. Es el mismo argumento que el parámetro de facilitadores del
+     * {@code @Order(7)}, aplicado a los permisos.
+     */
+    @DisplayName("Quién eligió la fecha se ve, y quién puede verlo se cambia sin desplegar")
+    @Test
+    @Order(11)
+    void losInscritosSeVenYElPermisoSeEditaEnCaliente() throws Exception {
+        // Talento tiene alcance TODO: ve al inscrito con nombre y, sobre todo, con la
+        // inscripcionId, que es lo que piden las marcas y la asistencia. Antes de esto no
+        // había forma de llegar a ella desde el panel.
+        JsonNode inscritos = json.readTree(conTokenGet(
+                "/api/v1/panel/sesiones-simulacion/" + sesionConInscrito + "/inscritos", tokenTalento)
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString());
+        assertThat(inscritos).hasSize(1);
+        assertThat(inscritos.get(0).get("candidato").asText()).isEqualTo("Candidata De Prueba");
+        assertThat(inscritos.get(0).get("inscripcionId").asLong()).isPositive();
+        assertThat(inscritos.get(0).get("asistio").isNull())
+                .as("nadie ha marcado nada todavía, que no es lo mismo que «no vino»").isTrue();
+
+        // Rosa es responsable de área -y de esta vacante, desde el @Order(7)-, así que la
+        // semilla le da SUS_VACANTES: ve a los suyos.
+        String tokenArea = leer(mvc.perform(post("/api/v1/panel/auth/dev-login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"usuarioRenaserOsId\":\"os-rosa-area\"}"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString(), "token");
+        conTokenGet("/api/v1/panel/sesiones-simulacion/" + sesionConInscrito + "/inscritos", tokenArea)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1));
+
+        // Y ahora se le quita, desde el panel. Ni un despliegue ni un token nuevo: el mismo
+        // de arriba deja de servir para esto en la siguiente llamada.
+        String tokenAdmin = crearUsuarioConRol("Ada", "Vera", "ada.admin@renaser.pe",
+                "os-ada-admin", "ADMINISTRADOR");
+        long rolArea = jdbc.queryForObject(
+                "select id from rol where codigo = 'RESPONSABLE_AREA'", Long.class);
+        conToken(post("/api/v1/panel/roles/" + rolArea + "/permisos/ver_inscritos_simulacion/revocacion"),
+                tokenAdmin, "{\"motivo\":\"Los nombres los lleva Talento\"}")
+                .andExpect(status().isOk());
+
+        conTokenGet("/api/v1/panel/sesiones-simulacion/" + sesionConInscrito + "/inscritos", tokenArea)
+                .andExpect(status().isForbidden());
+
+        // Se le devuelve, con otro alcance, y vuelve a ver
+        conToken(put("/api/v1/panel/roles/" + rolArea + "/permisos/ver_inscritos_simulacion"),
+                tokenAdmin, "{\"alcance\":\"TODO\",\"motivo\":\"Rosa conduce las sesiones\"}")
+                .andExpect(status().isOk());
+        conTokenGet("/api/v1/panel/sesiones-simulacion/" + sesionConInscrito + "/inscritos", tokenArea)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1));
+
+        // El cambio no es anónimo: queda quién lo hizo y por qué escrito a mano.
+        List<Map<String, Object>> rastro = jdbc.queryForList(
+                "select accion, motivo from auditoria where accion in "
+                        + "('conceder_permiso','revocar_permiso') and entidad_id = ? order by id",
+                rolArea);
+        assertThat(rastro).hasSize(2);
+        assertThat(rastro.get(0).get("motivo")).isEqualTo("Los nombres los lleva Talento");
     }
 
     // ============ Apoyo ============

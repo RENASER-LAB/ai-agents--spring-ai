@@ -66,6 +66,12 @@ sistema, no cómo queda para siempre.
 El cliente cambia cosas seguido. Por eso el sistema guarda **permisos**, no roles fijos: un rol
 es simplemente un conjunto de permisos con nombre.
 
+**Ya se puede hacer desde la API**, con `administrar_permisos`: `GET /api/v1/panel/roles/{id}/permisos`,
+`PUT …/{codigo}` y `POST …/{codigo}/revocacion` (ver [09-APIS.md](09-APIS.md)). Cada cambio pide
+motivo escrito y deja fila de auditoría. Como los permisos se releen en cada petición, lo que
+se cambie ahí vale desde la siguiente llamada de cada afectado: **no hace falta desplegar ni
+volver a entrar**.
+
 ---
 
 ## Qué puede hacer cada uno
@@ -160,6 +166,7 @@ se hayan despachado cien de una vez.
 |---|:--:|:--:|:--:|:--:|:--:|
 | Crear sesiones con fecha y cupo | ○ | ● | ○ | ● | ○ |
 | Elegir su fecha | ● | ○ | ○ | ○ | ○ |
+| **Ver quién eligió cada fecha** | ○ | ● | ◐ | ● | ○ |
 | Definir la matriz de información crítica | ○ | ● | ◐ | ● | ○ |
 | Calificar la simulación | ○ | ● | ◐ | ● | ○ |
 | Hacer la conversación final | ○ | ● | ◐ | ● | ○ |
@@ -242,6 +249,7 @@ resultado de esa persona es quien la va a tener en su equipo.
 | **Decidir si el Evaluador de Estándar puede bloquear** | ○ | ○ | ○ | ● | ○ |
 | **Crear usuarios y asignar roles** | ○ | ○ | ○ | ○ | ● |
 | **Crear roles nuevos** | ○ | ○ | ○ | ○ | ● |
+| **Cambiar qué puede cada rol y con qué alcance** | ○ | ○ | ○ | ○ | ● |
 | **Editar parámetros del sistema** | ○ | ○ | ○ | ● | ● |
 | **Ver el registro de auditoría** | ○ | ○ | ○ | ● | ● |
 
@@ -371,9 +379,14 @@ a mano.
 - El mensaje debe decir por qué: *"no puedes guardar: nadie quedaría con permiso para
   administrar roles"*.
 
+**De los tres, la API trae hoy el segundo**, y contando roles en vez de personas: no deja
+revocar el último rol de la organización que conserva `administrar_permisos`. Que nadie pueda
+editar su propio rol **todavía no está puesto**, así que de momento es una regla escrita y no
+una que el servidor haga cumplir.
+
 ### 2 · Que la pantalla se vuelva ilegible
 
-Son **73 permisos**. Con una casilla por cada uno y sin agrupar, nadie entiende qué está
+Son **75 permisos**. Con una casilla por cada uno y sin agrupar, nadie entiende qué está
 marcando, y la pantalla se usa mal o se deja de usar.
 
 **Cómo se evita:**
@@ -384,7 +397,7 @@ marcando, y la pantalla se usa mal o se deja de usar.
 - Un interruptor por grupo para marcar o desmarcar todo el bloque.
 
 ```
-  ROL · Equipo de Talento              53 de 73 permisos
+  ROL · Equipo de Talento              54 de 75 permisos
 
   Vacantes                                    [8/9] v
      [x] Ver vacantes
@@ -393,7 +406,7 @@ marcando, y la pantalla se usa mal o se deja de usar.
      [ ] Elegir la version de pesos
      ...
 
-  Configuracion                               [4/14] >
+  Configuracion                               [4/15] >
   Candidatos                                  [7/7]  >
 
                             [ Ver el sistema como este rol ]

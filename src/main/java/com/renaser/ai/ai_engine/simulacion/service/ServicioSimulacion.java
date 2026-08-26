@@ -22,6 +22,19 @@ public interface ServicioSimulacion {
     Long crearSesion(ContextoUsuario quien, CrearSesion datos);
     List<SesionPanel> listarSesiones(ContextoUsuario quien);
     SesionPanel verSesion(ContextoUsuario quien, Long sesionId);
+
+    /**
+     * Quién eligió esta fecha, con el nombre y la inscripción de cada uno.
+     *
+     * <p>Aparte de {@code verSesion} y no dentro de {@link SesionPanel} porque el panel lista
+     * todas las sesiones que la organización creó nunca: resolver los nombres de todas para
+     * enseñar una sería pagar la lista entera en cada carga.
+     *
+     * <p>Lo que devuelve depende del alcance que el rol tenga en
+     * {@code ver_inscritos_simulacion}, y ese alcance se cambia desde el panel.
+     */
+    List<InscritoEnSesion> listarInscritos(ContextoUsuario quien, Long sesionId);
+
     void ampliarCupo(ContextoUsuario quien, Long sesionId, AmpliarCupo datos);
     void cancelarSesion(ContextoUsuario quien, Long sesionId, CancelarSesion datos);
     void asignarResponsable(ContextoUsuario quien, Long sesionId, AsignarResponsable datos);

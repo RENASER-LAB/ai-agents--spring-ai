@@ -11,11 +11,13 @@ import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
 import com.renaser.ai.ai_engine.seguridad.dto.FiltroAlcance;
 import com.renaser.ai.ai_engine.seguridad.service.Permisos;
 import com.renaser.ai.ai_engine.simulacion.dto.DtosSimulacion.DecidirSobreAusente;
+import com.renaser.ai.ai_engine.simulacion.dto.DtosSimulacion.InscritoEnSesion;
 import com.renaser.ai.ai_engine.simulacion.dto.DtosSimulacion.MarcarAsistencia;
 import com.renaser.ai.ai_engine.simulacion.dto.DtosSimulacion.PreguntaResponse;
 import com.renaser.ai.ai_engine.simulacion.dto.DtosSimulacion.PreguntasEncoladas;
 import com.renaser.ai.ai_engine.simulacion.entity.InscripcionSesion;
 import com.renaser.ai.ai_engine.simulacion.entity.PreguntaGenerada;
+import com.renaser.ai.ai_engine.simulacion.entity.SesionSimulacion;
 import com.renaser.ai.ai_engine.simulacion.repository.InformacionCriticaRepository;
 import com.renaser.ai.ai_engine.simulacion.repository.InscripcionSesionRepository;
 import com.renaser.ai.ai_engine.simulacion.repository.MarcaTiempoSimulacionRepository;
@@ -27,6 +29,7 @@ import com.renaser.ai.ai_engine.simulacion.repository.TramoSimulacionRepository;
 import com.renaser.ai.ai_engine.simulacion.service.ServicioDisponibilidadSimulacion;
 import com.renaser.ai.ai_engine.usuario.repository.RolRepository;
 import com.renaser.ai.ai_engine.usuario.repository.UsuarioRolRepository;
+import com.renaser.ai.ai_engine.usuario.service.NombresDeUsuarios;
 import com.renaser.ai.ai_engine.vacante.entity.Vacante;
 import com.renaser.ai.ai_engine.vacante.repository.VacanteRepository;
 
@@ -107,6 +110,7 @@ class ServicioSimulacionImplTest {
     @Mock private PreguntaGeneradaRepository preguntas;
     @Mock private PostulacionRepository postulaciones;
     @Mock private VacanteRepository vacantes;
+    @Mock private NombresDeUsuarios nombres;
     @Mock private ColaCalificacionIa cola;
     @Mock private RolRepository roles;
     @Mock private UsuarioRolRepository usuarioRoles;
@@ -122,7 +126,8 @@ class ServicioSimulacionImplTest {
     void crearElServicio() {
         servicio = new ServicioSimulacionImpl(sesiones, sesionesVacante, responsables, tramos,
                 informacionCritica, inscripciones, marcas, preguntas, postulaciones, vacantes,
-                cola, roles, usuarioRoles, maquina, disponibilidad, parametros, auditoria, permisos);
+                nombres, cola, roles, usuarioRoles, maquina, disponibilidad, parametros,
+                auditoria, permisos);
     }
 
     // ============ Las fechas que ve el candidato ============
@@ -530,6 +535,168 @@ class ServicioSimulacionImplTest {
             verify(sesionesVacante, times(1)).findBySesionSimulacionIdIn(anyList());
             verify(responsables, times(1)).findBySesionSimulacionIdIn(anyList());
             verify(tramos, times(1)).findBySesionSimulacionIdInOrderByMinutoInicio(anyList());
+        }
+    }
+
+    /**
+     * Quién eligió cada fecha.
+     *
+     * <p>Lo que se prueba aquí no es que la lista salga: es que salga <b>recortada por el
+     * alcance que el rol tenga hoy</b>. Ese reparto se edita desde el panel —el permiso
+     * {@code ver_inscritos_simulacion} puede pasar de TODO a SUS_VACANTES o a PROPIO sin que
+     * nadie despliegue nada—, así que los tres casos se comprueban, incluido el que hoy no
+     * se siembra: si mañana alguien lo cambia, el que falte un caso no daría un error, daría
+     * la lista entera.
+     */
+    @org.junit.jupiter.api.Nested
+    @DisplayName("Al listar quién eligió una fecha")
+    class ListarInscritos {
+
+        private static final Long MI_VACANTE = 70L;
+        private static final Long VACANTE_AJENA = 71L;
+
+        private void laSesionExiste() {
+            when(sesiones.findByIdAndOrganizacionId(SESION, ORGANIZACION))
+                    .thenReturn(Optional.of(SesionSimulacion.builder()
+                            .id(SESION).organizacionId(ORGANIZACION)
+                            .fechaHora(Instant.parse("2026-09-01T15:00:00Z"))
+                            .duracionMinutos(120).modalidad("GRUPAL").cupo(6)
+                            .estado("PUBLICADA").build()));
+        }
+
+        /** Dos inscripciones: la 1 en una vacante de QUIEN, la 2 en una que no es suya. */
+        private void dosInscritosDeVacantesDistintas() {
+            laSesionExiste();
+            when(inscripciones.findBySesionSimulacionIdAndEsVigenteTrue(SESION)).thenReturn(List.of(
+                    InscripcionSesion.builder().id(1L).postulacionId(101L).esVigente(true)
+                            .inscritaEn(Instant.parse("2026-08-20T10:00:00Z")).asistio(true).build(),
+                    InscripcionSesion.builder().id(2L).postulacionId(102L).esVigente(true)
+                            .inscritaEn(Instant.parse("2026-08-19T10:00:00Z")).build()));
+            when(postulaciones.findAllById(any())).thenReturn(List.of(
+                    Postulacion.builder().id(101L).organizacionId(ORGANIZACION)
+                            .usuarioId(501L).vacanteId(MI_VACANTE).build(),
+                    Postulacion.builder().id(102L).organizacionId(ORGANIZACION)
+                            .usuarioId(502L).vacanteId(VACANTE_AJENA).build()));
+            when(vacantes.findAllById(any())).thenReturn(List.of(
+                    Vacante.builder().id(MI_VACANTE).titulo("Analista")
+                            .responsableUsuarioId(USUARIO).build(),
+                    Vacante.builder().id(VACANTE_AJENA).titulo("Contador")
+                            .responsableUsuarioId(OTRO_USUARIO).build()));
+        }
+
+        @Test
+        @DisplayName("Con alcance TODO salen todos, con su inscripción y por orden de llegada")
+        void conAlcanceTodoSalenTodos() {
+            when(permisos.alcanceDe("ver_inscritos_simulacion"))
+                    .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.TODO, USUARIO));
+            dosInscritosDeVacantesDistintas();
+            when(nombres.porUsuario(any())).thenReturn(Map.of(501L, "Ana Ruiz", 502L, "Beto Paz"));
+
+            var lista = servicio.listarInscritos(QUIEN, SESION);
+
+            // Por inscritaEn y no por id: el orden en que eligieron es el que significa algo,
+            // y sin orden explícito la lista dependería de lo que devolviera la base.
+            assertThat(lista).extracting(InscritoEnSesion::candidato)
+                    .containsExactly("Beto Paz", "Ana Ruiz");
+
+            // El inscripcionId es la razón de ser de esta lista: es lo que piden marcas y
+            // asistencia, y hasta ahora no había forma de averiguarlo desde el panel.
+            assertThat(lista).extracting(InscritoEnSesion::inscripcionId)
+                    .containsExactly(2L, 1L);
+            assertThat(lista.get(1).vacante()).isEqualTo("Analista");
+
+            // asistio es tri-estado: vacío es «nadie lo ha marcado», no «no vino».
+            assertThat(lista.get(0).asistio()).as("a este nadie le ha marcado nada").isNull();
+            assertThat(lista.get(1).asistio()).isTrue();
+        }
+
+        @Test
+        @DisplayName("Con alcance SUS_VACANTES solo salen los de sus vacantes")
+        void conAlcanceSusVacantesSoloLosSuyos() {
+            when(permisos.alcanceDe("ver_inscritos_simulacion"))
+                    .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.SUS_VACANTES, USUARIO));
+            dosInscritosDeVacantesDistintas();
+            when(nombres.porUsuario(any())).thenReturn(Map.of(501L, "Ana Ruiz"));
+
+            var lista = servicio.listarInscritos(QUIEN, SESION);
+
+            assertThat(lista).extracting(InscritoEnSesion::inscripcionId).containsExactly(1L);
+
+            // Y del que se cae no se pide el nombre: recortar después de haber traído los
+            // datos de una persona que este usuario no puede ver no es recortar.
+            ArgumentCaptor<java.util.Collection<Long>> pedidos =
+                    ArgumentCaptor.forClass(java.util.Collection.class);
+            verify(nombres).porUsuario(pedidos.capture());
+            assertThat(pedidos.getValue()).containsExactly(501L);
+        }
+
+        @Test
+        @DisplayName("Con alcance PROPIO solo sale su propia inscripción")
+        void conAlcancePropioSoloLaSuya() {
+            laSesionExiste();
+            when(permisos.alcanceDe("ver_inscritos_simulacion"))
+                    .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.PROPIO, USUARIO));
+            when(inscripciones.findBySesionSimulacionIdAndEsVigenteTrue(SESION)).thenReturn(List.of(
+                    InscripcionSesion.builder().id(1L).postulacionId(101L).esVigente(true)
+                            .inscritaEn(Instant.parse("2026-08-20T10:00:00Z")).build(),
+                    InscripcionSesion.builder().id(2L).postulacionId(102L).esVigente(true)
+                            .inscritaEn(Instant.parse("2026-08-19T10:00:00Z")).build()));
+            when(postulaciones.findAllById(any())).thenReturn(List.of(
+                    Postulacion.builder().id(101L).organizacionId(ORGANIZACION)
+                            .usuarioId(USUARIO).vacanteId(MI_VACANTE).build(),
+                    Postulacion.builder().id(102L).organizacionId(ORGANIZACION)
+                            .usuarioId(502L).vacanteId(MI_VACANTE).build()));
+            when(vacantes.findAllById(any())).thenReturn(List.of(
+                    Vacante.builder().id(MI_VACANTE).titulo("Analista")
+                            .responsableUsuarioId(OTRO_USUARIO).build()));
+            when(nombres.porUsuario(any())).thenReturn(Map.of(USUARIO, "Quien Llama"));
+
+            var lista = servicio.listarInscritos(QUIEN, SESION);
+
+            assertThat(lista).extracting(InscritoEnSesion::inscripcionId).containsExactly(1L);
+        }
+
+        @Test
+        @DisplayName("Una sesión a la que no se apuntó nadie no pregunta por ningún nombre")
+        void sinInscritosNoPideNombres() {
+            laSesionExiste();
+            when(permisos.alcanceDe("ver_inscritos_simulacion"))
+                    .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.TODO, USUARIO));
+            when(inscripciones.findBySesionSimulacionIdAndEsVigenteTrue(SESION))
+                    .thenReturn(List.of());
+
+            assertThat(servicio.listarInscritos(QUIEN, SESION)).isEmpty();
+
+            verifyNoInteractions(nombres);
+        }
+
+        @Test
+        @DisplayName("Los nombres se piden en una sola tanda, no uno por inscrito")
+        void losNombresSePidenDeUnaVez() {
+            when(permisos.alcanceDe("ver_inscritos_simulacion"))
+                    .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.TODO, USUARIO));
+            dosInscritosDeVacantesDistintas();
+            when(nombres.porUsuario(any())).thenReturn(Map.of(501L, "Ana Ruiz", 502L, "Beto Paz"));
+
+            servicio.listarInscritos(QUIEN, SESION);
+
+            // Contra Supabase cada viaje cuesta ~140 ms: una consulta por inscrito es la
+            // misma cadena que en su día dejó la bandeja en minuto y medio.
+            verify(nombres, times(1)).porUsuario(any());
+            verify(postulaciones, times(1)).findAllById(any());
+            verify(vacantes, times(1)).findAllById(any());
+        }
+
+        @Test
+        @DisplayName("De una sesión de otra organización no se ve ni que existe")
+        void deOtraOrganizacionNoSeVeNada() {
+            when(sesiones.findByIdAndOrganizacionId(99L, ORGANIZACION)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> servicio.listarInscritos(QUIEN, 99L))
+                    .isInstanceOf(ResourceNotFoundException.class);
+
+            // Y el permiso ni se consulta: primero es si la sesión existe para este usuario.
+            verifyNoInteractions(inscripciones, nombres);
         }
     }
 }
