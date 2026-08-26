@@ -47,19 +47,19 @@ demás de la calificación se prueba con un doble del modelo y no gasta nada.
 
 ---
 
-## 726 pruebas
+## 735 pruebas
 
-Contadas de correrlas el 26/08/2026 (tras las piezas D, E y F del multiempresa), no de
-recordarlas: el desglose sale de los informes de surefire y failsafe, y suma exacto.
+Contadas de correrlas el 26/08/2026 (tras las piezas D, E y F del multiempresa y su QA), no
+de recordarlas: el desglose sale de los informes de surefire y failsafe, y suma exacto.
 
 | Qué | Cuántas | Necesita |
 |---|---:|---|
-| Unitarias, con dobles | 522 | nada |
+| Unitarias, con dobles | 530 | nada |
 | Arquitectura | 9 | nada |
 | Las fórmulas del banco v3 | 22 | nada |
 | El validador de las respuestas v3 | 21 | nada |
 | El perfil del candidato (paquete `perfil`: merge, lectura, CRUD, retención, borrado) | 52 | nada |
-| Integración, de punta a punta | 94 | Docker |
+| Integración, de punta a punta | 95 | Docker |
 | Contra el proveedor de verdad, y el envío de correo | 6 | Docker o SMTP, y su bandera |
 
 El multiempresa (25/08) sumó 39 unitarias: 31 de la implementación —el login del panel, las
@@ -85,6 +85,20 @@ dentro que no se toca) y el tope validado desde la plataforma. Las de integraci�
 vida entera del tope: nace del alta, cada lectura escribe su costo exacto, al 80% suena una
 campana única, al 100% lo nuevo espera sin que la candidata se entere, y subir el tope por
 el endpoint despierta lo que esperaba.
+
+El QA de la fase 2 (26/08) sumó 8 unitarias y 1 de integración, cada una encima de un
+hallazgo real. El gordo: el modelo rápido (`deepseek-chat`, la lectura de CV — una llamada
+por candidato) no tenía tarifa en la V38 y todo ese gasto salía NULL, invisible para el
+tope; la V39 la siembra, `ClienteModeloDeepSeek` anota el modelo PEDIDO cuando el proveedor
+calla (antes anotaba siempre el caro), y un IT nuevo exige tarifa vigente para todo modelo
+de `application.yaml`. Los otros: la suspendida que congela también sus trabajos de IA
+nuevos y a la que el barrido no despierta ni con cupo (unitarias, más el viaje
+suspensión→reactivación dentro del IT del tope), la campana del 80% que ya no puede tumbar
+una postulación (corre en su propia transacción y su fallo se traga), la doble llave de la
+personalización desde la plataforma (una empresa con el permiso copiado no le enciende nada
+a la competencia, el motivo queda auditado, el objetivo inexistente es 404 — llegó sin una
+sola prueba), y el borrado 29733 que también vacía el nombre del papel firmado al postular
+(aserción nueva en `FlujoDosEmpresasIT`).
 
 ⚠️ Al recontar, **no sirve el atributo `tests=`** de los XML de surefire: con clases anidadas
 (`@Nested`) subcuenta, y por eso dos filas de esta tabla llevaban tiempo mal —las fórmulas

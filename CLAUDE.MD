@@ -68,9 +68,9 @@ Perfil Integral → prueba del puesto → simulacion → validacion → decision
 
 | | |
 |---|---|
-| Base de datos | **Flyway es el dueno del esquema**: V1-V38 en `src/main/resources/db/migration`, **102 tablas de este modulo** (105 en la base contando `flyway_schema_history` y las dos del motor de agentes, `agent_run` y `vector_store`). `ddl-auto: validate` |
+| Base de datos | **Flyway es el dueno del esquema**: V1-V39 en `src/main/resources/db/migration`, **102 tablas de este modulo** (105 en la base contando `flyway_schema_history` y las dos del motor de agentes, `agent_run` y `vector_store`). `ddl-auto: validate` |
 | Codigo | Veintiun paquetes de dominio bajo `ai_engine` (ver «Como esta organizado el codigo») |
-| Tests | **726, todos en verde (26/08/2026)**: 626 unitarios y 100 de integracion (6 saltados, los que gastan saldo o mandan correo de verdad). Ver «Correr los tests»: unitarios de la maquina y del anonimizador, migraciones contra Postgres real (Testcontainers) y flujos de punta a punta: hito 1, evaluacion, prueba, simulacion/validacion, calificacion con IA, la vacante sin banco, las dos empresas y el tope de IA de la plataforma |
+| Tests | **735, todos en verde (26/08/2026, tras el QA de la fase 2)**: 634 unitarios y 101 de integracion (6 saltados, los que gastan saldo o mandan correo de verdad). Ver «Correr los tests»: unitarios de la maquina y del anonimizador, migraciones contra Postgres real (Testcontainers) y flujos de punta a punta: hito 1, evaluacion, prueba, simulacion/validacion, calificacion con IA, la vacante sin banco, las dos empresas y el tope de IA de la plataforma |
 | IA que califica | **Seis de los diez agentes del catalogo estan implementados**: datos del curriculum, evidencia, evaluador, potencial/riesgo, prueba del puesto y las preguntas de la conversacion final. Todos corren por cola de RabbitMQ contra DeepSeek. Ver [Calificacion con IA](docs/CALIFICACION-CON-IA.md) |
 | Correo | **Ya sabe salir de verdad** (`EnviadorCorreoSmtp`), pero **por defecto no sale**: `renaser.correo.transporte` vale `log` salvo que se ponga `smtp`, y entonces solo se registra en `correo_enviado`. Para encenderlo hacen falta `CORREO_TRANSPORTE=smtp`, `CORREO_REMITENTE` y una cuenta que autentique. El RNF-65 pide que salga **desde el dominio propio de Renaser**: confirmar con ellos si ya lo tienen antes de encenderlo |
 | Acceso del candidato | Entra al portal **con un enlace, sin contrasena** (`EnlaceAcceso`, `ServicioEnlaceAcceso`). El enlace se le manda por correo, asi que depende de lo de arriba |
@@ -264,12 +264,12 @@ Las dos consultan el mismo backend, asi que ensenan el mismo orden.
 - Nada se recalcula hacia atras: cada nota queda atada a la version de pesos de su vacante.
 
 ### Correr los tests
-**626 unitarios en verde (26/08/2026).** Son dos tandas y el comando decide cual corre:
+**634 unitarios en verde (26/08/2026).** Son dos tandas y el comando decide cual corre:
 
 | Comando | Que corre | Cuantos | Necesita |
 |---|---|---:|---|
-| `./mvnw test` | unitarias con dobles y las de arquitectura | 626 | nada |
-| `./mvnw verify` | lo anterior mas las de integracion | 726 | Docker |
+| `./mvnw test` | unitarias con dobles y las de arquitectura | 634 | nada |
+| `./mvnw verify` | lo anterior mas las de integracion | 735 | Docker |
 
 Las de integracion levantan su propio PostgreSQL y su propio RabbitMQ con Testcontainers: hace
 falta el demonio de Docker encendido. El desglose completo esta en
@@ -365,30 +365,42 @@ Lo que hay que saber para tocar codigo:
   PROCESO publicado de la organizacion** — se publica por `POST /panel/textos-consentimiento`
   (permiso `editar_textos_correo`; crea la version Y la publica). Renaser lo tiene desde la
   V9; a las empresas nuevas el alta se lo copia en borrador.
-- **Cada llamada al modelo tiene precio** (pieza E, V38): `ejecucion_ia.costo` se escribe al
-  cerrar con la tarifa vigente de `tarifa_modelo` (por proveedor+modelo, vigencia por fecha;
-  las sembradas son PROVISIONALES). Tope mensual por organizacion: parametro
-  `tope_mensual_ia` (ausente = sin tope; lo administra Renaser, `editarParametro` se lo
-  niega a la empresa). Al 80% un correo `TOPE_IA_AVISO` una vez por mes (la marca es el
-  parametro `aviso_tope_enviado_mes`); al 100% los trabajos nuevos nacen **EN_ESPERA** —no
-  fallan, no se publican, el candidato ve «en curso»— y el sondeo de atascados los despierta
-  cuando vuelve el cupo (tope subido o mes nuevo, hora de Lima). El retrato que cierra una
-  tanda no pasa por el tope: sus insumos ya se pagaron. Consumo por empresa/mes/agente en
-  `GET /panel/plataforma/consumo?mes=YYYY-MM`.
+- **Cada llamada al modelo tiene precio** (pieza E, V38-V39): `ejecucion_ia.costo` se escribe
+  al cerrar con la tarifa vigente de `tarifa_modelo` (por proveedor+modelo, vigencia por
+  fecha; las sembradas son PROVISIONALES). La bitacora guarda el modelo QUE EL PROVEEDOR
+  REPORTA (o el pedido en esa llamada si calla), y por eso **todo modelo de
+  `application.yaml` necesita su tarifa** — la V39 sembro la del modelo rapido
+  (`deepseek-chat`, la lectura de CV) que a la V38 se le quedo fuera y dejaba ese gasto en
+  NULL; un IT recorre los modelos configurados y exige tarifa vigente para cada uno. Tope
+  mensual por organizacion: parametro `tope_mensual_ia` (ausente = sin tope; lo administra
+  Renaser, `editarParametro` se lo niega a la empresa). Al 80% un correo `TOPE_IA_AVISO`
+  una vez por mes (la marca es el parametro `aviso_tope_enviado_mes`; el aviso corre en su
+  PROPIA transaccion y su fallo se traga: una campana jamas tumba una postulacion); al 100%
+  los trabajos nuevos nacen **EN_ESPERA** —no fallan, no se publican, el candidato ve «en
+  curso»— y el sondeo de atascados los despierta cuando vuelve el cupo (tope subido o mes
+  nuevo, hora de Lima). El retrato que cierra una tanda no pasa por el tope: sus insumos ya
+  se pagaron. Consumo por empresa/mes/agente en `GET /panel/plataforma/consumo?mes=YYYY-MM`.
 - **Renaser suspende y reactiva empresas** (pieza F): `organizacion.es_activa` ahora lo leen
   el login del panel (mensaje claro: solo se llega con la contrasena correcta), el
   `FiltroIdentidad` (corta los tokens vivos de 8h, solo tipo EQUIPO; cuesta una consulta de
-  organizacion por peticion de panel, aceptado) y el tablon publico (lista, detalle, texto
-  legal y el POST directo de postular). Los candidatos que ya estaban dentro NO se tocan.
+  organizacion por peticion de panel, aceptado), el tablon publico (lista, detalle, texto
+  legal y el POST directo de postular) y **la cola de IA**: suspendida es congelada tambien
+  para el gasto — lo en vuelo termina, los trabajos NUEVOS de una suspendida nacen
+  EN_ESPERA y el barrido no la despierta ni con cupo; al reactivar, el mismo barrido lo
+  suelta todo (nada queda zombi). Los candidatos que ya estaban dentro NO se tocan: siguen
+  viendo lo suyo, y sus correos de transicion siguen saliendo.
   Endpoints de plataforma, todos con doble llave y auditados con motivo: suspension,
   reactivacion (la plataforma no puede suspenderse a si misma), tope-ia (en blanco = sin
   tope) y personalizacion de otra empresa. La ficha del continente
   (`GET /panel/plataforma/empresas`) trae estado, tope, banderas y consumo del mes — y ahi
   se acaba lo que Renaser ve: ninguna via nueva a los datos de las empresas, a proposito.
 - Los ITs del multiempresa son dos: `FlujoDosEmpresasIT` (alta, aislamiento, viaje del
-  candidato, consentimiento por postulacion, borrado, suspension y reactivacion) y
-  `FlujoPlataformaIT` (la vida entera del tope con la calificacion encendida y un doble del
-  modelo: costo exacto, campana del 80, EN_ESPERA al 100, despertar al subir el tope).
+  candidato, consentimiento por postulacion, borrado —tambien del papel firmado al
+  postular—, suspension y reactivacion) y `FlujoPlataformaIT` (la vida entera del tope con
+  la calificacion encendida y un doble del modelo que reporta lo que el proveedor real:
+  costo exacto de la pasada rapida, campana del 80, EN_ESPERA al 100, la suspendida que no
+  despierta ni con cupo, despertar al reactivar y al subir el tope, y tarifa vigente para
+  todo modelo configurado).
 
 ## El banco de preguntas v3 (19/08/2026)
 El cliente reemplazo el banco entero. Son **190 items** (85 directivo, 55 coordinacion, 50
@@ -606,7 +618,7 @@ Todo vive en `docs/`. Empezar por [docs/README.md](docs/README.md).
   ultimas etapas y sus tres reglas automaticas de disponibilidad.
 - [CI/CD](docs/CI-CD.md) — que se comprueba solo en cada cambio, como se despliega a AWS y que
   variables de entorno pide el servidor. **Leerlo antes de tocar `.github/workflows/`.**
-- [Comprobaciones automaticas](docs/COMPROBACIONES-AUTOMATICAS.md) — las 726 pruebas y las nueve
+- [Comprobaciones automaticas](docs/COMPROBACIONES-AUTOMATICAS.md) — las 735 pruebas y las nueve
   reglas de arquitectura, una por una. Que se mira solo y que no.
 - `docs/diagramas/` — HTML autocontenidos, se abren en el navegador.
 - `docs/mockups/` — prototipos de pantalla. **Los mantiene otra persona, no editarlos.**
