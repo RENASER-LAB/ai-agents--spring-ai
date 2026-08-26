@@ -329,12 +329,28 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
      */
     private boolean alcanzaA(ContextoUsuario quien, FiltroAlcance alcance, Postulacion p,
                              Map<Long, Vacante> porVacante) {
+        return alcanzaA(quien, alcance, p, id -> Optional.ofNullable(porVacante.get(id)));
+    }
+
+    /**
+     * Lo mismo para una postulación suelta, cuando no hay tanda con la que ir.
+     *
+     * <p>Las dos comparten cuerpo a propósito: qué significa que una vacante sea tuya se
+     * escribe una sola vez, y lo único que cambia es de dónde sale la vacante —de un mapa ya
+     * cargado o de la base—.
+     */
+    private boolean alcanzaA(ContextoUsuario quien, FiltroAlcance alcance, Postulacion p) {
+        return alcanzaA(quien, alcance, p, vacantes::findById);
+    }
+
+    private boolean alcanzaA(ContextoUsuario quien, FiltroAlcance alcance, Postulacion p,
+                             Function<Long, Optional<Vacante>> laVacante) {
         if (p == null) {
             return false;
         }
         return switch (alcance.tipo()) {
             case TODO -> true;
-            case SUS_VACANTES -> Optional.ofNullable(porVacante.get(p.getVacanteId()))
+            case SUS_VACANTES -> laVacante.apply(p.getVacanteId())
                     .map(v -> quien.usuarioId().equals(v.getResponsableUsuarioId()))
                     .orElse(false);
             // PROPIO no alcanza a nadie aquí, igual que no abre ninguna sesión ni lista
@@ -503,8 +519,12 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
     @Override
     @Transactional
     public void marcarEvento(ContextoUsuario quien, Long inscripcionId, MarcarEvento datos) {
-        InscripcionSesion inscripcion = laInscripcion(inscripcionId);
-        exigirQuePuedaFacilitar(quien, inscripcion.getSesionSimulacionId());
+        InscripcionYPostulacion par = laInscripcion(quien, inscripcionId);
+        // Facilitar ya resuelve el alcance de este permiso, así que se aprovecha en vez de
+        // volver a pedirlo: preguntar dos veces lo mismo invita a que un día no coincidan.
+        FiltroAlcance alcance = exigirQuePuedaFacilitar(
+                quien, par.inscripcion().getSesionSimulacionId());
+        exigirQueAlcance(quien, alcance, par);
 
         // Cada evento ocurre una vez. Volver a marcarlo corrige la hora, no crea otro.
         MarcaTiempoSimulacion marca = marcas
@@ -520,8 +540,11 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
 
     @Override
     public List<MarcaResponse> verMarcas(ContextoUsuario quien, Long inscripcionId) {
-        laInscripcion(inscripcionId);
-        permisos.alcanceDe("marcar_eventos_simulacion");
+        // Este es el que de verdad se escapaba: pide marcar_eventos_simulacion, que el
+        // responsable del área tiene acotado a sus vacantes, y no pasa por facilitar. Leía las
+        // marcas de cualquier candidato de la organización.
+        exigirQueAlcance(quien, permisos.alcanceDe("marcar_eventos_simulacion"),
+                laInscripcion(quien, inscripcionId));
         return marcas.findByInscripcionSesionIdOrderByOcurridaEn(inscripcionId).stream()
                 .map(m -> new MarcaResponse(m.getEvento(), m.getOcurridaEn()))
                 .toList();
@@ -530,15 +553,18 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
     @Override
     @Transactional
     public void marcarAsistencia(ContextoUsuario quien, Long inscripcionId, MarcarAsistencia datos) {
-        InscripcionSesion inscripcion = laInscripcion(inscripcionId);
-        permisos.alcanceDe("marcar_asistencia");
+        InscripcionYPostulacion par = laInscripcion(quien, inscripcionId);
+        // marcar_asistencia está sembrado TODO también para el responsable del área, y a
+        // propósito: puede estar en la sala sin ser responsable de esa vacante (V18). Con TODO
+        // esto no recorta nada; está aquí para que siga siendo verdad si alguien edita la fila.
+        exigirQueAlcance(quien, permisos.alcanceDe("marcar_asistencia"), par);
 
+        InscripcionSesion inscripcion = par.inscripcion();
         inscripcion.setAsistio(datos.asistio());
         inscripcion.setMarcadaPorUsuarioId(quien.usuarioId());
         inscripciones.save(inscripcion);
 
-        Postulacion postulacion = postulaciones.findById(inscripcion.getPostulacionId())
-                .orElseThrow(() -> new IllegalStateException("La postulación de esta inscripción ya no existe"));
+        Postulacion postulacion = par.postulacion();
 
         if (Boolean.TRUE.equals(datos.asistio())) {
             if (PUEDE_ELEGIR.equals(postulacion.getEstadoCodigo())) {
@@ -646,8 +672,8 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
      * <p>El parámetro es lo que hace esto cambiable sin desplegar: hoy son Talento y Dirección,
      * mañana puede ser otro rol, y basta con editarlo desde el panel.
      */
-    private void exigirQuePuedaFacilitar(ContextoUsuario quien, Long sesionId) {
-        permisos.alcanceDe("marcar_eventos_simulacion");
+    private FiltroAlcance exigirQuePuedaFacilitar(ContextoUsuario quien, Long sesionId) {
+        FiltroAlcance alcance = permisos.alcanceDe("marcar_eventos_simulacion");
         exigirRolDeFacilitador(quien.organizacionId(), quien.usuarioId());
 
         // Si la sesión tiene responsables asignados, solo ellos la conducen. Si no tiene,
@@ -658,6 +684,7 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
             throw new AccessDeniedException(
                     "Esta sesión tiene responsables asignados y no eres uno de ellos");
         }
+        return alcance;
     }
 
     /**
@@ -687,10 +714,44 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
                 .orElseThrow(() -> new ResourceNotFoundException("Sesión", "id", sesionId));
     }
 
-    private InscripcionSesion laInscripcion(Long inscripcionId) {
-        return inscripciones.findById(inscripcionId)
+    /**
+     * La inscripción, comprobando que sea de esta organización.
+     *
+     * <p>Antes era un {@code findById} pelado: no miraba ni la organización. El resto del
+     * sistema entra siempre por {@code findByIdAndOrganizacionId}, y aquí no había motivo para
+     * ser la excepción —con una sola organización dentro no se nota, y el modelo lleva
+     * {@code organizacion_id} en todas las tablas precisamente porque no va a ser así siempre—.
+     *
+     * <p>La organización no cuelga de la inscripción sino de su postulación, así que se llega
+     * por ahí. Una de otra organización responde lo mismo que una que no existe: 404 con el
+     * mismo texto, que es lo que evita usar este endpoint para averiguar qué ids hay.
+     */
+    private InscripcionYPostulacion laInscripcion(ContextoUsuario quien, Long inscripcionId) {
+        InscripcionSesion inscripcion = inscripciones.findById(inscripcionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Inscripción", "id", inscripcionId));
+        Postulacion postulacion = postulaciones
+                .findByIdAndOrganizacionId(inscripcion.getPostulacionId(), quien.organizacionId())
+                .orElseThrow(() -> new ResourceNotFoundException("Inscripción", "id", inscripcionId));
+        return new InscripcionYPostulacion(inscripcion, postulacion);
     }
+
+    /**
+     * Corta si ese alcance no llega a esa inscripción.
+     *
+     * <p>Los tres endpoints de la sesión en vivo pedían su permiso y tiraban el alcance, así
+     * que un {@code SUS_VACANTES} valía lo mismo que un {@code TODO}. Hoy solo
+     * {@code marcar_eventos_simulacion} está sembrado acotado, pero el reparto se edita desde
+     * el panel: lo que hoy no recorta nada empieza a recortar en cuanto alguien cambie la fila.
+     */
+    private void exigirQueAlcance(ContextoUsuario quien, FiltroAlcance alcance,
+                                  InscripcionYPostulacion par) {
+        if (!alcanzaA(quien, alcance, par.postulacion())) {
+            throw new ResourceNotFoundException("Inscripción", "id", par.inscripcion().getId());
+        }
+    }
+
+    /** Una inscripción con su postulación: aquí nunca hace falta una sin la otra. */
+    private record InscripcionYPostulacion(InscripcionSesion inscripcion, Postulacion postulacion) {}
 
     private Postulacion laMia(ContextoUsuario quien, UUID uuid) {
         return postulaciones.findByUuid(uuid)

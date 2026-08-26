@@ -181,7 +181,7 @@ lo interno viaja, y una prueba ajena responde 404.
 | POST `/sesiones-simulacion/{id}/cupo` · `/cancelacion` | Ampliar o cancelar. Al cancelar se avisa a los inscritos | `crear_sesiones_simulacion` |
 | POST `/sesiones-simulacion/{id}/responsables` | Quién conduce la sesión | `crear_sesiones_simulacion` |
 | GET/POST `/sesiones-simulacion/{id}/informacion-critica` | Qué debería preguntar un candidato fuerte | `definir_informacion_critica` |
-| GET/POST `/inscripciones/{id}/marcas` | Los diez eventos observables, marcados en vivo | `marcar_eventos_simulacion` |
+| GET/POST `/inscripciones/{id}/marcas` | Los diez eventos observables, marcados en vivo. Una inscripción fuera de alcance responde 404 | `marcar_eventos_simulacion` |
 | POST `/inscripciones/{id}/asistencia` | Si asistió. Si no, vuelve a la bandeja del equipo | `marcar_asistencia` |
 | POST `/postulaciones/{id}/ausencia-simulacion` | Qué hacer con quien faltó: otra fecha o cerrar | `decidir_sobre_ausente` |
 | POST `/postulaciones/{id}/simulacion/...` | Poner notas y ponderarlas, como en la prueba | `calificar_simulacion` |
@@ -212,10 +212,20 @@ desde `administrar_permisos`— abre todas las sesiones y sigue contando solo a 
 tenga el segundo permiso ve el conteo entero: no puede abrir la lista, así que no hay dos cifras
 que puedan contradecirse, y un número de inscritos es aforo, no identidades.
 
-**`PROPIO` no alcanza a nadie en los tres endpoints**: lista vacía, **404** en el detalle y
-ninguna fila en `/inscritos`. En el panel nada de esto es de quien mira —son candidatos—, y
-`/panel/**` exige un token `TIPO_EQUIPO`, así que quien entra por ahí no tiene postulación
-propia que enseñarse a sí mismo.
+**`PROPIO` no alcanza a nadie en ninguno de estos endpoints**: lista vacía, **404** en el
+detalle y ninguna fila en `/inscritos`, y lo mismo en las marcas y la asistencia. En el panel
+nada de esto es de quien mira —son candidatos—, y `/panel/**` exige un token `TIPO_EQUIPO`, así
+que quien entra por ahí no tiene postulación propia que enseñarse a sí mismo.
+
+⚠️ **Las marcas y la asistencia también miran el alcance, y la inscripción también mira la
+organización.** Los tres endpoints de `/inscripciones/{id}` pedían su permiso y tiraban el
+alcance, así que un `SUS_VACANTES` valía tanto como un `TODO`; y la inscripción se buscaba por
+id a secas, sin comprobar de qué organización era. Hoy el único que se escapaba de verdad es
+`GET /marcas` —`marcar_eventos_simulacion` está sembrado acotado para el responsable del área—;
+en `/asistencia` el permiso arranca en `TODO` a propósito, porque quien marca puede estar en la
+sala sin dirigir esa vacante, así que ahí el recorte no cambia nada **hoy**: cambia el día que
+alguien edite esa fila desde el panel. Una inscripción de otra organización responde lo mismo
+que una que no existe.
 
 ⚠️ **Tres reglas mueven al candidato solo**, y son el único punto del sistema donde el estado de
 una postulación depende de otra tabla: publicar una sesión o ampliar su cupo mueve a quien

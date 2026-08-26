@@ -314,6 +314,7 @@ class ServicioSimulacionImplTest {
     void asistirAvanzaPorLaMaquina() {
         Postulacion postulacion = postulacionEn(PUEDE_ELEGIR);
         hayInscripcionDe(postulacion);
+        alcanceDeAsistencia();
 
         servicio.marcarAsistencia(QUIEN, INSCRIPCION, new MarcarAsistencia(true));
 
@@ -331,6 +332,7 @@ class ServicioSimulacionImplTest {
     void noSeMueveAQuienYaAvanzo() {
         Postulacion postulacion = postulacionEn(POR_CONFIRMAR);
         hayInscripcionDe(postulacion);
+        alcanceDeAsistencia();
 
         servicio.marcarAsistencia(QUIEN, INSCRIPCION, new MarcarAsistencia(true));
 
@@ -346,6 +348,7 @@ class ServicioSimulacionImplTest {
     void faltarDevuelveALaBandejaDelEquipo() {
         Postulacion postulacion = postulacionEn(PUEDE_ELEGIR);
         InscripcionSesion inscripcion = hayInscripcionDe(postulacion);
+        alcanceDeAsistencia();
 
         servicio.marcarAsistencia(QUIEN, INSCRIPCION, new MarcarAsistencia(false));
 
@@ -369,18 +372,60 @@ class ServicioSimulacionImplTest {
     }
 
     @Test
-    @DisplayName("si la postulación de esa inscripción ya no está, no se inventa a quién mover")
-    void sinPostulacionNoSeMueveANadie() {
+    @DisplayName("una inscripción de otra organización responde lo mismo que una que no existe")
+    void unaInscripcionAjenaNoSeToca() {
+        // La organización no cuelga de la inscripción sino de su postulación, así que se llega
+        // por ahí. Antes esto era un findById pelado: una inscripción de otra organización se
+        // marcaba igual. Y cuando la postulación faltaba salía un IllegalStateException —un
+        // 500—; ahora sale el mismo 404 que una inscripción inexistente, que además es lo que
+        // impide usar este endpoint para averiguar qué ids hay al otro lado.
         InscripcionSesion inscripcion = InscripcionSesion.builder()
                 .id(INSCRIPCION).sesionSimulacionId(SESION).postulacionId(POSTULACION)
                 .esVigente(true).inscritaEn(Instant.now()).build();
         when(inscripciones.findById(INSCRIPCION)).thenReturn(Optional.of(inscripcion));
-        when(postulaciones.findById(POSTULACION)).thenReturn(Optional.empty());
+        when(postulaciones.findByIdAndOrganizacionId(POSTULACION, ORGANIZACION))
+                .thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> servicio.marcarAsistencia(QUIEN, INSCRIPCION, new MarcarAsistencia(true)))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(ResourceNotFoundException.class);
 
         verifyNoInteractions(maquina);
+        verify(inscripciones, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Ver las marcas de un candidato de otra vacante responde 404")
+    void lasMarcasAjenasNoSeLeen() {
+        // Este era el hueco de verdad: marcar_eventos_simulacion está sembrado SUS_VACANTES
+        // para el responsable del área, y verMarcas pedía el permiso pero tiraba el alcance,
+        // así que leía las marcas de cualquier candidato de la organización.
+        Postulacion ajena = postulacionEn(PUEDE_ELEGIR);
+        ajena.setVacanteId(VACANTE);
+        hayInscripcionDe(ajena);
+        when(permisos.alcanceDe("marcar_eventos_simulacion"))
+                .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.SUS_VACANTES, USUARIO));
+        when(vacantes.findById(VACANTE)).thenReturn(Optional.of(
+                Vacante.builder().id(VACANTE).responsableUsuarioId(OTRO_USUARIO).build()));
+
+        assertThatThrownBy(() -> servicio.verMarcas(QUIEN, INSCRIPCION))
+                .isInstanceOf(ResourceNotFoundException.class);
+
+        verifyNoInteractions(marcas);
+    }
+
+    @Test
+    @DisplayName("Con TODO se leen las marcas de cualquiera, que es lo que Talento necesita")
+    void conTodoSeLeenLasMarcas() {
+        Postulacion suya = postulacionEn(PUEDE_ELEGIR);
+        hayInscripcionDe(suya);
+        when(permisos.alcanceDe("marcar_eventos_simulacion"))
+                .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.TODO, USUARIO));
+        when(marcas.findByInscripcionSesionIdOrderByOcurridaEn(INSCRIPCION)).thenReturn(List.of());
+
+        assertThat(servicio.verMarcas(QUIEN, INSCRIPCION)).isEmpty();
+
+        // Con TODO no hace falta saber de quién es la vacante.
+        verifyNoInteractions(vacantes);
     }
 
     // ============ Qué se hace con quien no se presentó ============
@@ -444,15 +489,28 @@ class ServicioSimulacionImplTest {
         return postulacion;
     }
 
-    /** Una inscripción vigente y la postulación a la que pertenece, tal como las lee el servicio. */
+    /**
+     * Una inscripción vigente y la postulación a la que pertenece, tal como las lee el servicio.
+     *
+     * <p>La postulación se busca por id <b>y organización</b>: es por donde el servicio
+     * comprueba que la inscripción sea de quien pregunta, porque la organización no cuelga de
+     * la inscripción sino de su postulación.
+     */
     private InscripcionSesion hayInscripcionDe(Postulacion postulacion) {
         InscripcionSesion inscripcion = InscripcionSesion.builder()
                 .id(INSCRIPCION).sesionSimulacionId(SESION).postulacionId(POSTULACION)
                 .esVigente(true).inscritaEn(Instant.now())
                 .build();
         when(inscripciones.findById(INSCRIPCION)).thenReturn(Optional.of(inscripcion));
-        when(postulaciones.findById(POSTULACION)).thenReturn(Optional.of(postulacion));
+        when(postulaciones.findByIdAndOrganizacionId(POSTULACION, ORGANIZACION))
+                .thenReturn(Optional.of(postulacion));
         return inscripcion;
+    }
+
+    /** Marcar asistencia arranca con TODO para todos los roles que lo tienen, incluido el área. */
+    private void alcanceDeAsistencia() {
+        when(permisos.alcanceDe("marcar_asistencia"))
+                .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.TODO, USUARIO));
     }
 
     private void alcanceDeConversacion(FiltroAlcance.Tipo tipo) {
