@@ -346,6 +346,12 @@ class ArquitecturaTest {
             // El portal: el candidato es de la plataforma y sus cosas se filtran por
             // persona, no por organización. Y el tablón de vacantes publicadas es LA
             // excepción deliberada del spec B: se ve el de todas las empresas.
+            //
+            // Ojo: desde el corte del portal las dos entradas del tablón son INERTES —
+            // la regla solo inspecciona clases con algún método que reciba
+            // ContextoUsuario, y el tablón (público, sin token) no tiene ninguno. Se
+            // quedan como constancia de la excepción deliberada, y por si el tablón
+            // algún día recibe contexto y vuelve bajo el aduanero.
             "ServicioTablonPortalImpl#vacante",
             "ServicioPostulacionPortalImpl#postular",
             "ServicioPostulacionPortalImpl#comoResumen",
