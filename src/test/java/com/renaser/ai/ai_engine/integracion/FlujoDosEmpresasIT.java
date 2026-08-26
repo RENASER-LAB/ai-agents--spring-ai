@@ -547,6 +547,21 @@ public class FlujoDosEmpresasIT {
                   join solicitud_borrado sb on sb.persona_id = p.id
                  where sb.id = %d and p.anonimizado_en is not null and p.nombre is null"""
                 .formatted(solicitudId), Integer.class)).isEqualTo(1);
+
+        // Y arrasa parejo en el consentimiento: Camila tiene la fila de la cuenta (con la
+        // plataforma) Y la firmada al postular (con ACME, amarrada a su postulación desde
+        // la V38) — el borrado le quita el nombre registrado a TODAS, sin distinguir de
+        // qué empresa es cada papel.
+        assertThat(contar("""
+                select count(*) from consentimiento c
+                  join solicitud_borrado sb on sb.persona_id = c.persona_id
+                 where sb.id = %d and c.postulacion_id is not null"""
+                .formatted(solicitudId))).isEqualTo(1);
+        assertThat(contar("""
+                select count(*) from consentimiento c
+                  join solicitud_borrado sb on sb.persona_id = c.persona_id
+                 where sb.id = %d and c.nombre_registrado is not null"""
+                .formatted(solicitudId))).isZero();
     }
 
     // ============ La suspensión (pieza F) ============
