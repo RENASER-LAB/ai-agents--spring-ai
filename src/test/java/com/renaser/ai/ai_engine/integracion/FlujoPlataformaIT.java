@@ -113,15 +113,21 @@ public class FlujoPlataformaIT {
                     if (!"DATOS_CV".equals(agenteCodigo)) {
                         throw new IllegalStateException("agente inesperado: " + agenteCodigo);
                     }
-                    // 1200 de entrada y 340 de salida: con la tarifa provisional de la
-                    // V38 (0.27/1.10 por millón) son exactamente 0.0007 USD.
+                    // El modelo que reporta es EL DE LA PASADA RÁPIDA ('deepseek-chat',
+                    // renaser.ai.chat.modelo-rapido), que es lo que el proveedor real
+                    // contesta para DATOS_CV (razona=false) y lo que la bitácora guarda.
+                    // Es la fila que la V39 tarifa: si esa tarifa faltara, el costo
+                    // saldría NULL y la aserción de 0.0007 lo delataría — el descase
+                    // entre lo configurado y lo tarifado no puede volver a pasar callado.
+                    // 1200 de entrada y 340 de salida a 0.27/1.10 por millón: 0.0007 USD.
                     return new RespuestaModelo("""
                             {"nombre":"Se Lee Del Curriculum","email":"x@correo.pe",
                              "telefono":"999888777","perfilResumen":"Analista.",
                              "habilidades":["SQL"],"experienciaMesesTotal":48,
                              "ultimoPuesto":"Analista","ultimaEmpresa":"Andina",
                              "ultimaMesesDuracion":24,"educacionMaxima":"Universitaria completa"}""",
-                            "deepseek-v4-flash", "deepseek", "prueba", 1200, 340);
+                            razona ? "deepseek-v4-flash" : "deepseek-chat",
+                            "deepseek", "prueba", 1200, 340);
                 }
             };
         }
@@ -130,6 +136,7 @@ public class FlujoPlataformaIT {
     @Autowired MockMvc mvc;
     @Autowired JdbcTemplate jdbc;
     @Autowired ColaCalificacionIa cola;
+    @Autowired org.springframework.core.env.Environment entorno;
     final ObjectMapper json = new ObjectMapper();
 
     static final String MES = YearMonth.now(ZoneId.of("America/Lima")).toString();
@@ -241,12 +248,18 @@ public class FlujoPlataformaIT {
         postular("carmen@correo.pe", "Carmen");
         esperarLecturaDe("carmen@correo.pe");
 
-        // 1200 tokens a 0.27 + 340 a 1.10, entre un millón: 0.0007 USD, escala de la columna
+        // 1200 tokens a 0.27 + 340 a 1.10, entre un millón: 0.0007 USD, escala de la columna.
+        // Y la bitácora guarda lo que el proveedor reportó —'deepseek-chat', la pasada
+        // rápida—, que es el nombre contra el que se buscó la tarifa (V39).
         assertThat(jdbc.queryForObject("""
                 select costo from ejecucion_ia
                  where organizacion_id = %d and agente_codigo = 'DATOS_CV' and es_exitosa"""
                 .formatted(acmeId), BigDecimal.class))
                 .isEqualByComparingTo("0.0007");
+        assertThat(jdbc.queryForObject("""
+                select modelo from ejecucion_ia
+                 where organizacion_id = %d and agente_codigo = 'DATOS_CV' and es_exitosa"""
+                .formatted(acmeId), String.class)).isEqualTo("deepseek-chat");
         // Lejos del 80% del tope de 10: ninguna campana suena todavía
         assertThat(contar("select count(*) from correo_enviado where "
                 + "plantilla_correo_codigo = 'TOPE_IA_AVISO'")).isZero();
@@ -359,6 +372,35 @@ public class FlujoPlataformaIT {
             }
         }
         assertThat(totalAcme).isNotNull().isGreaterThan(new BigDecimal("12.50"));
+    }
+
+    // ============ La red contra el descase configuración/tarifa ============
+
+    @DisplayName("Todo modelo que la aplicación puede pedir tiene su tarifa vigente")
+    @Test
+    @Order(6)
+    void todoModeloConfiguradoTieneTarifa() {
+        // El freno entero de la pieza E depende de que el nombre que la bitácora guarda
+        // —el que el proveedor reporta, que es el pedido— case con una fila de
+        // tarifa_modelo. La V38 sembró el default-model y el embedding pero se olvidó
+        // del modelo-rapido (la lectura de CV, la llamada más frecuente): todo ese gasto
+        // salía NULL y el tope no lo veía. La V39 lo arregló; esta prueba impide que
+        // cambiar un modelo en application.yaml sin registrar su tarifa vuelva a dejar
+        // ciego el consumo sin que nadie se entere.
+        List<String> configurados = List.of(
+                entorno.getRequiredProperty("renaser.ai.chat.default-model"),
+                entorno.getRequiredProperty("renaser.ai.chat.modelo-rapido"),
+                entorno.getRequiredProperty("spring.ai.google.genai.embedding.text.model"));
+        for (String modelo : configurados) {
+            assertThat(contar("""
+                    select count(*) from tarifa_modelo
+                     where lower(modelo) = lower('%s') and vigente_desde <= now()"""
+                    .formatted(modelo)))
+                    .as("el modelo configurado «%s» necesita una tarifa vigente en "
+                            + "tarifa_modelo: sin ella su gasto sale NULL y el tope no lo ve",
+                            modelo)
+                    .isGreaterThanOrEqualTo(1);
+        }
     }
 
     // ============ Apoyo ============
