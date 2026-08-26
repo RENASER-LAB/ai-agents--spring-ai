@@ -175,9 +175,10 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
         }
 
         Map<Long, Long> inscritos = new HashMap<>();
-        List<Object[]> conteo = recorta
-                ? inscripciones.contarVigentesPorSesionDe(ids, quien.usuarioId())
-                : inscripciones.contarVigentesPorSesion(ids);
+        Long soloDe = aQuienSeRecortaElConteo(quien);
+        List<Object[]> conteo = soloDe == null
+                ? inscripciones.contarVigentesPorSesion(ids)
+                : inscripciones.contarVigentesPorSesionDe(ids, soloDe);
         for (Object[] fila : conteo) {
             inscritos.put((Long) fila[0], (Long) fila[1]);
         }
@@ -215,7 +216,7 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
             throw new ResourceNotFoundException("Sesión", "id", sesionId);
         }
         // El mismo recorte que la lista, o el detalle contaría a gente que luego no puede abrir.
-        return comoPanel(sesion, alcance.responsableOFiltroNulo());
+        return comoPanel(sesion, aQuienSeRecortaElConteo(quien));
     }
 
     /**
@@ -235,6 +236,25 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
         return quien.tiene("crear_sesiones_simulacion")
                 ? permisos.alcanceDe("crear_sesiones_simulacion")
                 : permisos.alcanceDe("ver_inscritos_simulacion");
+    }
+
+    /**
+     * A quién hay que recortar el conteo de inscritos, o nulo si no hay que recortarlo.
+     *
+     * <p>Va por {@code ver_inscritos_simulacion} y no por el permiso con que se llegó a la
+     * sesión, porque contar inscritos es ver inscritos: si se resolviera con el otro, un rol
+     * con crear sesiones en TODO y ver inscritos en SUS_VACANTES vería «6» en la sesión y dos
+     * filas al abrirla. Ese reparto no es el que siembra la V37, pero es un solo PUT desde el
+     * panel de permisos —que es justo lo que esta rama abre—.
+     *
+     * <p>Quien no tiene el permiso en absoluto se queda con el conteo entero: no puede abrir la
+     * lista, así que no hay dos cifras que puedan contradecirse, y el número de inscritos de
+     * una sesión es aforo, no identidades.
+     */
+    private Long aQuienSeRecortaElConteo(ContextoUsuario quien) {
+        return quien.tiene("ver_inscritos_simulacion")
+                ? permisos.alcanceDe("ver_inscritos_simulacion").responsableOFiltroNulo()
+                : null;
     }
 
     /** Si alguna de las vacantes de la sesión es de las que este usuario dirige. */
@@ -317,7 +337,12 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
             case SUS_VACANTES -> Optional.ofNullable(porVacante.get(p.getVacanteId()))
                     .map(v -> quien.usuarioId().equals(v.getResponsableUsuarioId()))
                     .orElse(false);
-            case PROPIO -> quien.usuarioId().equals(p.getUsuarioId());
+            // PROPIO no alcanza a nadie aquí, igual que no abre ninguna sesión ni lista
+            // ninguna: esto es el panel, y quien mira nunca es el candidato de la fila. Antes
+            // devolvía la inscripción propia de quien llamaba —inalcanzable, porque el panel
+            // exige TIPO_EQUIPO— y eso dejaba a los tres endpoints diciendo cosas distintas
+            // para el mismo alcance.
+            case PROPIO -> false;
         };
     }
 

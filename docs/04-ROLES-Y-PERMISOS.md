@@ -166,7 +166,7 @@ se hayan despachado cien de una vez.
 |---|:--:|:--:|:--:|:--:|:--:|
 | Crear sesiones con fecha y cupo | ○ | ● | ○ | ● | ○ |
 | Elegir su fecha | ● | ○ | ○ | ○ | ○ |
-| **Ver las sesiones y sus fechas** | ○ | ● | ◐ | ● | ○ |
+| **Ver las sesiones y sus fechas, desde el panel** | ○ | ● | ◐ | ● | ○ |
 | **Ver quién eligió cada fecha** | ○ | ● | ◐ | ● | ○ |
 | Definir la matriz de información crítica | ○ | ● | ◐ | ● | ○ |
 | Calificar la simulación | ○ | ● | ◐ | ● | ○ |

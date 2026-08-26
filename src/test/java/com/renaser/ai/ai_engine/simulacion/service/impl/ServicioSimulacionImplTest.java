@@ -718,6 +718,36 @@ class ServicioSimulacionImplTest {
         }
 
         @Test
+        @DisplayName("Con los dos permisos y alcances distintos, el conteo va por el de inscritos")
+        void elConteoSigueAlPermisoDeInscritosYNoAlDeCrear() {
+            // El reparto que la V37 no siembra pero que un PUT desde el panel de permisos deja
+            // montado en un momento: crear sesiones en TODO y ver inscritos en SUS_VACANTES.
+            // Abre todas las sesiones —por el primero— pero solo cuenta a los suyos, porque
+            // contar inscritos es ver inscritos. Si el conteo siguiera al permiso con que se
+            // llegó a la sesión, la sesión diría seis y la lista enseñaría dos.
+            ContextoUsuario losDos = new ContextoUsuario(USUARIO, 3L, ORGANIZACION, "EQUIPO",
+                    List.of(2L), Map.of("crear_sesiones_simulacion", "TODO",
+                            "ver_inscritos_simulacion", "SUS_VACANTES"));
+            when(permisos.alcanceDe("crear_sesiones_simulacion"))
+                    .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.TODO, USUARIO));
+            when(permisos.alcanceDe("ver_inscritos_simulacion"))
+                    .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.SUS_VACANTES, USUARIO));
+            when(sesiones.findByIdAndOrganizacionId(2L, ORGANIZACION))
+                    .thenReturn(Optional.of(sesion(2L)));
+            when(inscripciones.contarVigentesPorSesionDe(List.of(2L), USUARIO))
+                    .thenReturn(java.util.List.<Object[]>of(new Object[]{2L, 2L}));
+            when(sesionesVacante.findBySesionSimulacionId(2L)).thenReturn(List.of());
+            when(responsables.findBySesionSimulacionId(2L)).thenReturn(List.of());
+            when(tramos.findBySesionSimulacionIdOrderByMinutoInicio(2L)).thenReturn(List.of());
+
+            // La abre aunque la sesión no toque ninguna vacante suya: eso lo decide el TODO
+            // de crear sesiones.
+            assertThat(servicio.verSesion(losDos, 2L).inscritos()).isEqualTo(2L);
+
+            verify(inscripciones, never()).countBySesionSimulacionIdAndEsVigenteTrue(anyLong());
+        }
+
+        @Test
         @DisplayName("Quien crea sesiones las abre todas, sin comprobar de quién son las vacantes")
         void conTodoNoSeComprueban() {
             when(permisos.alcanceDe("crear_sesiones_simulacion"))
@@ -829,29 +859,30 @@ class ServicioSimulacionImplTest {
         }
 
         @Test
-        @DisplayName("Con alcance PROPIO solo sale su propia inscripción")
-        void conAlcancePropioSoloLaSuya() {
+        @DisplayName("Con alcance PROPIO no sale nadie, ni siquiera quien llama")
+        void conAlcancePropioNoSaleNadie() {
+            // PROPIO significa «lo tuyo», y en el panel nada de esto es de quien mira: son
+            // candidatos. Los tres endpoints lo tratan igual —la lista de sesiones sale vacía,
+            // el detalle da 404 y aquí no sale nadie—, y esa es la razón del cambio: antes
+            // devolvía la inscripción de quien llamaba, un caso que además el panel no permite
+            // alcanzar, porque exige TIPO_EQUIPO y quien entra por ahí no tiene postulación.
             laSesionExiste();
             when(permisos.alcanceDe("ver_inscritos_simulacion"))
                     .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.PROPIO, USUARIO));
             when(inscripciones.findBySesionSimulacionIdAndEsVigenteTrue(SESION)).thenReturn(List.of(
                     InscripcionSesion.builder().id(1L).postulacionId(101L).esVigente(true)
-                            .inscritaEn(Instant.parse("2026-08-20T10:00:00Z")).build(),
-                    InscripcionSesion.builder().id(2L).postulacionId(102L).esVigente(true)
-                            .inscritaEn(Instant.parse("2026-08-19T10:00:00Z")).build()));
+                            .inscritaEn(Instant.parse("2026-08-20T10:00:00Z")).build()));
             when(postulaciones.findAllById(any())).thenReturn(List.of(
                     Postulacion.builder().id(101L).organizacionId(ORGANIZACION)
-                            .usuarioId(USUARIO).vacanteId(MI_VACANTE).build(),
-                    Postulacion.builder().id(102L).organizacionId(ORGANIZACION)
-                            .usuarioId(502L).vacanteId(MI_VACANTE).build()));
+                            .usuarioId(USUARIO).vacanteId(MI_VACANTE).build()));
             when(vacantes.findAllById(any())).thenReturn(List.of(
                     Vacante.builder().id(MI_VACANTE).titulo("Analista")
                             .responsableUsuarioId(OTRO_USUARIO).build()));
-            when(nombres.porUsuario(any())).thenReturn(Map.of(USUARIO, "Quien Llama"));
 
-            var lista = servicio.listarInscritos(QUIEN, SESION);
+            assertThat(servicio.listarInscritos(QUIEN, SESION)).isEmpty();
 
-            assertThat(lista).extracting(InscritoEnSesion::inscripcionId).containsExactly(1L);
+            // Y no se pide ningún nombre: no hay a quién nombrar.
+            verify(nombres, never()).porUsuario(any());
         }
 
         @Test

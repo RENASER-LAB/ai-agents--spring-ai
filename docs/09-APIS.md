@@ -203,6 +203,20 @@ candidatos, no la de la sala entera —y es la misma en la lista, en el detalle 
 filas de `/inscritos`—. Decir «6» y luego enseñar dos no se lee como un permiso: se lee como que
 faltan cuatro. El recorte lo hace la base, no un filtro en memoria: un alcance es un `WHERE`.
 
+**Las tres cifras cuadran con cualquier reparto, no solo con el que siembra la V37.** Son dos
+preguntas distintas y cada una la contesta su permiso: *qué sesiones veo* lo decide
+`crear_sesiones_simulacion` si quien llama lo tiene y si no `ver_inscritos_simulacion`; *a
+cuántos inscritos alcanzo* lo decide siempre `ver_inscritos_simulacion`, porque contar inscritos
+es verlos. Así, un rol al que se le den los dos permisos **con alcances distintos** —un solo PUT
+desde `administrar_permisos`— abre todas las sesiones y sigue contando solo a los suyos. Quien no
+tenga el segundo permiso ve el conteo entero: no puede abrir la lista, así que no hay dos cifras
+que puedan contradecirse, y un número de inscritos es aforo, no identidades.
+
+**`PROPIO` no alcanza a nadie en los tres endpoints**: lista vacía, **404** en el detalle y
+ninguna fila en `/inscritos`. En el panel nada de esto es de quien mira —son candidatos—, y
+`/panel/**` exige un token `TIPO_EQUIPO`, así que quien entra por ahí no tiene postulación
+propia que enseñarse a sí mismo.
+
 ⚠️ **Tres reglas mueven al candidato solo**, y son el único punto del sistema donde el estado de
 una postulación depende de otra tabla: publicar una sesión o ampliar su cupo mueve a quien
 esperaba; llenar la última devuelve a quien no se inscribió; cancelar devuelve a los inscritos.
