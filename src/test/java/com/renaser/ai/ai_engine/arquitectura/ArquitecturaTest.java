@@ -313,6 +313,10 @@ class ArquitecturaTest {
             "ServicioSimulacionImpl#laVisible",
             "ServicioDecisionImpl#laVisible",
             "ServicioValidacionImpl#laVisible",
+            // Llegó con el desglose de la evaluación (PR #38, en paralelo al multiempresa):
+            // mismo patrón exacto que los de arriba. La regla lo denunció al fusionar — que
+            // es justo para lo que existe — y la lectura confirmó que deriva del padre.
+            "ServicioDesgloseEvaluacionImpl#laVisible",
             // Derivan de una postulación o vacante ya validada por su guardián: la
             // vacante de la postulación, el puesto de la vacante, la plantilla que la
             // vacante tiene asignada (y que se validó contra el dueño al asignarla).

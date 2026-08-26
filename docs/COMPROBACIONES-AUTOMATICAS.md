@@ -47,14 +47,15 @@ demás de la calificación se prueba con un doble del modelo y no gasta nada.
 
 ---
 
-## 735 pruebas
+## 746 pruebas
 
-Contadas de correrlas el 26/08/2026 (tras las piezas D, E y F del multiempresa y su QA), no
-de recordarlas: el desglose sale de los informes de surefire y failsafe, y suma exacto.
+Contadas de correrlas el 26/08/2026 (tras las piezas D, E y F del multiempresa, su QA y la
+fusión con main, que trajo el ranking por etapa y el desglose de la evaluación), no de
+recordarlas: el desglose sale de los informes de surefire y failsafe, y suma exacto.
 
 | Qué | Cuántas | Necesita |
 |---|---:|---|
-| Unitarias, con dobles | 530 | nada |
+| Unitarias, con dobles | 541 | nada |
 | Arquitectura | 9 | nada |
 | Las fórmulas del banco v3 | 22 | nada |
 | El validador de las respuestas v3 | 21 | nada |
