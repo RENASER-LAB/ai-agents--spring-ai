@@ -1,7 +1,9 @@
 package com.renaser.ai.ai_engine.integracion;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.renaser.ai.ai_engine.integracion.soporte.ImagenesDeContenedores;
+import com.renaser.ai.ai_engine.integracion.soporte.RespuestaV3;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.MethodOrderer;
@@ -31,6 +33,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -39,9 +42,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  *
  * <p>La plataforma da de alta a ACME por el endpoint real; su administradora entra por la
  * invitación; ACME publica una vacante evaluando con el método de Renaser (banderas
- * apagadas); una candidata de la plataforma le postula y su postulación es de ACME; ACME
- * personaliza sus pesos sin llevarse el banco; y el borrado de la ley 29733 solo funciona
- * desde la plataforma. Entre medias, lo ajeno responde «no existe» — en los dos sentidos.
+ * apagadas); una candidata de la plataforma le postula y su postulación es de ACME; la
+ * candidata rinde el examen entero del banco de Renaser y ACME ve su nota, su bandeja y
+ * su embudo —y la plataforma no—; ACME personaliza sus pesos sin llevarse el banco; y el
+ * borrado de la ley 29733 solo funciona desde la plataforma. Entre medias, lo ajeno
+ * responde «no existe» — en los dos sentidos.
  *
  * <p>La regla de arquitectura ({@code ArquitecturaTest}) vigila la forma; esta prueba
  * vigila la verdad: aquí las dos organizaciones existen con datos, y una consulta sin
@@ -296,11 +301,81 @@ public class FlujoDosEmpresasIT {
                 .andExpect(status().isNotFound());
     }
 
+    // ============ El viaje completo de la candidata ============
+
+    @DisplayName("La candidata rinde el examen de Renaser y ACME ve la nota en su bandeja")
+    @Test
+    @Order(5)
+    void laCandidataRindeElExamenYAcmeVeLaNota() throws Exception {
+        String codigo = jdbc.queryForObject(
+                "select uuid::text from postulacion where id = " + postulacionAcmeId, String.class);
+
+        // El examen se arma con el banco de la plataforma: los 50 ítems del nivel de
+        // Ejecución, aunque la vacante sea de ACME. La bandera apagada no es solo una
+        // columna: es este examen existiendo sin que ACME haya escrito una pregunta.
+        JsonNode evaluacion = json.readTree(mvc.perform(
+                        post("/api/v1/portal/evaluacion/" + codigo + "/inicio")
+                                .header("Authorization", "Bearer " + tokenCandidata))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.estado").value("EN_CURSO"))
+                .andReturn().getResponse().getContentAsString());
+        assertThat(evaluacion.get("total").asInt()).isEqualTo(50);
+
+        // Los responde todos —cada formato del v3 con su forma— y entrega
+        for (JsonNode pregunta : evaluacion.get("preguntas")) {
+            mvc.perform(put("/api/v1/portal/evaluacion/" + codigo + "/respuestas/"
+                            + pregunta.get("id").asLong())
+                            .header("Authorization", "Bearer " + tokenCandidata)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(RespuestaV3.para(pregunta)))
+                    .andExpect(status().isOk());
+        }
+        mvc.perform(post("/api/v1/portal/evaluacion/" + codigo + "/entrega")
+                        .header("Authorization", "Bearer " + tokenCandidata))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.estado").value("TERMINADA"));
+
+        // Lo cerrado se puntuó al entregar —aritmética contra la clave, sin IA— y la
+        // nota quedó atada a los pesos de la PLATAFORMA: los que la vacante fijó al
+        // nacer. Que ACME personalice los suyos después no la mueve.
+        assertThat(jdbc.queryForObject("""
+                select vp.organizacion_id from nota_etapa ne
+                  join version_pesos vp on vp.id = ne.version_pesos_id
+                 where ne.postulacion_id = %d and ne.etapa_codigo = 'PERFIL_INTEGRAL'"""
+                .formatted(postulacionAcmeId), Long.class)).isEqualTo(plataformaId);
+
+        // ACME ve el viaje entero desde su panel: la ficha con el estado real, la nota
+        // de la evaluación en el perfil integral, la candidata en su bandeja de «lo
+        // trabaja el sistema» (con la IA apagada ahí se queda) y su embudo contándola.
+        conTokenGet("/api/v1/panel/postulaciones/" + postulacionAcmeId, tokenAcme)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.estado").value("PERFIL_CALIFICANDO"));
+        conTokenGet("/api/v1/panel/postulaciones/" + postulacionAcmeId + "/perfil-integral",
+                tokenAcme)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.notaEtapa").isNotEmpty());
+        conTokenGet("/api/v1/panel/bandeja?espera_a=SISTEMA", tokenAcme)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].postulacionId").value(postulacionAcmeId));
+        conTokenGet("/api/v1/panel/vacantes/" + vacanteAcmeId + "/embudo", tokenAcme)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.porEstado.PERFIL_CALIFICANDO").value(1));
+
+        // Y la plataforma sigue sin ver nada de esto: ni la nota ni la bandeja
+        conTokenGet("/api/v1/panel/postulaciones/" + postulacionAcmeId + "/perfil-integral",
+                tokenPlataforma)
+                .andExpect(status().isNotFound());
+        conTokenGet("/api/v1/panel/bandeja?espera_a=SISTEMA", tokenPlataforma)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
     // ============ El aislamiento ============
 
     @DisplayName("Lo ajeno responde «no existe», en los dos sentidos")
     @Test
-    @Order(5)
+    @Order(6)
     void loAjenoRespondeNoExiste() throws Exception {
         // La plataforma no ve lo operativo de ACME…
         conTokenGet("/api/v1/panel/vacantes/" + vacanteAcmeId, tokenPlataforma)
@@ -358,7 +433,7 @@ public class FlujoDosEmpresasIT {
 
     @DisplayName("ACME personaliza sus pesos: copia con origen, y el banco sigue compartido")
     @Test
-    @Order(6)
+    @Order(7)
     void acmePersonalizaSusPesos() throws Exception {
         conToken(post("/api/v1/panel/organizacion/personalizacion"), tokenAcme,
                 "{\"instrumento\":\"PESOS\"}").andExpect(status().isOk());
@@ -392,7 +467,7 @@ public class FlujoDosEmpresasIT {
 
     @DisplayName("El borrado de la ley 29733 es de la plataforma: desde ACME ni se lista")
     @Test
-    @Order(7)
+    @Order(8)
     void elBorradoEsDeLaPlataforma() throws Exception {
         mvc.perform(post("/api/v1/portal/solicitudes-borrado")
                         .contentType(MediaType.APPLICATION_JSON)

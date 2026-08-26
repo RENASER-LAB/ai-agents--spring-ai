@@ -47,10 +47,10 @@ demás de la calificación se prueba con un doble del modelo y no gasta nada.
 
 ---
 
-## 681 pruebas
+## 682 pruebas
 
-Contadas de correrlas el 25/08/2026 (tras el multiempresa y su QA), no de recordarlas: el
-desglose sale de los informes de surefire y failsafe, y suma exacto.
+Contadas de correrlas el 25/08/2026 (tras el multiempresa, su QA y la revisión final), no de
+recordarlas: el desglose sale de los informes de surefire y failsafe, y suma exacto.
 
 | Qué | Cuántas | Necesita |
 |---|---:|---|
@@ -59,7 +59,7 @@ desglose sale de los informes de surefire y failsafe, y suma exacto.
 | Las fórmulas del banco v3 | 22 | nada |
 | El validador de las respuestas v3 | 21 | nada |
 | El perfil del candidato (paquete `perfil`: merge, lectura, CRUD, retención, borrado) | 52 | nada |
-| Integración, de punta a punta | 86 | Docker |
+| Integración, de punta a punta | 87 | Docker |
 | Contra el proveedor de verdad, y el envío de correo | 6 | Docker o SMTP, y su bandera |
 
 El multiempresa (25/08) sumó 39 unitarias: 31 de la implementación —el login del panel, las
@@ -67,7 +67,10 @@ invitaciones, el alta de empresas, el resolutor de dueño de instrumento, el cop
 personalización—, una regla de arquitectura nueva y `FlujoDosEmpresasIT` (dos empresas de
 verdad, de punta a punta); y 8 del QA —la carrera del canje, el equipo que no entra al
 portal, el mismo correo en dos empresas, y una prueba negativa por cada fuga cerrada que no
-la tenía (inscripción, barrera, prueba ajena, alerta ajena).
+la tenía (inscripción, barrera, prueba ajena, alerta ajena). La revisión final añadió a
+`FlujoDosEmpresasIT` el viaje que faltaba: la candidata rinde el examen entero del banco de
+Renaser en la vacante de ACME, la nota queda atada a los pesos de la plataforma, y ACME ve
+la ficha, la nota, su bandeja y su embudo — mientras la plataforma no ve nada de eso.
 
 ⚠️ Al recontar, **no sirve el atributo `tests=`** de los XML de surefire: con clases anidadas
 (`@Nested`) subcuenta, y por eso dos filas de esta tabla llevaban tiempo mal —las fórmulas
