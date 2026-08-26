@@ -5,6 +5,7 @@ import com.renaser.ai.ai_engine.ai.model.TrabajoIa;
 import com.renaser.ai.ai_engine.ai.repository.TrabajoIaRepository;
 import com.renaser.ai.ai_engine.ai.service.AgenteSeleccion;
 import com.renaser.ai.ai_engine.ai.service.ColaCalificacionIa;
+import com.renaser.ai.ai_engine.organizacion.repository.OrganizacionRepository;
 import com.renaser.ai.ai_engine.perfilintegral.service.PuenteCalificacionIa;
 
 import lombok.extern.slf4j.Slf4j;
@@ -90,6 +91,7 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
     private final TrabajoIaPublisher publicador;
     private final PuenteCalificacionIa puente;
     private final TopeMensualIa tope;
+    private final OrganizacionRepository organizaciones;
     private final Map<String, AgenteSeleccion> agentes;
     private final boolean habilitada;
     private final int maxIntentos;
@@ -100,6 +102,7 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
                                   TrabajoIaPublisher publicador,
                                   PuenteCalificacionIa puente,
                                   TopeMensualIa tope,
+                                  OrganizacionRepository organizaciones,
                                   List<AgenteSeleccion> agentes,
                                   @Value("${renaser.ai.calificacion.habilitada:true}") boolean habilitada,
                                   @Value("${renaser.ai.calificacion.max-intentos:3}") int maxIntentos,
@@ -109,6 +112,7 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
         this.publicador = publicador;
         this.puente = puente;
         this.tope = tope;
+        this.organizaciones = organizaciones;
         this.agentes = agentes.stream()
                 .collect(Collectors.toMap(AgenteSeleccion::codigo, Function.identity()));
         this.habilitada = habilitada;
@@ -357,10 +361,15 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
     }
 
     /**
-     * Despierta los trabajos congelados por el tope de IA cuyas organizaciones ya tienen
-     * cupo: el tope subió, o empezó el mes (pieza E). «La cola arranca sola con lo que
-     * quedó esperando» — este barrido es ese arranque, y corre con el mismo sondeo de
-     * los atascados.
+     * Despierta los trabajos congelados cuyas organizaciones ya tienen cupo Y están
+     * activas: el tope subió, empezó el mes (pieza E), o Renaser reactivó la empresa
+     * (pieza F). «La cola arranca sola con lo que quedó esperando» — este barrido es ese
+     * arranque, y corre con el mismo sondeo de los atascados.
+     *
+     * <p>Una organización suspendida NO despierta aunque le sobre cupo: suspendida es
+     * congelada, y despertarle trabajos sería gastar en el modelo por una empresa a la
+     * que Renaser le cerró la puerta. Sus EN_ESPERA no son zombis: el mismo barrido los
+     * suelta en el primer ciclo tras la reactivación.
      *
      * <p>El cupo se pregunta UNA vez por organización, no por trabajo: la suma del mes es
      * la parte cara. Y al despertar se sueltan TODOS los de esa organización aunque el
@@ -372,7 +381,7 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
                 .stream()
                 .collect(Collectors.groupingBy(TrabajoIa::getOrganizacionId));
         esperando.forEach((organizacionId, suyos) -> {
-            if (tope.sinCupo(organizacionId)) {
+            if (suspendida(organizacionId) || tope.sinCupo(organizacionId)) {
                 return;
             }
             for (TrabajoIa trabajo : suyos) {
@@ -489,12 +498,19 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
 
     /**
      * Crea el trabajo y lo publica a la cola — o lo deja EN_ESPERA si la organización
-     * agotó su tope mensual de IA (pieza E).
+     * agotó su tope mensual de IA (pieza E) o está suspendida (pieza F).
      *
      * <p>Este es el embudo de los trabajos NUEVOS, y por eso el tope se pregunta aquí y
      * no al ejecutar: lo ya publicado es una promesa y termina. El retrato que cierra una
      * tanda ({@code dispararElRetrato}) tampoco pasa por aquí a propósito: sus tres
      * insumos ya se pagaron, y dejarlos resumidos cuesta una llamada que no frena nada.
+     *
+     * <p>La suspensión congela con la misma mecánica que el tope, y por la misma razón
+     * coherente: lo en vuelo (PENDIENTE/EN_CURSO ya publicado) termina, lo nuevo espera.
+     * Un candidato que ya estaba dentro puede seguir entregando —su evaluación, su
+     * prueba— y eso pide calificaciones nuevas; gastarlas en el modelo mientras Renaser
+     * tiene la puerta cerrada sería pagar por una empresa congelada. Al reactivar, el
+     * barrido las suelta solo.
      *
      * <p>El candidato no ve la espera: para {@code comoVan} un EN_ESPERA está EN_CURSO,
      * que es la verdad — se va a calificar, solo que cuando haya cupo o cambie el mes.
@@ -507,17 +523,40 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
         if (creado.isEmpty()) {
             return false;
         }
-        if (tope.sinCupo(organizacionId) && registro.dejarEnEspera(creado.get().getId())) {
-            log.warn("La organización {} agotó su tope mensual de IA: el trabajo {} ({}) queda "
-                            + "EN_ESPERA hasta que suba el tope o empiece el mes",
-                    organizacionId, creado.get().getId(), agente);
+        // La suspensión se mira primero: es una lectura por clave primaria, y a una
+        // organización congelada no se le paga ni la suma del consumo del mes.
+        String freno = suspendida(organizacionId) ? "está suspendida"
+                : tope.sinCupo(organizacionId) ? "agotó su tope mensual de IA" : null;
+        if (freno != null && registro.dejarEnEspera(creado.get().getId())) {
+            log.warn("La organización {} {}: el trabajo {} ({}) queda EN_ESPERA hasta que "
+                            + "el barrido la encuentre con cupo y activa",
+                    organizacionId, freno, creado.get().getId(), agente);
             return true;
         }
         publicador.publicar(creado.get().getId());
         // El aviso del 80% se dispara donde el gasto crece: al encolar con cupo. Manda
-        // una sola vez por mes y jamás rompe el encolado.
-        tope.avisarSiCruzaElUmbral(organizacionId);
+        // una sola vez por mes y jamás rompe el encolado: corre en su propia transacción
+        // (REQUIRES_NEW) y cualquier tropiezo suyo se anota y se traga — la postulación
+        // que lo disparó no puede caerse por una campana.
+        try {
+            tope.avisarSiCruzaElUmbral(organizacionId);
+        } catch (RuntimeException e) {
+            log.error("El aviso del 80% del tope de IA de la organización {} falló y se ignora: "
+                    + "el encolado del trabajo {} sigue en pie. Motivo: {}",
+                    organizacionId, creado.get().getId(), mensaje(e));
+        }
         return true;
+    }
+
+    /**
+     * Si la organización está suspendida (pieza F): congelada, también para la IA nueva.
+     * Una organización que no existe no puede frenar nada — no debería pasar, y si pasa
+     * el trabajo seguirá el camino normal y fallará donde se vea.
+     */
+    private boolean suspendida(Long organizacionId) {
+        return organizaciones.findById(organizacionId)
+                .map(organizacion -> !organizacion.isEsActiva())
+                .orElse(false);
     }
 
     /**

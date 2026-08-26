@@ -337,6 +337,23 @@ public class FlujoPlataformaIT {
                  where organizacion_id = %d and codigo = 'tope_mensual_ia'"""
                 .formatted(acmeId), String.class)).isEqualTo("100");
 
+        // Con ACME SUSPENDIDA el barrido no despierta nada, ni con el cupo recién subido:
+        // suspendida es congelada (pieza F), y despertarle trabajos sería gastar en el
+        // modelo por una empresa a la que Renaser le cerró la puerta.
+        conToken(post("/api/v1/panel/plataforma/empresas/" + acmeId + "/suspension"),
+                tokenPlataforma, "{\"motivo\":\"Impago, justo cuando subía el tope\"}")
+                .andExpect(status().isOk());
+        cola.reintentarAtascados();
+        assertThat(jdbc.queryForObject("""
+                select estado from trabajo_ia
+                 where postulacion_id = %d and agente_codigo = 'DATOS_CV'"""
+                .formatted(postulacionEnEsperaId), String.class)).isEqualTo("EN_ESPERA");
+
+        // Reactivada, el MISMO barrido la encuentra activa y con cupo: nada quedó zombi
+        conToken(post("/api/v1/panel/plataforma/empresas/" + acmeId + "/reactivacion"),
+                tokenPlataforma, "{\"motivo\":\"Se puso al día\"}")
+                .andExpect(status().isOk());
+
         // El mismo barrido de los atascados: en producción corre solo cada cinco
         // minutos; aquí se le llama para no esperarlo.
         cola.reintentarAtascados();

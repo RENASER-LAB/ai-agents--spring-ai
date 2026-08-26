@@ -69,6 +69,9 @@ class ColaCalificacionIaImplTest {
     // Sin tope por defecto (sinCupo devuelve false en el mock): las pruebas del tope lo
     // encienden una a una.
     @Mock private TopeMensualIa tope;
+    // Sin organización por defecto (findById vacío = activa): las pruebas de la
+    // suspensión la apagan una a una.
+    @Mock private com.renaser.ai.ai_engine.organizacion.repository.OrganizacionRepository organizaciones;
     @Mock private AgenteSeleccion datosCv;
     @Mock private AgenteSeleccion evidenciaCv;
     @Mock private AgenteSeleccion evaluador;
@@ -254,6 +257,60 @@ class ColaCalificacionIaImplTest {
 
         verify(registro, never()).despertar(anyLong());
         verifyNoInteractions(publicador);
+    }
+
+    // ============ La suspensión congela también la IA (pieza F) ============
+
+    @Test
+    void unaOrganizacionSuspendidaCongelaSusTrabajosNuevosSinPagarNiLaSuma() {
+        // Un candidato que ya estaba dentro puede seguir entregando —su evaluación, su
+        // prueba— y eso pide calificaciones nuevas. Suspendida es congelada: la misma
+        // espera del tope, sin gastar en el modelo por una empresa con la puerta cerrada.
+        // Y sin pagar la suma del consumo: la suspensión se mira antes que el cupo.
+        when(organizaciones.findById(1L)).thenReturn(Optional.of(
+                com.renaser.ai.ai_engine.organizacion.entity.Organizacion.builder()
+                        .id(1L).esActiva(false).build()));
+        when(registro.crearSiHaceFalta(1L, POSTULACION, AgentePruebaPuesto.CODIGO_AGENTE, "FINA", null))
+                .thenReturn(Optional.of(trabajo(42L, AgentePruebaPuesto.CODIGO_AGENTE, "PENDIENTE", "FINA")));
+        when(registro.dejarEnEspera(42L)).thenReturn(true);
+
+        assertThat(cola.encolarPruebaPuesto(POSTULACION)).isTrue();
+
+        verifyNoInteractions(publicador, tope);
+    }
+
+    @Test
+    void elBarridoNoDespiertaAUnaSuspendidaAunqueLeSobreCupo() {
+        // Despertar trabajos de una suspendida sería gastar por una empresa congelada.
+        // No son zombis: el mismo barrido los suelta al primer ciclo tras reactivarla —
+        // el caso de la organización activa ya lo cubre elBarridoDespiertaLosQueEsperan.
+        when(trabajos.findByEstadoOrderByIdAsc("EN_ESPERA")).thenReturn(List.of(
+                trabajo(42L, AgenteDatosCv.CODIGO_AGENTE, "EN_ESPERA", "FINA")));
+        when(organizaciones.findById(1L)).thenReturn(Optional.of(
+                com.renaser.ai.ai_engine.organizacion.entity.Organizacion.builder()
+                        .id(1L).esActiva(false).build()));
+
+        cola.reintentarAtascados();
+
+        verify(registro, never()).despertar(anyLong());
+        verifyNoInteractions(publicador, tope);
+    }
+
+    // ============ La campana jamás tumba el encolado ============
+
+    @Test
+    void unTropiezoDelAvisoDel80NoTumbaElEncolado() {
+        // El aviso corre dentro de la transacción de postular (vía trasPostular →
+        // encolarDatosCv): si su fallo escapara, una campana rota tumbaría postulaciones.
+        // Se traga con su error anotado, y el trabajo queda publicado igual.
+        when(registro.crearSiHaceFalta(1L, POSTULACION, AgentePruebaPuesto.CODIGO_AGENTE, "FINA", null))
+                .thenReturn(Optional.of(trabajo(42L, AgentePruebaPuesto.CODIGO_AGENTE, "PENDIENTE", "FINA")));
+        doThrow(new IllegalStateException("se cayó la campana"))
+                .when(tope).avisarSiCruzaElUmbral(1L);
+
+        assertThat(cola.encolarPruebaPuesto(POSTULACION)).isTrue();
+
+        verify(publicador).publicar(42L);
     }
 
     // ============ El paso que toca, y no siempre es el primero ============
@@ -762,7 +819,7 @@ class ColaCalificacionIaImplTest {
     }
 
     private ColaCalificacionIaImpl conLaCalificacion(boolean habilitada) {
-        return new ColaCalificacionIaImpl(trabajos, registro, publicador, puente, tope,
+        return new ColaCalificacionIaImpl(trabajos, registro, publicador, puente, tope, organizaciones,
                 List.of(datosCv, evidenciaCv, evaluador, potencialRiesgo, pruebaPuesto, simulacion),
                 habilitada, 3, 15);
     }

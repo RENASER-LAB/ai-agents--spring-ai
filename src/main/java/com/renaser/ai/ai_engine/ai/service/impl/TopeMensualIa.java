@@ -82,8 +82,17 @@ public class TopeMensualIa {
      * lo ha mandado. Se llama al encolar un trabajo que SÍ tuvo cupo: es el momento en
      * que el gasto crece, y quien está por encima del 100% ya no necesita el aviso —sus
      * trabajos quedan en espera, que avisa solo.
+     *
+     * <p><b>En su propia transacción (REQUIRES_NEW), a propósito.</b> El encolado corre
+     * dentro de la transacción de postular, y una campana no puede tumbar una
+     * postulación: si dos postulaciones cruzan el umbral a la vez, las dos intentan crear
+     * la marca del mes y una choca con el UNIQUE de {@code parametro} — con la
+     * transacción compartida ese choque la marcaba entera para deshacer y el candidato
+     * veía un 500 por un aviso que además YA salió por la otra. Aparte, quien llama
+     * ({@code crearYAvisar}) traga cualquier tropiezo de este método; separar la
+     * transacción es lo que hace que tragarlo alcance.
      */
-    @Transactional
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
     public void avisarSiCruzaElUmbral(Long organizacionId) {
         Optional<BigDecimal> tope = topeDe(organizacionId);
         if (tope.isEmpty()) {
