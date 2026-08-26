@@ -171,8 +171,22 @@ se hayan despachado cien de una vez.
 | Definir la matriz de información crítica | ○ | ● | ◐ | ● | ○ |
 | Calificar la simulación | ○ | ● | ◐ | ● | ○ |
 | Hacer la conversación final | ○ | ● | ◐ | ● | ○ |
+| **Ver las marcas de los eventos observables** | ○ | ● | ◐ | ● | ○ |
+| **Marcar los eventos observables, en vivo** | ○ | ● | ○ † | ● | ○ |
 | Marcar quién asistió | ○ | ● | ● | ● | ○ |
 | Decidir qué hacer con un ausente | ○ | ● | ○ | ● | ○ |
+
+† Las dos filas de las marcas son el mismo permiso, `marcar_eventos_simulacion`, y al
+responsable del área **la V18 se lo siembra en `SUS_VACANTES`** —eso es el ◐ de la fila de
+arriba—: con él **lee** las marcas de los candidatos de sus vacantes, y una inscripción que no lo
+sea responde 404. El ○ de esta fila no sale del reparto de permisos sino de un parámetro:
+**marcar** exige además un rol de los que admite `roles_facilitador_simulacion`, que arranca en
+`TALENTO, DIRECCION` y se edita desde el panel sin desplegar. Si se añade su rol ahí, marca, y
+siempre dentro de sus vacantes. Y si la sesión tiene responsables asignados, solo ellos la
+conducen, sea cual sea su rol.
+
+Marcar quién asistió es la única acción de simulación donde el responsable del área tiene
+alcance pleno (●) y no «solo lo suyo»: puede estar en la sala sin dirigir esa vacante.
 
 ### Validación práctica
 

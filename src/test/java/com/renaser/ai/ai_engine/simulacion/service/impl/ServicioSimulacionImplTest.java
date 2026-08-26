@@ -806,6 +806,32 @@ class ServicioSimulacionImplTest {
         }
 
         @Test
+        @DisplayName("Con ver inscritos en PROPIO el conteo es cero, que es lo que enseña la lista")
+        void conPropioElConteoEsCero() {
+            // El otro reparto que un PUT deja montado: crear sesiones en TODO y ver inscritos
+            // en PROPIO. Abre la sesión por el primero, pero /inscritos con PROPIO no devuelve
+            // a nadie, así que el conteo tampoco puede decir seis.
+            ContextoUsuario losDos = new ContextoUsuario(USUARIO, 3L, ORGANIZACION, "EQUIPO",
+                    List.of(2L), Map.of("crear_sesiones_simulacion", "TODO",
+                            "ver_inscritos_simulacion", "PROPIO"));
+            when(permisos.alcanceDe("crear_sesiones_simulacion"))
+                    .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.TODO, USUARIO));
+            when(permisos.alcanceDe("ver_inscritos_simulacion"))
+                    .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.PROPIO, USUARIO));
+            when(sesiones.findByIdAndOrganizacionId(2L, ORGANIZACION))
+                    .thenReturn(Optional.of(sesion(2L)));
+            when(sesionesVacante.findBySesionSimulacionId(2L)).thenReturn(List.of());
+            when(responsables.findBySesionSimulacionId(2L)).thenReturn(List.of());
+            when(tramos.findBySesionSimulacionIdOrderByMinutoInicio(2L)).thenReturn(List.of());
+
+            assertThat(servicio.verSesion(losDos, 2L).inscritos()).isZero();
+
+            // Ni se cuenta el total ni se pregunta por los de una vacante: con PROPIO es cero.
+            verify(inscripciones, never()).countBySesionSimulacionIdAndEsVigenteTrue(anyLong());
+            verify(inscripciones, never()).contarVigentesPorSesionDe(anyList(), anyLong());
+        }
+
+        @Test
         @DisplayName("Quien crea sesiones las abre todas, sin comprobar de quién son las vacantes")
         void conTodoNoSeComprueban() {
             when(permisos.alcanceDe("crear_sesiones_simulacion"))

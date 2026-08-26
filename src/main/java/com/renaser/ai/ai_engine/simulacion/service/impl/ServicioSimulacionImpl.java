@@ -175,10 +175,12 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
         }
 
         Map<Long, Long> inscritos = new HashMap<>();
-        Long soloDe = aQuienSeRecortaElConteo(quien);
-        List<Object[]> conteo = soloDe == null
+        // Aquí PROPIO no llega: la lista sale vacía mucho antes. Solo hay dos casos.
+        FiltroAlcance deInscritos = alcanceParaContarInscritos(quien);
+        List<Object[]> conteo =
+                deInscritos == null || deInscritos.tipo() == FiltroAlcance.Tipo.TODO
                 ? inscripciones.contarVigentesPorSesion(ids)
-                : inscripciones.contarVigentesPorSesionDe(ids, soloDe);
+                : inscripciones.contarVigentesPorSesionDe(ids, deInscritos.usuarioId());
         for (Object[] fila : conteo) {
             inscritos.put((Long) fila[0], (Long) fila[1]);
         }
@@ -216,7 +218,7 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
             throw new ResourceNotFoundException("Sesión", "id", sesionId);
         }
         // El mismo recorte que la lista, o el detalle contaría a gente que luego no puede abrir.
-        return comoPanel(sesion, aQuienSeRecortaElConteo(quien));
+        return comoPanel(sesion, alcanceParaContarInscritos(quien));
     }
 
     /**
@@ -239,21 +241,21 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
     }
 
     /**
-     * A quién hay que recortar el conteo de inscritos, o nulo si no hay que recortarlo.
+     * Con qué alcance se cuentan los inscritos, o nulo si quien mira no puede verlos.
      *
      * <p>Va por {@code ver_inscritos_simulacion} y no por el permiso con que se llegó a la
      * sesión, porque contar inscritos es ver inscritos: si se resolviera con el otro, un rol
-     * con crear sesiones en TODO y ver inscritos en SUS_VACANTES vería «6» en la sesión y dos
-     * filas al abrirla. Ese reparto no es el que siembra la V37, pero es un solo PUT desde el
-     * panel de permisos —que es justo lo que esta rama abre—.
+     * con crear sesiones en TODO y ver inscritos acotado vería «6» en la sesión y dos filas al
+     * abrirla. Ese reparto no es el que siembra la V37, pero es un solo PUT desde el panel de
+     * permisos —que es justo lo que esta rama abre—.
      *
-     * <p>Quien no tiene el permiso en absoluto se queda con el conteo entero: no puede abrir la
-     * lista, así que no hay dos cifras que puedan contradecirse, y el número de inscritos de
+     * <p>Nulo significa que no tiene el permiso, y entonces el conteo va entero: no puede abrir
+     * la lista, así que no hay dos cifras que puedan contradecirse, y el número de inscritos de
      * una sesión es aforo, no identidades.
      */
-    private Long aQuienSeRecortaElConteo(ContextoUsuario quien) {
+    private FiltroAlcance alcanceParaContarInscritos(ContextoUsuario quien) {
         return quien.tiene("ver_inscritos_simulacion")
-                ? permisos.alcanceDe("ver_inscritos_simulacion").responsableOFiltroNulo()
+                ? permisos.alcanceDe("ver_inscritos_simulacion")
                 : null;
     }
 
@@ -777,14 +779,13 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
     /**
      * Una sola sesión: se piden sus cuatro cosas sueltas porque no hay tanda con la que ir.
      *
-     * @param soloDe si no es nulo, el conteo cuenta solo a los inscritos de las vacantes de ese
-     *               responsable. Es el mismo recorte que hace la lista, y tiene que ser el mismo:
-     *               si la lista dijera dos y el detalle de esa sesión dijera seis, la cifra no
-     *               significaría nada
+     * @param deInscritos con qué alcance se cuentan los inscritos. Es el mismo recorte que hace
+     *                    la lista, y tiene que ser el mismo: si la lista dijera dos y el detalle
+     *                    de esa sesión dijera seis, la cifra no significaría nada
      */
-    private SesionPanel comoPanel(SesionSimulacion s, Long soloDe) {
+    private SesionPanel comoPanel(SesionSimulacion s, FiltroAlcance deInscritos) {
         return comoPanel(s,
-                inscritosVisibles(s.getId(), soloDe),
+                inscritosVisibles(s.getId(), deInscritos),
                 sesionesVacante.findBySesionSimulacionId(s.getId()).stream()
                         .map(SesionVacante::getVacanteId).toList(),
                 responsables.findBySesionSimulacionId(s.getId()).stream()
@@ -792,13 +793,22 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
                 tramosDe(s.getId()));
     }
 
-    /** Cuántos inscritos vigentes tiene la sesión, recortados a los de {@code soloDe} si lo hay. */
-    private long inscritosVisibles(Long sesionId, Long soloDe) {
-        if (soloDe == null) {
+    /**
+     * Cuántos inscritos de esa sesión cuentan para quien mira, según su alcance.
+     *
+     * <p>Un alcance nulo es «no tiene el permiso de ver inscritos», y entonces cuenta la sesión
+     * entera. {@code PROPIO} cuenta cero, no todos: es lo que la lista de inscritos devuelve
+     * con ese alcance, y las dos cifras tienen que decir lo mismo.
+     */
+    private long inscritosVisibles(Long sesionId, FiltroAlcance alcance) {
+        if (alcance == null || alcance.tipo() == FiltroAlcance.Tipo.TODO) {
             return inscripciones.countBySesionSimulacionIdAndEsVigenteTrue(sesionId);
         }
-        return inscripciones.contarVigentesPorSesionDe(List.of(sesionId), soloDe).stream()
-                .findFirst().map(fila -> (Long) fila[1]).orElse(0L);
+        if (alcance.tipo() == FiltroAlcance.Tipo.PROPIO) {
+            return 0L;
+        }
+        return inscripciones.contarVigentesPorSesionDe(List.of(sesionId), alcance.usuarioId())
+                .stream().findFirst().map(fila -> (Long) fila[1]).orElse(0L);
     }
 
     private SesionPanel comoPanel(SesionSimulacion s, long inscritos, List<Long> vacanteIds,

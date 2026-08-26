@@ -203,19 +203,24 @@ candidatos, no la de la sala entera —y es la misma en la lista, en el detalle 
 filas de `/inscritos`—. Decir «6» y luego enseñar dos no se lee como un permiso: se lee como que
 faltan cuatro. El recorte lo hace la base, no un filtro en memoria: un alcance es un `WHERE`.
 
-**Las tres cifras cuadran con cualquier reparto, no solo con el que siembra la V37.** Son dos
-preguntas distintas y cada una la contesta su permiso: *qué sesiones veo* lo decide
-`crear_sesiones_simulacion` si quien llama lo tiene y si no `ver_inscritos_simulacion`; *a
-cuántos inscritos alcanzo* lo decide siempre `ver_inscritos_simulacion`, porque contar inscritos
-es verlos. Así, un rol al que se le den los dos permisos **con alcances distintos** —un solo PUT
-desde `administrar_permisos`— abre todas las sesiones y sigue contando solo a los suyos. Quien no
-tenga el segundo permiso ve el conteo entero: no puede abrir la lista, así que no hay dos cifras
-que puedan contradecirse, y un número de inscritos es aforo, no identidades.
+**Las tres cifras cuadran con cualquier reparto, no solo con el que siembra la V37.** Son dos preguntas distintas y cada una la contesta su permiso: *qué sesiones
+veo* lo decide `crear_sesiones_simulacion` si quien llama lo tiene y si no
+`ver_inscritos_simulacion`; *a cuántos inscritos alcanzo* lo decide siempre
+`ver_inscritos_simulacion`, porque contar inscritos es verlos. Así, un rol al que se le den los
+dos permisos **con alcances distintos** —un solo PUT desde `administrar_permisos`— abre todas las
+sesiones y sigue contando solo a los suyos. Quien no tenga el segundo permiso ve el conteo
+entero: no puede abrir la lista, así que no hay dos cifras que puedan contradecirse, y un número
+de inscritos es aforo, no identidades.
 
 **`PROPIO` no alcanza a nadie en ninguno de estos endpoints**: lista vacía, **404** en el
 detalle y ninguna fila en `/inscritos`, y lo mismo en las marcas y la asistencia. En el panel
 nada de esto es de quien mira —son candidatos—, y `/panel/**` exige un token `TIPO_EQUIPO`, así
 que quien entra por ahí no tiene postulación propia que enseñarse a sí mismo.
+
+Y con `PROPIO` el conteo es **cero**, que es lo que `/inscritos` devuelve con ese alcance. Nadie
+lo tiene hoy así, pero es un valor válido y se pone con ese mismo PUT: a quien además tuviera
+`crear_sesiones_simulacion` en `TODO`, la sesión le diría «6» y la lista le devolvería cero
+filas si el conteo no distinguiera los tres casos.
 
 ⚠️ **Las marcas y la asistencia también miran el alcance, y la inscripción también mira la
 organización.** Los tres endpoints de `/inscripciones/{id}` pedían su permiso y tiraban el
