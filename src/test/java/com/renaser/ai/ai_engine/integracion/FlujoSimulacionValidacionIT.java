@@ -281,6 +281,12 @@ public class FlujoSimulacionValidacionIT {
         conToken(post("/api/v1/panel/inscripciones/" + inscripcion + "/marcas"), tokenArea,
                 "{\"evento\":\"INICIO\"}").andExpect(status().isForbidden());
 
+        // Y una inscripción que no existe le contesta lo mismo, no un 404: el rol se comprueba
+        // antes de ir a buscarla. Si no, la diferencia entre las dos respuestas le iría diciendo
+        // qué ids hay dentro, sin necesidad de poder marcar nada.
+        conToken(post("/api/v1/panel/inscripciones/999999/marcas"), tokenArea,
+                "{\"evento\":\"INICIO\"}").andExpect(status().isForbidden());
+
         // Se añade su rol al parámetro -desde el panel, sin desplegar nada- y ahora sí puede
         conToken(put("/api/v1/panel/parametros/roles_facilitador_simulacion"), tokenTalento,
                 "{\"valor\":\"TALENTO,DIRECCION,RESPONSABLE_AREA\",\"motivo\":\"Rosa conduce las sesiones de su área\"}")

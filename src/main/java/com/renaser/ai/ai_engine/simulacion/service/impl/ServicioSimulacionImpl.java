@@ -521,12 +521,15 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
     @Override
     @Transactional
     public void marcarEvento(ContextoUsuario quien, Long inscripcionId, MarcarEvento datos) {
+        // Lo que no depende de la inscripción se comprueba antes de cargarla. Si no, quien
+        // tiene el permiso pero no el rol de facilitador recibe un 403 cuando la inscripción
+        // existe y un 404 cuando no, y esa diferencia le dice qué ids hay.
+        FiltroAlcance alcance = permisos.alcanceDe("marcar_eventos_simulacion");
+        exigirRolDeFacilitador(quien.organizacionId(), quien.usuarioId());
+
         InscripcionYPostulacion par = laInscripcion(quien, inscripcionId);
-        // Facilitar ya resuelve el alcance de este permiso, así que se aprovecha en vez de
-        // volver a pedirlo: preguntar dos veces lo mismo invita a que un día no coincidan.
-        FiltroAlcance alcance = exigirQuePuedaFacilitar(
-                quien, par.inscripcion().getSesionSimulacionId());
         exigirQueAlcance(quien, alcance, par);
+        exigirSerDeLosResponsables(quien, par.inscripcion().getSesionSimulacionId());
 
         // Cada evento ocurre una vez. Volver a marcarlo corrige la hora, no crea otro.
         MarcaTiempoSimulacion marca = marcas
@@ -667,26 +670,20 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
     // ============ Apoyo ============
 
     /**
-     * Quién puede facilitar una sesión: el permiso, más un rol de los que admite el parámetro
-     * {@code roles_facilitador_simulacion}, más —si la sesión tiene responsables asignados— ser
-     * uno de ellos.
+     * Si la sesión tiene responsables asignados, solo ellos la conducen.
      *
-     * <p>El parámetro es lo que hace esto cambiable sin desplegar: hoy son Talento y Dirección,
-     * mañana puede ser otro rol, y basta con editarlo desde el panel.
+     * <p>Si no tiene, basta con el permiso y el rol: no todas las sesiones necesitan nombrar a
+     * alguien. Esto va aparte de {@link #exigirRolDeFacilitador} porque es lo único de
+     * facilitar que necesita saber de qué sesión hablamos, y por tanto lo único que no puede
+     * comprobarse antes de cargar la inscripción.
      */
-    private FiltroAlcance exigirQuePuedaFacilitar(ContextoUsuario quien, Long sesionId) {
-        FiltroAlcance alcance = permisos.alcanceDe("marcar_eventos_simulacion");
-        exigirRolDeFacilitador(quien.organizacionId(), quien.usuarioId());
-
-        // Si la sesión tiene responsables asignados, solo ellos la conducen. Si no tiene,
-        // basta con el permiso y el rol: no todas las sesiones necesitan nombrar a alguien.
+    private void exigirSerDeLosResponsables(ContextoUsuario quien, Long sesionId) {
         List<SesionResponsable> asignados = responsables.findBySesionSimulacionId(sesionId);
         if (!asignados.isEmpty()
                 && asignados.stream().noneMatch(r -> r.getUsuarioId().equals(quien.usuarioId()))) {
             throw new AccessDeniedException(
                     "Esta sesión tiene responsables asignados y no eres uno de ellos");
         }
-        return alcance;
     }
 
     /**
