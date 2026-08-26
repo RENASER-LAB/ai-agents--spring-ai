@@ -806,6 +806,39 @@ class ServicioSimulacionImplTest {
         }
 
         @Test
+        @DisplayName("Con ver inscritos en PROPIO la lista también cuenta cero, no los de sus vacantes")
+        void conPropioLaListaTambienCuentaCero() {
+            // El cuarto sitio por el que salió la misma incoherencia: la lista de sesiones
+            // contaba por su cuenta y con PROPIO caía en la consulta de SUS_VACANTES, así que
+            // enseñaba los inscritos de sus vacantes mientras el detalle decía cero. Solo pasa
+            // si quien mira dirige alguna vacante con gente dentro —si no, la consulta devuelve
+            // cero por casualidad y el número parece bueno—, que es lo que lo escondía.
+            ContextoUsuario losDos = new ContextoUsuario(USUARIO, 3L, ORGANIZACION, "EQUIPO",
+                    List.of(2L), Map.of("crear_sesiones_simulacion", "TODO",
+                            "ver_inscritos_simulacion", "PROPIO"));
+            when(permisos.alcanceDe("crear_sesiones_simulacion"))
+                    .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.TODO, USUARIO));
+            when(permisos.alcanceDe("ver_inscritos_simulacion"))
+                    .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.PROPIO, USUARIO));
+            when(sesiones.findByOrganizacionIdOrderByFechaHora(ORGANIZACION))
+                    .thenReturn(List.of(sesion(1L)));
+            when(sesionesVacante.findBySesionSimulacionIdIn(List.of(1L))).thenReturn(List.of(
+                    SesionVacante.builder().sesionSimulacionId(1L).vacanteId(MI_VACANTE).build()));
+            when(responsables.findBySesionSimulacionIdIn(List.of(1L))).thenReturn(List.of());
+            when(tramos.findBySesionSimulacionIdInOrderByMinutoInicio(List.of(1L)))
+                    .thenReturn(List.of());
+
+            var lista = servicio.listarSesiones(losDos);
+
+            assertThat(lista.get(0).inscritos())
+                    .as("la lista y el detalle de la misma sesión no pueden decir cosas distintas")
+                    .isZero();
+            // Ninguna de las dos consultas de conteo se llega a hacer: con PROPIO son cero.
+            verify(inscripciones, never()).contarVigentesPorSesion(anyList());
+            verify(inscripciones, never()).contarVigentesPorSesionDe(anyList(), anyLong());
+        }
+
+        @Test
         @DisplayName("Con ver inscritos en PROPIO el conteo es cero, que es lo que enseña la lista")
         void conPropioElConteoEsCero() {
             // El otro reparto que un PUT deja montado: crear sesiones en TODO y ver inscritos
@@ -841,7 +874,9 @@ class ServicioSimulacionImplTest {
             when(sesionesVacante.findBySesionSimulacionId(2L)).thenReturn(List.of());
             when(responsables.findBySesionSimulacionId(2L)).thenReturn(List.of());
             when(tramos.findBySesionSimulacionIdOrderByMinutoInicio(2L)).thenReturn(List.of());
-            when(inscripciones.countBySesionSimulacionIdAndEsVigenteTrue(2L)).thenReturn(0L);
+            // El detalle cuenta por el mismo sitio que la lista, así que pide la consulta por
+            // lote con una sola sesión dentro.
+            when(inscripciones.contarVigentesPorSesion(List.of(2L))).thenReturn(List.of());
 
             assertThat(servicio.verSesion(QUIEN, 2L).id()).isEqualTo(2L);
 

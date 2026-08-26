@@ -201,7 +201,8 @@ una vacante suya, y una que no responde **404**, no 403.
 varias vacantes a la vez, así que para el responsable del área la cifra que ve es la de sus
 candidatos, no la de la sala entera —y es la misma en la lista, en el detalle y en el número de
 filas de `/inscritos`—. Decir «6» y luego enseñar dos no se lee como un permiso: se lee como que
-faltan cuatro. El recorte lo hace la base, no un filtro en memoria: un alcance es un `WHERE`.
+faltan cuatro. El recorte lo hace la base, no un filtro en memoria: un alcance es un `WHERE`, y
+los dos GET pasan por la misma función para decidirlo — no por dos copias que se separan.
 
 **Las tres cifras cuadran con cualquier reparto, no solo con el que siembra la V37.** Son dos preguntas distintas y cada una la contesta su permiso: *qué sesiones
 veo* lo decide `crear_sesiones_simulacion` si quien llama lo tiene y si no

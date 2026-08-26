@@ -174,16 +174,7 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
             ids = todas.stream().map(SesionSimulacion::getId).toList();
         }
 
-        Map<Long, Long> inscritos = new HashMap<>();
-        // Aquí PROPIO no llega: la lista sale vacía mucho antes. Solo hay dos casos.
-        FiltroAlcance deInscritos = alcanceParaContarInscritos(quien);
-        List<Object[]> conteo =
-                deInscritos == null || deInscritos.tipo() == FiltroAlcance.Tipo.TODO
-                ? inscripciones.contarVigentesPorSesion(ids)
-                : inscripciones.contarVigentesPorSesionDe(ids, deInscritos.usuarioId());
-        for (Object[] fila : conteo) {
-            inscritos.put((Long) fila[0], (Long) fila[1]);
-        }
+        Map<Long, Long> inscritos = contarInscritos(ids, alcanceParaContarInscritos(quien));
         Map<Long, List<Long>> responsablesPorSesion = responsables.findBySesionSimulacionIdIn(ids)
                 .stream().collect(Collectors.groupingBy(SesionResponsable::getSesionSimulacionId,
                         Collectors.mapping(SesionResponsable::getUsuarioId, Collectors.toList())));
@@ -791,21 +782,39 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
     }
 
     /**
-     * Cuántos inscritos de esa sesión cuentan para quien mira, según su alcance.
+     * Cuántos inscritos cuentan para quien mira en cada una de esas sesiones, según su alcance.
      *
-     * <p>Un alcance nulo es «no tiene el permiso de ver inscritos», y entonces cuenta la sesión
-     * entera. {@code PROPIO} cuenta cero, no todos: es lo que la lista de inscritos devuelve
-     * con ese alcance, y las dos cifras tienen que decir lo mismo.
+     * <p>Este método es el <b>único</b> sitio donde se decide cómo se cuenta, y esa es su razón
+     * de ser. La lista y el detalle lo resolvían por su cuenta y se separaron tres veces
+     * seguidas —primero el detalle no recortaba, luego el conteo seguía al permiso equivocado,
+     * luego {@code PROPIO} contaba como si fuera {@code SUS_VACANTES}—. Mientras hubiera dos
+     * implementaciones, arreglar una dejaba la otra rota.
+     *
+     * <p>Los casos: alcance nulo es «no tiene el permiso de ver inscritos» y cuenta la sesión
+     * entera —no puede abrir la lista, así que no hay dos cifras que puedan contradecirse—;
+     * {@code TODO} cuenta todo; {@code SUS_VACANTES} cuenta los de sus vacantes; y
+     * {@code PROPIO} cuenta cero, porque cero es lo que la lista de inscritos devuelve con ese
+     * alcance.
+     *
+     * @return cuántos por sesión; las que no salen es que no tienen a nadie que contar
      */
+    private Map<Long, Long> contarInscritos(List<Long> sesionIds, FiltroAlcance alcance) {
+        if (alcance != null && alcance.tipo() == FiltroAlcance.Tipo.PROPIO) {
+            return Map.of();
+        }
+        List<Object[]> filas = alcance == null || alcance.tipo() == FiltroAlcance.Tipo.TODO
+                ? inscripciones.contarVigentesPorSesion(sesionIds)
+                : inscripciones.contarVigentesPorSesionDe(sesionIds, alcance.usuarioId());
+        Map<Long, Long> conteo = new HashMap<>();
+        for (Object[] fila : filas) {
+            conteo.put((Long) fila[0], (Long) fila[1]);
+        }
+        return conteo;
+    }
+
+    /** Lo mismo para una sesión suelta. Pasa por el mismo sitio a propósito. */
     private long inscritosVisibles(Long sesionId, FiltroAlcance alcance) {
-        if (alcance == null || alcance.tipo() == FiltroAlcance.Tipo.TODO) {
-            return inscripciones.countBySesionSimulacionIdAndEsVigenteTrue(sesionId);
-        }
-        if (alcance.tipo() == FiltroAlcance.Tipo.PROPIO) {
-            return 0L;
-        }
-        return inscripciones.contarVigentesPorSesionDe(List.of(sesionId), alcance.usuarioId())
-                .stream().findFirst().map(fila -> (Long) fila[1]).orElse(0L);
+        return contarInscritos(List.of(sesionId), alcance).getOrDefault(sesionId, 0L);
     }
 
     private SesionPanel comoPanel(SesionSimulacion s, long inscritos, List<Long> vacanteIds,
