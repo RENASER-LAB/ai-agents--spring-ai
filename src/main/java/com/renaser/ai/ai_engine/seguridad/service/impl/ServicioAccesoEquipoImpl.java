@@ -166,7 +166,7 @@ public class ServicioAccesoEquipoImpl implements ServicioAccesoEquipo {
             // se descarta), pero un texto fijo parece una contraseña quemada — al analizador
             // estático y a cualquiera que lea. Aleatorio no hay nada que «revocar».
             byte[] bytesAlAzar = new byte[32];
-            new java.security.SecureRandom().nextBytes(bytesAlAzar);
+            AZAR.nextBytes(bytesAlAzar);
             hash = codificador.encode(java.util.Base64.getEncoder().encodeToString(bytesAlAzar));
             senuelo = hash;
         }
@@ -174,4 +174,5 @@ public class ServicioAccesoEquipoImpl implements ServicioAccesoEquipo {
     }
 
     private volatile String senuelo;
+    private static final java.security.SecureRandom AZAR = new java.security.SecureRandom();
 }
