@@ -7,6 +7,7 @@ import com.renaser.ai.ai_engine.archivo.repository.ArchivoRepository;
 import com.renaser.ai.ai_engine.archivo.service.AlmacenArchivos;
 import com.renaser.ai.ai_engine.auditoria.service.ServicioAuditoria;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.AlertaResponse;
+import com.renaser.ai.ai_engine.pesos.entity.Etapa;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.CalificacionEncoladaResponse;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.FilaRanking;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.HallazgoResponse;
@@ -103,6 +104,7 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
     private final ColaCalificacionIa cola;
     private final MaquinaEstados maquina;
     private final com.renaser.ai.ai_engine.perfilintegral.repository.EvaluacionRepository evaluaciones;
+    private final com.renaser.ai.ai_engine.pesos.repository.EtapaRepository etapasCatalogo;
     private final Permisos permisos;
 
     // El orden de la tanda. Manda el grupo, no la nota: quien llega a la nota arrastrando un
@@ -411,7 +413,28 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
     @Override
     @Transactional(readOnly = true)
     public RankingVacante ranking(ContextoUsuario quien, Long vacanteId) {
+        // La criba fina y todo lo anterior a las etapas dependen de esta firma:
+        // siempre es la nota de la preselección.
+        return ranking(quien, vacanteId, ETAPA);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public RankingVacante ranking(ContextoUsuario quien, Long vacanteId, String etapaCodigo) {
+        // Un llamador interno que pase nulo quiere el ranking de siempre, no un 500.
+        String etapa = etapaCodigo == null ? ETAPA : etapaCodigo;
+        // Primero quien mira, despues que mira: el alcance se comprueba antes de
+        // contestar nada, aunque sea un catalogo que ese permiso ya deja ver.
         Vacante vacante = vacanteVisible(quien, vacanteId, "ver_embudo");
+        // La preseleccion no se valida: es la etapa de siempre y validarla seria
+        // una consulta extra en cada apertura del ranking.
+        if (!ETAPA.equals(etapa) && !etapasCatalogo.existsById(etapa)) {
+            throw new IllegalArgumentException(
+                    "No existe la etapa «" + etapa + "». Las que puntúan: "
+                            + etapasCatalogo.findAllByOrderByOrdenAsc().stream()
+                                    .map(Etapa::getCodigo)
+                                    .collect(Collectors.joining(", ")));
+        }
         Puesto puesto = puestos.findById(vacante.getPuestoId()).orElse(null);
 
         // Los pesos son los de la versión de la vacante, no los de la última publicada: una
@@ -453,7 +476,7 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
         Map<Long, List<NotaCriterio>> notasPorPostulacion = notasCriterio.findByPostulacionIdIn(ids)
                 .stream().collect(Collectors.groupingBy(NotaCriterio::getPostulacionId));
         Map<Long, NotaEtapa> etapaPorPostulacion = porPostulacion(
-                notasEtapa.findByPostulacionIdInAndEtapaCodigo(ids, ETAPA),
+                notasEtapa.findByPostulacionIdInAndEtapaCodigo(ids, etapa),
                 NotaEtapa::getPostulacionId);
         Map<Long, Long> alertasPorPostulacion = alertas.findByPostulacionIdIn(ids).stream()
                 .collect(Collectors.groupingBy(Alerta::getPostulacionId, Collectors.counting()));

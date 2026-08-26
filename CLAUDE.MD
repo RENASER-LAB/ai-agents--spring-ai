@@ -219,7 +219,7 @@ forma de pedirla. Cuatro endpoints en `PostulacionesPanelController`:
 
 | Para que | Llamada |
 |---|---|
-| La tanda entera, ordenada de mas apto a menos | `GET /api/v1/panel/vacantes/{id}/ranking` |
+| La tanda entera, ordenada de mas apto a menos | `GET /api/v1/panel/vacantes/{id}/ranking?etapa=` · sin `etapa`, la nota de la preseleccion |
 | Primera pasada sobre todos los que no tienen nota | `POST /api/v1/panel/vacantes/{id}/criba-rapida` |
 | Segunda pasada, solo sobre la parte alta | `POST /api/v1/panel/vacantes/{id}/criba-fina` |
 | Releer un curriculum suelto | `POST /api/v1/panel/postulaciones/{id}/criba-cv` |
@@ -241,6 +241,42 @@ lo deja fallido en vez de inventar una nota. Los CVs de las semillas son de ese 
 en una base recien sembrada la criba los marca como fallidos: es correcto, no es un fallo.
 
 Ver [La criba de curriculums](docs/CRIBA-DE-CURRICULUMS.md).
+
+### El ranking por etapa y el desglose de la evaluacion (25/08/2026)
+
+Dos endpoints mas en `PostulacionesPanelController`:
+
+| Para que | Llamada |
+|---|---|
+| Ordenar la tanda por la nota de otra etapa | `GET /panel/vacantes/{id}/ranking?etapa=PRUEBA_PUESTO` |
+| Abrir la evaluacion del banco por dentro | `GET /panel/postulaciones/{id}/evaluacion` |
+
+- **`?etapa=` cambia solo con que nota se ordena.** Las ocho notas del curriculum de cada fila
+  siguen siendo las del Perfil Integral, porque son de esa etapa siempre. Los codigos salen del
+  catalogo `etapa`; uno que no este da 400. Quien no tenga nota en esa etapa sale al final, sin
+  heredar la de otra.
+- **Es una sobrecarga, no un cambio de firma, a proposito**: `cribaFina()` decide a quien
+  recalificar por la nota de preseleccion y tenia que seguir haciendolo. Sin el parametro el
+  camino es el de antes, sin una consulta de mas.
+- **El desglose es de solo lectura y nunca da 404.** Sin evaluacion asignada devuelve vacios: una
+  vacante publicada con el banco apagado es un caso normal. Lo guarda
+  `ver_respuestas_evaluacion`, que estaba en el catalogo desde V12 y **no lo comprobaba nadie**;
+  este es el primer endpoint que lo usa.
+- ⚠️ **`alineacion` sale vacia siempre**: la tabla `resultado_alineacion` existe, el panel ya la
+  lee y **ningun agente la escribe todavia**. Vacia significa «no calculado», no «todo en verde».
+- **La cuenta de la nota de la evaluacion vive en un solo sitio**,
+  `ServicioCalificacion.notaCombinada`. Estaba copiada en `PuenteCalificacionIaImpl`. Como
+  mezclar lo cerrado con lo abierto **es una interpretacion sin confirmar con el cliente**: el dia
+  que cambie tiene que cambiar a la vez para la nota de la etapa y para lo que ve el panel. No
+  volver a copiarla.
+
+Dos guiones para mirar el panel con datos y no con tablas vacias. **Escriben en la base local** y
+se pueden relanzar:
+
+| Guion | Que hace |
+|---|---|
+| `scripts/sembrar-evaluacion-local.py` | Postula, responde los ocho formatos y entrega, y deja que la IA califique. Cada abierta se responde **segun lo que pide su enunciado**: contestar lo mismo a todo daba ceros, y con razon |
+| `scripts/escenario-etapas-local.py` | Reparte candidatos por las cinco etapas calificando a mano por el camino, para que ninguna pestaña del panel se vea vacia |
 
 ### Las dos pantallas
 Ninguna vive en este repositorio: el `frontend/` de demostracion que habia aqui se borro a proposito (2e7b176) cuando el panel de verdad quedo en RENASER OS.

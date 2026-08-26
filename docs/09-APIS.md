@@ -1,13 +1,15 @@
 # Las APIs del sistema
 
 Sistema de selección de personal — Renaser Consulting
-Versión 1.4 · 2026-08-19 · Cubre **las cinco etapas del embudo**: postulación, Perfil Integral,
+Versión 1.5 · 2026-08-25 · Cubre **las cinco etapas del embudo**: postulación, Perfil Integral,
 prueba del puesto, simulación de trabajo, validación práctica y decisión final
 
 Este documento explica las APIs para quien las va a consumir: el frontend de RENASER OS y el
-portal del candidato. **La referencia viva es Swagger**, en `http://localhost:8080/swagger-ui.html`
-cuando la aplicación corre: ahí están los cuerpos exactos, se prueban las llamadas y siempre está
-al día porque se genera del código. Este documento cuenta lo que Swagger no cuenta: cómo entrar,
+portal del candidato. **La referencia viva es Swagger**, en `http://localhost:8081/swagger-ui.html`
+cuando la aplicación corre en local: ahí están los cuerpos exactos, se prueban las llamadas y
+siempre está al día porque se genera del código. **Es el 8081, no el 8080** — el perfil `local`
+mueve la aplicación de puerto porque el 8080 suele estar ocupado por Adminer, que responde 200 a
+todo y hace que un frontend mal apuntado parezca que funciona. Este documento cuenta lo que Swagger no cuenta: cómo entrar,
 qué puerta usar y las reglas que no se ven en un esquema.
 
 ---
@@ -146,22 +148,28 @@ la postulación en el acto (`NO_CONTINUA`), con la regla exacta escrita en su hi
 |---|---|---|
 | GET `/bandeja?espera_a=` | La bandeja: todo lo que espera a `CANDIDATO`, `SISTEMA`, `TALENTO` o `AREA` | `ver_candidatos` |
 | GET `/vacantes/{id}/embudo` | Cuántas postulaciones hay en cada estado | `ver_embudo` |
-| GET `/vacantes/{id}/ranking` | La tanda ordenada de más apto a menos, con las ocho notas del currículum de cada uno. **Incluye a quien todavía no tiene nota** | `ver_embudo` |
+| GET `/vacantes/{id}/ranking?etapa=` | La tanda ordenada de más apto a menos, con las ocho notas del currículum de cada uno. **Incluye a quien todavía no tiene nota**. Sin `etapa` ordena por la del Perfil Integral; con ella, por la nota de esa etapa | `ver_embudo` |
 | GET `/postulaciones/{id}` · `/historial` | La ficha completa y el recorrido | `abrir_ficha_candidato` |
 | POST `/postulaciones/{id}/transiciones` | Mover a cualquier estado. **El motivo es obligatorio, sin excepción** | `mover_postulacion` |
 | POST `/postulaciones/{id}/confirmacion-avance` | Confirmar que avanza: el sistema calcula el estado siguiente | `confirmar_avance` |
 | GET `/postulaciones/{id}/perfil-integral` | El retrato de la IA: notas del currículum, hallazgos y avisos | `ver_perfil_integral` |
+| GET `/postulaciones/{id}/evaluacion` | El desglose del banco: cada respuesta abierta con su nota, la explicación y la evidencia que citó la IA, el promedio de lo cerrado y los semáforos de alineación. **Sin evaluación asignada devuelve vacíos, no 404**. ⚠️ `alineacion` sale vacía siempre: nadie escribe esa tabla todavía | `ver_respuestas_evaluacion` |
 | POST `/postulaciones/{id}/criba-cv` | Que la IA lea **solo el currículum** y arme el retrato con eso. Es lo que se pide con una tanda recién llegada | `ajustar_nota` |
 | POST `/postulaciones/{id}/calificacion-perfil-integral` | Calificar con todo: currículum y evaluación. Exige evaluación entregada | `ajustar_nota` |
 | POST `/postulaciones/{id}/cv` | Reemplazar el currículum desde el panel | `ajustar_nota` |
 | GET `/archivos/{id}/descarga` | Descargar el CV | `descargar_entregables` |
 
-> **Este es el único ranking que existe, y es el de la etapa 2.** Ordena por grupo de prioridad y,
-> dentro de cada grupo, por la nota del Perfil Integral. No hay ranking general con las cuatro
-> etapas dentro, ni rankings de la prueba, la simulación o la validación: esas notas se consultan
-> de una en una por candidato. La Puntuación Global sí está calculada —sale en
-> `/postulaciones/{id}/semaforo`—, pero nunca como lista ordenada. Está apuntado como decisión 6
-> en [Alcance del MVP](08-ALCANCE-DEL-MVP.md), con lo que habría que decidir antes de montarlo.
+> **Hay un ranking por etapa, y es el mismo endpoint.** `?etapa=PERFIL_INTEGRAL` —que equivale
+> a no pasarlo—, `PRUEBA_PUESTO`, `SIMULACION`, `VALIDACION` o `DECISION` cambia **solo la nota con la que se ordena**: las ocho notas del
+> currículum de cada fila siguen siendo las del Perfil Integral, porque son de esa etapa siempre.
+> Sin el parámetro se comporta exactamente como antes —así lo llama la criba fina, que decide a
+> quién recalificar por la nota de preselección—, y una etapa que no esté en el catálogo es un 400.
+> Quien no tiene nota en la etapa pedida sale al final, sin heredar la de otra.
+>
+> Sigue sin haber un ranking **general** que mezcle las cuatro etapas en una sola nota. La
+> Puntuación Global está calculada —sale en `/postulaciones/{id}/semaforo`—, pero nunca como lista
+> ordenada. Está apuntado como decisión 6 en [Alcance del MVP](08-ALCANCE-DEL-MVP.md), con lo que
+> habría que decidir antes de montarlo.
 
 ### La prueba del puesto (hito 3)
 
@@ -170,8 +178,11 @@ la postulación en el acto (`NO_CONTINUA`), con la regla exacta escrita en su hi
 | POST `/plantillas-prueba` · `/{id}/versiones` | Crear la plantilla y una versión en borrador | `editar_plantillas_prueba` |
 | POST `/plantillas-prueba/versiones/{id}/publicacion` | Publicar: exige 8-10 preguntas universales, 3-5 específicas, y la rúbrica sumando 100. **Una versión sin entregables es un cuestionario**: la cuota no rige y basta con una pregunta | `editar_plantillas_prueba` |
 | POST `/postulaciones/{id}/prueba/plazo` | Fijarle a ESE candidato su fecha de cierre, normalmente para darle más horas. **Queda marcada como suya**: mover después la fecha de la vacante no se la toca. Antes de empezar, la fecha puesta manda sobre el cálculo por días | `mover_postulacion` |
+| GET `/postulaciones/{id}/prueba/respuestas` | Lo que contestó, pregunta a pregunta. Las preguntas son **las de la versión que él vio**, en su orden, no las del catálogo de hoy: una versión publicada después puede llevar otras | `abrir_ficha_candidato` |
+| GET `/postulaciones/{id}/prueba/notas` | La rúbrica entera con lo que lleva puesto cada criterio: puntaje, explicación y **de quién viene la nota**, si de la IA o de una persona. Lo que aún no tiene nota sale en nulo | `ajustar_nota` |
 | POST `/postulaciones/{id}/prueba/criterios/{criterioId}/nota` | Poner la nota de un criterio, con explicación obligatoria | `ajustar_nota` |
-| POST `/postulaciones/{id}/prueba/calificacion` | Ponderar las notas ya puestas. Exige que estén todos los criterios | `ajustar_nota` |
+| POST `/postulaciones/{id}/prueba/calificacion-ia` | Pedirle al agente `PRUEBA_PUESTO` los criterios que la rúbrica le reserva. Tarda decenas de segundos y **no pisa ningún ajuste hecho a mano** | `ajustar_nota` |
+| POST `/postulaciones/{id}/prueba/calificacion` | Ponderar las notas ya puestas. Exige que estén todos los criterios. **Escribe**: deja la nota guardada, no es una consulta | `ajustar_nota` |
 
 **El portal del candidato es `/api/v1/portal/prueba/{codigo}`**: ver, iniciar (arranca el
 reloj), responder, subir entregables y entregar. Mismas reglas que la evaluación: nada de
@@ -321,8 +332,10 @@ con las reglas que Swagger no cuenta, está en
 
 | Método y ruta | Qué hace | Permiso |
 |---|---|---|
-| GET/PUT `/portal/perfil` · POST/PUT/DELETE `/portal/perfil/{lista}[/{id}]` · POST `…/{id}/confirmacion` · PUT `…/orden` · GET `…/descarga` | El dueño ve, edita, confirma, reordena y descarga lo suyo. Vacío responde 200, nunca 404 | El propio token; lo ajeno es 404 |
-| GET `/portal/catalogos/niveles-educativos` · `/niveles-idioma` | Los desplegables, para no escribirlos a mano | Token de candidato |
+| GET/PUT `/portal/perfil` · GET `/portal/perfil/descarga` | El dueño ve su perfil entero y lo descarga (ley 29733). Vacío responde 200, nunca 404. El PUT **reemplaza** la cabecera, no la fusiona | El propio token; lo ajeno es 404 |
+| POST/PUT/DELETE + POST `/{id}/confirmacion` en `/portal/perfil/experiencia`, `/educacion`, `/idiomas`, `/certificaciones` · PUT `/orden` solo en las dos primeras | Añadir, corregir, borrar y dar por bueno lo que se sacó del currículum | El propio token |
+| POST y DELETE `/portal/perfil/enlaces` | **Solo esas dos**: un enlace no lleva origen ni confirmación, así que no se edita — se borra y se crea | El propio token |
+| GET `/portal/catalogos/niveles-educativos` · `/niveles-idioma` | Los desplegables, para no escribirlos a mano. Devuelven `codigo` y `nombre` ya ordenados: no hay campo `orden` | Token de candidato |
 | GET `/panel/postulaciones/{id}/perfil` | La trayectoria del candidato sin abrir su archivo. **No puntúa** | `ver_perfil_candidato`; la pretensión solo con `ver_pretension` |
 
 ---

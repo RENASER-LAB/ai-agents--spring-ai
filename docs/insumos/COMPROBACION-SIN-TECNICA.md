@@ -371,5 +371,5 @@ que son 154 y no están escritos para leerse del tirón.
 |---|---|
 | [Requisitos funcionales](../01-REQUISITOS-FUNCIONALES.md) | Qué hace el sistema, etapa por etapa |
 | [Modelo de datos](../05-MODELO-DE-DATOS.md) | Las 93 tablas por área y por qué existe cada una |
-| [Diccionario de datos](../07-DICCIONARIO-DE-DATOS.md) | Las 93 tablas columna por columna |
+| [Diccionario de datos](../07-DICCIONARIO-DE-DATOS.md) | Cada tabla columna por columna |
 | [Cambios del documento nuevo](CAMBIOS-DEL-DOCUMENTO-NUEVO.md) | Qué cambió el cliente y qué se decidió |

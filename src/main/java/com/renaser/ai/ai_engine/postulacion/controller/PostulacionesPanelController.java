@@ -7,6 +7,7 @@ import com.renaser.ai.ai_engine.postulacion.dto.DtosPostulacion.*;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.CalificacionEncoladaResponse;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.PerfilIntegralResponse;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.PasadaEncolada;
+import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.DesgloseEvaluacion;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.RankingVacante;
 import com.renaser.ai.ai_engine.perfilintegral.service.ServicioPerfilIntegralPanel;
 import com.renaser.ai.ai_engine.seguridad.service.Permisos;
@@ -31,6 +32,7 @@ public class PostulacionesPanelController {
 
     private final ServicioPostulacionesPanel servicio;
     private final ServicioPerfilIntegralPanel perfilIntegral;
+    private final com.renaser.ai.ai_engine.perfilintegral.service.ServicioDesgloseEvaluacion desglose;
     private final ServicioEnlaceAcceso enlaces;
     private final Permisos permisos;
 
@@ -54,8 +56,12 @@ public class PostulacionesPanelController {
     @Operation(summary = "La tanda entera ordenada de más apto a menos: grupo de prioridad, "
             + "nota, y las ocho notas del currículum de cada uno. Incluye a quien todavía no "
             + "tiene nota, porque un candidato sin calificar no puede desaparecer de la lista")
-    public RankingVacante ranking(@PathVariable Long id) {
-        return perfilIntegral.ranking(permisos.actual(), id);
+    public RankingVacante ranking(@PathVariable Long id,
+                                  @RequestParam(required = false) String etapa) {
+        // Sin etapa es el ranking de siempre: la nota de la preselección.
+        return etapa == null
+                ? perfilIntegral.ranking(permisos.actual(), id)
+                : perfilIntegral.ranking(permisos.actual(), id, etapa);
     }
 
     @PostMapping("/vacantes/{id}/criba-rapida")
@@ -100,6 +106,18 @@ public class PostulacionesPanelController {
             + "extraído: se vuelve a leer en la próxima calificación")
     public void reemplazarCv(@PathVariable Long id, @RequestParam("cv") MultipartFile cv) {
         perfilIntegral.reemplazarCv(permisos.actual(), id, cv);
+    }
+
+    @GetMapping("/postulaciones/{id}/evaluacion")
+    // «Ver respuesta por respuesta» es una accion con permiso propio desde V12, y este es
+    // el primer endpoint que la implementa. Usar el del perfil integral haria que quitarle
+    // ese permiso a un rol no le quitara nada.
+    @PreAuthorize("@permisos.tiene('ver_respuestas_evaluacion')")
+    @Operation(summary = "La evaluación del banco, abierta por dentro: cada respuesta abierta "
+            + "con la nota y la evidencia que citó la IA, el promedio de lo cerrado, y los "
+            + "semáforos de alineación. Sin calificar aún, las notas vienen vacías")
+    public DesgloseEvaluacion desgloseEvaluacion(@PathVariable Long id) {
+        return desglose.ver(permisos.actual(), id);
     }
 
     @PostMapping("/postulaciones/{id}/calificacion-perfil-integral")

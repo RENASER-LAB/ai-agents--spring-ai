@@ -664,7 +664,9 @@ Cada respuesta se guarda al momento, así que si se corta la luz el candidato re
 Las preguntas y las opciones se muestran en orden aleatorio, distinto para cada persona, y ese
 orden se guarda: es la única forma de mostrar meses después exactamente el examen que rindió.
 
-Una alerta **nunca descarta a nadie**. Lo mismo vale para un rojo en alineación personal.
+Una alerta **nunca descarta a nadie**. Lo mismo vale para un rojo en alineación personal. Lo mismo vale para un rojo en alineación
+personal — aunque `resultado_alineacion` sigue vacía: la tabla está y el panel ya la lee, pero
+ningún agente la escribe todavía.
 
 ---
 
