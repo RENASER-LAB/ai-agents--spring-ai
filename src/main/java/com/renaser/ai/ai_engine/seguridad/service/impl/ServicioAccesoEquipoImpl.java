@@ -84,6 +84,20 @@ public class ServicioAccesoEquipoImpl implements ServicioAccesoEquipo {
             throw new CredencialesInvalidasException("Correo o contraseña incorrectos");
         }
 
+        // Una organización suspendida queda congelada, y lo primero que congela es la
+        // puerta (pieza F; era el hueco que señaló el QA de la fase 1). El mensaje aquí
+        // SÍ es claro, al revés que el genérico de arriba: solo se llega con la
+        // contraseña correcta, así que no le regala nada a un desconocido — y a quien es
+        // de la casa le ahorra pelearse con una contraseña que sí funciona.
+        Organizacion organizacion = organizaciones.findById(usuario.getOrganizacionId())
+                .orElse(null);
+        if (organizacion == null || !organizacion.isEsActiva()) {
+            log.warn("Login rechazado: la organización {} está suspendida",
+                    usuario.getOrganizacionId());
+            throw new CredencialesInvalidasException(
+                    "La organización está suspendida: contacta a Renaser");
+        }
+
         intentos.registrarExito(datos.correo());
         usuario.setUltimoAccesoEn(Instant.now());
         usuarios.save(usuario);

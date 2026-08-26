@@ -39,7 +39,25 @@ public class ServicioPersonalizacionImpl implements ServicioPersonalizacion {
     @Override
     @Transactional
     public void encender(ContextoUsuario quien, Instrumento instrumento) {
-        Organizacion organizacion = laDe(quien);
+        encender(quien, laDe(quien), instrumento, null);
+    }
+
+    @Override
+    @Transactional
+    public void encenderPara(ContextoUsuario quien, Long organizacionId, Instrumento instrumento,
+                             String motivo) {
+        encender(quien, laObjetivo(quien, organizacionId), instrumento, motivo);
+    }
+
+    @Override
+    @Transactional
+    public void apagarPara(ContextoUsuario quien, Long organizacionId, Instrumento instrumento,
+                           String motivo) {
+        apagar(quien, laObjetivo(quien, organizacionId), instrumento, motivo);
+    }
+
+    private void encender(ContextoUsuario quien, Organizacion organizacion,
+                          Instrumento instrumento, String motivo) {
         if (organizacion.isEsPlataforma()) {
             throw new IllegalStateException(
                     "La plataforma ya es dueña de su método: no tiene nada que personalizar");
@@ -63,13 +81,17 @@ public class ServicioPersonalizacionImpl implements ServicioPersonalizacion {
 
         auditoria.registrar(quien.organizacionId(), quien, "encender_personalizacion",
                 "organizacion", organizacion.getId(), null,
-                Map.of("instrumento", instrumento.name(), "copiado", copiado.toString()), null);
+                Map.of("instrumento", instrumento.name(), "copiado", copiado.toString()), motivo);
     }
 
     @Override
     @Transactional
     public void apagar(ContextoUsuario quien, Instrumento instrumento) {
-        Organizacion organizacion = laDe(quien);
+        apagar(quien, laDe(quien), instrumento, null);
+    }
+
+    private void apagar(ContextoUsuario quien, Organizacion organizacion,
+                        Instrumento instrumento, String motivo) {
         if (!instrumento.esPropio(organizacion)) {
             throw new IllegalStateException(
                     "La personalización de " + instrumento + " ya está apagada");
@@ -95,7 +117,7 @@ public class ServicioPersonalizacionImpl implements ServicioPersonalizacion {
 
         auditoria.registrar(quien.organizacionId(), quien, "apagar_personalizacion",
                 "organizacion", organizacion.getId(), null,
-                Map.of("instrumento", instrumento.name(), "versionesArchivadas", archivadas), null);
+                Map.of("instrumento", instrumento.name(), "versionesArchivadas", archivadas), motivo);
         log.info("Personalización de {} apagada en la organización {} · {} versiones archivadas",
                 instrumento, organizacion.getId(), archivadas);
     }
@@ -104,5 +126,23 @@ public class ServicioPersonalizacionImpl implements ServicioPersonalizacion {
         return organizaciones.findById(quien.organizacionId())
                 .orElseThrow(() -> new IllegalStateException(
                         "No existe la organización " + quien.organizacionId()));
+    }
+
+    /**
+     * La organización sobre la que actúa la plataforma (pieza F). Doble llave como el
+     * resto del panel de plataforma: el permiso lo mira el controlador, y aquí se exige
+     * además SER la plataforma — y que el objetivo exista, con 404 para lo que no.
+     */
+    private Organizacion laObjetivo(ContextoUsuario quien, Long organizacionId) {
+        Organizacion plataforma = organizaciones.findByEsPlataformaTrue()
+                .orElseThrow(() -> new IllegalStateException(
+                        "Ninguna organización está marcada como plataforma"));
+        if (!plataforma.getId().equals(quien.organizacionId())) {
+            throw new org.springframework.security.access.AccessDeniedException(
+                    "Solo la plataforma enciende personalizaciones de otra organización");
+        }
+        return organizaciones.findById(organizacionId)
+                .orElseThrow(() -> new com.renaser.ai.ai_engine.ai.exception
+                        .ResourceNotFoundException("Empresa", "id", organizacionId));
     }
 }

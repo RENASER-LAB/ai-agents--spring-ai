@@ -75,6 +75,11 @@ class AccesoPanelTest {
                 .thenReturn(5);
         lenient().when(parametros.entero(eq(PLATAFORMA), eq("minutos_bloqueo_login"), eq(15)))
                 .thenReturn(15);
+        // La empresa de Ana existe y está activa; la prueba de la suspensión la apaga.
+        lenient().when(organizaciones.findById(EMPRESA))
+                .thenReturn(Optional.of(Organizacion.builder().id(EMPRESA).esActiva(true).build()));
+        lenient().when(organizaciones.findById(3L))
+                .thenReturn(Optional.of(Organizacion.builder().id(3L).esActiva(true).build()));
     }
 
     private Usuario equipo() {
@@ -151,6 +156,24 @@ class AccesoPanelTest {
 
         assertThat(sesion.usuarioId()).isEqualTo(40L);
         assertThat(sesion.token()).isEqualTo("el-token-de-la-antigua");
+    }
+
+    @Test
+    @DisplayName("El equipo de una organización suspendida no entra, y el mensaje lo dice")
+    void unaOrganizacionSuspendidaNoEntra() {
+        // El hueco que señaló el QA de la fase 1, cerrado (pieza F). El mensaje aquí SÍ
+        // es claro y no el genérico: solo se llega con la contraseña correcta, así que no
+        // se le regala nada a un desconocido — y quien es de la casa no se pelea con una
+        // contraseña que sí funciona.
+        when(usuarios.equipoPorCorreo("ana@acme.pe")).thenReturn(List.of(equipo()));
+        when(codificador.matches("secreta-larguisima", "$hash")).thenReturn(true);
+        when(organizaciones.findById(EMPRESA))
+                .thenReturn(Optional.of(Organizacion.builder().id(EMPRESA).esActiva(false).build()));
+
+        assertThatThrownBy(() -> servicio.entrar(new Login("ana@acme.pe", "secreta-larguisima")))
+                .isInstanceOf(CredencialesInvalidasException.class)
+                .hasMessageContaining("suspendida");
+        verify(tokens, org.mockito.Mockito.never()).emitir(anyLong(), anyLong(), anyString());
     }
 
     @Test

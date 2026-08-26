@@ -549,6 +549,96 @@ public class FlujoDosEmpresasIT {
                 .formatted(solicitudId), Integer.class)).isEqualTo(1);
     }
 
+    // ============ La suspensión (pieza F) ============
+
+    @DisplayName("La suspensión congela a ACME: su equipo fuera, su vacante escondida, su gente intacta")
+    @Test
+    @Order(9)
+    void laSuspensionCongelaAAcme() throws Exception {
+        // Una segunda candidata entra ANTES de la suspensión: es la que va a demostrar
+        // que los de dentro no pagan el problema comercial de la empresa. (Camila ya no
+        // puede: su borrado de la orden 8 desactivó la cuenta.)
+        String tokenDiana = crearCandidataYEntrar("diana@correo.pe");
+        MockMultipartFile cv = new MockMultipartFile("cv", "cv.pdf",
+                "application/pdf", "curriculum de diana".getBytes());
+        mvc.perform(multipart("/api/v1/portal/postulaciones")
+                        .file(cv)
+                        .param("vacanteId", String.valueOf(vacanteAcmeId))
+                        .param("resultadoOrgulloso", "Levanté un inventario en un fin de semana")
+                        .param("aceptaTratamiento", "true")
+                        .header("Authorization", "Bearer " + tokenDiana))
+                .andExpect(status().isCreated());
+
+        // La plataforma no puede suspenderse a sí misma: el candado de la puerta no se
+        // queda dentro de la casa.
+        conToken(post("/api/v1/panel/plataforma/empresas/" + plataformaId + "/suspension"),
+                tokenPlataforma, "{\"motivo\":\"un descuido\"}")
+                .andExpect(status().isBadRequest());
+
+        conToken(post("/api/v1/panel/plataforma/empresas/" + acmeId + "/suspension"),
+                tokenPlataforma, "{\"motivo\":\"Impago de tres meses\"}")
+                .andExpect(status().isOk());
+        assertThat(contar("select count(*) from auditoria where accion = 'suspender_empresa'"
+                + " and entidad_id = " + acmeId + " and motivo = 'Impago de tres meses'"))
+                .isEqualTo(1);
+
+        // El token vivo de Ana (8h) muere al momento: la suspensión no espera al
+        // vencimiento de nadie. Y el login le dice POR QUÉ — solo se llega ahí con la
+        // contraseña correcta, así que el mensaje no le regala nada a un desconocido.
+        conTokenGet("/api/v1/panel/usuarios", tokenAcme)
+                .andExpect(status().isUnauthorized());
+        mvc.perform(post("/api/v1/panel/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"correo\":\"ana@acme.pe\",\"contrasena\":\"%s\"}"
+                                .formatted(CONTRASENA_ANA)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.detail").value(
+                        org.hamcrest.Matchers.containsString("suspendida")));
+
+        // El tablón esconde la vacante — la lista, el detalle y el texto legal — y la
+        // vacante sigue PUBLICADA en la base: reactivar es volver a verla, no republicarla.
+        mvc.perform(get("/api/v1/portal/vacantes"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+        mvc.perform(get("/api/v1/portal/vacantes/" + vacanteAcmeId))
+                .andExpect(status().isNotFound());
+        mvc.perform(get("/api/v1/portal/vacantes/" + vacanteAcmeId + "/consentimiento"))
+                .andExpect(status().isNotFound());
+        assertThat(jdbc.queryForObject("select estado from vacante where id = " + vacanteAcmeId,
+                String.class)).isEqualTo("PUBLICADA");
+
+        // Diana, que ya estaba dentro, conserva acceso y datos: ve su postulación con la
+        // empresa y su estado de siempre. Ella no paga la suspensión.
+        conTokenGet("/api/v1/portal/postulaciones", tokenDiana)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].empresa").value("Acme S.A.C."));
+    }
+
+    @DisplayName("Al reactivar, todo vuelve tal cual: el login, el tablón y la bandeja")
+    @Test
+    @Order(10)
+    void alReactivarTodoVuelve() throws Exception {
+        conToken(post("/api/v1/panel/plataforma/empresas/" + acmeId + "/reactivacion"),
+                tokenPlataforma, "{\"motivo\":\"Se puso al día\"}")
+                .andExpect(status().isOk());
+
+        // Ana entra otra vez con la misma contraseña — nada suyo se tocó
+        tokenAcme = leer(mvc.perform(post("/api/v1/panel/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"correo\":\"ana@acme.pe\",\"contrasena\":\"%s\"}"
+                                .formatted(CONTRASENA_ANA)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString(), "token");
+        conTokenGet("/api/v1/panel/usuarios", tokenAcme).andExpect(status().isOk());
+
+        // Y su vacante reaparece en el tablón sin que nadie la republique
+        mvc.perform(get("/api/v1/portal/vacantes"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].nombreEmpresa").value("Acme S.A.C."));
+    }
+
     // ============ Apoyo ============
 
     private String crearCandidataYEntrar(String correo) throws Exception {

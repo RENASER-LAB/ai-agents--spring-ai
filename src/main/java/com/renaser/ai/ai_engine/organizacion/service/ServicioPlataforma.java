@@ -37,4 +37,21 @@ public interface ServicioPlataforma {
      * estos números cobra fuera del sistema lo que acuerde con cada empresa.
      */
     List<ConsumoEmpresa> consumo(ContextoUsuario quien, String mes);
+
+    /**
+     * Suspende una empresa: congelada, no borrada (pieza F). Su equipo no entra —ni con
+     * tokens vivos—, sus vacantes salen del tablón, y los candidatos que ya estaban
+     * dentro conservan acceso y datos. La plataforma no puede suspenderse a sí misma.
+     */
+    void suspender(ContextoUsuario quien, Long empresaId, String motivo);
+
+    /** Al reactivar, todo vuelve tal cual: login, tokens y tablón. */
+    void reactivar(ContextoUsuario quien, Long empresaId, String motivo);
+
+    /**
+     * Pone, sube o quita ({@code tope} vacío) el tope mensual de IA de una empresa
+     * (pieza E). El sondeo de la cola despierta solo lo que quedó EN_ESPERA si el cambio
+     * le devuelve el cupo.
+     */
+    void ponerTopeIa(ContextoUsuario quien, Long empresaId, String tope);
 }

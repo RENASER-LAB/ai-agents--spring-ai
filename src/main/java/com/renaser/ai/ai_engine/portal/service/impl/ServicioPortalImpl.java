@@ -94,35 +94,56 @@ public class ServicioPortalImpl implements ServicioPortal {
         // pieza B, con nombre y apellido — el tablón es lo que hace plataforma a la
         // plataforma. Cada vacante dice de qué empresa es, porque el candidato tiene que
         // saber a quién le manda su currículum.
-        List<Vacante> publicadas = vacantes.findByEstadoOrderByPublicadaEnDesc("PUBLICADA");
+        //
+        // De todas las ACTIVAS: una empresa suspendida no puede responder, y nadie debe
+        // postularle mientras tanto (pieza F). Sus vacantes siguen PUBLICADAS en la base
+        // a propósito — reactivar es volver a verlas, no volver a publicarlas.
+        List<Vacante> todas = vacantes.findByEstadoOrderByPublicadaEnDesc("PUBLICADA");
+        Map<Long, Organizacion> organizacionesActivas = organizacionesActivasDe(todas);
+        List<Vacante> publicadas = todas.stream()
+                .filter(v -> organizacionesActivas.containsKey(v.getOrganizacionId()))
+                .toList();
 
         // Los requisitos de todas de una vez. Este es el tablón de empleo: la única pantalla
         // que se sirve sin haber entrado y, por eso, la que más veces se pide. Una consulta
         // por vacante aquí no la paga un candidato, la paga cada visita.
         Map<Long, List<RequisitoObjetivo>> porVacante = requisitosDe(
                 publicadas.stream().map(Vacante::getId).toList());
-        Map<Long, String> nombrePorOrganizacion = nombresDeOrganizacion(publicadas);
 
         return publicadas.stream()
                 .map(v -> comoPublica(v, porVacante.getOrDefault(v.getId(), List.of()),
-                        nombrePorOrganizacion.getOrDefault(v.getOrganizacionId(), "")))
+                        organizacionesActivas.get(v.getOrganizacionId()).getNombre()))
                 .toList();
     }
 
     @Override
     public VacantePublica vacante(Long id) {
         // Sin filtro de organización a propósito: el tablón es de todas las empresas.
-        // Lo que sí se exige es que esté PUBLICADA — un borrador no existe para nadie.
+        // Lo que sí se exige es que esté PUBLICADA — un borrador no existe para nadie —
+        // y que su empresa esté activa: la vacante de una suspendida tampoco existe para
+        // el tablón (pieza F).
         Vacante vacante = vacantes.findById(id)
                 .filter(v -> "PUBLICADA".equals(v.getEstado()))
                 .orElseThrow(() -> new ResourceNotFoundException("Vacante", "id", id));
-        String nombreEmpresa = organizaciones.findById(vacante.getOrganizacionId())
-                .map(Organizacion::getNombre).orElse("");
+        Organizacion empresa = organizaciones.findById(vacante.getOrganizacionId())
+                .filter(Organizacion::isEsActiva)
+                .orElseThrow(() -> new ResourceNotFoundException("Vacante", "id", id));
         return comoPublica(vacante, requisitos.findByVacanteIdAndEsActivoTrue(vacante.getId()),
-                nombreEmpresa);
+                empresa.getNombre());
+    }
+
+    /** Las organizaciones ACTIVAS de un lote de vacantes: el colador del tablón. */
+    private Map<Long, Organizacion> organizacionesActivasDe(List<Vacante> deVacantes) {
+        List<Long> ids = deVacantes.stream().map(Vacante::getOrganizacionId).distinct().toList();
+        return organizaciones.findAllById(ids).stream()
+                .filter(Organizacion::isEsActiva)
+                .collect(Collectors.toMap(Organizacion::getId, Function.identity()));
     }
 
     private Map<Long, String> nombresDeOrganizacion(List<Vacante> deVacantes) {
+        // SIN filtrar por activa a propósito: lo usa «mis postulaciones», y el candidato
+        // que ya está dentro de un proceso conserva su vista aunque suspendan a la
+        // empresa — él no paga el problema comercial de nadie (pieza F).
         List<Long> ids = deVacantes.stream().map(Vacante::getOrganizacionId).distinct().toList();
         return organizaciones.findAllById(ids).stream()
                 .collect(Collectors.toMap(Organizacion::getId, Organizacion::getNombre));
@@ -168,12 +189,13 @@ public class ServicioPortalImpl implements ServicioPortal {
 
     @Override
     public ConsentimientoDeVacante consentimientoDeVacante(Long vacanteId) {
-        // Mismo guardián que el detalle público: una vacante sin publicar no existe para
-        // nadie, y su texto legal tampoco.
+        // Mismo guardián que el detalle público: una vacante sin publicar —o de una
+        // empresa suspendida— no existe para nadie, y su texto legal tampoco.
         Vacante vacante = vacantes.findById(vacanteId)
                 .filter(v -> "PUBLICADA".equals(v.getEstado()))
                 .orElseThrow(() -> new ResourceNotFoundException("Vacante", "id", vacanteId));
         Organizacion empresa = organizaciones.findById(vacante.getOrganizacionId())
+                .filter(Organizacion::isEsActiva)
                 .orElseThrow(() -> new ResourceNotFoundException("Vacante", "id", vacanteId));
         TextoConsentimiento texto = textoProcesoDe(empresa.getId());
         return new ConsentimientoDeVacante(empresa.getNombre(), texto.getVersion(), texto.getTexto());
@@ -301,8 +323,13 @@ public class ServicioPortalImpl implements ServicioPortal {
         }
         // El candidato postula a la vacante de cualquier empresa: la vacante se busca en
         // el tablón entero, no en la organización del candidato (que es la plataforma).
+        // Con el mismo colador del tablón: la vacante de una empresa suspendida no
+        // recibe postulaciones ni con el id en la mano (pieza F) — esconderla de la
+        // lista y aceptarle un POST directo sería un tablón de mentira.
         Vacante vacante = vacantes.findById(vacanteId)
                 .filter(v -> "PUBLICADA".equals(v.getEstado()))
+                .filter(v -> organizaciones.findById(v.getOrganizacionId())
+                        .map(Organizacion::isEsActiva).orElse(false))
                 .orElseThrow(() -> new ResourceNotFoundException("Vacante", "id", vacanteId));
         if (postulaciones.existsByUsuarioIdAndVacanteId(quien.usuarioId(), vacanteId)) {
             throw new IllegalStateException("Ya postulaste a esta vacante");

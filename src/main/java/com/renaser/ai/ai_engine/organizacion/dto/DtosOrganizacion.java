@@ -22,8 +22,19 @@ public final class DtosOrganizacion {
     public record EmpresaCreada(Long id, Long invitacionId, String urlInvitacion,
                                 Instant invitacionVenceEn) {}
 
+    // La ficha del continente (pieza F): el estado, el tope, las banderas y el consumo
+    // del mes — todo lo que Renaser administra de una empresa, y nada de lo de dentro.
     public record EmpresaPanel(Long id, String codigo, String nombre, boolean esActiva,
-                               Instant creadoEn) {}
+                               String topeMensualIa, Personalizacion personalizacion,
+                               BigDecimal consumoMesActual, Instant creadoEn) {}
+
+    // El motivo es obligatorio: cada acción de plataforma queda auditada con quién,
+    // cuándo y POR QUÉ — es lo que permite decirle a una empresa «esto pasó y esta fue
+    // la razón».
+    public record MotivoPlataforma(@NotBlank String motivo) {}
+
+    // El tope en texto (USD). En blanco o nulo = quitarle el tope.
+    public record TopeIa(String tope) {}
 
     // Qué tiene personalizado la organización de quien pregunta: una casilla por bandera.
     public record Personalizacion(boolean bancoPropio, boolean pesosPropios,

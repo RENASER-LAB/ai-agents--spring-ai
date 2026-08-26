@@ -1,5 +1,7 @@
 package com.renaser.ai.ai_engine.seguridad.filter;
 
+import com.renaser.ai.ai_engine.organizacion.entity.Organizacion;
+import com.renaser.ai.ai_engine.organizacion.repository.OrganizacionRepository;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
 import com.renaser.ai.ai_engine.seguridad.service.ServicioContexto;
 import com.renaser.ai.ai_engine.seguridad.service.ServicioToken;
@@ -34,6 +36,7 @@ public class FiltroIdentidad extends OncePerRequestFilter {
     private final ServicioToken tokens;
     private final ServicioContexto contextos;
     private final UsuarioRepository usuarios;
+    private final OrganizacionRepository organizaciones;
 
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
@@ -46,6 +49,16 @@ public class FiltroIdentidad extends OncePerRequestFilter {
                 String tipo = jwt.getClaimAsString("tipo");
                 usuarios.findById(usuarioId)
                         .filter(Usuario::isEsActivo)
+                        // Suspender una empresa corta también los tokens vivos de 8h
+                        // (pieza F): sin esto, cerrar el login dejaría a su equipo dentro
+                        // hasta que le venciera la sesión. Solo para EQUIPO — los
+                        // candidatos son de la plataforma y la suspensión de su empresa
+                        // no los toca. El precio es una consulta de organización por
+                        // petición de panel: se acepta, el tráfico del panel es bajo y la
+                        // consulta es por clave primaria sobre una tabla de decenas.
+                        .filter(usuario -> !"EQUIPO".equals(tipo)
+                                || organizaciones.findById(usuario.getOrganizacionId())
+                                        .map(Organizacion::isEsActiva).orElse(false))
                         .ifPresent(usuario -> {
                             ContextoUsuario contexto = contextos.armar(usuario, tipo);
                             // La autoridad TIPO_* es lo único que miran las cadenas;

@@ -156,6 +156,13 @@ class ServicioPortalImplTest {
                         .id(PERSONA).nombre("Ana").apellidos("Rojas").build()));
         org.mockito.Mockito.lenient()
                 .when(requisitos.findByVacanteIdAndEsActivoTrue(VACANTE)).thenReturn(List.of());
+        // La empresa de la vacante está activa: postular pasa por el colador del tablón
+        // (pieza F), y la prueba de la suspendida lo apaga encima de este stub.
+        org.mockito.Mockito.lenient()
+                .when(organizaciones.findById(organizacionDeLaVacante)).thenReturn(Optional.of(
+                        com.renaser.ai.ai_engine.organizacion.entity.Organizacion.builder()
+                                .id(organizacionDeLaVacante).nombre("La Empresa").esActiva(true)
+                                .build()));
         // El texto PROCESO publicado de la empresa de la vacante: postular lo firma
         org.mockito.Mockito.lenient().when(textosConsentimiento
                 .findFirstByOrganizacionIdAndTipoAndPublicadoEnIsNotNullOrderByPublicadoEnDesc(
@@ -231,6 +238,54 @@ class ServicioPortalImplTest {
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("texto de consentimiento");
         verifyNoInteractions(consentimientos);
+    }
+
+    @Test
+    @DisplayName("la vacante de una empresa suspendida no existe para el tablón ni recibe postulaciones")
+    void laVacanteDeUnaSuspendidaNoExisteParaElTablon() {
+        // Nadie debe postular a una empresa que no puede responder (pieza F). El detalle
+        // responde 404, y postular con el id en la mano también: esconderla de la lista
+        // y aceptar el POST directo sería un tablón de mentira.
+        armarVacantePublicada(2L);
+        when(organizaciones.findById(2L)).thenReturn(Optional.of(
+                com.renaser.ai.ai_engine.organizacion.entity.Organizacion.builder()
+                        .id(2L).nombre("Acme S.A.C.").esActiva(false).build()));
+
+        assertThatThrownBy(() -> servicio.vacante(VACANTE))
+                .isInstanceOf(com.renaser.ai.ai_engine.ai.exception.ResourceNotFoundException.class);
+        assertThatThrownBy(() -> servicio.consentimientoDeVacante(VACANTE))
+                .isInstanceOf(com.renaser.ai.ai_engine.ai.exception.ResourceNotFoundException.class);
+        assertThatThrownBy(() -> servicio.postular(QUIEN, VACANTE, cv, "Un resultado",
+                null, null, null, null, true, "10.0.0.1", "Navegador"))
+                .isInstanceOf(com.renaser.ai.ai_engine.ai.exception.ResourceNotFoundException.class);
+        verifyNoInteractions(consentimientos);
+    }
+
+    @Test
+    @DisplayName("el candidato que ya estaba dentro sigue viendo su postulación, suspendida o no la empresa")
+    void elCandidatoDentroSigueViendoLoSuyo() {
+        // La suspensión congela a la EMPRESA; los candidatos no pagan su problema
+        // comercial: sus postulaciones, estados e historial siguen a la vista (pieza F).
+        when(postulaciones.findByUsuarioIdOrderByCreadoEnDesc(USUARIO)).thenReturn(List.of(
+                com.renaser.ai.ai_engine.postulacion.entity.Postulacion.builder()
+                        .id(77L).uuid(java.util.UUID.randomUUID()).usuarioId(USUARIO)
+                        .organizacionId(2L).vacanteId(VACANTE).estadoCodigo("POSTULADA")
+                        .movidoEn(java.time.Instant.now()).creadoEn(java.time.Instant.now())
+                        .build()));
+        when(estados.findAllByOrderByOrden()).thenReturn(List.of());
+        when(vacantes.findAllById(List.of(VACANTE))).thenReturn(List.of(Vacante.builder()
+                .id(VACANTE).organizacionId(2L).titulo("Analista").build()));
+        // La empresa está suspendida y aun así su nombre se resuelve: la lista del
+        // candidato no pasa por el colador del tablón.
+        when(organizaciones.findAllById(List.of(2L))).thenReturn(List.of(
+                com.renaser.ai.ai_engine.organizacion.entity.Organizacion.builder()
+                        .id(2L).nombre("Acme S.A.C.").esActiva(false).build()));
+
+        var mias = servicio.misPostulaciones(QUIEN);
+
+        org.assertj.core.api.Assertions.assertThat(mias).hasSize(1);
+        org.assertj.core.api.Assertions.assertThat(mias.get(0).vacante()).isEqualTo("Analista");
+        org.assertj.core.api.Assertions.assertThat(mias.get(0).empresa()).isEqualTo("Acme S.A.C.");
     }
 
     @Test

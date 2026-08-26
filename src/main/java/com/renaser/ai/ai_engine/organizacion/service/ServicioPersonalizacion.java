@@ -19,4 +19,16 @@ public interface ServicioPersonalizacion {
     void encender(ContextoUsuario quien, Instrumento instrumento);
 
     void apagar(ContextoUsuario quien, Instrumento instrumento);
+
+    /**
+     * Las mismas dos, pero sobre OTRA organización y solo desde la plataforma (pieza F):
+     * Renaser enciende o apaga la personalización cuando una empresa se lo pide fuera
+     * del sistema. Misma mecánica, mismo copiado, misma auditoría — con la empresa
+     * objetivo como entidad y el motivo de quien lo pidió.
+     */
+    void encenderPara(ContextoUsuario quien, Long organizacionId, Instrumento instrumento,
+                      String motivo);
+
+    void apagarPara(ContextoUsuario quien, Long organizacionId, Instrumento instrumento,
+                    String motivo);
 }

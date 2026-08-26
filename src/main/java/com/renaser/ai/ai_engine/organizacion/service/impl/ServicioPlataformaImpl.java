@@ -1,11 +1,13 @@
 package com.renaser.ai.ai_engine.organizacion.service.impl;
 
+import com.renaser.ai.ai_engine.ai.exception.ResourceNotFoundException;
 import com.renaser.ai.ai_engine.auditoria.service.ServicioAuditoria;
 import com.renaser.ai.ai_engine.organizacion.dto.DtosOrganizacion.ConsumoAgente;
 import com.renaser.ai.ai_engine.organizacion.dto.DtosOrganizacion.ConsumoEmpresa;
 import com.renaser.ai.ai_engine.organizacion.dto.DtosOrganizacion.CrearEmpresa;
 import com.renaser.ai.ai_engine.organizacion.dto.DtosOrganizacion.EmpresaCreada;
 import com.renaser.ai.ai_engine.organizacion.dto.DtosOrganizacion.EmpresaPanel;
+import com.renaser.ai.ai_engine.organizacion.dto.DtosOrganizacion.Personalizacion;
 import com.renaser.ai.ai_engine.organizacion.entity.Organizacion;
 import com.renaser.ai.ai_engine.organizacion.repository.OrganizacionRepository;
 import com.renaser.ai.ai_engine.organizacion.service.ServicioPlataforma;
@@ -85,11 +87,111 @@ public class ServicioPlataformaImpl implements ServicioPlataforma {
     @Override
     public List<EmpresaPanel> empresas(ContextoUsuario quien) {
         laPlataformaDe(quien);
+        // La ficha del continente: estado, tope, banderas y el gasto del mes corriente.
+        // Es TODO lo que Renaser ve de una empresa — los candidatos, notas y decisiones
+        // no tienen endpoint desde la plataforma, y esa ausencia es el diseño (pieza F).
+        YearMonth mes = YearMonth.now(ZONA_LIMA);
+        Instant desde = mes.atDay(1).atStartOfDay(ZONA_LIMA).toInstant();
+        Instant hasta = mes.plusMonths(1).atDay(1).atStartOfDay(ZONA_LIMA).toInstant();
+        Map<Long, BigDecimal> consumoPorOrganizacion = new LinkedHashMap<>();
+        jdbc.query("""
+                SELECT organizacion_id, coalesce(sum(costo), 0) AS costo
+                  FROM ejecucion_ia
+                 WHERE creado_en >= ? AND creado_en < ?
+                 GROUP BY organizacion_id""",
+                fila -> {
+                    consumoPorOrganizacion.put(fila.getLong("organizacion_id"),
+                            fila.getBigDecimal("costo"));
+                },
+                java.sql.Timestamp.from(desde), java.sql.Timestamp.from(hasta));
+        Map<Long, String> topes = new LinkedHashMap<>();
+        jdbc.query("SELECT organizacion_id, valor FROM parametro WHERE codigo = 'tope_mensual_ia'",
+                fila -> {
+                    topes.put(fila.getLong("organizacion_id"), fila.getString("valor"));
+                });
+
         return organizaciones.findAll().stream()
                 .filter(o -> !o.isEsPlataforma())
                 .map(o -> new EmpresaPanel(o.getId(), o.getCodigo(), o.getNombre(),
-                        o.isEsActiva(), o.getCreadoEn()))
+                        o.isEsActiva(),
+                        topes.get(o.getId()),
+                        new Personalizacion(o.isBancoPropio(), o.isPesosPropios(),
+                                o.isPlantillasEvaluacionPropias(), o.isPruebasPuestoPropias()),
+                        consumoPorOrganizacion.getOrDefault(o.getId(), BigDecimal.ZERO),
+                        o.getCreadoEn()))
                 .toList();
+    }
+
+    @Override
+    @Transactional
+    public void suspender(ContextoUsuario quien, Long empresaId, String motivo) {
+        laPlataformaDe(quien);
+        Organizacion empresa = organizaciones.findById(empresaId)
+                .orElseThrow(() -> new ResourceNotFoundException("Empresa", "id", empresaId));
+        // Suspenderse a sí misma dejaría la plataforma sin nadie que pudiera reactivar
+        // nada: el candado de la puerta no puede quedarse dentro de la casa.
+        if (empresa.isEsPlataforma()) {
+            throw new IllegalArgumentException("La plataforma no puede suspenderse a sí misma");
+        }
+        if (!empresa.isEsActiva()) {
+            throw new IllegalStateException("La empresa «" + empresa.getNombre()
+                    + "» ya está suspendida");
+        }
+        empresa.setEsActiva(false);
+        organizaciones.save(empresa);
+        // Congelada, no borrada: el login y el filtro de identidad dejan fuera a su
+        // equipo, el tablón esconde sus vacantes, y TODO lo demás queda tal cual — los
+        // candidatos que ya estaban dentro no pagan el problema comercial de la empresa.
+        auditoria.registrar(quien.organizacionId(), quien, "suspender_empresa",
+                "organizacion", empresaId,
+                Map.of("esActiva", true), Map.of("esActiva", false), motivo);
+        log.warn("Empresa {} ({}) suspendida por la plataforma", empresaId, empresa.getCodigo());
+    }
+
+    @Override
+    @Transactional
+    public void reactivar(ContextoUsuario quien, Long empresaId, String motivo) {
+        laPlataformaDe(quien);
+        Organizacion empresa = organizaciones.findById(empresaId)
+                .orElseThrow(() -> new ResourceNotFoundException("Empresa", "id", empresaId));
+        if (empresa.isEsActiva()) {
+            throw new IllegalStateException("La empresa «" + empresa.getNombre()
+                    + "» no está suspendida");
+        }
+        empresa.setEsActiva(true);
+        organizaciones.save(empresa);
+        auditoria.registrar(quien.organizacionId(), quien, "reactivar_empresa",
+                "organizacion", empresaId,
+                Map.of("esActiva", false), Map.of("esActiva", true), motivo);
+        log.info("Empresa {} ({}) reactivada: todo vuelve tal cual", empresaId, empresa.getCodigo());
+    }
+
+    @Override
+    @Transactional
+    public void ponerTopeIa(ContextoUsuario quien, Long empresaId, String tope) {
+        laPlataformaDe(quien);
+        Organizacion empresa = organizaciones.findById(empresaId)
+                .orElseThrow(() -> new ResourceNotFoundException("Empresa", "id", empresaId));
+        // En blanco = sin tope: el valor vacío es «ausente» para ServicioParametros, y
+        // así quitarle el tope a una empresa no borra la fila ni su historia.
+        String valor = tope == null || tope.isBlank() ? "" : comoNumero(tope);
+        String anterior = jdbc.query(
+                "SELECT valor FROM parametro WHERE organizacion_id = ? AND codigo = 'tope_mensual_ia'",
+                fila -> fila.next() ? fila.getString(1) : null, empresaId);
+        jdbc.update("""
+                INSERT INTO parametro (organizacion_id, codigo, valor, tipo, descripcion)
+                VALUES (?, 'tope_mensual_ia', ?, 'TEXTO',
+                        'Tope mensual de gasto en IA (USD). Lo administra Renaser; vacío = sin tope')
+                ON CONFLICT (organizacion_id, codigo) DO UPDATE SET valor = excluded.valor""",
+                empresaId, valor);
+        // Los trabajos que la falta de cupo dejó EN_ESPERA no se despiertan aquí: los
+        // despierta el sondeo de la cola en su próximo ciclo, que ya sabe hacerlo y es
+        // el mismo camino del cambio de mes. Un solo sitio despierta.
+        auditoria.registrar(quien.organizacionId(), quien, "poner_tope_ia",
+                "organizacion", empresaId,
+                Map.of("tope", anterior == null ? "" : anterior), Map.of("tope", valor),
+                "Tope mensual de IA");
+        log.info("Tope de IA de la empresa {} ({}): «{}»", empresaId, empresa.getCodigo(), valor);
     }
 
     /**
