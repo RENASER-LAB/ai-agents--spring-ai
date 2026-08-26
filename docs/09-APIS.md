@@ -201,8 +201,10 @@ una vacante suya, y una que no responde **404**, no 403.
 varias vacantes a la vez, así que para el responsable del área la cifra que ve es la de sus
 candidatos, no la de la sala entera —y es la misma en la lista, en el detalle y en el número de
 filas de `/inscritos`—. Decir «6» y luego enseñar dos no se lee como un permiso: se lee como que
-faltan cuatro. El recorte lo hace la base, no un filtro en memoria: un alcance es un `WHERE`, y
-los dos GET pasan por la misma función para decidirlo — no por dos copias que se separan.
+faltan cuatro. Cuando hay filas que recortar lo recorta la base y no un filtro en memoria —un
+alcance es un `WHERE`—; con `PROPIO` no se llega a preguntar, porque la respuesta es cero sin
+mirar. Y los dos GET deciden con la misma función, `contarInscritos`, que es donde están los
+cuatro casos del alcance y el único sitio donde están — no dos copias que se separan.
 
 **Las tres cifras cuadran con cualquier reparto, no solo con el que siembra la V37.** Son dos preguntas distintas y cada una la contesta su permiso: *qué sesiones
 veo* lo decide `crear_sesiones_simulacion` si quien llama lo tiene y si no
@@ -213,10 +215,12 @@ sesiones y sigue contando solo a los suyos. Quien no tenga el segundo permiso ve
 entero: no puede abrir la lista, así que no hay dos cifras que puedan contradecirse, y un número
 de inscritos es aforo, no identidades.
 
-**`PROPIO` no alcanza a nadie en ninguno de estos endpoints**: lista vacía, **404** en el
-detalle y ninguna fila en `/inscritos`, y lo mismo en las marcas y la asistencia. En el panel
-nada de esto es de quien mira —son candidatos—, y `/panel/**` exige un token `TIPO_EQUIPO`, así
-que quien entra por ahí no tiene postulación propia que enseñarse a sí mismo.
+**`PROPIO` no alcanza a ningún inscrito**: ninguna fila en `/inscritos`, y lo mismo en las
+marcas y la asistencia. Y cuando además es el alcance con el que se miran las sesiones —el de
+`crear_sesiones_simulacion`, o el de `ver_inscritos_simulacion` si no se tiene el primero—, la
+lista sale vacía y el detalle responde **404**. En el panel nada de esto es de
+quien mira —son candidatos—, y `/panel/**` exige un token `TIPO_EQUIPO`, así que quien entra
+por ahí no tiene postulación propia que enseñarse a sí mismo.
 
 Y con `PROPIO` el conteo es **cero**, que es lo que `/inscritos` devuelve con ese alcance. Nadie
 lo tiene hoy así, pero es un valor válido y se pone con ese mismo PUT: a quien además tuviera

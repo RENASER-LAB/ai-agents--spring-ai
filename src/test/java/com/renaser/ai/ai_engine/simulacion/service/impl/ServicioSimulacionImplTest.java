@@ -827,6 +827,13 @@ class ServicioSimulacionImplTest {
             when(responsables.findBySesionSimulacionIdIn(List.of(1L))).thenReturn(List.of());
             when(tramos.findBySesionSimulacionIdInOrderByMinutoInicio(List.of(1L)))
                     .thenReturn(List.of());
+            // La precondición que escondía el fallo, montada: quien mira dirige una vacante con
+            // dos inscritos dentro. Sin esto la consulta devolvería lista vacía y el isZero()
+            // de abajo pasaría también con el código roto —una aserción que no comprueba nada—.
+            // Va lenient porque con el código arreglado no se llega a llamar, que es el punto.
+            org.mockito.Mockito.lenient()
+                    .when(inscripciones.contarVigentesPorSesionDe(List.of(1L), USUARIO))
+                    .thenReturn(java.util.List.<Object[]>of(new Object[]{1L, 2L}));
 
             var lista = servicio.listarSesiones(losDos);
 
