@@ -1,6 +1,8 @@
 package com.renaser.ai.ai_engine.portal.controller;
 
-import com.renaser.ai.ai_engine.portal.service.ServicioPortal;
+import com.renaser.ai.ai_engine.portal.service.ServicioCuentaPortal;
+import com.renaser.ai.ai_engine.portal.service.ServicioPostulacionPortal;
+import com.renaser.ai.ai_engine.portal.service.ServicioTablonPortal;
 import com.renaser.ai.ai_engine.postulacion.service.ServicioEnlaceAcceso;
 
 import com.renaser.ai.ai_engine.portal.dto.DtosPortal.*;
@@ -29,7 +31,11 @@ import java.util.UUID;
 @Tag(name = "Portal del candidato", description = "Lo que ve y hace quien postula")
 public class PortalController {
 
-    private final ServicioPortal servicio;
+    // Un servicio por tema, la misma puerta: el tablón público, la cuenta del candidato
+    // y su postulación. Las rutas no saben del corte.
+    private final ServicioCuentaPortal cuentas;
+    private final ServicioTablonPortal tablon;
+    private final ServicioPostulacionPortal postulaciones;
     private final ServicioEnlaceAcceso enlaces;
     private final Permisos permisos;
 
@@ -38,32 +44,41 @@ public class PortalController {
     @GetMapping("/vacantes")
     @Operation(summary = "Las vacantes publicadas")
     public List<VacantePublica> vacantes() {
-        return servicio.vacantesPublicadas();
+        return tablon.vacantesPublicadas();
     }
 
     @GetMapping("/vacantes/{id}")
     @Operation(summary = "El detalle público de una vacante, con sus requisitos indispensables")
     public VacantePublica vacante(@PathVariable Long id) {
-        return servicio.vacante(id);
+        return tablon.vacante(id);
     }
 
     @GetMapping("/consentimientos/textos")
-    @Operation(summary = "Los textos vigentes de los dos consentimientos")
+    @Operation(summary = "Los textos vigentes de los dos consentimientos de la plataforma")
     public List<TextoConsentimientoPublico> textos() {
-        return servicio.textosDeConsentimiento();
+        return cuentas.textosDeConsentimiento();
+    }
+
+    // Público como el tablón (misma regla de ConfiguracionSeguridad: GET /vacantes/**):
+    // el candidato tiene que poder leer qué va a aceptar ANTES de decidir postular.
+    @GetMapping("/vacantes/{id}/consentimiento")
+    @Operation(summary = "El texto de tratamiento de datos de la empresa de esta vacante, "
+            + "el que se acepta al postular")
+    public ConsentimientoDeVacante consentimientoDeVacante(@PathVariable Long id) {
+        return tablon.consentimientoDeVacante(id);
     }
 
     @PostMapping("/cuentas")
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Crear la cuenta: persona, acceso y consentimientos")
     public void crearCuenta(@Valid @RequestBody CrearCuenta datos, HttpServletRequest request) {
-        servicio.crearCuenta(datos, request.getRemoteAddr(), request.getHeader("User-Agent"));
+        cuentas.crearCuenta(datos, request.getRemoteAddr(), request.getHeader("User-Agent"));
     }
 
     @PostMapping("/auth/login")
     @Operation(summary = "Entrar con correo y contraseña; devuelve el token")
     public Sesion login(@Valid @RequestBody Login datos) {
-        return servicio.entrar(datos);
+        return cuentas.entrar(datos);
     }
 
     /**
@@ -91,7 +106,8 @@ public class PortalController {
     @PostMapping(value = "/postulaciones", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("@permisos.tiene('postular_vacante')")
     @Operation(summary = "Postular: CV (PDF o Word, máx. 10 MB), enlaces, el resultado del que "
-            + "te sientes orgulloso, y la confirmación de los requisitos indispensables")
+            + "te sientes orgulloso, la confirmación de los requisitos indispensables y la "
+            + "aceptación del tratamiento de datos de la empresa (obligatoria)")
     public ResponseEntity<Map<String, String>> postular(
             @RequestParam Long vacanteId,
             @RequestParam("cv") MultipartFile cv,
@@ -99,36 +115,43 @@ public class PortalController {
             @RequestParam(required = false) String portafolio,
             @RequestParam(required = false) String linkedin,
             @RequestParam(required = false) String github,
-            @RequestParam(required = false) List<Long> requisitosConfirmados) {
-        UUID uuid = servicio.postular(permisos.actual(), vacanteId, cv, resultadoOrgulloso,
-                portafolio, linkedin, github, requisitosConfirmados);
+            @RequestParam(required = false) List<Long> requisitosConfirmados,
+            // No obligatorio para Spring a propósito: si faltara aquí, el error saldría
+            // del manejador genérico como un 500 opaco. Lo exige el servicio, con un 400
+            // que dice qué falta. El IP y el navegador van al registro firmado, como en
+            // crearCuenta.
+            @RequestParam(required = false) Boolean aceptaTratamiento,
+            HttpServletRequest request) {
+        UUID uuid = postulaciones.postular(permisos.actual(), vacanteId, cv, resultadoOrgulloso,
+                portafolio, linkedin, github, requisitosConfirmados, aceptaTratamiento,
+                request.getRemoteAddr(), request.getHeader("User-Agent"));
         return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("codigo", uuid.toString()));
     }
 
     @GetMapping("/postulaciones")
     @Operation(summary = "Mis postulaciones, con su estado y días sin cambio")
     public List<MiPostulacion> misPostulaciones() {
-        return servicio.misPostulaciones(permisos.actual());
+        return postulaciones.misPostulaciones(permisos.actual());
     }
 
     @GetMapping("/postulaciones/{uuid}")
     @Operation(summary = "El detalle de una postulación mía, con su historial")
     public MiPostulacionDetalle miPostulacion(@PathVariable UUID uuid) {
-        return servicio.miPostulacion(permisos.actual(), uuid);
+        return postulaciones.miPostulacion(permisos.actual(), uuid);
     }
 
     @PostMapping("/postulaciones/{uuid}/retiro")
     @PreAuthorize("@permisos.tiene('retirar_postulacion')")
     @Operation(summary = "Retirar mi postulación. No borra mis datos: eso se pide aparte")
     public void retirar(@PathVariable UUID uuid) {
-        servicio.retirar(permisos.actual(), uuid);
+        postulaciones.retirar(permisos.actual(), uuid);
     }
 
     @PostMapping("/consentimientos/futuros/retiro")
     @PreAuthorize("@permisos.tiene('retirar_consentimiento_futuros')")
     @Operation(summary = "Retirar el consentimiento de futuros contactos")
     public void retirarFuturos() {
-        servicio.retirarConsentimientoFuturos(permisos.actual());
+        cuentas.retirarConsentimientoFuturos(permisos.actual());
     }
 
     @PostMapping("/solicitudes-borrado")
@@ -136,6 +159,6 @@ public class PortalController {
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Pedir el borrado de mis datos. Lo ejecuta Dirección o Administración")
     public void pedirBorrado(@RequestBody(required = false) PedirBorrado datos) {
-        servicio.pedirBorrado(permisos.actual(), datos == null ? null : datos.motivo());
+        cuentas.pedirBorrado(permisos.actual(), datos == null ? null : datos.motivo());
     }
 }

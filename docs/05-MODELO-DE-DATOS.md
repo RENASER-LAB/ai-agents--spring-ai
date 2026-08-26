@@ -23,8 +23,8 @@ Sirve para tres cosas:
 - **Entender el sistema.** Un modelo de datos bien contado explica el negocio mejor que
   cualquier otro documento.
 
-**La base ya está construida.** Las migraciones `V1` a `V36` viven en
-`src/main/resources/db/migration` —**100 tablas de este módulo**, 103 en la base contando la de
+**La base ya está construida.** Las migraciones `V1` a `V38` viven en
+`src/main/resources/db/migration` —**102 tablas de este módulo**, 105 en la base contando la de
 Flyway y las dos del motor de agentes— y Flyway es el dueño del esquema. Cambiar algo de aquí
 ya cuesta una migración nueva, y **una migración aplicada no se edita nunca**: se escribe otra
 encima.
@@ -36,6 +36,26 @@ La `V36` trae **el perfil del candidato**: seis tablas que cuelgan de `persona` 
 la columna `archivo.contenido_hash` (la huella que evita pagar dos lecturas del mismo
 currículum) y los permisos `ver_perfil_candidato` y `ver_pretension`. Ver
 [PROPUESTA-PERFIL-DEL-CANDIDATO.md](PROPUESTA-PERFIL-DEL-CANDIDATO.md).
+
+La `V37` convierte el esquema en **multiempresa**: `organizacion.es_plataforma` marca a la
+dueña de la plataforma (solo una puede serlo) y reemplaza al código `'RENASER'` que estaba
+quemado en el código; cuatro banderas por organización dicen qué instrumento es propio y
+cuál se lee de la plataforma (`banco_propio`, `pesos_propios`,
+`plantillas_evaluacion_propias`, `pruebas_puesto_propias`); `usuario.es_equipo` separa las
+cuentas del panel de las del portal —cae el CHECK que distinguía por el id de RENASER OS—;
+la tabla nueva `invitacion` es la única puerta de entrada al panel (se guarda el hash del
+token, nunca el token, y es de un solo uso); el banco pierde el modelo «`organizacion_id`
+vacío = biblioteca global» (esas filas pasan a la plataforma y la columna queda
+obligatoria); y `copiada_de_version_id` en los cuatro instrumentos dice de qué versión de
+la plataforma salió cada copia. El porqué de cada decisión está en
+`docs/superpowers/specs/2026-08-25-*.md`.
+
+La `V38` cierra el multiempresa: `consentimiento.postulacion_id` amarra el consentimiento
+del proceso a la postulación —y a la empresa— que lo firmó; la tabla nueva `tarifa_modelo`
+pone precio por millón de tokens a cada modelo, con vigencia por fecha; el estado
+`EN_ESPERA` entra al catálogo de `trabajo_ia` para los trabajos congelados por el tope
+mensual de IA; y se siembra la plantilla de correo del aviso del 80% (`TOPE_IA_AVISO`) para
+todas las organizaciones.
 
 Cuatro son del banco de preguntas v3: `V20` reemplaza el banco entero y añade cinco
 tablas (`rango_pregunta`, `campo_caso`, `multiplicador_bloque`, `umbral_nivel` y
@@ -402,13 +422,20 @@ El alcance tiene tres valores: **propio**, **sus vacantes** y **todo**.
 | Tabla | Para qué existe | Columnas que importan |
 |---|---|---|
 | `texto_consentimiento` | El texto que se acepta, versionado y con su huella | organizacion_id, tipo, version, texto, hash, publicado_en |
-| `consentimiento` | Que esta persona aceptó esta versión concreta | persona_id, texto_consentimiento_id, aceptado_en, ip, id_sesion, user_agent, retirado_en |
+| `consentimiento` | Que esta persona aceptó esta versión concreta | persona_id, texto_consentimiento_id, postulacion_id, aceptado_en, ip, id_sesion, user_agent, retirado_en |
 | `politica_conservacion` | Cuánto se guardan los datos y qué se hace al vencer | organizacion_id, meses, accion_al_vencer, es_activa |
 | `solicitud_borrado` | Pedir el borrado y ejecutarlo son dos cosas distintas, con días de por medio | persona_id, solicitado_en, ejecutado_en, ejecutado_por_usuario_id |
 
 **Son dos consentimientos, no uno.** El `tipo` distingue el del **proceso** —evaluar esta
 postulación— del de **futuros contactos** —guardar sus datos y avisarle de otras convocatorias—.
 El segundo nunca se da por supuesto, y `retirado_en` permite quitarlo sin tocar el primero.
+
+**Y desde el multiempresa, el del proceso se firma con cada empresa.** `postulacion_id` vacío
+es un consentimiento de cuenta con la plataforma (crear la cuenta, futuros contactos); lleno,
+el texto de la empresa de esa vacante, aceptado al postular. Postular a tres empresas son tres
+filas, cada una a nombre de la suya — lo que la ley 29733 espera: cada quien que trata datos,
+nombrado y consentido. Por eso la unicidad por persona y texto rige solo en las filas de
+cuenta: re-postular a la misma empresa con el mismo texto vigente vuelve a firmarse.
 
 Se guarda la versión del texto aceptado, no un simple «sí acepté», y también su **huella**, el
 **identificador de sesión** y el navegador, para poder exportar la evidencia completa.
@@ -802,13 +829,26 @@ Solo Dirección las cambia, y cada calificación guarda con qué versión se pro
 
 ---
 
-### Agentes de inteligencia artificial · 3 tablas
+### Agentes de inteligencia artificial · 4 tablas
 
 | Tabla | Para qué existe | Columnas que importan |
 |---|---|---|
 | `agente` | El catálogo de los nueve, con su versión | codigo, nombre, descripcion, version, es_activo |
 | `trabajo_ia` | El encargo pendiente. Se procesa en segundo plano; el candidato no espera | organizacion_id, agente_codigo, postulacion_id, referencia_tabla, referencia_id, estado, intentos, creado_en, terminado_en |
 | `ejecucion_ia` | Cada intento por separado | trabajo_ia_id, organizacion_id, agente_codigo, version_agente, objetivo, modelo, proveedor, version_modelo, instruccion_ia_id, envio, respuesta, confianza, tokens_entrada, tokens_salida, costo, duracion_ms, es_exitosa |
+| `tarifa_modelo` | El precio por millón de tokens de cada modelo, con vigencia por fecha | proveedor, modelo, precio_entrada_por_millon, precio_salida_por_millon, vigente_desde |
+
+**Cada llamada al modelo tiene precio.** Al cerrar una ejecución se escribe su `costo` con la
+tarifa vigente en ese momento: cuando el proveedor cambia sus precios se registra una tarifa
+nueva y lo ya ejecutado conserva la suya —sin vigencia, un cambio de precios reescribiría el
+pasado—. La tarifa no tiene «vigente hasta»: rige la de fecha más reciente que ya empezó, así
+no hay huecos ni solapes que validar. Sin tarifa registrada el costo queda vacío y se anota
+un aviso: la contabilidad nunca rompe una calificación.
+
+Sobre ese costo trabaja el **tope mensual por organización** (parámetro `tope_mensual_ia`,
+que administra la plataforma): al cruzar el 80% del mes sale un aviso único, y al 100% los
+trabajos nuevos nacen `EN_ESPERA` —un estado del encargo, no un fallo— hasta que el tope suba
+o empiece el mes. El candidato los ve «en curso», que es la verdad.
 
 Los nueve agentes son: Necesidad de Talento, Cazatalentos, Evidencia de Currículum, Evaluador,
 Potencial y Riesgo, Prueba del Puesto, Simulación, Desempeño y Aprendizaje. Cada ejecución guarda
@@ -939,9 +979,12 @@ es lo de arriba.
 
 Datos que se cargan con la primera migración, no a mano:
 
-- La **organización** Renaser
+- La **organización** Renaser, marcada como **dueña de la plataforma** (`es_plataforma`)
 - Los **18 estados** de la postulación, con su etapa y su momento
-- Los **73 permisos**, con su etiqueta y su grupo
+- Los **69 permisos** que las migraciones siembran, con su etiqueta y su grupo — contados
+  de las migraciones, no de los documentos de diseño. Los dos últimos son de la V37:
+  `personalizar_instrumentos` para el administrador de cada empresa y
+  `administrar_plataforma` solo para el de la plataforma
 - Los **cinco roles** iniciales con sus permisos: candidato, equipo de talento, responsable del
   área, dirección y administrador. Es como arranca el sistema, no cómo queda para siempre
 - Las **22 dimensiones**, con cuáles de ellas son obligatorias
@@ -950,7 +993,9 @@ Datos que se cargan con la primera migración, no a mano:
   de la validación
 - Las **preguntas de la prueba**: las previas, las diez universales y las del puesto
 - Los **nueve agentes**, con su versión inicial
-- Las **236 preguntas** del banco, como primera versión publicada de la biblioteca global
+- Las **236 preguntas** del banco, como primera versión publicada del banco de la
+  plataforma — desde la `V37` no hay filas «globales» sin dueño: compartir es leer las de
+  la plataforma
 - Las **once plantillas de prueba**, con sus tiempos y sus variantes de cambio
 - Una **plantilla de evaluación** por nivel y familia
 - Una primera **versión de pesos** con 40 / 30 / 15 / 15

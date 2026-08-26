@@ -122,7 +122,9 @@ public class RegistroTrabajosIa {
                 .collect(Collectors.toMap(TrabajoIa::getAgenteCodigo, Function.identity(),
                         (a, b) -> a.getId() >= b.getId() ? a : b));
 
-        List<String> vivos = conEstado(ultimoDeCada, "PENDIENTE", "EN_CURSO");
+        // EN_ESPERA también es «vivo»: un paso congelado por el tope de IA (pieza E) va a
+        // correr cuando haya cupo, y armar el retrato sin él sería armarlo con la mitad.
+        List<String> vivos = conEstado(ultimoDeCada, "PENDIENTE", "EN_CURSO", "EN_ESPERA");
         if (!vivos.isEmpty()) {
             log.debug("El retrato de la postulación {} todavía espera a {}", postulacionId, vivos);
             return Optional.empty();
@@ -254,5 +256,46 @@ public class RegistroTrabajosIa {
             trabajo.setTomadoEn(null);
             trabajos.save(trabajo);
         });
+    }
+
+    /**
+     * Congela un trabajo recién creado porque su organización agotó el tope del mes
+     * (pieza E). Solo se congela un PENDIENTE que nadie tomó: si un consumidor llegó
+     * antes, ese trabajo ya se está pagando y frenarlo a medias costaría lo mismo sin
+     * dar nada. EN_ESPERA no se publica a la cola y {@code tomarSiEstaPendiente} no lo
+     * toma: está fuera del circuito hasta que alguien lo despierte.
+     *
+     * @return true si quedó EN_ESPERA
+     */
+    @Transactional
+    public boolean dejarEnEspera(Long trabajoIaId) {
+        TrabajoIa trabajo = trabajos.findById(trabajoIaId).orElse(null);
+        if (trabajo == null || !"PENDIENTE".equals(trabajo.getEstado())) {
+            return false;
+        }
+        trabajo.setEstado("EN_ESPERA");
+        trabajos.save(trabajo);
+        return true;
+    }
+
+    /**
+     * Devuelve un EN_ESPERA a PENDIENTE cuando su organización recuperó cupo —tope
+     * subido, o mes nuevo—. Quien lo llama publica después el aviso a la cola; el
+     * candidato nunca se enteró de la espera: para él siempre estuvo «en curso».
+     *
+     * @return true si despertó; false si ya no estaba esperando
+     */
+    @Transactional
+    public boolean despertar(Long trabajoIaId) {
+        TrabajoIa trabajo = trabajos.findById(trabajoIaId).orElse(null);
+        if (trabajo == null || !"EN_ESPERA".equals(trabajo.getEstado())) {
+            return false;
+        }
+        trabajo.setEstado("PENDIENTE");
+        // El reloj del sondeo arranca de cero: si el aviso a la cola se pierde, el
+        // barrido de pendientes viejos lo vuelve a empujar como a cualquier otro.
+        trabajo.setCreadoEn(Instant.now());
+        trabajos.save(trabajo);
+        return true;
     }
 }

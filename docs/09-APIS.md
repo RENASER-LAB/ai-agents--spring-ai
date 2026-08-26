@@ -21,7 +21,7 @@ Todo vive bajo `/api/v1/`, en dos zonas con reglas distintas:
 | Puerta | Quién la usa | Cómo se identifica |
 |---|---|---|
 | `/api/v1/portal/**` | El candidato | Token propio, de crear cuenta y entrar con correo y contraseña |
-| `/api/v1/panel/**` | El equipo de Renaser | Token de equipo. Lo emitirá RENASER OS; mientras no exista ese contrato, el login de desarrollo |
+| `/api/v1/panel/**` | El equipo de cada empresa, Renaser incluida | Token de equipo, con correo y contraseña. Las cuentas nacen **solo por invitación**: el panel no tiene registro público |
 
 El token va en cada llamada, en la cabecera `Authorization: Bearer <token>`.
 
@@ -40,10 +40,22 @@ la lista de correos registrados. Tras varios intentos fallidos seguidos (configu
 en 5), la entrada se bloquea unos minutos y responde **429** con la cabecera `Retry-After` y el
 campo `segundosDeEspera`, para que la pantalla pueda decir cuánto falta en vez de adivinarlo.
 
-**El equipo, mientras no hay RENASER OS:** `POST /panel/auth/dev-login` con el id de RENASER OS.
-El primer id que entre en una base recién creada se registra solo, con los roles completos del
-equipo — es el arranque de desarrollo. En producción este login se apaga con
-`app.seguridad.dev-login-activo: false`.
+**El equipo:** `POST /panel/auth/login` con correo y contraseña. Solo entran cuentas de
+equipo: un candidato con su contraseña correcta recibe el mismo 401 que un correo que no
+existe — la contraseña del portal no abre el panel. El bloqueo por intentos es el mismo que
+el del candidato. RENASER OS quedó dormido: cuando se retome será añadir un proveedor de
+identidad, no rehacer este login.
+
+**La cuenta de equipo nace por invitación.** Un administrador invita
+(`POST /panel/usuarios/invitaciones`) y el invitado abre el enlace del correo y canjea el
+token en `POST /panel/auth/invitacion`, poniendo su nombre y su contraseña — mínimo doce
+caracteres, porque una cuenta de panel ve los datos de muchas personas. El token es de un
+solo uso y caduca (parámetro `dias_invitacion`, 7 por defecto); una invitación vencida,
+revocada o ya canjeada responde siempre el mismo 401.
+
+**El login de desarrollo** (`POST /panel/auth/dev-login`) sigue existiendo para local y para
+las pruebas, y está **apagado por defecto** (`app.seguridad.dev-login-activo: false`): solo
+`application-local.yaml` y las pruebas de integración lo encienden.
 
 ## Los errores hablan claro
 
@@ -66,13 +78,14 @@ en lenguaje normal.
 
 | Método y ruta | Qué hace | Quién |
 |---|---|---|
-| GET `/vacantes` | Las vacantes publicadas | Cualquiera, sin token |
+| GET `/vacantes` | Las vacantes publicadas **de todas las empresas activas**, cada una con el nombre de la suya. Las de una empresa suspendida no salen | Cualquiera, sin token |
 | GET `/vacantes/{id}` | El detalle público, con los requisitos indispensables | Cualquiera |
-| GET `/consentimientos/textos` | Los textos vigentes de los dos consentimientos | Cualquiera |
+| GET `/vacantes/{id}/consentimiento` | El texto de tratamiento de datos **de la empresa de esa vacante**: lo que se acepta al postular, con el nombre de quien tratará los datos | Cualquiera |
+| GET `/consentimientos/textos` | Los textos vigentes de los dos consentimientos de la plataforma (los de crear la cuenta) | Cualquiera |
 | POST `/cuentas` | Crear la cuenta y registrar los consentimientos | Cualquiera |
 | POST `/auth/login` | Entrar; devuelve el token | Cualquiera |
-| POST `/postulaciones` | Postular: CV (PDF o Word, máx. 10 MB), enlaces, el resultado del que se siente orgulloso, y la confirmación de los requisitos | Candidato |
-| GET `/postulaciones` | Sus postulaciones, con estado y días sin cambio | Candidato |
+| POST `/postulaciones` | Postular: CV (PDF o Word, máx. 10 MB), enlaces, el resultado del que se siente orgulloso, la confirmación de los requisitos y `aceptaTratamiento` (obligatorio): la aceptación del texto de la empresa queda firmada con IP y navegador, a nombre de esa postulación | Candidato |
+| GET `/postulaciones` | Sus postulaciones, con la empresa de cada una, estado y días sin cambio | Candidato |
 | GET `/postulaciones/{uuid}` | El detalle de una suya, con el historial completo | Candidato |
 | POST `/postulaciones/{uuid}/retiro` | Retirarla. **No borra sus datos**: eso se pide aparte | Candidato |
 | POST `/consentimientos/futuros/retiro` | Retirar el consentimiento de futuros contactos | Candidato |
@@ -81,6 +94,10 @@ en lenguaje normal.
 | POST `/evaluacion/{uuid}/inicio` | Empezar. La primera vez elige qué preguntas le tocan | Candidato |
 | PUT `/evaluacion/{uuid}/respuestas/{preguntaId}` | Guardar una respuesta | Candidato |
 | POST `/evaluacion/{uuid}/entrega` | Entregar. Ya no se cambia, y pasa a calificarse | Candidato |
+
+**El candidato es de la plataforma.** Una sola cuenta, y con ella postula a la vacante de
+cualquier empresa: su postulación nace en la empresa de la vacante, que es la que la ve en su
+panel. El tablón de vacantes es la única pantalla que mezcla empresas — a propósito.
 
 **La evaluación es de quien la responde.** Todo entra por el código de la postulación, no por
 el id de la evaluación, y una que no es suya responde 404 — un 403 ya confirmaría que existe.
@@ -267,11 +284,44 @@ el banco v4 que venga no necesitará una migración. El ciclo es
 | Método y ruta | Qué hace | Permiso |
 |---|---|---|
 | GET `/areas` · POST `/areas` | Las áreas de la organización: hace falta una para registrar una solicitud | `ver_solicitudes` / `crear_usuarios_y_asignar_roles` |
-| GET/PUT `/parametros` | Los valores que Renaser cambia sin programar | `editar_parametros` |
+| GET/PUT `/parametros` | Los valores que Renaser cambia sin programar. `tope_mensual_ia` se ve pero no se edita desde aquí: lo administra la plataforma | `editar_parametros` |
 | GET/POST `/plantillas-correo` | Los textos de correo. Editar = crear versión nueva | `editar_textos_correo` |
+| GET/POST `/textos-consentimiento` | Los textos legales de la organización, con su historia. El POST crea la versión nueva **y la publica**: es lo que abre la puerta de publicar vacantes — sin texto PROCESO publicado no se reciben candidatos | `editar_textos_correo` |
 | GET `/auditoria` | El registro, paginado. No se puede modificar ni borrar | `ver_auditoria` |
-| GET `/solicitudes-borrado` · POST `/{id}/ejecucion` | Ver y ejecutar los borrados: la persona queda vacía, la trazabilidad queda | `ejecutar_borrado_datos` |
+| GET `/solicitudes-borrado` · POST `/{id}/ejecucion` | Ver y ejecutar los borrados: la persona queda vacía, la trazabilidad queda. **Solo desde la plataforma**: los candidatos son cuentas de plataforma y la anonimización cruza empresas | `ejecutar_borrado_datos`, y ser la plataforma |
 | GET/POST `/usuarios` · POST `/{id}/roles` · GET `/roles` | El equipo y sus roles. El último administrador no se puede quitar | `crear_usuarios_y_asignar_roles` |
+| GET/POST `/usuarios/invitaciones` · DELETE `/{id}` | Invitar a alguien al equipo, ver las invitaciones y revocar una sin canjear. La respuesta del POST devuelve el enlace a quien invita | `crear_usuarios_y_asignar_roles` |
+
+### La plataforma y las empresas
+
+Desde el 25/08/2026 el sistema es multiempresa: cada empresa se registra por invitación de
+Renaser, publica sus vacantes y ve solo a sus candidatos. El porqué de cada decisión está en
+`docs/superpowers/specs/2026-08-25-*.md`.
+
+| Método y ruta | Qué hace | Permiso |
+|---|---|---|
+| GET `/plataforma/empresas` | La ficha del continente: cada empresa con su estado (activa o suspendida), su tope de IA, sus banderas de personalización y su consumo del mes corriente | `administrar_plataforma`, y ser la plataforma |
+| POST `/plataforma/empresas` | Dar de alta una empresa: nace con roles, parámetros, textos legales en borrador, correos activos y el tope de IA si se pide (`topeMensualIa` opcional), y con la invitación de su primer administrador ya enviada | `administrar_plataforma`, y ser la plataforma |
+| POST `/plataforma/empresas/{id}/suspension` | Suspenderla, con motivo: su equipo no entra —ni con tokens vivos—, sus vacantes salen del tablón, y los candidatos que ya estaban dentro conservan acceso y datos. La plataforma no puede suspenderse a sí misma | `administrar_plataforma`, y ser la plataforma |
+| POST `/plataforma/empresas/{id}/reactivacion` | Reactivarla, con motivo: todo vuelve tal cual | `administrar_plataforma`, y ser la plataforma |
+| PUT `/plataforma/empresas/{id}/tope-ia` | Poner, subir o quitar (`tope` en blanco) el tope mensual de IA. Lo que quedó en espera lo despierta solo el sondeo de la cola | `administrar_plataforma`, y ser la plataforma |
+| POST/DELETE `/plataforma/empresas/{id}/personalizacion/{instrumento}` | Encender o apagar la personalización **de otra empresa**, con motivo, cuando ella lo pide fuera del sistema. Misma copia y misma auditoría que si lo hiciera ella | `administrar_plataforma`, y ser la plataforma |
+| GET `/plataforma/consumo?mes=YYYY-MM` | El consumo de IA del mes por empresa y por agente: total, tokens y llamadas. Con estos números Renaser factura fuera del sistema | `administrar_plataforma`, y ser la plataforma |
+| GET `/organizacion/personalizacion` | Qué instrumentos tiene propios esta organización, bandera por bandera | `personalizar_instrumentos` |
+| POST `/organizacion/personalizacion` | Encender una bandera (`BANCO`, `PESOS`, `PLANTILLA_EVALUACION`, `PRUEBA`): copia el instrumento publicado de la plataforma y desde ahí se lee y edita lo propio | `personalizar_instrumentos` |
+| DELETE `/organizacion/personalizacion/{instrumento}` | Apagarla: se vuelve a leer el de la plataforma. La copia propia se archiva, nunca se borra | `personalizar_instrumentos` |
+
+Con la bandera apagada la empresa **lee** el instrumento de la plataforma —los listados del
+panel enseñan el método de Renaser en solo lectura, y una mejora de Renaser llega sola— pero
+no lo edita: mutar algo ajeno responde 404. Lo operativo (vacantes, solicitudes,
+postulaciones, sesiones) jamás se comparte: lo de otra empresa responde «no existe».
+
+**Renaser administra el continente, no el contenido.** Los endpoints de plataforma llegan a
+la ficha de la empresa —estado, tope, banderas, consumo— y ahí se acaban: no existe ningún
+camino desde la plataforma hacia los candidatos, notas, alertas ni decisiones de una
+empresa, y esa ausencia es el diseño (pieza F). La única grieta consciente es el borrado de
+la ley 29733, que ya se ejecuta desde la plataforma porque el candidato es una cuenta de
+plataforma; queda auditado y es el único.
 
 ### El perfil del candidato
 

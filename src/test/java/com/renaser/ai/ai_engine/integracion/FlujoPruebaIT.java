@@ -77,6 +77,9 @@ public class FlujoPruebaIT {
         registro.add("app.archivos.tipo", () -> "memoria");
         registro.add("app.seguridad.jwt-secreto",
                 () -> "clave-de-pruebas-suficientemente-larga-para-hmac-256-bits");
+        // El dev-login quedo apagado por defecto en application.yaml: aqui se enciende
+        // explicitamente, porque estas pruebas entran al panel por el.
+        registro.add("app.seguridad.dev-login-activo", () -> "true");
         registro.add("spring.ai.deepseek.api-key", () -> "clave-de-pruebas-no-se-usa");
         // La calificacion con IA se apaga en estas pruebas: aqui no se prueba, y si estuviera
         // encendida cada entrega intentaria hablar con DeepSeek con una clave de mentira.
@@ -200,6 +203,7 @@ public class FlujoPruebaIT {
                         .file(cv)
                         .param("vacanteId", String.valueOf(vacanteId))
                         .param("resultadoOrgulloso", "Reduje el tiempo de build de 8 a 2 minutos")
+                        .param("aceptaTratamiento", "true")
                         .header("Authorization", "Bearer " + tokenCandidato))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString(), "codigo");
@@ -409,6 +413,7 @@ public class FlujoPruebaIT {
                         .file(cv)
                         .param("vacanteId", String.valueOf(vacanteId))
                         .param("resultadoOrgulloso", "Otro resultado del que me siento orgullosa")
+                        .param("aceptaTratamiento", "true")
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString(), "codigo");

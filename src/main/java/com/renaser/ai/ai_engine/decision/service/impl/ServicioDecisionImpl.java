@@ -102,7 +102,11 @@ public class ServicioDecisionImpl implements ServicioDecision {
     @Transactional
     public Long registrarBarreraDetectada(ContextoUsuario quien, Long postulacionId, RegistrarBarrera datos) {
         Postulacion postulacion = laVisible(quien, postulacionId, "decidir_contratacion");
+        // La barrera tiene que ser de la MISMA vacante que la postulación: la barrera
+        // cuelga de una vacante, y sin esta comprobación se podía marcar a un candidato
+        // con la barrera de otra vacante — incluso de otra empresa.
         BarreraCritica barrera = barrerasCriticas.findById(datos.barreraCriticaId())
+                .filter(b -> b.getVacanteId().equals(postulacion.getVacanteId()))
                 .orElseThrow(() -> new ResourceNotFoundException("Barrera crítica", "id", datos.barreraCriticaId()));
 
         BarreraDetectada fila = BarreraDetectada.builder()

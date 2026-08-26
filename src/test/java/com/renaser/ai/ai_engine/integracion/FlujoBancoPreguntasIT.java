@@ -66,6 +66,9 @@ public class FlujoBancoPreguntasIT {
         registro.add("app.archivos.tipo", () -> "memoria");
         registro.add("app.seguridad.jwt-secreto",
                 () -> "clave-de-pruebas-suficientemente-larga-para-hmac-256-bits");
+        // El dev-login quedo apagado por defecto en application.yaml: aqui se enciende
+        // explicitamente, porque estas pruebas entran al panel por el.
+        registro.add("app.seguridad.dev-login-activo", () -> "true");
         registro.add("spring.ai.deepseek.api-key", () -> "clave-de-pruebas-no-se-usa");
         registro.add("renaser.ai.calificacion.habilitada", () -> "false");
     }
@@ -243,6 +246,7 @@ public class FlujoBancoPreguntasIT {
                         .file(cv)
                         .param("vacanteId", String.valueOf(vacanteId))
                         .param("resultadoOrgulloso", "Automaticé el cierre mensual y pasó de 3 días a 4 horas")
+                        .param("aceptaTratamiento", "true")
                         .header("Authorization", "Bearer " + tokenCandidato))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString(), "codigo");

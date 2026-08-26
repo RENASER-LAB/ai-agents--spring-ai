@@ -22,8 +22,9 @@ public class ProveedorIdentidadEquipoDesarrollo implements ProveedorIdentidadEqu
 
     @Override
     public Optional<Usuario> autenticarDesarrollo(String correo, String usuarioRenaserOsId) {
-        // Sin contraseña: es un login de desarrollo, protegido por app.seguridad.dev-login-activo
-        return organizaciones.findByCodigo("RENASER")
+        // Sin contraseña: es un login de desarrollo, protegido por app.seguridad.dev-login-activo.
+        // Solo conoce a la plataforma: los ids de RENASER OS son de la casa, no de las empresas.
+        return organizaciones.findByEsPlataformaTrue()
                 .map(Organizacion::getId)
                 .flatMap(orgId -> usuarios.findByOrganizacionIdAndUsuarioRenaserOsId(orgId, usuarioRenaserOsId))
                 .filter(Usuario::isEsActivo);

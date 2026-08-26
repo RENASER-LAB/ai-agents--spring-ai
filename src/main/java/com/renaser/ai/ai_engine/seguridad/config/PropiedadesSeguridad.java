@@ -17,7 +17,9 @@ public class PropiedadesSeguridad {
     private int minutosTokenCandidato = 120;
     private int minutosTokenEquipo = 480;
 
-    // El login de desarrollo del panel emite tokens de equipo sin RENASER OS.
-    // En producción se apaga y la identidad del equipo viene de RENASER OS.
-    private boolean devLoginActivo = true;
+    // El login de desarrollo del panel emite tokens de equipo sin contraseña. Apagado
+    // por defecto y en todo entorno de verdad: solo lo encienden application-local.yaml
+    // y las pruebas de integración, explícitamente. Estuvo encendido por defecto y eso
+    // significaba que cualquier despliegue que olvidara apagarlo regalaba el panel.
+    private boolean devLoginActivo = false;
 }

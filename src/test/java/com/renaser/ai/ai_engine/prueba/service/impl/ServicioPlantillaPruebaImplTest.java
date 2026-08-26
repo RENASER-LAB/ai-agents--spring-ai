@@ -67,13 +67,21 @@ class ServicioPlantillaPruebaImplTest {
     @Mock private EntregableRequeridoRepository entregablesRequeridos;
     @Mock private CriterioRepository criterios;
     @Mock private ServicioAuditoria auditoria;
+    @Mock private com.renaser.ai.ai_engine.organizacion.service.DuenoDelInstrumento dueno;
 
     private ServicioPlantillaPruebaImpl servicio;
 
     @BeforeEach
     void crearElServicio() {
         servicio = new ServicioPlantillaPruebaImpl(plantillas, versiones, variantes,
-                preguntasCatalogo, preguntasElegidas, entregablesRequeridos, criterios, auditoria);
+                preguntasCatalogo, preguntasElegidas, entregablesRequeridos, criterios,
+                auditoria, dueno);
+        // En estas pruebas la organizacion no personaliza nada: el resolutor contesta
+        // que el dueño de todo instrumento es ella misma (aqui hace de plataforma).
+        org.mockito.Mockito.lenient()
+                .when(dueno.duenoDe(org.mockito.ArgumentMatchers.eq(ORGANIZACION),
+                        org.mockito.ArgumentMatchers.any()))
+                .thenReturn(ORGANIZACION);
     }
 
     private VersionPlantillaPrueba versionEnBorrador() {

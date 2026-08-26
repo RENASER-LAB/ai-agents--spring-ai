@@ -70,6 +70,9 @@ public class FlujoSinBancoIT {
         registro.add("app.archivos.tipo", () -> "memoria");
         registro.add("app.seguridad.jwt-secreto",
                 () -> "clave-de-pruebas-suficientemente-larga-para-hmac-256-bits");
+        // El dev-login quedo apagado por defecto en application.yaml: aqui se enciende
+        // explicitamente, porque estas pruebas entran al panel por el.
+        registro.add("app.seguridad.dev-login-activo", () -> "true");
         registro.add("spring.ai.deepseek.api-key", () -> "clave-de-pruebas-no-se-usa");
         // Aquí la califica una persona; el agente de la prueba lo cubre FlujoCalificacionIaIT
         registro.add("renaser.ai.calificacion.habilitada", () -> "false");
@@ -210,6 +213,7 @@ public class FlujoSinBancoIT {
                         .file(cv)
                         .param("vacanteId", String.valueOf(vacanteId))
                         .param("resultadoOrgulloso", "Ordené la caja de tres sedes en dos meses")
+                        .param("aceptaTratamiento", "true")
                         .header("Authorization", "Bearer " + tokenCandidato))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString(), "codigo");
@@ -360,6 +364,7 @@ public class FlujoSinBancoIT {
                         .file(cv)
                         .param("vacanteId", String.valueOf(vacanteId))
                         .param("resultadoOrgulloso", "Cuadré la caja de tres sedes")
+                        .param("aceptaTratamiento", "true")
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString(), "codigo");

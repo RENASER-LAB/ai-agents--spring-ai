@@ -65,6 +65,9 @@ public class FlujoPerfilIT {
         registro.add("app.archivos.tipo", () -> "memoria");
         registro.add("app.seguridad.jwt-secreto",
                 () -> "clave-de-pruebas-suficientemente-larga-para-hmac-256-bits");
+        // El dev-login quedo apagado por defecto en application.yaml: aqui se enciende
+        // explicitamente, porque estas pruebas entran al panel por el.
+        registro.add("app.seguridad.dev-login-activo", () -> "true");
         registro.add("spring.ai.deepseek.api-key", () -> "clave-de-pruebas-no-se-usa");
         registro.add("renaser.ai.calificacion.habilitada", () -> "false");
     }
@@ -122,6 +125,7 @@ public class FlujoPerfilIT {
                         .file(cv)
                         .param("vacanteId", String.valueOf(vacanteId))
                         .param("resultadoOrgulloso", "Ordené el archivo de una clínica entera")
+                        .param("aceptaTratamiento", "true")
                         .param("linkedin", "https://www.linkedin.com/in/camila-rojas")
                         .param("github", "https://github.com/camila")
                         .header("Authorization", "Bearer " + tokenCandidato))
@@ -357,6 +361,7 @@ public class FlujoPerfilIT {
                         .file(cv)
                         .param("vacanteId", String.valueOf(vacante2))
                         .param("resultadoOrgulloso", "El mismo resultado de siempre")
+                        .param("aceptaTratamiento", "true")
                         .header("Authorization", "Bearer " + tokenCandidato))
                 .andExpect(status().isCreated());
         long postulacion2 = jdbc.queryForObject("select max(id) from postulacion", Long.class);

@@ -66,6 +66,12 @@ class ColaCalificacionIaImplTest {
     @Mock private RegistroTrabajosIa registro;
     @Mock private TrabajoIaPublisher publicador;
     @Mock private PuenteCalificacionIa puente;
+    // Sin tope por defecto (sinCupo devuelve false en el mock): las pruebas del tope lo
+    // encienden una a una.
+    @Mock private TopeMensualIa tope;
+    // Sin organización por defecto (findById vacío = activa): las pruebas de la
+    // suspensión la apagan una a una.
+    @Mock private com.renaser.ai.ai_engine.organizacion.repository.OrganizacionRepository organizaciones;
     @Mock private AgenteSeleccion datosCv;
     @Mock private AgenteSeleccion evidenciaCv;
     @Mock private AgenteSeleccion evaluador;
@@ -164,6 +170,147 @@ class ColaCalificacionIaImplTest {
 
         verifyNoInteractions(registro);
         verifyNoInteractions(publicador);
+    }
+
+    // ============ El tope mensual de IA (pieza E) ============
+
+    @Test
+    void sinCupoElTrabajoNuevoQuedaEnEsperaYNoSePublica() {
+        // Al 100% del tope lo nuevo no falla: espera. No se publica a la cola —ningún
+        // consumidor debe pagarlo— y el aviso del 80% tampoco sale: quien ya está por
+        // encima del tope no necesita la campana, necesita el freno.
+        when(registro.crearSiHaceFalta(1L, POSTULACION, AgentePruebaPuesto.CODIGO_AGENTE, "FINA", null))
+                .thenReturn(Optional.of(trabajo(42L, AgentePruebaPuesto.CODIGO_AGENTE, "PENDIENTE", "FINA")));
+        when(tope.sinCupo(1L)).thenReturn(true);
+        when(registro.dejarEnEspera(42L)).thenReturn(true);
+
+        assertThat(cola.encolarPruebaPuesto(POSTULACION)).isTrue();
+
+        verifyNoInteractions(publicador);
+        verify(tope, never()).avisarSiCruzaElUmbral(anyLong());
+    }
+
+    @Test
+    void conCupoSePublicaYSePreguntaPorElAvisoDel80() {
+        // El aviso se dispara donde el gasto crece: al encolar con cupo. Que salga o no
+        // (80% cruzado, una vez por mes) lo decide TopeMensualIa, que tiene sus pruebas.
+        when(registro.crearSiHaceFalta(1L, POSTULACION, AgentePruebaPuesto.CODIGO_AGENTE, "FINA", null))
+                .thenReturn(Optional.of(trabajo(42L, AgentePruebaPuesto.CODIGO_AGENTE, "PENDIENTE", "FINA")));
+        when(tope.sinCupo(1L)).thenReturn(false);
+
+        assertThat(cola.encolarPruebaPuesto(POSTULACION)).isTrue();
+
+        verify(publicador).publicar(42L);
+        verify(tope).avisarSiCruzaElUmbral(1L);
+    }
+
+    @Test
+    void unTrabajoEnEsperaEstaVivoYNoSeLeCreaUnGemelo() {
+        // EN_ESPERA va a correr cuando haya cupo: pedir la misma calificación otra vez no
+        // puede crear un segundo trabajo, o al despertar se pagaría dos veces.
+        when(trabajos.findFirstByPostulacionIdAndAgenteCodigoAndModoOrderByIdDesc(
+                POSTULACION, AgentePruebaPuesto.CODIGO_AGENTE, "FINA"))
+                .thenReturn(Optional.of(trabajo(42L, AgentePruebaPuesto.CODIGO_AGENTE, "EN_ESPERA", "FINA")));
+
+        assertThat(cola.encolarPruebaPuesto(POSTULACION)).isFalse();
+
+        verify(registro, never()).crearSiHaceFalta(anyLong(), anyLong(), anyString(), anyString(), any());
+    }
+
+    @Test
+    void elCandidatoVeEnCursoMientrasSuEmpresaEspera() {
+        // Para el candidato la espera del tope no existe: su calificación está en curso,
+        // que es la verdad — se hará cuando su empresa recupere cupo, y él no tiene por
+        // qué cargar con el asunto comercial de la empresa.
+        when(trabajos.findByPostulacionIdOrderByIdAsc(POSTULACION)).thenReturn(List.of(
+                trabajo(1L, AgenteDatosCv.CODIGO_AGENTE, "EN_ESPERA", "FINA")));
+
+        assertThat(cola.comoVa(POSTULACION)).isEqualTo("EN_CURSO");
+        assertThat(cola.comoVaLaLectura(POSTULACION)).isEqualTo("EN_CURSO");
+    }
+
+    @Test
+    void elBarridoDespiertaLosQueEsperanCuandoHayCupo() {
+        // «La cola arranca sola con lo que quedó esperando»: tope subido o mes nuevo, el
+        // sondeo los devuelve a PENDIENTE y los publica. Todos los de la organización de
+        // una vez — lo que esperaba ya estaba prometido.
+        when(trabajos.findByEstadoOrderByIdAsc("EN_ESPERA")).thenReturn(List.of(
+                trabajo(42L, AgenteDatosCv.CODIGO_AGENTE, "EN_ESPERA", "FINA"),
+                trabajo(43L, AgentePruebaPuesto.CODIGO_AGENTE, "EN_ESPERA", "FINA")));
+        when(tope.sinCupo(1L)).thenReturn(false);
+        when(registro.despertar(42L)).thenReturn(true);
+        when(registro.despertar(43L)).thenReturn(true);
+
+        cola.reintentarAtascados();
+
+        verify(publicador).publicar(42L);
+        verify(publicador).publicar(43L);
+    }
+
+    @Test
+    void elBarridoNoDespiertaAQuienSigueSinCupo() {
+        when(trabajos.findByEstadoOrderByIdAsc("EN_ESPERA")).thenReturn(List.of(
+                trabajo(42L, AgenteDatosCv.CODIGO_AGENTE, "EN_ESPERA", "FINA")));
+        when(tope.sinCupo(1L)).thenReturn(true);
+
+        cola.reintentarAtascados();
+
+        verify(registro, never()).despertar(anyLong());
+        verifyNoInteractions(publicador);
+    }
+
+    // ============ La suspensión congela también la IA (pieza F) ============
+
+    @Test
+    void unaOrganizacionSuspendidaCongelaSusTrabajosNuevosSinPagarNiLaSuma() {
+        // Un candidato que ya estaba dentro puede seguir entregando —su evaluación, su
+        // prueba— y eso pide calificaciones nuevas. Suspendida es congelada: la misma
+        // espera del tope, sin gastar en el modelo por una empresa con la puerta cerrada.
+        // Y sin pagar la suma del consumo: la suspensión se mira antes que el cupo.
+        when(organizaciones.findById(1L)).thenReturn(Optional.of(
+                com.renaser.ai.ai_engine.organizacion.entity.Organizacion.builder()
+                        .id(1L).esActiva(false).build()));
+        when(registro.crearSiHaceFalta(1L, POSTULACION, AgentePruebaPuesto.CODIGO_AGENTE, "FINA", null))
+                .thenReturn(Optional.of(trabajo(42L, AgentePruebaPuesto.CODIGO_AGENTE, "PENDIENTE", "FINA")));
+        when(registro.dejarEnEspera(42L)).thenReturn(true);
+
+        assertThat(cola.encolarPruebaPuesto(POSTULACION)).isTrue();
+
+        verifyNoInteractions(publicador, tope);
+    }
+
+    @Test
+    void elBarridoNoDespiertaAUnaSuspendidaAunqueLeSobreCupo() {
+        // Despertar trabajos de una suspendida sería gastar por una empresa congelada.
+        // No son zombis: el mismo barrido los suelta al primer ciclo tras reactivarla —
+        // el caso de la organización activa ya lo cubre elBarridoDespiertaLosQueEsperan.
+        when(trabajos.findByEstadoOrderByIdAsc("EN_ESPERA")).thenReturn(List.of(
+                trabajo(42L, AgenteDatosCv.CODIGO_AGENTE, "EN_ESPERA", "FINA")));
+        when(organizaciones.findById(1L)).thenReturn(Optional.of(
+                com.renaser.ai.ai_engine.organizacion.entity.Organizacion.builder()
+                        .id(1L).esActiva(false).build()));
+
+        cola.reintentarAtascados();
+
+        verify(registro, never()).despertar(anyLong());
+        verifyNoInteractions(publicador, tope);
+    }
+
+    // ============ La campana jamás tumba el encolado ============
+
+    @Test
+    void unTropiezoDelAvisoDel80NoTumbaElEncolado() {
+        // El aviso corre dentro de la transacción de postular (vía trasPostular →
+        // encolarDatosCv): si su fallo escapara, una campana rota tumbaría postulaciones.
+        // Se traga con su error anotado, y el trabajo queda publicado igual.
+        when(registro.crearSiHaceFalta(1L, POSTULACION, AgentePruebaPuesto.CODIGO_AGENTE, "FINA", null))
+                .thenReturn(Optional.of(trabajo(42L, AgentePruebaPuesto.CODIGO_AGENTE, "PENDIENTE", "FINA")));
+        doThrow(new IllegalStateException("se cayó la campana"))
+                .when(tope).avisarSiCruzaElUmbral(1L);
+
+        assertThat(cola.encolarPruebaPuesto(POSTULACION)).isTrue();
+
+        verify(publicador).publicar(42L);
     }
 
     // ============ El paso que toca, y no siempre es el primero ============
@@ -672,7 +819,7 @@ class ColaCalificacionIaImplTest {
     }
 
     private ColaCalificacionIaImpl conLaCalificacion(boolean habilitada) {
-        return new ColaCalificacionIaImpl(trabajos, registro, publicador, puente,
+        return new ColaCalificacionIaImpl(trabajos, registro, publicador, puente, tope, organizaciones,
                 List.of(datosCv, evidenciaCv, evaluador, potencialRiesgo, pruebaPuesto, simulacion),
                 habilitada, 3, 15);
     }

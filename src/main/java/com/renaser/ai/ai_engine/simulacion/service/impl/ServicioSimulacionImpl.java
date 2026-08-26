@@ -4,6 +4,7 @@ import com.renaser.ai.ai_engine.ai.exception.ResourceNotFoundException;
 import com.renaser.ai.ai_engine.ai.service.ColaCalificacionIa;
 import com.renaser.ai.ai_engine.auditoria.service.ServicioAuditoria;
 import com.renaser.ai.ai_engine.parametro.service.ServicioParametros;
+import com.renaser.ai.ai_engine.perfilintegral.repository.AlertaRepository;
 import com.renaser.ai.ai_engine.postulacion.entity.Postulacion;
 import com.renaser.ai.ai_engine.postulacion.repository.PostulacionRepository;
 import com.renaser.ai.ai_engine.postulacion.service.MaquinaEstados;
@@ -59,6 +60,7 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
     private final InscripcionSesionRepository inscripciones;
     private final MarcaTiempoSimulacionRepository marcas;
     private final PreguntaGeneradaRepository preguntas;
+    private final AlertaRepository alertas;
     private final PostulacionRepository postulaciones;
     private final VacanteRepository vacantes;
     private final ColaCalificacionIa cola;
@@ -327,7 +329,7 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
     @Override
     @Transactional
     public void marcarEvento(ContextoUsuario quien, Long inscripcionId, MarcarEvento datos) {
-        InscripcionSesion inscripcion = laInscripcion(inscripcionId);
+        InscripcionSesion inscripcion = laInscripcion(quien, inscripcionId);
         exigirQuePuedaFacilitar(quien, inscripcion.getSesionSimulacionId());
 
         // Cada evento ocurre una vez. Volver a marcarlo corrige la hora, no crea otro.
@@ -344,7 +346,7 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
 
     @Override
     public List<MarcaResponse> verMarcas(ContextoUsuario quien, Long inscripcionId) {
-        laInscripcion(inscripcionId);
+        laInscripcion(quien, inscripcionId);
         permisos.alcanceDe("marcar_eventos_simulacion");
         return marcas.findByInscripcionSesionIdOrderByOcurridaEn(inscripcionId).stream()
                 .map(m -> new MarcaResponse(m.getEvento(), m.getOcurridaEn()))
@@ -354,7 +356,7 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
     @Override
     @Transactional
     public void marcarAsistencia(ContextoUsuario quien, Long inscripcionId, MarcarAsistencia datos) {
-        InscripcionSesion inscripcion = laInscripcion(inscripcionId);
+        InscripcionSesion inscripcion = laInscripcion(quien, inscripcionId);
         permisos.alcanceDe("marcar_asistencia");
 
         inscripcion.setAsistio(datos.asistio());
@@ -413,6 +415,14 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
     @Transactional
     public Long registrarPregunta(ContextoUsuario quien, Long postulacionId, RegistrarPregunta datos) {
         laVisible(quien, postulacionId, "hacer_conversacion_final");
+        // La alerta que la pregunta cita tiene que ser de ESTA postulación: sin la
+        // comprobación, la fila guardaba una clave foránea hacia el expediente de otra
+        // empresa y la ficha la enseñaba después como si fuera propia.
+        if (datos.alertaId() != null) {
+            alertas.findById(datos.alertaId())
+                    .filter(a -> postulacionId.equals(a.getPostulacionId()))
+                    .orElseThrow(() -> new ResourceNotFoundException("Alerta", "id", datos.alertaId()));
+        }
         int siguiente = preguntas.findByPostulacionIdOrderByOrden(postulacionId).size() + 1;
         PreguntaGenerada fila = preguntas.save(PreguntaGenerada.builder()
                 .postulacionId(postulacionId)
@@ -511,9 +521,16 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
                 .orElseThrow(() -> new ResourceNotFoundException("Sesión", "id", sesionId));
     }
 
-    private InscripcionSesion laInscripcion(Long inscripcionId) {
-        return inscripciones.findById(inscripcionId)
+    /**
+     * La inscripción no guarda organización: se deriva de su sesión, que sí la tiene.
+     * Sin ese paso, marcar un evento o la asistencia sobre una inscripción ajena
+     * funcionaba — y marcar asistencia TRANSICIONA la postulación de la otra empresa.
+     */
+    private InscripcionSesion laInscripcion(ContextoUsuario quien, Long inscripcionId) {
+        InscripcionSesion inscripcion = inscripciones.findById(inscripcionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Inscripción", "id", inscripcionId));
+        laSesion(quien, inscripcion.getSesionSimulacionId());
+        return inscripcion;
     }
 
     private Postulacion laMia(ContextoUsuario quien, UUID uuid) {

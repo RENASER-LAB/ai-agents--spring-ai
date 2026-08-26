@@ -2,6 +2,7 @@ package com.renaser.ai.ai_engine.vacante.service.impl;
 
 import com.renaser.ai.ai_engine.ai.exception.ResourceNotFoundException;
 import com.renaser.ai.ai_engine.auditoria.service.ServicioAuditoria;
+import com.renaser.ai.ai_engine.consentimiento.repository.TextoConsentimientoRepository;
 import com.renaser.ai.ai_engine.notificacion.entity.PlantillaCorreoVacante;
 import com.renaser.ai.ai_engine.notificacion.repository.PlantillaCorreoRepository;
 import com.renaser.ai.ai_engine.notificacion.repository.PlantillaCorreoVacanteRepository;
@@ -14,7 +15,10 @@ import com.renaser.ai.ai_engine.pesos.repository.VersionPesosRepository;
 import com.renaser.ai.ai_engine.prueba.entity.VersionPlantillaPrueba;
 import com.renaser.ai.ai_engine.prueba.entity.IntentoPrueba;
 import com.renaser.ai.ai_engine.prueba.repository.IntentoPruebaRepository;
+import com.renaser.ai.ai_engine.prueba.repository.PlantillaPruebaRepository;
 import com.renaser.ai.ai_engine.prueba.repository.VersionPlantillaPruebaRepository;
+import com.renaser.ai.ai_engine.organizacion.service.DuenoDelInstrumento;
+import com.renaser.ai.ai_engine.organizacion.service.Instrumento;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
 import com.renaser.ai.ai_engine.solicitud.entity.SolicitudTalento;
 import com.renaser.ai.ai_engine.solicitud.repository.SolicitudTalentoRepository;
@@ -40,10 +44,13 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
     private final VersionPesosRepository versionesPesos;
     private final PlantillaEvaluacionRepository plantillas;
     private final VersionPlantillaPruebaRepository versionesPrueba;
+    private final PlantillaPruebaRepository plantillasPrueba;
     private final PlantillaCorreoRepository plantillasCorreo;
     private final PlantillaCorreoVacanteRepository plantillasPorVacante;
+    private final TextoConsentimientoRepository textosConsentimiento;
     private final IntentoPruebaRepository intentos;
     private final ServicioAuditoria auditoria;
+    private final DuenoDelInstrumento dueno;
 
     // ============ Puestos ============
 
@@ -92,8 +99,11 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                 .orElseThrow(() -> new ResourceNotFoundException("Puesto", "id", datos.puestoId()));
 
         // La versión de pesos publicada vigente. Elegir otra es de Dirección (hito 2).
+        // De quién son los pesos lo contesta el resolutor: los de la plataforma mientras
+        // la empresa no personalice, los suyos en cuanto encienda la bandera.
         VersionPesos pesos = versionesPesos
-                .findFirstByOrganizacionIdAndEstadoOrderByPublicadaEnDesc(quien.organizacionId(), "PUBLICADA")
+                .findFirstByOrganizacionIdAndEstadoOrderByPublicadaEnDesc(
+                        dueno.duenoDe(quien.organizacionId(), Instrumento.PESOS), "PUBLICADA")
                 .orElseThrow(() -> new IllegalStateException("No hay una versión de pesos publicada"));
 
         Vacante vacante = vacantes.save(Vacante.builder()
@@ -230,6 +240,18 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
             throw new IllegalStateException(
                     "Antes de publicar hay que elegir la prueba del puesto de esta vacante");
         }
+        // El requisito del día uno de la pieza A: sin texto legal publicado con SU nombre,
+        // la empresa no recibe candidatos — al postular se firma ese texto (ley 29733), y
+        // no puede firmarse lo que no existe. Renaser lo tiene publicado desde la V9; a
+        // las empresas nuevas el alta se lo copia en borrador y les toca publicarlo.
+        if (textosConsentimiento
+                .findFirstByOrganizacionIdAndTipoAndPublicadoEnIsNotNullOrderByPublicadoEnDesc(
+                        quien.organizacionId(), "PROCESO")
+                .isEmpty()) {
+            throw new IllegalStateException("Antes de publicar una vacante, publica el texto de "
+                    + "consentimiento de tu empresa (POST /panel/textos-consentimiento): quien "
+                    + "postule tiene que saber quién tratará sus datos");
+        }
         vacante.setEstado("PUBLICADA");
         vacante.setPublicadaEn(Instant.now());
         vacantes.save(vacante);
@@ -241,8 +263,11 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
     @Transactional
     public void asignarPlantillaEvaluacion(ContextoUsuario quien, Long id, Long plantillaEvaluacionId) {
         Vacante vacante = laDeLaOrganizacion(quien, id);
+        // Del dueño resuelto: con la bandera apagada la vacante usa las plantillas de la
+        // plataforma; encendida, solo las propias. Cualquier otra es un «no existe».
         PlantillaEvaluacion plantilla = plantillas
-                .findByIdAndOrganizacionId(plantillaEvaluacionId, quien.organizacionId())
+                .findByIdAndOrganizacionId(plantillaEvaluacionId,
+                        dueno.duenoDe(quien.organizacionId(), Instrumento.PLANTILLA_EVALUACION))
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Plantilla de evaluación", "id", plantillaEvaluacionId));
         if (!"PUBLICADA".equals(plantilla.getEstado())) {
@@ -273,6 +298,13 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
     public void asignarPlantillaPrueba(ContextoUsuario quien, Long id, Long versionPlantillaPruebaId) {
         Vacante vacante = laDeLaOrganizacion(quien, id);
         VersionPlantillaPrueba version = versionesPrueba.findById(versionPlantillaPruebaId)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Versión de prueba", "id", versionPlantillaPruebaId));
+        // La versión no sabe de organizaciones: se deriva a su plantilla y se valida
+        // contra el dueño resuelto. Sin esto, una vacante podía colgarse la prueba de
+        // otra empresa — y ese examen se le sirve al candidato al postular.
+        plantillasPrueba.findByIdAndOrganizacionId(version.getPlantillaPruebaId(),
+                        dueno.duenoDe(quien.organizacionId(), Instrumento.PRUEBA))
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Versión de prueba", "id", versionPlantillaPruebaId));
         if (!"PUBLICADA".equals(version.getEstado())) {
@@ -317,7 +349,8 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
     public void asignarVersionPesos(ContextoUsuario quien, Long id, Long versionPesosId) {
         Vacante vacante = laDeLaOrganizacion(quien, id);
         VersionPesos version = versionesPesos
-                .findByIdAndOrganizacionId(versionPesosId, quien.organizacionId())
+                .findByIdAndOrganizacionId(versionPesosId,
+                        dueno.duenoDe(quien.organizacionId(), Instrumento.PESOS))
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Versión de pesos", "id", versionPesosId));
         // La misma regla que al crear la vacante (RF-114): rige una versión aprobada.
