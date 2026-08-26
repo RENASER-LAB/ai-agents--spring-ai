@@ -162,7 +162,12 @@ public class ServicioAccesoEquipoImpl implements ServicioAccesoEquipo {
     private String hashSenuelo() {
         String hash = senuelo;
         if (hash == null) {
-            hash = codificador.encode("senuelo-que-no-abre-ninguna-puerta");
+            // Azar y no un literal: el contenido da igual (el resultado de la comparación
+            // se descarta), pero un texto fijo parece una contraseña quemada — al analizador
+            // estático y a cualquiera que lea. Aleatorio no hay nada que «revocar».
+            byte[] bytesAlAzar = new byte[32];
+            new java.security.SecureRandom().nextBytes(bytesAlAzar);
+            hash = codificador.encode(java.util.Base64.getEncoder().encodeToString(bytesAlAzar));
             senuelo = hash;
         }
         return hash;

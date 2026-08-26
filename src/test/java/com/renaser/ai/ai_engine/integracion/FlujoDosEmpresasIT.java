@@ -515,11 +515,96 @@ public class FlujoDosEmpresasIT {
                 .andExpect(jsonPath("$.bancoPropio").value(false));
     }
 
+    @DisplayName("ACME se lleva también el banco, las plantillas y las pruebas — copia completa")
+    @Test
+    @Order(8)
+    void acmePersonalizaLosOtrosTresInstrumentos() throws Exception {
+        // El banco es la copia más profunda: 190 preguntas con ocho tablas hijas, cuatro
+        // de ellas sin entidad JPA. Si el copiador pierde una tabla o no remapea los pares
+        // de consistencia, este es el test que lo delata — conteo contra el original.
+        conToken(post("/api/v1/panel/organizacion/personalizacion"), tokenAcme,
+                "{\"instrumento\":\"BANCO\"}").andExpect(status().isOk());
+
+        Long bancoAcme = jdbc.queryForObject("""
+                select id from version_banco where organizacion_id = %d
+                   and estado = 'PUBLICADA' and tipo_banco = 'NIVEL'
+                 order by id desc limit 1""".formatted(acmeId), Long.class);
+        Long bancoOrigen = jdbc.queryForObject(
+                "select copiada_de_version_id from version_banco where id = " + bancoAcme, Long.class);
+        assertThat(jdbc.queryForObject("select organizacion_id from version_banco where id = "
+                + bancoOrigen, Long.class)).isEqualTo(plataformaId);
+
+        // Pregunta por pregunta y cada tabla hija: tantas filas como el original
+        assertThat(contar("select count(*) from pregunta where version_banco_id = " + bancoAcme))
+                .isEqualTo(contar("select count(*) from pregunta where version_banco_id = " + bancoOrigen))
+                .isPositive();
+        for (String sql : List.of(
+                "select count(*) from opcion o join pregunta p on p.id = o.pregunta_id where p.version_banco_id = %d",
+                "select count(*) from pregunta_dimension d join pregunta p on p.id = d.pregunta_id where p.version_banco_id = %d",
+                "select count(*) from opcion_dimension od join opcion o on o.id = od.opcion_id join pregunta p on p.id = o.pregunta_id where p.version_banco_id = %d",
+                "select count(*) from rango_pregunta r join pregunta p on p.id = r.pregunta_id where p.version_banco_id = %d",
+                "select count(*) from campo_caso c join pregunta p on p.id = c.pregunta_id where p.version_banco_id = %d",
+                "select count(*) from par_consistencia where version_banco_id = %d",
+                "select count(*) from multiplicador_bloque where version_banco_id = %d",
+                "select count(*) from umbral_nivel where version_banco_id = %d",
+                "select count(*) from filtro_eliminatorio where version_banco_id = %d")) {
+            assertThat(contar(sql.formatted(bancoAcme)))
+                    .as(sql).isEqualTo(contar(sql.formatted(bancoOrigen)));
+        }
+        // Los pares de consistencia apuntan a las preguntas COPIADAS, no a las originales:
+        // sin el remapeo, la copia mediría consistencia contra el banco de la plataforma
+        assertThat(contar("""
+                select count(*) from par_consistencia pc
+                  join pregunta pa on pa.id = pc.pregunta_a_id
+                 where pc.version_banco_id = %d and pa.version_banco_id <> %d"""
+                .formatted(bancoAcme, bancoAcme))).isZero();
+
+        // Plantillas de evaluación y pruebas del puesto: copia con origen y sus hijas
+        conToken(post("/api/v1/panel/organizacion/personalizacion"), tokenAcme,
+                "{\"instrumento\":\"PLANTILLA_EVALUACION\"}").andExpect(status().isOk());
+        assertThat(contar("select count(*) from plantilla_evaluacion where organizacion_id = "
+                + acmeId)).isPositive();
+        assertThat(contar("""
+                select count(*) from cuota_plantilla_evaluacion c
+                  join plantilla_evaluacion pl on pl.id = c.plantilla_evaluacion_id
+                 where pl.organizacion_id = %d""".formatted(acmeId)))
+                .isEqualTo(contar("""
+                select count(*) from cuota_plantilla_evaluacion c
+                  join plantilla_evaluacion pl on pl.id = c.plantilla_evaluacion_id
+                 where pl.organizacion_id = %d and pl.estado = 'PUBLICADA'""".formatted(plataformaId)));
+
+        conToken(post("/api/v1/panel/organizacion/personalizacion"), tokenAcme,
+                "{\"instrumento\":\"PRUEBA\"}").andExpect(status().isOk());
+        // La copia de la prueba no arrastra amarres ajenos: ni el puesto de Renaser ni
+        // ninguna vacante — nace suelta, para que ACME la ate a lo suyo
+        assertThat(contar("select count(*) from plantilla_prueba where organizacion_id = "
+                + acmeId + " and puesto_id is not null")).isZero();
+        assertThat(contar("""
+                select count(*) from version_plantilla_prueba v
+                  join plantilla_prueba pp on pp.id = v.plantilla_prueba_id
+                 where pp.organizacion_id = %d and v.vacante_id is not null"""
+                .formatted(acmeId))).isZero();
+
+        // Encendida la bandera de cada uno, y apagar el banco lo archiva (RF-138) y
+        // devuelve a ACME al de la plataforma
+        conTokenGet("/api/v1/panel/organizacion/personalizacion", tokenAcme)
+                .andExpect(jsonPath("$.bancoPropio").value(true))
+                .andExpect(jsonPath("$.plantillasEvaluacionPropias").value(true))
+                .andExpect(jsonPath("$.pruebasPuestoPropias").value(true));
+        mvc.perform(delete("/api/v1/panel/organizacion/personalizacion/BANCO")
+                        .header("Authorization", "Bearer " + tokenAcme))
+                .andExpect(status().isOk());
+        assertThat(jdbc.queryForObject("select estado from version_banco where id = " + bancoAcme,
+                String.class)).isEqualTo("ARCHIVADA");
+        conTokenGet("/api/v1/panel/organizacion/personalizacion", tokenAcme)
+                .andExpect(jsonPath("$.bancoPropio").value(false));
+    }
+
     // ============ El borrado ============
 
     @DisplayName("El borrado de la ley 29733 es de la plataforma: desde ACME ni se lista")
     @Test
-    @Order(8)
+    @Order(9)
     void elBorradoEsDeLaPlataforma() throws Exception {
         mvc.perform(post("/api/v1/portal/solicitudes-borrado")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -568,7 +653,7 @@ public class FlujoDosEmpresasIT {
 
     @DisplayName("La suspensión congela a ACME: su equipo fuera, su vacante escondida, su gente intacta")
     @Test
-    @Order(9)
+    @Order(10)
     void laSuspensionCongelaAAcme() throws Exception {
         // Una segunda candidata entra ANTES de la suspensión: es la que va a demostrar
         // que los de dentro no pagan el problema comercial de la empresa. (Camila ya no
@@ -632,7 +717,7 @@ public class FlujoDosEmpresasIT {
 
     @DisplayName("Al reactivar, todo vuelve tal cual: el login, el tablón y la bandeja")
     @Test
-    @Order(10)
+    @Order(11)
     void alReactivarTodoVuelve() throws Exception {
         conToken(post("/api/v1/panel/plataforma/empresas/" + acmeId + "/reactivacion"),
                 tokenPlataforma, "{\"motivo\":\"Se puso al día\"}")
