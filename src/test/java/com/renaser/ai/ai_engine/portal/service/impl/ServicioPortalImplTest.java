@@ -46,6 +46,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -151,5 +152,28 @@ class ServicioPortalImplTest {
                 isNull(), isNull(), eq(true), eq(false), isNull());
         // Y sin evaluación creada: no queda ninguna fila esperando respuestas
         verifyNoInteractions(evaluaciones);
+    }
+
+    @Test
+    @DisplayName("una cuenta de equipo no entra al portal aunque su contraseña cuadre")
+    void unaCuentaDeEquipoNoEntraAlPortal() {
+        // El espejo del login del panel: desde la V37 el equipo también tiene contraseña,
+        // y sin el filtro es_equipo la gente del panel de la plataforma abría el portal
+        // como candidata. Ni siquiera se le llega a comprobar la contraseña.
+        when(organizaciones.findByEsPlataformaTrue()).thenReturn(Optional.of(
+                com.renaser.ai.ai_engine.organizacion.entity.Organizacion.builder()
+                        .id(ORGANIZACION).esPlataforma(true).build()));
+        when(usuarios.buscarPorCorreo(ORGANIZACION, "recluta@renaser.pe"))
+                .thenReturn(Optional.of(Usuario.builder()
+                        .id(60L).organizacionId(ORGANIZACION).correo("recluta@renaser.pe")
+                        .contrasenaHash("$hash").esEquipo(true).esActivo(true)
+                        .build()));
+
+        assertThatThrownBy(() -> servicio.entrar(new com.renaser.ai.ai_engine.portal.dto
+                        .DtosPortal.Login("recluta@renaser.pe", "su-contrasena-real")))
+                .isInstanceOf(com.renaser.ai.ai_engine.seguridad.exception
+                        .CredencialesInvalidasException.class)
+                .hasMessageContaining("Correo o contraseña incorrectos");
+        verifyNoInteractions(codificador);
     }
 }

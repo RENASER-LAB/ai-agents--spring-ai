@@ -64,7 +64,14 @@ public class ServicioAccesoEquipoImpl implements ServicioAccesoEquipo {
         // El correo puede existir en varias organizaciones (candidato en la plataforma y
         // reclutador en una empresa, por ejemplo). Solo cuentan las cuentas de EQUIPO:
         // esa es la línea que impide que un candidato entre al panel con su contraseña.
-        Usuario usuario = usuarios.equipoPorCorreo(datos.correo()).stream()
+        List<Usuario> candidatas = usuarios.equipoPorCorreo(datos.correo());
+        if (candidatas.isEmpty()) {
+            // Comparación señuelo: sin ella, un correo sin cuenta contesta al instante
+            // (ningún BCrypt que comprobar) y uno con cuenta tarda lo que tarda BCrypt.
+            // El mensaje no distingue los dos casos; el reloj tampoco debería.
+            codificador.matches(datos.contrasena(), hashSenuelo());
+        }
+        Usuario usuario = candidatas.stream()
                 .filter(Usuario::isEsActivo)
                 .filter(u -> u.getContrasenaHash() != null
                         && codificador.matches(datos.contrasena(), u.getContrasenaHash()))
@@ -132,4 +139,20 @@ public class ServicioAccesoEquipoImpl implements ServicioAccesoEquipo {
                 .orElseThrow(() -> new IllegalStateException(
                         "Ninguna organización está marcada como plataforma"));
     }
+
+    /**
+     * Un hash de nada, calculado una vez con el codificador de verdad para que la
+     * comparación señuelo cueste lo mismo que una real. Perezoso y no en el constructor:
+     * codificar en el arranque retrasaría a quien no va a fallar ningún login.
+     */
+    private String hashSenuelo() {
+        String hash = senuelo;
+        if (hash == null) {
+            hash = codificador.encode("senuelo-que-no-abre-ninguna-puerta");
+            senuelo = hash;
+        }
+        return hash;
+    }
+
+    private volatile String senuelo;
 }

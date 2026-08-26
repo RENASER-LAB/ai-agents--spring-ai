@@ -133,6 +133,27 @@ class AccesoPanelTest {
     }
 
     @Test
+    @DisplayName("Mismo correo con cuenta de equipo en dos empresas: gana la más antigua")
+    void mismoCorreoEnDosEmpresasGanaLaMasAntigua() {
+        // La consulta ordena por creadoEn (así lo declara equipoPorCorreo) y el servicio
+        // toma la primera que autentique: si las dos cuadran, entra la más antigua. Sin
+        // ese orden, a qué empresa entras dependería del humor del plan de la consulta.
+        Usuario antigua = equipo();
+        Usuario reciente = Usuario.builder()
+                .id(41L).organizacionId(3L).correo("ana@acme.pe")
+                .contrasenaHash("$hash-b").esEquipo(true).esActivo(true)
+                .build();
+        when(usuarios.equipoPorCorreo("ana@acme.pe")).thenReturn(List.of(antigua, reciente));
+        when(codificador.matches("secreta-larguisima", "$hash")).thenReturn(true);
+        when(tokens.emitir(40L, EMPRESA, "EQUIPO")).thenReturn("el-token-de-la-antigua");
+
+        Sesion sesion = servicio.entrar(new Login("ana@acme.pe", "secreta-larguisima"));
+
+        assertThat(sesion.usuarioId()).isEqualTo(40L);
+        assertThat(sesion.token()).isEqualTo("el-token-de-la-antigua");
+    }
+
+    @Test
     @DisplayName("Agotar los intentos bloquea, y el bloqueo dice cuánto falta")
     void agotarLosIntentosBloquea() {
         when(usuarios.equipoPorCorreo("ana@acme.pe")).thenReturn(List.of());

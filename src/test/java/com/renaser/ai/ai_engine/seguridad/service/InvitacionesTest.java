@@ -168,6 +168,7 @@ class InvitacionesTest {
     void canjearCreaLaCuentaYGastaLaInvitacion() {
         Invitacion invitacion = vigente();
         when(invitaciones.findByTokenHash(anyString())).thenReturn(Optional.of(invitacion));
+        when(invitaciones.gastar(eq(99L), any(Instant.class))).thenReturn(1);
         when(usuarios.buscarPorCorreo(ORG, "nuevo@acme.pe")).thenReturn(Optional.empty());
         when(personas.save(any(Persona.class)))
                 .thenAnswer(inv -> { Persona p = inv.getArgument(0); p.setId(70L); return p; });
@@ -185,9 +186,27 @@ class InvitacionesTest {
         verify(usuarios).save(usuario.capture());
         assertThat(usuario.getValue().isEsEquipo()).isTrue();
         assertThat(usuario.getValue().getContrasenaHash()).isEqualTo("$hash");
-        assertThat(invitacion.getAceptadaEn()).isNotNull();
+        // El gasto es el UPDATE condicional en la base, no un set en memoria
+        verify(invitaciones).gastar(eq(99L), any(Instant.class));
         // Un rol por cada código invitado
         verify(usuarioRoles, org.mockito.Mockito.times(2)).save(any());
+    }
+
+    @Test
+    @DisplayName("Dos canjes a la vez: el UPDATE condicional solo deja pasar al primero")
+    void dosCanjesALaVezSoloUnoGana() {
+        // La carrera de verdad: los dos POST leyeron la invitación VIGENTE antes de que
+        // ninguno la gastara. El segundo pierde en la base —gastar devuelve 0 filas— y
+        // recibe el mismo error genérico que una invitación gastada de toda la vida.
+        Invitacion invitacion = vigente();
+        when(invitaciones.findByTokenHash(anyString())).thenReturn(Optional.of(invitacion));
+        when(invitaciones.gastar(eq(99L), any(Instant.class))).thenReturn(0);
+
+        assertThatThrownBy(() -> servicio.aceptar(datosDeCanje()))
+                .isInstanceOf(CredencialesInvalidasException.class)
+                .hasMessage("La invitación no es válida o ya venció");
+        verify(usuarios, never()).save(any());
+        verify(personas, never()).save(any());
     }
 
     @Test

@@ -154,6 +154,15 @@ public class ServicioInvitacionesImpl implements ServicioInvitaciones {
                 .filter(i -> i.estaVigente(ahora))
                 .orElseThrow(() -> new CredencialesInvalidasException(INVITACION_NO_VALE));
 
+        // El gasto va ANTES de crear nada, y en la base: dos canjes simultáneos leen los
+        // dos la misma invitación vigente, pero el UPDATE condicional solo le da 1 al
+        // primero — el segundo recibe el mismo error genérico que una invitación gastada.
+        // Si algo de lo que sigue falla, la transacción entera se deshace y el gasto
+        // también: la invitación no se pierde por un canje que no terminó.
+        if (invitaciones.gastar(invitacion.getId(), ahora) == 0) {
+            throw new CredencialesInvalidasException(INVITACION_NO_VALE);
+        }
+
         // La carrera improbable: alguien creó esa cuenta entre la invitación y el canje.
         usuarios.buscarPorCorreo(invitacion.getOrganizacionId(), invitacion.getCorreo())
                 .ifPresent(u -> {
@@ -183,9 +192,6 @@ public class ServicioInvitacionesImpl implements ServicioInvitaciones {
                             .creadoEn(ahora)
                             .build()));
         }
-
-        invitacion.setAceptadaEn(ahora);
-        invitaciones.save(invitacion);
 
         log.info("Invitación {} canjeada · nace el usuario {} en la organización {}",
                 invitacion.getId(), usuario.getId(), invitacion.getOrganizacionId());

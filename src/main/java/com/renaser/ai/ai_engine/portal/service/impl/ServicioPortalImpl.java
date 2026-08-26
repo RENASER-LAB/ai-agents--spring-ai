@@ -236,6 +236,11 @@ public class ServicioPortalImpl implements ServicioPortal {
         int minutosBloqueo = parametros.entero(org.getId(), "minutos_bloqueo_login", 15);
 
         Usuario usuario = usuarios.buscarPorCorreo(org.getId(), datos.correo())
+                // La línea simétrica a la del panel: una cuenta de equipo no es un
+                // candidato. Desde la V37 el equipo también tiene contraseña, y sin este
+                // filtro la gente del panel de la plataforma abría el portal como
+                // candidata — dos mundos con la misma llave.
+                .filter(u -> !u.isEsEquipo())
                 .filter(Usuario::isEsActivo)
                 .filter(u -> u.getContrasenaHash() != null
                         && codificador.matches(datos.contrasena(), u.getContrasenaHash()))
