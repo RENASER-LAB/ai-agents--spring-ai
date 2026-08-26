@@ -572,7 +572,7 @@ com.renaser.ai.ai_engine.<dominio>
 | `auditoria` | El registro inmutable de quien hizo que |
 | `parametro` | Los valores que Renaser cambia sin programar |
 | `portal` | La cara del candidato: un controlador y tres servicios por tema (la cuenta y su acceso, el tablon publico, la postulacion) |
-| `administracion` | La cara de configuracion del panel |
+| `administracion` | La cara de configuracion del panel; el borrado 29733 vive aparte en `ServicioBorradoDatos` |
 | `seguridad` | Las dos puertas, tokens, contexto y permisos con alcance |
 | `comun` | El manejador de errores propio y el candado de Swagger |
 | `catalogo` | Los catalogos que el panel consulta |

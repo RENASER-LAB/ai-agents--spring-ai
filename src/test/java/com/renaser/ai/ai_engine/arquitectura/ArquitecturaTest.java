@@ -354,7 +354,7 @@ class ArquitecturaTest {
             "ServicioTablonPortalImpl#consentimientoDeVacante",
             // El borrado 29733 es de la plataforma: exigirPlataforma ya cerró la puerta
             // antes de estas búsquedas, y la solicitud cruza empresas a propósito.
-            "ServicioAdministracionImpl#ejecutarBorrado");
+            "ServicioBorradoDatosImpl#ejecutarBorrado");
 
     /**
      * Ningún servicio del panel busca por id suelto en un agregado con dueño.

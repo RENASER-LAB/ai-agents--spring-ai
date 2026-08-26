@@ -1,6 +1,7 @@
 package com.renaser.ai.ai_engine.administracion.controller;
 
 import com.renaser.ai.ai_engine.administracion.service.ServicioAdministracion;
+import com.renaser.ai.ai_engine.administracion.service.ServicioBorradoDatos;
 
 import com.renaser.ai.ai_engine.administracion.dto.DtosAdministracion.*;
 import com.renaser.ai.ai_engine.seguridad.dto.DtosSeguridad.CrearInvitacion;
@@ -27,6 +28,9 @@ import java.util.Map;
 public class AdministracionController {
 
     private final ServicioAdministracion servicio;
+    // El borrado 29733 tiene servicio propio: es lo más destructivo del sistema y no
+    // comparte techo con editar un parámetro. Las rutas son las mismas de siempre.
+    private final ServicioBorradoDatos borrados;
     private final ServicioInvitaciones invitaciones;
     private final Permisos permisos;
 
@@ -101,7 +105,7 @@ public class AdministracionController {
     @PreAuthorize("@permisos.tiene('ejecutar_borrado_datos')")
     @Operation(summary = "Las solicitudes de borrado pendientes")
     public List<SolicitudBorradoPanel> solicitudesBorrado() {
-        return servicio.solicitudesBorradoPendientes(permisos.actual());
+        return borrados.solicitudesBorradoPendientes(permisos.actual());
     }
 
     @PostMapping("/solicitudes-borrado/{id}/ejecucion")
@@ -109,7 +113,7 @@ public class AdministracionController {
     @Operation(summary = "Ejecutar la anonimización: vacía a la persona, borra el CV físico "
             + "y conserva la trazabilidad sin nombre")
     public void ejecutarBorrado(@PathVariable Long id) {
-        servicio.ejecutarBorrado(permisos.actual(), id);
+        borrados.ejecutarBorrado(permisos.actual(), id);
     }
 
     // ---------- Usuarios del equipo y roles ----------

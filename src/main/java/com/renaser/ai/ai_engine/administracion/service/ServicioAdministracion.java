@@ -27,10 +27,8 @@ public interface ServicioAdministracion {
 
     Page<FilaAuditoria> auditoria(ContextoUsuario quien, String entidad, int pagina, int tamano);
 
-    List<SolicitudBorradoPanel> solicitudesBorradoPendientes(ContextoUsuario quien);
-
-    // La anonimización: vacía a la persona, conserva la trazabilidad
-    void ejecutarBorrado(ContextoUsuario quien, Long solicitudId);
+    // El borrado 29733 vive aparte, en ServicioBorradoDatos: es el código más
+    // destructivo del sistema y no debe compartir techo con editar un parámetro.
 
     List<UsuarioPanel> usuariosEquipo(ContextoUsuario quien);
 
