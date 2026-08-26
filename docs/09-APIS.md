@@ -5,9 +5,11 @@ Versión 1.5 · 2026-08-25 · Cubre **las cinco etapas del embudo**: postulació
 prueba del puesto, simulación de trabajo, validación práctica y decisión final
 
 Este documento explica las APIs para quien las va a consumir: el frontend de RENASER OS y el
-portal del candidato. **La referencia viva es Swagger**, en `http://localhost:8080/swagger-ui.html`
-cuando la aplicación corre: ahí están los cuerpos exactos, se prueban las llamadas y siempre está
-al día porque se genera del código. Este documento cuenta lo que Swagger no cuenta: cómo entrar,
+portal del candidato. **La referencia viva es Swagger**, en `http://localhost:8081/swagger-ui.html`
+cuando la aplicación corre en local: ahí están los cuerpos exactos, se prueban las llamadas y
+siempre está al día porque se genera del código. **Es el 8081, no el 8080** — el perfil `local`
+mueve la aplicación de puerto porque el 8080 suele estar ocupado por Adminer, que responde 200 a
+todo y hace que un frontend mal apuntado parezca que funciona. Este documento cuenta lo que Swagger no cuenta: cómo entrar,
 qué puerta usar y las reglas que no se ven en un esquema.
 
 ---
@@ -280,8 +282,10 @@ con las reglas que Swagger no cuenta, está en
 
 | Método y ruta | Qué hace | Permiso |
 |---|---|---|
-| GET/PUT `/portal/perfil` · POST/PUT/DELETE `/portal/perfil/{lista}[/{id}]` · POST `…/{id}/confirmacion` · PUT `…/orden` · GET `…/descarga` | El dueño ve, edita, confirma, reordena y descarga lo suyo. Vacío responde 200, nunca 404 | El propio token; lo ajeno es 404 |
-| GET `/portal/catalogos/niveles-educativos` · `/niveles-idioma` | Los desplegables, para no escribirlos a mano | Token de candidato |
+| GET/PUT `/portal/perfil` · GET `/portal/perfil/descarga` | El dueño ve su perfil entero y lo descarga (ley 29733). Vacío responde 200, nunca 404. El PUT **reemplaza** la cabecera, no la fusiona | El propio token; lo ajeno es 404 |
+| POST/PUT/DELETE + POST `/{id}/confirmacion` en `/portal/perfil/experiencia`, `/educacion`, `/idiomas`, `/certificaciones` · PUT `/orden` solo en las dos primeras | Añadir, corregir, borrar y dar por bueno lo que se sacó del currículum | El propio token |
+| POST y DELETE `/portal/perfil/enlaces` | **Solo esas dos**: un enlace no lleva origen ni confirmación, así que no se edita — se borra y se crea | El propio token |
+| GET `/portal/catalogos/niveles-educativos` · `/niveles-idioma` | Los desplegables, para no escribirlos a mano. Devuelven `codigo` y `nombre` ya ordenados: no hay campo `orden` | Token de candidato |
 | GET `/panel/postulaciones/{id}/perfil` | La trayectoria del candidato sin abrir su archivo. **No puntúa** | `ver_perfil_candidato`; la pretensión solo con `ver_pretension` |
 
 ---

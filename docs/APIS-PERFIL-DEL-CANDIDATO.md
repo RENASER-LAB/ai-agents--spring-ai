@@ -1,8 +1,15 @@
 # APIs del perfil del candidato · para quien construya las pantallas
 
-> ✅ **Implementado desde el 25/08/2026.** La referencia viva es **Swagger**
-> (`/swagger-ui.html`), que se genera del código y siempre está al día. Este documento cuenta
-> lo que Swagger no cuenta: las reglas.
+> ✅ **Implementado desde el 25/08/2026.** La referencia viva de **rutas y cuerpos** es
+> **Swagger**, en `http://localhost:8081/swagger-ui.html` cuando la aplicación corre en local
+> (el 8081, no el 8080: ahí suele estar Adminer, que responde 200 a todo y te hace creer que
+> llamaste bien).
+>
+> Swagger se genera del código, así que las rutas, los verbos y la forma exacta de cada cuerpo
+> están siempre al día. Lo que **no** te va a decir: los códigos de error (no hay `@ApiResponse`
+> en estos controladores), los seis valores válidos del `tipo` de enlace, que la pretensión
+> desaparece del JSON sin permiso, ni ninguna regla de comportamiento. Eso es lo que cuenta este
+> documento.
 
 El diseño completo —requisitos, historias de usuario y tablas— está en
 [PROPUESTA-PERFIL-DEL-CANDIDATO.md](PROPUESTA-PERFIL-DEL-CANDIDATO.md).
@@ -36,7 +43,9 @@ Las mismas de siempre (ver [09-APIS.md](09-APIS.md)):
 | `/api/v1/portal/perfil/**` | El candidato, sobre **su** perfil | El suyo |
 | `/api/v1/panel/postulaciones/{id}/perfil` | El equipo, de solo lectura | El de equipo |
 
-Errores en RFC 7807, como el resto: `title`, `status` y `detail` en lenguaje normal.
+Errores en RFC 7807, como el resto: `title`, `status` y `detail` en lenguaje normal. Los **400
+de validación de campo** añaden encima una propiedad `errors` con el detalle por campo; los
+demás 400 solo traen `detail`. La tabla del final los separa.
 
 ---
 
@@ -117,27 +126,51 @@ suelto sin moneda da **400**. Para borrarla, `"pretension": null`.
 
 ### Las listas
 
-Mismo patrón para las cinco. `{lista}` es `experiencia`, `educacion`, `idiomas`,
-`certificaciones` o `enlaces`:
+**No son cinco iguales.** El nombre de cada una en la ruta es el mismo que su clave en el JSON
+del `GET`, así que un componente genérico funciona si usa esa clave literal — pero las
+operaciones disponibles cambian de una a otra:
 
-```
-POST   /api/v1/portal/perfil/{lista}          crear
-PUT    /api/v1/portal/perfil/{lista}/{id}     editar
-DELETE /api/v1/portal/perfil/{lista}/{id}     borrar
-```
+| Lista | Crear | Editar | Borrar | Confirmar | Reordenar |
+|---|---|---|---|---|---|
+| `/perfil/experiencia` | POST | PUT `/{id}` | DELETE `/{id}` | POST `/{id}/confirmacion` | PUT `/orden` |
+| `/perfil/educacion` | POST | PUT `/{id}` | DELETE `/{id}` | POST `/{id}/confirmacion` | PUT `/orden` |
+| `/perfil/idiomas` | POST | PUT `/{id}` | DELETE `/{id}` | POST `/{id}/confirmacion` | — |
+| `/perfil/certificaciones` | POST | PUT `/{id}` | DELETE `/{id}` | POST `/{id}/confirmacion` | — |
+| `/perfil/enlaces` | POST | — | DELETE `/{id}` | — | — |
+
+Ojo con la primera columna: `experiencia` y `educacion` van en **singular** y las otras tres en
+plural. No hay `/experiencias`.
+
+**El POST responde `201` con `{"id": 12}`.** El PUT, el DELETE y la confirmación responden `200`
+sin cuerpo.
 
 **Editar un elemento lo convierte en «escrito por mí»** (`origen: PERSONA`,
 `confirmado: true`). No hace falta decirlo aparte.
 
+#### Los enlaces son distintos
+
+Tienen dos operaciones, no cinco, y el motivo es que **no llevan `origen` ni `confirmado`**: un
+enlace es una dirección, no un dato que un modelo dedujo y la persona tenga que validar. Por eso
+no hay PUT ni confirmación. Para cambiar uno: borrarlo y crear el nuevo.
+
+El `tipo` es **el único valor del perfil que sí tienes que escribir a mano en el frontend** —no
+tiene endpoint de catálogo, es una lista fija en el servicio. Son seis:
+
+`LINKEDIN` · `GITHUB` · `PORTAFOLIO` · `PUBLICACION` · `PRODUCTO` · `OTRO`
+
+Cualquier otro valor da **400**. Solo `LINKEDIN` y `GITHUB` comprueban el dominio
+(`linkedin.com` / `github.com` y sus subdominios); los demás aceptan cualquier `http` o `https`.
+
 ### Confirmar lo que leyó el sistema
 
 ```
-POST /api/v1/portal/perfil/{lista}/{id}/confirmacion
+POST /api/v1/portal/perfil/experiencia/{id}/confirmacion
 ```
 
-Para cuando el dato está bien y el candidato solo quiere validarlo sin editarlo. Pasa a
-`confirmado: true` conservando `origen: CURRICULUM`, que es información útil: se sabe que salió
-del archivo y que la persona lo dio por bueno.
+Existe en las cuatro listas que llevan `origen` —experiencia, educación, idiomas y
+certificaciones—, no en enlaces. Para cuando el dato está bien y el candidato solo quiere
+validarlo sin editarlo. Pasa a `confirmado: true` conservando `origen: CURRICULUM`, que es
+información útil: se sabe que salió del archivo y que la persona lo dio por bueno.
 
 ### Reordenar
 
@@ -238,8 +271,11 @@ GET /api/v1/portal/catalogos/niveles-educativos
 GET /api/v1/portal/catalogos/niveles-idioma
 ```
 
-Devuelven `codigo`, `nombre` y `orden`. **No escribas estos valores a mano en el frontend**: es
-lo que ya se desincronizó una vez en este proyecto.
+Devuelven `codigo` y `nombre`, **ya ordenados**: no hay campo `orden` que mirar, así que la
+pantalla tiene que respetar el orden del array y no reordenarlo por su cuenta.
+
+**No escribas estos valores a mano en el frontend**: es lo que ya se desincronizó una vez en
+este proyecto. (La excepción es el `tipo` de los enlaces, que no tiene catálogo — ver arriba.)
 
 - Educativos: `SECUNDARIA`, `TECNICA`, `UNIVERSITARIA`, `TITULADO`, `MAESTRIA`, `DOCTORADO`
 - Idioma: `A1`, `A2`, `B1`, `B2`, `C1`, `C2`, `NATIVO`
@@ -250,7 +286,8 @@ lo que ya se desincronizó una vez en este proyecto.
 
 | Código | Cuándo | Qué hacer |
 |---|---|---|
-| **400** | Pretensión a medias, fecha `hasta` anterior a `desde`, enlace que no es una dirección o un LinkedIn que no es de LinkedIn | Enseñar el `detail`, que viene en lenguaje normal |
+| **400** | Pretensión a medias, fecha `hasta` anterior a `desde`, enlace que no es una dirección, un LinkedIn que no es de LinkedIn, o un `tipo` que no está en la lista de seis | Enseñar el `detail`, que viene en lenguaje normal |
+| **400** | Falla la validación de un campo: `puesto` vacío, `experienciaMeses` fuera de 0-720, `titular` de más de 200 | **Trae una propiedad extra `errors`**: un mapa de campo → mensaje. Píntalo debajo de cada input, no en un aviso global |
 | **401** | Token vencido | Volver a entrar |
 | **403** | Sin permiso (panel) | No pintar la sección |
 | **404** | El elemento de la lista no existe o no es suyo | Refrescar |
