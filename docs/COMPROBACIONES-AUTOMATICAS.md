@@ -47,7 +47,7 @@ demás de la calificación se prueba con un doble del modelo y no gasta nada.
 
 ---
 
-## 746 pruebas
+## 747 pruebas
 
 Contadas de correrlas el 26/08/2026 (tras las piezas D, E y F del multiempresa, su QA y la
 fusión con main, que trajo el ranking por etapa y el desglose de la evaluación), no de
@@ -60,7 +60,7 @@ recordarlas: el desglose sale de los informes de surefire y failsafe, y suma exa
 | Las fórmulas del banco v3 | 22 | nada |
 | El validador de las respuestas v3 | 21 | nada |
 | El perfil del candidato (paquete `perfil`: merge, lectura, CRUD, retención, borrado) | 52 | nada |
-| Integración, de punta a punta | 95 | Docker |
+| Integración, de punta a punta | 96 | Docker |
 | Contra el proveedor de verdad, y el envío de correo | 6 | Docker o SMTP, y su bandera |
 
 El multiempresa (25/08) sumó 39 unitarias: 31 de la implementación —el login del panel, las
