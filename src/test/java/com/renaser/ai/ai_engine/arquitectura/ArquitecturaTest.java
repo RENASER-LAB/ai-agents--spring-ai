@@ -346,12 +346,12 @@ class ArquitecturaTest {
             // El portal: el candidato es de la plataforma y sus cosas se filtran por
             // persona, no por organización. Y el tablón de vacantes publicadas es LA
             // excepción deliberada del spec B: se ve el de todas las empresas.
-            "ServicioPortalImpl#vacante",
-            "ServicioPortalImpl#postular",
-            "ServicioPortalImpl#comoResumen",
+            "ServicioTablonPortalImpl#vacante",
+            "ServicioPostulacionPortalImpl#postular",
+            "ServicioPostulacionPortalImpl#comoResumen",
             // El texto legal de la empresa de una vacante PUBLICADA: es del tablón, la
             // misma excepción deliberada que #vacante, y con el mismo filtro de estado.
-            "ServicioPortalImpl#consentimientoDeVacante",
+            "ServicioTablonPortalImpl#consentimientoDeVacante",
             // El borrado 29733 es de la plataforma: exigirPlataforma ya cerró la puerta
             // antes de estas búsquedas, y la solicitud cruza empresas a propósito.
             "ServicioAdministracionImpl#ejecutarBorrado");

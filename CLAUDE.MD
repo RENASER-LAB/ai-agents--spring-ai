@@ -571,7 +571,7 @@ com.renaser.ai.ai_engine.<dominio>
 | `archivo` | El almacen de archivos en disco |
 | `auditoria` | El registro inmutable de quien hizo que |
 | `parametro` | Los valores que Renaser cambia sin programar |
-| `portal` | La cara del candidato: un controlador y un servicio para todo el recorrido publico |
+| `portal` | La cara del candidato: un controlador y tres servicios por tema (la cuenta y su acceso, el tablon publico, la postulacion) |
 | `administracion` | La cara de configuracion del panel |
 | `seguridad` | Las dos puertas, tokens, contexto y permisos con alcance |
 | `comun` | El manejador de errores propio y el candado de Swagger |
