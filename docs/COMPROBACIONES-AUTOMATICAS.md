@@ -47,14 +47,14 @@ demás de la calificación se prueba con un doble del modelo y no gasta nada.
 
 ---
 
-## 673 pruebas
+## 681 pruebas
 
-Contadas de correrlas el 25/08/2026 (tras el multiempresa), no de recordarlas: el desglose
-sale de los informes de surefire y failsafe, y suma exacto.
+Contadas de correrlas el 25/08/2026 (tras el multiempresa y su QA), no de recordarlas: el
+desglose sale de los informes de surefire y failsafe, y suma exacto.
 
 | Qué | Cuántas | Necesita |
 |---|---:|---|
-| Unitarias, con dobles | 477 | nada |
+| Unitarias, con dobles | 485 | nada |
 | Arquitectura | 9 | nada |
 | Las fórmulas del banco v3 | 22 | nada |
 | El validador de las respuestas v3 | 21 | nada |
@@ -62,9 +62,12 @@ sale de los informes de surefire y failsafe, y suma exacto.
 | Integración, de punta a punta | 86 | Docker |
 | Contra el proveedor de verdad, y el envío de correo | 6 | Docker o SMTP, y su bandera |
 
-El multiempresa (25/08) sumó 31 unitarias —el login del panel, las invitaciones, el alta de
-empresas, el resolutor de dueño de instrumento, el copiador y la personalización—, una regla
-de arquitectura nueva y `FlujoDosEmpresasIT`: dos empresas de verdad, de punta a punta.
+El multiempresa (25/08) sumó 39 unitarias: 31 de la implementación —el login del panel, las
+invitaciones, el alta de empresas, el resolutor de dueño de instrumento, el copiador y la
+personalización—, una regla de arquitectura nueva y `FlujoDosEmpresasIT` (dos empresas de
+verdad, de punta a punta); y 8 del QA —la carrera del canje, el equipo que no entra al
+portal, el mismo correo en dos empresas, y una prueba negativa por cada fuga cerrada que no
+la tenía (inscripción, barrera, prueba ajena, alerta ajena).
 
 ⚠️ Al recontar, **no sirve el atributo `tests=`** de los XML de surefire: con clases anidadas
 (`@Nested`) subcuenta, y por eso dos filas de esta tabla llevaban tiempo mal —las fórmulas

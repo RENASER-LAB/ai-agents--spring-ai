@@ -70,7 +70,7 @@ Perfil Integral → prueba del puesto → simulacion → validacion → decision
 |---|---|
 | Base de datos | **Flyway es el dueno del esquema**: V1-V37 en `src/main/resources/db/migration`, **101 tablas de este modulo** (104 en la base contando `flyway_schema_history` y las dos del motor de agentes, `agent_run` y `vector_store`). `ddl-auto: validate` |
 | Codigo | Veintiun paquetes de dominio bajo `ai_engine` (ver «Como esta organizado el codigo») |
-| Tests | **673, todos en verde (25/08/2026)**: 581 unitarios y 92 de integracion (6 saltados, los que gastan saldo o mandan correo de verdad). Ver «Correr los tests»: unitarios de la maquina y del anonimizador, migraciones contra Postgres real (Testcontainers) y flujos de punta a punta: hito 1, evaluacion, prueba, simulacion/validacion, calificacion con IA, la vacante sin banco y las dos empresas |
+| Tests | **681, todos en verde (25/08/2026)**: 589 unitarios y 92 de integracion (6 saltados, los que gastan saldo o mandan correo de verdad). Ver «Correr los tests»: unitarios de la maquina y del anonimizador, migraciones contra Postgres real (Testcontainers) y flujos de punta a punta: hito 1, evaluacion, prueba, simulacion/validacion, calificacion con IA, la vacante sin banco y las dos empresas |
 | IA que califica | **Seis de los diez agentes del catalogo estan implementados**: datos del curriculum, evidencia, evaluador, potencial/riesgo, prueba del puesto y las preguntas de la conversacion final. Todos corren por cola de RabbitMQ contra DeepSeek. Ver [Calificacion con IA](docs/CALIFICACION-CON-IA.md) |
 | Correo | **Ya sabe salir de verdad** (`EnviadorCorreoSmtp`), pero **por defecto no sale**: `renaser.correo.transporte` vale `log` salvo que se ponga `smtp`, y entonces solo se registra en `correo_enviado`. Para encenderlo hacen falta `CORREO_TRANSPORTE=smtp`, `CORREO_REMITENTE` y una cuenta que autentique. El RNF-65 pide que salga **desde el dominio propio de Renaser**: confirmar con ellos si ya lo tienen antes de encenderlo |
 | Acceso del candidato | Entra al portal **con un enlace, sin contrasena** (`EnlaceAcceso`, `ServicioEnlaceAcceso`). El enlace se le manda por correo, asi que depende de lo de arriba |
@@ -264,12 +264,12 @@ Las dos consultan el mismo backend, asi que ensenan el mismo orden.
 - Nada se recalcula hacia atras: cada nota queda atada a la version de pesos de su vacante.
 
 ### Correr los tests
-**581 unitarios en verde (25/08/2026).** Son dos tandas y el comando decide cual corre:
+**589 unitarios en verde (25/08/2026).** Son dos tandas y el comando decide cual corre:
 
 | Comando | Que corre | Cuantos | Necesita |
 |---|---|---:|---|
-| `./mvnw test` | unitarias con dobles y las de arquitectura | 581 | nada |
-| `./mvnw verify` | lo anterior mas las de integracion | 673 | Docker |
+| `./mvnw test` | unitarias con dobles y las de arquitectura | 589 | nada |
+| `./mvnw verify` | lo anterior mas las de integracion | 681 | Docker |
 
 Las de integracion levantan su propio PostgreSQL y su propio RabbitMQ con Testcontainers: hace
 falta el demonio de Docker encendido. El desglose completo esta en
