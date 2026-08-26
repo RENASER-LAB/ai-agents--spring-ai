@@ -28,6 +28,7 @@ public class EjecutorAgenteIaImpl implements EjecutorAgenteIa {
     private final InstruccionIaRepository instrucciones;
     private final EjecucionIaRepository ejecuciones;
     private final ClienteModelo modelo;
+    private final CalculadoraCostoIa costos;
     private final JsonMapper json;
 
     @Override
@@ -117,6 +118,13 @@ public class EjecutorAgenteIaImpl implements EjecutorAgenteIa {
                 .respuesta(respuesta == null ? null : respuesta.texto())
                 .tokensEntrada(respuesta == null ? null : respuesta.tokensEntrada())
                 .tokensSalida(respuesta == null ? null : respuesta.tokensSalida())
+                // El costo se pone AL CERRAR, con la tarifa vigente en ese momento: es lo
+                // que hace que un cambio de precios no reescriba el pasado (pieza E). Si
+                // el proveedor ni contestó no hay tokens que cobrar, y sin tarifa queda
+                // vacío con su aviso — la contabilidad jamás rompe una calificación.
+                .costo(respuesta == null ? null : costos.costoDe(respuesta.proveedor(),
+                        respuesta.modelo(), respuesta.tokensEntrada(), respuesta.tokensSalida(),
+                        Instant.now()))
                 .duracionMs((int) ((System.nanoTime() - empezo) / 1_000_000L))
                 .esExitosa(exitosa)
                 .error(error)

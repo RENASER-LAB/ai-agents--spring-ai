@@ -1,6 +1,8 @@
 package com.renaser.ai.ai_engine.organizacion.service.impl;
 
 import com.renaser.ai.ai_engine.auditoria.service.ServicioAuditoria;
+import com.renaser.ai.ai_engine.organizacion.dto.DtosOrganizacion.ConsumoAgente;
+import com.renaser.ai.ai_engine.organizacion.dto.DtosOrganizacion.ConsumoEmpresa;
 import com.renaser.ai.ai_engine.organizacion.dto.DtosOrganizacion.CrearEmpresa;
 import com.renaser.ai.ai_engine.organizacion.dto.DtosOrganizacion.EmpresaCreada;
 import com.renaser.ai.ai_engine.organizacion.dto.DtosOrganizacion.EmpresaPanel;
@@ -18,7 +20,13 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.YearMonth;
+import java.time.ZoneId;
+import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -56,6 +64,7 @@ public class ServicioPlataformaImpl implements ServicioPlataforma {
                 .build());
 
         sembrar(empresa.getId(), plataformaId);
+        sembrarTopeIa(empresa.getId(), datos.topeMensualIa());
 
         // La invitación va al final, cuando la empresa ya tiene su plantilla de correo
         // copiada: si fuera antes, el aviso saldría con la plantilla de nadie y se
@@ -147,6 +156,92 @@ public class ServicioPlataformaImpl implements ServicioPlataforma {
                 WHERE pc.organizacion_id = ? AND pc.es_activa""",
                 empresaId, plataformaId);
     }
+
+    /**
+     * El tope mensual de IA del alta (pieza E), si quien da el alta puso uno. Va como
+     * parámetro de la empresa —es SU tope— pero lo administra Renaser: la copia de
+     * parámetros no lo trae (la plataforma no se pone tope a sí misma por defecto), y
+     * {@code editarParametro} se lo niega a la propia empresa.
+     */
+    private void sembrarTopeIa(Long empresaId, String tope) {
+        if (tope == null || tope.isBlank()) {
+            return;
+        }
+        jdbc.update("""
+                INSERT INTO parametro (organizacion_id, codigo, valor, tipo, descripcion)
+                VALUES (?, 'tope_mensual_ia', ?, 'TEXTO',
+                        'Tope mensual de gasto en IA (USD). Lo administra Renaser; vacío = sin tope')
+                ON CONFLICT (organizacion_id, codigo) DO UPDATE SET valor = excluded.valor""",
+                empresaId, comoNumero(tope));
+    }
+
+    /** Valida que el tope sea un número no negativo y lo normaliza. */
+    private static String comoNumero(String tope) {
+        try {
+            BigDecimal valor = new BigDecimal(tope.trim());
+            if (valor.signum() < 0) {
+                throw new IllegalArgumentException("El tope mensual de IA no puede ser negativo");
+            }
+            return valor.toPlainString();
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException(
+                    "El tope mensual de IA debe ser un número, no «" + tope + "»");
+        }
+    }
+
+    @Override
+    public List<ConsumoEmpresa> consumo(ContextoUsuario quien, String mes) {
+        laPlataformaDe(quien);
+        YearMonth pedido;
+        try {
+            pedido = mes == null || mes.isBlank()
+                    ? YearMonth.now(ZONA_LIMA) : YearMonth.parse(mes.trim());
+        } catch (DateTimeParseException e) {
+            throw new IllegalArgumentException("El mes va como YYYY-MM, no «" + mes + "»");
+        }
+        Instant desde = pedido.atDay(1).atStartOfDay(ZONA_LIMA).toInstant();
+        Instant hasta = pedido.plusMonths(1).atDay(1).atStartOfDay(ZONA_LIMA).toInstant();
+
+        // SQL directo sobre ejecucion_ia por lo mismo que la siembra: es una agregación
+        // sin regla de negocio encima, y traer aquí el repositorio del motor de agentes
+        // cruzaría la frontera de ArchUnit por una consulta de solo lectura.
+        Map<Long, List<ConsumoAgente>> porOrganizacion = new LinkedHashMap<>();
+        jdbc.query("""
+                SELECT e.organizacion_id, e.agente_codigo,
+                       coalesce(sum(e.costo), 0)          AS costo,
+                       coalesce(sum(e.tokens_entrada), 0) AS tokens_entrada,
+                       coalesce(sum(e.tokens_salida), 0)  AS tokens_salida,
+                       count(*)                           AS llamadas
+                  FROM ejecucion_ia e
+                 WHERE e.creado_en >= ? AND e.creado_en < ?
+                 GROUP BY e.organizacion_id, e.agente_codigo
+                 ORDER BY e.organizacion_id, costo DESC""",
+                fila -> {
+                    porOrganizacion
+                            .computeIfAbsent(fila.getLong("organizacion_id"), id -> new ArrayList<>())
+                            .add(new ConsumoAgente(fila.getString("agente_codigo"),
+                                    fila.getBigDecimal("costo"),
+                                    fila.getLong("tokens_entrada"),
+                                    fila.getLong("tokens_salida"),
+                                    fila.getLong("llamadas")));
+                },
+                java.sql.Timestamp.from(desde), java.sql.Timestamp.from(hasta));
+
+        Map<Long, String> nombres = new LinkedHashMap<>();
+        organizaciones.findAllById(porOrganizacion.keySet())
+                .forEach(o -> nombres.put(o.getId(), o.getNombre()));
+
+        return porOrganizacion.entrySet().stream()
+                .map(entrada -> new ConsumoEmpresa(entrada.getKey(),
+                        nombres.getOrDefault(entrada.getKey(), ""),
+                        entrada.getValue().stream()
+                                .map(ConsumoAgente::costo)
+                                .reduce(BigDecimal.ZERO, BigDecimal::add),
+                        entrada.getValue()))
+                .toList();
+    }
+
+    private static final ZoneId ZONA_LIMA = ZoneId.of("America/Lima");
 
     /** La segunda llave: además del permiso, hay que SER de la plataforma. */
     private Long laPlataformaDe(ContextoUsuario quien) {

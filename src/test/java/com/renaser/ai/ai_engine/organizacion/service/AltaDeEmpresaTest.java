@@ -79,7 +79,7 @@ class AltaDeEmpresaTest {
                 .thenReturn(new InvitacionCreada(99L, "https://panel/invitacion?token=x", Instant.now()));
 
         EmpresaCreada creada = servicio.crearEmpresa(DUENA,
-                new CrearEmpresa("Acme S.A.", "ACME", "admin@acme.pe"));
+                new CrearEmpresa("Acme S.A.", "ACME", "admin@acme.pe", null));
 
         assertThat(creada.id()).isEqualTo(2L);
         assertThat(creada.urlInvitacion()).contains("token=");
@@ -103,7 +103,7 @@ class AltaDeEmpresaTest {
     @DisplayName("Alguien de una empresa no da de alta empresas, aunque tenga el permiso")
     void unaEmpresaNoDaDeAltaEmpresas() {
         assertThatThrownBy(() -> servicio.crearEmpresa(INTRUSA,
-                new CrearEmpresa("Colada S.A.", "COLADA", "admin@colada.pe")))
+                new CrearEmpresa("Colada S.A.", "COLADA", "admin@colada.pe", null)))
                 .isInstanceOf(AccessDeniedException.class);
         verify(organizaciones, never()).save(any());
         verify(invitaciones, never()).crearParaOrganizacion(any(), any(), anyString(), any());
@@ -116,9 +116,33 @@ class AltaDeEmpresaTest {
                 .thenReturn(Optional.of(Organizacion.builder().id(7L).codigo("ACME").build()));
 
         assertThatThrownBy(() -> servicio.crearEmpresa(DUENA,
-                new CrearEmpresa("Acme S.A.", "ACME", "admin@acme.pe")))
+                new CrearEmpresa("Acme S.A.", "ACME", "admin@acme.pe", null)))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("ACME");
         verify(organizaciones, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("El alta con tope de IA lo siembra como parámetro; uno ilegible no crea nada")
+    void elAltaConTopeLoSiembra() {
+        // El tope del alta es la sexta copia de la siembra (pieza E): un parámetro de la
+        // empresa que administra Renaser. Y un tope que no es número revienta aquí, en la
+        // cara de quien da el alta, no meses después al encolar el primer trabajo.
+        when(organizaciones.findByCodigo("ACME")).thenReturn(Optional.empty());
+        when(organizaciones.save(any(Organizacion.class)))
+                .thenAnswer(inv -> { Organizacion o = inv.getArgument(0); o.setId(2L); return o; });
+        when(invitaciones.crearParaOrganizacion(DUENA, 2L, "admin@acme.pe", List.of("ADMINISTRADOR")))
+                .thenReturn(new InvitacionCreada(99L, "https://panel/invitacion?token=x", Instant.now()));
+
+        servicio.crearEmpresa(DUENA, new CrearEmpresa("Acme S.A.", "ACME", "admin@acme.pe", "50"));
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(jdbc, org.mockito.Mockito.times(6)).update(sql.capture(), any(Object[].class));
+        assertThat(sql.getAllValues().get(5)).contains("tope_mensual_ia");
+
+        assertThatThrownBy(() -> servicio.crearEmpresa(DUENA,
+                new CrearEmpresa("Beta S.A.", "BETA", "admin@beta.pe", "cincuenta")))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("número");
     }
 }

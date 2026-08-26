@@ -75,6 +75,15 @@ public class ServicioAdministracionImpl implements ServicioAdministracion {
     @Override
     @Transactional
     public void editarParametro(ContextoUsuario quien, String codigo, String valor, String motivo) {
+        // El tope de IA es un parámetro de la empresa pero lo administra Renaser (pieza
+        // E): existe para frenar la factura, y quien paga la factura no es quien lo sube.
+        // La empresa lo VE en su lista; cambiarlo es de la plataforma (PUT
+        // /panel/plataforma/empresas/{id}/tope-ia).
+        if ("tope_mensual_ia".equals(codigo) && organizaciones.findByEsPlataformaTrue()
+                .map(p -> !p.getId().equals(quien.organizacionId())).orElse(true)) {
+            throw new IllegalStateException(
+                    "El tope mensual de IA lo administra Renaser: pide el cambio a la plataforma");
+        }
         Parametro parametro = parametros.findByOrganizacionIdAndCodigo(quien.organizacionId(), codigo)
                 .orElseThrow(() -> new ResourceNotFoundException("Parámetro", "código", codigo));
         if ("ENTERO".equals(parametro.getTipo())) {

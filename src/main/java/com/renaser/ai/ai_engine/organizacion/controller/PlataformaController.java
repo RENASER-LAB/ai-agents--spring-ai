@@ -1,5 +1,6 @@
 package com.renaser.ai.ai_engine.organizacion.controller;
 
+import com.renaser.ai.ai_engine.organizacion.dto.DtosOrganizacion.ConsumoEmpresa;
 import com.renaser.ai.ai_engine.organizacion.dto.DtosOrganizacion.CrearEmpresa;
 import com.renaser.ai.ai_engine.organizacion.dto.DtosOrganizacion.EmpresaCreada;
 import com.renaser.ai.ai_engine.organizacion.dto.DtosOrganizacion.EmpresaPanel;
@@ -43,8 +44,18 @@ public class PlataformaController {
     @PreAuthorize("@permisos.tiene('administrar_plataforma')")
     @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Dar de alta una empresa: la crea con su siembra completa (roles, "
-            + "parámetros, textos en borrador, correos activos) e invita a su primer administrador")
+            + "parámetros, textos en borrador, correos activos, tope de IA si se pide) e "
+            + "invita a su primer administrador")
     public EmpresaCreada crearEmpresa(@Valid @RequestBody CrearEmpresa datos) {
         return servicio.crearEmpresa(permisos.actual(), datos);
+    }
+
+    @GetMapping("/consumo")
+    @PreAuthorize("@permisos.tiene('administrar_plataforma')")
+    @Operation(summary = "El consumo de IA de un mes (YYYY-MM; en blanco, el corriente) por "
+            + "empresa y por agente: total gastado y tokens. Con esto Renaser factura fuera")
+    public List<ConsumoEmpresa> consumo(
+            @org.springframework.web.bind.annotation.RequestParam(required = false) String mes) {
+        return servicio.consumo(permisos.actual(), mes);
     }
 }

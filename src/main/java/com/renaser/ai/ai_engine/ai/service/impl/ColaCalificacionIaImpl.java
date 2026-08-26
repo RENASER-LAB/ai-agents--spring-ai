@@ -89,6 +89,7 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
     private final RegistroTrabajosIa registro;
     private final TrabajoIaPublisher publicador;
     private final PuenteCalificacionIa puente;
+    private final TopeMensualIa tope;
     private final Map<String, AgenteSeleccion> agentes;
     private final boolean habilitada;
     private final int maxIntentos;
@@ -98,6 +99,7 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
                                   RegistroTrabajosIa registro,
                                   TrabajoIaPublisher publicador,
                                   PuenteCalificacionIa puente,
+                                  TopeMensualIa tope,
                                   List<AgenteSeleccion> agentes,
                                   @Value("${renaser.ai.calificacion.habilitada:true}") boolean habilitada,
                                   @Value("${renaser.ai.calificacion.max-intentos:3}") int maxIntentos,
@@ -106,6 +108,7 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
         this.registro = registro;
         this.publicador = publicador;
         this.puente = puente;
+        this.tope = tope;
         this.agentes = agentes.stream()
                 .collect(Collectors.toMap(AgenteSeleccion::codigo, Function.identity()));
         this.habilitada = habilitada;
@@ -249,7 +252,9 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
             return "SIN_EMPEZAR";
         }
         return switch (ultimo.get().getEstado()) {
-            case "PENDIENTE", "EN_CURSO" -> "EN_CURSO";
+            // EN_ESPERA (tope de IA) también es «en curso» para el dueño del perfil: su
+            // lectura va a salir, solo que cuando su empresa recupere cupo.
+            case "PENDIENTE", "EN_CURSO", "EN_ESPERA" -> "EN_CURSO";
             case "FALLIDO" -> "FALLIDA";
             default -> "TERMINADA";
         };
@@ -268,9 +273,13 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
             return "SIN_EMPEZAR";
         }
         // Un trabajo vivo manda sobre todo lo demás: mientras quede uno, la calificación no
-        // ha terminado, aunque los anteriores hayan salido bien.
+        // ha terminado, aunque los anteriores hayan salido bien. EN_ESPERA cuenta como
+        // vivo y se enseña como EN_CURSO: al candidato le es verdad —su calificación está
+        // en camino—, y que su empresa agotó el tope del mes no es asunto que se le cuente
+        // a él (pieza E).
         boolean vivo = suyos.stream()
-                .anyMatch(t -> "PENDIENTE".equals(t.getEstado()) || "EN_CURSO".equals(t.getEstado()));
+                .anyMatch(t -> "PENDIENTE".equals(t.getEstado()) || "EN_CURSO".equals(t.getEstado())
+                        || "EN_ESPERA".equals(t.getEstado()));
         if (vivo) {
             return "EN_CURSO";
         }
@@ -343,6 +352,37 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
             registro.devolverAPendiente(trabajo.getId());
             publicador.publicar(trabajo.getId());
         }
+
+        despertarLosQueEsperan();
+    }
+
+    /**
+     * Despierta los trabajos congelados por el tope de IA cuyas organizaciones ya tienen
+     * cupo: el tope subió, o empezó el mes (pieza E). «La cola arranca sola con lo que
+     * quedó esperando» — este barrido es ese arranque, y corre con el mismo sondeo de
+     * los atascados.
+     *
+     * <p>El cupo se pregunta UNA vez por organización, no por trabajo: la suma del mes es
+     * la parte cara. Y al despertar se sueltan TODOS los de esa organización aunque el
+     * primero vuelva a comerse el cupo: lo que quedó esperando ya se prometió, y el tope
+     * frena lo nuevo, no lo prometido — la misma regla que el retrato.
+     */
+    private void despertarLosQueEsperan() {
+        Map<Long, List<TrabajoIa>> esperando = trabajos.findByEstadoOrderByIdAsc("EN_ESPERA")
+                .stream()
+                .collect(Collectors.groupingBy(TrabajoIa::getOrganizacionId));
+        esperando.forEach((organizacionId, suyos) -> {
+            if (tope.sinCupo(organizacionId)) {
+                return;
+            }
+            for (TrabajoIa trabajo : suyos) {
+                if (registro.despertar(trabajo.getId())) {
+                    publicador.publicar(trabajo.getId());
+                }
+            }
+            log.info("La organización {} recuperó cupo de IA: {} trabajos despiertan",
+                    organizacionId, suyos.size());
+        });
     }
 
     /**
@@ -447,13 +487,37 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
         return creado.isPresent();
     }
 
+    /**
+     * Crea el trabajo y lo publica a la cola — o lo deja EN_ESPERA si la organización
+     * agotó su tope mensual de IA (pieza E).
+     *
+     * <p>Este es el embudo de los trabajos NUEVOS, y por eso el tope se pregunta aquí y
+     * no al ejecutar: lo ya publicado es una promesa y termina. El retrato que cierra una
+     * tanda ({@code dispararElRetrato}) tampoco pasa por aquí a propósito: sus tres
+     * insumos ya se pagaron, y dejarlos resumidos cuesta una llamada que no frena nada.
+     *
+     * <p>El candidato no ve la espera: para {@code comoVan} un EN_ESPERA está EN_CURSO,
+     * que es la verdad — se va a calificar, solo que cuando haya cupo o cambie el mes.
+     */
     private boolean crearYAvisar(Long postulacionId, String agente, String modo,
                                  Long alimentadoPor) {
         Long organizacionId = puente.organizacionDe(postulacionId);
         Optional<TrabajoIa> creado = registro.crearSiHaceFalta(
                 organizacionId, postulacionId, agente, modo, alimentadoPor);
-        creado.ifPresent(trabajo -> publicador.publicar(trabajo.getId()));
-        return creado.isPresent();
+        if (creado.isEmpty()) {
+            return false;
+        }
+        if (tope.sinCupo(organizacionId) && registro.dejarEnEspera(creado.get().getId())) {
+            log.warn("La organización {} agotó su tope mensual de IA: el trabajo {} ({}) queda "
+                            + "EN_ESPERA hasta que suba el tope o empiece el mes",
+                    organizacionId, creado.get().getId(), agente);
+            return true;
+        }
+        publicador.publicar(creado.get().getId());
+        // El aviso del 80% se dispara donde el gasto crece: al encolar con cupo. Manda
+        // una sola vez por mes y jamás rompe el encolado.
+        tope.avisarSiCruzaElUmbral(organizacionId);
+        return true;
     }
 
     /**
@@ -479,7 +543,9 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
             return Situacion.HAY_QUE_ENCOLARLO;
         }
         String estado = ultimo.get().getEstado();
-        if ("PENDIENTE".equals(estado) || "EN_CURSO".equals(estado)) {
+        // EN_ESPERA está vivo: va a correr cuando su organización recupere cupo (pieza
+        // E), y crearle un gemelo sería pagar dos veces al despertar.
+        if ("PENDIENTE".equals(estado) || "EN_CURSO".equals(estado) || "EN_ESPERA".equals(estado)) {
             return Situacion.ESTA_VIVO;
         }
         if ("FALLIDO".equals(estado)) {

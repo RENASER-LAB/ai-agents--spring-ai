@@ -1,5 +1,6 @@
 package com.renaser.ai.ai_engine.organizacion.service;
 
+import com.renaser.ai.ai_engine.organizacion.dto.DtosOrganizacion.ConsumoEmpresa;
 import com.renaser.ai.ai_engine.organizacion.dto.DtosOrganizacion.CrearEmpresa;
 import com.renaser.ai.ai_engine.organizacion.dto.DtosOrganizacion.EmpresaCreada;
 import com.renaser.ai.ai_engine.organizacion.dto.DtosOrganizacion.EmpresaPanel;
@@ -29,4 +30,11 @@ public interface ServicioPlataforma {
     EmpresaCreada crearEmpresa(ContextoUsuario quien, CrearEmpresa datos);
 
     List<EmpresaPanel> empresas(ContextoUsuario quien);
+
+    /**
+     * El consumo de IA de un mes ({@code YYYY-MM}, hora de Lima) por organización, con
+     * su desglose por agente (pieza E). Es la mirada de Renaser sobre el gasto: con
+     * estos números cobra fuera del sistema lo que acuerde con cada empresa.
+     */
+    List<ConsumoEmpresa> consumo(ContextoUsuario quien, String mes);
 }

@@ -8,5 +8,7 @@ import java.util.List;
 
 public interface UsuarioRolRepository extends JpaRepository<UsuarioRol, UsuarioRol.Clave> {
     List<UsuarioRol> findByUsuarioId(Long usuarioId);
+    // Quiénes tienen un rol: el aviso del tope de IA les escribe a los administradores
+    List<UsuarioRol> findByRolId(Long rolId);
     long countByRolId(Long rolId);
 }
