@@ -21,6 +21,15 @@ public final class DtosAdministracion {
     public record PlantillaPanel(Long id, String codigo, Integer version, String asunto,
                                  String cuerpo, boolean esActiva) {}
 
+    // Los textos legales de la organización. La versión es opcional: en blanco, el
+    // sistema numera la siguiente («2.0» tras la «1.0» del alta). El tipo es PROCESO o
+    // FUTUROS_CONTACTOS, los dos de texto_consentimiento desde la V3.
+    public record NuevoTextoConsentimiento(@NotBlank String tipo, @NotBlank String texto,
+                                           String version) {}
+
+    public record TextoConsentimientoPanel(Long id, String tipo, String version, String texto,
+                                           Instant publicadoEn) {}
+
     public record FilaAuditoria(Long id, String accion, String entidad, Long entidadId,
                                 Long usuarioId, String motivo, Instant ocurridaEn) {}
 

@@ -114,44 +114,123 @@ class ServicioPortalImplTest {
                 almacen, correo, auditoria, parametros, tokens, intentos, codificador);
     }
 
-    @Test
-    @DisplayName("sin banco no se crea evaluación y la postulación va directa a la bandeja del equipo")
-    void sinBancoVaDirectaALaBandeja() {
+    /**
+     * La vacante publicada de la organización pedida, con todo lo que postular necesita.
+     *
+     * <p>Todo con {@code lenient()} a propósito: las pruebas que cortan a mitad de camino
+     * —sin texto publicado, por ejemplo— no llegan a usar los últimos pasos, y el modo
+     * estricto de Mockito las tumbaría por stubs sin usar.
+     */
+    private void armarVacantePublicada(Long organizacionDeLaVacante) {
         // La vacante se busca en el tablón entero (findById): el candidato es de la
         // plataforma y postula a la vacante de cualquier empresa.
-        when(vacantes.findById(VACANTE))
+        org.mockito.Mockito.lenient().when(vacantes.findById(VACANTE))
                 .thenReturn(Optional.of(Vacante.builder()
-                        .id(VACANTE).organizacionId(ORGANIZACION).estado("PUBLICADA")
+                        .id(VACANTE).organizacionId(organizacionDeLaVacante).estado("PUBLICADA")
                         .titulo("Administrador").puestoId(5L)
                         .aplicaEvaluacion(false)
                         .build()));
-        when(postulaciones.existsByUsuarioIdAndVacanteId(USUARIO, VACANTE)).thenReturn(false);
-        when(postulaciones.save(any(Postulacion.class))).thenAnswer(inv -> {
-            Postulacion p = inv.getArgument(0);
-            p.setId(77L);
-            return p;
-        });
-        when(transiciones.save(any(TransicionEstado.class))).thenAnswer(inv -> inv.getArgument(0));
-        when(almacen.guardar(eq(ORGANIZACION), eq(cv)))
+        org.mockito.Mockito.lenient()
+                .when(postulaciones.existsByUsuarioIdAndVacanteId(USUARIO, VACANTE)).thenReturn(false);
+        org.mockito.Mockito.lenient()
+                .when(postulaciones.save(any(Postulacion.class))).thenAnswer(inv -> {
+                    Postulacion p = inv.getArgument(0);
+                    p.setId(77L);
+                    return p;
+                });
+        org.mockito.Mockito.lenient()
+                .when(transiciones.save(any(TransicionEstado.class)))
+                .thenAnswer(inv -> inv.getArgument(0));
+        org.mockito.Mockito.lenient().when(almacen.guardar(eq(organizacionDeLaVacante), eq(cv)))
                 .thenReturn(Archivo.builder().id(88L).build());
-        when(cvs.save(any(Cv.class))).thenAnswer(inv -> {
+        org.mockito.Mockito.lenient().when(cvs.save(any(Cv.class))).thenAnswer(inv -> {
             Cv guardado = inv.getArgument(0);
             guardado.setId(99L);
             return guardado;
         });
-        when(usuarios.findById(USUARIO)).thenReturn(Optional.of(Usuario.builder()
-                .id(USUARIO).personaId(PERSONA).correo("ana@ejemplo.pe").build()));
-        when(personas.findById(PERSONA)).thenReturn(Optional.of(Persona.builder()
-                .id(PERSONA).nombre("Ana").build()));
-        when(requisitos.findByVacanteIdAndEsActivoTrue(VACANTE)).thenReturn(List.of());
+        org.mockito.Mockito.lenient()
+                .when(usuarios.findById(USUARIO)).thenReturn(Optional.of(Usuario.builder()
+                        .id(USUARIO).personaId(PERSONA).correo("ana@ejemplo.pe").build()));
+        org.mockito.Mockito.lenient()
+                .when(personas.findById(PERSONA)).thenReturn(Optional.of(Persona.builder()
+                        .id(PERSONA).nombre("Ana").apellidos("Rojas").build()));
+        org.mockito.Mockito.lenient()
+                .when(requisitos.findByVacanteIdAndEsActivoTrue(VACANTE)).thenReturn(List.of());
+        // El texto PROCESO publicado de la empresa de la vacante: postular lo firma
+        org.mockito.Mockito.lenient().when(textosConsentimiento
+                .findFirstByOrganizacionIdAndTipoAndPublicadoEnIsNotNullOrderByPublicadoEnDesc(
+                        organizacionDeLaVacante, "PROCESO"))
+                .thenReturn(Optional.of(com.renaser.ai.ai_engine.consentimiento.entity
+                        .TextoConsentimiento.builder()
+                        .id(500L).organizacionId(organizacionDeLaVacante).tipo("PROCESO")
+                        .build()));
+    }
 
-        servicio.postular(QUIEN, VACANTE, cv, "Ordené la caja de tres sedes", null, null, null, null);
+    @Test
+    @DisplayName("sin banco no se crea evaluación y la postulación va directa a la bandeja del equipo")
+    void sinBancoVaDirectaALaBandeja() {
+        armarVacantePublicada(ORGANIZACION);
+
+        servicio.postular(QUIEN, VACANTE, cv, "Ordené la caja de tres sedes",
+                null, null, null, null, true, "10.0.0.1", "Navegador");
 
         // El salto: directo a la bandeja del equipo, sin turno de candidato en el perfil
         verify(maquina).transicionar(any(Postulacion.class), eq("PERFIL_POR_CONFIRMAR"),
                 isNull(), isNull(), eq(true), eq(false), isNull());
         // Y sin evaluación creada: no queda ninguna fila esperando respuestas
         verifyNoInteractions(evaluaciones);
+    }
+
+    @Test
+    @DisplayName("postular firma el texto de LA EMPRESA de la vacante, amarrado a la postulación")
+    void postularFirmaConLaEmpresaDeLaVacante() {
+        // La organización del candidato es la plataforma (1L); la de la vacante, otra.
+        // El registro firmado tiene que apuntar al texto de la EMPRESA — es lo que la ley
+        // 29733 espera: cada quien que trata datos, nombrado y consentido.
+        Long empresa = 2L;
+        armarVacantePublicada(empresa);
+
+        servicio.postular(QUIEN, VACANTE, cv, "Ordené la caja de tres sedes",
+                null, null, null, null, true, "10.0.0.1", "Navegador");
+
+        var captor = org.mockito.ArgumentCaptor.forClass(
+                com.renaser.ai.ai_engine.consentimiento.entity.Consentimiento.class);
+        verify(consentimientos).save(captor.capture());
+        var firmado = captor.getValue();
+        org.assertj.core.api.Assertions.assertThat(firmado.getTextoConsentimientoId()).isEqualTo(500L);
+        org.assertj.core.api.Assertions.assertThat(firmado.getPostulacionId()).isEqualTo(77L);
+        org.assertj.core.api.Assertions.assertThat(firmado.getPersonaId()).isEqualTo(PERSONA);
+        org.assertj.core.api.Assertions.assertThat(firmado.getIp()).isEqualTo("10.0.0.1");
+        org.assertj.core.api.Assertions.assertThat(firmado.getNombreRegistrado()).isEqualTo("Ana Rojas");
+    }
+
+    @Test
+    @DisplayName("sin aceptar el tratamiento de datos no hay postulación, y no queda nada a medias")
+    void sinAceptarElTratamientoNoHayPostulacion() {
+        assertThatThrownBy(() -> servicio.postular(QUIEN, VACANTE, cv, "Un resultado",
+                null, null, null, null, null, "10.0.0.1", "Navegador"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("aceptar el tratamiento");
+        // Se corta ANTES de tocar nada: ni postulación, ni CV, ni consentimiento
+        verifyNoInteractions(postulaciones, almacen, consentimientos);
+    }
+
+    @Test
+    @DisplayName("si la empresa no tiene texto publicado, postular se frena con un error claro")
+    void sinTextoPublicadoPostularSeFrena() {
+        // Defensa en profundidad: publicar la vacante ya exige el texto, pero si esta
+        // situación llegara a darse el candidato no puede firmar un texto que no existe.
+        armarVacantePublicada(2L);
+        when(textosConsentimiento
+                .findFirstByOrganizacionIdAndTipoAndPublicadoEnIsNotNullOrderByPublicadoEnDesc(
+                        2L, "PROCESO"))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> servicio.postular(QUIEN, VACANTE, cv, "Un resultado",
+                null, null, null, null, true, "10.0.0.1", "Navegador"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("texto de consentimiento");
+        verifyNoInteractions(consentimientos);
     }
 
     @Test

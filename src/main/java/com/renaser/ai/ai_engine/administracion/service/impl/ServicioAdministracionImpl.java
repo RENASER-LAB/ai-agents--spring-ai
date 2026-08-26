@@ -51,6 +51,7 @@ public class ServicioAdministracionImpl implements ServicioAdministracion {
     private final RolRepository roles;
     private final UsuarioRolRepository usuarioRoles;
     private final ConsentimientoRepository consentimientos;
+    private final TextoConsentimientoRepository textosConsentimiento;
     private final PostulacionRepository postulaciones;
     private final EstadoPostulacionRepository estados;
     private final CvRepository cvs;
@@ -133,6 +134,61 @@ public class ServicioAdministracionImpl implements ServicioAdministracion {
                 "plantilla_correo", nueva.getId(), null,
                 Map.of("codigo", datos.codigo(), "version", siguienteVersion), null);
         return nueva.getId();
+    }
+
+    // ============ Textos de consentimiento ============
+    // Van con el permiso de los textos de correo (ver AdministracionController): los dos
+    // son «lo que la empresa le dice al candidato», y un permiso nuevo exigiría tocar la
+    // matriz de roles de todas las organizaciones por una acción que se usa una vez.
+
+    @Override
+    public List<TextoConsentimientoPanel> textosConsentimiento(ContextoUsuario quien) {
+        return textosConsentimiento.findByOrganizacionIdOrderByTipoAscCreadoEnDesc(quien.organizacionId())
+                .stream()
+                .map(t -> new TextoConsentimientoPanel(t.getId(), t.getTipo(), t.getVersion(),
+                        t.getTexto(), t.getPublicadoEn()))
+                .toList();
+    }
+
+    @Override
+    @Transactional
+    public Long publicarTextoConsentimiento(ContextoUsuario quien, NuevoTextoConsentimiento datos) {
+        if (!List.of("PROCESO", "FUTUROS_CONTACTOS").contains(datos.tipo())) {
+            throw new IllegalArgumentException(
+                    "El tipo debe ser PROCESO o FUTUROS_CONTACTOS, no «" + datos.tipo() + "»");
+        }
+        // La versión nueva nace publicada: es la que rige desde ya. Las anteriores no se
+        // tocan —ni siquiera una en borrador del alta—, porque los consentimientos ya
+        // firmados apuntan a la suya y el vigente se resuelve por publicado_en más
+        // reciente, no por una bandera.
+        String version = datos.version() == null || datos.version().isBlank()
+                ? (textosConsentimiento.countByOrganizacionIdAndTipo(
+                        quien.organizacionId(), datos.tipo()) + 1) + ".0"
+                : datos.version().trim();
+        TextoConsentimiento texto = textosConsentimiento.save(TextoConsentimiento.builder()
+                .organizacionId(quien.organizacionId())
+                .tipo(datos.tipo())
+                .version(version)
+                .texto(datos.texto())
+                .hash(hashSha256(datos.texto()))
+                .publicadoEn(Instant.now())
+                .creadoEn(Instant.now())
+                .build());
+        auditoria.registrar(quien.organizacionId(), quien, "publicar_texto_consentimiento",
+                "texto_consentimiento", texto.getId(), null,
+                Map.of("tipo", datos.tipo(), "version", version), null);
+        return texto.getId();
+    }
+
+    /** La misma huella que la V9 calcula con digest(): quien compare, cuadra. */
+    private static String hashSha256(String texto) {
+        try {
+            var sha = java.security.MessageDigest.getInstance("SHA-256");
+            return java.util.HexFormat.of()
+                    .formatHex(sha.digest(texto.getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        } catch (java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException("Esta JVM no tiene SHA-256", e);
+        }
     }
 
     // ============ Auditoría ============

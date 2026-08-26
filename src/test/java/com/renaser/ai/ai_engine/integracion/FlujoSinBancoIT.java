@@ -213,6 +213,7 @@ public class FlujoSinBancoIT {
                         .file(cv)
                         .param("vacanteId", String.valueOf(vacanteId))
                         .param("resultadoOrgulloso", "Ordené la caja de tres sedes en dos meses")
+                        .param("aceptaTratamiento", "true")
                         .header("Authorization", "Bearer " + tokenCandidato))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString(), "codigo");
@@ -363,6 +364,7 @@ public class FlujoSinBancoIT {
                         .file(cv)
                         .param("vacanteId", String.valueOf(vacanteId))
                         .param("resultadoOrgulloso", "Cuadré la caja de tres sedes")
+                        .param("aceptaTratamiento", "true")
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString(), "codigo");

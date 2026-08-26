@@ -18,6 +18,13 @@ public interface ServicioAdministracion {
     // versión vieja sigue explicado por ella
     Long nuevaVersionPlantilla(ContextoUsuario quien, NuevaPlantilla datos);
 
+    List<TextoConsentimientoPanel> textosConsentimiento(ContextoUsuario quien);
+
+    // Crea la versión nueva del texto legal Y LA PUBLICA: es lo que le abre a la empresa
+    // la puerta de publicar vacantes (pieza D). Una versión publicada jamás se toca; los
+    // consentimientos ya firmados siguen apuntando a la suya.
+    Long publicarTextoConsentimiento(ContextoUsuario quien, NuevoTextoConsentimiento datos);
+
     Page<FilaAuditoria> auditoria(ContextoUsuario quien, String entidad, int pagina, int tamano);
 
     List<SolicitudBorradoPanel> solicitudesBorradoPendientes(ContextoUsuario quien);

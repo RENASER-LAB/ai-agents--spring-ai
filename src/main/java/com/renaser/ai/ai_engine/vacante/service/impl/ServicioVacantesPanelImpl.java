@@ -2,6 +2,7 @@ package com.renaser.ai.ai_engine.vacante.service.impl;
 
 import com.renaser.ai.ai_engine.ai.exception.ResourceNotFoundException;
 import com.renaser.ai.ai_engine.auditoria.service.ServicioAuditoria;
+import com.renaser.ai.ai_engine.consentimiento.repository.TextoConsentimientoRepository;
 import com.renaser.ai.ai_engine.notificacion.entity.PlantillaCorreoVacante;
 import com.renaser.ai.ai_engine.notificacion.repository.PlantillaCorreoRepository;
 import com.renaser.ai.ai_engine.notificacion.repository.PlantillaCorreoVacanteRepository;
@@ -46,6 +47,7 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
     private final PlantillaPruebaRepository plantillasPrueba;
     private final PlantillaCorreoRepository plantillasCorreo;
     private final PlantillaCorreoVacanteRepository plantillasPorVacante;
+    private final TextoConsentimientoRepository textosConsentimiento;
     private final IntentoPruebaRepository intentos;
     private final ServicioAuditoria auditoria;
     private final DuenoDelInstrumento dueno;
@@ -237,6 +239,18 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
         if (vacante.getVersionPlantillaPruebaId() == null) {
             throw new IllegalStateException(
                     "Antes de publicar hay que elegir la prueba del puesto de esta vacante");
+        }
+        // El requisito del día uno de la pieza A: sin texto legal publicado con SU nombre,
+        // la empresa no recibe candidatos — al postular se firma ese texto (ley 29733), y
+        // no puede firmarse lo que no existe. Renaser lo tiene publicado desde la V9; a
+        // las empresas nuevas el alta se lo copia en borrador y les toca publicarlo.
+        if (textosConsentimiento
+                .findFirstByOrganizacionIdAndTipoAndPublicadoEnIsNotNullOrderByPublicadoEnDesc(
+                        quien.organizacionId(), "PROCESO")
+                .isEmpty()) {
+            throw new IllegalStateException("Antes de publicar una vacante, publica el texto de "
+                    + "consentimiento de tu empresa (POST /panel/textos-consentimiento): quien "
+                    + "postule tiene que saber quién tratará sus datos");
         }
         vacante.setEstado("PUBLICADA");
         vacante.setPublicadaEn(Instant.now());

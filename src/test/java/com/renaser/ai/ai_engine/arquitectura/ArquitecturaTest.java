@@ -349,6 +349,9 @@ class ArquitecturaTest {
             "ServicioPortalImpl#vacante",
             "ServicioPortalImpl#postular",
             "ServicioPortalImpl#comoResumen",
+            // El texto legal de la empresa de una vacante PUBLICADA: es del tablón, la
+            // misma excepción deliberada que #vacante, y con el mismo filtro de estado.
+            "ServicioPortalImpl#consentimientoDeVacante",
             // El borrado 29733 es de la plataforma: exigirPlataforma ya cerró la puerta
             // antes de estas búsquedas, y la solicitud cruza empresas a propósito.
             "ServicioAdministracionImpl#ejecutarBorrado");

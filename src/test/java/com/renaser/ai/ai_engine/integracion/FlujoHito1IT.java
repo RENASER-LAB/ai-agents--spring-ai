@@ -265,6 +265,7 @@ public class FlujoHito1IT {
                         .file(cv)
                         .param("vacanteId", String.valueOf(vacanteId))
                         .param("resultadoOrgulloso", "Rediseñé el flujo de citas y bajó el ausentismo 30%")
+                        .param("aceptaTratamiento", "true")
                         .param("portafolio", "https://camila.dev")
                         .param("requisitosConfirmados", String.valueOf(requisitoId))
                         .header("Authorization", "Bearer " + tokenCandidato))

@@ -167,6 +167,32 @@ public class ServicioPortalImpl implements ServicioPortal {
     }
 
     @Override
+    public ConsentimientoDeVacante consentimientoDeVacante(Long vacanteId) {
+        // Mismo guardián que el detalle público: una vacante sin publicar no existe para
+        // nadie, y su texto legal tampoco.
+        Vacante vacante = vacantes.findById(vacanteId)
+                .filter(v -> "PUBLICADA".equals(v.getEstado()))
+                .orElseThrow(() -> new ResourceNotFoundException("Vacante", "id", vacanteId));
+        Organizacion empresa = organizaciones.findById(vacante.getOrganizacionId())
+                .orElseThrow(() -> new ResourceNotFoundException("Vacante", "id", vacanteId));
+        TextoConsentimiento texto = textoProcesoDe(empresa.getId());
+        return new ConsentimientoDeVacante(empresa.getNombre(), texto.getVersion(), texto.getTexto());
+    }
+
+    /**
+     * El texto PROCESO publicado de una empresa. No debería faltar nunca —publicar una
+     * vacante lo exige—, pero si falta es un 409 que dice qué pasa, no un vacío que deja
+     * al candidato postulando sin saber quién trata sus datos.
+     */
+    private TextoConsentimiento textoProcesoDe(Long organizacionId) {
+        return textosConsentimiento
+                .findFirstByOrganizacionIdAndTipoAndPublicadoEnIsNotNullOrderByPublicadoEnDesc(
+                        organizacionId, "PROCESO")
+                .orElseThrow(() -> new IllegalStateException("Esta empresa todavía no publicó su "
+                        + "texto de consentimiento: no puede recibir postulaciones"));
+    }
+
+    @Override
     @Transactional
     public void crearCuenta(CrearCuenta datos, String ip, String userAgent) {
         // Sin aceptar el tratamiento de datos no hay cuenta: no es una casilla decorativa
@@ -264,7 +290,15 @@ public class ServicioPortalImpl implements ServicioPortal {
     @Transactional
     public UUID postular(ContextoUsuario quien, Long vacanteId, MultipartFile cv,
                          String resultadoOrgulloso, String portafolio, String linkedin, String github,
-                         List<Long> requisitosConfirmados) {
+                         List<Long> requisitosConfirmados, Boolean aceptaTratamiento,
+                         String ip, String userAgent) {
+        // Sin aceptar el texto de la empresa no hay postulación, igual que sin aceptar el
+        // de la plataforma no hay cuenta. Es la capa de la pieza D: al postular consiente
+        // con ESA empresa, que es quien va a tratar sus datos en este proceso.
+        if (!Boolean.TRUE.equals(aceptaTratamiento)) {
+            throw new IllegalArgumentException("Hay que aceptar el tratamiento de datos de la "
+                    + "empresa de esta vacante para postular");
+        }
         // El candidato postula a la vacante de cualquier empresa: la vacante se busca en
         // el tablón entero, no en la organización del candidato (que es la plataforma).
         Vacante vacante = vacantes.findById(vacanteId)
@@ -302,6 +336,23 @@ public class ServicioPortalImpl implements ServicioPortal {
                 .ocurridaEn(Instant.now()).creadoEn(Instant.now())
                 .build());
 
+        // El registro firmado del texto de LA EMPRESA DE LA VACANTE, amarrado a esta
+        // postulación: versión exacta, IP y navegador, como el de la cuenta. Si la
+        // empresa no tiene texto publicado —no debería pasar: publicar la vacante lo
+        // exige—, textoProcesoDe corta con un 409 claro antes de guardar nada más.
+        Persona persona = personas.findById(quien.personaId()).orElse(null);
+        consentimientos.save(Consentimiento.builder()
+                .personaId(quien.personaId())
+                .textoConsentimientoId(textoProcesoDe(organizacionDeLaVacante).getId())
+                .postulacionId(postulacion.getId())
+                .nombreRegistrado(persona == null ? null
+                        : (persona.getNombre() + " " + persona.getApellidos()).trim())
+                .aceptadoEn(Instant.now())
+                .ip(ip)
+                .userAgent(userAgent)
+                .creadoEn(Instant.now())
+                .build());
+
         Archivo archivo = almacen.guardar(organizacionDeLaVacante, cv);
         Cv curriculum = cvs.save(Cv.builder()
                 .postulacionId(postulacion.getId())
@@ -327,7 +378,7 @@ public class ServicioPortalImpl implements ServicioPortal {
         lecturaCv.trasPostular(quien.personaId(), postulacion.getId());
 
         Usuario usuario = usuarios.findById(quien.usuarioId()).orElseThrow();
-        String nombre = personas.findById(quien.personaId()).map(Persona::getNombre).orElse("");
+        String nombre = persona == null ? "" : persona.getNombre();
         correo.enviar(organizacionDeLaVacante, usuario.getId(), usuario.getCorreo(), "POSTULACION_RECIBIDA",
                 Map.of("nombre", nombre == null ? "" : nombre,
                        "vacante", vacante.getTitulo(),
@@ -391,8 +442,14 @@ public class ServicioPortalImpl implements ServicioPortal {
                 .filter(Objects::nonNull).distinct().toList();
         Map<Long, Vacante> porVacante = vacantes.findAllById(vacanteIds).stream()
                 .collect(Collectors.toMap(Vacante::getId, Function.identity()));
+        // El nombre de cada empresa, por lo mismo que en el tablón: esta lista mezcla los
+        // procesos del candidato en todas las empresas y cada uno dice de quién es.
+        Map<Long, String> nombrePorOrganizacion = nombresDeOrganizacion(
+                porVacante.values().stream().toList());
 
-        return mias.stream().map(p -> comoResumen(p, porVacante, nombreEstado)).toList();
+        return mias.stream()
+                .map(p -> comoResumen(p, porVacante, nombreEstado, nombrePorOrganizacion))
+                .toList();
     }
 
     @Override
@@ -460,18 +517,22 @@ public class ServicioPortalImpl implements ServicioPortal {
                 .collect(Collectors.toMap(Vacante::getId, Function.identity()));
         Map<String, String> unEstado = estados.findById(p.getEstadoCodigo()).stream()
                 .collect(Collectors.toMap(EstadoPostulacion::getCodigo, EstadoPostulacion::getNombre));
-        return comoResumen(p, unaVacante, unEstado);
+        return comoResumen(p, unaVacante, unEstado,
+                nombresDeOrganizacion(unaVacante.values().stream().toList()));
     }
 
     private MiPostulacion comoResumen(Postulacion p, Map<Long, Vacante> porVacante,
-                                      Map<String, String> nombrePorEstado) {
-        String titulo = Optional.ofNullable(porVacante.get(p.getVacanteId()))
-                .map(Vacante::getTitulo).orElse("");
+                                      Map<String, String> nombrePorEstado,
+                                      Map<Long, String> nombrePorOrganizacion) {
+        Optional<Vacante> vacante = Optional.ofNullable(porVacante.get(p.getVacanteId()));
+        String titulo = vacante.map(Vacante::getTitulo).orElse("");
+        String empresa = vacante.map(Vacante::getOrganizacionId)
+                .map(id -> nombrePorOrganizacion.getOrDefault(id, "")).orElse("");
         // Si el código no está en el catálogo se enseña el código, igual que antes: es feo,
         // pero deja ver qué estado es en vez de un hueco en blanco.
         String nombreEstado = nombrePorEstado.getOrDefault(p.getEstadoCodigo(), p.getEstadoCodigo());
         long dias = Duration.between(p.getMovidoEn(), Instant.now()).toDays();
-        return new MiPostulacion(p.getUuid().toString(), titulo, p.getEstadoCodigo(), nombreEstado,
-                p.getGrupoPrioridad(), dias, p.getCreadoEn());
+        return new MiPostulacion(p.getUuid().toString(), titulo, empresa, p.getEstadoCodigo(),
+                nombreEstado, p.getGrupoPrioridad(), dias, p.getCreadoEn());
     }
 }

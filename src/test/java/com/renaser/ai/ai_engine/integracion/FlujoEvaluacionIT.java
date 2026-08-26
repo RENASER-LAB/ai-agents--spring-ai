@@ -163,6 +163,7 @@ public class FlujoEvaluacionIT {
                         .file(cv)
                         .param("vacanteId", String.valueOf(vacanteId))
                         .param("resultadoOrgulloso", "Automaticé el cierre mensual y pasó de 3 días a 4 horas")
+                        .param("aceptaTratamiento", "true")
                         .header("Authorization", "Bearer " + tokenCandidato))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString(), "codigo");

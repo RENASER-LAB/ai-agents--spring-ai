@@ -48,9 +48,18 @@ public class PortalController {
     }
 
     @GetMapping("/consentimientos/textos")
-    @Operation(summary = "Los textos vigentes de los dos consentimientos")
+    @Operation(summary = "Los textos vigentes de los dos consentimientos de la plataforma")
     public List<TextoConsentimientoPublico> textos() {
         return servicio.textosDeConsentimiento();
+    }
+
+    // Público como el tablón (misma regla de ConfiguracionSeguridad: GET /vacantes/**):
+    // el candidato tiene que poder leer qué va a aceptar ANTES de decidir postular.
+    @GetMapping("/vacantes/{id}/consentimiento")
+    @Operation(summary = "El texto de tratamiento de datos de la empresa de esta vacante, "
+            + "el que se acepta al postular")
+    public ConsentimientoDeVacante consentimientoDeVacante(@PathVariable Long id) {
+        return servicio.consentimientoDeVacante(id);
     }
 
     @PostMapping("/cuentas")
@@ -91,7 +100,8 @@ public class PortalController {
     @PostMapping(value = "/postulaciones", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("@permisos.tiene('postular_vacante')")
     @Operation(summary = "Postular: CV (PDF o Word, máx. 10 MB), enlaces, el resultado del que "
-            + "te sientes orgulloso, y la confirmación de los requisitos indispensables")
+            + "te sientes orgulloso, la confirmación de los requisitos indispensables y la "
+            + "aceptación del tratamiento de datos de la empresa (obligatoria)")
     public ResponseEntity<Map<String, String>> postular(
             @RequestParam Long vacanteId,
             @RequestParam("cv") MultipartFile cv,
@@ -99,9 +109,16 @@ public class PortalController {
             @RequestParam(required = false) String portafolio,
             @RequestParam(required = false) String linkedin,
             @RequestParam(required = false) String github,
-            @RequestParam(required = false) List<Long> requisitosConfirmados) {
+            @RequestParam(required = false) List<Long> requisitosConfirmados,
+            // No obligatorio para Spring a propósito: si faltara aquí, el error saldría
+            // del manejador genérico como un 500 opaco. Lo exige el servicio, con un 400
+            // que dice qué falta. El IP y el navegador van al registro firmado, como en
+            // crearCuenta.
+            @RequestParam(required = false) Boolean aceptaTratamiento,
+            HttpServletRequest request) {
         UUID uuid = servicio.postular(permisos.actual(), vacanteId, cv, resultadoOrgulloso,
-                portafolio, linkedin, github, requisitosConfirmados);
+                portafolio, linkedin, github, requisitosConfirmados, aceptaTratamiento,
+                request.getRemoteAddr(), request.getHeader("User-Agent"));
         return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("codigo", uuid.toString()));
     }
 

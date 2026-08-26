@@ -203,6 +203,7 @@ public class FlujoPruebaIT {
                         .file(cv)
                         .param("vacanteId", String.valueOf(vacanteId))
                         .param("resultadoOrgulloso", "Reduje el tiempo de build de 8 a 2 minutos")
+                        .param("aceptaTratamiento", "true")
                         .header("Authorization", "Bearer " + tokenCandidato))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString(), "codigo");
@@ -412,6 +413,7 @@ public class FlujoPruebaIT {
                         .file(cv)
                         .param("vacanteId", String.valueOf(vacanteId))
                         .param("resultadoOrgulloso", "Otro resultado del que me siento orgullosa")
+                        .param("aceptaTratamiento", "true")
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString(), "codigo");

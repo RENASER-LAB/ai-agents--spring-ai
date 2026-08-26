@@ -449,6 +449,7 @@ public class FlujoSimulacionValidacionIT {
                         .file(cv)
                         .param("vacanteId", String.valueOf(vacanteId))
                         .param("resultadoOrgulloso", "Reduje a la mitad el tiempo de respuesta")
+                        .param("aceptaTratamiento", "true")
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString(), "codigo");

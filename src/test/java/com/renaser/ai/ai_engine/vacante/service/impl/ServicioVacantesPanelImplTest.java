@@ -77,6 +77,8 @@ class ServicioVacantesPanelImplTest {
     @Mock private com.renaser.ai.ai_engine.prueba.repository.PlantillaPruebaRepository plantillasPrueba;
     @Mock private PlantillaCorreoRepository plantillasCorreo;
     @Mock private PlantillaCorreoVacanteRepository plantillasPorVacante;
+    @Mock private com.renaser.ai.ai_engine.consentimiento.repository.TextoConsentimientoRepository
+            textosConsentimiento;
     @Mock private IntentoPruebaRepository intentos;
     @Mock private ServicioAuditoria auditoria;
     @Mock private com.renaser.ai.ai_engine.organizacion.service.DuenoDelInstrumento dueno;
@@ -87,13 +89,21 @@ class ServicioVacantesPanelImplTest {
     void crearElServicio() {
         servicio = new ServicioVacantesPanelImpl(vacantes, puestos, requisitos, solicitudes,
                 versionesPesos, plantillas, versionesPrueba, plantillasPrueba, plantillasCorreo,
-                plantillasPorVacante, intentos, auditoria, dueno);
+                plantillasPorVacante, textosConsentimiento, intentos, auditoria, dueno);
         // En estas pruebas la organizacion no personaliza nada: el resolutor contesta
         // que el dueño de todo instrumento es ella misma (aqui hace de plataforma).
         org.mockito.Mockito.lenient()
                 .when(dueno.duenoDe(org.mockito.ArgumentMatchers.eq(ORGANIZACION),
                         org.mockito.ArgumentMatchers.any()))
                 .thenReturn(ORGANIZACION);
+        // Y tiene su texto legal publicado, como Renaser desde la V9: publicar una vacante
+        // lo exige (pieza D), y la prueba que lo quita es la que comprueba el freno.
+        org.mockito.Mockito.lenient()
+                .when(textosConsentimiento
+                        .findFirstByOrganizacionIdAndTipoAndPublicadoEnIsNotNullOrderByPublicadoEnDesc(
+                                ORGANIZACION, "PROCESO"))
+                .thenReturn(Optional.of(com.renaser.ai.ai_engine.consentimiento.entity
+                        .TextoConsentimiento.builder().id(70L).tipo("PROCESO").build()));
     }
 
     private Vacante vacante(String estado, boolean aplicaEvaluacion, Long plantillaEvaluacionId) {
@@ -130,6 +140,24 @@ class ServicioVacantesPanelImplTest {
         assertThatThrownBy(() -> servicio.publicar(QUIEN, VACANTE))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("plantilla de evaluación");
+    }
+
+    @Test
+    @DisplayName("sin el texto legal publicado no se publica la vacante, y el error dice qué falta")
+    void sinTextoLegalNoSePublica() {
+        // El requisito del día uno de la pieza A: al postular se firma el texto PROCESO de
+        // la empresa, y no puede firmarse lo que no existe. El error sale aquí, en la cara
+        // de quien publica, no en la del primer candidato.
+        Vacante v = vacante("BORRADOR", false, null);
+        when(textosConsentimiento
+                .findFirstByOrganizacionIdAndTipoAndPublicadoEnIsNotNullOrderByPublicadoEnDesc(
+                        ORGANIZACION, "PROCESO"))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> servicio.publicar(QUIEN, VACANTE))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("texto de consentimiento");
+        assertThat(v.getEstado()).isEqualTo("BORRADOR");
     }
 
     // ============ El interruptor ============

@@ -63,6 +63,27 @@ public class AdministracionController {
         return Map.of("id", servicio.nuevaVersionPlantilla(permisos.actual(), datos));
     }
 
+    // ---------- Textos de consentimiento ----------
+    // Con el permiso de los textos de correo, a propósito: los dos son «lo que la empresa
+    // le dice al candidato», y el catálogo de permisos no tiene uno de textos legales —
+    // crearlo obligaría a migrar la matriz de roles de todas las organizaciones.
+
+    @GetMapping("/textos-consentimiento")
+    @PreAuthorize("@permisos.tiene('editar_textos_correo')")
+    @Operation(summary = "Los textos legales de la organización, con toda su historia de versiones")
+    public List<TextoConsentimientoPanel> textosConsentimiento() {
+        return servicio.textosConsentimiento(permisos.actual());
+    }
+
+    @PostMapping("/textos-consentimiento")
+    @PreAuthorize("@permisos.tiene('editar_textos_correo')")
+    @ResponseStatus(HttpStatus.CREATED)
+    @Operation(summary = "Publicar una versión nueva del texto legal. Es el paso que abre la "
+            + "puerta de publicar vacantes: sin texto PROCESO publicado no se reciben candidatos")
+    public Map<String, Long> publicarTextoConsentimiento(@Valid @RequestBody NuevoTextoConsentimiento datos) {
+        return Map.of("id", servicio.publicarTextoConsentimiento(permisos.actual(), datos));
+    }
+
     // ---------- Auditoría ----------
 
     @GetMapping("/auditoria")

@@ -125,6 +125,7 @@ public class FlujoPerfilIT {
                         .file(cv)
                         .param("vacanteId", String.valueOf(vacanteId))
                         .param("resultadoOrgulloso", "Ordené el archivo de una clínica entera")
+                        .param("aceptaTratamiento", "true")
                         .param("linkedin", "https://www.linkedin.com/in/camila-rojas")
                         .param("github", "https://github.com/camila")
                         .header("Authorization", "Bearer " + tokenCandidato))
@@ -360,6 +361,7 @@ public class FlujoPerfilIT {
                         .file(cv)
                         .param("vacanteId", String.valueOf(vacante2))
                         .param("resultadoOrgulloso", "El mismo resultado de siempre")
+                        .param("aceptaTratamiento", "true")
                         .header("Authorization", "Bearer " + tokenCandidato))
                 .andExpect(status().isCreated());
         long postulacion2 = jdbc.queryForObject("select max(id) from postulacion", Long.class);

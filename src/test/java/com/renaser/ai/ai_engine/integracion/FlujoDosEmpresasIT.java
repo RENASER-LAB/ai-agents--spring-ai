@@ -256,6 +256,20 @@ public class FlujoDosEmpresasIT {
         conToken(post("/api/v1/panel/vacantes/" + vacanteAcmeId + "/plantilla-prueba"), tokenAcme,
                 "{\"versionPlantillaPruebaId\": %d}".formatted(versionPruebaId)).andExpect(status().isOk());
 
+        // El requisito del día uno (pieza D): sin texto legal publicado con SU nombre,
+        // ACME no publica. Los del alta están en borrador — a propósito, nombran a Renaser.
+        conToken(post("/api/v1/panel/vacantes/" + vacanteAcmeId + "/publicacion"), tokenAcme, null)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail").value(
+                        org.hamcrest.Matchers.containsString("texto de consentimiento")));
+
+        conToken(post("/api/v1/panel/textos-consentimiento"), tokenAcme, """
+                {"tipo": "PROCESO", "texto": "Acme S.A.C. tratará tus datos para evaluar tu \
+                postulación a sus vacantes. Una IA participa y una persona confirma."}""")
+                .andExpect(status().isCreated());
+        assertThat(contar("select count(*) from texto_consentimiento where organizacion_id = "
+                + acmeId + " and tipo = 'PROCESO' and publicado_en is not null")).isEqualTo(1);
+
         conToken(post("/api/v1/panel/vacantes/" + vacanteAcmeId + "/publicacion"), tokenAcme, null)
                 .andExpect(status().isOk());
     }
@@ -271,12 +285,31 @@ public class FlujoDosEmpresasIT {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].nombreEmpresa").value("Acme S.A.C."));
 
+        // Antes de postular, la candidata puede leer QUÉ va a aceptar y DE QUIÉN: el
+        // texto de ACME, público como el tablón (sin token)
+        mvc.perform(get("/api/v1/portal/vacantes/" + vacanteAcmeId + "/consentimiento"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.nombreEmpresa").value("Acme S.A.C."))
+                .andExpect(jsonPath("$.texto").value(
+                        org.hamcrest.Matchers.containsString("Acme S.A.C.")));
+
+        // Sin la casilla marcada no hay postulación: no es decorativa (ley 29733)
         MockMultipartFile cv = new MockMultipartFile("cv", "cv.pdf",
                 "application/pdf", "curriculum de camila".getBytes());
         mvc.perform(multipart("/api/v1/portal/postulaciones")
                         .file(cv)
                         .param("vacanteId", String.valueOf(vacanteAcmeId))
                         .param("resultadoOrgulloso", "Ordené un almacén que llevaba años a ciegas")
+                        .header("Authorization", "Bearer " + tokenCandidata))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value(
+                        org.hamcrest.Matchers.containsString("aceptar el tratamiento")));
+
+        mvc.perform(multipart("/api/v1/portal/postulaciones")
+                        .file(cv)
+                        .param("vacanteId", String.valueOf(vacanteAcmeId))
+                        .param("resultadoOrgulloso", "Ordené un almacén que llevaba años a ciegas")
+                        .param("aceptaTratamiento", "true")
                         .header("Authorization", "Bearer " + tokenCandidata))
                 .andExpect(status().isCreated());
 
@@ -293,6 +326,25 @@ public class FlujoDosEmpresasIT {
                   join version_banco vb on vb.id = e.version_banco_nivel_id
                  where p.id = %d""".formatted(postulacionAcmeId), Long.class))
                 .isEqualTo(plataformaId);
+
+        // El consentimiento quedó firmado A NOMBRE DE ACME y amarrado a esta postulación:
+        // postular a tres empresas serían tres filas, cada una con su papel en regla. El
+        // de la cuenta (con la plataforma) sigue ahí, aparte, sin postulación.
+        assertThat(jdbc.queryForObject("""
+                select t.organizacion_id from consentimiento c
+                  join texto_consentimiento t on t.id = c.texto_consentimiento_id
+                 where c.postulacion_id = %d""".formatted(postulacionAcmeId), Long.class))
+                .isEqualTo(acmeId);
+        assertThat(contar("""
+                select count(*) from consentimiento c
+                  join texto_consentimiento t on t.id = c.texto_consentimiento_id
+                 where c.postulacion_id is null and t.organizacion_id = %d"""
+                .formatted(plataformaId))).isEqualTo(1);
+
+        // Y «mis postulaciones» le dice a la candidata con QUIÉN está en proceso
+        conTokenGet("/api/v1/portal/postulaciones", tokenCandidata)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].empresa").value("Acme S.A.C."));
 
         // ACME la ve en su panel; la plataforma no — no es su candidata en este proceso
         conTokenGet("/api/v1/panel/postulaciones/" + postulacionAcmeId, tokenAcme)
