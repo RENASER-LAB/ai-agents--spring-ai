@@ -68,9 +68,9 @@ Perfil Integral → prueba del puesto → simulacion → validacion → decision
 
 | | |
 |---|---|
-| Base de datos | **Flyway es el dueno del esquema**: V1-V37 en `src/main/resources/db/migration`, **101 tablas de este modulo** (104 en la base contando `flyway_schema_history` y las dos del motor de agentes, `agent_run` y `vector_store`). `ddl-auto: validate` |
+| Base de datos | **Flyway es el dueno del esquema**: V1-V38 en `src/main/resources/db/migration`, **102 tablas de este modulo** (105 en la base contando `flyway_schema_history` y las dos del motor de agentes, `agent_run` y `vector_store`). `ddl-auto: validate` |
 | Codigo | Veintiun paquetes de dominio bajo `ai_engine` (ver «Como esta organizado el codigo») |
-| Tests | **682, todos en verde (25/08/2026)**: 589 unitarios y 93 de integracion (6 saltados, los que gastan saldo o mandan correo de verdad). Ver «Correr los tests»: unitarios de la maquina y del anonimizador, migraciones contra Postgres real (Testcontainers) y flujos de punta a punta: hito 1, evaluacion, prueba, simulacion/validacion, calificacion con IA, la vacante sin banco y las dos empresas |
+| Tests | **726, todos en verde (26/08/2026)**: 626 unitarios y 100 de integracion (6 saltados, los que gastan saldo o mandan correo de verdad). Ver «Correr los tests»: unitarios de la maquina y del anonimizador, migraciones contra Postgres real (Testcontainers) y flujos de punta a punta: hito 1, evaluacion, prueba, simulacion/validacion, calificacion con IA, la vacante sin banco, las dos empresas y el tope de IA de la plataforma |
 | IA que califica | **Seis de los diez agentes del catalogo estan implementados**: datos del curriculum, evidencia, evaluador, potencial/riesgo, prueba del puesto y las preguntas de la conversacion final. Todos corren por cola de RabbitMQ contra DeepSeek. Ver [Calificacion con IA](docs/CALIFICACION-CON-IA.md) |
 | Correo | **Ya sabe salir de verdad** (`EnviadorCorreoSmtp`), pero **por defecto no sale**: `renaser.correo.transporte` vale `log` salvo que se ponga `smtp`, y entonces solo se registra en `correo_enviado`. Para encenderlo hacen falta `CORREO_TRANSPORTE=smtp`, `CORREO_REMITENTE` y una cuenta que autentique. El RNF-65 pide que salga **desde el dominio propio de Renaser**: confirmar con ellos si ya lo tienen antes de encenderlo |
 | Acceso del candidato | Entra al portal **con un enlace, sin contrasena** (`EnlaceAcceso`, `ServicioEnlaceAcceso`). El enlace se le manda por correo, asi que depende de lo de arriba |
@@ -264,12 +264,12 @@ Las dos consultan el mismo backend, asi que ensenan el mismo orden.
 - Nada se recalcula hacia atras: cada nota queda atada a la version de pesos de su vacante.
 
 ### Correr los tests
-**589 unitarios en verde (25/08/2026).** Son dos tandas y el comando decide cual corre:
+**626 unitarios en verde (26/08/2026).** Son dos tandas y el comando decide cual corre:
 
 | Comando | Que corre | Cuantos | Necesita |
 |---|---|---:|---|
-| `./mvnw test` | unitarias con dobles y las de arquitectura | 589 | nada |
-| `./mvnw verify` | lo anterior mas las de integracion | 682 | Docker |
+| `./mvnw test` | unitarias con dobles y las de arquitectura | 626 | nada |
+| `./mvnw verify` | lo anterior mas las de integracion | 726 | Docker |
 
 Las de integracion levantan su propio PostgreSQL y su propio RabbitMQ con Testcontainers: hace
 falta el demonio de Docker encendido. El desglose completo esta en
@@ -321,10 +321,10 @@ y el diseño en [docs/PROPUESTA-PERFIL-DEL-CANDIDATO.md](docs/PROPUESTA-PERFIL-D
 ⚠️ **No encender con candidatos reales sin el texto de consentimiento nuevo**: el vigente
 cubre una postulacion concreta, no un perfil que se conserva entre convocatorias (RF-169).
 
-## Multiempresa (25/08/2026)
+## Multiempresa (26/08/2026 · completo, piezas A-F)
 El sistema paso de «Renaser contrata para Renaser» a plataforma tipo Indeed: cada empresa
 se registra por invitacion de Renaser, publica sus vacantes y ve solo a sus candidatos.
-Los tres specs con el porque de cada decision estan en `docs/superpowers/specs/2026-08-25-*.md`.
+Los seis specs con el porque de cada decision estan en `docs/superpowers/specs/2026-08-25-*.md`.
 Lo que hay que saber para tocar codigo:
 
 - **La plataforma es un dato, no un literal**: `organizacion.es_plataforma` (solo una puede
@@ -357,8 +357,38 @@ Lo que hay que saber para tocar codigo:
   vacantes, a proposito.
 - **El borrado 29733 es de la plataforma**: los candidatos son cuentas de plataforma y la
   anonimizacion cruza empresas. Desde una empresa responde 403.
-- Pendiente (piezas D/E/F): el candidato ante varias empresas, el coste de la IA por
-  empresa, y Renaser supervisando empresas (suspension, encender banderas desde arriba).
+- **El consentimiento se firma con cada empresa** (pieza D, V38): al crear la cuenta se
+  consiente con la plataforma; al postular se acepta el texto PROCESO de LA EMPRESA de la
+  vacante, y la fila de `consentimiento` queda con `postulacion_id`, IP y navegador.
+  Postular exige `aceptaTratamiento` (400 sin el), el texto se lee sin token en
+  `GET /portal/vacantes/{id}/consentimiento`, y **publicar una vacante exige el texto
+  PROCESO publicado de la organizacion** — se publica por `POST /panel/textos-consentimiento`
+  (permiso `editar_textos_correo`; crea la version Y la publica). Renaser lo tiene desde la
+  V9; a las empresas nuevas el alta se lo copia en borrador.
+- **Cada llamada al modelo tiene precio** (pieza E, V38): `ejecucion_ia.costo` se escribe al
+  cerrar con la tarifa vigente de `tarifa_modelo` (por proveedor+modelo, vigencia por fecha;
+  las sembradas son PROVISIONALES). Tope mensual por organizacion: parametro
+  `tope_mensual_ia` (ausente = sin tope; lo administra Renaser, `editarParametro` se lo
+  niega a la empresa). Al 80% un correo `TOPE_IA_AVISO` una vez por mes (la marca es el
+  parametro `aviso_tope_enviado_mes`); al 100% los trabajos nuevos nacen **EN_ESPERA** —no
+  fallan, no se publican, el candidato ve «en curso»— y el sondeo de atascados los despierta
+  cuando vuelve el cupo (tope subido o mes nuevo, hora de Lima). El retrato que cierra una
+  tanda no pasa por el tope: sus insumos ya se pagaron. Consumo por empresa/mes/agente en
+  `GET /panel/plataforma/consumo?mes=YYYY-MM`.
+- **Renaser suspende y reactiva empresas** (pieza F): `organizacion.es_activa` ahora lo leen
+  el login del panel (mensaje claro: solo se llega con la contrasena correcta), el
+  `FiltroIdentidad` (corta los tokens vivos de 8h, solo tipo EQUIPO; cuesta una consulta de
+  organizacion por peticion de panel, aceptado) y el tablon publico (lista, detalle, texto
+  legal y el POST directo de postular). Los candidatos que ya estaban dentro NO se tocan.
+  Endpoints de plataforma, todos con doble llave y auditados con motivo: suspension,
+  reactivacion (la plataforma no puede suspenderse a si misma), tope-ia (en blanco = sin
+  tope) y personalizacion de otra empresa. La ficha del continente
+  (`GET /panel/plataforma/empresas`) trae estado, tope, banderas y consumo del mes — y ahi
+  se acaba lo que Renaser ve: ninguna via nueva a los datos de las empresas, a proposito.
+- Los ITs del multiempresa son dos: `FlujoDosEmpresasIT` (alta, aislamiento, viaje del
+  candidato, consentimiento por postulacion, borrado, suspension y reactivacion) y
+  `FlujoPlataformaIT` (la vida entera del tope con la calificacion encendida y un doble del
+  modelo: costo exacto, campana del 80, EN_ESPERA al 100, despertar al subir el tope).
 
 ## El banco de preguntas v3 (19/08/2026)
 El cliente reemplazo el banco entero. Son **190 items** (85 directivo, 55 coordinacion, 50
@@ -439,7 +469,7 @@ fusiona.** El detalle esta en [docs/CI-CD.md](docs/CI-CD.md); aqui lo que hay qu
 
 | Cuando | Que corre |
 |---|---|
-| En cada PR y en cada push a `main` | `./mvnw verify` (los 444 tests), Semgrep, Gitleaks y la cobertura del codigo nuevo en SonarCloud |
+| En cada PR y en cada push a `main` | `./mvnw verify` (la tanda entera de tests), Semgrep, Gitleaks y la cobertura del codigo nuevo en SonarCloud |
 | Al fusionar a `main`, si todo quedo verde | Se construye la imagen con el `Dockerfile`, se sube a ECR y se le dice por SSM a la maquina de EC2 que se actualice. Un smoke test comprueba que responde desde internet |
 | De noche, sin bloquear a nadie | PIT (mutation testing) y fuzzing de la API con Schemathesis |
 
@@ -576,7 +606,7 @@ Todo vive en `docs/`. Empezar por [docs/README.md](docs/README.md).
   ultimas etapas y sus tres reglas automaticas de disponibilidad.
 - [CI/CD](docs/CI-CD.md) — que se comprueba solo en cada cambio, como se despliega a AWS y que
   variables de entorno pide el servidor. **Leerlo antes de tocar `.github/workflows/`.**
-- [Comprobaciones automaticas](docs/COMPROBACIONES-AUTOMATICAS.md) — las 444 pruebas y las siete
+- [Comprobaciones automaticas](docs/COMPROBACIONES-AUTOMATICAS.md) — las 726 pruebas y las nueve
   reglas de arquitectura, una por una. Que se mira solo y que no.
 - `docs/diagramas/` — HTML autocontenidos, se abren en el navegador.
 - `docs/mockups/` — prototipos de pantalla. **Los mantiene otra persona, no editarlos.**

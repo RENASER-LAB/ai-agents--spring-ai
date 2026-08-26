@@ -47,19 +47,19 @@ demás de la calificación se prueba con un doble del modelo y no gasta nada.
 
 ---
 
-## 682 pruebas
+## 726 pruebas
 
-Contadas de correrlas el 25/08/2026 (tras el multiempresa, su QA y la revisión final), no de
+Contadas de correrlas el 26/08/2026 (tras las piezas D, E y F del multiempresa), no de
 recordarlas: el desglose sale de los informes de surefire y failsafe, y suma exacto.
 
 | Qué | Cuántas | Necesita |
 |---|---:|---|
-| Unitarias, con dobles | 485 | nada |
+| Unitarias, con dobles | 522 | nada |
 | Arquitectura | 9 | nada |
 | Las fórmulas del banco v3 | 22 | nada |
 | El validador de las respuestas v3 | 21 | nada |
 | El perfil del candidato (paquete `perfil`: merge, lectura, CRUD, retención, borrado) | 52 | nada |
-| Integración, de punta a punta | 87 | Docker |
+| Integración, de punta a punta | 94 | Docker |
 | Contra el proveedor de verdad, y el envío de correo | 6 | Docker o SMTP, y su bandera |
 
 El multiempresa (25/08) sumó 39 unitarias: 31 de la implementación —el login del panel, las
@@ -71,6 +71,20 @@ la tenía (inscripción, barrera, prueba ajena, alerta ajena). La revisión fina
 `FlujoDosEmpresasIT` el viaje que faltaba: la candidata rinde el examen entero del banco de
 Renaser en la vacante de ACME, la nota queda atada a los pesos de la plataforma, y ACME ve
 la ficha, la nota, su bandeja y su embudo — mientras la plataforma no ve nada de eso.
+
+Las piezas D, E y F (26/08) sumaron 37 unitarias y 7 de integración. Las unitarias: el
+consentimiento firmado con la empresa de la vacante (postular sin aceptar, sin texto
+publicado, la firma con IP y postulación), publicar-vacante-sin-texto-legal, la calculadora
+del costo (tarifa vigente por fecha, sin tarifa, tokens ausentes), el tope mensual (el freno
+exacto en el 100%, la campana única del 80%, el mes nuevo, el tope ilegible que no congela a
+nadie), los estados EN_ESPERA en la cola y la barrera, la suspensión (login con mensaje
+claro, la plataforma que no se suspende a sí misma, el tablón que esconde y el candidato de
+dentro que no se toca) y el tope validado desde la plataforma. Las de integración:
+`FlujoDosEmpresasIT` ganó la suspensión y la reactivación completas, y `FlujoPlataformaIT`
+—nuevo, con la calificación encendida y un doble del modelo con tokens fijos— recorre la
+vida entera del tope: nace del alta, cada lectura escribe su costo exacto, al 80% suena una
+campana única, al 100% lo nuevo espera sin que la candidata se entere, y subir el tope por
+el endpoint despierta lo que esperaba.
 
 ⚠️ Al recontar, **no sirve el atributo `tests=`** de los XML de surefire: con clases anidadas
 (`@Nested`) subcuenta, y por eso dos filas de esta tabla llevaban tiempo mal —las fórmulas
