@@ -182,10 +182,13 @@ def main():
             "GET", f"/api/v1/panel/postulaciones/{fila['postulacionId']}/prueba/respuestas", token)
         if codigo_r == 200 and isinstance(suyas, list):
             sin_responder += sum(1 for r in suyas if not (r.get("respuesta") or "").strip())
-            for r in suyas:
+            # Se numera por POSICION en la lista, no con `orden`: ese campo es el del
+            # catalogo de preguntas y no el de esta plantilla —ADMIN_Q01 llega con un 7—.
+            # La lista si viene ordenada como la vio el candidato, que es lo que vale.
+            for posicion, r in enumerate(suyas, 1):
                 respuestas_hoja.append([
                     fila.get("candidato") or "",
-                    r.get("orden"),
+                    posicion,
                     r.get("codigo") or "",
                     (r.get("enunciado") or "").strip(),
                     (r.get("respuesta") or "").strip(),

@@ -34,6 +34,14 @@ build/
 
 ### Secrets (nunca commitear) ###
 application-secrets.yaml
+# Y cualquier copia suya: un `.bak-antes-de-…` lleva las mismas claves y la regla
+# de arriba, que es un nombre exacto, no lo cubria.
+application-secrets.yaml.*
+
+# Salida de los scripts, no fuente: `excel-de-la-prueba.py` arma el xlsx —con las
+# respuestas de candidatos reales dentro— y `genera-prueba-tecnica-*.py` el pdf.
+notas-prueba-*.xlsx
+prueba-tecnica-*.pdf
 
 ### Graphify (cache local, se regenera con `graphify .`) ###
 graphify-out/
