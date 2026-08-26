@@ -190,13 +190,18 @@ lo interno viaja, y una prueba ajena responde 404.
 **El portal del candidato es `/portal/simulacion/{codigo}`**: ver las fechas de su vacante que
 tengan cupo, elegir una, y consultar la que eligió.
 
-⚠️ **Los dos GET de sesiones admiten dos permisos, y no es una excepción caprichosa.** Quien
-conduce una sesión suele ser el responsable del área, que no crea sesiones: con un solo permiso
-podía leer los inscritos de una sesión pero no había endpoint que le dijera qué sesiones
-existen, así que tenía la lista de un `{id}` que no había forma de averiguar. Con el alcance
-acotado ve solo las sesiones que tocan una vacante suya, y una que no responde **404**, no 403.
-El conteo `inscritos` se recorta con el mismo criterio: decir «6» y luego enseñar dos no se lee
-como un permiso, se lee como que faltan cuatro.
+⚠️ **Los dos GET de sesiones admiten dos permisos, y no es una excepción caprichosa.** El
+responsable del área no crea sesiones, pero marca la asistencia de sus candidatos y necesita
+las `inscripcionId` que ese endpoint le da: con un solo permiso podía leer los inscritos de una
+sesión y no había endpoint que le dijera qué sesiones existen, así que tenía la lista de un
+`{id}` que no había forma de averiguar. Con el alcance acotado ve solo las sesiones que tocan
+una vacante suya, y una que no responde **404**, no 403.
+
+**El conteo `inscritos` se recorta con el mismo criterio en los dos GET.** Una sesión sirve a
+varias vacantes a la vez, así que para el responsable del área la cifra que ve es la de sus
+candidatos, no la de la sala entera —y es la misma en la lista, en el detalle y en el número de
+filas de `/inscritos`—. Decir «6» y luego enseñar dos no se lee como un permiso: se lee como que
+faltan cuatro. El recorte lo hace la base, no un filtro en memoria: un alcance es un `WHERE`.
 
 ⚠️ **Tres reglas mueven al candidato solo**, y son el único punto del sistema donde el estado de
 una postulación depende de otra tabla: publicar una sesión o ampliar su cupo mueve a quien

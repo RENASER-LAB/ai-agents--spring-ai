@@ -47,14 +47,14 @@ demás de la calificación se prueba con un doble del modelo y no gasta nada.
 
 ---
 
-## 667 pruebas
+## 675 pruebas
 
 Contadas de correrlas el 26/08/2026, no de recordarlas: el desglose sale de los
 informes de surefire y failsafe, y suma exacto.
 
 | Qué | Cuántas | Necesita |
 |---|---:|---|
-| Unitarias, con dobles | 466 | nada |
+| Unitarias, con dobles | 474 | nada |
 | Arquitectura | 8 | nada |
 | Las fórmulas del banco v3 | 22 | nada |
 | El validador de las respuestas v3 | 21 | nada |

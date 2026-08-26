@@ -445,6 +445,44 @@ public class FlujoSimulacionValidacionIT {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1));
 
+        // Y llega hasta ahí por su cuenta: la lista de sesiones también le abre, aunque no
+        // pueda crearlas. Sin esto tendría los inscritos de una sesión cuyo id no hay forma de
+        // averiguar. Sale recortada a las sesiones que tocan una vacante suya.
+        JsonNode sesionesDeRosa = json.readTree(conTokenGet(
+                "/api/v1/panel/sesiones-simulacion", tokenArea)
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString());
+        assertThat(sesionesDeRosa).isNotEmpty();
+        assertThat(sesionesDeRosa).allSatisfy(s ->
+                assertThat(s.get("id").asLong()).isNotNull());
+
+        // Las tres cifras de la misma sesión concuerdan: la de la lista, la del detalle y las
+        // filas de /inscritos. Aquí solo hay un inscrito, así que esto NO distingue un conteo
+        // recortado de uno sin recortar —eso lo sujeta el unitario, que comprueba con qué
+        // consulta se cuenta—. Lo que sí hace, y por eso está aquí, es ejecutar la consulta
+        // nueva contra PostgreSQL de verdad: que la JPQL con sus dos saltos sea válida no se
+        // ve con dobles.
+        long enLaLista = -1;
+        for (JsonNode s : sesionesDeRosa) {
+            if (s.get("id").asLong() == sesionConInscrito) {
+                enLaLista = s.get("inscritos").asLong();
+            }
+        }
+        assertThat(enLaLista).as("la sesión con su inscrito tiene que estar en su lista").isOne();
+        conTokenGet("/api/v1/panel/sesiones-simulacion/" + sesionConInscrito, tokenArea)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.inscritos").value(1));
+
+        // Y una sesión que no toca ninguna vacante suya no se abre: 404, no 403, que
+        // confirmaría que existe.
+        long sesionAjena = jdbc.queryForObject(
+                "insert into sesion_simulacion (organizacion_id, fecha_hora, duracion_minutos, "
+                        + "modalidad, cupo, estado, creada_por_usuario_id, creado_en) values "
+                        + "(1, now() + interval '30 days', 120, 'GRUPAL', 4, 'PUBLICADA', 1, now()) "
+                        + "returning id", Long.class);
+        conTokenGet("/api/v1/panel/sesiones-simulacion/" + sesionAjena, tokenArea)
+                .andExpect(status().isNotFound());
+
         // Y ahora se le quita, desde el panel. Ni un despliegue ni un token nuevo: el mismo
         // de arriba deja de servir para esto en la siguiente llamada.
         String tokenAdmin = crearUsuarioConRol("Ada", "Vera", "ada.admin@renaser.pe",

@@ -205,11 +205,17 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
     public SesionPanel verSesion(ContextoUsuario quien, Long sesionId) {
         SesionSimulacion sesion = laSesion(quien, sesionId);
         FiltroAlcance alcance = alcanceParaVerSesiones(quien);
-        if (alcance.tipo() != FiltroAlcance.Tipo.TODO && !tocaUnaVacanteSuya(quien, sesion)) {
+        // PROPIO no abre ninguna, igual que no lista ninguna: una sesión no es de nadie en
+        // particular, así que «lo suyo» no señala a ninguna.
+        boolean alcanza = alcance.tipo() == FiltroAlcance.Tipo.TODO
+                || (alcance.tipo() == FiltroAlcance.Tipo.SUS_VACANTES
+                        && tocaUnaVacanteSuya(quien, sesion));
+        if (!alcanza) {
             // 404 y no 403: un 403 confirmaría que esa sesión existe.
             throw new ResourceNotFoundException("Sesión", "id", sesionId);
         }
-        return comoPanel(sesion);
+        // El mismo recorte que la lista, o el detalle contaría a gente que luego no puede abrir.
+        return comoPanel(sesion, alcance.responsableOFiltroNulo());
     }
 
     /**
@@ -682,15 +688,31 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
         return p;
     }
 
-    /** Una sola sesión: se piden sus cuatro cosas sueltas porque no hay tanda con la que ir. */
-    private SesionPanel comoPanel(SesionSimulacion s) {
+    /**
+     * Una sola sesión: se piden sus cuatro cosas sueltas porque no hay tanda con la que ir.
+     *
+     * @param soloDe si no es nulo, el conteo cuenta solo a los inscritos de las vacantes de ese
+     *               responsable. Es el mismo recorte que hace la lista, y tiene que ser el mismo:
+     *               si la lista dijera dos y el detalle de esa sesión dijera seis, la cifra no
+     *               significaría nada
+     */
+    private SesionPanel comoPanel(SesionSimulacion s, Long soloDe) {
         return comoPanel(s,
-                inscripciones.countBySesionSimulacionIdAndEsVigenteTrue(s.getId()),
+                inscritosVisibles(s.getId(), soloDe),
                 sesionesVacante.findBySesionSimulacionId(s.getId()).stream()
                         .map(SesionVacante::getVacanteId).toList(),
                 responsables.findBySesionSimulacionId(s.getId()).stream()
                         .map(SesionResponsable::getUsuarioId).toList(),
                 tramosDe(s.getId()));
+    }
+
+    /** Cuántos inscritos vigentes tiene la sesión, recortados a los de {@code soloDe} si lo hay. */
+    private long inscritosVisibles(Long sesionId, Long soloDe) {
+        if (soloDe == null) {
+            return inscripciones.countBySesionSimulacionIdAndEsVigenteTrue(sesionId);
+        }
+        return inscripciones.contarVigentesPorSesionDe(List.of(sesionId), soloDe).stream()
+                .findFirst().map(fila -> (Long) fila[1]).orElse(0L);
     }
 
     private SesionPanel comoPanel(SesionSimulacion s, long inscritos, List<Long> vacanteIds,

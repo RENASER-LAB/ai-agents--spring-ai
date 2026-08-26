@@ -57,6 +57,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -675,6 +676,45 @@ class ServicioSimulacionImplTest {
             assertThatThrownBy(() -> servicio.verSesion(RESPONSABLE, 2L))
                     .as("un 403 confirmaría que esa sesión existe")
                     .isInstanceOf(ResourceNotFoundException.class);
+        }
+
+        @Test
+        @DisplayName("El detalle cuenta lo mismo que la lista, no el total de la sesión")
+        void elDetalleCuentaLoMismoQueLaLista() {
+            // El fallo que esto sujeta: la lista decía dos y el detalle de la misma sesión seis,
+            // porque el detalle contaba por su cuenta y sin recortar. Tres cifras distintas para
+            // la misma sesión no son un permiso: son una resta que nadie sabe hacer.
+            when(permisos.alcanceDe("ver_inscritos_simulacion"))
+                    .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.SUS_VACANTES, USUARIO));
+            when(sesiones.findByIdAndOrganizacionId(1L, ORGANIZACION))
+                    .thenReturn(Optional.of(sesion(1L)));
+            when(sesionesVacante.findBySesionSimulacionId(1L)).thenReturn(List.of(
+                    SesionVacante.builder().sesionSimulacionId(1L).vacanteId(MI_VACANTE).build()));
+            when(vacantes.findAllById(List.of(MI_VACANTE))).thenReturn(List.of(
+                    Vacante.builder().id(MI_VACANTE).responsableUsuarioId(USUARIO).build()));
+            when(inscripciones.contarVigentesPorSesionDe(List.of(1L), USUARIO))
+                    .thenReturn(java.util.List.<Object[]>of(new Object[]{1L, 2L}));
+            when(responsables.findBySesionSimulacionId(1L)).thenReturn(List.of());
+            when(tramos.findBySesionSimulacionIdOrderByMinutoInicio(1L)).thenReturn(List.of());
+
+            assertThat(servicio.verSesion(RESPONSABLE, 1L).inscritos()).isEqualTo(2L);
+
+            verify(inscripciones, never()).countBySesionSimulacionIdAndEsVigenteTrue(anyLong());
+        }
+
+        @Test
+        @DisplayName("Con PROPIO tampoco se abre ninguna, igual que no se lista ninguna")
+        void conPropioNoSeAbreNinguna() {
+            when(permisos.alcanceDe("ver_inscritos_simulacion"))
+                    .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.PROPIO, USUARIO));
+            when(sesiones.findByIdAndOrganizacionId(1L, ORGANIZACION))
+                    .thenReturn(Optional.of(sesion(1L)));
+
+            assertThatThrownBy(() -> servicio.verSesion(RESPONSABLE, 1L))
+                    .isInstanceOf(ResourceNotFoundException.class);
+
+            // Y no se llega a mirar de quién son las vacantes: con PROPIO da igual.
+            verifyNoInteractions(vacantes);
         }
 
         @Test
