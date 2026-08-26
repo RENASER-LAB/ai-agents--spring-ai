@@ -377,4 +377,23 @@ class ServicioVacantesPanelImplTest {
         assertThatThrownBy(() -> servicio.asignarVersionPesos(QUIEN, VACANTE, VERSION_PESOS))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
+
+    @Test
+    @DisplayName("la prueba de otra empresa no se le puede colgar a una vacante propia")
+    void laPruebaDeOtraEmpresaNoSeAsigna() {
+        // La fuga cerrada en la pieza B: la versión de prueba no sabe de organizaciones
+        // y antes se asignaba por id suelto. Se deriva a su plantilla y se valida contra
+        // el dueño resuelto — ese examen se le sirve al candidato al postular, así que
+        // colgarse la prueba ajena era servir el examen de otra empresa.
+        Vacante v = vacante("PUBLICADA", false, null);
+        when(versionesPrueba.findById(31L)).thenReturn(Optional.of(
+                VersionPlantillaPrueba.builder().id(31L).plantillaPruebaId(300L)
+                        .estado("PUBLICADA").build()));
+        when(plantillasPrueba.findByIdAndOrganizacionId(300L, ORGANIZACION))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> servicio.asignarPlantillaPrueba(QUIEN, VACANTE, 31L))
+                .isInstanceOf(ResourceNotFoundException.class);
+        verify(vacantes, org.mockito.Mockito.never()).save(v);
+    }
 }

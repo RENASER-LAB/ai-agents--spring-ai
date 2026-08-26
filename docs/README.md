@@ -114,7 +114,7 @@ pasa), **sin datos** (falta evidencia) o **reserva** (no para esta vacante, pero
 | Inteligencia artificial · conversación y calificación | DeepSeek, que es un servicio externo |
 | Inteligencia artificial · búsqueda por significado | Google Gemini, que es un servicio externo |
 | Frontend | React con Vite, el de RENASER OS |
-| Identidad del equipo | RENASER OS emite el token; aquí solo se valida |
+| Identidad del equipo | Correo y contraseña, cuentas por invitación (25/08); RENASER OS quedó dormido como integración futura |
 
 **Qué sale de Renaser y qué no.** La base de datos y los archivos viven en servidores de
 Renaser. Los dos modelos son de fuera: DeepSeek califica y Google busca por significado.
