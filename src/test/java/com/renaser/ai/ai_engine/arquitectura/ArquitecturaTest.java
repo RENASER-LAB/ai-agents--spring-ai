@@ -314,7 +314,6 @@ class ArquitecturaTest {
             // alcance SUS_VACANTES. Derivar al padre en su forma más pura.
             "ServicioPostulacionesPanelImpl#laVisible",
             "ServicioPerfilIntegralPanelImpl#laVisible",
-            "ServicioPerfilPanelImpl#laVisible",
             "ServicioCalificacionPruebaImpl#laVisible",
             "ServicioCalificacionSimulacion#laVisible",
             "ServicioSimulacionImpl#laVisible",
