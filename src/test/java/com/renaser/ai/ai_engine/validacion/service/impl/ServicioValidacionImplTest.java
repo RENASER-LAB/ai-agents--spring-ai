@@ -8,12 +8,10 @@ import com.renaser.ai.ai_engine.postulacion.entity.Postulacion;
 import com.renaser.ai.ai_engine.postulacion.repository.PostulacionRepository;
 import com.renaser.ai.ai_engine.postulacion.service.MaquinaEstados;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
-import com.renaser.ai.ai_engine.seguridad.dto.FiltroAlcance;
 import com.renaser.ai.ai_engine.seguridad.service.Permisos;
 import com.renaser.ai.ai_engine.usuario.repository.RolRepository;
 import com.renaser.ai.ai_engine.usuario.repository.UsuarioRolRepository;
-import com.renaser.ai.ai_engine.vacante.entity.Vacante;
-import com.renaser.ai.ai_engine.vacante.repository.VacanteRepository;
+import com.renaser.ai.ai_engine.vacante.service.AlcanceSobreLaVacante;
 import com.renaser.ai.ai_engine.validacion.repository.ValidacionRepository;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -28,6 +26,8 @@ import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -58,7 +58,7 @@ class ServicioValidacionImplTest {
 
     @Mock private ValidacionRepository validaciones;
     @Mock private PostulacionRepository postulaciones;
-    @Mock private VacanteRepository vacantes;
+    @Mock private AlcanceSobreLaVacante alcance;
     @Mock private RolRepository roles;
     @Mock private UsuarioRolRepository usuarioRoles;
     @Mock private CalificacionPorCriterio calificacion;
@@ -71,33 +71,27 @@ class ServicioValidacionImplTest {
 
     @BeforeEach
     void crearElServicio() {
-        servicio = new ServicioValidacionImpl(validaciones, postulaciones, vacantes, roles,
+        servicio = new ServicioValidacionImpl(validaciones, postulaciones, alcance, roles,
                 usuarioRoles, calificacion, maquina, parametros, auditoria, permisos);
     }
 
-    private void hayPostulacion() {
-        when(postulaciones.findByIdAndOrganizacionId(POSTULACION, ORGANIZACION))
-                .thenReturn(Optional.of(Postulacion.builder()
-                        .id(POSTULACION).organizacionId(ORGANIZACION).vacanteId(VACANTE).build()));
+    /** El guardián deja pasar: la postulación es de esta empresa y el alcance llega. */
+    private void alcanzable(String permiso) {
+        when(alcance.laPostulacionVisible(any(), eq(POSTULACION), eq(permiso)))
+                .thenReturn(Postulacion.builder()
+                        .id(POSTULACION).organizacionId(ORGANIZACION).vacanteId(VACANTE).build());
     }
 
-    private void conAlcanceAcotado(String permiso) {
-        when(permisos.alcanceDe(permiso))
-                .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.SUS_VACANTES, USUARIO));
-    }
-
-    private void laVacanteEsDe(Long responsable) {
-        when(vacantes.findById(VACANTE)).thenReturn(Optional.of(Vacante.builder()
-                .id(VACANTE).organizacionId(ORGANIZACION)
-                .responsableUsuarioId(responsable).build()));
+    /** El guardián dice que no, con el mismo 404 que si la postulación no existiera. */
+    private void fueraDeAlcance(String permiso) {
+        when(alcance.laPostulacionVisible(any(), eq(POSTULACION), eq(permiso)))
+                .thenThrow(new ResourceNotFoundException("Postulación", "id", POSTULACION));
     }
 
     @Test
     @DisplayName("Ver el periodo de una vacante ajena responde 404, no 403")
     void verElDeUnaVacanteAjena() {
-        hayPostulacion();
-        conAlcanceAcotado("completar_metricas_validacion");
-        laVacanteEsDe(OTRO_USUARIO);
+        fueraDeAlcance("completar_metricas_validacion");
 
         assertThatThrownBy(() -> servicio.ver(QUIEN, POSTULACION))
                 .as("un 403 confirmaría que ese candidato está en validación")
@@ -110,15 +104,14 @@ class ServicioValidacionImplTest {
     @Test
     @DisplayName("Habilitar mira su propio permiso, no el de ver las métricas")
     void habilitarMiraSuPermiso() {
-        hayPostulacion();
-        conAlcanceAcotado("habilitar_validacion");
-        laVacanteEsDe(OTRO_USUARIO);
+        fueraDeAlcance("habilitar_validacion");
 
         assertThatThrownBy(() -> servicio.habilitar(QUIEN, POSTULACION, null))
                 .isInstanceOf(ResourceNotFoundException.class);
 
-        verify(permisos).alcanceDe("habilitar_validacion");
-        verify(permisos, never()).alcanceDe("completar_metricas_validacion");
+        verify(alcance).laPostulacionVisible(any(), eq(POSTULACION), eq("habilitar_validacion"));
+        verify(alcance, never()).laPostulacionVisible(
+                any(), eq(POSTULACION), eq("completar_metricas_validacion"));
     }
 
     @Test
@@ -126,14 +119,12 @@ class ServicioValidacionImplTest {
     void cerrarMiraSuPermiso() {
         // Cerrar termina el periodo del candidato. Si el alcance saliera de un permiso de
         // lectura, quien solo puede mirar acabaría cerrando periodos de convocatorias ajenas.
-        hayPostulacion();
-        conAlcanceAcotado("cerrar_validacion");
-        laVacanteEsDe(OTRO_USUARIO);
+        fueraDeAlcance("cerrar_validacion");
 
         assertThatThrownBy(() -> servicio.cerrar(QUIEN, POSTULACION))
                 .isInstanceOf(ResourceNotFoundException.class);
 
-        verify(permisos).alcanceDe("cerrar_validacion");
+        verify(alcance).laPostulacionVisible(any(), eq(POSTULACION), eq("cerrar_validacion"));
         verify(maquina, never()).transicionar(org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyBoolean(),
@@ -143,9 +134,7 @@ class ServicioValidacionImplTest {
     @Test
     @DisplayName("Con la vacante suya sí pasa del guardián")
     void conLaVacanteSuyaPasa() {
-        hayPostulacion();
-        conAlcanceAcotado("completar_metricas_validacion");
-        laVacanteEsDe(USUARIO);
+        alcanzable("completar_metricas_validacion");
         when(validaciones.findByPostulacionId(POSTULACION)).thenReturn(Optional.empty());
 
         // Pasa el guardián y falla más adelante, al no haber periodo: es la prueba de que el

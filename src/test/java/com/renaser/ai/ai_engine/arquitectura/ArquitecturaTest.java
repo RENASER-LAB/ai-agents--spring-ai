@@ -314,11 +314,8 @@ class ArquitecturaTest {
             // alcance SUS_VACANTES. Derivar al padre en su forma más pura.
             "ServicioPostulacionesPanelImpl#laVisible",
             "ServicioPerfilIntegralPanelImpl#laVisible",
-            "ServicioCalificacionPruebaImpl#laVisible",
-            "ServicioCalificacionSimulacion#laVisible",
             "ServicioSimulacionImpl#laVisible",
             "ServicioDecisionImpl#laVisible",
-            "ServicioValidacionImpl#laVisible",
             // Llegó con el desglose de la evaluación (PR #38, en paralelo al multiempresa):
             // mismo patrón exacto que los de arriba. La regla lo denunció al fusionar — que
             // es justo para lo que existe — y la lectura confirmó que deriva del padre.

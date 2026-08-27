@@ -15,7 +15,7 @@ import com.renaser.ai.ai_engine.usuario.entity.Rol;
 import com.renaser.ai.ai_engine.usuario.entity.UsuarioRol;
 import com.renaser.ai.ai_engine.usuario.repository.RolRepository;
 import com.renaser.ai.ai_engine.usuario.repository.UsuarioRolRepository;
-import com.renaser.ai.ai_engine.vacante.repository.VacanteRepository;
+import com.renaser.ai.ai_engine.vacante.service.AlcanceSobreLaVacante;
 import com.renaser.ai.ai_engine.validacion.dto.DtosValidacion.*;
 import com.renaser.ai.ai_engine.validacion.entity.Validacion;
 import com.renaser.ai.ai_engine.validacion.repository.ValidacionRepository;
@@ -44,7 +44,7 @@ public class ServicioValidacionImpl implements ServicioValidacion {
 
     private final ValidacionRepository validaciones;
     private final PostulacionRepository postulaciones;
-    private final VacanteRepository vacantes;
+    private final AlcanceSobreLaVacante alcance;
     private final RolRepository roles;
     private final UsuarioRolRepository usuarioRoles;
     private final CalificacionPorCriterio calificacion;
@@ -230,17 +230,6 @@ public class ServicioValidacionImpl implements ServicioValidacion {
     }
 
     private Postulacion laVisible(ContextoUsuario quien, Long postulacionId, String permiso) {
-        Postulacion p = postulaciones.findByIdAndOrganizacionId(postulacionId, quien.organizacionId())
-                .orElseThrow(() -> new ResourceNotFoundException("Postulación", "id", postulacionId));
-        FiltroAlcance alcance = permisos.alcanceDe(permiso);
-        if (alcance.tipo() == FiltroAlcance.Tipo.SUS_VACANTES) {
-            boolean esSuya = vacantes.findById(p.getVacanteId())
-                    .map(v -> quien.usuarioId().equals(v.getResponsableUsuarioId()))
-                    .orElse(false);
-            if (!esSuya) {
-                throw new ResourceNotFoundException("Postulación", "id", postulacionId);
-            }
-        }
-        return p;
+        return alcance.laPostulacionVisible(quien, postulacionId, permiso);
     }
 }
