@@ -795,4 +795,49 @@ class ServicioPerfilIntegralPanelImplTest {
     }
 
     private static final String LE_TOCA = "PERFIL_TURNO_CANDIDATO";
+
+    @org.junit.jupiter.api.Nested
+    @DisplayName("Recalificar es la palanca de la calibración")
+    class Recalificar {
+
+        private Postulacion conEvaluacion() {
+            Postulacion p = Postulacion.builder().id(2L).organizacionId(ORGANIZACION)
+                    .vacanteId(VACANTE).evaluacionId(60L).build();
+            when(postulaciones.findByIdAndOrganizacionId(2L, ORGANIZACION))
+                    .thenReturn(Optional.of(p));
+            return p;
+        }
+
+        @Test
+        @DisplayName("si no falta nada, se rehace el evaluador igual: quien pide RE-calificar quiere notas nuevas")
+        void rehaceAunqueEsteTodoHecho() {
+            conEvaluacion();
+            when(cola.encolarPerfilIntegral(2L)).thenReturn(false);   // todo TERMINADO
+            when(cola.reencolarEvaluador(2L)).thenReturn(true);
+
+            assertThat(servicio.recalificar(quien, 2L).estado()).isEqualTo("ENCOLADA");
+        }
+
+        @Test
+        @DisplayName("con un trabajo vivo no se paga dos veces: SIN_CAMBIOS")
+        void conUnoVivoNoDuplica() {
+            conEvaluacion();
+            when(cola.encolarPerfilIntegral(2L)).thenReturn(false);
+            when(cola.reencolarEvaluador(2L)).thenReturn(false);
+
+            assertThat(servicio.recalificar(quien, 2L).estado()).isEqualTo("SIN_CAMBIOS");
+        }
+
+        @Test
+        @DisplayName("sin evaluación entregada no hay nada que recalificar")
+        void sinEvaluacionNoHayNada() {
+            when(postulaciones.findByIdAndOrganizacionId(2L, ORGANIZACION))
+                    .thenReturn(Optional.of(Postulacion.builder().id(2L)
+                            .organizacionId(ORGANIZACION).vacanteId(VACANTE).build()));
+
+            org.assertj.core.api.Assertions.assertThatThrownBy(() -> servicio.recalificar(quien, 2L))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("no tiene evaluación");
+        }
+    }
 }

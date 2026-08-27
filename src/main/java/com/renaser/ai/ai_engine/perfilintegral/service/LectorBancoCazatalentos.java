@@ -59,7 +59,8 @@ public class LectorBancoCazatalentos {
      * motor, delante de la nota: la prosa se queda, el número deja de estar solo en prosa.
      */
     private static final Pattern REGLA_DURA =
-            Pattern.compile("REGLA DURA.*m[áa]ximo[^0-9]*([0-9])", Pattern.CASE_INSENSITIVE);
+            Pattern.compile("REGLA DURA.*m[áa]ximo[^0-9]*([0-9])",
+                    Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
     public static final String MARCA_TOPE = "[TOPE_SIN_DATO=";
 
     /** ¿Este archivo es un banco CAZATALENTOS? Mira las hojas, no el contenido. */

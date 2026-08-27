@@ -285,6 +285,45 @@ class ServicioBancoPreguntasImplTest {
         }
 
         @Test
+        @DisplayName("una ABIERTA que puntúa sin su guía del evaluador no se publica")
+        void rechazaUnaAbiertaSinGuia() {
+            // El método CAZATALENTOS vive en C3/C4/señal: sin ellos el agente califica a ojo.
+            versionEnBorradorCon(List.of(pregunta("ABIERTA")
+                    .c3Esperado("el dato").c4Esperado(null).senalDeCero("nada").build()), List.of());
+
+            assertThatThrownBy(() -> servicio.publicarVersion(quien, VERSION))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("D01").hasMessageContaining("C4");
+        }
+
+        @Test
+        @DisplayName("una ABIERTA con opciones es un error de datos: es de respuesta libre")
+        void rechazaUnaAbiertaConOpciones() {
+            versionEnBorradorCon(List.of(pregunta("ABIERTA")
+                            .c3Esperado("d").c4Esperado("f").senalDeCero("s").build()),
+                    List.of(opcion("a", null, null, false, null)));
+
+            assertThatThrownBy(() -> servicio.publicarVersion(quien, VERSION))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("no lleva opciones");
+        }
+
+        @Test
+        @DisplayName("una ABIERTA completa pasa la aduana, y una de cierre (peso 0) sin guía también")
+        void unaAbiertaCompletaPasa() {
+            versionEnBorradorCon(List.of(
+                    pregunta("ABIERTA").c3Esperado("d").c4Esperado("f").senalDeCero("s").build(),
+                    pregunta("ABIERTA").codigo("Z01").esPuntuable(false).peso((short) 0).build()),
+                    List.of());
+            when(versiones.findPublicadasHermanas(any(), any(), any(), any())).thenReturn(List.of());
+
+            servicio.publicarVersion(quien, VERSION);
+
+            verify(versiones).save(org.mockito.ArgumentMatchers.argThat(
+                    v -> "PUBLICADA".equals(v.getEstado())));
+        }
+
+        @Test
         @DisplayName("un CD sin casosPedidos no tiene denominador con qué puntuarse")
         void rechazaUnCdSinCasosPedidos() {
             versionEnBorradorCon(List.of(pregunta("CD").casosPedidos(null).build()), List.of());
@@ -641,6 +680,25 @@ class ServicioBancoPreguntasImplTest {
             assertThat(laPublicada.getEnunciado()).isEqualTo("Otro enunciado");
             assertThat(laPublicada.getSituacion()).isEqualTo("Otra situación");
             assertThat(laPublicada.getLogicaInterna()).isEqualTo("Otra clave");
+        }
+
+        @Test
+        @DisplayName("la guía del evaluador se recalibra en una publicada: el candidato nunca la ve")
+        void laGuiaSeRecalibra() {
+            // Es la palanca de la calibración de CAZATALENTOS. Quien la toque debe
+            // recalificar a la vacante entera; aquí solo se comprueba que el cambio entra.
+            when(versiones.findById(VERSION)).thenReturn(Optional.of(version("PUBLICADA")));
+            Pregunta abierta = pregunta("ABIERTA")
+                    .c3Esperado("el plazo").c4Esperado("el nombre").senalDeCero("vieja").build();
+            when(preguntas.findById(PREGUNTA)).thenReturn(Optional.of(abierta));
+
+            servicio.corregirTextoPregunta(quien, PREGUNTA,
+                    new CorregirTextoPregunta(null, null, null, null, null,
+                            "«Le di retroalimentación y mejoró», sin plazo ni documento."));
+
+            assertThat(abierta.getSenalDeCero()).startsWith("«Le di retroalimentación");
+            assertThat(abierta.getC3Esperado()).as("lo no enviado no se toca").isEqualTo("el plazo");
+            verify(preguntas).save(abierta);
         }
 
         @Test

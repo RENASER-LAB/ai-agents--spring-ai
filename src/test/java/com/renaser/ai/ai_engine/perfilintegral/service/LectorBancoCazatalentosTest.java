@@ -149,4 +149,110 @@ class LectorBancoCazatalentosTest {
         // Bytes cualquiera: ni siquiera es un xlsx. esSuyo responde que no, sin reventar.
         assertThat(lector.esSuyo("no soy un xlsx".getBytes())).isFalse();
     }
+
+    @Nested
+    @DisplayName("Los errores se acumulan con su fila, y con uno solo no se usa nada")
+    class LosErrores {
+
+        private BancoLeido leeFilas(String[][] filas) throws Exception {
+            try (var libro = new org.apache.poi.xssf.usermodel.XSSFWorkbook();
+                 var salida = new java.io.ByteArrayOutputStream()) {
+                var hoja = libro.createSheet(LectorBancoCazatalentos.HOJA);
+                hoja.createRow(0).createCell(0).setCellValue("Prueba RENASER — de prueba");
+                hoja.createRow(2).createCell(0).setCellValue("Código");
+                hoja.createRow(3).createCell(0).setCellValue("guía de la columna");
+                int n = 4;
+                for (String[] fila : filas) {
+                    var r = hoja.createRow(n++);
+                    for (int c = 0; c < fila.length; c++) {
+                        if (fila[c] != null) {
+                            r.createCell(c).setCellValue(fila[c]);
+                        }
+                    }
+                }
+                libro.write(salida);
+                return lector.leer(new ByteArrayInputStream(salida.toByteArray()));
+            }
+        }
+
+        private String[] fila(String codigo, String pilar, String enunciado, String c3,
+                              String c4, String senal, String peso, String elim) {
+            return new String[]{codigo, pilar, enunciado, c3, c4, senal, peso, elim};
+        }
+
+        private final String[] sana =
+                fila("R01", "1 Iniciativa", "¿Qué mejoraste?", "el dato", "lo feo", "nada", "1", "no");
+
+        @Test
+        @DisplayName("Una puntuable sin C3, C4 ni señal junta las tres faltas de una vez")
+        void sinLaGuiaDelEvaluador() throws Exception {
+            BancoLeido leido = leeFilas(new String[][]{
+                    fila("R01", "1 Iniciativa", "¿Qué mejoraste?", null, null, null, "1", "no")});
+            assertThat(leido.errores()).extracting(e -> e.mensaje())
+                    .anyMatch(m -> m.contains("C3"))
+                    .anyMatch(m -> m.contains("C4"))
+                    .anyMatch(m -> m.contains("SEÑAL DE 0"));
+            assertThat(leido.preguntas()).as("con errores, lo leído no se usa").isEmpty();
+        }
+
+        @Test
+        @DisplayName("Una de cierre (peso 0) no necesita la guía: puntúa el peso, no la columna")
+        void elCierreNoLaNecesita() throws Exception {
+            BancoLeido leido = leeFilas(new String[][]{sana,
+                    fila("Z01", "CIERRE", "¿Por qué tú?", null, null, null, "0", "no")});
+            assertThat(leido.errores()).isEmpty();
+            assertThat(leido.preguntas()).hasSize(2);
+        }
+
+        @Test
+        @DisplayName("Código repetido, enunciado ausente, peso y eliminatoria inválidos: cada uno con su fila")
+        void lasFaltasClasicas() throws Exception {
+            BancoLeido leido = leeFilas(new String[][]{
+                    sana,
+                    fila("R01", "1 Iniciativa", "¿Otra vez R01?", "d", "f", "s", "1", "no"),
+                    fila("R03", "1 Iniciativa", null, "d", "f", "s", "1", "no"),
+                    fila("R04", "1 Iniciativa", "¿Peso raro?", "d", "f", "s", "7", "no"),
+                    fila("R05", "1 Iniciativa", "¿Eliminatoria rara?", "d", "f", "s", "1", "quizás")});
+            assertThat(leido.errores()).extracting(e -> e.mensaje())
+                    .anyMatch(m -> m.contains("ya apareció"))
+                    .anyMatch(m -> m.contains("falta la pregunta"))
+                    .anyMatch(m -> m.contains("peso debe ser 0, 1 o 2"))
+                    .anyMatch(m -> m.contains("«sí» o «no»"));
+        }
+
+        @Test
+        @DisplayName("Un pilar que no es ninguno de los 7 no se adivina")
+        void pilarDesconocido() throws Exception {
+            BancoLeido leido = leeFilas(new String[][]{
+                    fila("R01", "9 Carisma", "¿...?", "d", "f", "s", "1", "no")});
+            assertThat(leido.errores()).extracting(e -> e.mensaje())
+                    .anyMatch(m -> m.contains("no es ninguno de los 7"));
+        }
+
+        @Test
+        @DisplayName("Sin encabezado «Código» o sin ninguna pregunta, el error lo dice")
+        void hojaVaciaOSinAncla() throws Exception {
+            assertThat(leeFilas(new String[][]{}).errores())
+                    .extracting(e -> e.mensaje())
+                    .anyMatch(m -> m.contains("ninguna pregunta"));
+            // Y un libro con la hoja pero sin la fila de encabezados:
+            try (var libro = new org.apache.poi.xssf.usermodel.XSSFWorkbook();
+                 var salida = new java.io.ByteArrayOutputStream()) {
+                libro.createSheet(LectorBancoCazatalentos.HOJA)
+                        .createRow(0).createCell(0).setCellValue("sin ancla");
+                libro.write(salida);
+                BancoLeido leido = lector.leer(new ByteArrayInputStream(salida.toByteArray()));
+                assertThat(leido.errores()).extracting(e -> e.mensaje())
+                        .anyMatch(m -> m.contains("encabezados"));
+            }
+        }
+
+        @Test
+        @DisplayName("Un archivo ilegible es un error del archivo, no una excepción al aire")
+        void archivoIlegible() {
+            BancoLeido leido = lector.leer(new ByteArrayInputStream("basura".getBytes()));
+            assertThat(leido.errores()).isNotEmpty();
+            assertThat(leido.preguntas()).isEmpty();
+        }
+    }
 }

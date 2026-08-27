@@ -149,6 +149,28 @@ class CalificacionCriteriosTest {
     }
 
     @Test
+    @DisplayName("Una pregunta sin pilar no puede entrar al índice: no se escribe nada")
+    void sinPilarNoSeEscribe() {
+        // El pilar es el denominador de la agregación: adivinarlo inventaría la nota.
+        when(preguntas.findByVersionBancoIdOrderByOrden(BANCO))
+                .thenReturn(List.of(pregunta(101L, "R01", 1)));
+        when(respuestas.findByEvaluacionId(EVALUACION)).thenReturn(List.of(respuesta(201L, 101L)));
+        when(preguntaDimensiones.findByPreguntaIdIn(anyList())).thenReturn(List.of());
+        when(notasRespuesta.findByRespuestaIdIn(anyList())).thenReturn(List.of(nota(201L, 3)));
+
+        servicio.calificarEtapa(postulacion);
+
+        verify(notasEtapa, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("El método del banco se responde desde la evaluación, y sin evaluación es nulo")
+    void elMetodoSeResponde() {
+        assertThat(servicio.metodoDe(postulacion)).isEqualTo("CRITERIOS");
+        assertThat(servicio.metodoDe(Postulacion.builder().id(2L).build())).isNull();
+    }
+
+    @Test
     @DisplayName("Un banco que no es CRITERIOS ni se mira")
     void otroBancoNoHaceNada() {
         when(versionesBanco.findById(BANCO)).thenReturn(Optional.of(
