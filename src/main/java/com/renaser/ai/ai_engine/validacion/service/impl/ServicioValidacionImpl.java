@@ -9,7 +9,6 @@ import com.renaser.ai.ai_engine.postulacion.entity.Postulacion;
 import com.renaser.ai.ai_engine.postulacion.repository.PostulacionRepository;
 import com.renaser.ai.ai_engine.postulacion.service.MaquinaEstados;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
-import com.renaser.ai.ai_engine.seguridad.dto.FiltroAlcance;
 import com.renaser.ai.ai_engine.seguridad.service.Permisos;
 import com.renaser.ai.ai_engine.usuario.entity.Rol;
 import com.renaser.ai.ai_engine.usuario.entity.UsuarioRol;
@@ -51,7 +50,6 @@ public class ServicioValidacionImpl implements ServicioValidacion {
     private final MaquinaEstados maquina;
     private final ServicioParametros parametros;
     private final ServicioAuditoria auditoria;
-    private final Permisos permisos;
 
     @Override
     @Transactional

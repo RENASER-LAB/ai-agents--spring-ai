@@ -93,7 +93,6 @@ class ServicioCalificacionPruebaImplTest {
     @Mock private RespuestaPruebaRepository respuestas;
     @Mock private VersionPesosRepository versionesPesos;
     @Mock private ColaCalificacionIa cola;
-    @Mock private Permisos permisos;
     @Mock private ServicioAuditoria auditoria;
 
     private ServicioCalificacionPruebaImpl servicio;
@@ -102,7 +101,7 @@ class ServicioCalificacionPruebaImplTest {
     void crearElServicio() {
         servicio = new ServicioCalificacionPruebaImpl(postulaciones, alcanceVacante, intentos, criterios,
                 preguntasElegidas, preguntasCatalogo, respuestas, notasCriterio, versionesPesos,
-                cola, permisos, auditoria, calificacion);
+                cola, auditoria, calificacion);
     }
 
     // ============ Quién puede pedirlo ============

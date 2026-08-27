@@ -1068,6 +1068,12 @@ class ServicioSimulacionImplTest {
             when(vacantes.findAllById(any())).thenReturn(List.of(
                     Vacante.builder().id(MI_VACANTE).titulo("Analista")
                             .responsableUsuarioId(OTRO_USUARIO).build()));
+            // El doble aplica la regla, no un veredicto fijo: sin esto el test pasaría por el
+            // valor por defecto del mock —false— y diría lo mismo estuviera la regla bien o mal.
+            when(alcanceVacante.alcanzaA(any(), any(), any(), any())).thenAnswer(i -> {
+                FiltroAlcance a = i.getArgument(1);
+                return a.tipo() == FiltroAlcance.Tipo.TODO;
+            });
 
             assertThat(servicio.listarInscritos(QUIEN, SESION)).isEmpty();
 

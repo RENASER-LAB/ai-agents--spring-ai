@@ -4,7 +4,6 @@ import com.renaser.ai.ai_engine.perfilintegral.entity.Criterio;
 import com.renaser.ai.ai_engine.perfilintegral.service.CalificacionPorCriterio;
 import com.renaser.ai.ai_engine.postulacion.entity.Postulacion;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
-import com.renaser.ai.ai_engine.simulacion.dto.DtosSimulacion.MarcaResponse;
 import com.renaser.ai.ai_engine.vacante.service.AlcanceSobreLaVacante;
 
 import lombok.RequiredArgsConstructor;

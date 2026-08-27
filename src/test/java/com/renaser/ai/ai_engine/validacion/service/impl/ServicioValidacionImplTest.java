@@ -65,14 +65,13 @@ class ServicioValidacionImplTest {
     @Mock private MaquinaEstados maquina;
     @Mock private ServicioParametros parametros;
     @Mock private ServicioAuditoria auditoria;
-    @Mock private Permisos permisos;
 
     private ServicioValidacionImpl servicio;
 
     @BeforeEach
     void crearElServicio() {
         servicio = new ServicioValidacionImpl(validaciones, postulaciones, alcance, roles,
-                usuarioRoles, calificacion, maquina, parametros, auditoria, permisos);
+                usuarioRoles, calificacion, maquina, parametros, auditoria);
     }
 
     /** El guardián deja pasar: la postulación es de esta empresa y el alcance llega. */

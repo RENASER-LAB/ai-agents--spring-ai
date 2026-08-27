@@ -18,10 +18,8 @@ import com.renaser.ai.ai_engine.perfilintegral.repository.NotaEtapaRepository;
 import com.renaser.ai.ai_engine.pesos.entity.PesoEtapa;
 import com.renaser.ai.ai_engine.pesos.repository.PesoEtapaRepository;
 import com.renaser.ai.ai_engine.postulacion.entity.Postulacion;
-import com.renaser.ai.ai_engine.postulacion.repository.PostulacionRepository;
 import com.renaser.ai.ai_engine.postulacion.service.MaquinaEstados;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
-import com.renaser.ai.ai_engine.seguridad.dto.FiltroAlcance;
 import com.renaser.ai.ai_engine.seguridad.service.Permisos;
 import com.renaser.ai.ai_engine.vacante.entity.Vacante;
 import com.renaser.ai.ai_engine.vacante.repository.VacanteRepository;
@@ -63,7 +61,6 @@ public class ServicioDecisionImpl implements ServicioDecision {
 
     private static final BigDecimal CIEN = BigDecimal.valueOf(100);
 
-    private final PostulacionRepository postulaciones;
     private final VacanteRepository vacantes;
     private final AlcanceSobreLaVacante alcanceVacante;
     private final BarreraCriticaRepository barrerasCriticas;

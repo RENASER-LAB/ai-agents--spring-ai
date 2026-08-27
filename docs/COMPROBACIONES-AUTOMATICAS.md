@@ -55,11 +55,11 @@ surefire y failsafe, y suma exacto.
 
 | Qué | Cuántas | Necesita |
 |---|---:|---|
-| Unitarias, con dobles | 658 | nada |
+| Unitarias, con dobles | 659 | nada |
 | Arquitectura | 12 | nada |
 | Las fórmulas del banco v3 | 22 | nada |
 | El validador de las respuestas v3 | 21 | nada |
-| El perfil del candidato (paquete `perfil`: merge, lectura, CRUD, retención, borrado) | 52 | nada |
+| El perfil del candidato (paquete `perfil`: merge, lectura, CRUD, retención, borrado) | 51 | nada |
 | Integración, de punta a punta | 100 | Docker |
 | Contra el proveedor de verdad, y el envío de correo | 6 | Docker o SMTP, y su bandera |
 

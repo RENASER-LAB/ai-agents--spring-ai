@@ -41,7 +41,6 @@ import com.renaser.ai.ai_engine.postulacion.repository.EstadoPostulacionReposito
 import com.renaser.ai.ai_engine.postulacion.repository.PostulacionRepository;
 import com.renaser.ai.ai_engine.postulacion.service.MaquinaEstados;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
-import com.renaser.ai.ai_engine.seguridad.dto.FiltroAlcance;
 import com.renaser.ai.ai_engine.seguridad.service.Permisos;
 import com.renaser.ai.ai_engine.usuario.entity.Persona;
 import com.renaser.ai.ai_engine.usuario.entity.Usuario;
@@ -107,7 +106,6 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
     private final MaquinaEstados maquina;
     private final com.renaser.ai.ai_engine.perfilintegral.repository.EvaluacionRepository evaluaciones;
     private final com.renaser.ai.ai_engine.pesos.repository.EtapaRepository etapasCatalogo;
-    private final Permisos permisos;
 
     // El orden de la tanda. Manda el grupo, no la nota: quien llega a la nota arrastrando un
     // riesgo crítico no va por delante de quien llega sin ninguno, y ordenar por número

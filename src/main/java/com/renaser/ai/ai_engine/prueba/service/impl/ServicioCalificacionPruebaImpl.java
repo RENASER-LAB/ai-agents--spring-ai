@@ -27,9 +27,7 @@ import com.renaser.ai.ai_engine.prueba.entity.IntentoPrueba;
 import com.renaser.ai.ai_engine.prueba.repository.IntentoPruebaRepository;
 import com.renaser.ai.ai_engine.prueba.service.ServicioCalificacionPrueba;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
-import com.renaser.ai.ai_engine.seguridad.dto.FiltroAlcance;
 import com.renaser.ai.ai_engine.seguridad.service.Permisos;
-import com.renaser.ai.ai_engine.vacante.entity.Vacante;
 import com.renaser.ai.ai_engine.vacante.service.AlcanceSobreLaVacante;
 
 import lombok.RequiredArgsConstructor;
@@ -60,7 +58,6 @@ public class ServicioCalificacionPruebaImpl implements ServicioCalificacionPrueb
     private final NotaCriterioRepository notasCriterio;
     private final VersionPesosRepository versionesPesos;
     private final ColaCalificacionIa cola;
-    private final Permisos permisos;
     private final ServicioAuditoria auditoria;
     private final CalificacionPorCriterio calificacion;
 

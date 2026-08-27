@@ -1,6 +1,5 @@
 package com.renaser.ai.ai_engine.perfilintegral.service.impl;
 
-import com.renaser.ai.ai_engine.ai.exception.ResourceNotFoundException;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.AlineacionVista;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.DesgloseEvaluacion;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.RespuestaAbiertaVista;
@@ -20,7 +19,6 @@ import com.renaser.ai.ai_engine.perfilintegral.service.ServicioDesgloseEvaluacio
 import com.renaser.ai.ai_engine.postulacion.entity.Postulacion;
 import com.renaser.ai.ai_engine.postulacion.repository.PostulacionRepository;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
-import com.renaser.ai.ai_engine.seguridad.dto.FiltroAlcance;
 import com.renaser.ai.ai_engine.seguridad.service.Permisos;
 import com.renaser.ai.ai_engine.vacante.service.AlcanceSobreLaVacante;
 
@@ -46,7 +44,6 @@ public class ServicioDesgloseEvaluacionImpl implements ServicioDesgloseEvaluacio
     private final NotaRespuestaRepository notasRespuesta;
     private final ResultadoAlineacionRepository alineaciones;
     private final ServicioCalificacion calificacion;
-    private final Permisos permisos;
     private final CalificacionCriterios calificacionCriterios;
     private final com.renaser.ai.ai_engine.perfilintegral.repository.NotaEtapaRepository notasEtapa;
 

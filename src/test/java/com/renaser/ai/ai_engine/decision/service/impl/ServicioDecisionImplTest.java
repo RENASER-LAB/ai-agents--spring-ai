@@ -12,7 +12,6 @@ import com.renaser.ai.ai_engine.parametro.service.ServicioParametros;
 import com.renaser.ai.ai_engine.perfilintegral.repository.NotaEtapaRepository;
 import com.renaser.ai.ai_engine.pesos.repository.PesoEtapaRepository;
 import com.renaser.ai.ai_engine.postulacion.entity.Postulacion;
-import com.renaser.ai.ai_engine.postulacion.repository.PostulacionRepository;
 import com.renaser.ai.ai_engine.postulacion.service.MaquinaEstados;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
 import com.renaser.ai.ai_engine.seguridad.dto.FiltroAlcance;
@@ -57,7 +56,6 @@ class ServicioDecisionImplTest {
     private static final ContextoUsuario QUIEN = new ContextoUsuario(
             USUARIO, 33L, ORGANIZACION, "EQUIPO", List.of(), Map.of());
 
-    @Mock private PostulacionRepository postulaciones;
     @Mock private VacanteRepository vacantes;
     @Mock private com.renaser.ai.ai_engine.vacante.service.AlcanceSobreLaVacante alcanceVacante;
     @Mock private BarreraCriticaRepository barrerasCriticas;
@@ -75,7 +73,7 @@ class ServicioDecisionImplTest {
 
     @BeforeEach
     void crearElServicio() {
-        servicio = new ServicioDecisionImpl(postulaciones, vacantes, alcanceVacante, barrerasCriticas,
+        servicio = new ServicioDecisionImpl(vacantes, alcanceVacante, barrerasCriticas,
                 barrerasDetectadas, decisiones, evidencias, notasEtapa, pesosEtapa,
                 maquina, parametros, auditoria, permisos);
     }
