@@ -25,6 +25,7 @@ import com.renaser.ai.ai_engine.postulacion.service.MaquinaEstados;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
 
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -305,6 +306,55 @@ class ServicioEvaluacionImplTest {
             assertThatThrownBy(() -> servicio.responder(CANDIDATA, CODIGO, 1L,
                     new Responder(5L, null, null, 12)))
                     .isSameAs(choque);
+        }
+    }
+
+    @Nested
+    @DisplayName("Una ABIERTA se responde escribiendo, y solo escribiendo")
+    class ResponderUnaAbierta {
+
+        // Aceptar una opción contaría como respondida para entregar, pero el evaluador
+        // —que solo mira texto— nunca la calificaría: postulación sin nota de etapa.
+        private void examenConAbierta() {
+            when(postulaciones.findByUuid(CODIGO)).thenReturn(Optional.of(
+                    Postulacion.builder().id(50L).uuid(CODIGO).usuarioId(9L).evaluacionId(60L).build()));
+            when(evaluaciones.findById(60L)).thenReturn(Optional.of(
+                    Evaluacion.builder().id(60L).usuarioId(9L).estado("EN_CURSO")
+                            .iniciadaEn(java.time.Instant.now())
+                            .vigenteHasta(java.time.Instant.now().plusSeconds(3600))
+                            .plantillaEvaluacionId(3L).build()));
+            when(ordenes.findByEvaluacionIdOrderByPosicion(60L)).thenReturn(List.of(
+                    OrdenPregunta.builder().evaluacionId(60L).preguntaId(1L).posicion(1).build()));
+            when(preguntas.findById(1L)).thenReturn(Optional.of(
+                    Pregunta.builder().id(1L).tipo("ABIERTA")
+                            .enunciado("¿Qué mejoraste sin que nadie te lo pidiera?").build()));
+        }
+
+        @Test
+        @DisplayName("con texto se guarda")
+        void conTextoSeGuarda() {
+            examenConAbierta();
+            when(respuestas.findByEvaluacionIdAndPreguntaId(60L, 1L)).thenReturn(Optional.empty());
+            when(respuestas.saveAndFlush(any())).thenAnswer(i -> i.getArgument(0));
+
+            servicio.responder(CANDIDATA, CODIGO, 1L,
+                    new Responder(null, "Monté el cuadre diario de caja.", null, 30));
+
+            verify(respuestas).saveAndFlush(any());
+        }
+
+        @Test
+        @DisplayName("una opción se rechaza, y el vacío también")
+        void sinTextoNoHayRespuesta() {
+            examenConAbierta();
+            assertThatThrownBy(() -> servicio.responder(CANDIDATA, CODIGO, 1L,
+                    new Responder(5L, null, null, 12)))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("no lleva opciones");
+            assertThatThrownBy(() -> servicio.responder(CANDIDATA, CODIGO, 1L,
+                    new Responder(null, "   ", null, 12)))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("escribir");
         }
     }
 

@@ -59,6 +59,9 @@ class ServicioDesgloseEvaluacionImplTest {
     @Mock private ResultadoAlineacionRepository alineaciones;
     @Mock private ServicioCalificacion calificacion;
     @Mock private Permisos permisos;
+    // Devuelve null por defecto = banco sin método CRITERIOS: el camino clásico de estos tests.
+    @Mock private CalificacionCriterios calificacionCriterios;
+    @Mock private com.renaser.ai.ai_engine.perfilintegral.repository.NotaEtapaRepository notasEtapa;
 
     @InjectMocks
     private ServicioDesgloseEvaluacionImpl servicio;
@@ -196,6 +199,39 @@ class ServicioDesgloseEvaluacionImplTest {
     }
 
     // ---------- Los dobles ----------
+
+    @Test
+    void enUnBancoCriteriosLaNotaEsElIndiceDeLaEtapa() {
+        // Promediar los 0–4 a partes iguales enseñaría una nota distinta de la que decide:
+        // sin peso de ítem y sin pilares. La que se enseña es la misma con la que se ranquea.
+        conPostulacion(EVALUACION);
+        conEvaluacion("ENTREGADA");
+        conCerradas("0", 0);
+        when(respuestas.findByEvaluacionId(EVALUACION)).thenReturn(List.of());
+        when(calificacionCriterios.metodoDe(org.mockito.ArgumentMatchers.any()))
+                .thenReturn("CRITERIOS");
+        when(notasEtapa.findByPostulacionIdAndEtapaCodigo(POSTULACION, "PERFIL_INTEGRAL"))
+                .thenReturn(Optional.of(com.renaser.ai.ai_engine.perfilintegral.entity.NotaEtapa
+                        .builder().puntaje(new BigDecimal("62.50")).build()));
+
+        assertThat(servicio.ver(quien, POSTULACION).notaEvaluacion())
+                .isEqualByComparingTo(new BigDecimal("62.50"));
+    }
+
+    @Test
+    void enUnBancoCriteriosSinEtapaCalculadaLaNotaVieneVacia() {
+        // El evaluador aún no terminó: sin nota es sin nota, no un promedio provisional.
+        conPostulacion(EVALUACION);
+        conEvaluacion("ENTREGADA");
+        conCerradas("0", 0);
+        when(respuestas.findByEvaluacionId(EVALUACION)).thenReturn(List.of());
+        when(calificacionCriterios.metodoDe(org.mockito.ArgumentMatchers.any()))
+                .thenReturn("CRITERIOS");
+        when(notasEtapa.findByPostulacionIdAndEtapaCodigo(POSTULACION, "PERFIL_INTEGRAL"))
+                .thenReturn(Optional.empty());
+
+        assertThat(servicio.ver(quien, POSTULACION).notaEvaluacion()).isNull();
+    }
 
     private void conPostulacion(Long evaluacionId) {
         when(postulaciones.findByIdAndOrganizacionId(POSTULACION, ORGANIZACION))

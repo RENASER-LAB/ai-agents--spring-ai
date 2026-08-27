@@ -172,6 +172,40 @@ class ColaCalificacionIaImplTest {
         verifyNoInteractions(publicador);
     }
 
+    // ============ Reencolar al evaluador: la palanca de la calibración ============
+
+    @Test
+    void reencolarRehaceUnEvaluadorTerminado() {
+        // encolarPerfilIntegral vería TERMINADO y no haría nada — ese es justo el problema
+        // que esto resuelve: cambió una señal y las mismas respuestas se puntúan de nuevo.
+        when(puente.tieneEvaluacionEntregada(POSTULACION)).thenReturn(true);
+        yaHecho(AgenteEvaluador.CODIGO_AGENTE, "FINA", 5L);
+
+        cola.reencolarEvaluador(POSTULACION);
+
+        verify(registro).crearSiHaceFalta(1L, POSTULACION, AgenteEvaluador.CODIGO_AGENTE, "FINA", null);
+    }
+
+    @Test
+    void reencolarNoLePoneUnGemeloAUnoVivo() {
+        // Uno en marcha se respeta: crearle un gemelo sería pagar dos veces al modelo.
+        when(puente.tieneEvaluacionEntregada(POSTULACION)).thenReturn(true);
+        when(trabajos.findFirstByPostulacionIdAndAgenteCodigoAndModoOrderByIdDesc(
+                POSTULACION, AgenteEvaluador.CODIGO_AGENTE, "FINA"))
+                .thenReturn(Optional.of(trabajo(5L, AgenteEvaluador.CODIGO_AGENTE, "EN_CURSO", "FINA")));
+
+        assertThat(cola.reencolarEvaluador(POSTULACION)).isFalse();
+
+        verifyNoInteractions(registro);
+    }
+
+    @Test
+    void reencolarConLaCalificacionApagadaNoHaceNada() {
+        assertThat(conLaCalificacion(false).reencolarEvaluador(POSTULACION)).isFalse();
+
+        verifyNoInteractions(registro);
+    }
+
     // ============ El tope mensual de IA (pieza E) ============
 
     @Test

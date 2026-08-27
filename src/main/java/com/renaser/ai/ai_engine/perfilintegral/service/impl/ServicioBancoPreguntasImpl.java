@@ -212,6 +212,9 @@ public class ServicioBancoPreguntasImpl implements ServicioBancoPreguntas {
                 .casosPedidos(datos.casosPedidos())
                 .rangosDePreguntaCodigo(datos.rangosDePreguntaCodigo())
                 .formulaPuntaje(datos.formulaPuntaje())
+                .c3Esperado(datos.c3Esperado())
+                .c4Esperado(datos.c4Esperado())
+                .senalDeCero(datos.senalDeCero())
                 .creadoEn(Instant.now())
                 .build());
         auditoria.registrar(quien.organizacionId(), quien, "crear_pregunta",
@@ -400,6 +403,9 @@ public class ServicioBancoPreguntasImpl implements ServicioBancoPreguntas {
         pregunta.setCasosPedidos(datos.casosPedidos());
         pregunta.setRangosDePreguntaCodigo(datos.rangosDePreguntaCodigo());
         pregunta.setFormulaPuntaje(datos.formulaPuntaje());
+        pregunta.setC3Esperado(datos.c3Esperado());
+        pregunta.setC4Esperado(datos.c4Esperado());
+        pregunta.setSenalDeCero(datos.senalDeCero());
         preguntas.save(pregunta);
 
         auditoria.registrar(quien.organizacionId(), quien, "editar_pregunta",
@@ -609,6 +615,19 @@ public class ServicioBancoPreguntasImpl implements ServicioBancoPreguntas {
         if (datos.logicaInterna() != null) {
             pregunta.setLogicaInterna(datos.logicaInterna());
         }
+        // La guía del evaluador (CAZATALENTOS) es la palanca de la calibración: el
+        // candidato nunca la ve, así que corregirla no cambia el examen de nadie — cambia
+        // cómo se califica, y por eso quien la toque debe recalificar a la vacante entera
+        // (docs/DECISION-UNA-VACANTE-UNA-VERSION.md · scripts/recalificar-banco.py).
+        if (datos.c3Esperado() != null) {
+            pregunta.setC3Esperado(datos.c3Esperado());
+        }
+        if (datos.c4Esperado() != null) {
+            pregunta.setC4Esperado(datos.c4Esperado());
+        }
+        if (datos.senalDeCero() != null) {
+            pregunta.setSenalDeCero(datos.senalDeCero());
+        }
         preguntas.save(pregunta);
         auditoria.registrar(quien.organizacionId(), quien, "corregir_texto_pregunta",
                 "pregunta", preguntaId, antes,
@@ -787,6 +806,20 @@ public class ServicioBancoPreguntasImpl implements ServicioBancoPreguntas {
                     if (p.isEsPuntuable() || tienePeso) {
                         throw new IllegalStateException(falla(p,
                                 "un par de consistencia no suma: solo penaliza si se contradice"));
+                    }
+                }
+                case "ABIERTA" -> {
+                    // El método CAZATALENTOS vive en estas tres declaraciones: sin ellas el
+                    // evaluador califica a ojo, que es lo que el instrumento prohíbe. Las de
+                    // cierre (peso 0) no puntúan y no las necesitan.
+                    if (p.isEsPuntuable() && (p.getC3Esperado() == null
+                            || p.getC4Esperado() == null || p.getSenalDeCero() == null)) {
+                        throw new IllegalStateException(falla(p,
+                                "puntúa pero no declara su C3 esperado, su C4 esperado o su señal de 0"));
+                    }
+                    if (!suyas.isEmpty()) {
+                        throw new IllegalStateException(falla(p,
+                                "es de respuesta libre y no lleva opciones, pero tiene " + suyas.size()));
                     }
                 }
                 default -> { /* formatos v0.1 no puntuables: se admiten tal cual */ }

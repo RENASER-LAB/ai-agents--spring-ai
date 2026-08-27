@@ -115,6 +115,9 @@ public class CopiadorDeInstrumentosImpl implements CopiadorDeInstrumentos {
                 .publicadaEn(ahora)
                 .creadoEn(ahora)
                 .copiadaDeVersionId(vieja.getId())
+                // Sin esto, un banco CAZATALENTOS copiado caería al motor de claves y
+                // calificaría a todos con 0 en silencio: el método viaja con la versión.
+                .metodoCalificacion(vieja.getMetodoCalificacion())
                 .build());
         sumar(conteos, "version_banco", 1);
 
@@ -138,6 +141,11 @@ public class CopiadorDeInstrumentosImpl implements CopiadorDeInstrumentos {
                     .casosPedidos(p.getCasosPedidos())
                     .rangosDePreguntaCodigo(p.getRangosDePreguntaCodigo())
                     .formulaPuntaje(p.getFormulaPuntaje())
+                    // La guía del evaluador del banco CAZATALENTOS: sin ella el agente
+                    // calificaría a ojo, que es lo que el instrumento prohíbe.
+                    .c3Esperado(p.getC3Esperado())
+                    .c4Esperado(p.getC4Esperado())
+                    .senalDeCero(p.getSenalDeCero())
                     .creadoEn(ahora)
                     .build());
             mapaPreguntas.put(p.getId(), copia.getId());

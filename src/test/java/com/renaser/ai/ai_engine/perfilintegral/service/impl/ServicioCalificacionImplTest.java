@@ -59,6 +59,8 @@ class ServicioCalificacionImplTest {
     @Mock private NotaEtapaRepository notasEtapa;
     @Mock private VersionPesosRepository versionesPesos;
     @Mock private VacanteRepository vacantes;
+    // Vacío por defecto: banco sin método declarado, que es el camino v3 de estos tests.
+    @Mock private com.renaser.ai.ai_engine.perfilintegral.repository.VersionBancoRepository versionesBanco;
 
     @InjectMocks
     private ServicioCalificacionImpl servicio;
@@ -146,5 +148,25 @@ class ServicioCalificacionImplTest {
         // el conteo de arriba sigue en 1 y solo esto lo delata.
         verify(opciones, never()).findByPreguntaIdOrderByLetra(any());
         verify(opciones, never()).findById(any());
+    }
+
+    @Test
+    @DisplayName("un banco CRITERIOS no tiene nada cerrado: aquí no se escribe ninguna nota")
+    void unBancoCriteriosSeSalta() {
+        // Su nota de etapa la escribe CalificacionCriterios cuando el evaluador termina.
+        // Escribir aquí un 0 sería una nota falsa esperando a ser sobrescrita.
+        when(postulaciones.findById(50L)).thenReturn(Optional.of(
+                Postulacion.builder().id(50L).evaluacionId(60L).vacanteId(5L).build()));
+        when(evaluaciones.findById(60L)).thenReturn(Optional.of(
+                Evaluacion.builder().id(60L).versionBancoNivelId(30L).build()));
+        when(versionesBanco.findById(30L)).thenReturn(Optional.of(
+                com.renaser.ai.ai_engine.perfilintegral.entity.VersionBanco.builder()
+                        .id(30L).metodoCalificacion("CRITERIOS").build()));
+
+        org.assertj.core.api.Assertions.assertThat(servicio.calificarLoCerrado(50L))
+                .isEqualByComparingTo(BigDecimal.ZERO);
+
+        verify(notasEtapa, never()).save(any());
+        verify(respuestas, never()).findByEvaluacionId(any());
     }
 }

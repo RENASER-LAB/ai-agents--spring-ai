@@ -7,6 +7,8 @@ import com.renaser.ai.ai_engine.perfilintegral.entity.NotaEtapa;
 import com.renaser.ai.ai_engine.perfilintegral.entity.Opcion;
 import com.renaser.ai.ai_engine.perfilintegral.entity.ParConsistencia;
 import com.renaser.ai.ai_engine.perfilintegral.entity.Pregunta;
+import com.renaser.ai.ai_engine.perfilintegral.entity.VersionBanco;
+import com.renaser.ai.ai_engine.perfilintegral.repository.VersionBancoRepository;
 import com.renaser.ai.ai_engine.perfilintegral.entity.Respuesta;
 import com.renaser.ai.ai_engine.perfilintegral.repository.AlertaRepository;
 import com.renaser.ai.ai_engine.perfilintegral.repository.EvaluacionRepository;
@@ -77,6 +79,7 @@ public class ServicioCalificacionImpl implements ServicioCalificacion {
     private final NotaEtapaRepository notasEtapa;
     private final VersionPesosRepository versionesPesos;
     private final VacanteRepository vacantes;
+    private final VersionBancoRepository versionesBanco;
 
     @Override
     @Transactional
@@ -86,6 +89,15 @@ public class ServicioCalificacionImpl implements ServicioCalificacion {
         Evaluacion evaluacion = evaluaciones.findById(postulacion.getEvaluacionId())
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Evaluación", "postulación", postulacionId));
+
+        // Un banco CRITERIOS no tiene nada cerrado que puntuar: todas sus preguntas son
+        // abiertas y su nota de etapa la escribe CalificacionCriterios cuando el EVALUADOR
+        // termina. Escribir aquí un 0 sería una nota falsa esperando a ser sobrescrita.
+        VersionBanco banco = evaluacion.getVersionBancoNivelId() == null ? null
+                : versionesBanco.findById(evaluacion.getVersionBancoNivelId()).orElse(null);
+        if (banco != null && CalificacionCriterios.METODO.equals(banco.getMetodoCalificacion())) {
+            return BigDecimal.ZERO;
+        }
 
         List<Respuesta> suyas = respuestas.findByEvaluacionId(evaluacion.getId());
         List<Long> preguntaIds = suyas.stream().map(Respuesta::getPreguntaId).toList();

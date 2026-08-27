@@ -51,8 +51,8 @@ public final class DtosBancoPreguntas {
             String bloque,
             @NotBlank @Pattern(regexp =
                     "ESTILO|SITUACION|CONDUCTUAL|MICROCASO|DILEMA|CONSISTENCIA"
-                    + "|EF-4|SJT-R|SEC|INV|DE|CD|V|PC",
-                    message = "tipo debe ser uno de los 14 formatos del banco")
+                    + "|EF-4|SJT-R|SEC|INV|DE|CD|V|PC|ABIERTA",
+                    message = "tipo debe ser uno de los 15 formatos del banco")
             String tipo,
             @NotBlank String enunciado,
             String situacion,
@@ -75,7 +75,14 @@ public final class DtosBancoPreguntas {
              *  en otro banco (C36 remite a D57), así que no se valida contra esta versión. */
             String rangosDePreguntaCodigo,
             /** Solo V: si en vez de tabla trae la fórmula escrita. */
-            String formulaPuntaje) {}
+            String formulaPuntaje,
+            // --- Solo ABIERTA (banco CAZATALENTOS): la guía del evaluador ---
+            /** Qué debe aparecer para marcar C3 (dato duro) en esta pregunta. */
+            String c3Esperado,
+            /** Qué cuenta como C4 (la parte incómoda) en esta pregunta. */
+            String c4Esperado,
+            /** Si la respuesta la cumple, el puntaje es 0 y se acaba el cálculo. */
+            String senalDeCero) {}
 
     // logicaInterna queda fuera a propósito: no sale de la base (RF-53).
     public record PreguntaResponse(
@@ -187,7 +194,14 @@ public final class DtosBancoPreguntas {
     public record CorregirTextoPregunta(
             String enunciado,
             String situacion,
-            String logicaInterna) {}
+            String logicaInterna,
+            // La guía del evaluador (banco CAZATALENTOS) sí se recalibra en una publicada:
+            // el candidato nunca la ve, pero cambia cómo se califica — quien la toque debe
+            // recalificar a la vacante entera (docs/DECISION-UNA-VACANTE-UNA-VERSION.md,
+            // scripts/recalificar-banco.py).
+            String c3Esperado,
+            String c4Esperado,
+            String senalDeCero) {}
 
     public record CorregirTextoOpcion(@NotBlank String texto) {}
 

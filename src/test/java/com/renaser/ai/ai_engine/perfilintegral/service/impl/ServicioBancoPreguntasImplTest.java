@@ -126,7 +126,8 @@ class ServicioBancoPreguntasImplTest {
     private CrearPregunta crear(String tipo, Short peso, Short casosPedidos,
                                 String rangosDe, String formula) {
         return new CrearPregunta("D01", "A1", tipo, "¿...?", null, "la clave secreta",
-                true, 1, peso, true, false, casosPedidos, rangosDe, formula);
+                true, 1, peso, true, false, casosPedidos, rangosDe, formula,
+                null, null, null);
     }
 
     @Nested
@@ -281,6 +282,45 @@ class ServicioBancoPreguntasImplTest {
             assertThatThrownBy(() -> servicio.publicarVersion(quien, VERSION))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("distractores");
+        }
+
+        @Test
+        @DisplayName("una ABIERTA que puntúa sin su guía del evaluador no se publica")
+        void rechazaUnaAbiertaSinGuia() {
+            // El método CAZATALENTOS vive en C3/C4/señal: sin ellos el agente califica a ojo.
+            versionEnBorradorCon(List.of(pregunta("ABIERTA")
+                    .c3Esperado("el dato").c4Esperado(null).senalDeCero("nada").build()), List.of());
+
+            assertThatThrownBy(() -> servicio.publicarVersion(quien, VERSION))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("D01").hasMessageContaining("C4");
+        }
+
+        @Test
+        @DisplayName("una ABIERTA con opciones es un error de datos: es de respuesta libre")
+        void rechazaUnaAbiertaConOpciones() {
+            versionEnBorradorCon(List.of(pregunta("ABIERTA")
+                            .c3Esperado("d").c4Esperado("f").senalDeCero("s").build()),
+                    List.of(opcion("a", null, null, false, null)));
+
+            assertThatThrownBy(() -> servicio.publicarVersion(quien, VERSION))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessageContaining("no lleva opciones");
+        }
+
+        @Test
+        @DisplayName("una ABIERTA completa pasa la aduana, y una de cierre (peso 0) sin guía también")
+        void unaAbiertaCompletaPasa() {
+            versionEnBorradorCon(List.of(
+                    pregunta("ABIERTA").c3Esperado("d").c4Esperado("f").senalDeCero("s").build(),
+                    pregunta("ABIERTA").codigo("Z01").esPuntuable(false).peso((short) 0).build()),
+                    List.of());
+            when(versiones.findPublicadasHermanas(any(), any(), any(), any())).thenReturn(List.of());
+
+            servicio.publicarVersion(quien, VERSION);
+
+            verify(versiones).save(org.mockito.ArgumentMatchers.argThat(
+                    v -> "PUBLICADA".equals(v.getEstado())));
         }
 
         @Test
@@ -612,7 +652,7 @@ class ServicioBancoPreguntasImplTest {
             when(versiones.findById(VERSION)).thenReturn(Optional.of(version("PUBLICADA")));
 
             servicio.corregirTextoPregunta(quien, PREGUNTA,
-                    new CorregirTextoPregunta("Con la errata corregida", null, null));
+                    new CorregirTextoPregunta("Con la errata corregida", null, null, null, null, null));
 
             assertThat(laPublicada.getEnunciado()).isEqualTo("Con la errata corregida");
             verify(auditoria).registrar(eq(ORGANIZACION), eq(quien),
@@ -629,17 +669,36 @@ class ServicioBancoPreguntasImplTest {
             when(versiones.findById(VERSION)).thenReturn(Optional.of(version("PUBLICADA")));
 
             servicio.corregirTextoPregunta(quien, PREGUNTA,
-                    new CorregirTextoPregunta("Enunciado nuevo", null, null));
+                    new CorregirTextoPregunta("Enunciado nuevo", null, null, null, null, null));
 
             assertThat(laPublicada.getSituacion()).isEqualTo("La situación de siempre");
             assertThat(laPublicada.getLogicaInterna()).isEqualTo("La clave secreta");
 
             // Y lo que sí llega, se cambia: los tres campos a la vez
             servicio.corregirTextoPregunta(quien, PREGUNTA,
-                    new CorregirTextoPregunta("Otro enunciado", "Otra situación", "Otra clave"));
+                    new CorregirTextoPregunta("Otro enunciado", "Otra situación", "Otra clave", null, null, null));
             assertThat(laPublicada.getEnunciado()).isEqualTo("Otro enunciado");
             assertThat(laPublicada.getSituacion()).isEqualTo("Otra situación");
             assertThat(laPublicada.getLogicaInterna()).isEqualTo("Otra clave");
+        }
+
+        @Test
+        @DisplayName("la guía del evaluador se recalibra en una publicada: el candidato nunca la ve")
+        void laGuiaSeRecalibra() {
+            // Es la palanca de la calibración de CAZATALENTOS. Quien la toque debe
+            // recalificar a la vacante entera; aquí solo se comprueba que el cambio entra.
+            when(versiones.findById(VERSION)).thenReturn(Optional.of(version("PUBLICADA")));
+            Pregunta abierta = pregunta("ABIERTA")
+                    .c3Esperado("el plazo").c4Esperado("el nombre").senalDeCero("vieja").build();
+            when(preguntas.findById(PREGUNTA)).thenReturn(Optional.of(abierta));
+
+            servicio.corregirTextoPregunta(quien, PREGUNTA,
+                    new CorregirTextoPregunta(null, null, null, null, null,
+                            "«Le di retroalimentación y mejoró», sin plazo ni documento."));
+
+            assertThat(abierta.getSenalDeCero()).startsWith("«Le di retroalimentación");
+            assertThat(abierta.getC3Esperado()).as("lo no enviado no se toca").isEqualTo("el plazo");
+            verify(preguntas).save(abierta);
         }
 
         @Test
@@ -649,7 +708,7 @@ class ServicioBancoPreguntasImplTest {
             when(versiones.findById(VERSION)).thenReturn(Optional.of(version("BORRADOR")));
 
             assertThatThrownBy(() -> servicio.corregirTextoPregunta(quien, PREGUNTA,
-                    new CorregirTextoPregunta("Otro", null, null)))
+                    new CorregirTextoPregunta("Otro", null, null, null, null, null)))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("un borrador se edita entero");
         }
@@ -661,7 +720,7 @@ class ServicioBancoPreguntasImplTest {
             when(versiones.findById(VERSION)).thenReturn(Optional.of(version("ARCHIVADA")));
 
             assertThatThrownBy(() -> servicio.corregirTextoPregunta(quien, PREGUNTA,
-                    new CorregirTextoPregunta("Otro", null, null)))
+                    new CorregirTextoPregunta("Otro", null, null, null, null, null)))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("ya no se toca");
             verify(preguntas, never()).save(any());

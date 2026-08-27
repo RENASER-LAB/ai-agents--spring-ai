@@ -25,7 +25,7 @@ queda esperando a que una persona decida.**
 | Agente | Qué hace |
 |---|---|
 | **Evidencia del currículum** | Puntúa el currículum sobre 100 con los ocho criterios, con el peso que corresponde al nivel del puesto. Y clasifica cada afirmación: demostrada, declarada, contradicha o falta información |
-| **Evaluador** | Califica de 0 a 4 las respuestas abiertas, citando la parte de la respuesta en que se basa |
+| **Evaluador** | Califica de 0 a 4 las respuestas abiertas, citando la parte de la respuesta en que se basa. Con un banco CAZATALENTOS (método `CRITERIOS`) cambia el contrato: no devuelve puntaje sino **qué criterios vio** (C1 episodio, C2 autoría, C3 dato duro, C4 incomodidad, y si cumple la señal de 0) y el número lo cuenta el código |
 | **Potencial y riesgo** | Arma el Perfil de Talento: adecuación, potencial, alto rendimiento, confianza de la evidencia, y los hallazgos |
 
 5. Al terminar el tercero, el sistema **rehace la nota de la etapa** juntando currículum y
@@ -114,6 +114,12 @@ entra en la etapa y para la que enseña el panel. Estuvo copiada en dos sitios h
 - **Una nota sin explicación no se guarda.** Si el modelo devuelve un puntaje suelto, se
   descarta esa nota. No se pone un cero en su lugar: quedarse sin nota y valer cero son cosas
   distintas.
+- **En un banco CAZATALENTOS, media rúbrica no es una nota.** Si el evaluador dejó respuestas
+  sin calificar, el trabajo entero falla y se reintenta: la nota de etapa (el índice por
+  pilares que escribe `CalificacionCriterios`) solo se calcula con la tanda completa.
+- **Recalificar es reencolar de verdad.** `POST /postulaciones/{id}/calificacion-perfil-integral`
+  rehace al evaluador aunque ya esté terminado (`reencolarEvaluador`): es la palanca de la
+  calibración — cambia una señal, se recalifica, las mismas respuestas se puntúan de nuevo.
 - **Lo que una persona ajustó a mano, la IA no lo pisa.** Aunque se vuelva a calificar.
 - **Lo que el modelo se inventa, se descarta.** Un criterio que no existe, un tipo de hallazgo
   que no está entre los cinco, una nota para la respuesta de otro candidato: nada de eso entra.

@@ -82,6 +82,7 @@ class ServicioVacantesPanelImplTest {
     @Mock private IntentoPruebaRepository intentos;
     @Mock private ServicioAuditoria auditoria;
     @Mock private com.renaser.ai.ai_engine.organizacion.service.DuenoDelInstrumento dueno;
+    @Mock private com.renaser.ai.ai_engine.postulacion.repository.PostulacionRepository postulaciones;
 
     private ServicioVacantesPanelImpl servicio;
 
@@ -89,7 +90,8 @@ class ServicioVacantesPanelImplTest {
     void crearElServicio() {
         servicio = new ServicioVacantesPanelImpl(vacantes, puestos, requisitos, solicitudes,
                 versionesPesos, plantillas, versionesPrueba, plantillasPrueba, plantillasCorreo,
-                plantillasPorVacante, textosConsentimiento, intentos, auditoria, dueno);
+                plantillasPorVacante, textosConsentimiento, intentos, auditoria, dueno,
+                postulaciones);
         // En estas pruebas la organizacion no personaliza nada: el resolutor contesta
         // que el dueño de todo instrumento es ella misma (aqui hace de plataforma).
         org.mockito.Mockito.lenient()
@@ -214,7 +216,8 @@ class ServicioVacantesPanelImplTest {
     @Test
     @DisplayName("asignar una versión publicada queda guardado y auditado")
     void asignarUnaPublicadaSeGuarda() {
-        Vacante v = vacante("PUBLICADA", false, null);
+        // En borrador: publicada la vacante, la vara ya no se cambia (ver el test siguiente).
+        Vacante v = vacante("BORRADOR", false, null);
         v.setVersionPesosId(2L);
         when(versionesPesos.findByIdAndOrganizacionId(VERSION_PESOS, ORGANIZACION))
                 .thenReturn(Optional.of(VersionPesos.builder()
@@ -227,6 +230,43 @@ class ServicioVacantesPanelImplTest {
         verify(auditoria).registrar(ORGANIZACION, QUIEN, "asignar_version_pesos",
                 "vacante", VACANTE, Map.of("versionPesosId", "2"),
                 Map.of("versionPesosId", String.valueOf(VERSION_PESOS)), null);
+    }
+
+    @Test
+    @DisplayName("con postulantes dentro, la versión de pesos ya no se cambia: una vacante, una versión")
+    void conPostulantesLosPesosNoSeCambian() {
+        // Todos los candidatos de una vacante se miden con la misma vara
+        // (docs/DECISION-UNA-VACANTE-UNA-VERSION.md). Cambiarla a mitad dejaría a unos
+        // calificados con la v1 y a otros con la v2, ordenados juntos en el mismo ranking.
+        Vacante v = vacante("PUBLICADA", false, null);
+        v.setVersionPesosId(2L);
+        when(versionesPesos.findByIdAndOrganizacionId(VERSION_PESOS, ORGANIZACION))
+                .thenReturn(Optional.of(VersionPesos.builder()
+                        .id(VERSION_PESOS).estado("PUBLICADA").build()));
+        when(postulaciones.countByVacanteId(VACANTE)).thenReturn(1L);
+
+        assertThatThrownBy(() -> servicio.asignarVersionPesos(QUIEN, VACANTE, VERSION_PESOS))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("misma vara");
+        verify(vacantes, org.mockito.Mockito.never()).save(v);
+    }
+
+    @Test
+    @DisplayName("publicada pero sin postulantes, la vacante todavía se termina de configurar")
+    void publicadaSinPostulantesSeConfigura() {
+        // La línea es la primera postulación, no la publicación: el flujo sin banco asigna
+        // sus pesos después de publicar, antes de abrir la puerta a nadie.
+        Vacante v = vacante("PUBLICADA", false, null);
+        v.setVersionPesosId(2L);
+        when(versionesPesos.findByIdAndOrganizacionId(VERSION_PESOS, ORGANIZACION))
+                .thenReturn(Optional.of(VersionPesos.builder()
+                        .id(VERSION_PESOS).estado("PUBLICADA").build()));
+        when(postulaciones.countByVacanteId(VACANTE)).thenReturn(0L);
+
+        servicio.asignarVersionPesos(QUIEN, VACANTE, VERSION_PESOS);
+
+        assertThat(v.getVersionPesosId()).isEqualTo(VERSION_PESOS);
+        verify(vacantes).save(v);
     }
 
     // ============ Cuándo cierra la prueba de la vacante ============

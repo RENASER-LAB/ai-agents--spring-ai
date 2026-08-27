@@ -27,4 +27,14 @@ public class NotaRespuesta {
     private String motivoAjuste;
     private Instant ajustadaEn;
     private Instant creadoEn;
+
+    // --- Banco CAZATALENTOS: los criterios que el agente vio, presentes o ausentes ---
+    // El puntaje sale de contarlos en código, no de la aritmética del modelo. Y quedan
+    // guardados para que las banderas del cuestionario completo sean consultas, no otra
+    // pasada de IA. NULL en las notas de los bancos que no se califican así.
+    private Boolean c1Episodio;
+    private Boolean c2Autoria;
+    private Boolean c3Dato;
+    private Boolean c4Incomodidad;
+    private Boolean cumpleSenalCero;
 }

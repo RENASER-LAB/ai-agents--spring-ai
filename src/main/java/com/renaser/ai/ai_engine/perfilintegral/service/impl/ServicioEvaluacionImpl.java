@@ -205,6 +205,17 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
             Set<Long> suyas = opciones.findByPreguntaIdOrderByLetra(preguntaId).stream()
                     .map(Opcion::getId).collect(Collectors.toSet());
             ValidadorDetalleV3.validar(pregunta.getTipo(), suyas, datos.detalle());
+        } else if ("ABIERTA".equals(pregunta.getTipo())) {
+            // Una ABIERTA se responde escribiendo, y solo escribiendo. Aceptar una opción
+            // aquí contaría como respondida para entregar, pero el evaluador —que solo mira
+            // texto— nunca la calificaría, y la postulación se quedaría sin nota de etapa.
+            if (datos.opcionId() != null) {
+                throw new IllegalArgumentException(
+                        "Esta pregunta es de respuesta abierta: no lleva opciones");
+            }
+            if (datos.texto() == null || datos.texto().isBlank()) {
+                throw new IllegalArgumentException("Hay que escribir una respuesta");
+            }
         } else if (datos.opcionId() == null && (datos.texto() == null || datos.texto().isBlank())) {
             throw new IllegalArgumentException("Hay que elegir una opción o escribir una respuesta");
         }

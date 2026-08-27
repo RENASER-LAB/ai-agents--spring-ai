@@ -53,6 +53,10 @@ public interface PostulacionRepository extends JpaRepository<Postulacion, Long> 
 
     List<Postulacion> findByVacanteIdOrderByCreadoEnDesc(Long vacanteId);
 
+    // La guarda de «una vacante, una versión» pregunta si ya hay alguien midiéndose:
+    // desde la primera postulación, los instrumentos de la vacante no se cambian.
+    long countByVacanteId(Long vacanteId);
+
     // El sondeo cierra desde aquí las evaluaciones y las pruebas vencidas: la
     // postulación se conoce por el intento, no al revés.
     Optional<Postulacion> findByEvaluacionId(Long evaluacionId);

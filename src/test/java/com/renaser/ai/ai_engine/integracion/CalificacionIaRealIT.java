@@ -217,6 +217,7 @@ public class CalificacionIaRealIT {
     @Order(4)
     void elEvaluadorCalificaRespuestasAbiertasDeVerdad() {
         InsumoRespuestas insumo = new InsumoRespuestas("Analista de procesos", "EJECUCION",
+                null,
                 List.of(
                         new RespuestaAbierta(4001L, "CONDUCTUAL",
                                 "Cuenta un error tuyo cuyo reporte te perjudicaba. "
@@ -225,11 +226,13 @@ public class CalificacionIaRealIT {
                                 "Detecté que había cargado mal un tipo de cambio y el cierre "
                                         + "salía con 12 mil soles de más. Lo avisé el mismo día, "
                                         + "rehicimos el asiento y desde entonces el archivo tiene "
-                                        + "una validación que compara contra la tasa oficial."),
+                                        + "una validación que compara contra la tasa oficial.",
+                                null, null, null),
                         new RespuestaAbierta(4002L, "CONDUCTUAL",
                                 "Cuenta algo que aprendiste rápido porque lo necesitabas.",
                                 null, List.of("APR"),
-                                "Aprendí lo que hacía falta y salió bien.")));
+                                "Aprendí lo que hacía falta y salió bien.",
+                                null, null, null)));
 
         TrabajoIa trabajo = trabajoDePrueba(AgenteEvaluador.CODIGO_AGENTE);
         ResultadoEvaluador resultado = ejecutor.ejecutar(trabajo, "Prueba real de EVALUADOR",
@@ -262,7 +265,8 @@ public class CalificacionIaRealIT {
                 new BigDecimal("75.00"),
                 List.of(new NotaRespuestaIa(4001L, new BigDecimal("3"),
                         "Avisó a tiempo y dejó una validación puesta",
-                        "lo avisé el mismo día", new BigDecimal("70"))),
+                        "lo avisé el mismo día", new BigDecimal("70"),
+                        null, null, null, null, null)),
                 List.of("Respondió de forma muy distinta a dos preguntas que miden lo mismo"));
 
         TrabajoIa trabajo = trabajoDePrueba(AgentePotencialRiesgo.CODIGO_AGENTE);

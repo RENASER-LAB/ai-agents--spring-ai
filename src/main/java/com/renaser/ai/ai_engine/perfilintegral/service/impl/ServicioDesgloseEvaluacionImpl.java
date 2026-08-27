@@ -47,6 +47,8 @@ public class ServicioDesgloseEvaluacionImpl implements ServicioDesgloseEvaluacio
     private final ResultadoAlineacionRepository alineaciones;
     private final ServicioCalificacion calificacion;
     private final Permisos permisos;
+    private final CalificacionCriterios calificacionCriterios;
+    private final com.renaser.ai.ai_engine.perfilintegral.repository.NotaEtapaRepository notasEtapa;
 
     @Override
     @Transactional(readOnly = true)
@@ -68,7 +70,7 @@ public class ServicioDesgloseEvaluacionImpl implements ServicioDesgloseEvaluacio
                 postulacionId,
                 evaluacion == null ? null : evaluacion.getEstado(),
                 evaluacion == null ? null : evaluacion.getTerminadaEn(),
-                notaEvaluacion(cerrado, abiertas),
+                notaDe(postulacion, cerrado, abiertas),
                 new ResumenCerradas(cerrado.nota(), cerrado.preguntas()),
                 abiertas,
                 alineaciones.findByEvaluacionId(postulacion.getEvaluacionId()).stream()
@@ -124,8 +126,25 @@ public class ServicioDesgloseEvaluacionImpl implements ServicioDesgloseEvaluacio
                 .toList();
     }
 
-    /** La cuenta vive en {@link ServicioCalificacion#notaCombinada}: una sola para todos. */
-    private BigDecimal notaEvaluacion(ResumenCerrado cerrado, List<RespuestaAbiertaVista> abiertas) {
+    /**
+     * La nota que se enseña arriba del desglose.
+     *
+     * <p>En un banco CRITERIOS es <b>el índice de la etapa</b> —pilares ponderados, el mismo
+     * número con el que se ranquea—, leído de {@code nota_etapa}. Promediar los 0–4 a partes
+     * iguales aquí enseñaría una nota distinta de la que decide, con los pesos de ítem y de
+     * pilar perdidos. Vacía mientras el evaluador no haya terminado.
+     *
+     * <p>En el resto, la cuenta de siempre: vive en
+     * {@link ServicioCalificacion#notaCombinada}, una sola para todos.
+     */
+    private BigDecimal notaDe(Postulacion postulacion, ResumenCerrado cerrado,
+                              List<RespuestaAbiertaVista> abiertas) {
+        if (CalificacionCriterios.METODO.equals(calificacionCriterios.metodoDe(postulacion))) {
+            return notasEtapa
+                    .findByPostulacionIdAndEtapaCodigo(postulacion.getId(), "PERFIL_INTEGRAL")
+                    .map(com.renaser.ai.ai_engine.perfilintegral.entity.NotaEtapa::getPuntaje)
+                    .orElse(null);
+        }
         return ServicioCalificacion.notaCombinada(cerrado,
                 abiertas.stream().map(RespuestaAbiertaVista::puntaje).toList());
     }

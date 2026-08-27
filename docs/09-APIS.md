@@ -320,12 +320,12 @@ el banco v4 que venga no necesitará una migración. El ciclo es
 | POST `/banco-preguntas/versiones` | Crear una versión, en borrador | `editar_banco_preguntas` |
 | POST `/banco-preguntas/versiones/{id}/publicacion` | Validar, publicar y archivar a la saliente | `publicar_version_banco` |
 | POST `/banco-preguntas/versiones/{id}/archivado` | Retirarla sin reemplazo. Se bloquea si dejaría candidatos esperando sin banco | `publicar_version_banco` |
-| GET/POST `/banco-preguntas/versiones/{id}/preguntas` | Las preguntas: los 14 formatos (6 del v0.1 + 8 del v3) con peso, ítem clave y eliminatorio | `ver` / `editar_banco_preguntas` |
+| GET/POST `/banco-preguntas/versiones/{id}/preguntas` | Las preguntas: los 15 formatos (6 del v0.1 + 8 del v3 + `ABIERTA` del banco CAZATALENTOS, que lleva su guía del evaluador: C3 esperado, C4 esperado y señal de 0) | `ver` / `editar_banco_preguntas` |
 | GET/POST `/banco-preguntas/preguntas/{id}/opciones` | Las opciones con su clave: puntaje, valor oculto (EF-4), distractor (INV/DE), orden correcto (SEC) | `ver` / `editar_banco_preguntas` |
 | GET/POST `/banco-preguntas/preguntas/{id}/rangos` | Los tramos de puntaje de los ítems V | `ver` / `editar_banco_preguntas` |
 | GET/POST `/banco-preguntas/preguntas/{id}/campos-caso` | Los campos de los casos descompuestos (CD) | `ver` / `editar_banco_preguntas` |
 | GET/POST `/banco-preguntas/versiones/{id}/pares-consistencia` | Emparejar dos preguntas de la versión para vigilar contradicciones | `ver` / `editar_banco_preguntas` |
-| POST `/banco-preguntas/importaciones` | **Subir la plantilla Excel** (multipart: `archivo`, `nivelPuestoCodigo`, `etiqueta`). Crea una versión en borrador con todo el archivo; si algo no cuadra, 400 con la lista `{hoja, fila, mensaje}` y no se importa nada | `editar_banco_preguntas` |
+| POST `/banco-preguntas/importaciones` | **Subir la plantilla Excel** (multipart: `archivo`, `nivelPuestoCodigo`, `etiqueta`). Crea una versión en borrador con todo el archivo; si algo no cuadra, 400 con la lista `{hoja, fila, mensaje}` y no se importa nada. Traga dos formatos y elige solo: la plantilla v3, o el libro CAZATALENTOS (se delata por su hoja «Prueba RENASER» y entra con método `CRITERIOS`) | `editar_banco_preguntas` |
 | GET `/banco-preguntas/dimensiones` | El catálogo de dimensiones: lo que vale escribir en la columna «Qué mide» | `ver_banco_preguntas` |
 | PUT/DELETE `/banco-preguntas/preguntas/{id}` | Reemplazar o quitar una pregunta **de un borrador**; borrarla se lleva sus opciones, campos, rangos y pares | `editar_banco_preguntas` |
 | PUT/DELETE `/banco-preguntas/opciones/{id}`, `/rangos/{id}`, `/campos-caso/{id}`, `/pares-consistencia/{id}` | Lo mismo para cada pieza de un borrador | `editar_banco_preguntas` |

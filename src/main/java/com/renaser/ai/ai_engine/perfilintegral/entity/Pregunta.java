@@ -44,4 +44,14 @@ public class Pregunta {
 
     /** V: si en vez de tabla trae la fórmula escrita. */
     private String formulaPuntaje;
+
+    // --- Banco CAZATALENTOS (tipo ABIERTA) ---
+    /** Qué debe aparecer para marcar C3 (dato duro) en esta pregunta. Guía del evaluador. */
+    private String c3Esperado;
+
+    /** Qué cuenta como C4 (la parte incómoda) en esta pregunta. */
+    private String c4Esperado;
+
+    /** Si la respuesta la cumple, el puntaje es 0 y se acaba el cálculo. */
+    private String senalDeCero;
 }

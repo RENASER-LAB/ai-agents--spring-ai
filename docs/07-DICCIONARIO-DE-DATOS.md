@@ -909,7 +909,10 @@ veces y quedan tres filas sin relación entre sí: eso es lo que vino a resolver
 
 ## `dimension`
 
-Las 22 cosas que se miden. Catálogo cerrado.
+Las 22 cosas que se miden, más los 7 pilares del banco CAZATALENTOS (`V41`: `PIL_INICIATIVA`
+… `PIL_INTEGRIDAD`, órdenes 23–29). Los pilares no son dimensiones que se observen: son la
+taxonomía con que ese banco agrega y pondera, y viven aquí para que `pregunta_dimension` y
+`peso_dimension` sirvan tal cual, sin una tabla más.
 
 | Columna | Tipo | Oblig. | Qué guarda |
 |---|---|---|---|
@@ -941,6 +944,7 @@ Una versión del banco, en borrador o publicada.
 | `estado` | text | sí | `BORRADOR` o `PUBLICADA` |
 | `publicada_por_usuario_id` | bigint | no | |
 | `publicada_en` | timestamptz | no | |
+| `metodo_calificacion` | text | no | `V41`. Vacío = motor de claves versionadas (v0.1 y v3) · `CRITERIOS` = conteo C1..C4 del banco CAZATALENTOS. Es lo que decide qué motor califica |
 
 **Clave primaria:** `id`
 
@@ -963,7 +967,7 @@ Una pregunta dentro de una versión.
 | `version_banco_id` | bigint | sí | |
 | `codigo` | text | sí | `D01`, `S14`, `O33`, `C07` |
 | `bloque` | text | no | Para las de alineación personal |
-| `tipo` | text | sí | `ESTILO`, `SITUACION`, `CONDUCTUAL`, `MICROCASO`, `DILEMA`, `CONSISTENCIA` |
+| `tipo` | text | sí | Los 6 del v0.1 (`ESTILO`…`CONSISTENCIA`), los 8 del v3 (`EF-4`, `SJT-R`, `SEC`, `INV`, `DE`, `CD`, `V`, `PC`) y `ABIERTA` (banco CAZATALENTOS, `V41`) |
 | `enunciado` | text | sí | |
 | `situacion` | text | no | El contexto, cuando lo hay |
 | `logica_interna` | text | no | Qué se espera. **Nunca llega al portal** |
@@ -975,6 +979,9 @@ Una pregunta dentro de una versión.
 | `formula_puntaje` | text | no | La fórmula escrita, en los ítems V que no dan tramos |
 | `rangos_de_pregunta_codigo` | text | no | Remite a los tramos de otra pregunta («Misma tabla que D57»). Se guarda la remisión, no una copia: si cambia la de origen, no quedan dos versiones |
 | `casos_pedidos` | smallint | no | Cuántos casos se piden. Un «5 campos x 3» son 15 casillas pero **cinco preguntas repetidas tres veces** |
+| `c3_esperado` | text | no | Solo `ABIERTA` (`V41`): qué cuenta como dato duro en esta pregunta. La guía del evaluador; el candidato no la ve |
+| `c4_esperado` | text | no | Solo `ABIERTA`: qué cuenta como la parte incómoda |
+| `senal_de_cero` | text | no | Solo `ABIERTA`: si la respuesta la cumple, el puntaje es 0 y se acaba el cálculo. En la eliminatoria, cumplirla es además descarte |
 
 **Clave primaria:** `id` · **Único:** `version_banco_id` + `codigo`
 
@@ -1290,6 +1297,8 @@ El puntaje de esa respuesta y por qué.
 | `ajustada_por_usuario_id` | bigint | no | |
 | `motivo_ajuste` | text | no | **Obligatorio si hay ajuste** |
 | `ajustada_en` | timestamptz | no | |
+| `c1_episodio` … `c4_incomodidad` | boolean ×4 | no | `V41`, solo bancos `CRITERIOS`: qué criterios vio el agente. El `puntaje` sale de **contarlos en código**, no de la aritmética del modelo — y con ellos las banderas del cuestionario (`SIN_INCOMODIDAD`, `SOLO_NOSOTROS`) serán consultas, no otra pasada de IA |
+| `cumple_senal_cero` | boolean | no | Si la respuesta cumple la señal de 0 de su pregunta → puntaje 0 |
 
 **Clave primaria:** `id` · **Único:** `respuesta_id`
 

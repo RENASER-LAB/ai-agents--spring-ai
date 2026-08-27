@@ -109,20 +109,32 @@ public final class DtosCalificacionIa {
 
     // ==================== EVALUADOR ====================
 
-    public record InsumoRespuestas(String puesto, String nivelPuesto,
+    /** metodoCalificacion: null = escala 0–4 clásica · CRITERIOS = conteo C1..C4 (CAZATALENTOS). */
+    public record InsumoRespuestas(String puesto, String nivelPuesto, String metodoCalificacion,
                                    List<RespuestaAbierta> respuestas) {
     }
 
+    /** c3Esperado, c4Esperado y senalDeCero viajan solo en los bancos CRITERIOS: son la guía
+     *  que cada pregunta declara para su evaluador. Nulos en el resto. */
     public record RespuestaAbierta(Long respuestaId, String tipoDePregunta, String pregunta,
-                                   String situacion, List<String> queMide, String respuesta) {
+                                   String situacion, List<String> queMide, String respuesta,
+                                   String c3Esperado, String c4Esperado, String senalDeCero) {
     }
 
     public record ResultadoEvaluador(List<NotaRespuestaIa> notas) {
     }
 
-    /** puntaje de 0 a 4. explicacion y evidenciaCitada obligatorias (RF-56). */
+    /**
+     * puntaje de 0 a 4. explicacion y evidenciaCitada obligatorias (RF-56).
+     *
+     * <p>En los bancos CRITERIOS el modelo no devuelve puntaje: devuelve los cuatro criterios
+     * y la señal, y el número lo cuenta el código ({@code FormulasCazatalentos}). En el resto,
+     * los booleanos vienen nulos y manda el puntaje, como siempre.
+     */
     public record NotaRespuestaIa(Long respuestaId, BigDecimal puntaje, String explicacion,
-                                  String evidenciaCitada, BigDecimal confianza) {
+                                  String evidenciaCitada, BigDecimal confianza,
+                                  Boolean cumpleSenalCero, Boolean c1Episodio, Boolean c2Autoria,
+                                  Boolean c3Dato, Boolean c4Incomodidad) {
     }
 
     // ==================== POTENCIAL_RIESGO ====================
