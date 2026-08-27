@@ -462,8 +462,10 @@ public class FlujoSimulacionValidacionIT {
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString());
         assertThat(sesionesDeRosa).isNotEmpty();
+        // Positivo y no «no nulo»: asLong() devuelve un primitivo, así que nunca sería nulo y
+        // la comprobación no diría nada. Un campo que faltara en el JSON saldría como cero.
         assertThat(sesionesDeRosa).allSatisfy(s ->
-                assertThat(s.get("id").asLong()).isNotNull());
+                assertThat(s.get("id").asLong()).isPositive());
 
         // Las tres cifras de la misma sesión concuerdan: la de la lista, la del detalle y las
         // filas de /inscritos. Aquí solo hay un inscrito, así que esto NO distingue un conteo

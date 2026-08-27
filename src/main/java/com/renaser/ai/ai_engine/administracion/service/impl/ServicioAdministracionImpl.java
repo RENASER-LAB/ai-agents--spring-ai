@@ -35,6 +35,11 @@ public class ServicioAdministracionImpl implements ServicioAdministracion {
     /** El permiso que abre la puerta de los permisos: el único que no puede quedarse sin nadie. */
     private static final String ADMINISTRAR_PERMISOS = "administrar_permisos";
 
+    // Los nombres de campo que se repiten: en los 404 y en el detalle de la auditoría.
+    private static final String CAMPO_CODIGO = "código";
+    private static final String CAMPO_PERMISO = "permiso";
+    private static final String CAMPO_ALCANCE = "alcance";
+
     private final ParametroRepository parametros;
     private final PlantillaCorreoRepository plantillas;
     private final AuditoriaRepository auditorias;
@@ -71,7 +76,7 @@ public class ServicioAdministracionImpl implements ServicioAdministracion {
                     "El tope mensual de IA lo administra Renaser: pide el cambio a la plataforma");
         }
         Parametro parametro = parametros.findByOrganizacionIdAndCodigo(quien.organizacionId(), codigo)
-                .orElseThrow(() -> new ResourceNotFoundException("Parámetro", "código", codigo));
+                .orElseThrow(() -> new ResourceNotFoundException("Parámetro", CAMPO_CODIGO, codigo));
         if ("ENTERO".equals(parametro.getTipo())) {
             try {
                 Integer.parseInt(valor.trim());
@@ -314,8 +319,8 @@ public class ServicioAdministracionImpl implements ServicioAdministracion {
 
         auditoria.registrar(quien.organizacionId(), quien, "conceder_permiso",
                 "rol", rol.getId(),
-                anterior == null ? null : Map.of("permiso", codigoPermiso, "alcance", anterior),
-                Map.of("permiso", codigoPermiso, "alcance", datos.alcance()), datos.motivo());
+                anterior == null ? null : Map.of(CAMPO_PERMISO, codigoPermiso, CAMPO_ALCANCE, anterior),
+                Map.of(CAMPO_PERMISO, codigoPermiso, CAMPO_ALCANCE, datos.alcance()), datos.motivo());
     }
 
     @Override
@@ -344,7 +349,7 @@ public class ServicioAdministracionImpl implements ServicioAdministracion {
 
         auditoria.registrar(quien.organizacionId(), quien, "revocar_permiso",
                 "rol", rol.getId(),
-                Map.of("permiso", codigoPermiso, "alcance", actual.getAlcance()),
+                Map.of(CAMPO_PERMISO, codigoPermiso, CAMPO_ALCANCE, actual.getAlcance()),
                 null, motivo);
     }
 
@@ -363,7 +368,7 @@ public class ServicioAdministracionImpl implements ServicioAdministracion {
      */
     private Permiso elPermiso(String codigo) {
         return permisos.findByCodigo(codigo)
-                .orElseThrow(() -> new ResourceNotFoundException("Permiso", "código", codigo));
+                .orElseThrow(() -> new ResourceNotFoundException("Permiso", CAMPO_CODIGO, codigo));
     }
 
     @Override
@@ -390,7 +395,7 @@ public class ServicioAdministracionImpl implements ServicioAdministracion {
     private void asignarRolesInterno(ContextoUsuario quien, Long usuarioId, List<String> codigos) {
         for (String codigo : codigos) {
             Rol rol = roles.findByOrganizacionIdAndCodigo(quien.organizacionId(), codigo)
-                    .orElseThrow(() -> new ResourceNotFoundException("Rol", "código", codigo));
+                    .orElseThrow(() -> new ResourceNotFoundException("Rol", CAMPO_CODIGO, codigo));
             usuarioRoles.save(UsuarioRol.builder()
                     .usuarioId(usuarioId).rolId(rol.getId())
                     .asignadoPorUsuarioId(quien.usuarioId())

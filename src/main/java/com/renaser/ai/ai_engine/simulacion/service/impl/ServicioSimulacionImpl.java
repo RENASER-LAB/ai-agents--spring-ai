@@ -45,6 +45,10 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ServicioSimulacionImpl implements ServicioSimulacion {
 
+    private static final String VER_INSCRITOS = "ver_inscritos_simulacion";
+    /** El nombre del recurso en los 404, para que todos digan lo mismo. */
+    private static final String INSCRIPCION = "Inscripción";
+
     private static final String ESPERANDO = "SIMULACION_POR_HABILITAR";
     private static final String PUEDE_ELEGIR = "SIMULACION_TURNO_CANDIDATO";
     private static final String POR_CONFIRMAR = "SIMULACION_POR_CONFIRMAR";
@@ -230,7 +234,7 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
     private FiltroAlcance alcanceParaVerSesiones(ContextoUsuario quien) {
         return quien.tiene("crear_sesiones_simulacion")
                 ? permisos.alcanceDe("crear_sesiones_simulacion")
-                : permisos.alcanceDe("ver_inscritos_simulacion");
+                : permisos.alcanceDe(VER_INSCRITOS);
     }
 
     /**
@@ -247,8 +251,8 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
      * una sesión es aforo, no identidades.
      */
     private FiltroAlcance alcanceParaContarInscritos(ContextoUsuario quien) {
-        return quien.tiene("ver_inscritos_simulacion")
-                ? permisos.alcanceDe("ver_inscritos_simulacion")
+        return quien.tiene(VER_INSCRITOS)
+                ? permisos.alcanceDe(VER_INSCRITOS)
                 : null;
     }
 
@@ -266,7 +270,7 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
     @Override
     public List<InscritoEnSesion> listarInscritos(ContextoUsuario quien, Long sesionId) {
         SesionSimulacion sesion = laSesion(quien, sesionId);
-        FiltroAlcance alcance = permisos.alcanceDe("ver_inscritos_simulacion");
+        FiltroAlcance alcance = permisos.alcanceDe(VER_INSCRITOS);
 
         List<InscripcionSesion> vigentes =
                 inscripciones.findBySesionSimulacionIdAndEsVigenteTrue(sesion.getId());
@@ -504,7 +508,7 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
     public MiSesion miSesion(ContextoUsuario quien, UUID uuidPostulacion) {
         Postulacion postulacion = laMia(quien, uuidPostulacion);
         InscripcionSesion inscripcion = inscripciones.findByPostulacionIdAndEsVigenteTrue(postulacion.getId())
-                .orElseThrow(() -> new ResourceNotFoundException("Inscripción", "postulación", uuidPostulacion));
+                .orElseThrow(() -> new ResourceNotFoundException(INSCRIPCION, "postulación", uuidPostulacion));
         SesionSimulacion sesion = sesiones.findById(inscripcion.getSesionSimulacionId()).orElseThrow();
         return comoMiSesion(inscripcion, sesion);
     }
@@ -732,11 +736,11 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
      */
     private InscripcionYPostulacion laInscripcion(ContextoUsuario quien, Long inscripcionId) {
         InscripcionSesion inscripcion = inscripciones.findById(inscripcionId)
-                .orElseThrow(() -> new ResourceNotFoundException("Inscripción", "id", inscripcionId));
+                .orElseThrow(() -> new ResourceNotFoundException(INSCRIPCION, "id", inscripcionId));
         laSesion(quien, inscripcion.getSesionSimulacionId());
         Postulacion postulacion = postulaciones
                 .findByIdAndOrganizacionId(inscripcion.getPostulacionId(), quien.organizacionId())
-                .orElseThrow(() -> new ResourceNotFoundException("Inscripción", "id", inscripcionId));
+                .orElseThrow(() -> new ResourceNotFoundException(INSCRIPCION, "id", inscripcionId));
         return new InscripcionYPostulacion(inscripcion, postulacion);
     }
 
@@ -751,7 +755,7 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
     private void exigirQueAlcance(ContextoUsuario quien, FiltroAlcance alcance,
                                   InscripcionYPostulacion par) {
         if (!alcanzaA(quien, alcance, par.postulacion())) {
-            throw new ResourceNotFoundException("Inscripción", "id", par.inscripcion().getId());
+            throw new ResourceNotFoundException(INSCRIPCION, "id", par.inscripcion().getId());
         }
     }
 
