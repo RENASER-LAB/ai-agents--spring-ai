@@ -26,4 +26,7 @@ public class PlantillaEvaluacion {
     private Long publicadaPorUsuarioId;
     private Instant publicadaEn;
     private Instant creadoEn;
+
+    // De qué versión de la plataforma salió esta copia, si salió de una (pieza A).
+    private Long copiadaDeVersionId;
 }

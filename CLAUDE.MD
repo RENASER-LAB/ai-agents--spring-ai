@@ -68,14 +68,14 @@ Perfil Integral → prueba del puesto → simulacion → validacion → decision
 
 | | |
 |---|---|
-| Base de datos | **Flyway es el dueno del esquema**: V1-V37 en `src/main/resources/db/migration`, **100 tablas de este modulo** (103 en la base contando `flyway_schema_history` y las dos del motor de agentes, `agent_run` y `vector_store`). `ddl-auto: validate` |
+| Base de datos | **Flyway es el dueno del esquema**: V1-V40 en `src/main/resources/db/migration`, **102 tablas de este modulo** (105 en la base contando `flyway_schema_history` y las dos del motor de agentes, `agent_run` y `vector_store`). `ddl-auto: validate` |
 | Codigo | Veintiun paquetes de dominio bajo `ai_engine` (ver «Como esta organizado el codigo») |
-| Tests | **680, todos en verde (26/08/2026)**: 594 unitarios y 86 de integracion (de esos 86, 6 se saltan: los que gastan saldo o mandan correo de verdad). Ver «Correr los tests»: unitarios de la maquina y del anonimizador, migraciones contra Postgres real (Testcontainers) y flujos de punta a punta: hito 1, evaluacion, prueba, simulacion/validacion, calificacion con IA y la vacante sin banco |
+| Tests | **786, todos en verde (27/08/2026, tras fusionar main)**: 683 unitarios y 103 de integracion (de esos 103, 6 se saltan: los que gastan saldo o mandan correo de verdad). Ver «Correr los tests»: unitarios de la maquina y del anonimizador, migraciones contra Postgres real (Testcontainers) y flujos de punta a punta: hito 1, evaluacion, prueba, simulacion/validacion, calificacion con IA, la vacante sin banco, las dos empresas y el tope de IA de la plataforma |
 | IA que califica | **Seis de los diez agentes del catalogo estan implementados**: datos del curriculum, evidencia, evaluador, potencial/riesgo, prueba del puesto y las preguntas de la conversacion final. Todos corren por cola de RabbitMQ contra DeepSeek. Ver [Calificacion con IA](docs/CALIFICACION-CON-IA.md) |
 | Correo | **Ya sabe salir de verdad** (`EnviadorCorreoSmtp`), pero **por defecto no sale**: `renaser.correo.transporte` vale `log` salvo que se ponga `smtp`, y entonces solo se registra en `correo_enviado`. Para encenderlo hacen falta `CORREO_TRANSPORTE=smtp`, `CORREO_REMITENTE` y una cuenta que autentique. El RNF-65 pide que salga **desde el dominio propio de Renaser**: confirmar con ellos si ya lo tienen antes de encenderlo |
 | Acceso del candidato | Entra al portal **con un enlace, sin contrasena** (`EnlaceAcceso`, `ServicioEnlaceAcceso`). El enlace se le manda por correo, asi que depende de lo de arriba |
 | Lo configurable | El plazo para responder la evaluacion dejo de estar en el codigo: es el parametro `dias_plazo_evaluacion` (14 por defecto, migracion `V22`). Se cuenta desde que sale la invitacion, no desde que se creo la evaluacion |
-| Identidad equipo | `dev-login` de desarrollo; el contrato de RENASER OS no existe aun (`ProveedorIdentidadEquipo`) |
+| Identidad equipo | **Correo y contrasena** (`POST /panel/auth/login`), cuentas solo por invitacion; RENASER OS quedo dormido y el `dev-login` esta **apagado por defecto** (lo encienden `application-local.yaml` y las pruebas). Ver «Multiempresa» |
 | Frontend | **Dos, y hacen cosas distintas.** Ver «Las dos pantallas» mas abajo |
 | Mockups | Los mantiene otra persona y **describen la version anterior** |
 
@@ -300,19 +300,20 @@ Las dos consultan el mismo backend, asi que ensenan el mismo orden.
 - Nada se recalcula hacia atras: cada nota queda atada a la version de pesos de su vacante.
 
 ### Correr los tests
-**594 unitarios en verde (26/08/2026).** Son dos tandas y el comando decide cual corre:
+**683 unitarios en verde (27/08/2026).** Son dos tandas y el comando decide cual corre:
 
 | Comando | Que corre | Cuantos | Necesita |
 |---|---|---:|---|
-| `./mvnw test` | unitarias con dobles y las de arquitectura | 594 | nada |
-| `./mvnw verify` | lo anterior mas las de integracion | 680 | Docker |
+| `./mvnw test` | unitarias con dobles y las de arquitectura | 683 | nada |
+| `./mvnw verify` | lo anterior mas las de integracion | 786 | Docker |
 
 Las de integracion levantan su propio PostgreSQL y su propio RabbitMQ con Testcontainers: hace
 falta el demonio de Docker encendido. El desglose completo esta en
 [docs/COMPROBACIONES-AUTOMATICAS.md](docs/COMPROBACIONES-AUTOMATICAS.md).
 
-Entre las unitarias hay **8 reglas de arquitectura con ArchUnit** (la frontera del motor, las capas y
-que el estado solo lo mueva la maquina — las mismas reglas que este archivo tiene en prosa).
+Entre las unitarias hay **9 reglas de arquitectura con ArchUnit** (la frontera del motor, las capas,
+que el estado solo lo mueva la maquina, y que ningun servicio del panel busque por id suelto en un
+agregado con dueno — las mismas reglas que este archivo tiene en prosa).
 
 **El test que gasta dinero no corre solo**: `CalificacionIaRealIT` esta detras de
 `@EnabledIfEnvironmentVariable`, asi que se salta sola si no esta la variable. Ni `test` ni
@@ -355,6 +356,87 @@ y el diseño en [docs/PROPUESTA-PERFIL-DEL-CANDIDATO.md](docs/PROPUESTA-PERFIL-D
 
 ⚠️ **No encender con candidatos reales sin el texto de consentimiento nuevo**: el vigente
 cubre una postulacion concreta, no un perfil que se conserva entre convocatorias (RF-169).
+
+## Multiempresa (26/08/2026 · completo, piezas A-F)
+El sistema paso de «Renaser contrata para Renaser» a plataforma tipo Indeed: cada empresa
+se registra por invitacion de Renaser, publica sus vacantes y ve solo a sus candidatos.
+Los seis specs con el porque de cada decision estan en `docs/superpowers/specs/2026-08-25-*.md`.
+Lo que hay que saber para tocar codigo:
+
+- **La plataforma es un dato, no un literal**: `organizacion.es_plataforma` (solo una puede
+  serlo). El `findByCodigo("RENASER")` quemado ya no existe: se resuelve con
+  `findByEsPlataformaTrue`.
+- **Cuatro banderas de personalizacion** por organizacion (banco, pesos, plantillas de
+  evaluacion, pruebas), apagadas por defecto = leer el instrumento de la plataforma;
+  encender = copiarlo (`POST /panel/organizacion/personalizacion`). El UNICO punto que las
+  interpreta es `organizacion/service/DuenoDelInstrumento`: toda consulta de instrumentos
+  pasa por el. **Leer resuelve, editar no**: con la bandera apagada se VE el metodo de la
+  plataforma en solo lectura; mutar algo ajeno responde 404. Apagar archiva el banco
+  propio, nunca lo borra (RF-138).
+- **Dos logins separados**: el portal del candidato (registro publico, como siempre) y el
+  panel de empresas (`POST /panel/auth/login`), que solo autentica cuentas con
+  `usuario.es_equipo` — un candidato con su contrasena correcta recibe el mismo 401 que un
+  correo inexistente. Las cuentas del panel nacen SOLO por invitacion (tabla `invitacion`,
+  token de un solo uso, se guarda el hash). El candidato es de la plataforma: una cuenta,
+  postula a cualquier empresa, y **su postulacion nace en la organizacion de la vacante**.
+- **El alta de empresas** (`POST /panel/plataforma/empresas`, permiso
+  `administrar_plataforma` + ser la plataforma) siembra roles y matriz de permisos (sin
+  `administrar_plataforma`), parametros, textos legales en borrador y correos activos, e
+  invita al primer administrador.
+- **El aislamiento tiene dos vigilantes**: la regla de ArchUnit que prohibe `findById`
+  suelto sobre repositorios de agregados con dueno (lista `LLAMADAS_SIN_DUENO_ACORDADAS`
+  en `ArquitecturaTest`; al anadir una llamada legitima hay que escribirla ahi con su
+  porque) y `FlujoDosEmpresasIT`, que recorre el alta, el aislamiento en ambos sentidos,
+  el metodo compartido, el viaje completo del candidato en la empresa nueva (rinde el
+  examen del banco de la plataforma y la empresa ve nota, bandeja y embudo) y el borrado
+  de punta a punta. La unica pantalla que mezcla empresas es el tablon publico de
+  vacantes, a proposito.
+- **El borrado 29733 es de la plataforma**: los candidatos son cuentas de plataforma y la
+  anonimizacion cruza empresas. Desde una empresa responde 403.
+- **El consentimiento se firma con cada empresa** (pieza D, V38): al crear la cuenta se
+  consiente con la plataforma; al postular se acepta el texto PROCESO de LA EMPRESA de la
+  vacante, y la fila de `consentimiento` queda con `postulacion_id`, IP y navegador.
+  Postular exige `aceptaTratamiento` (400 sin el), el texto se lee sin token en
+  `GET /portal/vacantes/{id}/consentimiento`, y **publicar una vacante exige el texto
+  PROCESO publicado de la organizacion** — se publica por `POST /panel/textos-consentimiento`
+  (permiso `editar_textos_correo`; crea la version Y la publica). Renaser lo tiene desde la
+  V9; a las empresas nuevas el alta se lo copia en borrador.
+- **Cada llamada al modelo tiene precio** (pieza E, V38-V39): `ejecucion_ia.costo` se escribe
+  al cerrar con la tarifa vigente de `tarifa_modelo` (por proveedor+modelo, vigencia por
+  fecha; las sembradas son PROVISIONALES). La bitacora guarda el modelo QUE EL PROVEEDOR
+  REPORTA (o el pedido en esa llamada si calla), y por eso **todo modelo de
+  `application.yaml` necesita su tarifa** — la V39 sembro la del modelo rapido
+  (`deepseek-chat`, la lectura de CV) que a la V38 se le quedo fuera y dejaba ese gasto en
+  NULL; un IT recorre los modelos configurados y exige tarifa vigente para cada uno. Tope
+  mensual por organizacion: parametro `tope_mensual_ia` (ausente = sin tope; lo administra
+  Renaser, `editarParametro` se lo niega a la empresa). Al 80% un correo `TOPE_IA_AVISO`
+  una vez por mes (la marca es el parametro `aviso_tope_enviado_mes`; el aviso corre en su
+  PROPIA transaccion y su fallo se traga: una campana jamas tumba una postulacion); al 100%
+  los trabajos nuevos nacen **EN_ESPERA** —no fallan, no se publican, el candidato ve «en
+  curso»— y el sondeo de atascados los despierta cuando vuelve el cupo (tope subido o mes
+  nuevo, hora de Lima). El retrato que cierra una tanda no pasa por el tope: sus insumos ya
+  se pagaron. Consumo por empresa/mes/agente en `GET /panel/plataforma/consumo?mes=YYYY-MM`.
+- **Renaser suspende y reactiva empresas** (pieza F): `organizacion.es_activa` ahora lo leen
+  el login del panel (mensaje claro: solo se llega con la contrasena correcta), el
+  `FiltroIdentidad` (corta los tokens vivos de 8h, solo tipo EQUIPO; cuesta una consulta de
+  organizacion por peticion de panel, aceptado), el tablon publico (lista, detalle, texto
+  legal y el POST directo de postular) y **la cola de IA**: suspendida es congelada tambien
+  para el gasto — lo en vuelo termina, los trabajos NUEVOS de una suspendida nacen
+  EN_ESPERA y el barrido no la despierta ni con cupo; al reactivar, el mismo barrido lo
+  suelta todo (nada queda zombi). Los candidatos que ya estaban dentro NO se tocan: siguen
+  viendo lo suyo, y sus correos de transicion siguen saliendo.
+  Endpoints de plataforma, todos con doble llave y auditados con motivo: suspension,
+  reactivacion (la plataforma no puede suspenderse a si misma), tope-ia (en blanco = sin
+  tope) y personalizacion de otra empresa. La ficha del continente
+  (`GET /panel/plataforma/empresas`) trae estado, tope, banderas y consumo del mes — y ahi
+  se acaba lo que Renaser ve: ninguna via nueva a los datos de las empresas, a proposito.
+- Los ITs del multiempresa son dos: `FlujoDosEmpresasIT` (alta, aislamiento, viaje del
+  candidato, consentimiento por postulacion, borrado —tambien del papel firmado al
+  postular—, suspension y reactivacion) y `FlujoPlataformaIT` (la vida entera del tope con
+  la calificacion encendida y un doble del modelo que reporta lo que el proveedor real:
+  costo exacto de la pasada rapida, campana del 80, EN_ESPERA al 100, la suspendida que no
+  despierta ni con cupo, despertar al reactivar y al subir el tope, y tarifa vigente para
+  todo modelo configurado).
 
 ## El banco de preguntas v3 (19/08/2026)
 El cliente reemplazo el banco entero. Son **190 items** (85 directivo, 55 coordinacion, 50
@@ -435,7 +517,7 @@ fusiona.** El detalle esta en [docs/CI-CD.md](docs/CI-CD.md); aqui lo que hay qu
 
 | Cuando | Que corre |
 |---|---|
-| En cada PR y en cada push a `main` | `./mvnw verify` (las 680 pruebas), Semgrep, Gitleaks y la cobertura del codigo nuevo en SonarCloud |
+| En cada PR y en cada push a `main` | `./mvnw verify` (la tanda entera de tests), Semgrep, Gitleaks y la cobertura del codigo nuevo en SonarCloud |
 | Al fusionar a `main`, si todo quedo verde | Se construye la imagen con el `Dockerfile`, se sube a ECR y se le dice por SSM a la maquina de EC2 que se actualice. Un smoke test comprueba que responde desde internet |
 | De noche, sin bloquear a nadie | PIT (mutation testing) y fuzzing de la API con Schemathesis |
 
@@ -515,7 +597,7 @@ com.renaser.ai.ai_engine.<dominio>
 | Dominio | Que guarda |
 |---|---|
 | `usuario` | Persona, usuario del equipo, roles y permisos |
-| `organizacion` | La organizacion y sus areas |
+| `organizacion` | La organizacion, sus areas, la plataforma (alta de empresas) y la personalizacion de instrumentos |
 | `solicitud` | La Solicitud de Talento y sus resultados esperados |
 | `vacante` | Vacante, puesto, catalogos y requisitos objetivos |
 | `postulacion` | La postulacion, su historial, el CV y **la maquina de estados** |
@@ -525,8 +607,8 @@ com.renaser.ai.ai_engine.<dominio>
 | `archivo` | El almacen de archivos en disco |
 | `auditoria` | El registro inmutable de quien hizo que |
 | `parametro` | Los valores que Renaser cambia sin programar |
-| `portal` | La cara del candidato: un controlador y un servicio para todo el recorrido publico |
-| `administracion` | La cara de configuracion del panel |
+| `portal` | La cara del candidato: un controlador y tres servicios por tema (la cuenta y su acceso, el tablon publico, la postulacion) |
+| `administracion` | La cara de configuracion del panel; el borrado 29733 vive aparte en `ServicioBorradoDatos` |
 | `seguridad` | Las dos puertas, tokens, contexto y permisos con alcance |
 | `comun` | El manejador de errores propio y el candado de Swagger |
 | `catalogo` | Los catalogos que el panel consulta |
@@ -556,7 +638,7 @@ Todo vive en `docs/`. Empezar por [docs/README.md](docs/README.md).
   **Ojo: la maquina de estados es propuesta nuestra, no viene de Renaser.**
 - [Roles y permisos](docs/04-ROLES-Y-PERMISOS.md) — los **75** permisos, accion por accion.
   Un rol es un conjunto de permisos guardado en base de datos, no algo fijo en codigo. En la
-  base hay **69** sembrados; el resto solo esta disenado. Desde la V37 el reparto se edita por
+  base hay **71** sembrados; el resto solo esta disenado. Desde la V40 el reparto se edita por
   la API con `administrar_permisos`, y `FiltroIdentidad` lo relee en cada peticion, asi que un
   cambio vale sin desplegar y sin volver a entrar.
 - [Modelo de datos](docs/05-MODELO-DE-DATOS.md) — las **93** tablas por area, que impide la base
@@ -575,7 +657,7 @@ Todo vive en `docs/`. Empezar por [docs/README.md](docs/README.md).
   ultimas etapas y sus tres reglas automaticas de disponibilidad.
 - [CI/CD](docs/CI-CD.md) — que se comprueba solo en cada cambio, como se despliega a AWS y que
   variables de entorno pide el servidor. **Leerlo antes de tocar `.github/workflows/`.**
-- [Comprobaciones automaticas](docs/COMPROBACIONES-AUTOMATICAS.md) — las 680 pruebas y las ocho
+- [Comprobaciones automaticas](docs/COMPROBACIONES-AUTOMATICAS.md) — las 786 pruebas y las nueve
   reglas de arquitectura, una por una. Que se mira solo y que no.
 - `docs/diagramas/` — HTML autocontenidos, se abren en el navegador.
 - `docs/mockups/` — prototipos de pantalla. **Los mantiene otra persona, no editarlos.**

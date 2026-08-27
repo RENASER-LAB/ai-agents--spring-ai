@@ -27,6 +27,10 @@ public interface TrabajoIaRepository extends JpaRepository<TrabajoIa, Long> {
     // recogió se murió a mitad. Ver ReintentoTrabajosIa.
     List<TrabajoIa> findByEstadoAndCreadoEnBefore(String estado, Instant limite);
 
+    // Los congelados por el tope de IA (pieza E): el sondeo pregunta por organización si
+    // ya hay cupo y los despierta. Índice parcial trabajo_ia_en_espera_idx (V38).
+    List<TrabajoIa> findByEstadoOrderByIdAsc(String estado);
+
     List<TrabajoIa> findByEstadoAndTomadoEnBefore(String estado, Instant limite);
 
     /**

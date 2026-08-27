@@ -1,9 +1,14 @@
 package com.renaser.ai.ai_engine.administracion.controller;
 
 import com.renaser.ai.ai_engine.administracion.service.ServicioAdministracion;
+import com.renaser.ai.ai_engine.administracion.service.ServicioBorradoDatos;
 
 import com.renaser.ai.ai_engine.administracion.dto.DtosAdministracion.*;
+import com.renaser.ai.ai_engine.seguridad.dto.DtosSeguridad.CrearInvitacion;
+import com.renaser.ai.ai_engine.seguridad.dto.DtosSeguridad.InvitacionCreada;
+import com.renaser.ai.ai_engine.seguridad.dto.DtosSeguridad.InvitacionPanel;
 import com.renaser.ai.ai_engine.seguridad.service.Permisos;
+import com.renaser.ai.ai_engine.seguridad.service.ServicioInvitaciones;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -24,6 +29,10 @@ import java.util.Map;
 public class AdministracionController {
 
     private final ServicioAdministracion servicio;
+    // El borrado 29733 tiene servicio propio: es lo más destructivo del sistema y no
+    // comparte techo con editar un parámetro. Las rutas son las mismas de siempre.
+    private final ServicioBorradoDatos borrados;
+    private final ServicioInvitaciones invitaciones;
     private final Permisos permisos;
 
     // ---------- Parámetros ----------
@@ -59,6 +68,27 @@ public class AdministracionController {
         return Map.of("id", servicio.nuevaVersionPlantilla(permisos.actual(), datos));
     }
 
+    // ---------- Textos de consentimiento ----------
+    // Con el permiso de los textos de correo, a propósito: los dos son «lo que la empresa
+    // le dice al candidato», y el catálogo de permisos no tiene uno de textos legales —
+    // crearlo obligaría a migrar la matriz de roles de todas las organizaciones.
+
+    @GetMapping("/textos-consentimiento")
+    @PreAuthorize("@permisos.tiene('editar_textos_correo')")
+    @Operation(summary = "Los textos legales de la organización, con toda su historia de versiones")
+    public List<TextoConsentimientoPanel> textosConsentimiento() {
+        return servicio.textosConsentimiento(permisos.actual());
+    }
+
+    @PostMapping("/textos-consentimiento")
+    @PreAuthorize("@permisos.tiene('editar_textos_correo')")
+    @ResponseStatus(HttpStatus.CREATED)
+    @Operation(summary = "Publicar una versión nueva del texto legal. Es el paso que abre la "
+            + "puerta de publicar vacantes: sin texto PROCESO publicado no se reciben candidatos")
+    public Map<String, Long> publicarTextoConsentimiento(@Valid @RequestBody NuevoTextoConsentimiento datos) {
+        return Map.of("id", servicio.publicarTextoConsentimiento(permisos.actual(), datos));
+    }
+
     // ---------- Auditoría ----------
 
     @GetMapping("/auditoria")
@@ -76,7 +106,7 @@ public class AdministracionController {
     @PreAuthorize("@permisos.tiene('ejecutar_borrado_datos')")
     @Operation(summary = "Las solicitudes de borrado pendientes")
     public List<SolicitudBorradoPanel> solicitudesBorrado() {
-        return servicio.solicitudesBorradoPendientes(permisos.actual());
+        return borrados.solicitudesBorradoPendientes(permisos.actual());
     }
 
     @PostMapping("/solicitudes-borrado/{id}/ejecucion")
@@ -84,7 +114,7 @@ public class AdministracionController {
     @Operation(summary = "Ejecutar la anonimización: vacía a la persona, borra el CV físico "
             + "y conserva la trazabilidad sin nombre")
     public void ejecutarBorrado(@PathVariable Long id) {
-        servicio.ejecutarBorrado(permisos.actual(), id);
+        borrados.ejecutarBorrado(permisos.actual(), id);
     }
 
     // ---------- Usuarios del equipo y roles ----------
@@ -99,7 +129,8 @@ public class AdministracionController {
     @PostMapping("/usuarios")
     @PreAuthorize("@permisos.tiene('crear_usuarios_y_asignar_roles')")
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Dar de alta a alguien del equipo, con su id de RENASER OS y sus roles")
+    @Operation(summary = "Dar de alta a alguien del equipo a mano, con sus roles. El camino "
+            + "normal es la invitación; este queda para cargas administrativas")
     public Map<String, Long> crearUsuario(@Valid @RequestBody CrearUsuarioEquipo datos) {
         return Map.of("id", servicio.crearUsuarioEquipo(permisos.actual(), datos));
     }
@@ -109,6 +140,31 @@ public class AdministracionController {
     @Operation(summary = "Reemplazar los roles de un usuario. El último administrador no se puede quitar")
     public void asignarRoles(@PathVariable Long id, @Valid @RequestBody AsignarRoles datos) {
         servicio.asignarRoles(permisos.actual(), id, datos.roles());
+    }
+
+    // ---------- Invitaciones al panel ----------
+
+    @GetMapping("/usuarios/invitaciones")
+    @PreAuthorize("@permisos.tiene('crear_usuarios_y_asignar_roles')")
+    @Operation(summary = "Las invitaciones de la organización, canjeadas o no")
+    public List<InvitacionPanel> invitaciones() {
+        return invitaciones.listar(permisos.actual());
+    }
+
+    @PostMapping("/usuarios/invitaciones")
+    @PreAuthorize("@permisos.tiene('crear_usuarios_y_asignar_roles')")
+    @ResponseStatus(HttpStatus.CREATED)
+    @Operation(summary = "Invitar a alguien al equipo: manda el correo con el enlace de un "
+            + "solo uso y devuelve ese enlace a quien invita")
+    public InvitacionCreada invitar(@Valid @RequestBody CrearInvitacion datos) {
+        return invitaciones.crear(permisos.actual(), datos.correo(), datos.roles());
+    }
+
+    @DeleteMapping("/usuarios/invitaciones/{id}")
+    @PreAuthorize("@permisos.tiene('crear_usuarios_y_asignar_roles')")
+    @Operation(summary = "Revocar una invitación que aún no se canjeó")
+    public void revocarInvitacion(@PathVariable Long id) {
+        invitaciones.revocar(permisos.actual(), id);
     }
 
     @GetMapping("/areas")

@@ -296,6 +296,58 @@ class RegistroTrabajosIaTest {
         verify(trabajos, never()).save(any(TrabajoIa.class));
     }
 
+    // ============ La espera del tope de IA (pieza E) ============
+
+    @Test
+    void soloUnPendienteQueNadieTomoSeCongelaPorElTope() {
+        // Un consumidor pudo llegar antes de que el tope actuara: ese trabajo ya se está
+        // pagando y congelarlo a medias costaría lo mismo sin dar nada.
+        TrabajoIa recien = trabajo(9L, "PENDIENTE", 0);
+        when(trabajos.findById(9L)).thenReturn(Optional.of(recien));
+        assertThat(registro.dejarEnEspera(9L)).isTrue();
+        assertThat(recien.getEstado()).isEqualTo("EN_ESPERA");
+
+        TrabajoIa tomado = trabajo(10L, "EN_CURSO", 1);
+        when(trabajos.findById(10L)).thenReturn(Optional.of(tomado));
+        assertThat(registro.dejarEnEspera(10L)).isFalse();
+        assertThat(tomado.getEstado()).isEqualTo("EN_CURSO");
+    }
+
+    @Test
+    void despertarDevuelveAPendienteYReiniciaElRelojDelSondeo() {
+        TrabajoIa dormido = trabajo(9L, "EN_ESPERA", 0);
+        Instant creadoOriginal = Instant.now().minusSeconds(3600);
+        dormido.setCreadoEn(creadoOriginal);
+        when(trabajos.findById(9L)).thenReturn(Optional.of(dormido));
+
+        assertThat(registro.despertar(9L)).isTrue();
+
+        assertThat(dormido.getEstado()).isEqualTo("PENDIENTE");
+        // El reloj arranca de cero: si el aviso a la cola se pierde, el barrido de
+        // pendientes viejos lo empuja igual — pero no lo cuenta viejo desde que se congeló.
+        assertThat(dormido.getCreadoEn()).isAfter(creadoOriginal);
+
+        // Y uno que ya no espera —lo despertó otro ciclo, o terminó— no se toca
+        TrabajoIa despierto = trabajo(10L, "PENDIENTE", 0);
+        when(trabajos.findById(10L)).thenReturn(Optional.of(despierto));
+        assertThat(registro.despertar(10L)).isFalse();
+        verify(trabajos, never()).save(despierto);
+    }
+
+    @Test
+    void unHermanoEnEsperaTambienDetieneElRetrato() {
+        // El paso congelado por el tope VA a correr cuando haya cupo: armar el retrato
+        // sin él sería armarlo con la mitad, y al despertar nadie lo rehace.
+        when(trabajos.bloquearLosQueVanALaVez(55L, "FINA", A_LA_VEZ)).thenReturn(List.of(
+                trabajo(1L, "DATOS_CV", "EN_ESPERA"),
+                trabajo(2L, "EVIDENCIA_CV", "TERMINADO"),
+                trabajo(3L, "EVALUADOR", "TERMINADO")));
+
+        assertThat(registro.crearElRetratoSiLosDemasAcabaron(
+                1L, 55L, A_LA_VEZ, "POTENCIAL_RIESGO", "FINA", 3L)).isEmpty();
+        verify(trabajos, never()).save(any(TrabajoIa.class));
+    }
+
     private static final List<String> A_LA_VEZ =
             List.of("DATOS_CV", "EVIDENCIA_CV", "EVALUADOR");
 

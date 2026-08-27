@@ -78,8 +78,8 @@ public class ClienteModeloDeepSeek implements ClienteModelo {
     @Override
     public RespuestaModelo preguntar(String agenteCodigo, String instruccion, String contenido,
                                      boolean razona) {
-        ChatResponse respuesta = llamar(agenteCodigo, instruccion, contenido,
-                razona ? modelo : modeloRapido);
+        String pedido = razona ? modelo : modeloRapido;
+        ChatResponse respuesta = llamar(agenteCodigo, instruccion, contenido, pedido);
 
         if (respuesta == null || respuesta.getResult() == null) {
             throw new IllegalStateException(
@@ -96,10 +96,13 @@ public class ClienteModeloDeepSeek implements ClienteModelo {
             throw new IllegalStateException(explicarVacio(agenteCodigo, motivoCierre, uso));
         }
 
+        // Si el proveedor no dice qué modelo usó, la bitácora guarda EL PEDIDO en esta
+        // llamada — no el campo por defecto: una pasada rápida anotada como el modelo que
+        // razona mentiría en la bitácora y se cobraría con la tarifa que no es (pieza E).
         String modeloReal = respuesta.getMetadata() == null ? null : respuesta.getMetadata().getModel();
         return new RespuestaModelo(
                 texto,
-                modeloReal == null || modeloReal.isBlank() ? modelo : modeloReal,
+                modeloReal == null || modeloReal.isBlank() ? pedido : modeloReal,
                 PROVEEDOR,
                 respuesta.getMetadata() == null ? null : respuesta.getMetadata().getId(),
                 uso == null ? null : uso.getPromptTokens(),

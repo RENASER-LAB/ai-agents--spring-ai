@@ -47,20 +47,59 @@ demás de la calificación se prueba con un doble del modelo y no gasta nada.
 
 ---
 
-## 680 pruebas
+## 786 pruebas
 
-Contadas de correrlas el 26/08/2026, no de recordarlas: el desglose sale de los
-informes de surefire y failsafe, y suma exacto.
+Contadas de correrlas el 27/08/2026 (tras fusionar el multiempresa con los inscritos de la
+simulación y los permisos editables), no de recordarlas: el desglose sale de los informes de
+surefire y failsafe, y suma exacto.
 
 | Qué | Cuántas | Necesita |
 |---|---:|---|
-| Unitarias, con dobles | 479 | nada |
-| Arquitectura | 8 | nada |
+| Unitarias, con dobles | 579 | nada |
+| Arquitectura | 9 | nada |
 | Las fórmulas del banco v3 | 22 | nada |
 | El validador de las respuestas v3 | 21 | nada |
-| El perfil del candidato (merge, lectura, CRUD, estados, retención, borrado) | 64 | nada |
-| Integración, de punta a punta | 80 | Docker |
+| El perfil del candidato (paquete `perfil`: merge, lectura, CRUD, retención, borrado) | 52 | nada |
+| Integración, de punta a punta | 97 | Docker |
 | Contra el proveedor de verdad, y el envío de correo | 6 | Docker o SMTP, y su bandera |
+
+El multiempresa (25/08) sumó 39 unitarias: 31 de la implementación —el login del panel, las
+invitaciones, el alta de empresas, el resolutor de dueño de instrumento, el copiador y la
+personalización—, una regla de arquitectura nueva y `FlujoDosEmpresasIT` (dos empresas de
+verdad, de punta a punta); y 8 del QA —la carrera del canje, el equipo que no entra al
+portal, el mismo correo en dos empresas, y una prueba negativa por cada fuga cerrada que no
+la tenía (inscripción, barrera, prueba ajena, alerta ajena). La revisión final añadió a
+`FlujoDosEmpresasIT` el viaje que faltaba: la candidata rinde el examen entero del banco de
+Renaser en la vacante de ACME, la nota queda atada a los pesos de la plataforma, y ACME ve
+la ficha, la nota, su bandeja y su embudo — mientras la plataforma no ve nada de eso.
+
+Las piezas D, E y F (26/08) sumaron 37 unitarias y 7 de integración. Las unitarias: el
+consentimiento firmado con la empresa de la vacante (postular sin aceptar, sin texto
+publicado, la firma con IP y postulación), publicar-vacante-sin-texto-legal, la calculadora
+del costo (tarifa vigente por fecha, sin tarifa, tokens ausentes), el tope mensual (el freno
+exacto en el 100%, la campana única del 80%, el mes nuevo, el tope ilegible que no congela a
+nadie), los estados EN_ESPERA en la cola y la barrera, la suspensión (login con mensaje
+claro, la plataforma que no se suspende a sí misma, el tablón que esconde y el candidato de
+dentro que no se toca) y el tope validado desde la plataforma. Las de integración:
+`FlujoDosEmpresasIT` ganó la suspensión y la reactivación completas, y `FlujoPlataformaIT`
+—nuevo, con la calificación encendida y un doble del modelo con tokens fijos— recorre la
+vida entera del tope: nace del alta, cada lectura escribe su costo exacto, al 80% suena una
+campana única, al 100% lo nuevo espera sin que la candidata se entere, y subir el tope por
+el endpoint despierta lo que esperaba.
+
+El QA de la fase 2 (26/08) sumó 8 unitarias y 1 de integración, cada una encima de un
+hallazgo real. El gordo: el modelo rápido (`deepseek-chat`, la lectura de CV — una llamada
+por candidato) no tenía tarifa en la V38 y todo ese gasto salía NULL, invisible para el
+tope; la V39 la siembra, `ClienteModeloDeepSeek` anota el modelo PEDIDO cuando el proveedor
+calla (antes anotaba siempre el caro), y un IT nuevo exige tarifa vigente para todo modelo
+de `application.yaml`. Los otros: la suspendida que congela también sus trabajos de IA
+nuevos y a la que el barrido no despierta ni con cupo (unitarias, más el viaje
+suspensión→reactivación dentro del IT del tope), la campana del 80% que ya no puede tumbar
+una postulación (corre en su propia transacción y su fallo se traga), la doble llave de la
+personalización desde la plataforma (una empresa con el permiso copiado no le enciende nada
+a la competencia, el motivo queda auditado, el objetivo inexistente es 404 — llegó sin una
+sola prueba), y el borrado 29733 que también vacía el nombre del papel firmado al postular
+(aserción nueva en `FlujoDosEmpresasIT`).
 
 ⚠️ Al recontar, **no sirve el atributo `tests=`** de los XML de surefire: con clases anidadas
 (`@Nested`) subcuenta, y por eso dos filas de esta tabla llevaban tiempo mal —las fórmulas
@@ -73,7 +112,8 @@ grep -ho "<testcase" target/surefire-reports/*.xml | wc -l
 
 Las tres filas del medio se listan aparte porque se prueban solas, sin contexto de Spring:
 son las que deciden la nota de una persona y las que impiden que una respuesta con mala
-forma llegue a puntuarse.
+forma llegue a puntuarse. La fila del perfil cuenta las del paquete `perfil`; antes esta
+tabla decía 64 porque sumaba pruebas de otros paquetes que tocan el perfil de pasada.
 
 Entre las de integración hay dos que no se parecen al resto y conviene conocer: la del **banco
 por el panel** (`FlujoBancoPreguntasIT`), donde un administrador construye, publica y archiva un
@@ -97,12 +137,12 @@ no sirve para nada.
 
 ---
 
-## Las ocho reglas de arquitectura
+## Las nueve reglas de arquitectura
 
 Están en `ArquitecturaTest` y no inventan nada: son las reglas que el `CLAUDE.md` ya tenía
 escritas en prosa. **Una regla en prosa se rompe sin que nadie se entere** —alguien añade un
 import, el código compila, las pruebas pasan y la frontera ya no existe— y eso es lo que
-estas ocho impiden.
+estas nueve impiden.
 
 | Regla | Por qué importa |
 |---|---|
@@ -114,6 +154,7 @@ estas ocho impiden.
 | Las entidades no salen por un endpoint | Una entidad publicada convierte cualquier columna nueva en un cambio de contrato |
 | Todo controlador nuevo está en la lista del candado de Swagger | Un endpoint que nadie apuntó ahí queda fuera del candado, y se publica sin que nadie lo haya decidido |
 | Nadie escribe en la consola a pelo | Lo que se imprime así no aparece en el registro, y el registro es lo único que queda cuando algo falla en producción |
+| **Ningún servicio del panel busca por id suelto en un agregado con dueño** | La del multiempresa (25/08). Con una sola empresa un `findById` sin filtrar funciona idéntico y nadie lo nota; con dos, lee datos de la competencia. Las llamadas legítimas —casi todas «derivar al padre»— están enumeradas en `LLAMADAS_SIN_DUENO_ACORDADAS` con su porqué: añadir una nueva falla hasta que alguien la escriba ahí. Corrida contra el código anterior a los arreglos, denunció las fugas una por una |
 
 ### Las dos desviaciones que había, y ya no
 
@@ -125,7 +166,9 @@ tras un patrón genérico. Eso es lo que hizo que se arreglaran: una desviación
 decide, una escondida se olvida. Hoy los catálogos salen de `ServicioCatalogo` y el arranque
 del primer usuario del equipo de `ServicioAccesoEquipo`.
 
-**Las ocho reglas no tienen excepciones.**
+**Las ocho primeras reglas no tienen excepciones.** La novena enumera las suyas una por
+una, con su motivo escrito — que es distinto de no tenerlas: una excepción a la vista se
+decide, una escondida se olvida.
 
 ---
 

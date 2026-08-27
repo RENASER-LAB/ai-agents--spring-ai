@@ -21,4 +21,7 @@ public class PlantillaPrueba {
     private String nombre;
     private boolean esActiva;
     private Instant creadoEn;
+
+    // De qué plantilla de la plataforma salió esta copia, si salió de una (pieza A).
+    private Long copiadaDeVersionId;
 }

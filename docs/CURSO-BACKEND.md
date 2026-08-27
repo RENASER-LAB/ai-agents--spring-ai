@@ -170,7 +170,11 @@ Al terminar sabrás: **por qué el siguiente estado se calcula en vez de escribi
 |---|---|---|---|
 | 35 | `portal/dto/DtosPortal.java` | 50 | Lo que ve el candidato |
 | 36 | `portal/controller/PortalController.java` | 119 | Los endpoints públicos y con token de candidato |
-| 37 | `portal/service/impl/ServicioPortalImpl.java` | 374 | Postular, subir CV, consultar el avance |
+| 37 | `portal/service/impl/ServicioPostulacionPortalImpl.java` | 322 | Postular, subir CV, consultar el avance |
+
+El antiguo `ServicioPortalImpl` se partió en tres por tema: la cuenta
+(`ServicioCuentaPortalImpl`), el tablón público (`ServicioTablonPortalImpl`) y la
+postulación — la fila 37 apunta a este último, que es el del recorrido.
 
 Al terminar sabrás: **por qué el portal y el panel son dos puertas distintas.**
 
@@ -308,7 +312,11 @@ Pequeño, se usa desde todas partes y explica cosas que ya viste sin entender.
 | 82 | `notificacion/service/impl/EnviadorCorreoLog.java` | 17 | **Hoy el correo se registra, no se envía** |
 | 83 | `consentimiento/entity/Consentimiento.java` | 28 | Lo que el candidato aceptó, y en qué versión |
 | 84 | `comun/programado/SondeoVencimientos.java` | 53 | Lo que corre solo cada tanto |
-| 85 | `administracion/service/impl/ServicioAdministracionImpl.java` | 353 | Usuarios, roles y parámetros desde el panel |
+| 85 | `administracion/service/impl/ServicioAdministracionImpl.java` | 311 | Usuarios, roles y parámetros desde el panel |
+
+El borrado 29733 ya no vive aquí: se mudó a
+`administracion/service/impl/ServicioBorradoDatosImpl.java`, porque lo más destructivo
+del sistema no comparte techo con editar un parámetro.
 
 Al terminar sabrás: **dónde tocar cuando el cliente pide cambiar un tiempo, un peso o un texto.**
 
@@ -359,7 +367,7 @@ El único punto donde selección y motor se tocan de verdad es
 ## Etapa 19 · El perfil del candidato
 
 Migración V36 (25/08/2026). Es de selección, no del motor: se lee después de la 18 porque
-llegó después, no porque dependa de ella. Ya no es la última: la `V37` trajo después los
+llegó después, no porque dependa de ella. Ya no es la última: la `V40` trajo después los
 inscritos de una sesión y los permisos editables, y esa no tiene etapa propia porque no añade
 ninguna tabla.
 

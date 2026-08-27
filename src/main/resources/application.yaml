@@ -231,6 +231,13 @@ renaser:
   portal:
     url: ${PORTAL_URL:https://renaser-os-postulantes.vercel.app}
 
+  # La direccion del panel de empresas, la que se pega en el correo de invitacion.
+  # No es la del portal del candidato: son dos frontends con dos logins distintos.
+  # Ese panel necesita una pantalla en /invitacion que lea el token de la URL, pida
+  # nombre y contrasena, y llame a POST /api/v1/panel/auth/invitacion.
+  panel:
+    url: ${PANEL_URL:http://localhost:5173}
+
   correo:
     transporte: ${CORREO_TRANSPORTE:log}
     # La dirección que ve el candidato. Puede no ser la misma que autentica: con un dominio
@@ -276,3 +283,8 @@ app:
     # Cuánto vive un token de candidato y uno del equipo (en minutos)
     minutos-token-candidato: 120
     minutos-token-equipo: 480
+    # El login de desarrollo emite tokens de equipo sin contraseña. Apagado aquí, que es
+    # lo que hereda todo entorno; lo encienden application-local.yaml y las pruebas,
+    # explícitamente. Encendido por defecto significaba que un despliegue que olvidara
+    # apagarlo regalaba el panel entero.
+    dev-login-activo: false

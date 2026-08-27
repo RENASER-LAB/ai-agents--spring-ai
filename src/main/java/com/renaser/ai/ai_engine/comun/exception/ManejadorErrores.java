@@ -73,7 +73,8 @@ import java.util.regex.Pattern;
         SimulacionPanelController.class,
         SimulacionPortalController.class,
         ValidacionPanelController.class,
-        com.renaser.ai.ai_engine.perfil.controller.PerfilPortalController.class})
+        com.renaser.ai.ai_engine.perfil.controller.PerfilPortalController.class,
+        com.renaser.ai.ai_engine.organizacion.controller.PlataformaController.class})
 @Order(Ordered.HIGHEST_PRECEDENCE)
 @Slf4j
 public class ManejadorErrores {

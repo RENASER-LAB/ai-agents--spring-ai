@@ -61,6 +61,11 @@ public class ConfiguracionSeguridad {
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .addFilterBefore(filtroIdentidad, UsernamePasswordAuthenticationFilter.class)
             .authorizeHttpRequests(auth -> auth
+                // Las tres formas de conseguir un token de equipo, públicas a la fuerza:
+                // quien entra todavía no tiene sesión. La invitación lleva su credencial
+                // dentro (el token de un solo uso); el dev-login se apaga por propiedad.
+                .requestMatchers(HttpMethod.POST, "/api/v1/panel/auth/login").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/v1/panel/auth/invitacion").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/panel/auth/dev-login").permitAll()
                 .anyRequest().hasAuthority("TIPO_EQUIPO"))
             .exceptionHandling(e -> e.authenticationEntryPoint(entradaSinIdentidad()));

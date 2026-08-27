@@ -1,7 +1,7 @@
 # Diccionario de datos
 
 Sistema de selección de personal — Renaser Consulting
-Versión 2.2 · 2026-08-26 · Puesto al día con las migraciones hasta la `V37`
+Versión 2.2 · 2026-08-26 · Puesto al día con las migraciones hasta la `V40`
 
 Cada tabla con todas sus columnas, tipos y claves. **Este documento se consulta**, no se lee de
 corrido: es la base para escribir las migraciones de Flyway.
@@ -170,7 +170,7 @@ la simulación va en `SESIONES`, no en `SIMULACION`.
 
 **No lleva organización:** los permisos son los mismos para todos. Lo que cambia es quién los
 tiene. Solo crece con una migración: los dos últimos, `ver_inscritos_simulacion` y
-`administrar_permisos`, llegaron con la `V37`.
+`administrar_permisos`, llegaron con la `V40`.
 
 La etiqueta existe porque la pantalla donde se reparten permisos nunca debe mostrar nombres
 técnicos.

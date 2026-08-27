@@ -4,6 +4,7 @@ import com.renaser.ai.ai_engine.ai.exception.ResourceNotFoundException;
 import com.renaser.ai.ai_engine.ai.service.ColaCalificacionIa;
 import com.renaser.ai.ai_engine.auditoria.service.ServicioAuditoria;
 import com.renaser.ai.ai_engine.parametro.service.ServicioParametros;
+import com.renaser.ai.ai_engine.perfilintegral.repository.AlertaRepository;
 import com.renaser.ai.ai_engine.postulacion.entity.Postulacion;
 import com.renaser.ai.ai_engine.postulacion.repository.PostulacionRepository;
 import com.renaser.ai.ai_engine.postulacion.service.MaquinaEstados;
@@ -66,6 +67,7 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
     private final InscripcionSesionRepository inscripciones;
     private final MarcaTiempoSimulacionRepository marcas;
     private final PreguntaGeneradaRepository preguntas;
+    private final AlertaRepository alertas;
     private final PostulacionRepository postulaciones;
     private final VacanteRepository vacantes;
     private final NombresDeUsuarios nombres;
@@ -538,7 +540,7 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
     public List<MarcaResponse> verMarcas(ContextoUsuario quien, Long inscripcionId) {
         // Este es el que de verdad se escapaba: pide marcar_eventos_simulacion, que el
         // responsable del área tiene acotado a sus vacantes, y no pasa por facilitar. Leía las
-        // marcas de cualquier candidato de la organización.
+        // marcas de cualquier candidato de la empresa.
         exigirQueAlcance(quien, permisos.alcanceDe("marcar_eventos_simulacion"),
                 laInscripcion(quien, inscripcionId));
         return marcas.findByInscripcionSesionIdOrderByOcurridaEn(inscripcionId).stream()
@@ -611,6 +613,14 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
     @Transactional
     public Long registrarPregunta(ContextoUsuario quien, Long postulacionId, RegistrarPregunta datos) {
         laVisible(quien, postulacionId, "hacer_conversacion_final");
+        // La alerta que la pregunta cita tiene que ser de ESTA postulación: sin la
+        // comprobación, la fila guardaba una clave foránea hacia el expediente de otra
+        // empresa y la ficha la enseñaba después como si fuera propia.
+        if (datos.alertaId() != null) {
+            alertas.findById(datos.alertaId())
+                    .filter(a -> postulacionId.equals(a.getPostulacionId()))
+                    .orElseThrow(() -> new ResourceNotFoundException("Alerta", "id", datos.alertaId()));
+        }
         int siguiente = preguntas.findByPostulacionIdOrderByOrden(postulacionId).size() + 1;
         PreguntaGenerada fila = preguntas.save(PreguntaGenerada.builder()
                 .postulacionId(postulacionId)
@@ -705,20 +715,25 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
     }
 
     /**
-     * La inscripción, comprobando que sea de esta organización.
+     * La inscripción, con su postulación y comprobando que las dos sean de esta empresa.
      *
-     * <p>Antes era un {@code findById} pelado: no miraba ni la organización. El resto del
-     * sistema entra siempre por {@code findByIdAndOrganizacionId}, y aquí no había motivo para
-     * ser la excepción —con una sola organización dentro no se nota, y el modelo lleva
-     * {@code organizacion_id} en todas las tablas precisamente porque no va a ser así siempre—.
+     * <p>La inscripción no guarda empresa, así que se comprueba por sus dos lados y no por uno:
+     * la sesión la tiene como columna, y la postulación también. Sin ese paso, marcar un evento
+     * o la asistencia sobre una inscripción ajena funcionaba —y marcar asistencia TRANSICIONA
+     * la postulación de la otra empresa—. Comprobar los dos lados no es redundante: una
+     * inscripción cuya sesión fuera de una empresa y cuya postulación fuera de otra son datos
+     * rotos, y así no pasan.
      *
-     * <p>La organización no cuelga de la inscripción sino de su postulación, así que se llega
-     * por ahí. Una de otra organización responde lo mismo que una que no existe: 404 con el
+     * <p>La postulación además hace falta para el alcance —de qué vacante es—, así que se trae
+     * de todos modos: no es una consulta de más.
+     *
+     * <p>Una inscripción de otra empresa responde lo mismo que una que no existe: 404 con el
      * mismo texto, que es lo que evita usar este endpoint para averiguar qué ids hay.
      */
     private InscripcionYPostulacion laInscripcion(ContextoUsuario quien, Long inscripcionId) {
         InscripcionSesion inscripcion = inscripciones.findById(inscripcionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Inscripción", "id", inscripcionId));
+        laSesion(quien, inscripcion.getSesionSimulacionId());
         Postulacion postulacion = postulaciones
                 .findByIdAndOrganizacionId(inscripcion.getPostulacionId(), quien.organizacionId())
                 .orElseThrow(() -> new ResourceNotFoundException("Inscripción", "id", inscripcionId));
