@@ -169,10 +169,16 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
                     "Esta postulación todavía no tiene evaluación: no hay nada que calificar");
         }
 
-        if (!cola.encolarPerfilIntegral(postulacionId)) {
+        // Primero lo que falte (huecos, fallos); si no falta nada, se rehace el evaluador
+        // igualmente: quien pide RE-calificar quiere notas nuevas, no que le digan que las
+        // viejas ya existen. Es la palanca de la calibración: cambia una señal, se pide
+        // esto, y las mismas respuestas se puntúan con la señal nueva.
+        boolean encolado = cola.encolarPerfilIntegral(postulacionId)
+                || cola.reencolarEvaluador(postulacionId);
+        if (!encolado) {
             return new CalificacionEncoladaResponse("SIN_CAMBIOS",
-                    "No había nada que calificar: o ya está todo hecho, o hay un trabajo en "
-                            + "marcha ahora mismo. Consulta el perfil para verlo.");
+                    "Hay un trabajo de calificación en marcha ahora mismo: cuando termine, "
+                            + "vuelve a pedirla si hace falta.");
         }
         return new CalificacionEncoladaResponse("ENCOLADA",
                 "La calificación quedó en cola. Tarda decenas de segundos: "

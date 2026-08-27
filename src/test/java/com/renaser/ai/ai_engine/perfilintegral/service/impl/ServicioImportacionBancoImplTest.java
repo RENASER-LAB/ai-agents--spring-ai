@@ -19,6 +19,7 @@ import com.renaser.ai.ai_engine.perfilintegral.repository.PreguntaRepository;
 import com.renaser.ai.ai_engine.perfilintegral.repository.RangoPreguntaRepository;
 import com.renaser.ai.ai_engine.perfilintegral.repository.VersionBancoRepository;
 import com.renaser.ai.ai_engine.perfilintegral.service.ImportacionInvalidaException;
+import com.renaser.ai.ai_engine.perfilintegral.service.LectorBancoCazatalentos;
 import com.renaser.ai.ai_engine.perfilintegral.service.LectorPlantillaBanco;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
 import com.renaser.ai.ai_engine.seguridad.service.Permisos;
@@ -30,6 +31,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.InjectMocks;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
@@ -53,6 +55,9 @@ class ServicioImportacionBancoImplTest {
     private static final Long ORGANIZACION = 1L;
 
     @Mock private LectorPlantillaBanco lector;
+    // Real y no mock: es sin estado, y sobre los bytes de mentira de estos tests responde
+    // que el archivo no es suyo — que es justo el camino que estos tests ejercitan.
+    @Spy private LectorBancoCazatalentos lectorCazatalentos = new LectorBancoCazatalentos();
     @Mock private VersionBancoRepository versiones;
     @Mock private PreguntaRepository preguntas;
     @Mock private OpcionRepository opciones;
@@ -78,9 +83,11 @@ class ServicioImportacionBancoImplTest {
     private static BancoLeido leidoSano() {
         return new BancoLeido(
                 List.of(new FilaPregunta(5, "X01", "CD", "Tu caso. (1 campo)", null,
-                                (short) 1, false, List.of("INT"), (short) 1, null, null, "nota"),
+                                (short) 1, false, List.of("INT"), (short) 1, null, null, "nota",
+                                null, null, null),
                         new FilaPregunta(6, "X02", "PC", "¿Autorizas?", null,
-                                (short) 0, true, List.of(), null, null, null, null)),
+                                (short) 0, true, List.of(), null, null, null, null,
+                                null, null, null)),
                 List.of(new FilaOpcion(5, "X02", "Sí", null, null, false, null),
                         new FilaOpcion(6, "X02", "No", null, null, false, null)),
                 List.of(new FilaCampoCaso(5, "X01", "Nombre de la tarea", null)),

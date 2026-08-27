@@ -138,6 +138,21 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
     }
 
     @Override
+    public boolean reencolarEvaluador(Long postulacionId) {
+        if (apagada(postulacionId)) {
+            return false;
+        }
+        // La única diferencia con el camino normal: TERMINADO no exime. Un trabajo vivo sí
+        // —crearle un gemelo sería pagar dos veces—, pero uno terminado se rehace, que es
+        // exactamente lo que significa recalibrar. La barrera rehará el retrato al acabar.
+        if (situacionDe(postulacionId, AgenteEvaluador.CODIGO_AGENTE, FINA, null)
+                == Situacion.ESTA_VIVO) {
+            return false;
+        }
+        return crearYAvisar(postulacionId, AgenteEvaluador.CODIGO_AGENTE, FINA, null);
+    }
+
+    @Override
     public boolean encolarCribaRapida(Long postulacionId) {
         if (apagada(postulacionId)) {
             return false;

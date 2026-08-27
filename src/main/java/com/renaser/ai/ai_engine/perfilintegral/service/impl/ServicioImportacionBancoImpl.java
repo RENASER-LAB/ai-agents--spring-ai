@@ -23,6 +23,7 @@ import com.renaser.ai.ai_engine.perfilintegral.repository.PreguntaRepository;
 import com.renaser.ai.ai_engine.perfilintegral.repository.RangoPreguntaRepository;
 import com.renaser.ai.ai_engine.perfilintegral.repository.VersionBancoRepository;
 import com.renaser.ai.ai_engine.perfilintegral.service.ImportacionInvalidaException;
+import com.renaser.ai.ai_engine.perfilintegral.service.LectorBancoCazatalentos;
 import com.renaser.ai.ai_engine.perfilintegral.service.LectorPlantillaBanco;
 import com.renaser.ai.ai_engine.perfilintegral.service.ServicioImportacionBanco;
 import com.renaser.ai.ai_engine.auditoria.service.ServicioAuditoria;
@@ -62,6 +63,7 @@ public class ServicioImportacionBancoImpl implements ServicioImportacionBanco {
     private static final String LETRAS = "abcdefghijklmnopqrstuvwxyz";
 
     private final LectorPlantillaBanco lector;
+    private final LectorBancoCazatalentos lectorCazatalentos;
     private final VersionBancoRepository versiones;
     private final PreguntaRepository preguntas;
     private final OpcionRepository opciones;
@@ -90,15 +92,23 @@ public class ServicioImportacionBancoImpl implements ServicioImportacionBanco {
             throw new IllegalArgumentException("El archivo llegó vacío");
         }
 
-        // El índice nombre/código → código, con la misma normalización que usa el lector
-        // para buscar: «Integridad», «INTEGRIDAD» e «int» dan todos INT.
-        Map<String, String> indice = new HashMap<>();
-        for (var d : dimensiones.findAllByOrderByOrden()) {
-            indice.put(LectorPlantillaBanco.normalizar(d.getCodigo()), d.getCodigo());
-            indice.put(LectorPlantillaBanco.normalizar(d.getNombre()), d.getCodigo());
-        }
+        // Dos formatos de archivo, dos lectores. El del banco CAZATALENTOS se delata por su
+        // hoja «Prueba RENASER»; cualquier otro libro sigue el camino de la plantilla v3.
+        boolean esCazatalentos = lectorCazatalentos.esSuyo(archivo);
 
-        BancoLeido leido = lector.leer(new ByteArrayInputStream(archivo), indice);
+        BancoLeido leido;
+        if (esCazatalentos) {
+            leido = lectorCazatalentos.leer(new ByteArrayInputStream(archivo));
+        } else {
+            // El índice nombre/código → código, con la misma normalización que usa el lector
+            // para buscar: «Integridad», «INTEGRIDAD» e «int» dan todos INT.
+            Map<String, String> indice = new HashMap<>();
+            for (var d : dimensiones.findAllByOrderByOrden()) {
+                indice.put(LectorPlantillaBanco.normalizar(d.getCodigo()), d.getCodigo());
+                indice.put(LectorPlantillaBanco.normalizar(d.getNombre()), d.getCodigo());
+            }
+            leido = lector.leer(new ByteArrayInputStream(archivo), indice);
+        }
         if (!leido.errores().isEmpty()) {
             // Nada se insertó: el lector corre antes de tocar cualquier repositorio.
             throw new ImportacionInvalidaException(leido.errores());
@@ -112,6 +122,9 @@ public class ServicioImportacionBancoImpl implements ServicioImportacionBanco {
                 .nivelPuestoCodigo(nivelPuestoCodigo)
                 .etiqueta(etiqueta)
                 .estado("BORRADOR")
+                // El discriminador del motor: CRITERIOS puntúa contando C1..C4; NULL, el
+                // de claves versionadas de siempre.
+                .metodoCalificacion(esCazatalentos ? "CRITERIOS" : null)
                 .creadoEn(Instant.now())
                 .build());
 
@@ -139,6 +152,9 @@ public class ServicioImportacionBancoImpl implements ServicioImportacionBanco {
                     .casosPedidos(p.casosPedidos())
                     .formulaPuntaje(p.formulaPuntaje())
                     .rangosDePreguntaCodigo(p.rangosDePreguntaCodigo())
+                    .c3Esperado(p.c3Esperado())
+                    .c4Esperado(p.c4Esperado())
+                    .senalDeCero(p.senalDeCero())
                     .creadoEn(ahora)
                     .build());
         }

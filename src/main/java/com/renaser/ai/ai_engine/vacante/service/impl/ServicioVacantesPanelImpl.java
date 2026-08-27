@@ -51,6 +51,7 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
     private final IntentoPruebaRepository intentos;
     private final ServicioAuditoria auditoria;
     private final DuenoDelInstrumento dueno;
+    private final com.renaser.ai.ai_engine.postulacion.repository.PostulacionRepository postulaciones;
 
     // ============ Puestos ============
 
@@ -285,6 +286,7 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
         }
 
         Long anterior = vacante.getPlantillaEvaluacionId();
+        exigirVaraQuieta(vacante, anterior, plantillaEvaluacionId, "su plantilla de evaluación");
         vacante.setPlantillaEvaluacionId(plantillaEvaluacionId);
         vacantes.save(vacante);
         auditoria.registrar(quien.organizacionId(), quien, "asignar_plantilla_evaluacion",
@@ -313,6 +315,7 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
         }
 
         Long anterior = vacante.getVersionPlantillaPruebaId();
+        exigirVaraQuieta(vacante, anterior, versionPlantillaPruebaId, "su versión de prueba");
         vacante.setVersionPlantillaPruebaId(versionPlantillaPruebaId);
         vacantes.save(vacante);
         auditoria.registrar(quien.organizacionId(), quien, "asignar_plantilla_prueba",
@@ -360,14 +363,43 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
         }
 
         // Nada se recalcula hacia atrás: cada nota guardada conserva la versión con la que
-        // se calculó. Cambiar esto solo mueve las propuestas de decisión que aún no se toman.
+        // se calculó. Pero eso protege el pasado, no la competencia: dos candidatos de la
+        // misma vacante medidos con varas distintas no se pueden ordenar en la misma lista.
+        // Por eso la versión solo se cambia en borrador (docs/DECISION-UNA-VACANTE-UNA-VERSION.md).
         Long anterior = vacante.getVersionPesosId();
+        exigirVaraQuieta(vacante, anterior, versionPesosId, "su versión de pesos");
         vacante.setVersionPesosId(versionPesosId);
         vacantes.save(vacante);
         auditoria.registrar(quien.organizacionId(), quien, "asignar_version_pesos",
                 "vacante", id,
                 anterior == null ? null : Map.of("versionPesosId", String.valueOf(anterior)),
                 Map.of("versionPesosId", String.valueOf(versionPesosId)), null);
+    }
+
+    /**
+     * Una vacante, una versión, de principio a fin (docs/DECISION-UNA-VACANTE-UNA-VERSION.md).
+     *
+     * <p>Todos los candidatos de una vacante se miden con la misma vara: cambiarle un
+     * instrumento con gente ya dentro deja a los de antes calificados con uno y a los de
+     * después con otro, y el ranking los ordena juntos como si fueran comparables. Que cada
+     * nota conserve su versión protege el pasado; esto protege la competencia.
+     *
+     * <p>La línea es la <b>primera postulación</b>, no la publicación: una vacante publicada
+     * a la que nadie ha postulado todavía puede terminar de configurarse (es el camino del
+     * flujo sin banco, que asigna sus pesos después de publicar). Y asignar donde no había
+     * nada se permite siempre: nadie fue medido con una vara que no existía.
+     */
+    private void exigirVaraQuieta(Vacante vacante, Long anterior, Long nuevo, String queCosa) {
+        if (anterior == null || anterior.equals(nuevo) || "BORRADOR".equals(vacante.getEstado())) {
+            return;
+        }
+        if (postulaciones.countByVacanteId(vacante.getId()) > 0) {
+            throw new IllegalStateException("Esta vacante ya tiene postulantes y " + queCosa
+                    + " no se cambia: todos sus candidatos se miden con la misma vara. Para "
+                    + "estrenar otra versión, ábrela en la siguiente convocatoria; para "
+                    + "recalibrar señales, edita las preguntas del banco y recalifica a todos "
+                    + "(scripts/recalificar-banco.py).");
+        }
     }
 
     @Override

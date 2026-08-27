@@ -276,11 +276,12 @@ public class FlujoImportadorBancoIT {
                         .header("Authorization", "Bearer " + tokenEquipo))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(2));
-        // El catálogo con que el panel llenará la columna «Qué mide»
+        // El catálogo con que el panel llenará la columna «Qué mide»: las 22 dimensiones
+        // más los 7 pilares del banco CAZATALENTOS (V41).
         mvc.perform(get("/api/v1/panel/banco-preguntas/dimensiones")
                         .header("Authorization", "Bearer " + tokenEquipo))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(22))
+                .andExpect(jsonPath("$.length()").value(29))
                 .andExpect(jsonPath("$[0].codigo").exists());
     }
 

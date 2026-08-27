@@ -332,7 +332,8 @@ public class LectorPlantillaBanco {
             return new FilaPregunta(n, codigo, tipo, enunciado, situacion,
                     peso.shortValue(), eliminatoria, dimensiones,
                     nCampos == null ? null : nCampos.shortValue(),
-                    formula, rangosDe, notaInterna);
+                    formula, rangosDe, notaInterna,
+                    null, null, null);      // C3/C4/señal son del banco CAZATALENTOS
         }
 
         private FilaOpcion leerOpcion(Row fila, Map<String, String> tipoPorCodigo) {

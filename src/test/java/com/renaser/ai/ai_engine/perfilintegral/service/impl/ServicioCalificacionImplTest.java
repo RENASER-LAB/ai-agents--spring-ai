@@ -59,6 +59,8 @@ class ServicioCalificacionImplTest {
     @Mock private NotaEtapaRepository notasEtapa;
     @Mock private VersionPesosRepository versionesPesos;
     @Mock private VacanteRepository vacantes;
+    // Vacío por defecto: banco sin método declarado, que es el camino v3 de estos tests.
+    @Mock private com.renaser.ai.ai_engine.perfilintegral.repository.VersionBancoRepository versionesBanco;
 
     @InjectMocks
     private ServicioCalificacionImpl servicio;

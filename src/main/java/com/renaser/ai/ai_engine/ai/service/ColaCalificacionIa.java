@@ -45,6 +45,19 @@ public interface ColaCalificacionIa {
     boolean encolarPerfilIntegral(Long postulacionId);
 
     /**
+     * Vuelve a calificar las respuestas AUNQUE ya estén calificadas.
+     *
+     * <p>Es la herramienta de calibración: cuando cambia una señal de 0 o un peso, las
+     * calificaciones viejas son las del instrumento viejo, y {@code encolarPerfilIntegral}
+     * las vería TERMINADAS y no haría nada. Esto crea el trabajo del evaluador igual; al
+     * terminar, la barrera rehace el Perfil de Talento como siempre.
+     *
+     * @return true si quedó en la cola; false si hay uno vivo ahora mismo (no se paga dos
+     *         veces) o la calificación está apagada.
+     */
+    boolean reencolarEvaluador(Long postulacionId);
+
+    /**
      * Arranca la criba: leer el currículum y armar el Perfil de Talento con solo eso.
      *
      * <p>Es el mismo recorrido que el de arriba, pero para quien todavía no ha respondido

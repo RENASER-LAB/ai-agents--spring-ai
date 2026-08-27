@@ -126,7 +126,8 @@ class ServicioBancoPreguntasImplTest {
     private CrearPregunta crear(String tipo, Short peso, Short casosPedidos,
                                 String rangosDe, String formula) {
         return new CrearPregunta("D01", "A1", tipo, "¿...?", null, "la clave secreta",
-                true, 1, peso, true, false, casosPedidos, rangosDe, formula);
+                true, 1, peso, true, false, casosPedidos, rangosDe, formula,
+                null, null, null);
     }
 
     @Nested
@@ -612,7 +613,7 @@ class ServicioBancoPreguntasImplTest {
             when(versiones.findById(VERSION)).thenReturn(Optional.of(version("PUBLICADA")));
 
             servicio.corregirTextoPregunta(quien, PREGUNTA,
-                    new CorregirTextoPregunta("Con la errata corregida", null, null));
+                    new CorregirTextoPregunta("Con la errata corregida", null, null, null, null, null));
 
             assertThat(laPublicada.getEnunciado()).isEqualTo("Con la errata corregida");
             verify(auditoria).registrar(eq(ORGANIZACION), eq(quien),
@@ -629,14 +630,14 @@ class ServicioBancoPreguntasImplTest {
             when(versiones.findById(VERSION)).thenReturn(Optional.of(version("PUBLICADA")));
 
             servicio.corregirTextoPregunta(quien, PREGUNTA,
-                    new CorregirTextoPregunta("Enunciado nuevo", null, null));
+                    new CorregirTextoPregunta("Enunciado nuevo", null, null, null, null, null));
 
             assertThat(laPublicada.getSituacion()).isEqualTo("La situación de siempre");
             assertThat(laPublicada.getLogicaInterna()).isEqualTo("La clave secreta");
 
             // Y lo que sí llega, se cambia: los tres campos a la vez
             servicio.corregirTextoPregunta(quien, PREGUNTA,
-                    new CorregirTextoPregunta("Otro enunciado", "Otra situación", "Otra clave"));
+                    new CorregirTextoPregunta("Otro enunciado", "Otra situación", "Otra clave", null, null, null));
             assertThat(laPublicada.getEnunciado()).isEqualTo("Otro enunciado");
             assertThat(laPublicada.getSituacion()).isEqualTo("Otra situación");
             assertThat(laPublicada.getLogicaInterna()).isEqualTo("Otra clave");
@@ -649,7 +650,7 @@ class ServicioBancoPreguntasImplTest {
             when(versiones.findById(VERSION)).thenReturn(Optional.of(version("BORRADOR")));
 
             assertThatThrownBy(() -> servicio.corregirTextoPregunta(quien, PREGUNTA,
-                    new CorregirTextoPregunta("Otro", null, null)))
+                    new CorregirTextoPregunta("Otro", null, null, null, null, null)))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("un borrador se edita entero");
         }
@@ -661,7 +662,7 @@ class ServicioBancoPreguntasImplTest {
             when(versiones.findById(VERSION)).thenReturn(Optional.of(version("ARCHIVADA")));
 
             assertThatThrownBy(() -> servicio.corregirTextoPregunta(quien, PREGUNTA,
-                    new CorregirTextoPregunta("Otro", null, null)))
+                    new CorregirTextoPregunta("Otro", null, null, null, null, null)))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("ya no se toca");
             verify(preguntas, never()).save(any());

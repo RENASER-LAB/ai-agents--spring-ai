@@ -34,7 +34,11 @@ public final class DtosImportacionBanco {
             String formulaPuntaje,
             /** Solo V: el código del ítem cuya tabla de tramos se reutiliza. */
             String rangosDePreguntaCodigo,
-            String logicaInterna) {}
+            String logicaInterna,
+            /** Solo ABIERTA (CAZATALENTOS): la guía del evaluador. Nulos en el resto. */
+            String c3Esperado,
+            String c4Esperado,
+            String senalDeCero) {}
 
     /** Una fila de la hoja Opciones. La letra no viene: se sintetiza a, b, c… al insertar. */
     public record FilaOpcion(

@@ -41,6 +41,8 @@ import com.renaser.ai.ai_engine.perfilintegral.repository.PesoCriterioRepository
 import com.renaser.ai.ai_engine.perfilintegral.repository.PreguntaDimensionRepository;
 import com.renaser.ai.ai_engine.perfilintegral.repository.PreguntaRepository;
 import com.renaser.ai.ai_engine.perfilintegral.repository.RespuestaRepository;
+import com.renaser.ai.ai_engine.perfilintegral.service.FormulasCazatalentos;
+import com.renaser.ai.ai_engine.perfilintegral.service.LectorBancoCazatalentos;
 import com.renaser.ai.ai_engine.perfilintegral.service.PuenteCalificacionIa;
 import com.renaser.ai.ai_engine.perfilintegral.service.ServicioCalificacion;
 import com.renaser.ai.ai_engine.pesos.entity.PesoComponentePerfil;
@@ -118,6 +120,7 @@ public class PuenteCalificacionIaImpl implements PuenteCalificacionIa {
     private final ServicioCalificacion calificacion;
     private final ServicioParametros parametros;
     private final MaquinaEstados maquina;
+    private final CalificacionCriterios calificacionCriterios;
 
     @Override
     public Long organizacionDe(Long postulacionId) {
@@ -312,8 +315,10 @@ public class PuenteCalificacionIaImpl implements PuenteCalificacionIa {
     public InsumoRespuestas insumoRespuestas(Long postulacionId) {
         Postulacion postulacion = postulacion(postulacionId);
         Puesto puesto = puesto(vacante(postulacion));
+        // El método del banco viaja en el insumo: es lo que le dice al agente con qué
+        // formato responder — criterios en CRITERIOS, puntaje directo en el resto.
         return new InsumoRespuestas(puesto.getNombre(), puesto.getNivelPuestoCodigo(),
-                abiertas(postulacion));
+                calificacionCriterios.metodoDe(postulacion), abiertas(postulacion));
     }
 
     /**
@@ -348,7 +353,8 @@ public class PuenteCalificacionIaImpl implements PuenteCalificacionIa {
                 continue;
             }
             salida.add(new RespuestaAbierta(r.getId(), p.getTipo(), p.getEnunciado(),
-                    p.getSituacion(), dimensiones.getOrDefault(p.getId(), List.of()), r.getTexto()));
+                    p.getSituacion(), dimensiones.getOrDefault(p.getId(), List.of()), r.getTexto(),
+                    p.getC3Esperado(), p.getC4Esperado(), p.getSenalDeCero()));
         }
         return salida;
     }
@@ -360,6 +366,17 @@ public class PuenteCalificacionIaImpl implements PuenteCalificacionIa {
         Postulacion postulacion = postulacion(postulacionId);
         List<Long> mias = abiertas(postulacion).stream().map(RespuestaAbierta::respuestaId).toList();
 
+        // En un banco CRITERIOS el agente no trae puntaje: trae los criterios, y el número
+        // lo cuenta el código. Para la regla dura (R11) hace falta saber de qué pregunta es
+        // cada respuesta, así que se resuelve el mapa una vez.
+        boolean porCriterios = CalificacionCriterios.METODO
+                .equals(calificacionCriterios.metodoDe(postulacion));
+        Map<Long, Pregunta> preguntaDeRespuesta = porCriterios
+                ? preguntaPorRespuesta(postulacion) : Map.of();
+
+        // Para saber al final si quedó todo cubierto: lo que se guardó ahora más lo que ya
+        // estaba ajustado a mano (eso no se pisa, pero cuenta como calificado).
+        java.util.Set<Long> cubiertas = new java.util.HashSet<>();
         int guardadas = 0;
         for (NotaRespuestaIa nota : lista(resultado == null ? null : resultado.notas())) {
             if (nota.respuestaId() == null || !mias.contains(nota.respuestaId())) {
@@ -368,10 +385,31 @@ public class PuenteCalificacionIaImpl implements PuenteCalificacionIa {
                 continue;
             }
             // La base exige explicación y el documento exige evidencia citada (RF-56).
-            if (nota.puntaje() == null || esVacio(nota.explicacion())) {
-                log.warn("Nota de la respuesta {} descartada: sin puntaje o sin explicación",
-                        nota.respuestaId());
+            if (esVacio(nota.explicacion())) {
+                log.warn("Nota de la respuesta {} descartada: sin explicación", nota.respuestaId());
                 continue;
+            }
+            BigDecimal puntaje;
+            if (porCriterios) {
+                if (nota.cumpleSenalCero() == null || nota.c1Episodio() == null
+                        || nota.c2Autoria() == null || nota.c3Dato() == null
+                        || nota.c4Incomodidad() == null) {
+                    log.warn("Nota de la respuesta {} descartada: en un banco CRITERIOS el "
+                            + "agente declara los cuatro criterios y la señal, no un número",
+                            nota.respuestaId());
+                    continue;
+                }
+                Pregunta pregunta = preguntaDeRespuesta.get(nota.respuestaId());
+                puntaje = BigDecimal.valueOf(FormulasCazatalentos.puntaje(
+                        nota.cumpleSenalCero(), nota.c1Episodio(), nota.c2Autoria(),
+                        nota.c3Dato(), nota.c4Incomodidad(),
+                        pregunta == null ? null
+                                : LectorBancoCazatalentos.topeSinDato(pregunta.getLogicaInterna())));
+            } else if (nota.puntaje() == null) {
+                log.warn("Nota de la respuesta {} descartada: sin puntaje", nota.respuestaId());
+                continue;
+            } else {
+                puntaje = acotar(nota.puntaje(), CUATRO);
             }
 
             NotaRespuesta fila = notasRespuesta.findByRespuestaId(nota.respuestaId())
@@ -380,18 +418,54 @@ public class PuenteCalificacionIaImpl implements PuenteCalificacionIa {
                             .creadoEn(Instant.now())
                             .build());
             if (fila.getAjustadaPorUsuarioId() != null) {
+                cubiertas.add(nota.respuestaId());      // calificada por una persona: no se pisa
                 continue;
             }
-            fila.setPuntaje(acotar(nota.puntaje(), CUATRO));
+            fila.setPuntaje(puntaje);
             fila.setExplicacion(nota.explicacion());
             fila.setEvidenciaCitada(nota.evidenciaCitada());
             fila.setConfianza(acotar(nota.confianza(), CIEN));
             fila.setEjecucionIaId(ejecucionIaId);
+            if (porCriterios) {
+                fila.setCumpleSenalCero(nota.cumpleSenalCero());
+                fila.setC1Episodio(nota.c1Episodio());
+                fila.setC2Autoria(nota.c2Autoria());
+                fila.setC3Dato(nota.c3Dato());
+                fila.setC4Incomodidad(nota.c4Incomodidad());
+            }
             notasRespuesta.save(fila);
+            cubiertas.add(nota.respuestaId());
             guardadas++;
         }
         log.info("EVALUADOR: {} de {} respuestas abiertas calificadas en la postulación {}",
                 guardadas, mias.size(), postulacionId);
+
+        if (porCriterios) {
+            // En un banco CRITERIOS media rúbrica no es una nota, y la cola solo reintenta
+            // lo FALLIDO: si el agente omitió respuestas o devolvió notas inservibles, dar
+            // el trabajo por terminado dejaría la postulación sin nota de etapa para
+            // siempre. Se revienta —la transacción deshace lo guardado— y el reintento
+            // vuelve a pedir la tanda completa.
+            List<Long> sinNota = mias.stream().filter(id -> !cubiertas.contains(id)).toList();
+            if (!sinNota.isEmpty()) {
+                throw new IllegalStateException("El evaluador dejó " + sinNota.size() + " de "
+                        + mias.size() + " respuestas sin calificar (" + sinNota
+                        + "): sin la tanda completa no hay nota de etapa, se reintenta");
+            }
+            // La nota de etapa sale de estas calificaciones, así que se recalcula aquí.
+            calificacionCriterios.calificarEtapa(postulacion);
+        }
+    }
+
+    /** De qué pregunta es cada respuesta de la evaluación de esta postulación. */
+    private Map<Long, Pregunta> preguntaPorRespuesta(Postulacion postulacion) {
+        List<Respuesta> suyas = respuestas.findByEvaluacionId(postulacion.getEvaluacionId());
+        Map<Long, Pregunta> porId = preguntas.findByIdIn(
+                        suyas.stream().map(Respuesta::getPreguntaId).toList()).stream()
+                .collect(Collectors.toMap(Pregunta::getId, Function.identity()));
+        return suyas.stream()
+                .filter(r -> porId.containsKey(r.getPreguntaId()))
+                .collect(Collectors.toMap(Respuesta::getId, r -> porId.get(r.getPreguntaId())));
     }
 
     // ==================== POTENCIAL_RIESGO ====================
@@ -696,7 +770,8 @@ public class PuenteCalificacionIaImpl implements PuenteCalificacionIa {
         return notasRespuesta.findByRespuestaIdIn(
                         abiertas.stream().map(RespuestaAbierta::respuestaId).toList()).stream()
                 .map(n -> new NotaRespuestaIa(n.getRespuestaId(), n.getPuntaje(), n.getExplicacion(),
-                        n.getEvidenciaCitada(), n.getConfianza()))
+                        n.getEvidenciaCitada(), n.getConfianza(), n.getCumpleSenalCero(),
+                        n.getC1Episodio(), n.getC2Autoria(), n.getC3Dato(), n.getC4Incomodidad()))
                 .toList();
     }
 

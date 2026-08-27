@@ -59,6 +59,9 @@ class ServicioDesgloseEvaluacionImplTest {
     @Mock private ResultadoAlineacionRepository alineaciones;
     @Mock private ServicioCalificacion calificacion;
     @Mock private Permisos permisos;
+    // Devuelve null por defecto = banco sin método CRITERIOS: el camino clásico de estos tests.
+    @Mock private CalificacionCriterios calificacionCriterios;
+    @Mock private com.renaser.ai.ai_engine.perfilintegral.repository.NotaEtapaRepository notasEtapa;
 
     @InjectMocks
     private ServicioDesgloseEvaluacionImpl servicio;
