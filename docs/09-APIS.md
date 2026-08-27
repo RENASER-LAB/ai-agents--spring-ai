@@ -30,6 +30,22 @@ permiso: quien no lo tiene recibe un **403 con explicación**, no un error opaco
 permiso tiene **alcance**: el responsable de un área solo ve las postulaciones de sus vacantes,
 aunque llame al mismo endpoint que Talento.
 
+Los tres alcances se comportan igual en todos los endpoints del panel que cuelgan de **una
+postulación o de una vacante concreta**, porque **lo decide un solo sitio**
+(`AlcanceSobreLaVacante`): con `TODO` se ve todo lo de la empresa; con `SUS_VACANTES`, solo lo
+de las vacantes que esa persona dirige, y lo demás responde **404** y no 403 —un 403
+confirmaría que ese `{id}` existe—; y con **`PROPIO` no se alcanza ninguna fila**: las listas
+salen vacías y cualquier `{id}` es 404. `PROPIO` es el alcance del portal, donde sí hay algo
+que sea de quien mira; en el panel quien mira nunca es el candidato de la fila. Ningún rol lo
+tiene sembrado así en un permiso que se acote por vacante —el único `PROPIO` que la V9 le da a
+un rol de panel es `crear_solicitud`, que ni siquiera mira su alcance—, pero desde la V40 se
+pone con un solo `PUT`, así que los endpoints lo contemplan.
+
+Dos familias tienen su propia regla y se explican donde toca: la **solicitud de talento**, cuyo
+dueño es alguien del equipo y no una vacante, y las **sesiones de simulación**, que sirven a
+varias vacantes a la vez —así que «es tuya» no se pregunta de la misma forma, y el conteo de
+inscritos tiene además un cuarto caso: quien no tiene `ver_inscritos_simulacion`—.
+
 ## Cómo entrar
 
 **El candidato:** `POST /portal/cuentas` para crear la cuenta (exige aceptar el tratamiento de
@@ -121,6 +137,12 @@ la postulación en el acto (`NO_CONTINUA`), con la regla exacta escrita en su hi
 | GET `/solicitudes` · `/{id}` | Verlas, según el alcance de quien mira | `ver_solicitudes` |
 | POST `/solicitudes/{id}/aprobacion` | Aprobar: queda ABIERTA y ya admite vacante | `aprobar_solicitud` |
 | POST `/solicitudes/{id}/rechazo` | Rechazar, con motivo | `aprobar_solicitud` |
+
+⚠️ **La solicitud es el único sitio del panel donde `PROPIO` sí alcanza algo**, y por eso su
+alcance no lo resuelve el guardián de las vacantes: aquí «lo suyo» son las solicitudes que esa
+persona pidió, y el vínculo es `solicitud_talento.responsable_usuario_id`. Con `ver_solicitudes`
+en cualquier alcance que no sea `TODO` —`SUS_VACANTES` es lo que siembra la V9 al responsable
+del área— se ven solo las propias, y una ajena responde 404.
 
 ### Vacantes
 

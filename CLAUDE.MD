@@ -302,6 +302,15 @@ Las dos consultan el mismo backend, asi que ensenan el mismo orden.
   `postulacion.estado_codigo` a mano.
 - El alcance se aplica dentro de las consultas con `Permisos.alcanceDe`. Un 404 tambien
   significa «esto no es tuyo».
+- **Que una postulacion o una vacante sea tuya lo decide `AlcanceSobreLaVacante`, y solo el.**
+  Un servicio nuevo que necesite acotar por vacante lo inyecta y llama a
+  `laPostulacionVisible`, `laVacanteVisible` o `alcanzaA` — **no** vuelve a escribir el
+  `== SUS_VACANTES`. Esa linea estuvo copiada catorce veces y doce se dejaban `PROPIO` sin
+  tratar; la version del guardian es un `switch` sobre el enum, asi que un alcance nuevo rompe
+  la compilacion en un sitio en vez de colarse en doce. Lo que **no** pasa por ahi, y no es un
+  descuido: la **sesion de simulacion**, que sirve a varias vacantes a la vez y lleva su propia
+  regla (`tocaUnaVacanteSuya`, y el conteo con su cuarto caso en `contarInscritos`); y la
+  **solicitud de talento**, cuyo dueno es alguien del equipo (`ServicioSolicitudesImpl`).
 - El esquema solo cambia con una migracion nueva. **Nunca** editar una ya aplicada.
 - **Antes de numerar una migracion, mirar cual es la mas alta que existe** — y no solo en tu
   rama. Ricardo tambien crea migraciones: la de simulacion y validacion tuvo que pasar de `V16`
@@ -648,7 +657,7 @@ com.renaser.ai.ai_engine.<dominio>
 | `usuario` | Persona, usuario del equipo, roles y permisos |
 | `organizacion` | La organizacion, sus areas, la plataforma (alta de empresas) y la personalizacion de instrumentos |
 | `solicitud` | La Solicitud de Talento y sus resultados esperados |
-| `vacante` | Vacante, puesto, catalogos y requisitos objetivos |
+| `vacante` | Vacante, puesto, catalogos y requisitos objetivos. Aqui vive tambien `AlcanceSobreLaVacante`, que decide para todo el panel que filas alcanza cada alcance |
 | `postulacion` | La postulacion, su historial, el CV y **la maquina de estados** |
 | `pesos` | Las versiones de pesos del embudo |
 | `consentimiento` | Textos legales, consentimientos y solicitudes de borrado |

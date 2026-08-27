@@ -87,6 +87,11 @@ arreglo o una función concreta y nadie volvió a añadir su fila a estas tablas
 
 Leyenda: ● puede · ○ no puede · ◐ solo lo suyo
 
+El ◐ no es siempre el mismo alcance: en la columna del **candidato** es `PROPIO` —lo suyo, en
+el portal— y en la del **responsable del área** es `SUS_VACANTES` —lo de las vacantes que
+dirige—. No son intercambiables, y la diferencia importa desde que el reparto se edita por
+API: mira «Cómo se guarda esto», al final.
+
 ### Solicitud de Talento
 
 | Acción | Candidato | Talento | Resp. área | Dirección | Admin |
@@ -396,6 +401,33 @@ responsable del área y el que tiene Talento: lo que cambia es hasta dónde lleg
 
 Convertirlo en un simple sí o no le abriría al responsable del área los datos de todos los
 candidatos de la empresa.
+
+**Qué alcanza cada uno**, que es lo que hay que saber antes de tocar la matriz de un rol:
+
+| Alcance | Hasta dónde llega |
+|---|---|
+| **todo** (`TODO`) | Todas las filas **de su empresa**. Nunca de otra: el aislamiento no es un alcance, va por encima |
+| **sus vacantes** (`SUS_VACANTES`) | Solo lo que cuelga de una vacante donde esa persona es la responsable. La comparación es contra `vacante.responsable_usuario_id` |
+| **propio** (`PROPIO`) | Solo lo que es de quien mira. Es el alcance **del portal**: sus postulaciones, su ficha, su currículum |
+
+⚠️ **`PROPIO` en un permiso que se acota por vacante no alcanza ninguna fila**, y eso es a
+propósito. En el panel nada es de quien mira —son candidatos, y `/panel/**` exige un token de
+equipo—, así que la lista sale vacía y abrir un `{id}` responde 404. Poner `PROPIO` en
+`ver_candidatos` no acota el permiso: lo apaga.
+
+Dos cosas del panel no se acotan por vacante y llevan su propia regla. La **solicitud de
+talento** sí tiene dueño dentro del equipo: ahí «lo suyo» son las que esa persona pidió, el
+vínculo es `solicitud_talento.responsable_usuario_id`, y con `PROPIO` ve las suyas. Y la
+**sesión de simulación** sirve a varias vacantes a la vez, así que «es tuya» es que toque
+alguna vacante suya; con `PROPIO` tampoco ve ninguna. Además hay permisos cuyo alcance el
+servicio pide solo para que quien no lo tenga reciba un 403, y luego no filtra por él: ahí
+cambiar el alcance no cambia nada. **Que un alcance esté sembrado no quiere decir que se
+aplique** — esta matriz dice lo que se pretende, y el servicio dice lo que ocurre.
+
+Hasta la V40 esto era una discusión de laboratorio, porque el reparto solo se tocaba entrando
+a la base. Desde que `administrar_permisos` edita `rol_permiso` por API, **un solo `PUT` deja
+puesto cualquiera de los tres**, sin desplegar. Por eso el código no pregunta «¿es sus
+vacantes?» sino que trata los tres casos, y en un único sitio: `AlcanceSobreLaVacante`.
 
 **El backend verifica el permiso en cada llamada** (ver «Seguridad» en los no funcionales).
 Ocultar un botón no es seguridad: si el permiso no se valida en el servidor, cualquiera puede

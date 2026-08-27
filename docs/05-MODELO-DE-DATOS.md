@@ -427,7 +427,9 @@ El permiso guarda una etiqueta en lenguaje normal —«puede cerrar una vacante�
 pantalla donde se reparten permisos nunca debe mostrar nombres técnicos. Los permisos **no
 llevan organización**: son los mismos para todos, y lo que cambia es quién los tiene.
 
-El alcance tiene tres valores: **propio**, **sus vacantes** y **todo**.
+El alcance tiene tres valores: **propio**, **sus vacantes** y **todo**. Qué alcanza cada uno
+—y por qué **propio** es el alcance del portal y en el panel no llega a ninguna fila— está en
+[Roles y permisos](04-ROLES-Y-PERMISOS.md).
 
 ---
 
