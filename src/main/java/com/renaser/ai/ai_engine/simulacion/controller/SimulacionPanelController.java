@@ -31,7 +31,10 @@ public class SimulacionPanelController {
     // ---------- Sesiones ----------
 
     @GetMapping("/sesiones-simulacion")
-    @PreAuthorize("@permisos.tiene('crear_sesiones_simulacion')")
+    @PreAuthorize("@permisos.tiene('crear_sesiones_simulacion') "
+            + "or @permisos.tiene('ver_inscritos_simulacion')")
+    @Operation(summary = "Las sesiones. Quien solo puede ver inscritos también entra: sin esto "
+            + "tendría la lista de una sesión cuyo id no hay forma de averiguar")
     public List<SesionPanel> listar() {
         return servicio.listarSesiones(permisos.actual());
     }
@@ -45,9 +48,20 @@ public class SimulacionPanelController {
     }
 
     @GetMapping("/sesiones-simulacion/{id}")
-    @PreAuthorize("@permisos.tiene('crear_sesiones_simulacion')")
+    @PreAuthorize("@permisos.tiene('crear_sesiones_simulacion') "
+            + "or @permisos.tiene('ver_inscritos_simulacion')")
+    @Operation(summary = "Una sesión. Con alcance acotado, una que no toca ninguna vacante suya "
+            + "responde 404")
     public SesionPanel detalle(@PathVariable Long id) {
         return servicio.verSesion(permisos.actual(), id);
+    }
+
+    @GetMapping("/sesiones-simulacion/{id}/inscritos")
+    @PreAuthorize("@permisos.tiene('ver_inscritos_simulacion')")
+    @Operation(summary = "Quién eligió esta fecha. Trae la inscripcion_id que piden marcas y "
+            + "asistencia. Cuánto se ve depende del alcance del rol, que se edita en el panel")
+    public List<InscritoEnSesion> inscritos(@PathVariable Long id) {
+        return servicio.listarInscritos(permisos.actual(), id);
     }
 
     @PostMapping("/sesiones-simulacion/{id}/cupo")

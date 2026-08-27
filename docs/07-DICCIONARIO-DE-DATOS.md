@@ -1,13 +1,18 @@
 # Diccionario de datos
 
 Sistema de selección de personal — Renaser Consulting
-Versión 2.1 · 2026-08-25 · Puesto al día con las migraciones hasta la `V36`
+Versión 2.2 · 2026-08-27 · Puesto al día con las migraciones hasta la `V40`
 
 Cada tabla con todas sus columnas, tipos y claves. **Este documento se consulta**, no se lee de
 corrido: es la base para escribir las migraciones de Flyway.
 
-Lo que llegó después de la versión 2.0 va marcado con su migración entre paréntesis. La única
-tabla de la base que no está aquí es `agent_run`, que es del motor de agentes y no de selección.
+Lo que llegó después de la versión 2.0 va marcado con su migración entre paréntesis.
+
+⚠️ **Tres tablas de la base no tienen ficha aquí.** `agent_run` es del motor de agentes y no de
+selección, así que no la tendrá nunca. `invitacion` (`V37`) y `tarifa_modelo` (`V38`) sí
+deberían tenerla: llegaron con el multiempresa y su ficha está pendiente. Hasta que se
+escriban, para esas dos manda la migración. De las **102 tablas de selección** que existen hoy,
+aquí hay ficha de 100, más otras diez que están solo diseñadas y todavía no existen.
 
 Para entender *por qué* el modelo es así, está el [Modelo de datos](05-MODELO-DE-DATOS.md).
 
@@ -150,20 +155,32 @@ Un nombre y una lista de permisos.
 
 ## `permiso`
 
-Una acción suelta que se puede conceder o no. **Son 73.**
+Una acción suelta que se puede conceder o no. **Sembrados hay 71**, contados sobre los bloques
+`INSERT INTO permiso` de las migraciones. La matriz de
+[Roles y permisos](04-ROLES-Y-PERMISOS.md) enumera 77, y **las dos listas no se contienen la
+una a la otra**: allí hay acciones diseñadas que la base todavía no tiene —el Radar entero y
+casi todas las métricas—, y aquí hay cuatro permisos sembrados que aquella matriz no enumera,
+porque llegaron con una función o un arreglo concreto y nadie volvió a la tabla a añadir la
+fila (`ver_banco_preguntas` de la `V13`, `corregir_contacto_candidato` de la `V27`,
+`ver_perfil_candidato` y `ver_pretension` de la `V36`). Ese documento describe el sistema
+completo; este sigue al código.
 
 | Columna | Tipo | Oblig. | Qué guarda |
 |---|---|---|---|
 | `id` | bigint | sí | Clave |
 | `codigo` | text | sí | `cerrar_vacante` |
 | `etiqueta` | text | sí | «Cerrar una vacante». En lenguaje normal |
-| `grupo` | text | sí | `SOLICITUDES`, `VACANTES`, `CANDIDATOS`, `EVALUACION`, `SIMULACION`, `VALIDACION`, `DECISION`, `CIERRE`, `RADAR`, `METRICAS`, `CONFIGURACION` |
+| `grupo` | text | sí | `SOLICITUDES`, `VACANTES`, `CANDIDATOS`, `EVALUACION`, `SESIONES`, `VALIDACION`, `DECISION`, `CIERRE`, `RADAR`, `METRICAS`, `CONFIGURACION` |
 | `orden` | integer | sí | Dentro de su grupo |
 
 **Clave primaria:** `id` · **Único:** `codigo`
 
+Los grupos que existen de verdad hoy son nueve —`DECISION` y `RADAR` están solo diseñados—, y
+la simulación va en `SESIONES`, no en `SIMULACION`.
+
 **No lleva organización:** los permisos son los mismos para todos. Lo que cambia es quién los
-tiene. Solo crece con una migración.
+tiene. Solo crece con una migración: los dos últimos, `ver_inscritos_simulacion` y
+`administrar_permisos`, llegaron con la `V40`.
 
 La etiqueta existe porque la pantalla donde se reparten permisos nunca debe mostrar nombres
 técnicos.
@@ -198,6 +215,22 @@ Qué permisos tiene un rol y con qué alcance.
 
 El alcance va aquí y no en el permiso porque es **el mismo permiso** el que tienen el responsable
 del área y el Equipo de Talento: lo que cambia es hasta dónde llega.
+
+**Esta tabla ya se escribe por la API** (`V40`), con `administrar_permisos`: `PUT` para conceder
+con alcance y `POST …/revocacion` para quitar, cada uno con motivo escrito y su fila de
+auditoría. Dos consecuencias para quien lea esta ficha:
+
+- **`creado_en` es cuándo se concedió el permiso, no cuándo cambió el alcance.** Subir un
+  `SUS_VACANTES` a `TODO` deja la fecha como estaba a propósito: cuándo cambió y por qué lo dice
+  la auditoría, que es donde vive la historia. Esta tabla solo sabe cómo están las cosas hoy.
+- **Nadie relee esto en diferido.** `FiltroIdentidad` lo consulta en cada petición y no hay
+  caché en medio, así que un cambio vale desde la siguiente llamada del afectado — sin desplegar
+  y sin que vuelva a entrar. Ponerle caché a `ServicioContexto` rompería justo eso.
+
+**El último `administrar_permisos` de una organización no se puede revocar**: dejaría el reparto
+sin nadie que pudiera volver a tocarlo, y de ahí solo se sale entrando a la base a mano. El
+candado cuenta filas dentro de la organización y no en toda la tabla, para que dos empresas no
+se tapen la una a la otra.
 
 ## `enlace_acceso`
 
@@ -1679,6 +1712,19 @@ Esta tabla es lo que permite que los tres momentos que antes eran estados —ele
 el día, estar en la sesión— sean uno solo: la bandeja los distingue cruzando la inscripción con
 la fecha de la sesión.
 
+⚠️ **No lleva `organizacion_id`, y eso obliga a comprobarla por sus dos lados.** La empresa está
+en la sesión y está en la postulación, no aquí. Quien cargue una inscripción por su id a secas
+—las marcas, la asistencia— tiene que mirar las dos: comprobar solo una deja pasar una
+inscripción ajena, y marcar asistencia sobre ella **transiciona la postulación de la otra
+empresa**. Comprobar las dos no es redundante: una inscripción cuya sesión fuera de una empresa
+y cuya postulación fuera de otra son datos rotos, y así no llegan a existir.
+
+Desde la `V40` estas filas también salen por el panel: `GET /sesiones-simulacion/{id}/inscritos`
+devuelve el `id` de la inscripción —que es lo que las marcas y la asistencia piden por ruta—,
+junto con `inscrita_en`, `asistio` y el nombre del candidato. `asistio` vacío significa **que
+nadie ha marcado nada todavía**, que no es lo mismo que «no vino»: eso es `false`, y además
+apaga `es_vigente`.
+
 ## `tramo_simulacion`
 
 Cómo se reparten los minutos de esta sesión.
@@ -2494,5 +2540,5 @@ Lo que **no** cabe en una restricción y hay que probar en el código está en
 - [Alcance del MVP](08-ALCANCE-DEL-MVP.md) — qué tablas entran en cada hito
 - [Requisitos funcionales](01-REQUISITOS-FUNCIONALES.md) — qué hace el sistema
 - [Estados de la postulación](03-ESTADOS-POSTULACION.md) — los 18 estados y sus transiciones
-- [Roles y permisos](04-ROLES-Y-PERMISOS.md) — los 73 permisos
+- [Roles y permisos](04-ROLES-Y-PERMISOS.md) — los 77 permisos
 - [Diagrama del modelo](diagramas/modelo-de-datos.html) — se abre en el navegador

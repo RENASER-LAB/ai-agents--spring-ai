@@ -2,6 +2,7 @@ package com.renaser.ai.ai_engine.administracion.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 
 import java.time.Instant;
 import java.util.List;
@@ -48,6 +49,38 @@ public final class DtosAdministracion {
     public record AsignarRoles(@NotNull List<String> roles) {}
 
     public record RolPanel(Long id, String codigo, String nombre, boolean esSistema) {}
+
+    /**
+     * Una casilla de la matriz de permisos de un rol.
+     *
+     * <p>Sale el catálogo entero y no solo lo concedido: un panel que solo enseña lo que ya
+     * está no deja añadir nada, y quien administra necesita ver también lo que falta. El
+     * alcance vacío es exactamente eso — este rol no tiene este permiso.
+     *
+     * @param alcance {@code TODO}, {@code SUS_VACANTES}, {@code PROPIO} o vacío
+     */
+    public record PermisoDelRol(String codigo, String etiqueta, String grupo, Integer orden,
+                                String alcance) {}
+
+    /**
+     * Conceder un permiso a un rol, o cambiarle el alcance si ya lo tenía.
+     *
+     * <p>El motivo es obligatorio y no es burocracia: esto cambia lo que un grupo de personas
+     * puede hacer con los datos de los candidatos, y surte efecto en la siguiente petición de
+     * cada una. Si alguien pregunta después por qué su equipo empezó a ver algo, la respuesta
+     * tiene que estar escrita.
+     */
+    public record ConcederPermiso(
+            @NotBlank @Pattern(regexp = "TODO|SUS_VACANTES|PROPIO",
+                    message = "alcance debe ser TODO, SUS_VACANTES o PROPIO")
+            String alcance,
+            @NotBlank(message = "Cambiar lo que puede un rol exige un motivo escrito")
+            String motivo) {}
+
+    /** Quitarle un permiso a un rol. Mismo motivo obligatorio, por lo mismo. */
+    public record RevocarPermiso(
+            @NotBlank(message = "Cambiar lo que puede un rol exige un motivo escrito")
+            String motivo) {}
 
     public record CrearArea(@NotBlank String nombre) {}
 

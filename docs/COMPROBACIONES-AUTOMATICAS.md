@@ -47,20 +47,20 @@ demás de la calificación se prueba con un doble del modelo y no gasta nada.
 
 ---
 
-## 747 pruebas
+## 787 pruebas
 
-Contadas de correrlas el 26/08/2026 (tras las piezas D, E y F del multiempresa, su QA y la
-fusión con main, que trajo el ranking por etapa y el desglose de la evaluación), no de
-recordarlas: el desglose sale de los informes de surefire y failsafe, y suma exacto.
+Contadas de correrlas el 27/08/2026 (tras fusionar el multiempresa con los inscritos de la
+simulación y los permisos editables), no de recordarlas: el desglose sale de los informes de
+surefire y failsafe, y suma exacto.
 
 | Qué | Cuántas | Necesita |
 |---|---:|---|
-| Unitarias, con dobles | 541 | nada |
-| Arquitectura | 9 | nada |
+| Unitarias, con dobles | 577 | nada |
+| Arquitectura | 12 | nada |
 | Las fórmulas del banco v3 | 22 | nada |
 | El validador de las respuestas v3 | 21 | nada |
 | El perfil del candidato (paquete `perfil`: merge, lectura, CRUD, retención, borrado) | 52 | nada |
-| Integración, de punta a punta | 96 | Docker |
+| Integración, de punta a punta | 97 | Docker |
 | Contra el proveedor de verdad, y el envío de correo | 6 | Docker o SMTP, y su bandera |
 
 El multiempresa (25/08) sumó 39 unitarias: 31 de la implementación —el login del panel, las
@@ -101,6 +101,26 @@ a la competencia, el motivo queda auditado, el objetivo inexistente es 404 — l
 sola prueba), y el borrado 29733 que también vacía el nombre del papel firmado al postular
 (aserción nueva en `FlujoDosEmpresasIT`).
 
+Los inscritos de la simulación y los permisos editables (27/08) sumaron **34 unitarias y 1 de
+integración**. Casi todas son de alcance, y casi todas existen porque el conteo y la lista se
+separaron tres veces seguidas: `ServicioSimulacionImplTest` creció en 19 —que la lista, el
+detalle y `/inscritos` digan el mismo número con `TODO`, con `SUS_VACANTES` y con `PROPIO`,
+también cuando los dos permisos traen alcances distintos, que es un reparto que hoy nadie
+tiene pero que un solo PUT deja puesto—. `PermisosDeUnRolTest` aporta 8, y las dos que más
+importan no son del camino feliz: que el último `administrar_permisos` no se pueda revocar y
+que ese candado cuente **dentro de la organización** y no en toda la base, o dos empresas se
+taparían la una a la otra. `NombresDeUsuariosTest` aporta 5, todas sobre lo que pasa cuando
+no hay nombre que dar: sin persona, con la persona borrada o a medio rellenar sale
+`(anonimizado)` y nunca una cadena vacía —ese nombre lo resolvía la bandeja por su cuenta y
+ahora lo resuelve un colaborador, así que `ServicioPostulacionesPanelImplTest` cambió de
+cuidar cómo se resuelve a cuidar que la ficha lo traiga y que una postulación ajena siga
+respondiendo 404 y no 403—. La de integración es el viaje entero por la API dentro de
+`FlujoSimulacionValidacionIT`: quién eligió la fecha se ve, y **quién puede verlo se cambia
+sin desplegar** — al responsable del área se le revoca el permiso desde el panel y el mismo
+token deja de servir en la llamada siguiente, sin desplegar y sin volver a entrar. De paso es
+lo único que ejecuta la consulta nueva del conteo contra PostgreSQL de verdad: que su JPQL
+con dos saltos sea válida no se ve con dobles.
+
 ⚠️ Al recontar, **no sirve el atributo `tests=`** de los XML de surefire: con clases anidadas
 (`@Nested`) subcuenta, y por eso dos filas de esta tabla llevaban tiempo mal —las fórmulas
 ponían 20 cuando son 22, y el validador 14 cuando son 21— aunque el total cuadrase por
@@ -114,6 +134,16 @@ Las tres filas del medio se listan aparte porque se prueban solas, sin contexto 
 son las que deciden la nota de una persona y las que impiden que una respuesta con mala
 forma llegue a puntuarse. La fila del perfil cuenta las del paquete `perfil`; antes esta
 tabla decía 64 porque sumaba pruebas de otros paquetes que tocan el perfil de pasada.
+
+**La fila de arquitectura cuenta el paquete entero, y ya no son nueve.** Nueve son las reglas
+de `ArquitecturaTest`, que es lo que enumera el apartado de abajo; las otras tres son
+`MigracionesSinChoqueTest`, que no vigila el código sino los nombres de los archivos de
+migración: **que dos ramas no reclamen el mismo número**. Es el único conflicto del
+repositorio que git no sabe ver —dos `V40__…sql` distintos son, para git, dos archivos
+distintos, y los fusiona sin marcar nada—, y quien se entera es Flyway al arrancar. Pasó el
+26/08/2026 con tres ramas peleándose el 37; esta misma rama tuvo que renumerar su migración
+al `V40` por eso. Vive en `arquitectura/` porque lee archivos y no necesita Docker, como las
+otras nueve.
 
 Entre las de integración hay dos que no se parecen al resto y conviene conocer: la del **banco
 por el panel** (`FlujoBancoPreguntasIT`), donde un administrador construye, publica y archiva un

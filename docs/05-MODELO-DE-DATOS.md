@@ -23,7 +23,7 @@ Sirve para tres cosas:
 - **Entender el sistema.** Un modelo de datos bien contado explica el negocio mejor que
   cualquier otro documento.
 
-**La base ya está construida.** Las migraciones `V1` a `V38` viven en
+**La base ya está construida.** Las migraciones `V1` a `V40` viven en
 `src/main/resources/db/migration` —**102 tablas de este módulo**, 105 en la base contando la de
 Flyway y las dos del motor de agentes— y Flyway es el dueño del esquema. Cambiar algo de aquí
 ya cuesta una migración nueva, y **una migración aplicada no se edita nunca**: se escribe otra
@@ -55,7 +55,21 @@ del proceso a la postulación —y a la empresa— que lo firmó; la tabla nueva
 pone precio por millón de tokens a cada modelo, con vigencia por fecha; el estado
 `EN_ESPERA` entra al catálogo de `trabajo_ia` para los trabajos congelados por el tope
 mensual de IA; y se siembra la plantilla de correo del aviso del 80% (`TOPE_IA_AVISO`) para
-todas las organizaciones.
+todas las organizaciones. La `V39` es de una línea: siembra la tarifa del modelo rápido, que
+a la `V38` se le quedó fuera y dejaba invisible el gasto de leer currículums.
+
+La `V40` **no añade ninguna tabla**, y eso es lo interesante: lo que hacía falta —saber quién
+eligió cada fecha de una sesión— ya estaba en `inscripcion_sesion`, solo que no salía por
+ningún endpoint. Lo único que trae son dos permisos, `ver_inscritos_simulacion` y
+`administrar_permisos`, con su reparto inicial en `rol_permiso`. Y ese reparto **es un punto de
+partida, no una decisión grabada en el código**: desde este mismo hito se edita por la API, y
+`FiltroIdentidad` lo relee en cada petición. Ver [Roles y permisos](04-ROLES-Y-PERMISOS.md).
+
+⚠️ Esta migración nació como `V37` y hubo que renumerarla: `main` reclamó ese número para el
+multiempresa mientras la rama estaba abierta. Git no ve ese choque —dos archivos con nombres
+distintos se fusionan sin conflicto— y quien se entera es Flyway al arrancar, así que ahora hay
+una prueba que lo vigila (`MigracionesSinChoqueTest`). Si un comentario del código todavía dice
+«V37» hablando de este reparto, es de antes de la renumeración.
 
 Cuatro son del banco de preguntas v3: `V20` reemplaza el banco entero y añade cinco
 tablas (`rango_pregunta`, `campo_caso`, `multiplicador_bloque`, `umbral_nivel` y
@@ -400,7 +414,7 @@ código. El Administrador puede crear roles nuevos y repartir permisos sin que n
 | `usuario` | Cómo entra al sistema | organizacion_id, persona_id, correo, contrasena_hash, usuario_renaser_os_id, area_id, es_activo |
 | `area` | El departamento que contrata. Hace falta para saber qué ve un responsable y para impedir que alguien sea Evaluador de Estándar de su propia área | organizacion_id, nombre |
 | `rol` | Un nombre y una lista de permisos | organizacion_id, codigo, nombre, descripcion |
-| `permiso` | Una acción suelta que se puede conceder o no. Son 73 | codigo, etiqueta, grupo |
+| `permiso` | Una acción suelta que se puede conceder o no. Son 77 diseñados, 71 sembrados | codigo, etiqueta, grupo |
 | `usuario_rol` | Una persona puede tener varios roles. Puede hacer lo que le permita cualquiera de ellos | usuario_id, rol_id |
 | `rol_permiso` | Qué permisos tiene un rol y **con qué alcance** | rol_id, permiso_id, alcance |
 
@@ -981,10 +995,11 @@ Datos que se cargan con la primera migración, no a mano:
 
 - La **organización** Renaser, marcada como **dueña de la plataforma** (`es_plataforma`)
 - Los **18 estados** de la postulación, con su etapa y su momento
-- Los **69 permisos** que las migraciones siembran, con su etiqueta y su grupo — contados
-  de las migraciones, no de los documentos de diseño. Los dos últimos son de la V37:
+- Los **71 permisos** que las migraciones siembran, con su etiqueta y su grupo — contados
+  de las migraciones, no de los documentos de diseño. Cuatro son recientes: de la V37,
   `personalizar_instrumentos` para el administrador de cada empresa y
-  `administrar_plataforma` solo para el de la plataforma
+  `administrar_plataforma` solo para el de la plataforma; de la V40,
+  `ver_inscritos_simulacion` y `administrar_permisos`
 - Los **cinco roles** iniciales con sus permisos: candidato, equipo de talento, responsable del
   área, dirección y administrador. Es como arranca el sistema, no cómo queda para siempre
 - Las **22 dimensiones**, con cuáles de ellas son obligatorias

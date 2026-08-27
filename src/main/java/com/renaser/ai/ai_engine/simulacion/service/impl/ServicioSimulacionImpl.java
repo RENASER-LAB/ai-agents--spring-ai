@@ -20,6 +20,8 @@ import com.renaser.ai.ai_engine.usuario.entity.Rol;
 import com.renaser.ai.ai_engine.usuario.entity.UsuarioRol;
 import com.renaser.ai.ai_engine.usuario.repository.RolRepository;
 import com.renaser.ai.ai_engine.usuario.repository.UsuarioRolRepository;
+import com.renaser.ai.ai_engine.usuario.service.NombresDeUsuarios;
+import com.renaser.ai.ai_engine.vacante.entity.Vacante;
 import com.renaser.ai.ai_engine.vacante.repository.VacanteRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -28,15 +30,24 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class ServicioSimulacionImpl implements ServicioSimulacion {
+
+    private static final String VER_INSCRITOS = "ver_inscritos_simulacion";
+    /** El nombre del recurso en los 404, para que todos digan lo mismo. */
+    private static final String INSCRIPCION = "Inscripción";
 
     private static final String ESPERANDO = "SIMULACION_POR_HABILITAR";
     private static final String PUEDE_ELEGIR = "SIMULACION_TURNO_CANDIDATO";
@@ -63,6 +74,7 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
     private final AlertaRepository alertas;
     private final PostulacionRepository postulaciones;
     private final VacanteRepository vacantes;
+    private final NombresDeUsuarios nombres;
     private final ColaCalificacionIa cola;
     private final RolRepository roles;
     private final UsuarioRolRepository usuarioRoles;
@@ -126,10 +138,15 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
 
     @Override
     public List<SesionPanel> listarSesiones(ContextoUsuario quien) {
-        permisos.alcanceDe("crear_sesiones_simulacion");
+        FiltroAlcance alcance = alcanceParaVerSesiones(quien);
         List<SesionSimulacion> todas = sesiones.findByOrganizacionIdOrderByFechaHora(
                 quien.organizacionId());
         if (todas.isEmpty()) {
+            return List.of();
+        }
+        // Con PROPIO no hay nada que enseñar: una sesión no es de nadie en particular, y quien
+        // solo alcanza lo suyo mira su sesión por el portal, no por el panel.
+        if (alcance.tipo() == FiltroAlcance.Tipo.PROPIO) {
             return List.of();
         }
 
@@ -140,13 +157,30 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
         // sobre una lista que solo crece es un problema que se nota tarde, cuando ya hay
         // un año de sesiones dentro.
         List<Long> ids = todas.stream().map(SesionSimulacion::getId).toList();
-        Map<Long, Long> inscritos = new HashMap<>();
-        for (Object[] fila : inscripciones.contarVigentesPorSesion(ids)) {
-            inscritos.put((Long) fila[0], (Long) fila[1]);
-        }
         Map<Long, List<Long>> vacantesPorSesion = sesionesVacante.findBySesionSimulacionIdIn(ids)
                 .stream().collect(Collectors.groupingBy(SesionVacante::getSesionSimulacionId,
                         Collectors.mapping(SesionVacante::getVacanteId, Collectors.toList())));
+
+        // Con SUS_VACANTES la lista se queda en las sesiones que tocan alguna vacante suya, y
+        // el conteo cuenta solo a los suyos. Son las dos caras de lo mismo: enseñar una sesión
+        // entera y luego negar a sus inscritos sería peor que no enseñarla.
+        boolean recorta = alcance.tipo() == FiltroAlcance.Tipo.SUS_VACANTES;
+        if (recorta) {
+            Set<Long> suyas = vacantes
+                    .findByOrganizacionIdAndResponsableUsuarioIdOrderByCreadoEnDesc(
+                            quien.organizacionId(), quien.usuarioId())
+                    .stream().map(Vacante::getId).collect(Collectors.toSet());
+            todas = todas.stream()
+                    .filter(s -> vacantesPorSesion.getOrDefault(s.getId(), List.of())
+                            .stream().anyMatch(suyas::contains))
+                    .toList();
+            if (todas.isEmpty()) {
+                return List.of();
+            }
+            ids = todas.stream().map(SesionSimulacion::getId).toList();
+        }
+
+        Map<Long, Long> inscritos = contarInscritos(ids, alcanceParaContarInscritos(quien));
         Map<Long, List<Long>> responsablesPorSesion = responsables.findBySesionSimulacionIdIn(ids)
                 .stream().collect(Collectors.groupingBy(SesionResponsable::getSesionSimulacionId,
                         Collectors.mapping(SesionResponsable::getUsuarioId, Collectors.toList())));
@@ -169,7 +203,162 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
 
     @Override
     public SesionPanel verSesion(ContextoUsuario quien, Long sesionId) {
-        return comoPanel(laSesion(quien, sesionId));
+        SesionSimulacion sesion = laSesion(quien, sesionId);
+        FiltroAlcance alcance = alcanceParaVerSesiones(quien);
+        // PROPIO no abre ninguna, igual que no lista ninguna: una sesión no es de nadie en
+        // particular, así que «lo suyo» no señala a ninguna.
+        boolean alcanza = alcance.tipo() == FiltroAlcance.Tipo.TODO
+                || (alcance.tipo() == FiltroAlcance.Tipo.SUS_VACANTES
+                        && tocaUnaVacanteSuya(quien, sesion));
+        if (!alcanza) {
+            // 404 y no 403: un 403 confirmaría que esa sesión existe.
+            throw new ResourceNotFoundException("Sesión", "id", sesionId);
+        }
+        // El mismo recorte que la lista, o el detalle contaría a gente que luego no puede abrir.
+        return comoPanel(sesion, alcanceParaContarInscritos(quien));
+    }
+
+    /**
+     * Con qué alcance mira las sesiones quien llama.
+     *
+     * <p>Dos permisos abren esta puerta y hay que resolver cuál trae puesto: quien crea las
+     * sesiones —Talento, Dirección— y quien solo necesita ver a los inscritos, que es el
+     * responsable del área. {@code alcanceDe} lanza si el permiso falta, así que preguntar
+     * primero con {@code tiene} es lo que evita que el segundo caso pase la anotación del
+     * controlador y reviente una línea más abajo.
+     *
+     * <p>Se prefiere el de crear sesiones cuando están los dos porque es el más amplio de los
+     * dos repartos de hoy; si mañana alguien invierte eso desde el panel, esto sigue valiendo,
+     * porque lo que manda es el alcance que traiga la fila, no cuál de los dos permisos es.
+     */
+    private FiltroAlcance alcanceParaVerSesiones(ContextoUsuario quien) {
+        return quien.tiene("crear_sesiones_simulacion")
+                ? permisos.alcanceDe("crear_sesiones_simulacion")
+                : permisos.alcanceDe(VER_INSCRITOS);
+    }
+
+    /**
+     * Con qué alcance se cuentan los inscritos, o nulo si quien mira no puede verlos.
+     *
+     * <p>Va por {@code ver_inscritos_simulacion} y no por el permiso con que se llegó a la
+     * sesión, porque contar inscritos es ver inscritos: si se resolviera con el otro, un rol
+     * con crear sesiones en TODO y ver inscritos acotado vería «6» en la sesión y dos filas al
+     * abrirla. Ese reparto no es el que siembra la V40, pero es un solo PUT desde el panel de
+     * permisos —que es justo lo que esta rama abre—.
+     *
+     * <p>Nulo significa que no tiene el permiso, y entonces el conteo va entero: no puede abrir
+     * la lista, así que no hay dos cifras que puedan contradecirse, y el número de inscritos de
+     * una sesión es aforo, no identidades.
+     */
+    private FiltroAlcance alcanceParaContarInscritos(ContextoUsuario quien) {
+        return quien.tiene(VER_INSCRITOS)
+                ? permisos.alcanceDe(VER_INSCRITOS)
+                : null;
+    }
+
+    /** Si alguna de las vacantes de la sesión es de las que este usuario dirige. */
+    private boolean tocaUnaVacanteSuya(ContextoUsuario quien, SesionSimulacion sesion) {
+        List<Long> deLaSesion = sesionesVacante.findBySesionSimulacionId(sesion.getId())
+                .stream().map(SesionVacante::getVacanteId).toList();
+        if (deLaSesion.isEmpty()) {
+            return false;
+        }
+        return vacantes.findAllById(deLaSesion).stream()
+                .anyMatch(v -> quien.usuarioId().equals(v.getResponsableUsuarioId()));
+    }
+
+    @Override
+    public List<InscritoEnSesion> listarInscritos(ContextoUsuario quien, Long sesionId) {
+        SesionSimulacion sesion = laSesion(quien, sesionId);
+        FiltroAlcance alcance = permisos.alcanceDe(VER_INSCRITOS);
+
+        List<InscripcionSesion> vigentes =
+                inscripciones.findBySesionSimulacionIdAndEsVigenteTrue(sesion.getId());
+        if (vigentes.isEmpty()) {
+            return List.of();
+        }
+
+        // Las postulaciones primero: hacen falta para el alcance —de qué vacante es cada
+        // una— antes de saber qué filas sobreviven, y pedir los nombres de las que se van a
+        // descartar sería traer datos de personas que este usuario no puede ver.
+        Map<Long, Postulacion> porPostulacion = postulaciones.findAllById(
+                        vigentes.stream().map(InscripcionSesion::getPostulacionId)
+                                .filter(Objects::nonNull).collect(Collectors.toSet()))
+                .stream().collect(Collectors.toMap(Postulacion::getId, Function.identity()));
+        Map<Long, Vacante> porVacante = vacantes.findAllById(
+                        porPostulacion.values().stream().map(Postulacion::getVacanteId)
+                                .filter(Objects::nonNull).collect(Collectors.toSet()))
+                .stream().collect(Collectors.toMap(Vacante::getId, Function.identity()));
+
+        List<InscripcionSesion> visibles = vigentes.stream()
+                .filter(i -> alcanzaA(quien, alcance, porPostulacion.get(i.getPostulacionId()),
+                        porVacante))
+                .sorted(Comparator.comparing(InscripcionSesion::getInscritaEn,
+                        Comparator.nullsLast(Comparator.naturalOrder())))
+                .toList();
+        if (visibles.isEmpty()) {
+            return List.of();
+        }
+
+        Map<Long, String> candidatos = nombres.porUsuario(visibles.stream()
+                .map(i -> porPostulacion.get(i.getPostulacionId()))
+                .filter(Objects::nonNull)
+                .map(Postulacion::getUsuarioId)
+                .toList());
+
+        return visibles.stream().map(i -> {
+            Postulacion p = porPostulacion.get(i.getPostulacionId());
+            Vacante v = p == null ? null : porVacante.get(p.getVacanteId());
+            return new InscritoEnSesion(
+                    i.getId(), i.getPostulacionId(),
+                    p == null ? NombresDeUsuarios.ANONIMO
+                            : candidatos.getOrDefault(p.getUsuarioId(), NombresDeUsuarios.ANONIMO),
+                    v == null ? "" : v.getTitulo(),
+                    i.getInscritaEn(), i.getAsistio());
+        }).toList();
+    }
+
+    /**
+     * Si este usuario puede ver esta inscripción, según el alcance que su rol tenga hoy.
+     *
+     * <p>Los tres casos del enum están cubiertos a propósito, y no solo el que hoy se
+     * siembra. El reparto de {@code rol_permiso} se edita desde el panel: si mañana alguien
+     * pone {@code PROPIO} en este permiso, el que falte un caso aquí no daría un error — daría
+     * la lista entera, que es exactamente lo contrario de lo que esa configuración pide.
+     */
+    private boolean alcanzaA(ContextoUsuario quien, FiltroAlcance alcance, Postulacion p,
+                             Map<Long, Vacante> porVacante) {
+        return alcanzaA(quien, alcance, p, id -> Optional.ofNullable(porVacante.get(id)));
+    }
+
+    /**
+     * Lo mismo para una postulación suelta, cuando no hay tanda con la que ir.
+     *
+     * <p>Las dos comparten cuerpo a propósito: qué significa que una vacante sea tuya se
+     * escribe una sola vez, y lo único que cambia es de dónde sale la vacante —de un mapa ya
+     * cargado o de la base—.
+     */
+    private boolean alcanzaA(ContextoUsuario quien, FiltroAlcance alcance, Postulacion p) {
+        return alcanzaA(quien, alcance, p, vacantes::findById);
+    }
+
+    private boolean alcanzaA(ContextoUsuario quien, FiltroAlcance alcance, Postulacion p,
+                             Function<Long, Optional<Vacante>> laVacante) {
+        if (p == null) {
+            return false;
+        }
+        return switch (alcance.tipo()) {
+            case TODO -> true;
+            case SUS_VACANTES -> laVacante.apply(p.getVacanteId())
+                    .map(v -> quien.usuarioId().equals(v.getResponsableUsuarioId()))
+                    .orElse(false);
+            // PROPIO no alcanza a nadie aquí, igual que no abre ninguna sesión ni lista
+            // ninguna: esto es el panel, y quien mira nunca es el candidato de la fila. Antes
+            // devolvía la inscripción propia de quien llamaba —inalcanzable, porque el panel
+            // exige TIPO_EQUIPO— y eso dejaba a los tres endpoints diciendo cosas distintas
+            // para el mismo alcance.
+            case PROPIO -> false;
+        };
     }
 
     @Override
@@ -319,7 +508,7 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
     public MiSesion miSesion(ContextoUsuario quien, UUID uuidPostulacion) {
         Postulacion postulacion = laMia(quien, uuidPostulacion);
         InscripcionSesion inscripcion = inscripciones.findByPostulacionIdAndEsVigenteTrue(postulacion.getId())
-                .orElseThrow(() -> new ResourceNotFoundException("Inscripción", "postulación", uuidPostulacion));
+                .orElseThrow(() -> new ResourceNotFoundException(INSCRIPCION, "postulación", uuidPostulacion));
         SesionSimulacion sesion = sesiones.findById(inscripcion.getSesionSimulacionId()).orElseThrow();
         return comoMiSesion(inscripcion, sesion);
     }
@@ -329,8 +518,15 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
     @Override
     @Transactional
     public void marcarEvento(ContextoUsuario quien, Long inscripcionId, MarcarEvento datos) {
-        InscripcionSesion inscripcion = laInscripcion(quien, inscripcionId);
-        exigirQuePuedaFacilitar(quien, inscripcion.getSesionSimulacionId());
+        // Lo que no depende de la inscripción se comprueba antes de cargarla. Si no, quien
+        // tiene el permiso pero no el rol de facilitador recibe un 403 cuando la inscripción
+        // existe y un 404 cuando no, y esa diferencia le dice qué ids hay.
+        FiltroAlcance alcance = permisos.alcanceDe("marcar_eventos_simulacion");
+        exigirRolDeFacilitador(quien.organizacionId(), quien.usuarioId());
+
+        InscripcionYPostulacion par = laInscripcion(quien, inscripcionId);
+        exigirQueAlcance(quien, alcance, par);
+        exigirSerDeLosResponsables(quien, par.inscripcion().getSesionSimulacionId());
 
         // Cada evento ocurre una vez. Volver a marcarlo corrige la hora, no crea otro.
         MarcaTiempoSimulacion marca = marcas
@@ -346,8 +542,11 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
 
     @Override
     public List<MarcaResponse> verMarcas(ContextoUsuario quien, Long inscripcionId) {
-        laInscripcion(quien, inscripcionId);
-        permisos.alcanceDe("marcar_eventos_simulacion");
+        // Este es el que de verdad se escapaba: pide marcar_eventos_simulacion, que el
+        // responsable del área tiene acotado a sus vacantes, y no pasa por facilitar. Leía las
+        // marcas de cualquier candidato de la empresa.
+        exigirQueAlcance(quien, permisos.alcanceDe("marcar_eventos_simulacion"),
+                laInscripcion(quien, inscripcionId));
         return marcas.findByInscripcionSesionIdOrderByOcurridaEn(inscripcionId).stream()
                 .map(m -> new MarcaResponse(m.getEvento(), m.getOcurridaEn()))
                 .toList();
@@ -356,15 +555,18 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
     @Override
     @Transactional
     public void marcarAsistencia(ContextoUsuario quien, Long inscripcionId, MarcarAsistencia datos) {
-        InscripcionSesion inscripcion = laInscripcion(quien, inscripcionId);
-        permisos.alcanceDe("marcar_asistencia");
+        InscripcionYPostulacion par = laInscripcion(quien, inscripcionId);
+        // marcar_asistencia está sembrado TODO también para el responsable del área, y a
+        // propósito: puede estar en la sala sin ser responsable de esa vacante (V18). Con TODO
+        // esto no recorta nada; está aquí para que siga siendo verdad si alguien edita la fila.
+        exigirQueAlcance(quien, permisos.alcanceDe("marcar_asistencia"), par);
 
+        InscripcionSesion inscripcion = par.inscripcion();
         inscripcion.setAsistio(datos.asistio());
         inscripcion.setMarcadaPorUsuarioId(quien.usuarioId());
         inscripciones.save(inscripcion);
 
-        Postulacion postulacion = postulaciones.findById(inscripcion.getPostulacionId())
-                .orElseThrow(() -> new IllegalStateException("La postulación de esta inscripción ya no existe"));
+        Postulacion postulacion = par.postulacion();
 
         if (Boolean.TRUE.equals(datos.asistio())) {
             if (PUEDE_ELEGIR.equals(postulacion.getEstadoCodigo())) {
@@ -473,19 +675,14 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
     // ============ Apoyo ============
 
     /**
-     * Quién puede facilitar una sesión: el permiso, más un rol de los que admite el parámetro
-     * {@code roles_facilitador_simulacion}, más —si la sesión tiene responsables asignados— ser
-     * uno de ellos.
+     * Si la sesión tiene responsables asignados, solo ellos la conducen.
      *
-     * <p>El parámetro es lo que hace esto cambiable sin desplegar: hoy son Talento y Dirección,
-     * mañana puede ser otro rol, y basta con editarlo desde el panel.
+     * <p>Si no tiene, basta con el permiso y el rol: no todas las sesiones necesitan nombrar a
+     * alguien. Esto va aparte de {@link #exigirRolDeFacilitador} porque es lo único de
+     * facilitar que necesita saber de qué sesión hablamos, y por tanto lo único que no puede
+     * comprobarse antes de cargar la inscripción.
      */
-    private void exigirQuePuedaFacilitar(ContextoUsuario quien, Long sesionId) {
-        permisos.alcanceDe("marcar_eventos_simulacion");
-        exigirRolDeFacilitador(quien.organizacionId(), quien.usuarioId());
-
-        // Si la sesión tiene responsables asignados, solo ellos la conducen. Si no tiene,
-        // basta con el permiso y el rol: no todas las sesiones necesitan nombrar a alguien.
+    private void exigirSerDeLosResponsables(ContextoUsuario quien, Long sesionId) {
         List<SesionResponsable> asignados = responsables.findBySesionSimulacionId(sesionId);
         if (!asignados.isEmpty()
                 && asignados.stream().noneMatch(r -> r.getUsuarioId().equals(quien.usuarioId()))) {
@@ -522,16 +719,48 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
     }
 
     /**
-     * La inscripción no guarda organización: se deriva de su sesión, que sí la tiene.
-     * Sin ese paso, marcar un evento o la asistencia sobre una inscripción ajena
-     * funcionaba — y marcar asistencia TRANSICIONA la postulación de la otra empresa.
+     * La inscripción, con su postulación y comprobando que las dos sean de esta empresa.
+     *
+     * <p>La inscripción no guarda empresa, así que se comprueba por sus dos lados y no por uno:
+     * la sesión la tiene como columna, y la postulación también. Sin ese paso, marcar un evento
+     * o la asistencia sobre una inscripción ajena funcionaba —y marcar asistencia TRANSICIONA
+     * la postulación de la otra empresa—. Comprobar los dos lados no es redundante: una
+     * inscripción cuya sesión fuera de una empresa y cuya postulación fuera de otra son datos
+     * rotos, y así no pasan.
+     *
+     * <p>La postulación además hace falta para el alcance —de qué vacante es—, así que se trae
+     * de todos modos: no es una consulta de más.
+     *
+     * <p>Una inscripción de otra empresa responde lo mismo que una que no existe: 404 con el
+     * mismo texto, que es lo que evita usar este endpoint para averiguar qué ids hay.
      */
-    private InscripcionSesion laInscripcion(ContextoUsuario quien, Long inscripcionId) {
+    private InscripcionYPostulacion laInscripcion(ContextoUsuario quien, Long inscripcionId) {
         InscripcionSesion inscripcion = inscripciones.findById(inscripcionId)
-                .orElseThrow(() -> new ResourceNotFoundException("Inscripción", "id", inscripcionId));
+                .orElseThrow(() -> new ResourceNotFoundException(INSCRIPCION, "id", inscripcionId));
         laSesion(quien, inscripcion.getSesionSimulacionId());
-        return inscripcion;
+        Postulacion postulacion = postulaciones
+                .findByIdAndOrganizacionId(inscripcion.getPostulacionId(), quien.organizacionId())
+                .orElseThrow(() -> new ResourceNotFoundException(INSCRIPCION, "id", inscripcionId));
+        return new InscripcionYPostulacion(inscripcion, postulacion);
     }
+
+    /**
+     * Corta si ese alcance no llega a esa inscripción.
+     *
+     * <p>Los tres endpoints de la sesión en vivo pedían su permiso y tiraban el alcance, así
+     * que un {@code SUS_VACANTES} valía lo mismo que un {@code TODO}. Hoy solo
+     * {@code marcar_eventos_simulacion} está sembrado acotado, pero el reparto se edita desde
+     * el panel: lo que hoy no recorta nada empieza a recortar en cuanto alguien cambie la fila.
+     */
+    private void exigirQueAlcance(ContextoUsuario quien, FiltroAlcance alcance,
+                                  InscripcionYPostulacion par) {
+        if (!alcanzaA(quien, alcance, par.postulacion())) {
+            throw new ResourceNotFoundException(INSCRIPCION, "id", par.inscripcion().getId());
+        }
+    }
+
+    /** Una inscripción con su postulación: aquí nunca hace falta una sin la otra. */
+    private record InscripcionYPostulacion(InscripcionSesion inscripcion, Postulacion postulacion) {}
 
     private Postulacion laMia(ContextoUsuario quien, UUID uuid) {
         return postulaciones.findByUuid(uuid)
@@ -554,15 +783,57 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
         return p;
     }
 
-    /** Una sola sesión: se piden sus cuatro cosas sueltas porque no hay tanda con la que ir. */
-    private SesionPanel comoPanel(SesionSimulacion s) {
+    /**
+     * Una sola sesión: se piden sus cuatro cosas sueltas porque no hay tanda con la que ir.
+     *
+     * @param deInscritos con qué alcance se cuentan los inscritos. Es el mismo recorte que hace
+     *                    la lista, y tiene que ser el mismo: si la lista dijera dos y el detalle
+     *                    de esa sesión dijera seis, la cifra no significaría nada
+     */
+    private SesionPanel comoPanel(SesionSimulacion s, FiltroAlcance deInscritos) {
         return comoPanel(s,
-                inscripciones.countBySesionSimulacionIdAndEsVigenteTrue(s.getId()),
+                inscritosVisibles(s.getId(), deInscritos),
                 sesionesVacante.findBySesionSimulacionId(s.getId()).stream()
                         .map(SesionVacante::getVacanteId).toList(),
                 responsables.findBySesionSimulacionId(s.getId()).stream()
                         .map(SesionResponsable::getUsuarioId).toList(),
                 tramosDe(s.getId()));
+    }
+
+    /**
+     * Cuántos inscritos cuentan para quien mira en cada una de esas sesiones, según su alcance.
+     *
+     * <p>Este método es el <b>único</b> sitio donde se decide cómo se cuenta, y esa es su razón
+     * de ser. La lista y el detalle lo resolvían por su cuenta y se separaron tres veces
+     * seguidas —primero el detalle no recortaba, luego el conteo seguía al permiso equivocado,
+     * luego {@code PROPIO} contaba como si fuera {@code SUS_VACANTES}—. Mientras hubiera dos
+     * implementaciones, arreglar una dejaba la otra rota.
+     *
+     * <p>Los casos: alcance nulo es «no tiene el permiso de ver inscritos» y cuenta la sesión
+     * entera —no puede abrir la lista, así que no hay dos cifras que puedan contradecirse—;
+     * {@code TODO} cuenta todo; {@code SUS_VACANTES} cuenta los de sus vacantes; y
+     * {@code PROPIO} cuenta cero, porque cero es lo que la lista de inscritos devuelve con ese
+     * alcance.
+     *
+     * @return cuántos por sesión; las que no salen es que no tienen a nadie que contar
+     */
+    private Map<Long, Long> contarInscritos(List<Long> sesionIds, FiltroAlcance alcance) {
+        if (alcance != null && alcance.tipo() == FiltroAlcance.Tipo.PROPIO) {
+            return Map.of();
+        }
+        List<Object[]> filas = alcance == null || alcance.tipo() == FiltroAlcance.Tipo.TODO
+                ? inscripciones.contarVigentesPorSesion(sesionIds)
+                : inscripciones.contarVigentesPorSesionDe(sesionIds, alcance.usuarioId());
+        Map<Long, Long> conteo = new HashMap<>();
+        for (Object[] fila : filas) {
+            conteo.put((Long) fila[0], (Long) fila[1]);
+        }
+        return conteo;
+    }
+
+    /** Lo mismo para una sesión suelta. Pasa por el mismo sitio a propósito. */
+    private long inscritosVisibles(Long sesionId, FiltroAlcance alcance) {
+        return contarInscritos(List.of(sesionId), alcance).getOrDefault(sesionId, 0L);
     }
 
     private SesionPanel comoPanel(SesionSimulacion s, long inscritos, List<Long> vacanteIds,

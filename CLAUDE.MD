@@ -68,9 +68,9 @@ Perfil Integral → prueba del puesto → simulacion → validacion → decision
 
 | | |
 |---|---|
-| Base de datos | **Flyway es el dueno del esquema**: V1-V39 en `src/main/resources/db/migration`, **102 tablas de este modulo** (105 en la base contando `flyway_schema_history` y las dos del motor de agentes, `agent_run` y `vector_store`). `ddl-auto: validate` |
+| Base de datos | **Flyway es el dueno del esquema**: V1-V40 en `src/main/resources/db/migration`, **102 tablas de este modulo** (105 en la base contando `flyway_schema_history` y las dos del motor de agentes, `agent_run` y `vector_store`). `ddl-auto: validate` |
 | Codigo | Veintiun paquetes de dominio bajo `ai_engine` (ver «Como esta organizado el codigo») |
-| Tests | **747, todos en verde (26/08/2026, tras fusionar main)**: 645 unitarios y 102 de integracion (6 saltados, los que gastan saldo o mandan correo de verdad). Ver «Correr los tests»: unitarios de la maquina y del anonimizador, migraciones contra Postgres real (Testcontainers) y flujos de punta a punta: hito 1, evaluacion, prueba, simulacion/validacion, calificacion con IA, la vacante sin banco, las dos empresas y el tope de IA de la plataforma |
+| Tests | **787, todos en verde (27/08/2026, tras fusionar main)**: 684 unitarios y 103 de integracion (de esos 103, 6 se saltan: los que gastan saldo o mandan correo de verdad). Ver «Correr los tests»: unitarios de la maquina y del anonimizador, migraciones contra Postgres real (Testcontainers) y flujos de punta a punta: hito 1, evaluacion, prueba, simulacion/validacion, calificacion con IA, la vacante sin banco, las dos empresas y el tope de IA de la plataforma |
 | IA que califica | **Seis de los diez agentes del catalogo estan implementados**: datos del curriculum, evidencia, evaluador, potencial/riesgo, prueba del puesto y las preguntas de la conversacion final. Todos corren por cola de RabbitMQ contra DeepSeek. Ver [Calificacion con IA](docs/CALIFICACION-CON-IA.md) |
 | Correo | **Ya sabe salir de verdad** (`EnviadorCorreoSmtp`), pero **por defecto no sale**: `renaser.correo.transporte` vale `log` salvo que se ponga `smtp`, y entonces solo se registra en `correo_enviado`. Para encenderlo hacen falta `CORREO_TRANSPORTE=smtp`, `CORREO_REMITENTE` y una cuenta que autentique. El RNF-65 pide que salga **desde el dominio propio de Renaser**: confirmar con ellos si ya lo tienen antes de encenderlo |
 | Acceso del candidato | Entra al portal **con un enlace, sin contrasena** (`EnlaceAcceso`, `ServicioEnlaceAcceso`). El enlace se le manda por correo, asi que depende de lo de arriba |
@@ -113,9 +113,13 @@ proposito, no trabajo olvidado:
 Otros placeholders puestos a proposito: los **umbrales de los grupos de prioridad (80 y 65)** son
 parametro editable y Renaser no los ha confirmado.
 
-Conocido y aceptado: `FiltroAlcance.responsableOFiltroNulo()` trata el alcance `PROPIO` igual que
-`TODO` —devuelve nulo y no filtra—. Hoy no es alcanzable porque ninguna semilla da un permiso de
-panel con ese alcance, pero si alguien configura un rol asi, veria de mas.
+⚠️ Conocido y **ya no tan lejano**: `FiltroAlcance.responsableOFiltroNulo()` trata el alcance
+`PROPIO` igual que `TODO` —devuelve nulo y no filtra—, y lo usa la bandeja del panel
+(`ServicioPostulacionesPanelImpl`). Antes hacia falta entrar a la base para poner un `PROPIO`
+en un permiso de panel; **desde la V40 basta un `PUT` de `administrar_permisos`**, que acepta
+los tres valores. Ninguna semilla lo pone asi, pero ya no es «inalcanzable»: es un cambio de
+configuracion sin desplegar. La simulacion si distingue los tres casos (ver
+`ServicioSimulacionImpl.alcanzaA`); la bandeja todavia no.
 
 **Los agentes de la calificacion ya NO corren en fila** (20/08/2026): los tres que no
 dependen de nadie —datos del CV, evidencia y evaluador— van a la vez, y el que arma el
@@ -294,18 +298,22 @@ Las dos consultan el mismo backend, asi que ensenan el mismo orden.
 - El alcance se aplica dentro de las consultas con `Permisos.alcanceDe`. Un 404 tambien
   significa «esto no es tuyo».
 - El esquema solo cambia con una migracion nueva. **Nunca** editar una ya aplicada.
-- **Antes de numerar una migracion, mirar cual es la mas alta que existe.** Ricardo tambien crea
-  migraciones: la de simulacion y validacion tuvo que pasar de `V16` a `V18` porque el ya habia
-  tomado esos numeros, y Flyway no arranca con dos del mismo numero.
+- **Antes de numerar una migracion, mirar cual es la mas alta que existe** — y no solo en tu
+  rama. Ricardo tambien crea migraciones: la de simulacion y validacion tuvo que pasar de `V16`
+  a `V18`, y la de los inscritos de `V37` a `V40` porque `main` reclamo ese numero mientras la
+  rama estaba abierta. **Git no ve ese choque**: `V40__una.sql` y `V40__otra.sql` son dos
+  archivos distintos y los fusiona sin avisar; quien se entera es Flyway al arrancar. Ahora hay
+  una prueba que lo caza (`MigracionesSinChoqueTest`), pero cada rama pasa el CI en verde por
+  su cuenta: solo salta cuando la segunda se fusiona.
 - Nada se recalcula hacia atras: cada nota queda atada a la version de pesos de su vacante.
 
 ### Correr los tests
-**645 unitarios en verde (26/08/2026).** Son dos tandas y el comando decide cual corre:
+**684 unitarios en verde (27/08/2026).** Son dos tandas y el comando decide cual corre:
 
 | Comando | Que corre | Cuantos | Necesita |
 |---|---|---:|---|
-| `./mvnw test` | unitarias con dobles y las de arquitectura | 645 | nada |
-| `./mvnw verify` | lo anterior mas las de integracion | 747 | Docker |
+| `./mvnw test` | unitarias con dobles y las de arquitectura | 684 | nada |
+| `./mvnw verify` | lo anterior mas las de integracion | 787 | Docker |
 
 Las de integracion levantan su propio PostgreSQL y su propio RabbitMQ con Testcontainers: hace
 falta el demonio de Docker encendido. El desglose completo esta en
@@ -437,6 +445,42 @@ Lo que hay que saber para tocar codigo:
   costo exacto de la pasada rapida, campana del 80, EN_ESPERA al 100, la suspendida que no
   despierta ni con cupo, despertar al reactivar y al subir el tope, y tarifa vigente para
   todo modelo configurado).
+
+## Los inscritos de una sesion y los permisos editables (27/08/2026 · V40)
+Quien conduce una simulacion no sabia a quien esperaba: el nombre estaba en la base
+—`inscripcion_sesion` → `postulacion` → `usuario` → `persona`— pero no salia por ningun
+endpoint, y sin el no habia forma de llegar a las `inscripcionId` que piden
+`/inscripciones/{id}/marcas` y `/asistencia`. La V40 **no anade ninguna tabla**: solo dos
+permisos y su reparto inicial. Lo que hay que saber para tocar codigo:
+
+- **`GET /panel/sesiones-simulacion/{id}/inscritos`** (permiso `ver_inscritos_simulacion`)
+  devuelve `inscripcionId`, `postulacionId`, `candidato`, `vacante`, `inscritaEn` y `asistio`,
+  recortado por el alcance. Y **los dos GET de sesiones aceptan los dos permisos**
+  (`crear_sesiones_simulacion` **o** `ver_inscritos_simulacion`): sin eso, el responsable del
+  area tendria los inscritos de un `{id}` que no hay forma de averiguar.
+- **`contarInscritos` es el UNICO sitio que decide como se cuentan los inscritos**
+  (`ServicioSimulacionImpl`). La lista, el detalle y `/inscritos` se separaron tres veces
+  seguidas; mientras hubiera dos implementaciones, arreglar una dejaba la otra rota. Sus cuatro
+  casos: alcance nulo (no tiene el permiso) cuenta la sesion entera, `TODO` cuenta todo,
+  `SUS_VACANTES` cuenta con un `WHERE` en la base y `PROPIO` cuenta cero sin preguntar. **Con
+  que alcance se cuenta lo decide siempre `ver_inscritos_simulacion`**, no el permiso con el
+  que se llego a la sesion: contar inscritos es verlos.
+- **Las marcas y la asistencia aplican el alcance** (`verMarcas`, `marcarEvento`,
+  `marcarAsistencia`): antes pedian su permiso y lo tiraban, asi que un `SUS_VACANTES` valia
+  tanto como un `TODO`. Y `laInscripcion` comprueba la empresa **por sus dos lados** —la sesion
+  la lleva como columna y la postulacion tambien—, porque la inscripcion no guarda organizacion
+  y marcar asistencia sobre una ajena transiciona la postulacion de la otra empresa. Ajena
+  responde 404, igual que una que no existe.
+- **El reparto se edita por API**: `GET /panel/roles/{id}/permisos`, `PUT …/{codigo}`,
+  `POST …/{codigo}/revocacion`, con `administrar_permisos`. Motivo obligatorio y auditoria en
+  los tres. **El ultimo rol de la organizacion con `administrar_permisos` no se puede quedar
+  sin el** —el candado cuenta por organizacion, no en total—. Va aparte de
+  `crear_usuarios_y_asignar_roles` a proposito: dar un rol es una cosa, redefinir lo que ese
+  rol significa es otra. Cambiar el alcance **no** reescribe `rol_permiso.creado_en`: cuando
+  cambio lo dice la auditoria.
+- **`NombresDeUsuarios`** resuelve el nombre respetando la anonimizacion: sin usuario, sin
+  persona o con la persona borrada devuelve `(anonimizado)`, nunca una cadena vacia, y una
+  tanda entera cuesta dos consultas.
 
 ## El banco de preguntas v3 (19/08/2026)
 El cliente reemplazo el banco entero. Son **190 items** (85 directivo, 55 coordinacion, 50
@@ -636,8 +680,13 @@ Todo vive en `docs/`. Empezar por [docs/README.md](docs/README.md).
   transiciones. Base del backend: ningun estado fuera de esa lista puede existir. Tienen forma
   de rejilla (cinco etapas por cuatro momentos), asi que el siguiente estado se calcula.
   **Ojo: la maquina de estados es propuesta nuestra, no viene de Renaser.**
-- [Roles y permisos](docs/04-ROLES-Y-PERMISOS.md) — los **73** permisos, accion por accion.
-  Un rol es un conjunto de permisos guardado en base de datos, no algo fijo en codigo.
+- [Roles y permisos](docs/04-ROLES-Y-PERMISOS.md) — los **77** permisos, accion por accion.
+  Un rol es un conjunto de permisos guardado en base de datos, no algo fijo en codigo. En la
+  base hay **71** sembrados: el doc enumera el sistema completo y la base solo lo construido,
+  y las dos listas no se contienen del todo (hay cuatro sembrados que el doc no enumera). Desde
+  la V40 el reparto se edita por la API con `administrar_permisos`, y `FiltroIdentidad` lo
+  relee en cada peticion, asi que un cambio vale sin desplegar y sin volver a entrar. **No le
+  pongas cache a `ServicioContexto`**: eso es justo lo que romperia.
 - [Modelo de datos](docs/05-MODELO-DE-DATOS.md) — las **93** tablas por area, que impide la base
   y que tiene que vivir en el codigo. Se lee para entender el modelo.
 - [Diccionario de datos](docs/07-DICCIONARIO-DE-DATOS.md) — cada tabla con todas sus columnas,
@@ -654,7 +703,7 @@ Todo vive en `docs/`. Empezar por [docs/README.md](docs/README.md).
   ultimas etapas y sus tres reglas automaticas de disponibilidad.
 - [CI/CD](docs/CI-CD.md) — que se comprueba solo en cada cambio, como se despliega a AWS y que
   variables de entorno pide el servidor. **Leerlo antes de tocar `.github/workflows/`.**
-- [Comprobaciones automaticas](docs/COMPROBACIONES-AUTOMATICAS.md) — las 747 pruebas y las nueve
+- [Comprobaciones automaticas](docs/COMPROBACIONES-AUTOMATICAS.md) — las 787 pruebas y las nueve
   reglas de arquitectura, una por una. Que se mira solo y que no.
 - `docs/diagramas/` — HTML autocontenidos, se abren en el navegador.
 - `docs/mockups/` — prototipos de pantalla. **Los mantiene otra persona, no editarlos.**

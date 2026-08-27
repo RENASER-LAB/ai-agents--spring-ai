@@ -17,14 +17,25 @@ Este censo estaba antes atado a `feat/talentov3`, commit `c7c095a`. **Ese commit
 de `main`**: la historia se rehizo y quien clone hoy no lo tiene, así que el ancla no servía
 para comprobar nada. Por eso ahora apunta a `main`.
 
-⚠️ Los documentos de `docs/` describen el sistema completo (93 tablas, 73 permisos). El código
-va por detrás y por otro camino en algunos puntos. **Cuando se contradigan, manda el código.**
+**El censo es una foto del 25/08 y no se ha vuelto a tomar entera**, porque los números de
+línea de cada archivo que se citan más abajo son de ese día y recontar la cabecera sin
+recontarlos todos engañaría más que ayudar. Lo que ha cambiado desde entonces, para que nadie
+se lleve una sorpresa: las migraciones llegan a la **`V40`** y las tablas de selección son
+**102** —`invitacion` y `tarifa_modelo`, del multiempresa, más las que ya había—, y las pruebas
+son **786 en total**: 683 unitarias (las 645 de la tabla son de ese día) y 103 de integración.
+El desglose al día está en [Comprobaciones automáticas](COMPROBACIONES-AUTOMATICAS.md).
+
+⚠️ Los documentos de `docs/` describen el sistema completo (93 tablas, 77 permisos). El código
+va por detrás y por otro camino en algunos puntos —de esos 77 permisos hay **71 sembrados** en
+la base, y al revés también: hay cuatro sembrados que la matriz del doc 04 no enumera—.
+**Cuando se contradigan, manda el código.**
 
 **La excepción es el [diccionario de datos](07-DICCIONARIO-DE-DATOS.md)**, que desde el
-25/08/2026 sigue al código: están **las 100 tablas de selección que existen de verdad** y las
-columnas que fueron añadiendo las migraciones, cada añadido con la suya marcada. Sigue
-llevando además las que solo están diseñadas, así que ahí es al revés: le sobran, no le
-faltan. Lo demás de `docs/` sigue siendo el diseño.
+25/08/2026 sigue al código: están **las tablas de selección que existen de verdad** —100 de las
+102 de hoy; a `invitacion` y `tarifa_modelo` les falta la ficha— y las columnas que fueron
+añadiendo las migraciones, cada añadido con la suya marcada. Sigue llevando además las diez que
+solo están diseñadas, así que ahí es al revés: le sobran más de las que le faltan. Lo demás de
+`docs/` sigue siendo el diseño.
 
 ---
 
@@ -365,8 +376,10 @@ El único punto donde selección y motor se tocan de verdad es
 
 ## Etapa 19 · El perfil del candidato
 
-Migración V36, lo más reciente (25/08/2026). Es de selección, no del motor: se lee después de
-la 18 porque llegó después, no porque dependa de ella.
+Migración V36 (25/08/2026). Es de selección, no del motor: se lee después de la 18 porque
+llegó después, no porque dependa de ella. Ya no es la última: la `V40` trajo después los
+inscritos de una sesión y los permisos editables, y esa no tiene etapa propia porque no añade
+ninguna tabla.
 
 Hasta aquí, todo lo que sabías de una persona vivía **dentro de su postulación**: volvía a
 postular y volvía a escribirlo todo. El perfil cuelga de `persona`, así que **le sobrevive a

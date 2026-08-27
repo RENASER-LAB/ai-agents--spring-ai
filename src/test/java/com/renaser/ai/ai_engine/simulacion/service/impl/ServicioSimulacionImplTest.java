@@ -12,13 +12,16 @@ import com.renaser.ai.ai_engine.seguridad.dto.FiltroAlcance;
 import com.renaser.ai.ai_engine.seguridad.service.Permisos;
 import com.renaser.ai.ai_engine.perfilintegral.entity.Alerta;
 import com.renaser.ai.ai_engine.simulacion.dto.DtosSimulacion.DecidirSobreAusente;
+import com.renaser.ai.ai_engine.simulacion.dto.DtosSimulacion.InscritoEnSesion;
 import com.renaser.ai.ai_engine.simulacion.dto.DtosSimulacion.MarcarAsistencia;
 import com.renaser.ai.ai_engine.simulacion.dto.DtosSimulacion.PreguntaResponse;
 import com.renaser.ai.ai_engine.simulacion.dto.DtosSimulacion.PreguntasEncoladas;
 import com.renaser.ai.ai_engine.simulacion.dto.DtosSimulacion.RegistrarPregunta;
+import com.renaser.ai.ai_engine.simulacion.dto.DtosSimulacion.SesionPanel;
 import com.renaser.ai.ai_engine.simulacion.entity.InscripcionSesion;
 import com.renaser.ai.ai_engine.simulacion.entity.PreguntaGenerada;
 import com.renaser.ai.ai_engine.simulacion.entity.SesionSimulacion;
+import com.renaser.ai.ai_engine.simulacion.entity.SesionVacante;
 import com.renaser.ai.ai_engine.simulacion.repository.InformacionCriticaRepository;
 import com.renaser.ai.ai_engine.simulacion.repository.InscripcionSesionRepository;
 import com.renaser.ai.ai_engine.simulacion.repository.MarcaTiempoSimulacionRepository;
@@ -30,6 +33,7 @@ import com.renaser.ai.ai_engine.simulacion.repository.TramoSimulacionRepository;
 import com.renaser.ai.ai_engine.simulacion.service.ServicioDisponibilidadSimulacion;
 import com.renaser.ai.ai_engine.usuario.repository.RolRepository;
 import com.renaser.ai.ai_engine.usuario.repository.UsuarioRolRepository;
+import com.renaser.ai.ai_engine.usuario.service.NombresDeUsuarios;
 import com.renaser.ai.ai_engine.vacante.entity.Vacante;
 import com.renaser.ai.ai_engine.vacante.repository.VacanteRepository;
 
@@ -55,6 +59,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -97,8 +102,17 @@ class ServicioSimulacionImplTest {
     private static final java.util.UUID UUID_POSTULACION =
             java.util.UUID.fromString("11111111-2222-3333-4444-555555555555");
 
+    // Quien crea las sesiones: Talento o Dirección. Lleva el permiso puesto porque el servicio
+    // pregunta cuál de los dos trae antes de pedir su alcance.
     private static final ContextoUsuario QUIEN = new ContextoUsuario(
-            USUARIO, 3L, ORGANIZACION, "EQUIPO", List.of(2L), Map.of());
+            USUARIO, 3L, ORGANIZACION, "EQUIPO", List.of(2L),
+            Map.of("crear_sesiones_simulacion", "TODO"));
+
+    // El responsable del área: no crea sesiones, solo mira a los inscritos de las suyas. Es el
+    // caso que antes se quedaba fuera de la lista y por tanto sin forma de saber ningún id.
+    private static final ContextoUsuario RESPONSABLE = new ContextoUsuario(
+            USUARIO, 3L, ORGANIZACION, "EQUIPO", List.of(3L),
+            Map.of("ver_inscritos_simulacion", "SUS_VACANTES"));
 
     @Mock private SesionSimulacionRepository sesiones;
     @Mock private SesionVacanteRepository sesionesVacante;
@@ -111,6 +125,7 @@ class ServicioSimulacionImplTest {
     @Mock private com.renaser.ai.ai_engine.perfilintegral.repository.AlertaRepository alertas;
     @Mock private PostulacionRepository postulaciones;
     @Mock private VacanteRepository vacantes;
+    @Mock private NombresDeUsuarios nombres;
     @Mock private ColaCalificacionIa cola;
     @Mock private RolRepository roles;
     @Mock private UsuarioRolRepository usuarioRoles;
@@ -126,7 +141,7 @@ class ServicioSimulacionImplTest {
     void crearElServicio() {
         servicio = new ServicioSimulacionImpl(sesiones, sesionesVacante, responsables, tramos,
                 informacionCritica, inscripciones, marcas, preguntas, alertas, postulaciones,
-                vacantes, cola, roles, usuarioRoles, maquina, disponibilidad, parametros,
+                vacantes, nombres, cola, roles, usuarioRoles, maquina, disponibilidad, parametros,
                 auditoria, permisos);
     }
 
@@ -302,6 +317,7 @@ class ServicioSimulacionImplTest {
     void asistirAvanzaPorLaMaquina() {
         Postulacion postulacion = postulacionEn(PUEDE_ELEGIR);
         hayInscripcionDe(postulacion);
+        alcanceDeAsistencia();
 
         servicio.marcarAsistencia(QUIEN, INSCRIPCION, new MarcarAsistencia(true));
 
@@ -319,6 +335,7 @@ class ServicioSimulacionImplTest {
     void noSeMueveAQuienYaAvanzo() {
         Postulacion postulacion = postulacionEn(POR_CONFIRMAR);
         hayInscripcionDe(postulacion);
+        alcanceDeAsistencia();
 
         servicio.marcarAsistencia(QUIEN, INSCRIPCION, new MarcarAsistencia(true));
 
@@ -334,6 +351,7 @@ class ServicioSimulacionImplTest {
     void faltarDevuelveALaBandejaDelEquipo() {
         Postulacion postulacion = postulacionEn(PUEDE_ELEGIR);
         InscripcionSesion inscripcion = hayInscripcionDe(postulacion);
+        alcanceDeAsistencia();
 
         servicio.marcarAsistencia(QUIEN, INSCRIPCION, new MarcarAsistencia(false));
 
@@ -357,8 +375,13 @@ class ServicioSimulacionImplTest {
     }
 
     @Test
-    @DisplayName("si la postulación de esa inscripción ya no está, no se inventa a quién mover")
-    void sinPostulacionNoSeMueveANadie() {
+    @DisplayName("una inscripción de otra organización responde lo mismo que una que no existe")
+    void unaInscripcionAjenaNoSeToca() {
+        // La organización no cuelga de la inscripción sino de su postulación, así que se llega
+        // por ahí. Antes esto era un findById pelado: una inscripción de otra organización se
+        // marcaba igual. Y cuando la postulación faltaba salía un IllegalStateException —un
+        // 500—; ahora sale el mismo 404 que una inscripción inexistente, que además es lo que
+        // impide usar este endpoint para averiguar qué ids hay al otro lado.
         InscripcionSesion inscripcion = InscripcionSesion.builder()
                 .id(INSCRIPCION).sesionSimulacionId(SESION).postulacionId(POSTULACION)
                 .esVigente(true).inscritaEn(Instant.now()).build();
@@ -366,12 +389,49 @@ class ServicioSimulacionImplTest {
         when(sesiones.findByIdAndOrganizacionId(SESION, ORGANIZACION)).thenReturn(
                 Optional.of(SesionSimulacion.builder()
                         .id(SESION).organizacionId(ORGANIZACION).estado("PUBLICADA").build()));
-        when(postulaciones.findById(POSTULACION)).thenReturn(Optional.empty());
+        when(postulaciones.findByIdAndOrganizacionId(POSTULACION, ORGANIZACION))
+                .thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> servicio.marcarAsistencia(QUIEN, INSCRIPCION, new MarcarAsistencia(true)))
-                .isInstanceOf(IllegalStateException.class);
+                .isInstanceOf(ResourceNotFoundException.class);
 
         verifyNoInteractions(maquina);
+        verify(inscripciones, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Ver las marcas de un candidato de otra vacante responde 404")
+    void lasMarcasAjenasNoSeLeen() {
+        // Este era el hueco de verdad: marcar_eventos_simulacion está sembrado SUS_VACANTES
+        // para el responsable del área, y verMarcas pedía el permiso pero tiraba el alcance,
+        // así que leía las marcas de cualquier candidato de la organización.
+        Postulacion ajena = postulacionEn(PUEDE_ELEGIR);
+        ajena.setVacanteId(VACANTE);
+        hayInscripcionDe(ajena);
+        when(permisos.alcanceDe("marcar_eventos_simulacion"))
+                .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.SUS_VACANTES, USUARIO));
+        when(vacantes.findById(VACANTE)).thenReturn(Optional.of(
+                Vacante.builder().id(VACANTE).responsableUsuarioId(OTRO_USUARIO).build()));
+
+        assertThatThrownBy(() -> servicio.verMarcas(QUIEN, INSCRIPCION))
+                .isInstanceOf(ResourceNotFoundException.class);
+
+        verifyNoInteractions(marcas);
+    }
+
+    @Test
+    @DisplayName("Con TODO se leen las marcas de cualquiera, que es lo que Talento necesita")
+    void conTodoSeLeenLasMarcas() {
+        Postulacion suya = postulacionEn(PUEDE_ELEGIR);
+        hayInscripcionDe(suya);
+        when(permisos.alcanceDe("marcar_eventos_simulacion"))
+                .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.TODO, USUARIO));
+        when(marcas.findByInscripcionSesionIdOrderByOcurridaEn(INSCRIPCION)).thenReturn(List.of());
+
+        assertThat(servicio.verMarcas(QUIEN, INSCRIPCION)).isEmpty();
+
+        // Con TODO no hace falta saber de quién es la vacante.
+        verifyNoInteractions(vacantes);
     }
 
     @Test
@@ -474,20 +534,33 @@ class ServicioSimulacionImplTest {
         return postulacion;
     }
 
-    /** Una inscripción vigente y la postulación a la que pertenece, tal como las lee el servicio. */
+    /**
+     * Una inscripción vigente y la postulación a la que pertenece, tal como las lee el servicio.
+     *
+     * <p>La postulación se busca por id <b>y organización</b>: es por donde el servicio
+     * comprueba que la inscripción sea de quien pregunta, porque la organización no cuelga de
+     * la inscripción sino de su postulación.
+     */
     private InscripcionSesion hayInscripcionDe(Postulacion postulacion) {
         InscripcionSesion inscripcion = InscripcionSesion.builder()
                 .id(INSCRIPCION).sesionSimulacionId(SESION).postulacionId(POSTULACION)
                 .esVigente(true).inscritaEn(Instant.now())
                 .build();
         when(inscripciones.findById(INSCRIPCION)).thenReturn(Optional.of(inscripcion));
-        // La inscripción se deriva ahora a su sesión, que es la que tiene organización:
-        // sin esta fila, marcar cualquier cosa sobre ella respondería 404.
+        // La inscripción se comprueba por sus dos lados: la sesión, que lleva la empresa como
+        // columna, y la postulación, que la lleva también y además dice de qué vacante es.
         when(sesiones.findByIdAndOrganizacionId(SESION, ORGANIZACION)).thenReturn(
                 Optional.of(SesionSimulacion.builder()
                         .id(SESION).organizacionId(ORGANIZACION).estado("PUBLICADA").build()));
-        when(postulaciones.findById(POSTULACION)).thenReturn(Optional.of(postulacion));
+        when(postulaciones.findByIdAndOrganizacionId(POSTULACION, ORGANIZACION))
+                .thenReturn(Optional.of(postulacion));
         return inscripcion;
+    }
+
+    /** Marcar asistencia arranca con TODO para todos los roles que lo tienen, incluido el área. */
+    private void alcanceDeAsistencia() {
+        when(permisos.alcanceDe("marcar_asistencia"))
+                .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.TODO, USUARIO));
     }
 
     private void alcanceDeConversacion(FiltroAlcance.Tipo tipo) {
@@ -505,6 +578,12 @@ class ServicioSimulacionImplTest {
     @org.junit.jupiter.api.Nested
     @DisplayName("Al listar las sesiones en el panel")
     class ListarSesiones {
+
+        @org.junit.jupiter.api.BeforeEach
+        void quienMiraCreaSesiones() {
+            when(permisos.alcanceDe("crear_sesiones_simulacion"))
+                    .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.TODO, USUARIO));
+        }
 
         private com.renaser.ai.ai_engine.simulacion.entity.SesionSimulacion sesion(long id) {
             return com.renaser.ai.ai_engine.simulacion.entity.SesionSimulacion.builder()
@@ -582,6 +661,447 @@ class ServicioSimulacionImplTest {
             verify(sesionesVacante, times(1)).findBySesionSimulacionIdIn(anyList());
             verify(responsables, times(1)).findBySesionSimulacionIdIn(anyList());
             verify(tramos, times(1)).findBySesionSimulacionIdInOrderByMinutoInicio(anyList());
+        }
+    }
+
+    /**
+     * La lista de sesiones vista por quien no las crea.
+     *
+     * <p>El responsable del área tiene {@code ver_inscritos_simulacion} y no
+     * {@code crear_sesiones_simulacion}. Sin esto la lista le respondía 403, y entonces el
+     * endpoint de inscritos era una puerta sin picaporte: podía leer los de una sesión, pero
+     * no había forma de averiguar el id de ninguna.
+     */
+    @org.junit.jupiter.api.Nested
+    @DisplayName("Al listar las sesiones con el alcance acotado")
+    class ListarSesionesConAlcance {
+
+        private static final Long MI_VACANTE = 70L;
+        private static final Long VACANTE_AJENA = 71L;
+
+        private SesionSimulacion sesion(Long id) {
+            return SesionSimulacion.builder()
+                    .id(id).organizacionId(ORGANIZACION)
+                    .fechaHora(Instant.parse("2026-09-01T15:00:00Z"))
+                    .duracionMinutos(120).modalidad("GRUPAL").cupo(6).estado("PUBLICADA").build();
+        }
+
+        /** La sesión 1 toca una vacante de RESPONSABLE; la 2, una ajena. */
+        private void dosSesionesDeVacantesDistintas() {
+            when(sesiones.findByOrganizacionIdOrderByFechaHora(ORGANIZACION))
+                    .thenReturn(List.of(sesion(1L), sesion(2L)));
+            when(sesionesVacante.findBySesionSimulacionIdIn(List.of(1L, 2L))).thenReturn(List.of(
+                    SesionVacante.builder().sesionSimulacionId(1L).vacanteId(MI_VACANTE).build(),
+                    SesionVacante.builder().sesionSimulacionId(2L).vacanteId(VACANTE_AJENA).build()));
+            when(vacantes.findByOrganizacionIdAndResponsableUsuarioIdOrderByCreadoEnDesc(
+                    ORGANIZACION, USUARIO))
+                    .thenReturn(List.of(Vacante.builder().id(MI_VACANTE).titulo("Analista")
+                            .responsableUsuarioId(USUARIO).build()));
+        }
+
+        @Test
+        @DisplayName("Solo salen las sesiones que tocan una vacante suya")
+        void soloLasSesionesDeSusVacantes() {
+            when(permisos.alcanceDe("ver_inscritos_simulacion"))
+                    .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.SUS_VACANTES, USUARIO));
+            dosSesionesDeVacantesDistintas();
+            when(inscripciones.contarVigentesPorSesionDe(List.of(1L), USUARIO))
+                    .thenReturn(java.util.List.<Object[]>of(new Object[]{1L, 2L}));
+            when(responsables.findBySesionSimulacionIdIn(List.of(1L))).thenReturn(List.of());
+            when(tramos.findBySesionSimulacionIdInOrderByMinutoInicio(List.of(1L)))
+                    .thenReturn(List.of());
+
+            var lista = servicio.listarSesiones(RESPONSABLE);
+
+            assertThat(lista).extracting(SesionPanel::id).containsExactly(1L);
+        }
+
+        @Test
+        @DisplayName("El conteo cuenta solo a los suyos, para que cuadre con la lista de inscritos")
+        void elConteoSeRecortaIgualQueLaLista() {
+            when(permisos.alcanceDe("ver_inscritos_simulacion"))
+                    .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.SUS_VACANTES, USUARIO));
+            dosSesionesDeVacantesDistintas();
+            // En la sesión 1 hay seis inscritos, pero solo dos son de su vacante.
+            when(inscripciones.contarVigentesPorSesionDe(List.of(1L), USUARIO))
+                    .thenReturn(java.util.List.<Object[]>of(new Object[]{1L, 2L}));
+            when(responsables.findBySesionSimulacionIdIn(List.of(1L))).thenReturn(List.of());
+            when(tramos.findBySesionSimulacionIdInOrderByMinutoInicio(List.of(1L)))
+                    .thenReturn(List.of());
+
+            var lista = servicio.listarSesiones(RESPONSABLE);
+
+            assertThat(lista.get(0).inscritos())
+                    .as("decir 6 y luego enseñar 2 no se lee como un permiso, se lee como un fallo")
+                    .isEqualTo(2L);
+            // Y el conteo sin recortar ni se pide: contar filas que se van a descartar es
+            // traerlas para nada.
+            verify(inscripciones, never()).contarVigentesPorSesion(anyList());
+        }
+
+        @Test
+        @DisplayName("Si ninguna sesión es de sus vacantes, la lista sale vacía sin pedir nada más")
+        void sinSesionesSuyasNoConsultaLoQueCuelga() {
+            when(permisos.alcanceDe("ver_inscritos_simulacion"))
+                    .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.SUS_VACANTES, USUARIO));
+            when(sesiones.findByOrganizacionIdOrderByFechaHora(ORGANIZACION))
+                    .thenReturn(List.of(sesion(2L)));
+            when(sesionesVacante.findBySesionSimulacionIdIn(List.of(2L))).thenReturn(List.of(
+                    SesionVacante.builder().sesionSimulacionId(2L).vacanteId(VACANTE_AJENA).build()));
+            when(vacantes.findByOrganizacionIdAndResponsableUsuarioIdOrderByCreadoEnDesc(
+                    ORGANIZACION, USUARIO)).thenReturn(List.of());
+
+            assertThat(servicio.listarSesiones(RESPONSABLE)).isEmpty();
+
+            verifyNoInteractions(inscripciones, responsables, tramos);
+        }
+
+        @Test
+        @DisplayName("Con PROPIO no sale ninguna: una sesión no es de nadie en particular")
+        void conPropioNoSaleNinguna() {
+            when(permisos.alcanceDe("ver_inscritos_simulacion"))
+                    .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.PROPIO, USUARIO));
+            when(sesiones.findByOrganizacionIdOrderByFechaHora(ORGANIZACION))
+                    .thenReturn(List.of(sesion(1L)));
+
+            assertThat(servicio.listarSesiones(RESPONSABLE)).isEmpty();
+
+            verifyNoInteractions(inscripciones, sesionesVacante, responsables, tramos);
+        }
+
+        @Test
+        @DisplayName("Abrir una sesión que no toca ninguna vacante suya responde 404")
+        void unaSesionAjenaNoSeAbre() {
+            when(permisos.alcanceDe("ver_inscritos_simulacion"))
+                    .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.SUS_VACANTES, USUARIO));
+            when(sesiones.findByIdAndOrganizacionId(2L, ORGANIZACION))
+                    .thenReturn(Optional.of(sesion(2L)));
+            when(sesionesVacante.findBySesionSimulacionId(2L)).thenReturn(List.of(
+                    SesionVacante.builder().sesionSimulacionId(2L).vacanteId(VACANTE_AJENA).build()));
+            when(vacantes.findAllById(List.of(VACANTE_AJENA))).thenReturn(List.of(
+                    Vacante.builder().id(VACANTE_AJENA).responsableUsuarioId(OTRO_USUARIO).build()));
+
+            assertThatThrownBy(() -> servicio.verSesion(RESPONSABLE, 2L))
+                    .as("un 403 confirmaría que esa sesión existe")
+                    .isInstanceOf(ResourceNotFoundException.class);
+        }
+
+        @Test
+        @DisplayName("El detalle cuenta lo mismo que la lista, no el total de la sesión")
+        void elDetalleCuentaLoMismoQueLaLista() {
+            // El fallo que esto sujeta: la lista decía dos y el detalle de la misma sesión seis,
+            // porque el detalle contaba por su cuenta y sin recortar. Tres cifras distintas para
+            // la misma sesión no son un permiso: son una resta que nadie sabe hacer.
+            when(permisos.alcanceDe("ver_inscritos_simulacion"))
+                    .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.SUS_VACANTES, USUARIO));
+            when(sesiones.findByIdAndOrganizacionId(1L, ORGANIZACION))
+                    .thenReturn(Optional.of(sesion(1L)));
+            when(sesionesVacante.findBySesionSimulacionId(1L)).thenReturn(List.of(
+                    SesionVacante.builder().sesionSimulacionId(1L).vacanteId(MI_VACANTE).build()));
+            when(vacantes.findAllById(List.of(MI_VACANTE))).thenReturn(List.of(
+                    Vacante.builder().id(MI_VACANTE).responsableUsuarioId(USUARIO).build()));
+            when(inscripciones.contarVigentesPorSesionDe(List.of(1L), USUARIO))
+                    .thenReturn(java.util.List.<Object[]>of(new Object[]{1L, 2L}));
+            when(responsables.findBySesionSimulacionId(1L)).thenReturn(List.of());
+            when(tramos.findBySesionSimulacionIdOrderByMinutoInicio(1L)).thenReturn(List.of());
+
+            assertThat(servicio.verSesion(RESPONSABLE, 1L).inscritos()).isEqualTo(2L);
+
+            verify(inscripciones, never()).countBySesionSimulacionIdAndEsVigenteTrue(anyLong());
+        }
+
+        @Test
+        @DisplayName("Con PROPIO tampoco se abre ninguna, igual que no se lista ninguna")
+        void conPropioNoSeAbreNinguna() {
+            when(permisos.alcanceDe("ver_inscritos_simulacion"))
+                    .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.PROPIO, USUARIO));
+            when(sesiones.findByIdAndOrganizacionId(1L, ORGANIZACION))
+                    .thenReturn(Optional.of(sesion(1L)));
+
+            assertThatThrownBy(() -> servicio.verSesion(RESPONSABLE, 1L))
+                    .isInstanceOf(ResourceNotFoundException.class);
+
+            // Y no se llega a mirar de quién son las vacantes: con PROPIO da igual.
+            verifyNoInteractions(vacantes);
+        }
+
+        @Test
+        @DisplayName("Con los dos permisos y alcances distintos, el conteo va por el de inscritos")
+        void elConteoSigueAlPermisoDeInscritosYNoAlDeCrear() {
+            // El reparto que la V40 no siembra pero que un PUT desde el panel de permisos deja
+            // montado en un momento: crear sesiones en TODO y ver inscritos en SUS_VACANTES.
+            // Abre todas las sesiones —por el primero— pero solo cuenta a los suyos, porque
+            // contar inscritos es ver inscritos. Si el conteo siguiera al permiso con que se
+            // llegó a la sesión, la sesión diría seis y la lista enseñaría dos.
+            ContextoUsuario losDos = new ContextoUsuario(USUARIO, 3L, ORGANIZACION, "EQUIPO",
+                    List.of(2L), Map.of("crear_sesiones_simulacion", "TODO",
+                            "ver_inscritos_simulacion", "SUS_VACANTES"));
+            when(permisos.alcanceDe("crear_sesiones_simulacion"))
+                    .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.TODO, USUARIO));
+            when(permisos.alcanceDe("ver_inscritos_simulacion"))
+                    .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.SUS_VACANTES, USUARIO));
+            when(sesiones.findByIdAndOrganizacionId(2L, ORGANIZACION))
+                    .thenReturn(Optional.of(sesion(2L)));
+            when(inscripciones.contarVigentesPorSesionDe(List.of(2L), USUARIO))
+                    .thenReturn(java.util.List.<Object[]>of(new Object[]{2L, 2L}));
+            when(sesionesVacante.findBySesionSimulacionId(2L)).thenReturn(List.of());
+            when(responsables.findBySesionSimulacionId(2L)).thenReturn(List.of());
+            when(tramos.findBySesionSimulacionIdOrderByMinutoInicio(2L)).thenReturn(List.of());
+
+            // La abre aunque la sesión no toque ninguna vacante suya: eso lo decide el TODO
+            // de crear sesiones.
+            assertThat(servicio.verSesion(losDos, 2L).inscritos()).isEqualTo(2L);
+
+            verify(inscripciones, never()).countBySesionSimulacionIdAndEsVigenteTrue(anyLong());
+        }
+
+        @Test
+        @DisplayName("Con ver inscritos en PROPIO la lista también cuenta cero, no los de sus vacantes")
+        void conPropioLaListaTambienCuentaCero() {
+            // El cuarto sitio por el que salió la misma incoherencia: la lista de sesiones
+            // contaba por su cuenta y con PROPIO caía en la consulta de SUS_VACANTES, así que
+            // enseñaba los inscritos de sus vacantes mientras el detalle decía cero. Solo pasa
+            // si quien mira dirige alguna vacante con gente dentro —si no, la consulta devuelve
+            // cero por casualidad y el número parece bueno—, que es lo que lo escondía.
+            ContextoUsuario losDos = new ContextoUsuario(USUARIO, 3L, ORGANIZACION, "EQUIPO",
+                    List.of(2L), Map.of("crear_sesiones_simulacion", "TODO",
+                            "ver_inscritos_simulacion", "PROPIO"));
+            when(permisos.alcanceDe("crear_sesiones_simulacion"))
+                    .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.TODO, USUARIO));
+            when(permisos.alcanceDe("ver_inscritos_simulacion"))
+                    .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.PROPIO, USUARIO));
+            when(sesiones.findByOrganizacionIdOrderByFechaHora(ORGANIZACION))
+                    .thenReturn(List.of(sesion(1L)));
+            when(sesionesVacante.findBySesionSimulacionIdIn(List.of(1L))).thenReturn(List.of(
+                    SesionVacante.builder().sesionSimulacionId(1L).vacanteId(MI_VACANTE).build()));
+            when(responsables.findBySesionSimulacionIdIn(List.of(1L))).thenReturn(List.of());
+            when(tramos.findBySesionSimulacionIdInOrderByMinutoInicio(List.of(1L)))
+                    .thenReturn(List.of());
+            // La precondición que escondía el fallo, montada: quien mira dirige una vacante con
+            // dos inscritos dentro. Sin esto la consulta devolvería lista vacía y el isZero()
+            // de abajo pasaría también con el código roto —una aserción que no comprueba nada—.
+            // Va lenient porque con el código arreglado no se llega a llamar, que es el punto.
+            org.mockito.Mockito.lenient()
+                    .when(inscripciones.contarVigentesPorSesionDe(List.of(1L), USUARIO))
+                    .thenReturn(java.util.List.<Object[]>of(new Object[]{1L, 2L}));
+
+            var lista = servicio.listarSesiones(losDos);
+
+            assertThat(lista.get(0).inscritos())
+                    .as("la lista y el detalle de la misma sesión no pueden decir cosas distintas")
+                    .isZero();
+            // Ninguna de las dos consultas de conteo se llega a hacer: con PROPIO son cero.
+            verify(inscripciones, never()).contarVigentesPorSesion(anyList());
+            verify(inscripciones, never()).contarVigentesPorSesionDe(anyList(), anyLong());
+        }
+
+        @Test
+        @DisplayName("Con ver inscritos en PROPIO el conteo es cero, que es lo que enseña la lista")
+        void conPropioElConteoEsCero() {
+            // El otro reparto que un PUT deja montado: crear sesiones en TODO y ver inscritos
+            // en PROPIO. Abre la sesión por el primero, pero /inscritos con PROPIO no devuelve
+            // a nadie, así que el conteo tampoco puede decir seis.
+            ContextoUsuario losDos = new ContextoUsuario(USUARIO, 3L, ORGANIZACION, "EQUIPO",
+                    List.of(2L), Map.of("crear_sesiones_simulacion", "TODO",
+                            "ver_inscritos_simulacion", "PROPIO"));
+            when(permisos.alcanceDe("crear_sesiones_simulacion"))
+                    .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.TODO, USUARIO));
+            when(permisos.alcanceDe("ver_inscritos_simulacion"))
+                    .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.PROPIO, USUARIO));
+            when(sesiones.findByIdAndOrganizacionId(2L, ORGANIZACION))
+                    .thenReturn(Optional.of(sesion(2L)));
+            when(sesionesVacante.findBySesionSimulacionId(2L)).thenReturn(List.of());
+            when(responsables.findBySesionSimulacionId(2L)).thenReturn(List.of());
+            when(tramos.findBySesionSimulacionIdOrderByMinutoInicio(2L)).thenReturn(List.of());
+
+            assertThat(servicio.verSesion(losDos, 2L).inscritos()).isZero();
+
+            // Ni se cuenta el total ni se pregunta por los de una vacante: con PROPIO es cero.
+            verify(inscripciones, never()).countBySesionSimulacionIdAndEsVigenteTrue(anyLong());
+            verify(inscripciones, never()).contarVigentesPorSesionDe(anyList(), anyLong());
+        }
+
+        @Test
+        @DisplayName("Quien crea sesiones las abre todas, sin comprobar de quién son las vacantes")
+        void conTodoNoSeComprueban() {
+            when(permisos.alcanceDe("crear_sesiones_simulacion"))
+                    .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.TODO, USUARIO));
+            when(sesiones.findByIdAndOrganizacionId(2L, ORGANIZACION))
+                    .thenReturn(Optional.of(sesion(2L)));
+            when(sesionesVacante.findBySesionSimulacionId(2L)).thenReturn(List.of());
+            when(responsables.findBySesionSimulacionId(2L)).thenReturn(List.of());
+            when(tramos.findBySesionSimulacionIdOrderByMinutoInicio(2L)).thenReturn(List.of());
+            // El detalle cuenta por el mismo sitio que la lista, así que pide la consulta por
+            // lote con una sola sesión dentro.
+            when(inscripciones.contarVigentesPorSesion(List.of(2L))).thenReturn(List.of());
+
+            assertThat(servicio.verSesion(QUIEN, 2L).id()).isEqualTo(2L);
+
+            // Con TODO no hace falta saber de quién son las vacantes de la sesión.
+            verify(vacantes, never()).findAllById(anyList());
+        }
+    }
+
+    /**
+     * Quién eligió cada fecha.
+     *
+     * <p>Lo que se prueba aquí no es que la lista salga: es que salga <b>recortada por el
+     * alcance que el rol tenga hoy</b>. Ese reparto se edita desde el panel —el permiso
+     * {@code ver_inscritos_simulacion} puede pasar de TODO a SUS_VACANTES o a PROPIO sin que
+     * nadie despliegue nada—, así que los tres casos se comprueban, incluido el que hoy no
+     * se siembra: si mañana alguien lo cambia, el que falte un caso no daría un error, daría
+     * la lista entera.
+     */
+    @org.junit.jupiter.api.Nested
+    @DisplayName("Al listar quién eligió una fecha")
+    class ListarInscritos {
+
+        private static final Long MI_VACANTE = 70L;
+        private static final Long VACANTE_AJENA = 71L;
+
+        private void laSesionExiste() {
+            when(sesiones.findByIdAndOrganizacionId(SESION, ORGANIZACION))
+                    .thenReturn(Optional.of(SesionSimulacion.builder()
+                            .id(SESION).organizacionId(ORGANIZACION)
+                            .fechaHora(Instant.parse("2026-09-01T15:00:00Z"))
+                            .duracionMinutos(120).modalidad("GRUPAL").cupo(6)
+                            .estado("PUBLICADA").build()));
+        }
+
+        /** Dos inscripciones: la 1 en una vacante de QUIEN, la 2 en una que no es suya. */
+        private void dosInscritosDeVacantesDistintas() {
+            laSesionExiste();
+            when(inscripciones.findBySesionSimulacionIdAndEsVigenteTrue(SESION)).thenReturn(List.of(
+                    InscripcionSesion.builder().id(1L).postulacionId(101L).esVigente(true)
+                            .inscritaEn(Instant.parse("2026-08-20T10:00:00Z")).asistio(true).build(),
+                    InscripcionSesion.builder().id(2L).postulacionId(102L).esVigente(true)
+                            .inscritaEn(Instant.parse("2026-08-19T10:00:00Z")).build()));
+            when(postulaciones.findAllById(any())).thenReturn(List.of(
+                    Postulacion.builder().id(101L).organizacionId(ORGANIZACION)
+                            .usuarioId(501L).vacanteId(MI_VACANTE).build(),
+                    Postulacion.builder().id(102L).organizacionId(ORGANIZACION)
+                            .usuarioId(502L).vacanteId(VACANTE_AJENA).build()));
+            when(vacantes.findAllById(any())).thenReturn(List.of(
+                    Vacante.builder().id(MI_VACANTE).titulo("Analista")
+                            .responsableUsuarioId(USUARIO).build(),
+                    Vacante.builder().id(VACANTE_AJENA).titulo("Contador")
+                            .responsableUsuarioId(OTRO_USUARIO).build()));
+        }
+
+        @Test
+        @DisplayName("Con alcance TODO salen todos, con su inscripción y por orden de llegada")
+        void conAlcanceTodoSalenTodos() {
+            when(permisos.alcanceDe("ver_inscritos_simulacion"))
+                    .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.TODO, USUARIO));
+            dosInscritosDeVacantesDistintas();
+            when(nombres.porUsuario(any())).thenReturn(Map.of(501L, "Ana Ruiz", 502L, "Beto Paz"));
+
+            var lista = servicio.listarInscritos(QUIEN, SESION);
+
+            // Por inscritaEn y no por id: el orden en que eligieron es el que significa algo,
+            // y sin orden explícito la lista dependería de lo que devolviera la base.
+            assertThat(lista).extracting(InscritoEnSesion::candidato)
+                    .containsExactly("Beto Paz", "Ana Ruiz");
+
+            // El inscripcionId es la razón de ser de esta lista: es lo que piden marcas y
+            // asistencia, y hasta ahora no había forma de averiguarlo desde el panel.
+            assertThat(lista).extracting(InscritoEnSesion::inscripcionId)
+                    .containsExactly(2L, 1L);
+            assertThat(lista.get(1).vacante()).isEqualTo("Analista");
+
+            // asistio es tri-estado: vacío es «nadie lo ha marcado», no «no vino».
+            assertThat(lista.get(0).asistio()).as("a este nadie le ha marcado nada").isNull();
+            assertThat(lista.get(1).asistio()).isTrue();
+        }
+
+        @Test
+        @DisplayName("Con alcance SUS_VACANTES solo salen los de sus vacantes")
+        void conAlcanceSusVacantesSoloLosSuyos() {
+            when(permisos.alcanceDe("ver_inscritos_simulacion"))
+                    .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.SUS_VACANTES, USUARIO));
+            dosInscritosDeVacantesDistintas();
+            when(nombres.porUsuario(any())).thenReturn(Map.of(501L, "Ana Ruiz"));
+
+            var lista = servicio.listarInscritos(QUIEN, SESION);
+
+            assertThat(lista).extracting(InscritoEnSesion::inscripcionId).containsExactly(1L);
+
+            // Y del que se cae no se pide el nombre: recortar después de haber traído los
+            // datos de una persona que este usuario no puede ver no es recortar.
+            ArgumentCaptor<java.util.Collection<Long>> pedidos =
+                    ArgumentCaptor.forClass(java.util.Collection.class);
+            verify(nombres).porUsuario(pedidos.capture());
+            assertThat(pedidos.getValue()).containsExactly(501L);
+        }
+
+        @Test
+        @DisplayName("Con alcance PROPIO no sale nadie, ni siquiera quien llama")
+        void conAlcancePropioNoSaleNadie() {
+            // PROPIO significa «lo tuyo», y en el panel nada de esto es de quien mira: son
+            // candidatos. Los tres endpoints lo tratan igual —la lista de sesiones sale vacía,
+            // el detalle da 404 y aquí no sale nadie—, y esa es la razón del cambio: antes
+            // devolvía la inscripción de quien llamaba, un caso que además el panel no permite
+            // alcanzar, porque exige TIPO_EQUIPO y quien entra por ahí no tiene postulación.
+            laSesionExiste();
+            when(permisos.alcanceDe("ver_inscritos_simulacion"))
+                    .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.PROPIO, USUARIO));
+            when(inscripciones.findBySesionSimulacionIdAndEsVigenteTrue(SESION)).thenReturn(List.of(
+                    InscripcionSesion.builder().id(1L).postulacionId(101L).esVigente(true)
+                            .inscritaEn(Instant.parse("2026-08-20T10:00:00Z")).build()));
+            when(postulaciones.findAllById(any())).thenReturn(List.of(
+                    Postulacion.builder().id(101L).organizacionId(ORGANIZACION)
+                            .usuarioId(USUARIO).vacanteId(MI_VACANTE).build()));
+            when(vacantes.findAllById(any())).thenReturn(List.of(
+                    Vacante.builder().id(MI_VACANTE).titulo("Analista")
+                            .responsableUsuarioId(OTRO_USUARIO).build()));
+
+            assertThat(servicio.listarInscritos(QUIEN, SESION)).isEmpty();
+
+            // Y no se pide ningún nombre: no hay a quién nombrar.
+            verify(nombres, never()).porUsuario(any());
+        }
+
+        @Test
+        @DisplayName("Una sesión a la que no se apuntó nadie no pregunta por ningún nombre")
+        void sinInscritosNoPideNombres() {
+            laSesionExiste();
+            when(permisos.alcanceDe("ver_inscritos_simulacion"))
+                    .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.TODO, USUARIO));
+            when(inscripciones.findBySesionSimulacionIdAndEsVigenteTrue(SESION))
+                    .thenReturn(List.of());
+
+            assertThat(servicio.listarInscritos(QUIEN, SESION)).isEmpty();
+
+            verifyNoInteractions(nombres);
+        }
+
+        @Test
+        @DisplayName("Los nombres se piden en una sola tanda, no uno por inscrito")
+        void losNombresSePidenDeUnaVez() {
+            when(permisos.alcanceDe("ver_inscritos_simulacion"))
+                    .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.TODO, USUARIO));
+            dosInscritosDeVacantesDistintas();
+            when(nombres.porUsuario(any())).thenReturn(Map.of(501L, "Ana Ruiz", 502L, "Beto Paz"));
+
+            servicio.listarInscritos(QUIEN, SESION);
+
+            // Contra Supabase cada viaje cuesta ~140 ms: una consulta por inscrito es la
+            // misma cadena que en su día dejó la bandeja en minuto y medio.
+            verify(nombres, times(1)).porUsuario(any());
+            verify(postulaciones, times(1)).findAllById(any());
+            verify(vacantes, times(1)).findAllById(any());
+        }
+
+        @Test
+        @DisplayName("De una sesión de otra organización no se ve ni que existe")
+        void deOtraOrganizacionNoSeVeNada() {
+            when(sesiones.findByIdAndOrganizacionId(99L, ORGANIZACION)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> servicio.listarInscritos(QUIEN, 99L))
+                    .isInstanceOf(ResourceNotFoundException.class);
+
+            // Y el permiso ni se consulta: primero es si la sesión existe para este usuario.
+            verifyNoInteractions(inscripciones, nombres);
         }
     }
 }

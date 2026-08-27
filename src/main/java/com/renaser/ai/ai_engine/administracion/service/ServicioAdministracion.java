@@ -38,6 +38,20 @@ public interface ServicioAdministracion {
 
     List<RolPanel> roles(ContextoUsuario quien);
 
+    // ---------- Qué puede cada rol ----------
+    //
+    // El reparto vive en rol_permiso y el FiltroIdentidad lo relee en cada petición, así que
+    // lo que se cambie aquí surte efecto en la siguiente llamada de cada afectado, sin
+    // desplegar y sin que nadie tenga que volver a entrar.
+
+    List<PermisoDelRol> permisosDelRol(ContextoUsuario quien, Long rolId);
+
+    /** Concede el permiso, o le cambia el alcance si el rol ya lo tenía. */
+    void concederPermiso(ContextoUsuario quien, Long rolId, String codigoPermiso,
+                         ConcederPermiso datos);
+
+    void revocarPermiso(ContextoUsuario quien, Long rolId, String codigoPermiso, String motivo);
+
     // Las áreas reflejan la estructura de Renaser. Sin un área no se puede registrar
     // una Solicitud de Talento.
     List<AreaPanel> areas(ContextoUsuario quien);

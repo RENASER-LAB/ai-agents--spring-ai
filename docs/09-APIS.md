@@ -1,7 +1,7 @@
 # Las APIs del sistema
 
 Sistema de selección de personal — Renaser Consulting
-Versión 1.5 · 2026-08-25 · Cubre **las cinco etapas del embudo**: postulación, Perfil Integral,
+Versión 1.6 · 2026-08-26 · Cubre **las cinco etapas del embudo**: postulación, Perfil Integral,
 prueba del puesto, simulación de trabajo, validación práctica y decisión final
 
 Este documento explica las APIs para quien las va a consumir: el frontend de RENASER OS y el
@@ -192,11 +192,13 @@ lo interno viaja, y una prueba ajena responde 404.
 
 | Método y ruta | Qué hace | Permiso |
 |---|---|---|
-| GET/POST `/sesiones-simulacion` | Las sesiones con fecha y cupo. Publicar una mueve a quien estaba esperando | `crear_sesiones_simulacion` |
+| POST `/sesiones-simulacion` | Crear una sesión con fecha y cupo. Publicarla mueve a quien estaba esperando | `crear_sesiones_simulacion` |
+| GET `/sesiones-simulacion` · `/{id}` | Las sesiones. **También entra quien solo puede ver inscritos**, recortado a las que tocan una vacante suya | `crear_sesiones_simulacion` **o** `ver_inscritos_simulacion` |
+| GET `/sesiones-simulacion/{id}/inscritos` | **Quién eligió esta fecha**: nombre, vacante y la `inscripcionId` que piden las marcas y la asistencia. Recortado por el alcance del rol | `ver_inscritos_simulacion` |
 | POST `/sesiones-simulacion/{id}/cupo` · `/cancelacion` | Ampliar o cancelar. Al cancelar se avisa a los inscritos | `crear_sesiones_simulacion` |
 | POST `/sesiones-simulacion/{id}/responsables` | Quién conduce la sesión | `crear_sesiones_simulacion` |
 | GET/POST `/sesiones-simulacion/{id}/informacion-critica` | Qué debería preguntar un candidato fuerte | `definir_informacion_critica` |
-| GET/POST `/inscripciones/{id}/marcas` | Los diez eventos observables, marcados en vivo | `marcar_eventos_simulacion` |
+| GET/POST `/inscripciones/{id}/marcas` | Los diez eventos observables, marcados en vivo. Una inscripción fuera de alcance responde 404 | `marcar_eventos_simulacion` |
 | POST `/inscripciones/{id}/asistencia` | Si asistió. Si no, vuelve a la bandeja del equipo | `marcar_asistencia` |
 | POST `/postulaciones/{id}/ausencia-simulacion` | Qué hacer con quien faltó: otra fecha o cerrar | `decidir_sobre_ausente` |
 | POST `/postulaciones/{id}/simulacion/...` | Poner notas y ponderarlas, como en la prueba | `calificar_simulacion` |
@@ -204,6 +206,59 @@ lo interno viaja, y una prueba ajena responde 404.
 
 **El portal del candidato es `/portal/simulacion/{codigo}`**: ver las fechas de su vacante que
 tengan cupo, elegir una, y consultar la que eligió.
+
+⚠️ **Los dos GET de sesiones admiten dos permisos, y no es una excepción caprichosa.** El
+responsable del área no crea sesiones, pero marca la asistencia de sus candidatos y necesita
+las `inscripcionId` que ese endpoint le da: con un solo permiso podía leer los inscritos de una
+sesión y no había endpoint que le dijera qué sesiones existen, así que tenía la lista de un
+`{id}` que no había forma de averiguar. Con el alcance acotado ve solo las sesiones que tocan
+una vacante suya, y una que no responde **404**, no 403.
+
+**El conteo `inscritos` se recorta con el mismo criterio en los dos GET.** Una sesión sirve a
+varias vacantes a la vez, así que para el responsable del área la cifra que ve es la de sus
+candidatos, no la de la sala entera —y es la misma en la lista, en el detalle y en el número de
+filas de `/inscritos`—. Decir «6» y luego enseñar dos no se lee como un permiso: se lee como que
+faltan cuatro. **El conteo** lo recorta la base y no un filtro en memoria —contar es un
+`COUNT` con su `WHERE`, y traerse las filas para descartarlas después sería traer datos que
+quien mira no puede ver—; con `PROPIO` ni siquiera se pregunta, porque la respuesta es cero sin
+mirar. Y los dos GET deciden con la misma función, `contarInscritos`, que es donde están los
+cuatro casos del alcance y el único sitio donde están — no dos copias que se separan.
+
+`/inscritos` sí recorta en memoria, y no es un descuido: para saber si una inscripción es «de
+sus vacantes» hay que pasar por su postulación, así que las postulaciones se traen igual. Lo
+que se pide **después** de recortar son los nombres, que es el dato personal: de los descartados
+no se pregunta ni cómo se llaman.
+
+**Las tres cifras cuadran con cualquier reparto, no solo con el que siembra la V40.** Son dos
+preguntas distintas y cada una la contesta su permiso: *qué sesiones veo* lo decide
+`crear_sesiones_simulacion` si quien llama lo tiene y si no `ver_inscritos_simulacion`; *a
+cuántos inscritos alcanzo* lo decide siempre `ver_inscritos_simulacion`, porque contar inscritos
+es verlos. Así, un rol al que se le den los dos permisos **con alcances distintos** —un solo PUT
+desde `administrar_permisos`— abre todas las sesiones y sigue contando solo a los suyos. Quien
+no tenga el segundo permiso ve el conteo entero: no puede abrir la lista, así que no hay dos
+cifras que puedan contradecirse, y un número de inscritos es aforo, no identidades.
+
+**`PROPIO` no alcanza a ningún inscrito**: ninguna fila en `/inscritos`, y lo mismo en las
+marcas y la asistencia. Y cuando además es el alcance con el que se miran las sesiones —el de
+`crear_sesiones_simulacion`, o el de `ver_inscritos_simulacion` si no se tiene el primero—, la
+lista sale vacía y el detalle responde **404**. En el panel nada de esto es de
+quien mira —son candidatos—, y `/panel/**` exige un token `TIPO_EQUIPO`, así que quien entra
+por ahí no tiene postulación propia que enseñarse a sí mismo.
+
+Y con `PROPIO` el conteo es **cero**, que es lo que `/inscritos` devuelve con ese alcance. Nadie
+lo tiene hoy así, pero es un valor válido y se pone con ese mismo PUT: a quien además tuviera
+`crear_sesiones_simulacion` en `TODO`, la sesión le diría «6» y la lista le devolvería cero
+filas si el conteo no distinguiera los tres casos.
+
+⚠️ **Las marcas y la asistencia también miran el alcance, y la inscripción también mira la
+organización.** Los tres endpoints de `/inscripciones/{id}` pedían su permiso y tiraban el
+alcance, así que un `SUS_VACANTES` valía tanto como un `TODO`; y la inscripción se buscaba por
+id a secas, sin comprobar de qué organización era. Hoy el único que se escapaba de verdad es
+`GET /marcas` —`marcar_eventos_simulacion` está sembrado acotado para el responsable del área—;
+en `/asistencia` el permiso arranca en `TODO` a propósito, porque quien marca puede estar en la
+sala sin dirigir esa vacante, así que ahí el recorte no cambia nada **hoy**: cambia el día que
+alguien edite esa fila desde el panel. Una inscripción de otra organización responde lo mismo
+que una que no existe.
 
 ⚠️ **Tres reglas mueven al candidato solo**, y son el único punto del sistema donde el estado de
 una postulación depende de otra tabla: publicar una sesión o ampliar su cupo mueve a quien
@@ -291,6 +346,21 @@ el banco v4 que venga no necesitará una migración. El ciclo es
 | GET `/solicitudes-borrado` · POST `/{id}/ejecucion` | Ver y ejecutar los borrados: la persona queda vacía, la trazabilidad queda. **Solo desde la plataforma**: los candidatos son cuentas de plataforma y la anonimización cruza empresas | `ejecutar_borrado_datos`, y ser la plataforma |
 | GET/POST `/usuarios` · POST `/{id}/roles` · GET `/roles` | El equipo y sus roles. El último administrador no se puede quitar | `crear_usuarios_y_asignar_roles` |
 | GET/POST `/usuarios/invitaciones` · DELETE `/{id}` | Invitar a alguien al equipo, ver las invitaciones y revocar una sin canjear. La respuesta del POST devuelve el enlace a quien invita | `crear_usuarios_y_asignar_roles` |
+| GET `/roles/{id}/permisos` | La matriz de un rol: el catálogo entero, con el alcance de lo concedido y vacío en lo que no | `administrar_permisos` |
+| PUT `/roles/{id}/permisos/{codigo}` · POST `…/revocacion` | Conceder con alcance, o quitar. **Motivo obligatorio** | `administrar_permisos` |
+
+**Qué puede cada rol se edita aquí, no en el código.** El `FiltroIdentidad` relee
+`rol_permiso` en cada petición, así que un cambio surte efecto en la siguiente llamada de
+cada afectado: sin desplegar y sin que nadie tenga que volver a entrar. Por eso mismo
+**`ServicioContexto` no lleva caché**, y ponérsela rompería justo esto.
+
+⚠️ `administrar_permisos` va aparte de `crear_usuarios_y_asignar_roles` a propósito: dar un
+rol a alguien es una cosa, redefinir lo que ese rol significa es otra bastante mayor —quien
+escribe en `rol_permiso` puede concederse todo—. Y **el último rol de la organización que
+conserva `administrar_permisos` no se puede quedar sin él**: revocarlo dejaría el reparto sin
+nadie que pudiera volver a tocarlo, y de ahí solo se sale entrando a la base a mano. El
+candado cuenta por organización y no en total, para que dos organizaciones no se tapen la una
+a la otra.
 
 ### La plataforma y las empresas
 

@@ -24,7 +24,8 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/panel")
 @RequiredArgsConstructor
-@Tag(name = "Panel · Administración", description = "Parámetros, correos, auditoría, borrados, usuarios")
+@Tag(name = "Panel · Administración",
+        description = "Parámetros, correos, auditoría, borrados, usuarios, roles y permisos")
 public class AdministracionController {
 
     private final ServicioAdministracion servicio;
@@ -186,5 +187,42 @@ public class AdministracionController {
     @Operation(summary = "Los roles que existen")
     public List<RolPanel> roles() {
         return servicio.roles(permisos.actual());
+    }
+
+    // ---------- Qué puede cada rol ----------
+    //
+    // Con permiso propio y no con crear_usuarios_y_asignar_roles: dar un rol a alguien es
+    // una cosa, redefinir lo que ese rol significa es otra bastante mayor —quien escribe
+    // aquí puede concederse todo—, y separarlas permite tener a quien haga lo primero sin
+    // poder hacer lo segundo.
+
+    @GetMapping("/roles/{id}/permisos")
+    @PreAuthorize("@permisos.tiene('administrar_permisos')")
+    @Operation(summary = "La matriz de un rol: el catálogo entero, con el alcance de lo que "
+            + "tiene concedido y vacío en lo que no")
+    public List<PermisoDelRol> permisosDelRol(@PathVariable Long id) {
+        return servicio.permisosDelRol(permisos.actual(), id);
+    }
+
+    @PutMapping("/roles/{id}/permisos/{codigo}")
+    @PreAuthorize("@permisos.tiene('administrar_permisos')")
+    @Operation(summary = "Conceder el permiso o cambiarle el alcance. Surte efecto en la "
+            + "siguiente petición de cada afectado: no hace falta que vuelva a entrar")
+    public void concederPermiso(@PathVariable Long id, @PathVariable String codigo,
+                                @Valid @RequestBody ConcederPermiso datos) {
+        servicio.concederPermiso(permisos.actual(), id, codigo, datos);
+    }
+
+    // POST y no DELETE porque el motivo es obligatorio y va en el cuerpo: hay proxies y
+    // clientes que descartan el cuerpo de un DELETE, y ahí el motivo llegaría vacío y esto
+    // respondería un 400 que nadie sabe explicar. Misma forma que `/cancelacion` en las
+    // sesiones y `/ejecucion` en los borrados, que son igual de definitivos.
+    @PostMapping("/roles/{id}/permisos/{codigo}/revocacion")
+    @PreAuthorize("@permisos.tiene('administrar_permisos')")
+    @Operation(summary = "Quitarle el permiso al rol. El último «administrar_permisos» no se "
+            + "puede quitar: dejaría el reparto sin nadie que pudiera tocarlo")
+    public void revocarPermiso(@PathVariable Long id, @PathVariable String codigo,
+                               @Valid @RequestBody RevocarPermiso datos) {
+        servicio.revocarPermiso(permisos.actual(), id, codigo, datos.motivo());
     }
 }

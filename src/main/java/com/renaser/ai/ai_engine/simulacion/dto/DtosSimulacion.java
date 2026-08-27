@@ -41,6 +41,19 @@ public final class DtosSimulacion {
             String enunciado, List<Long> vacanteIds, List<Long> responsableIds,
             List<TramoResponse> tramos) {}
 
+    /**
+     * Quién eligió esta fecha. Uno por inscripción vigente.
+     *
+     * <p>Lleva el {@code inscripcionId} porque sin él la lista no sirve para trabajar: es lo
+     * que piden {@code /inscripciones/{id}/marcas} y {@code /inscripciones/{id}/asistencia},
+     * y hasta ahora no había forma de averiguarlo desde el panel.
+     *
+     * @param asistio tri-estado: vacío es «nadie lo ha marcado todavía», que no es «no vino»
+     */
+    public record InscritoEnSesion(
+            Long inscripcionId, Long postulacionId, String candidato, String vacante,
+            Instant inscritaEn, Boolean asistio) {}
+
     public record AmpliarCupo(@NotNull @Positive Integer cupo) {}
 
     public record CancelarSesion(@NotBlank String motivo) {}
