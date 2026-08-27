@@ -1,6 +1,7 @@
 # Lo que corre en el servidor de AWS.
 #
-# Son tres contenedores: la aplicacion, Caddy y la cola. Lo pesado sigue fuera —la base es
+# Son tres contenedores encendidos —la aplicacion, la cola y Caddy— y un cuarto detras de un
+# perfil apagado: «talento». Lo pesado sigue fuera —la base es
 # Supabase y los curriculums viven en su bucket— asi que esta maquina se puede tirar y
 # volver a crear sin perder nada que importe: los certificados los saca Caddy otra vez
 # solo, y los mensajes que hubiera en la cola los reencola la propia aplicacion, que apunta
@@ -162,6 +163,81 @@ services:
       # Levantar de cero tarda mas que un ping: sin este margen el primer arranque puede
       # marcarse unhealthy antes de terminar y tirar el depends_on de la aplicacion.
       start_period: 30s
+    logging: *registro
+
+  # ---------------------------------------------------------------- talento
+  #
+  # El modulo de Capacidad, Desempeno y Human Gate (repositorio renaser-os-talent-backend).
+  #
+  # ⚠️ SE PERDIO EN UN MERGE Y SE RECUPERA AQUI. Este bloque entro el 24/08/2026 en
+  # 2286eff y desaparecio el 27/08 en el merge a755a33, que se quedo con la version del
+  # compose de `main` —donde talento nunca estuvo— mientras el Caddyfile, el .env.example
+  # y desplegar.sh si conservaban su parte. El sintoma de esa asimetria: `desplegar.sh`
+  # hace `config --services | grep -qx talento`, no encontraba nada, e imprimia «Talento
+  # apagado» aunque el .env dijera COMPOSE_PROFILES=talento.
+  #
+  # ⚠️ HOY TALENTO SE DESPLIEGA EN RENDER (decision del 27/08/2026), asi que este perfil
+  # NO se enciende. Se recupera igual por dos razones: era trabajo perdido sin querer, y
+  # es la salida si el arranque en frio del plan gratuito de Render —quince minutos de
+  # inactividad y cerca de un minuto para despertar— resulta inaceptable en la practica.
+  # El parrafo original decia «por que aqui y no en Render»; ese argumento ya no vale y
+  # por eso no se restaura: ver render.yaml del repositorio de talento.
+  #
+  # LA MEMORIA ES EL LIMITE REAL, no el CPU, y LA CUENTA ORIGINAL YA NO SIRVE. Este bloque
+  # se escribio sobre un compose que todavia no tenia la cola: decia «el motor 2 GB, este
+  # 1 GB, Caddy unos 50 MB». Hoy rabbitmq reserva 768 MB mas. La maquina es una t3.medium:
+  # 4.096 MB, mas los 2 GB de swap de user-data.sh.
+  #
+  #     MEMORIA_APP  +  cola 768m  +  talento 1g  +  Caddy ~50m
+  #     3g (lo que recomienda .env.example)  ->  4.914 MB en una maquina de 4.096
+  #
+  # ⚠️ ENCENDER ESTE PERFIL EXIGE BAJAR MEMORIA_APP A 2g. Con 3g la maquina entra en swap
+  # permanente, y asi es como se ve: sin mem_limit la primera tanda de calificacion con IA
+  # se come la maquina y el contenedor de talento desaparece sin dejar nada en su log.
+  #
+  # 1 GB alcanza porque este modulo no llama a ningun modelo ni consume de la cola: son
+  # consultas, reglas y formulas. Sus 133 pruebas corren en menos de un minuto.
+  talento:
+    # DETRAS DE UN PERFIL, y esto no es un detalle de estilo.
+    #
+    # Sin el, añadir este servicio rompe el despliegue del motor: `docker compose up -d`
+    # intentaria levantarlo, IMAGEN_TALENTO estaria vacia en el .env que ya existe en la
+    # maquina, y el arranque fallaria entero — llevandose por delante un backend que
+    # funcionaba. Con el perfil, lo de hoy sigue igual hasta que alguien lo encienda.
+    #
+    # Se enciende poniendo COMPOSE_PROFILES=talento en el .env del servidor.
+    profiles:
+      - talento
+    image: ${IMAGEN_TALENTO}
+    container_name: renaser-talento
+    restart: always
+    environment:
+      # La misma base que el motor, la cadena DIRECTA de Supabase (5432, no el pooler).
+      # Nombres distintos a los del motor porque este modulo los lee con su propio prefijo.
+      RENASER_DB_URL: ${SPRING_DATASOURCE_URL}
+      RENASER_DB_USER: ${SPRING_DATASOURCE_USERNAME}
+      RENASER_DB_PASSWORD: ${SPRING_DATASOURCE_PASSWORD}
+      # Cinco conexiones de las treinta del proyecto. El motor ya reserva doce y las
+      # personas necesitan las suyas: psql, el panel de Supabase, la rama de otro.
+      RENASER_DB_POOL_MAX: ${RENASER_DB_POOL_MAX:-5}
+
+      # ⚠️ La identidad la emite Supabase Auth, no este backend. Sin el JWKS el modulo
+      # arranca DENEGANDO todo Talento —falla cerrado, no abierto—, asi que un despliegue
+      # sin esta variable levanta un servicio que responde 401 a todo y parece roto.
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: ${TALENTO_JWKS_URI}
+      RENASER_JWT_ISSUER: ${TALENTO_JWT_ISSUER}
+      RENASER_JWT_AUDIENCE: ${TALENTO_JWT_AUDIENCE:-authenticated}
+
+      RENASER_ORG_CODIGO: ${RENASER_ORG_CODIGO:-RENASER}
+      # Nunca «*»: son los origenes del panel que puede llamarle.
+      RENASER_WEB_ORIGENES_PERMITIDOS: ${TALENTO_ORIGENES}
+
+      JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=70.0
+    mem_limit: ${MEMORIA_TALENTO:-1g}
+    # Solo red interna: quien habla con el mundo es Caddy. No se publica en loopback
+    # porque el chequeo de desplegar.sh pregunta por el motor, no por este.
+    expose:
+      - "8080"
     logging: *registro
 
   # ---------------------------------------------------------------- la puerta
