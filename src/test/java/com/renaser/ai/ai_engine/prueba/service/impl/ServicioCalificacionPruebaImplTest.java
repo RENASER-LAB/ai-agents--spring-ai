@@ -42,6 +42,8 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -81,7 +83,7 @@ class ServicioCalificacionPruebaImplTest {
             USUARIO, 3L, ORGANIZACION, "EQUIPO", List.of(2L), Map.of());
 
     @Mock private PostulacionRepository postulaciones;
-    @Mock private VacanteRepository vacantes;
+    @Mock private com.renaser.ai.ai_engine.vacante.service.AlcanceSobreLaVacante alcanceVacante;
     @Mock private IntentoPruebaRepository intentos;
     @Mock private CriterioRepository criterios;
     @Mock private NotaCriterioRepository notasCriterio;
@@ -91,16 +93,15 @@ class ServicioCalificacionPruebaImplTest {
     @Mock private RespuestaPruebaRepository respuestas;
     @Mock private VersionPesosRepository versionesPesos;
     @Mock private ColaCalificacionIa cola;
-    @Mock private Permisos permisos;
     @Mock private ServicioAuditoria auditoria;
 
     private ServicioCalificacionPruebaImpl servicio;
 
     @BeforeEach
     void crearElServicio() {
-        servicio = new ServicioCalificacionPruebaImpl(postulaciones, vacantes, intentos, criterios,
+        servicio = new ServicioCalificacionPruebaImpl(postulaciones, alcanceVacante, intentos, criterios,
                 preguntasElegidas, preguntasCatalogo, respuestas, notasCriterio, versionesPesos,
-                cola, permisos, auditoria, calificacion);
+                cola, auditoria, calificacion);
     }
 
     // ============ Quién puede pedirlo ============
@@ -108,8 +109,7 @@ class ServicioCalificacionPruebaImplTest {
     @Test
     @DisplayName("una postulación de otra organización no existe para quien pregunta")
     void noSeCalificaLaDeOtraOrganizacion() {
-        when(postulaciones.findByIdAndOrganizacionId(POSTULACION, ORGANIZACION))
-                .thenReturn(Optional.empty());
+        fueraDeAlcance("ajustar_nota");
 
         assertThatThrownBy(() -> servicio.calificarConIa(QUIEN, POSTULACION))
                 .isInstanceOf(ResourceNotFoundException.class);
@@ -120,8 +120,9 @@ class ServicioCalificacionPruebaImplTest {
     @Test
     @DisplayName("sin el permiso de ajustar notas no se llega a pedir nada")
     void sinPermisoNoSePideNada() {
-        hayPostulacion();
-        when(permisos.alcanceDe("ajustar_nota"))
+        // El 403 de no tener el permiso sale del guardián tal cual, sin disfrazarse de 404:
+        // no tener el permiso y no alcanzar la fila son cosas distintas.
+        when(alcanceVacante.laPostulacionVisible(any(), eq(POSTULACION), eq("ajustar_nota")))
                 .thenThrow(new AccessDeniedException("No tienes el permiso «ajustar_nota»"));
 
         assertThatThrownBy(() -> servicio.calificarConIa(QUIEN, POSTULACION))
@@ -133,10 +134,7 @@ class ServicioCalificacionPruebaImplTest {
     @Test
     @DisplayName("con alcance «sus vacantes», la de otro responsable tampoco existe")
     void conAlcanceDeSusVacantesLaDeOtroNoSeVe() {
-        hayPostulacion();
-        alcance(FiltroAlcance.Tipo.SUS_VACANTES);
-        when(vacantes.findById(VACANTE)).thenReturn(Optional.of(
-                Vacante.builder().id(VACANTE).responsableUsuarioId(OTRO_USUARIO).build()));
+        fueraDeAlcance("ajustar_nota");
 
         assertThatThrownBy(() -> servicio.calificarConIa(QUIEN, POSTULACION))
                 .as("un 404 también significa «esto no es tuyo»")
@@ -149,9 +147,6 @@ class ServicioCalificacionPruebaImplTest {
     @DisplayName("con alcance «sus vacantes», la propia sí se puede pedir")
     void conAlcanceDeSusVacantesLaSuyaSiSePide() {
         hayPostulacion();
-        alcance(FiltroAlcance.Tipo.SUS_VACANTES);
-        when(vacantes.findById(VACANTE)).thenReturn(Optional.of(
-                Vacante.builder().id(VACANTE).responsableUsuarioId(USUARIO).build()));
         hayIntento(Instant.now());
         hayRubricaCon("AGENTE");
         when(cola.encolarPruebaPuesto(POSTULACION)).thenReturn(true);
@@ -165,7 +160,6 @@ class ServicioCalificacionPruebaImplTest {
     @DisplayName("si esta postulación no llegó a tener prueba, no hay nada que calificar")
     void sinIntentoNoHayNadaQueCalificar() {
         hayPostulacion();
-        alcance(FiltroAlcance.Tipo.TODO);
         when(intentos.findByPostulacionId(POSTULACION)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> servicio.calificarConIa(QUIEN, POSTULACION))
@@ -180,7 +174,6 @@ class ServicioCalificacionPruebaImplTest {
     @DisplayName("una prueba que todavía no se entregó no se califica")
     void noSeCalificaLoQueElCandidatoEstaEscribiendo() {
         hayPostulacion();
-        alcance(FiltroAlcance.Tipo.TODO);
         hayIntento(null);
 
         assertThatThrownBy(() -> servicio.calificarConIa(QUIEN, POSTULACION))
@@ -196,7 +189,6 @@ class ServicioCalificacionPruebaImplTest {
     @DisplayName("si la rúbrica no le reserva ni un criterio al agente, no se encola")
     void sinCriteriosDelAgenteNoSeGastaUnaVueltaDeCola() {
         hayPostulacion();
-        alcance(FiltroAlcance.Tipo.TODO);
         hayIntento(Instant.now());
         hayRubricaCon("PERSONA", "PERSONA");
 
@@ -215,7 +207,6 @@ class ServicioCalificacionPruebaImplTest {
     @DisplayName("con la prueba entregada y criterios del agente, la calificación queda en cola")
     void seEncolaYSeAvisaQueTarda() {
         hayPostulacion();
-        alcance(FiltroAlcance.Tipo.TODO);
         hayIntento(Instant.now());
         hayRubricaCon("PERSONA", "AGENTE");
         when(cola.encolarPruebaPuesto(POSTULACION)).thenReturn(true);
@@ -233,7 +224,6 @@ class ServicioCalificacionPruebaImplTest {
     @DisplayName("si la cola dice que no, no se anuncia que se encoló")
     void loQueLaColaRechazaNoSeAnunciaComoEncolado() {
         hayPostulacion();
-        alcance(FiltroAlcance.Tipo.TODO);
         hayIntento(Instant.now());
         hayRubricaCon("AGENTE");
         when(cola.encolarPruebaPuesto(POSTULACION)).thenReturn(false);
@@ -248,16 +238,27 @@ class ServicioCalificacionPruebaImplTest {
 
     // ============ Apoyo ============
 
+    /** Lo que el guardián devuelve cuando la postulación es de esta empresa y se alcanza. */
     private void hayPostulacion() {
-        when(postulaciones.findByIdAndOrganizacionId(POSTULACION, ORGANIZACION))
-                .thenReturn(Optional.of(Postulacion.builder()
+        when(alcanceVacante.laPostulacionVisible(any(), eq(POSTULACION), eq("ajustar_nota")))
+                .thenReturn(Postulacion.builder()
                         .id(POSTULACION).organizacionId(ORGANIZACION).vacanteId(VACANTE)
                         .usuarioId(OTRO_USUARIO).estadoCodigo("PRUEBA_CALIFICANDO")
-                        .build()));
+                        .build());
     }
 
-    private void alcance(FiltroAlcance.Tipo tipo) {
-        when(permisos.alcanceDe("ajustar_nota")).thenReturn(new FiltroAlcance(tipo, USUARIO));
+    /** Lo mismo, para los caminos que miran otro permiso. */
+    private void conPostulacionVisible(String permiso) {
+        when(alcanceVacante.laPostulacionVisible(any(), eq(POSTULACION), eq(permiso)))
+                .thenReturn(Postulacion.builder()
+                        .id(POSTULACION).organizacionId(ORGANIZACION).vacanteId(VACANTE)
+                        .usuarioId(OTRO_USUARIO).estadoCodigo("PRUEBA_CALIFICANDO").build());
+    }
+
+    /** Y lo que devuelve cuando no: el mismo 404 que si no existiera. */
+    private void fueraDeAlcance(String permiso) {
+        when(alcanceVacante.laPostulacionVisible(any(), eq(POSTULACION), eq(permiso)))
+                .thenThrow(new ResourceNotFoundException("Postulación", "id", POSTULACION));
     }
 
     /** Un intento de prueba; {@code entregadoEn} nulo es «todavía la está haciendo». */
@@ -275,9 +276,7 @@ class ServicioCalificacionPruebaImplTest {
     @Test
     @DisplayName("devuelve las preguntas en su orden, con lo que contestó a cada una")
     void devuelveLasRespuestasEnOrden() {
-        hayPostulacion();
-        when(permisos.alcanceDe("abrir_ficha_candidato"))
-                .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.TODO, USUARIO));
+        conPostulacionVisible("abrir_ficha_candidato");
         when(intentos.findByPostulacionId(POSTULACION)).thenReturn(Optional.of(
                 IntentoPrueba.builder().id(9L).postulacionId(POSTULACION)
                         .versionPlantillaPruebaId(VERSION_PLANTILLA).build()));
@@ -308,9 +307,7 @@ class ServicioCalificacionPruebaImplTest {
     @Test
     @DisplayName("sin intento no hay respuestas que enseñar")
     void sinIntentoNoHayRespuestas() {
-        hayPostulacion();
-        when(permisos.alcanceDe("abrir_ficha_candidato"))
-                .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.TODO, USUARIO));
+        conPostulacionVisible("abrir_ficha_candidato");
         when(intentos.findByPostulacionId(POSTULACION)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> servicio.verRespuestas(QUIEN, POSTULACION))
@@ -320,8 +317,7 @@ class ServicioCalificacionPruebaImplTest {
     @Test
     @DisplayName("la de otra organización tampoco enseña respuestas")
     void lasRespuestasDeOtraOrganizacionNoSeVen() {
-        when(postulaciones.findByIdAndOrganizacionId(POSTULACION, ORGANIZACION))
-                .thenReturn(Optional.empty());
+        fueraDeAlcance("abrir_ficha_candidato");
 
         assertThatThrownBy(() -> servicio.verRespuestas(QUIEN, POSTULACION))
                 .isInstanceOf(ResourceNotFoundException.class);
@@ -337,11 +333,7 @@ class ServicioCalificacionPruebaImplTest {
         // nadie haya tocado el código. «antes» es el valor que TENÍA, no el más temprano.
         Instant nueva = Instant.now().plus(3, java.time.temporal.ChronoUnit.DAYS);
         Instant antes = nueva.plus(5, java.time.temporal.ChronoUnit.DAYS);
-        when(postulaciones.findByIdAndOrganizacionId(POSTULACION, ORGANIZACION))
-                .thenReturn(Optional.of(Postulacion.builder()
-                        .id(POSTULACION).organizacionId(ORGANIZACION).vacanteId(VACANTE).build()));
-        when(permisos.alcanceDe("mover_postulacion"))
-                .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.TODO, USUARIO));
+        conPostulacionVisible("mover_postulacion");
         IntentoPrueba intento = IntentoPrueba.builder()
                 .id(9L).postulacionId(POSTULACION).versionPlantillaPruebaId(VERSION_PLANTILLA)
                 .iniciadoEn(Instant.now()).venceEn(antes)
@@ -362,11 +354,7 @@ class ServicioCalificacionPruebaImplTest {
     @Test
     @DisplayName("una prueba ya entregada no cambia de plazo")
     void unaEntregadaNoCambiaDePlazo() {
-        when(postulaciones.findByIdAndOrganizacionId(POSTULACION, ORGANIZACION))
-                .thenReturn(Optional.of(Postulacion.builder()
-                        .id(POSTULACION).organizacionId(ORGANIZACION).vacanteId(VACANTE).build()));
-        when(permisos.alcanceDe("mover_postulacion"))
-                .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.TODO, USUARIO));
+        conPostulacionVisible("mover_postulacion");
         when(intentos.findByPostulacionId(POSTULACION)).thenReturn(Optional.of(
                 IntentoPrueba.builder().id(9L).postulacionId(POSTULACION)
                         .iniciadoEn(Instant.now()).entregadoEn(Instant.now())
@@ -382,11 +370,7 @@ class ServicioCalificacionPruebaImplTest {
     @Test
     @DisplayName("sin intento creado no hay plazo que fijar")
     void sinIntentoNoHayPlazo() {
-        when(postulaciones.findByIdAndOrganizacionId(POSTULACION, ORGANIZACION))
-                .thenReturn(Optional.of(Postulacion.builder()
-                        .id(POSTULACION).organizacionId(ORGANIZACION).vacanteId(VACANTE).build()));
-        when(permisos.alcanceDe("mover_postulacion"))
-                .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.TODO, USUARIO));
+        conPostulacionVisible("mover_postulacion");
         when(intentos.findByPostulacionId(POSTULACION)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> servicio.definirPlazo(QUIEN, POSTULACION,

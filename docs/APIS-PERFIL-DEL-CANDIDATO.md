@@ -256,8 +256,11 @@ Solo lectura, con el permiso `ver_perfil_candidato`. Devuelve lo mismo que el po
 pretensión salarial**, salvo que además se tenga `ver_pretension` — y sin ese permiso el campo
 no aparece en el JSON **ni como `null`**.
 
-El permiso respeta su alcance: si está limitado a «sus vacantes», el candidato de una
-convocatoria ajena responde **404**, igual que en el resto del panel.
+El permiso respeta su alcance, y el alcance que mira es el de `ver_perfil_candidato` y no el de
+otro permiso del panel: si está limitado a «sus vacantes», el candidato de una convocatoria
+ajena responde **404**, igual que en el resto del panel. Y con `PROPIO` no responde ninguno,
+porque ese alcance es del portal y aquí nadie mira su propia ficha. Lo decide el mismo guardián
+que el resto del panel, `AlcanceSobreLaVacante`.
 
 **Un candidato sin perfil devuelve 200 con todo vacío**, no 404: la ficha no puede romperse por
 eso.

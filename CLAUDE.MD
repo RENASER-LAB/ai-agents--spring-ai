@@ -70,7 +70,7 @@ Perfil Integral → prueba del puesto → simulacion → validacion → decision
 |---|---|
 | Base de datos | **Flyway es el dueno del esquema**: V1-V40 en `src/main/resources/db/migration`, **102 tablas de este modulo** (105 en la base contando `flyway_schema_history` y las dos del motor de agentes, `agent_run` y `vector_store`). `ddl-auto: validate` |
 | Codigo | Veintiun paquetes de dominio bajo `ai_engine` (ver «Como esta organizado el codigo») |
-| Tests | **787, todos en verde (27/08/2026, tras fusionar main)**: 684 unitarios y 103 de integracion (de esos 103, 6 se saltan: los que gastan saldo o mandan correo de verdad). Ver «Correr los tests»: unitarios de la maquina y del anonimizador, migraciones contra Postgres real (Testcontainers) y flujos de punta a punta: hito 1, evaluacion, prueba, simulacion/validacion, calificacion con IA, la vacante sin banco, las dos empresas y el tope de IA de la plataforma |
+| Tests | **871, todos en verde (27/08/2026)**: 765 unitarios y 106 de integracion (de esos 106, 6 se saltan: los que gastan saldo o mandan correo de verdad). Ver «Correr los tests»: unitarios de la maquina y del anonimizador, migraciones contra Postgres real (Testcontainers) y flujos de punta a punta: hito 1, evaluacion, prueba, simulacion/validacion, calificacion con IA, la vacante sin banco, las dos empresas y el tope de IA de la plataforma |
 | IA que califica | **Seis de los diez agentes del catalogo estan implementados**: datos del curriculum, evidencia, evaluador, potencial/riesgo, prueba del puesto y las preguntas de la conversacion final. Todos corren por cola de RabbitMQ contra DeepSeek. Ver [Calificacion con IA](docs/CALIFICACION-CON-IA.md) |
 | Correo | **Ya sabe salir de verdad** (`EnviadorCorreoSmtp`), pero **por defecto no sale**: `renaser.correo.transporte` vale `log` salvo que se ponga `smtp`, y entonces solo se registra en `correo_enviado`. Para encenderlo hacen falta `CORREO_TRANSPORTE=smtp`, `CORREO_REMITENTE` y una cuenta que autentique. El RNF-65 pide que salga **desde el dominio propio de Renaser**: confirmar con ellos si ya lo tienen antes de encenderlo |
 | Acceso del candidato | Entra al portal **con un enlace, sin contrasena** (`EnlaceAcceso`, `ServicioEnlaceAcceso`). El enlace se le manda por correo, asi que depende de lo de arriba |
@@ -113,13 +113,18 @@ proposito, no trabajo olvidado:
 Otros placeholders puestos a proposito: los **umbrales de los grupos de prioridad (80 y 65)** son
 parametro editable y Renaser no los ha confirmado.
 
-⚠️ Conocido y **ya no tan lejano**: `FiltroAlcance.responsableOFiltroNulo()` trata el alcance
-`PROPIO` igual que `TODO` —devuelve nulo y no filtra—, y lo usa la bandeja del panel
-(`ServicioPostulacionesPanelImpl`). Antes hacia falta entrar a la base para poner un `PROPIO`
-en un permiso de panel; **desde la V40 basta un `PUT` de `administrar_permisos`**, que acepta
-los tres valores. Ninguna semilla lo pone asi, pero ya no es «inalcanzable»: es un cambio de
-configuracion sin desplegar. La simulacion si distingue los tres casos (ver
-`ServicioSimulacionImpl.alcanzaA`); la bandeja todavia no.
+**El alcance de una fila lo decide un solo sitio**: `AlcanceSobreLaVacante` (paquete `vacante`).
+Antes «con `SUS_VACANTES` solo alcanzas lo de tus vacantes» estaba escrito catorce veces en
+nueve clases de siete modulos, y doce de ellas **dejaban pasar `PROPIO`** —solo probaban «es
+`SUS_VACANTES`»—, o sea acceso completo justo para quien menos alcance tiene. Con la V40 eso
+dejo de ser inalcanzable: `administrar_permisos` acepta los tres valores por `PUT`, sin
+desplegar. Hoy el guardian trata los tres casos con un `switch` sobre el enum, para que un
+cuarto valor rompa la compilacion en vez de colarse.
+
+⚠️ Lo que queda de aquello: `FiltroAlcance.responsableOFiltroNulo()` sigue devolviendo nulo con
+`PROPIO` igual que con `TODO`. Su unico uso —la bandeja, en `ServicioPostulacionesPanelImpl`—
+ya lo trata aparte con `noAlcanzaANadieEnElPanel()`, y el javadoc del metodo avisa. Quien lo
+use en un sitio nuevo tiene que hacer lo mismo.
 
 **Los agentes de la calificacion ya NO corren en fila** (20/08/2026): los tres que no
 dependen de nadie —datos del CV, evidencia y evaluador— van a la vez, y el que arma el
@@ -297,6 +302,15 @@ Las dos consultan el mismo backend, asi que ensenan el mismo orden.
   `postulacion.estado_codigo` a mano.
 - El alcance se aplica dentro de las consultas con `Permisos.alcanceDe`. Un 404 tambien
   significa «esto no es tuyo».
+- **Que una postulacion o una vacante sea tuya lo decide `AlcanceSobreLaVacante`, y solo el.**
+  Un servicio nuevo que necesite acotar por vacante lo inyecta y llama a
+  `laPostulacionVisible`, `laVacanteVisible` o `alcanzaA` — **no** vuelve a escribir el
+  `== SUS_VACANTES`. Esa linea estuvo copiada catorce veces y doce se dejaban `PROPIO` sin
+  tratar; la version del guardian es un `switch` sobre el enum, asi que un alcance nuevo rompe
+  la compilacion en un sitio en vez de colarse en doce. Lo que **no** pasa por ahi, y no es un
+  descuido: la **sesion de simulacion**, que sirve a varias vacantes a la vez y lleva su propia
+  regla (`tocaUnaVacanteSuya`, y el conteo con su cuarto caso en `contarInscritos`); y la
+  **solicitud de talento**, cuyo dueno es alguien del equipo (`ServicioSolicitudesImpl`).
 - El esquema solo cambia con una migracion nueva. **Nunca** editar una ya aplicada.
 - **Antes de numerar una migracion, mirar cual es la mas alta que existe** — y no solo en tu
   rama. Ricardo tambien crea migraciones: la de simulacion y validacion tuvo que pasar de `V16`
@@ -308,12 +322,12 @@ Las dos consultan el mismo backend, asi que ensenan el mismo orden.
 - Nada se recalcula hacia atras: cada nota queda atada a la version de pesos de su vacante.
 
 ### Correr los tests
-**684 unitarios en verde (27/08/2026).** Son dos tandas y el comando decide cual corre:
+**765 unitarios en verde (27/08/2026).** Son dos tandas y el comando decide cual corre:
 
 | Comando | Que corre | Cuantos | Necesita |
 |---|---|---:|---|
-| `./mvnw test` | unitarias con dobles y las de arquitectura | 684 | nada |
-| `./mvnw verify` | lo anterior mas las de integracion | 787 | Docker |
+| `./mvnw test` | unitarias con dobles y las de arquitectura | 765 | nada |
+| `./mvnw verify` | lo anterior mas las de integracion | 871 | Docker |
 
 Las de integracion levantan su propio PostgreSQL y su propio RabbitMQ con Testcontainers: hace
 falta el demonio de Docker encendido. El desglose completo esta en
@@ -643,7 +657,7 @@ com.renaser.ai.ai_engine.<dominio>
 | `usuario` | Persona, usuario del equipo, roles y permisos |
 | `organizacion` | La organizacion, sus areas, la plataforma (alta de empresas) y la personalizacion de instrumentos |
 | `solicitud` | La Solicitud de Talento y sus resultados esperados |
-| `vacante` | Vacante, puesto, catalogos y requisitos objetivos |
+| `vacante` | Vacante, puesto, catalogos y requisitos objetivos. Aqui vive tambien `AlcanceSobreLaVacante`, que decide para todo el panel que filas alcanza cada alcance |
 | `postulacion` | La postulacion, su historial, el CV y **la maquina de estados** |
 | `pesos` | Las versiones de pesos del embudo |
 | `consentimiento` | Textos legales, consentimientos y solicitudes de borrado |
@@ -703,7 +717,7 @@ Todo vive en `docs/`. Empezar por [docs/README.md](docs/README.md).
   ultimas etapas y sus tres reglas automaticas de disponibilidad.
 - [CI/CD](docs/CI-CD.md) — que se comprueba solo en cada cambio, como se despliega a AWS y que
   variables de entorno pide el servidor. **Leerlo antes de tocar `.github/workflows/`.**
-- [Comprobaciones automaticas](docs/COMPROBACIONES-AUTOMATICAS.md) — las 787 pruebas y las nueve
+- [Comprobaciones automaticas](docs/COMPROBACIONES-AUTOMATICAS.md) — las 871 pruebas y las nueve
   reglas de arquitectura, una por una. Que se mira solo y que no.
 - `docs/diagramas/` — HTML autocontenidos, se abren en el navegador.
 - `docs/mockups/` — prototipos de pantalla. **Los mantiene otra persona, no editarlos.**

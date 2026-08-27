@@ -302,21 +302,19 @@ class ArquitecturaTest {
      * no por organización; y el borrado 29733 es de la plataforma y ya pasó su aduana.
      */
     private static final Set<String> LLAMADAS_SIN_DUENO_ACORDADAS = Set.of(
+            // El guardián compartido, al que están migrando los laVisible de cada panel: la
+            // postulación ya se resolvió con findByIdAndOrganizacionId y su vacante se pide por
+            // id solo para saber de quién es. Es el mismo caso de los de abajo, en un solo
+            // sitio. Ojo al escribirlo: tiene que ser vacantes.findById(...) literal, porque
+            // esta regla recorre las LLAMADAS y una referencia a método (vacantes::findById)
+            // se le escapa sin que nadie lo haya decidido.
+            "AlcanceSobreLaVacante#alcanzaA",
             // El guardián laVisible de cada panel: la postulación ya se resolvió con
             // findByIdAndOrganizacionId; su vacante se pide por id solo para comprobar el
             // alcance SUS_VACANTES. Derivar al padre en su forma más pura.
-            "ServicioPostulacionesPanelImpl#laVisible",
-            "ServicioPerfilIntegralPanelImpl#laVisible",
-            "ServicioPerfilPanelImpl#laVisible",
-            "ServicioCalificacionPruebaImpl#laVisible",
-            "ServicioCalificacionSimulacion#laVisible",
-            "ServicioSimulacionImpl#laVisible",
-            "ServicioDecisionImpl#laVisible",
-            "ServicioValidacionImpl#laVisible",
             // Llegó con el desglose de la evaluación (PR #38, en paralelo al multiempresa):
             // mismo patrón exacto que los de arriba. La regla lo denunció al fusionar — que
             // es justo para lo que existe — y la lectura confirmó que deriva del padre.
-            "ServicioDesgloseEvaluacionImpl#laVisible",
             // Derivan de una postulación o vacante ya validada por su guardián: la
             // vacante de la postulación, el puesto de la vacante, la plantilla que la
             // vacante tiene asignada (y que se validó contra el dueño al asignarla).
@@ -324,7 +322,6 @@ class ArquitecturaTest {
             "ServicioPostulacionesPanelImpl#ficha",
             "ServicioPerfilIntegralPanelImpl#pesosDe",
             "ServicioPerfilIntegralPanelImpl#ranking",
-            "ServicioPerfilIntegralPanelImpl#vacanteVisible",
             "ServicioDecisionImpl#calcular",
             "ServicioDecisionImpl#decidir",
             "ServicioEvaluacionImpl#crearAlPostular",

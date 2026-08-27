@@ -27,10 +27,8 @@ import com.renaser.ai.ai_engine.prueba.entity.IntentoPrueba;
 import com.renaser.ai.ai_engine.prueba.repository.IntentoPruebaRepository;
 import com.renaser.ai.ai_engine.prueba.service.ServicioCalificacionPrueba;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
-import com.renaser.ai.ai_engine.seguridad.dto.FiltroAlcance;
 import com.renaser.ai.ai_engine.seguridad.service.Permisos;
-import com.renaser.ai.ai_engine.vacante.entity.Vacante;
-import com.renaser.ai.ai_engine.vacante.repository.VacanteRepository;
+import com.renaser.ai.ai_engine.vacante.service.AlcanceSobreLaVacante;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -51,7 +49,7 @@ public class ServicioCalificacionPruebaImpl implements ServicioCalificacionPrueb
     private static final String ETAPA = "PRUEBA_PUESTO";
 
     private final PostulacionRepository postulaciones;
-    private final VacanteRepository vacantes;
+    private final AlcanceSobreLaVacante alcance;
     private final IntentoPruebaRepository intentos;
     private final CriterioRepository criterios;
     private final PreguntaVersionPlantillaRepository preguntasElegidas;
@@ -60,7 +58,6 @@ public class ServicioCalificacionPruebaImpl implements ServicioCalificacionPrueb
     private final NotaCriterioRepository notasCriterio;
     private final VersionPesosRepository versionesPesos;
     private final ColaCalificacionIa cola;
-    private final Permisos permisos;
     private final ServicioAuditoria auditoria;
     private final CalificacionPorCriterio calificacion;
 
@@ -246,17 +243,6 @@ public class ServicioCalificacionPruebaImpl implements ServicioCalificacionPrueb
     }
 
     private Postulacion laVisible(ContextoUsuario quien, Long postulacionId, String permiso) {
-        Postulacion p = postulaciones.findByIdAndOrganizacionId(postulacionId, quien.organizacionId())
-                .orElseThrow(() -> new ResourceNotFoundException("Postulación", "id", postulacionId));
-        FiltroAlcance alcance = permisos.alcanceDe(permiso);
-        if (alcance.tipo() == FiltroAlcance.Tipo.SUS_VACANTES) {
-            boolean esSuya = vacantes.findById(p.getVacanteId())
-                    .map(v -> quien.usuarioId().equals(v.getResponsableUsuarioId()))
-                    .orElse(false);
-            if (!esSuya) {
-                throw new ResourceNotFoundException("Postulación", "id", postulacionId);
-            }
-        }
-        return p;
+        return alcance.laPostulacionVisible(quien, postulacionId, permiso);
     }
 }

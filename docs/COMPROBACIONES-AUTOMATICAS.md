@@ -47,20 +47,20 @@ demás de la calificación se prueba con un doble del modelo y no gasta nada.
 
 ---
 
-## 787 pruebas
+## 871 pruebas
 
-Contadas de correrlas el 27/08/2026 (tras fusionar el multiempresa con los inscritos de la
-simulación y los permisos editables), no de recordarlas: el desglose sale de los informes de
-surefire y failsafe, y suma exacto.
+Contadas de correrlas el 27/08/2026 (con el multiempresa, los inscritos de la simulación, los
+permisos editables y el guardián común del alcance), no de recordarlas: el desglose sale de
+los informes de surefire y failsafe, y suma exacto.
 
 | Qué | Cuántas | Necesita |
 |---|---:|---|
-| Unitarias, con dobles | 577 | nada |
+| Unitarias, con dobles | 659 | nada |
 | Arquitectura | 12 | nada |
 | Las fórmulas del banco v3 | 22 | nada |
 | El validador de las respuestas v3 | 21 | nada |
-| El perfil del candidato (paquete `perfil`: merge, lectura, CRUD, retención, borrado) | 52 | nada |
-| Integración, de punta a punta | 97 | Docker |
+| El perfil del candidato (paquete `perfil`: merge, lectura, CRUD, retención, borrado) | 51 | nada |
+| Integración, de punta a punta | 100 | Docker |
 | Contra el proveedor de verdad, y el envío de correo | 6 | Docker o SMTP, y su bandera |
 
 El multiempresa (25/08) sumó 39 unitarias: 31 de la implementación —el login del panel, las
@@ -120,6 +120,29 @@ sin desplegar** — al responsable del área se le revoca el permiso desde el pa
 token deja de servir en la llamada siguiente, sin desplegar y sin volver a entrar. De paso es
 lo único que ejecuta la consulta nueva del conteo contra PostgreSQL de verdad: que su JPQL
 con dos saltos sea válida no se ve con dobles.
+
+El guardián común del alcance (27/08) dejó **23 unitarias netas más y ninguna de integración**
+en los archivos que tocó, y esa segunda cifra es la que hay que leer: el comportamiento
+observable no cambia —salvo con `PROPIO`—, así que ningún flujo de punta a punta se tocó.
+`AlcanceSobreLaVacanteTest` aporta 14 y es donde vive ahora la mecánica entera: los tres
+alcances, la vacante que ya no está, la postulación nula, el 404 con el mismo texto que si no
+existiera, el 403 de quien no tiene el permiso —que sale tal cual y no se disfraza de 404— y
+que se mira el alcance del permiso que llega y no el de uno fijo. Antes de mover nada se
+pusieron pruebas a **los tres guardianes que no tenían ninguna** —`ServicioValidacionImplTest`
+(4), `ServicioCalificacionSimulacionTest` (3) y `ServicioDecisionImplTest`, que pasó de 2 a
+5—: contra el código de entonces y sin tocarlo, porque su trabajo era decir si la migración
+cambiaba algo. Lo que fijan no es solo que lo ajeno responda 404, sino **qué permiso mira cada
+camino**: pegar el permiso de al lado al migrar no rompe nada visible —el endpoint sigue
+guardado por su `@PreAuthorize`, y lo único que cambia es de dónde sale el alcance—, que es
+exactamente la escalada silenciosa que la
+regla existe para impedir. En los seis servicios que ya cubrían el alcance, esas pruebas
+dejaron de repetir la mecánica y pasaron a comprobar que se delega y con qué permiso: por eso
+`ServicioPerfilPanelImplTest` tiene una menos y no una más.
+
+Y de paso deja al descubierto una cuenta vieja: **este trabajo no tocó ni un archivo de
+`integracion/` y failsafe cuenta hoy 106**, así que las 103 que decía esta tabla ya venían
+cortas — no son tres pruebas nuevas. Las cifras solo se sostienen recontando los `<testcase>`,
+nunca restando la de ayer de la de hoy.
 
 ⚠️ Al recontar, **no sirve el atributo `tests=`** de los XML de surefire: con clases anidadas
 (`@Nested`) subcuenta, y por eso dos filas de esta tabla llevaban tiempo mal —las fórmulas
@@ -185,6 +208,20 @@ estas nueve impiden.
 | Todo controlador nuevo está en la lista del candado de Swagger | Un endpoint que nadie apuntó ahí queda fuera del candado, y se publica sin que nadie lo haya decidido |
 | Nadie escribe en la consola a pelo | Lo que se imprime así no aparece en el registro, y el registro es lo único que queda cuando algo falla en producción |
 | **Ningún servicio del panel busca por id suelto en un agregado con dueño** | La del multiempresa (25/08). Con una sola empresa un `findById` sin filtrar funciona idéntico y nadie lo nota; con dos, lee datos de la competencia. Las llamadas legítimas —casi todas «derivar al padre»— están enumeradas en `LLAMADAS_SIN_DUENO_ACORDADAS` con su porqué: añadir una nueva falla hasta que alguien la escriba ahí. Corrida contra el código anterior a los arreglos, denunció las fugas una por una |
+
+**La lista de la novena encogió de 39 llamadas a 30** (27/08). No porque la regla se relajara,
+sino porque los nueve guardianes que pedían la vacante para resolver el alcance se
+concentraron en uno: `AlcanceSobreLaVacante#alcanzaA` entró, y las diez entradas que ya no
+corresponden a ninguna llamada salieron. Una lista de excepciones que nadie poda deja de ser
+una aduana y pasa a ser un montón: cada nombre que sobra es un sitio donde mañana se puede
+colar algo sin que nadie lo decida.
+
+⚠️ **La regla tiene un punto ciego que conviene saber antes de escribir el código, no
+después**: recorre las **llamadas** de cada método (`getMethodCallsFromSelf()`), así que ve
+`vacantes.findById(id)` pero **no ve `vacantes::findById`**. Una referencia a método se le
+escapa entera, y el archivo pasa en verde sin que nadie haya acordado nada. Por eso el
+guardián común escribe la llamada literal aunque la referencia fuera más corta: la forma que
+la aduana no mira es la forma que no se usa.
 
 ### Las dos desviaciones que había, y ya no
 

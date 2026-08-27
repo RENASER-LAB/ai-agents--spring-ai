@@ -1,15 +1,10 @@
 package com.renaser.ai.ai_engine.simulacion.service;
 
-import com.renaser.ai.ai_engine.ai.exception.ResourceNotFoundException;
 import com.renaser.ai.ai_engine.perfilintegral.entity.Criterio;
 import com.renaser.ai.ai_engine.perfilintegral.service.CalificacionPorCriterio;
 import com.renaser.ai.ai_engine.postulacion.entity.Postulacion;
-import com.renaser.ai.ai_engine.postulacion.repository.PostulacionRepository;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
-import com.renaser.ai.ai_engine.seguridad.dto.FiltroAlcance;
-import com.renaser.ai.ai_engine.seguridad.service.Permisos;
-import com.renaser.ai.ai_engine.simulacion.dto.DtosSimulacion.MarcaResponse;
-import com.renaser.ai.ai_engine.vacante.repository.VacanteRepository;
+import com.renaser.ai.ai_engine.vacante.service.AlcanceSobreLaVacante;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -31,10 +26,8 @@ public class ServicioCalificacionSimulacion {
 
     private static final String ETAPA = "SIMULACION";
 
-    private final PostulacionRepository postulaciones;
-    private final VacanteRepository vacantes;
+    private final AlcanceSobreLaVacante alcance;
     private final CalificacionPorCriterio calificacion;
-    private final Permisos permisos;
 
     public List<CalificacionPorCriterio.Vista> verNotas(ContextoUsuario quien, Long postulacionId) {
         laVisible(quien, postulacionId);
@@ -55,18 +48,8 @@ public class ServicioCalificacionSimulacion {
         return calificacion.calcularNotaEtapa(postulacion, ETAPA, calificacion.rubricaGlobalDe(ETAPA));
     }
 
+    /** Los tres caminos miran el mismo permiso, así que va escrito aquí y no por parámetro. */
     private Postulacion laVisible(ContextoUsuario quien, Long postulacionId) {
-        Postulacion p = postulaciones.findByIdAndOrganizacionId(postulacionId, quien.organizacionId())
-                .orElseThrow(() -> new ResourceNotFoundException("Postulación", "id", postulacionId));
-        FiltroAlcance alcance = permisos.alcanceDe("calificar_simulacion");
-        if (alcance.tipo() == FiltroAlcance.Tipo.SUS_VACANTES) {
-            boolean esSuya = vacantes.findById(p.getVacanteId())
-                    .map(v -> quien.usuarioId().equals(v.getResponsableUsuarioId()))
-                    .orElse(false);
-            if (!esSuya) {
-                throw new ResourceNotFoundException("Postulación", "id", postulacionId);
-            }
-        }
-        return p;
+        return alcance.laPostulacionVisible(quien, postulacionId, "calificar_simulacion");
     }
 }

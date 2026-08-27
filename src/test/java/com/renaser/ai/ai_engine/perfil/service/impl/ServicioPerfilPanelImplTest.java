@@ -25,6 +25,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("El perfil que ve el panel")
@@ -34,24 +36,24 @@ class ServicioPerfilPanelImplTest {
     private static final long ORGANIZACION = 1L;
     private static final long PERSONA = 30L;
 
-    @Mock private PostulacionRepository postulaciones;
-    @Mock private com.renaser.ai.ai_engine.vacante.repository.VacanteRepository vacantes;
+    @Mock private com.renaser.ai.ai_engine.vacante.service.AlcanceSobreLaVacante alcance;
     @Mock private UsuarioRepository usuarios;
     @Mock private PintorDePerfil pintor;
-    @Mock private com.renaser.ai.ai_engine.seguridad.service.Permisos permisos;
 
     private ServicioPerfilPanelImpl servicio;
 
     @BeforeEach
     void crearElServicio() {
-        servicio = new ServicioPerfilPanelImpl(postulaciones, vacantes, usuarios, pintor, permisos);
-        lenient().when(postulaciones.findByIdAndOrganizacionId(POSTULACION, ORGANIZACION))
-                .thenReturn(Optional.of(Postulacion.builder()
+        servicio = new ServicioPerfilPanelImpl(alcance, usuarios, pintor);
+        // Quién alcanza qué ya no se decide aquí: lo decide AlcanceSobreLaVacante, y allí
+        // tiene sus propias pruebas. Lo que se comprueba en esta clase es que se le pregunta
+        // por el permiso correcto y que lo que conteste llega intacto al llamador.
+        lenient().when(alcance.laPostulacionVisible(
+                        org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq(POSTULACION),
+                        org.mockito.ArgumentMatchers.eq("ver_perfil_candidato")))
+                .thenReturn(Postulacion.builder()
                         .id(POSTULACION).organizacionId(ORGANIZACION).usuarioId(20L)
-                        .vacanteId(7L).build()));
-        lenient().when(permisos.alcanceDe("ver_perfil_candidato")).thenReturn(
-                new com.renaser.ai.ai_engine.seguridad.dto.FiltroAlcance(
-                        com.renaser.ai.ai_engine.seguridad.dto.FiltroAlcance.Tipo.TODO, 99L));
+                        .vacanteId(7L).build());
         lenient().when(usuarios.findById(20L)).thenReturn(Optional.of(
                 Usuario.builder().id(20L).personaId(PERSONA).build()));
     }
@@ -98,53 +100,45 @@ class ServicioPerfilPanelImplTest {
     }
 
     @Test
-    @DisplayName("Con el permiso limitado a SUS_VACANTES, el candidato de otro es un 404")
-    void alcanceLimitadoNoVeLoAjeno() {
-        // Sin esto, un rol con ver_perfil_candidato acotado a sus vacantes leia la
+    @DisplayName("Lo que el guardián no deja ver sale como 404, sin envolver ni suavizar")
+    void loQueElGuardianNiegaSaleTalCual() {
+        // Sin este guardián, un rol con ver_perfil_candidato acotado a sus vacantes leia la
         // trayectoria —y con DIRECCION, la pretension salarial— de candidatos de
         // convocatorias ajenas. Los roles se configuran desde el panel: que hoy nadie
         // tenga esa forma no basta.
-        when(permisos.alcanceDe("ver_perfil_candidato")).thenReturn(
-                new com.renaser.ai.ai_engine.seguridad.dto.FiltroAlcance(
-                        com.renaser.ai.ai_engine.seguridad.dto.FiltroAlcance.Tipo.SUS_VACANTES,
-                        99L));
-        when(vacantes.findById(7L)).thenReturn(Optional.of(
-                com.renaser.ai.ai_engine.vacante.entity.Vacante.builder()
-                        .id(7L).responsableUsuarioId(1234L).build()));
+        when(alcance.laPostulacionVisible(
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq(POSTULACION),
+                org.mockito.ArgumentMatchers.eq("ver_perfil_candidato")))
+                .thenThrow(new ResourceNotFoundException("Postulación", "id", POSTULACION));
 
         assertThatThrownBy(() -> servicio.verDePostulacion(
                 equipoCon("ver_perfil_candidato"), POSTULACION))
                 .isInstanceOf(ResourceNotFoundException.class);
+
+        // Y no se llega a pintar nada de quien no le toca.
+        verifyNoInteractions(pintor, usuarios);
     }
 
     @Test
-    @DisplayName("Con SUS_VACANTES y siendo el responsable, sí lo ve")
-    void alcanceLimitadoVeLoSuyo() {
-        when(permisos.alcanceDe("ver_perfil_candidato")).thenReturn(
-                new com.renaser.ai.ai_engine.seguridad.dto.FiltroAlcance(
-                        com.renaser.ai.ai_engine.seguridad.dto.FiltroAlcance.Tipo.SUS_VACANTES,
-                        99L));
-        when(vacantes.findById(7L)).thenReturn(Optional.of(
-                com.renaser.ai.ai_engine.vacante.entity.Vacante.builder()
-                        .id(7L).responsableUsuarioId(99L).build()));
+    @DisplayName("Se pregunta por ver_perfil_candidato, no por otro permiso del panel")
+    void sePreguntaPorSuPermiso() {
+        // El error caro al migrar es pedir el alcance del permiso de al lado: nada falla, y
+        // un rol con este acotado y otro libre acabaría leyendo perfiles ajenos.
         when(pintor.pintar(PERSONA)).thenReturn(conPretension());
         when(pintor.sinPretension(conPretension()))
                 .thenAnswer(i -> new PintorDePerfilPuro().sinPretension(conPretension()));
 
         assertThat(servicio.verDePostulacion(equipoCon("ver_perfil_candidato"), POSTULACION)
                 .titular()).isEqualTo("Analista");
+
+        verify(alcance).laPostulacionVisible(
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq(POSTULACION),
+                org.mockito.ArgumentMatchers.eq("ver_perfil_candidato"));
     }
 
-    @Test
-    @DisplayName("Una postulación de otra organización es un 404, como en todo el panel")
-    void otraOrganizacionEs404() {
-        when(postulaciones.findByIdAndOrganizacionId(POSTULACION, ORGANIZACION))
-                .thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> servicio.verDePostulacion(
-                equipoCon("ver_perfil_candidato"), POSTULACION))
-                .isInstanceOf(ResourceNotFoundException.class);
-    }
+    // El 404 de una postulación de otra empresa se prueba ahora donde se decide, en
+    // AlcanceSobreLaVacanteTest#laDeOtraEmpresaNiSeMira. Repetirlo aquí sería comprobar el
+    // mock, no el código.
 
     /** El quitado de la pretension de verdad, sin repositorios: para no mockear al mockeado. */
     private static class PintorDePerfilPuro {
