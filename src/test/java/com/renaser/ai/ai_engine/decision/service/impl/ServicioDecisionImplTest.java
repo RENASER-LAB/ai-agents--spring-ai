@@ -121,4 +121,75 @@ class ServicioDecisionImplTest {
 
         verify(barrerasDetectadas).save(any());
     }
+
+    // ============ El alcance: qué postulaciones y qué vacantes alcanza quien mira ============
+
+    /**
+     * Caracterización antes de migrar al guardián compartido.
+     *
+     * <p>Este servicio tenía las dos formas de la regla escritas a mano y ni una prueba de
+     * alcance, con seis llamadas y cinco permisos distintos. Es el archivo donde más fácil es
+     * pegar el permiso equivocado al migrar, y el error no se vería: {@code @PreAuthorize}
+     * seguiría guardando el endpoint y solo el <i>alcance</i> saldría del permiso de al lado.
+     * Estas pruebas fijan qué permiso mira cada camino.
+     */
+    private static final Long OTRO_USUARIO = 77L;
+
+    private void laPostulacionEsDeLaVacante() {
+        when(postulaciones.findByIdAndOrganizacionId(POSTULACION, ORGANIZACION))
+                .thenReturn(Optional.of(Postulacion.builder()
+                        .id(POSTULACION).organizacionId(ORGANIZACION).vacanteId(VACANTE).build()));
+    }
+
+    private void laVacanteEsDe(Long responsable) {
+        when(vacantes.findById(VACANTE)).thenReturn(Optional.of(
+                com.renaser.ai.ai_engine.vacante.entity.Vacante.builder()
+                        .id(VACANTE).organizacionId(ORGANIZACION)
+                        .responsableUsuarioId(responsable).build()));
+    }
+
+    @Test
+    @DisplayName("El semáforo de una postulación de vacante ajena responde 404")
+    void elSemaforoDeUnaAjenaNoSeAbre() {
+        laPostulacionEsDeLaVacante();
+        when(permisos.alcanceDe("ver_semaforo_decision"))
+                .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.SUS_VACANTES, USUARIO));
+        laVacanteEsDe(OTRO_USUARIO);
+
+        assertThatThrownBy(() -> servicio.verSemaforo(QUIEN, POSTULACION))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("Pedir evidencia adicional mira su propio permiso, no el del semáforo")
+    void pedirEvidenciaMiraSuPermiso() {
+        // Si mirara el del semáforo, un rol con ver_semaforo_decision libre y
+        // pedir_evidencia_adicional acotado pediría evidencia de convocatorias ajenas.
+        laPostulacionEsDeLaVacante();
+        when(permisos.alcanceDe("pedir_evidencia_adicional"))
+                .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.SUS_VACANTES, USUARIO));
+        laVacanteEsDe(OTRO_USUARIO);
+
+        assertThatThrownBy(() -> servicio.pedirEvidenciaAdicional(QUIEN, POSTULACION,
+                new com.renaser.ai.ai_engine.decision.dto.DtosDecision.PedirEvidencia(
+                        "Falta el certificado", "Adjunta el título")))
+                .isInstanceOf(ResourceNotFoundException.class);
+
+        verify(permisos).alcanceDe("pedir_evidencia_adicional");
+        verify(permisos, never()).alcanceDe("ver_semaforo_decision");
+    }
+
+    @Test
+    @DisplayName("Definir barreras en una vacante que no dirige responde 404")
+    void lasBarrerasDeUnaVacanteAjena() {
+        when(permisos.alcanceDe("definir_barreras_criticas"))
+                .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.SUS_VACANTES, USUARIO));
+        when(vacantes.findByIdAndOrganizacionId(VACANTE, ORGANIZACION)).thenReturn(Optional.of(
+                com.renaser.ai.ai_engine.vacante.entity.Vacante.builder()
+                        .id(VACANTE).organizacionId(ORGANIZACION)
+                        .responsableUsuarioId(OTRO_USUARIO).build()));
+
+        assertThatThrownBy(() -> servicio.listarBarrerasDeVacante(QUIEN, VACANTE))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
 }
