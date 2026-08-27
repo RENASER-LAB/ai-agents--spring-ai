@@ -47,7 +47,7 @@ demás de la calificación se prueba con un doble del modelo y no gasta nada.
 
 ---
 
-## 787 pruebas
+## 871 pruebas
 
 Contadas de correrlas el 27/08/2026 (tras fusionar el multiempresa con los inscritos de la
 simulación y los permisos editables), no de recordarlas: el desglose sale de los informes de
@@ -55,12 +55,12 @@ surefire y failsafe, y suma exacto.
 
 | Qué | Cuántas | Necesita |
 |---|---:|---|
-| Unitarias, con dobles | 577 | nada |
+| Unitarias, con dobles | 658 | nada |
 | Arquitectura | 12 | nada |
 | Las fórmulas del banco v3 | 22 | nada |
 | El validador de las respuestas v3 | 21 | nada |
 | El perfil del candidato (paquete `perfil`: merge, lectura, CRUD, retención, borrado) | 52 | nada |
-| Integración, de punta a punta | 97 | Docker |
+| Integración, de punta a punta | 100 | Docker |
 | Contra el proveedor de verdad, y el envío de correo | 6 | Docker o SMTP, y su bandera |
 
 El multiempresa (25/08) sumó 39 unitarias: 31 de la implementación —el login del panel, las

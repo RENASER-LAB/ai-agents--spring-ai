@@ -57,6 +57,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -404,8 +405,7 @@ class ServicioSimulacionImplTest {
         hayInscripcionDe(ajena);
         when(permisos.alcanceDe("marcar_eventos_simulacion"))
                 .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.SUS_VACANTES, USUARIO));
-        when(vacantes.findById(VACANTE)).thenReturn(Optional.of(
-                Vacante.builder().id(VACANTE).responsableUsuarioId(OTRO_USUARIO).build()));
+        when(alcanceVacante.alcanzaA(any(), any(), any())).thenReturn(false);
 
         assertThatThrownBy(() -> servicio.verMarcas(QUIEN, INSCRIPCION))
                 .isInstanceOf(ResourceNotFoundException.class);
@@ -424,8 +424,9 @@ class ServicioSimulacionImplTest {
 
         assertThat(servicio.verMarcas(QUIEN, INSCRIPCION)).isEmpty();
 
-        // Con TODO no hace falta saber de quién es la vacante.
-        verifyNoInteractions(vacantes);
+        // Con TODO no se pregunta de quién es la vacante: eso lo comprueba ahora el test del
+        // guardián, que es donde vive la decisión. Aquí basta con que se le consulte.
+        verify(alcanceVacante).alcanzaA(any(), any(), any());
     }
 
     @Test
@@ -557,6 +558,9 @@ class ServicioSimulacionImplTest {
                         .id(SESION).organizacionId(ORGANIZACION).estado("PUBLICADA").build()));
         when(postulaciones.findByIdAndOrganizacionId(POSTULACION, ORGANIZACION))
                 .thenReturn(Optional.of(postulacion));
+        // Y el guardián deja pasar: qué alcanza quien mira se decide y se prueba en
+        // AlcanceSobreLaVacante. Los tests que quieren un no lo dicen ellos.
+        lenient().when(alcanceVacante.alcanzaA(any(), any(), any())).thenReturn(true);
         return inscripcion;
     }
 
@@ -979,6 +983,23 @@ class ServicioSimulacionImplTest {
                             .responsableUsuarioId(USUARIO).build(),
                     Vacante.builder().id(VACANTE_AJENA).titulo("Contador")
                             .responsableUsuarioId(OTRO_USUARIO).build()));
+            // Lo que se prueba en este bloque es el RECORTE —qué filas sobreviven y de cuáles
+            // se piden nombres—, no qué significa el alcance, que vive en el guardián y allí
+            // tiene sus pruebas. Así que el doble aplica la regla de verdad en vez de fingir
+            // un veredicto: si fingiera, la lista dejaría de decir nada sobre el recorte.
+            lenient().when(alcanceVacante.alcanzaA(any(), any(), any(), any()))
+                    .thenAnswer(i -> {
+                        FiltroAlcance a = i.getArgument(1);
+                        Postulacion p = i.getArgument(2);
+                        if (p == null) {
+                            return false;
+                        }
+                        return switch (a.tipo()) {
+                            case TODO -> true;
+                            case SUS_VACANTES -> MI_VACANTE.equals(p.getVacanteId());
+                            case PROPIO -> false;
+                        };
+                    });
         }
 
         @Test
