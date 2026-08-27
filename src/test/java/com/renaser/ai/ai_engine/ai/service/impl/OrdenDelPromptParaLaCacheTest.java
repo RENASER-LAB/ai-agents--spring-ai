@@ -60,6 +60,7 @@ class OrdenDelPromptParaLaCacheTest {
     @Mock private AgenteRepository agentes;
     @Mock private InstruccionIaRepository instrucciones;
     @Mock private EjecucionIaRepository ejecuciones;
+    @Mock private com.renaser.ai.ai_engine.ai.repository.TarifaModeloRepository tarifas;
 
     /** Lo que se le mandó al modelo en cada llamada: la instrucción y los datos, aparte. */
     private record Envio(String instruccion, String contenido) {
@@ -102,8 +103,10 @@ class OrdenDelPromptParaLaCacheTest {
             return fila;
         });
 
+        // La calculadora del costo con un repositorio vacío: sin tarifa el costo queda
+        // nulo, que aquí da igual — esta prueba mira el orden del prompt, no el precio.
         ejecutor = new EjecutorAgenteIaImpl(agentes, instrucciones, ejecuciones, espia,
-                JsonMapper.builder().build());
+                new CalculadoraCostoIa(tarifas), JsonMapper.builder().build());
     }
 
     private void calificar(String curriculum) {

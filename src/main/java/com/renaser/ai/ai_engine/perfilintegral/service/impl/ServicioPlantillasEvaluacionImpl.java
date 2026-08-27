@@ -10,6 +10,8 @@ import com.renaser.ai.ai_engine.perfilintegral.mapper.PlantillaEvaluacionMapper;
 import com.renaser.ai.ai_engine.perfilintegral.repository.CuotaPlantillaEvaluacionRepository;
 import com.renaser.ai.ai_engine.perfilintegral.repository.PlantillaEvaluacionRepository;
 import com.renaser.ai.ai_engine.perfilintegral.service.ServicioPlantillasEvaluacion;
+import com.renaser.ai.ai_engine.organizacion.service.DuenoDelInstrumento;
+import com.renaser.ai.ai_engine.organizacion.service.Instrumento;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
 import com.renaser.ai.ai_engine.seguridad.service.Permisos;
 
@@ -31,6 +33,7 @@ public class ServicioPlantillasEvaluacionImpl implements ServicioPlantillasEvalu
     private final CuotaPlantillaEvaluacionMapper cuotaMapper;
     private final ServicioAuditoria auditoria;
     private final Permisos permisos;
+    private final DuenoDelInstrumento dueno;
 
     @Override
     @Transactional
@@ -55,7 +58,10 @@ public class ServicioPlantillasEvaluacionImpl implements ServicioPlantillasEvalu
     @Override
     public List<PlantillaResponse> listar(ContextoUsuario quien) {
         permisos.alcanceDe("elegir_plantilla_evaluacion");
-        return plantillas.findByOrganizacionIdOrderByCreadoEnDesc(quien.organizacionId()).stream()
+        // El resolutor decide de quién son las plantillas que esta organización ve: las
+        // suyas si personalizó, las de la plataforma si no.
+        return plantillas.findByOrganizacionIdOrderByCreadoEnDesc(
+                        dueno.duenoDe(quien.organizacionId(), Instrumento.PLANTILLA_EVALUACION)).stream()
                 .map(plantillaMapper::toResponse)
                 .toList();
     }
@@ -63,7 +69,7 @@ public class ServicioPlantillasEvaluacionImpl implements ServicioPlantillasEvalu
     @Override
     @Transactional
     public void publicar(ContextoUsuario quien, Long id) {
-        PlantillaEvaluacion plantilla = laVisible(quien, id);
+        PlantillaEvaluacion plantilla = laPropia(quien, id);
         if (!"BORRADOR".equals(plantilla.getEstado())) {
             throw new IllegalStateException("Solo se publica una plantilla en borrador; esta está " + plantilla.getEstado());
         }
@@ -83,7 +89,7 @@ public class ServicioPlantillasEvaluacionImpl implements ServicioPlantillasEvalu
     @Override
     @Transactional
     public Long agregarCuota(ContextoUsuario quien, Long plantillaId, CrearCuota datos) {
-        PlantillaEvaluacion plantilla = laVisible(quien, plantillaId);
+        PlantillaEvaluacion plantilla = laPropia(quien, plantillaId);
         if (!"BORRADOR".equals(plantilla.getEstado())) {
             throw new IllegalStateException("No se pueden agregar cuotas a una plantilla ya publicada");
         }
@@ -114,7 +120,17 @@ public class ServicioPlantillasEvaluacionImpl implements ServicioPlantillasEvalu
                 .toList();
     }
 
+    // Leer resuelve, editar no: con la bandera apagada la organización VE las plantillas
+    // de la plataforma —eso contesta el resolutor— pero solo edita las suyas.
+
     private PlantillaEvaluacion laVisible(ContextoUsuario quien, Long id) {
+        return plantillas.findByIdAndOrganizacionId(id, quien.organizacionId())
+                .or(() -> plantillas.findByIdAndOrganizacionId(
+                        id, dueno.duenoDe(quien.organizacionId(), Instrumento.PLANTILLA_EVALUACION)))
+                .orElseThrow(() -> new ResourceNotFoundException("Plantilla de evaluación", "id", id));
+    }
+
+    private PlantillaEvaluacion laPropia(ContextoUsuario quien, Long id) {
         return plantillas.findByIdAndOrganizacionId(id, quien.organizacionId())
                 .orElseThrow(() -> new ResourceNotFoundException("Plantilla de evaluación", "id", id));
     }

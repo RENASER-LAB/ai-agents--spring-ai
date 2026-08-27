@@ -5,6 +5,7 @@ import com.renaser.ai.ai_engine.ai.controller.perfilintegral.AgentesIaPanelContr
 import com.renaser.ai.ai_engine.catalogo.controller.CatalogoController;
 import com.renaser.ai.ai_engine.decision.controller.DecisionPanelController;
 import com.renaser.ai.ai_engine.perfilintegral.controller.BancoPreguntasController;
+import com.renaser.ai.ai_engine.perfilintegral.service.ImportacionInvalidaException;
 import com.renaser.ai.ai_engine.perfilintegral.controller.EvaluacionPortalController;
 import com.renaser.ai.ai_engine.perfilintegral.controller.PlantillasEvaluacionController;
 import com.renaser.ai.ai_engine.pesos.controller.PesosController;
@@ -71,7 +72,9 @@ import java.util.regex.Pattern;
         DecisionPanelController.class,
         SimulacionPanelController.class,
         SimulacionPortalController.class,
-        ValidacionPanelController.class})
+        ValidacionPanelController.class,
+        com.renaser.ai.ai_engine.perfil.controller.PerfilPortalController.class,
+        com.renaser.ai.ai_engine.organizacion.controller.PlataformaController.class})
 @Order(Ordered.HIGHEST_PRECEDENCE)
 @Slf4j
 public class ManejadorErrores {
@@ -99,6 +102,20 @@ public class ManejadorErrores {
         return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
                 .header(HttpHeaders.RETRY_AFTER, String.valueOf(ex.getSegundosDeEspera()))
                 .body(problema);
+    }
+
+    // El Excel del banco no sirve, y el porqué son N problemas, no uno: 400 con la
+    // lista completa {hoja, fila, mensaje}, que es lo que el administrador necesita
+    // para corregir el archivo de una sola pasada.
+    @ExceptionHandler(ImportacionInvalidaException.class)
+    public ProblemDetail importacionInvalida(ImportacionInvalidaException ex, WebRequest request) {
+        log.warn("Importación inválida - Path: {}, Problemas: {}",
+                request.getDescription(false), ex.getErrores().size());
+        ProblemDetail problema = construir(HttpStatus.BAD_REQUEST,
+                "El archivo tiene problemas y no se importó nada",
+                "importacion-invalida", ex.getMessage());
+        problema.setProperty("errores", ex.getErrores());
+        return problema;
     }
 
     // Una regla de negocio incumplida es un 400 con explicación, no un 500 opaco:

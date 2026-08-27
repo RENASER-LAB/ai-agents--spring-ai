@@ -4,6 +4,7 @@ import com.renaser.ai.ai_engine.archivo.config.PropiedadesAlmacen;
 import com.renaser.ai.ai_engine.archivo.entity.Archivo;
 import com.renaser.ai.ai_engine.archivo.repository.ArchivoRepository;
 import com.renaser.ai.ai_engine.archivo.service.AlmacenArchivos;
+import com.renaser.ai.ai_engine.archivo.service.HashContenido;
 import com.renaser.ai.ai_engine.archivo.service.TiposDeArchivo;
 
 import lombok.extern.slf4j.Slf4j;
@@ -86,11 +87,13 @@ public class AlmacenArchivosSupabase implements AlmacenArchivos {
         TiposDeArchivo.exigirValido(nombreOriginal, archivo.getContentType());
 
         String ruta = rutaNueva(organizacionId, nombreOriginal);
+        byte[] contenido;
         try {
-            subir(ruta, archivo.getBytes(), archivo.getContentType());
+            contenido = archivo.getBytes();
         } catch (IOException e) {
             throw new UncheckedIOException("No se pudo leer el archivo que llegó", e);
         }
+        subir(ruta, contenido, archivo.getContentType());
 
         return archivos.save(Archivo.builder()
                 .organizacionId(organizacionId)
@@ -98,6 +101,9 @@ public class AlmacenArchivosSupabase implements AlmacenArchivos {
                 .nombreOriginal(nombreOriginal)
                 .tamano(archivo.getSize())
                 .tipo(archivo.getContentType())
+                // La huella es lo que permite no pagar dos lecturas del mismo curriculum.
+                // Se calcula aqui porque este es el unico embudo por el que pasan los bytes.
+                .contenidoHash(HashContenido.sha256(contenido))
                 .subidoEn(Instant.now())
                 .creadoEn(Instant.now())
                 .build());

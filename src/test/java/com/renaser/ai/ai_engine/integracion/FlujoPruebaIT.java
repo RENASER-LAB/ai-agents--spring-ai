@@ -3,6 +3,7 @@ package com.renaser.ai.ai_engine.integracion;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.renaser.ai.ai_engine.comun.programado.SondeoVencimientos;
+import com.renaser.ai.ai_engine.integracion.soporte.ImagenesDeContenedores;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.DisplayName;
@@ -61,7 +62,7 @@ public class FlujoPruebaIT {
 
     @Container
     @ServiceConnection
-    static RabbitMQContainer rabbit = new RabbitMQContainer("rabbitmq:3-management-alpine");
+    static RabbitMQContainer rabbit = new RabbitMQContainer(ImagenesDeContenedores.RABBITMQ);
 
     @DynamicPropertySource
     static void propiedades(DynamicPropertyRegistry registro) {
@@ -76,6 +77,9 @@ public class FlujoPruebaIT {
         registro.add("app.archivos.tipo", () -> "memoria");
         registro.add("app.seguridad.jwt-secreto",
                 () -> "clave-de-pruebas-suficientemente-larga-para-hmac-256-bits");
+        // El dev-login quedo apagado por defecto en application.yaml: aqui se enciende
+        // explicitamente, porque estas pruebas entran al panel por el.
+        registro.add("app.seguridad.dev-login-activo", () -> "true");
         registro.add("spring.ai.deepseek.api-key", () -> "clave-de-pruebas-no-se-usa");
         // La calificacion con IA se apaga en estas pruebas: aqui no se prueba, y si estuviera
         // encendida cada entrega intentaria hablar con DeepSeek con una clave de mentira.
@@ -199,6 +203,7 @@ public class FlujoPruebaIT {
                         .file(cv)
                         .param("vacanteId", String.valueOf(vacanteId))
                         .param("resultadoOrgulloso", "Reduje el tiempo de build de 8 a 2 minutos")
+                        .param("aceptaTratamiento", "true")
                         .header("Authorization", "Bearer " + tokenCandidato))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString(), "codigo");
@@ -323,6 +328,21 @@ public class FlujoPruebaIT {
                         + segundoCriterioId + "/nota"), tokenTalento,
                 "{\"puntaje\":35,\"explicacion\":\"Código limpio, faltó cubrir un caso borde\"}")
                 .andExpect(status().isOk());
+
+        // Una nota de criterio que NO es de esta rúbrica, como la que deja la criba o el
+        // perfil integral: `nota_criterio` es una sola tabla para las tres etapas que
+        // puntúan por criterio. La nota de la prueba tiene que seguir siendo 85.
+        //
+        // Sin esto el fallo no se veía: aquí se sumaban TODAS las notas de la postulación,
+        // y como en las pruebas de antes solo existían las dos de la rúbrica, el total
+        // coincidía por casualidad. En producción no: un candidato de 50 sobre 100 salió
+        // con 675 porque se le pegaron las siete del perfil.
+        Long criterioAjeno = jdbc.queryForObject(
+                "insert into criterio (codigo, nombre, etapa_codigo, puntos, metodo_verificacion, orden) "
+                        + "values ('DE_OTRA_ETAPA', 'Criterio de otra etapa', 'PERFIL_INTEGRAL', "
+                        + "590, 'AGENTE', 99) returning id", Long.class);
+        jdbc.update("insert into nota_criterio (postulacion_id, criterio_id, puntaje, explicacion, origen) "
+                + "values (?, ?, 590, 'De otra etapa', 'AGENTE')", postulacionId, criterioAjeno);
 
         String cuerpo = conToken(post("/api/v1/panel/postulaciones/" + postulacionId + "/prueba/calificacion"),
                         tokenTalento, null)
@@ -502,6 +522,7 @@ public class FlujoPruebaIT {
                         .file(cv)
                         .param("vacanteId", String.valueOf(vacanteId))
                         .param("resultadoOrgulloso", "Otro resultado del que me siento orgullosa")
+                        .param("aceptaTratamiento", "true")
                         .header("Authorization", "Bearer " + token))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString(), "codigo");

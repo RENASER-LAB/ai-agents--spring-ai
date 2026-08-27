@@ -35,6 +35,7 @@
 		<testcontainers.version>2.0.5</testcontainers.version>
 		<!-- La misma que ya traia spring-ai-pdf-document-reader: no baja nada nuevo -->
 		<pdfbox.version>3.0.7</pdfbox.version>
+		<poi.version>5.4.1</poi.version>
 		<archunit.version>1.4.1</archunit.version>
 		<!-- 0.8.13+ es la primera que entiende los .class de Java 25 -->
 		<jacoco.version>0.8.13</jacoco.version>
@@ -153,11 +154,20 @@
 		<!-- Saca el texto del curriculum en PDF: sin eso la IA no tiene que leer (RF-41).
 		     Ya venia dentro de spring-ai-pdf-document-reader; se declara aparte para que
 		     nuestro codigo no dependa de una transitiva que manda otra libreria. Los .docx
-		     se leen sin libreria (ver ExtractorTextoCv), asi que Apache POI no hace falta. -->
+		     se leen sin libreria (ver ExtractorTextoCv). -->
 		<dependency>
 			<groupId>org.apache.pdfbox</groupId>
 			<artifactId>pdfbox</artifactId>
 			<version>${pdfbox.version}</version>
+		</dependency>
+		<!-- Lee el Excel con que el administrador sube su banco de preguntas (ver
+		     LectorPlantillaBanco). El archivo entra por multipart, se lee en memoria una
+		     vez y se descarta: nunca se guarda en el almacen. POI tambien escribe los
+		     xlsx que las pruebas del lector fabrican al vuelo. -->
+		<dependency>
+			<groupId>org.apache.poi</groupId>
+			<artifactId>poi-ooxml</artifactId>
+			<version>${poi.version}</version>
 		</dependency>
 
 		<dependency>

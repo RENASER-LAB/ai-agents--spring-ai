@@ -1,10 +1,12 @@
 # Levantar el backend en AWS
 
-Una máquina, dos contenedores, y nada que administrar en ella.
+Una máquina, tres contenedores, y nada que administrar en ella.
 
-**Todo lo pesado vive fuera**: la base en Supabase, los currículums en su bucket, la cola en
-Amazon MQ, y el chat y los embeddings en APIs de terceros. Esta máquina se puede tirar y
-volver a crear sin perder nada más que los certificados, que Caddy saca otra vez solo.
+**Lo pesado vive fuera**: la base en Supabase, los currículums en su bucket, y el chat y los
+embeddings en APIs de terceros. La cola sí corre aquí —RabbitMQ como un contenedor más—
+pero no guarda nada que importe: los trabajos se apuntan en la tabla `trabajo_ia` antes de
+publicarse y un sondeo los reencola si se pierden. Esta máquina se puede tirar y volver a
+crear sin perder nada más que los certificados, que Caddy saca otra vez solo.
 
 **Lo que ya está creado** (cuenta 526338061654, `us-east-1`):
 
@@ -12,7 +14,6 @@ volver a crear sin perder nada más que los certificados, que Caddy saca otra ve
 |---|---|
 | Instancia | `i-05fc037e853d07264` · `t3.medium` · Elastic IP `18.204.177.210` |
 | Imagen | `526338061654.dkr.ecr.us-east-1.amazonaws.com/ai-engine:latest` |
-| Broker | `renaser-mq` · RabbitMQ 4.2 · `amqps://…:5671` |
 | Grupo de seguridad | `sg-0fe61167414449546` — solo 80 y 443 |
 | Rol | `renaser-ec2` — ECR de lectura y SSM |
 | Rol que asume GitHub | `github-despliegue` — ECR de escritura y `SendCommand`; su política de confianza solo acepta `main`, y el `sub` va con identificadores numéricos (ver [CI-CD.md](../docs/CI-CD.md)) |
@@ -24,6 +25,7 @@ volver a crear sin perder nada más que los certificados, que Caddy saca otra ve
 | Contenedor | Para qué | Puertos al mundo |
 |---|---|---|
 | `aplicacion` | El backend | ninguno — el 8080 solo en `127.0.0.1` |
+| `rabbitmq` | La cola de la calificación con IA | ninguno — solo la red interna |
 | `caddy` | HTTPS y reparto | 80 y 443 |
 
 Solo Caddy mira a internet. La aplicación publica su 8080 **únicamente en loopback**, que es
@@ -37,29 +39,39 @@ se entra por SSM Session Manager, así que no hay ninguna llave que perder ni ro
 |---|---:|
 | EC2 `t3.medium` (4 GB) | ~$30 |
 | Disco EBS 20 GB | ~$2 |
-| Amazon MQ `mq.m7g.medium` | ~$57 |
 | ECR (la imagen pesa ~450 MB) | ~$0,05 |
-| **Total** | **~$89** |
+| **Total** | **~$32** |
 
-La línea grande es el broker, y fue una decisión tomada a sabiendas. Si algún día se quiere
-recortar, ahí está el margen: bajarlo a `mq.t3.micro` son ~$26, y meter RabbitMQ como un
-contenedor más en esta misma máquina son $0.
+Hasta agosto de 2026 aquí había una línea más: Amazon MQ (`mq.m7g.medium`), **~$119 al mes
+medidos** — el 77% de la factura, y el doble de lo que se estimó al contratarlo. Se
+sustituyó por el contenedor `rabbitmq` de este mismo compose, que hace lo mismo por $0.
 
-### La cola: Amazon MQ
+### La cola: un contenedor propio
 
-Renaser ya tenía el broker creado (`renaser-mq`, RabbitMQ 4.2, `mq.m7g.medium`), así que la
-aplicación lo usa en vez de levantar uno propio. Cuesta más que el servidor, y fue una
-decisión tomada a sabiendas.
+RabbitMQ 4.2 corre en esta misma máquina, con 768 MB de techo y sin ningún puerto
+publicado: solo la aplicación, por la red interna del compose, puede hablarle.
 
-**Tres cosas que no son como en local** y rompen el arranque si se copian mal:
+**Por qué no hace falta un broker gestionado.** La durabilidad de los trabajos no descansa
+en la cola: cada trabajo se guarda en la tabla `trabajo_ia` antes de publicarse el aviso, y
+`ReintentoTrabajosIa` sondea cada cinco minutos lo pendiente o colgado y lo reencola. Si el
+broker pierde mensajes —un reinicio, un volumen borrado, la máquina recreada— lo peor que
+pasa es que una calificación espere unos veinte minutos. Pagar un gestionado compra
+disponibilidad que este flujo no necesita.
 
-- El puerto es **5671**, no 5672: Amazon MQ solo habla AMQPS.
-- Por lo mismo, `SPRING_RABBITMQ_SSL_ENABLED` va en **`true`**.
-- El `RABBITMQ_HOST` va **sin `amqps://` y sin puerto**. Spring arma la url solo; pegar el
-  endpoint entero da un fallo de resolución de nombre que no menciona el esquema.
+**Su configuración vive en [`rabbitmq.conf`](rabbitmq.conf)**, montado por el compose. Lo
+importante ahí es el `consumer_timeout` de 60 minutos: una calificación real puede pasar de
+la media hora, y con el valor por defecto (30 min) el broker reencolaba el trabajo a medias
+y la misma inferencia se pagaba dos y tres veces.
 
-El usuario y la contraseña se pusieron al crear el broker y **no se pueden recuperar desde la
-API de AWS**: los usuarios de un broker RabbitMQ se gestionan dentro del propio RabbitMQ.
+**Las credenciales las eliges tú** (o las genera `armar-env.sh`): el broker crea ese usuario
+la primera vez que arranca con el volumen vacío, leyendo las mismas variables del `.env`
+que usa la aplicación. Si algún día se cambia la contraseña en Parameter Store, al broker
+hay que cambiársela por dentro (`rabbitmqctl change_password`): no le llega sola.
+
+**Si algún día hay que volver a un broker externo**: `RABBITMQ_HOST` con el endpoint (sin
+esquema y sin puerto — Spring arma la url solo), el puerto y el TLS en el compose (Amazon
+MQ solo habla AMQPS: 5671 y `SPRING_RABBITMQ_SSL_ENABLED=true`), y fuera el servicio
+`rabbitmq`.
 
 ### Por qué no un balanceador
 
@@ -72,9 +84,10 @@ el certificado de Let's Encrypt solo, sin cron ni recordatorios, y va en el mism
 
 ### 1. Región
 
-**`us-east-1`**, porque es donde ya está el broker. Supabase está en `us-west-2`, así que cada
-consulta a la base cruza el país; si algún día se nota en las pantallas que hacen muchas
-consultas, lo que hay que mover es el broker, no el servidor.
+**`us-east-1`**, que es donde están la instancia y el registro de imágenes. Supabase está en
+`us-west-2`, así que cada consulta a la base cruza el país; si algún día se nota en las
+pantallas que hacen muchas consultas, lo que tocaría mover es el servidor hacia la base —
+la cola ya viaja con él.
 
 ### 2. El repositorio de imágenes
 
@@ -115,14 +128,17 @@ cd /opt/renaser && cp .env.example .env && nano .env
 ```
 
 Casi todos los valores están ya en tu `application-secrets.yaml` local; el propio
-`.env.example` dice de qué clave sale cada uno. **Dos hay que inventarlos:**
+`.env.example` dice de qué clave sale cada uno. **Tres hay que inventarlos** —el
+`JWT_SECRETO` y las credenciales del broker— y los tres los genera `armar-env.sh` solo. A
+mano:
 
 ```bash
 openssl rand -base64 48   # JWT_SECRETO
+openssl rand -base64 32   # RABBITMQ_PASSWORD (el usuario, el que quieras)
 ```
 
-Y el usuario y la contraseña del broker son los que pusiste al crearlo: **no se pueden sacar de
-AWS**, los guarda el propio RabbitMQ.
+El broker crea ese usuario en su primer arranque con el volumen vacío, así que en una
+máquina nueva las credenciales siempre casan solas.
 
 ⚠️ **El `JWT_SECRETO` tiene que ser distinto del local.** Si se reutiliza, un token emitido
 en la máquina de cualquier desarrollador vale en producción.
@@ -196,5 +212,6 @@ como pendiente en el `CLAUDE.MD`, y mientras siga así el registro se llena de r
 un 500 de verdad pasa desapercibido.
 
 **El disco de la máquina es prescindible.** No hay ningún currículum aquí: viven en el bucket
-de Supabase. Lo único con volumen propio son los certificados de Caddy, y se vuelven a sacar
-solos.
+de Supabase. Con volumen propio están los certificados de Caddy —se vuelven a sacar solos— y
+la cola del broker, que tampoco duele perder: los trabajos viven en `trabajo_ia` y el sondeo
+de la aplicación los reencola.

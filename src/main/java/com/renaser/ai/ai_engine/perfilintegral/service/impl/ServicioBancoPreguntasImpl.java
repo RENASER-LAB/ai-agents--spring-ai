@@ -20,10 +20,13 @@ import com.renaser.ai.ai_engine.perfilintegral.repository.CampoCasoRepository;
 import com.renaser.ai.ai_engine.perfilintegral.repository.EvaluacionRepository;
 import com.renaser.ai.ai_engine.perfilintegral.repository.OpcionRepository;
 import com.renaser.ai.ai_engine.perfilintegral.repository.ParConsistenciaRepository;
+import com.renaser.ai.ai_engine.perfilintegral.repository.PreguntaDimensionRepository;
 import com.renaser.ai.ai_engine.perfilintegral.repository.PreguntaRepository;
 import com.renaser.ai.ai_engine.perfilintegral.repository.RangoPreguntaRepository;
 import com.renaser.ai.ai_engine.perfilintegral.repository.VersionBancoRepository;
 import com.renaser.ai.ai_engine.perfilintegral.service.ServicioBancoPreguntas;
+import com.renaser.ai.ai_engine.organizacion.service.DuenoDelInstrumento;
+import com.renaser.ai.ai_engine.organizacion.service.Instrumento;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
 import com.renaser.ai.ai_engine.seguridad.service.Permisos;
 
@@ -55,6 +58,7 @@ public class ServicioBancoPreguntasImpl implements ServicioBancoPreguntas {
     private final RangoPreguntaRepository rangos;
     private final CampoCasoRepository camposCaso;
     private final ParConsistenciaRepository pares;
+    private final PreguntaDimensionRepository preguntaDimensiones;
     private final EvaluacionRepository evaluaciones;
     private final VersionBancoMapper versionBancoMapper;
     private final PreguntaMapper preguntaMapper;
@@ -64,6 +68,7 @@ public class ServicioBancoPreguntasImpl implements ServicioBancoPreguntas {
     private final ParConsistenciaMapper parMapper;
     private final ServicioAuditoria auditoria;
     private final Permisos permisos;
+    private final DuenoDelInstrumento dueno;
 
     @Override
     @Transactional
@@ -85,7 +90,10 @@ public class ServicioBancoPreguntasImpl implements ServicioBancoPreguntas {
     @Override
     public List<VersionBancoResponse> listarVersiones(ContextoUsuario quien) {
         permisos.alcanceDe("ver_banco_preguntas");
-        return versiones.findVisibles(quien.organizacionId()).stream()
+        // El resolutor decide de quién es el banco que esta organización ve: el suyo si
+        // personalizó, el de la plataforma si no. Ya no existen filas «globales» sin dueño.
+        return versiones.findByOrganizacionIdOrderByCreadoEnDesc(
+                        dueno.duenoDe(quien.organizacionId(), Instrumento.BANCO)).stream()
                 .map(versionBancoMapper::toResponse)
                 .toList();
     }
@@ -93,7 +101,7 @@ public class ServicioBancoPreguntasImpl implements ServicioBancoPreguntas {
     @Override
     @Transactional
     public void publicarVersion(ContextoUsuario quien, Long id) {
-        VersionBanco version = laVersionVisible(quien, id);
+        VersionBanco version = laVersionPropia(quien, id);
         if (!"BORRADOR".equals(version.getEstado())) {
             throw new IllegalStateException("Solo se publica una versión en borrador; esta está " + version.getEstado());
         }
@@ -122,7 +130,7 @@ public class ServicioBancoPreguntasImpl implements ServicioBancoPreguntas {
     @Override
     @Transactional
     public void archivarVersion(ContextoUsuario quien, Long id) {
-        VersionBanco version = laVersionVisible(quien, id);
+        VersionBanco version = laVersionPropia(quien, id);
         if (!"PUBLICADA".equals(version.getEstado())) {
             // Un BORRADOR no circula: abandonarlo no necesita endpoint. Y una ARCHIVADA ya está.
             throw new IllegalStateException("Solo se archiva una versión publicada; esta está " + version.getEstado());
@@ -175,7 +183,7 @@ public class ServicioBancoPreguntasImpl implements ServicioBancoPreguntas {
     @Override
     @Transactional
     public Long crearPregunta(ContextoUsuario quien, Long versionBancoId, CrearPregunta datos) {
-        VersionBanco version = laVersionVisible(quien, versionBancoId);
+        VersionBanco version = laVersionPropia(quien, versionBancoId);
         exigirBorrador(version, "agregar preguntas");
 
         // Campos que solo tienen sentido en su formato: rechazarlos temprano evita que el
@@ -224,10 +232,10 @@ public class ServicioBancoPreguntasImpl implements ServicioBancoPreguntas {
     @Override
     @Transactional
     public Long agregarOpcion(ContextoUsuario quien, Long preguntaId, CrearOpcion datos) {
-        Pregunta pregunta = laPreguntaVisible(quien, preguntaId);
+        Pregunta pregunta = laPreguntaPropia(quien, preguntaId);
         // El mismo candado que crearPregunta. Sin él, la clave de una pregunta publicada se
         // podía alterar por debajo de un examen ya en curso.
-        exigirBorrador(laVersionVisible(quien, pregunta.getVersionBancoId()), "agregar opciones");
+        exigirBorrador(laVersionPropia(quien, pregunta.getVersionBancoId()), "agregar opciones");
 
         Opcion opcion = opciones.save(Opcion.builder()
                 .preguntaId(pregunta.getId())
@@ -258,8 +266,8 @@ public class ServicioBancoPreguntasImpl implements ServicioBancoPreguntas {
     @Override
     @Transactional
     public Long agregarRango(ContextoUsuario quien, Long preguntaId, CrearRango datos) {
-        Pregunta pregunta = laPreguntaVisible(quien, preguntaId);
-        exigirBorrador(laVersionVisible(quien, pregunta.getVersionBancoId()), "agregar rangos");
+        Pregunta pregunta = laPreguntaPropia(quien, preguntaId);
+        exigirBorrador(laVersionPropia(quien, pregunta.getVersionBancoId()), "agregar rangos");
         if (!"V".equals(pregunta.getTipo())) {
             throw new IllegalArgumentException("los rangos de puntaje son solo de los ítems V");
         }
@@ -291,8 +299,8 @@ public class ServicioBancoPreguntasImpl implements ServicioBancoPreguntas {
     @Override
     @Transactional
     public Long agregarCampoCaso(ContextoUsuario quien, Long preguntaId, CrearCampoCaso datos) {
-        Pregunta pregunta = laPreguntaVisible(quien, preguntaId);
-        exigirBorrador(laVersionVisible(quien, pregunta.getVersionBancoId()), "agregar campos");
+        Pregunta pregunta = laPreguntaPropia(quien, preguntaId);
+        exigirBorrador(laVersionPropia(quien, pregunta.getVersionBancoId()), "agregar campos");
         if (!"CD".equals(pregunta.getTipo())) {
             throw new IllegalArgumentException("los campos de caso son solo de los casos descompuestos (CD)");
         }
@@ -323,7 +331,7 @@ public class ServicioBancoPreguntasImpl implements ServicioBancoPreguntas {
     @Override
     @Transactional
     public Long agregarParConsistencia(ContextoUsuario quien, Long versionBancoId, CrearParConsistencia datos) {
-        VersionBanco version = laVersionVisible(quien, versionBancoId);
+        VersionBanco version = laVersionPropia(quien, versionBancoId);
         exigirBorrador(version, "agregar pares de consistencia");
 
         // La FK solo exige que las preguntas existan; que sean de ESTA versión hay que
@@ -354,6 +362,339 @@ public class ServicioBancoPreguntasImpl implements ServicioBancoPreguntas {
         return pares.findByVersionBancoId(versionBancoId).stream()
                 .map(parMapper::toResponse)
                 .toList();
+    }
+
+    // ---------- La edición de un borrador ----------
+    // Mientras la versión está en BORRADOR se edita entera: reemplazar, borrar, incluso
+    // descartarla. Nada de esto ha circulado todavía, así que no hay historia que
+    // proteger. En cuanto se publica, esta puerta se cierra (exigirBorrador) y solo
+    // queda la corrección editorial de más abajo.
+
+    @Override
+    @Transactional
+    public void actualizarPregunta(ContextoUsuario quien, Long preguntaId, CrearPregunta datos) {
+        Pregunta pregunta = laPreguntaPropia(quien, preguntaId);
+        exigirBorrador(laVersionPropia(quien, pregunta.getVersionBancoId()), "editar preguntas");
+        // Las mismas guardas por formato que al crear: editar no es una puerta trasera.
+        if (datos.casosPedidos() != null && !"CD".equals(datos.tipo())) {
+            throw new IllegalArgumentException("casosPedidos es solo de los casos descompuestos (CD)");
+        }
+        if ((datos.rangosDePreguntaCodigo() != null || datos.formulaPuntaje() != null)
+                && !"V".equals(datos.tipo())) {
+            throw new IllegalArgumentException("la tabla de rangos y la fórmula son solo de los ítems V");
+        }
+
+        Map<String, Object> antes = Map.of("codigo", pregunta.getCodigo(),
+                "tipo", pregunta.getTipo(), "enunciado", pregunta.getEnunciado());
+        pregunta.setCodigo(datos.codigo());
+        pregunta.setBloque(datos.bloque());
+        pregunta.setTipo(datos.tipo());
+        pregunta.setEnunciado(datos.enunciado());
+        pregunta.setSituacion(datos.situacion());
+        pregunta.setLogicaInterna(datos.logicaInterna());
+        pregunta.setEsPuntuable(datos.esPuntuable());
+        pregunta.setOrden(datos.orden());
+        pregunta.setPeso(datos.peso());
+        pregunta.setEsClave(Boolean.TRUE.equals(datos.esClave()));
+        pregunta.setEsEliminatorio(Boolean.TRUE.equals(datos.esEliminatorio()));
+        pregunta.setCasosPedidos(datos.casosPedidos());
+        pregunta.setRangosDePreguntaCodigo(datos.rangosDePreguntaCodigo());
+        pregunta.setFormulaPuntaje(datos.formulaPuntaje());
+        preguntas.save(pregunta);
+
+        auditoria.registrar(quien.organizacionId(), quien, "editar_pregunta",
+                "pregunta", preguntaId, antes,
+                Map.of("codigo", datos.codigo(), "tipo", datos.tipo(),
+                        "enunciado", datos.enunciado()), null);
+    }
+
+    @Override
+    @Transactional
+    public void eliminarPregunta(ContextoUsuario quien, Long preguntaId) {
+        Pregunta pregunta = laPreguntaPropia(quien, preguntaId);
+        exigirBorrador(laVersionPropia(quien, pregunta.getVersionBancoId()), "eliminar preguntas");
+
+        // De fuera hacia dentro: primero lo que la apunta, o la FK no deja borrarla.
+        pares.deleteByPreguntaAIdOrPreguntaBId(preguntaId, preguntaId);
+        List<Long> suya = List.of(preguntaId);
+        opciones.deleteByPreguntaIdIn(suya);
+        rangos.deleteByPreguntaIdIn(suya);
+        camposCaso.deleteByPreguntaIdIn(suya);
+        preguntaDimensiones.deleteByPreguntaIdIn(suya);
+        preguntas.delete(pregunta);
+
+        auditoria.registrar(quien.organizacionId(), quien, "eliminar_pregunta",
+                "pregunta", preguntaId,
+                Map.of("codigo", pregunta.getCodigo(), "tipo", pregunta.getTipo()),
+                null, null);
+    }
+
+    @Override
+    @Transactional
+    public void actualizarOpcion(ContextoUsuario quien, Long opcionId, CrearOpcion datos) {
+        Opcion opcion = laOpcionEditable(quien, opcionId, "editar opciones");
+        Map<String, Object> antes = Map.of("letra", opcion.getLetra(), "texto", opcion.getTexto());
+        opcion.setLetra(datos.letra());
+        opcion.setTexto(datos.texto());
+        opcion.setPuntaje(datos.puntaje() == null ? null : BigDecimal.valueOf(datos.puntaje()));
+        opcion.setValor(datos.valor());
+        opcion.setEsDistractor(Boolean.TRUE.equals(datos.esDistractor()));
+        opcion.setOrdenCorrecto(datos.ordenCorrecto());
+        opciones.save(opcion);
+        auditoria.registrar(quien.organizacionId(), quien, "editar_opcion",
+                "opcion", opcionId, antes,
+                Map.of("letra", datos.letra(), "texto", datos.texto()), null);
+    }
+
+    @Override
+    @Transactional
+    public void eliminarOpcion(ContextoUsuario quien, Long opcionId) {
+        Opcion opcion = laOpcionEditable(quien, opcionId, "eliminar opciones");
+        opciones.delete(opcion);
+        auditoria.registrar(quien.organizacionId(), quien, "eliminar_opcion",
+                "opcion", opcionId,
+                Map.of("letra", opcion.getLetra(), "texto", opcion.getTexto()), null, null);
+    }
+
+    @Override
+    @Transactional
+    public void actualizarRango(ContextoUsuario quien, Long rangoId, CrearRango datos) {
+        RangoPregunta rango = elRangoEditable(quien, rangoId, "editar rangos");
+        Map<String, Object> antes = Map.of("orden", rango.getOrden(),
+                "condicion", rango.getCondicion(), "puntaje", rango.getPuntaje());
+        rango.setOrden(datos.orden());
+        rango.setCondicion(datos.condicion());
+        rango.setPuntaje(datos.puntaje());
+        rango.setGeneraBandera(Boolean.TRUE.equals(datos.generaBandera()));
+        rangos.save(rango);
+        auditoria.registrar(quien.organizacionId(), quien, "editar_rango_pregunta",
+                "rango_pregunta", rangoId, antes,
+                Map.of("orden", datos.orden(), "condicion", datos.condicion(),
+                        "puntaje", datos.puntaje()), null);
+    }
+
+    @Override
+    @Transactional
+    public void eliminarRango(ContextoUsuario quien, Long rangoId) {
+        RangoPregunta rango = elRangoEditable(quien, rangoId, "eliminar rangos");
+        rangos.delete(rango);
+        auditoria.registrar(quien.organizacionId(), quien, "eliminar_rango_pregunta",
+                "rango_pregunta", rangoId,
+                Map.of("orden", rango.getOrden(), "condicion", rango.getCondicion()),
+                null, null);
+    }
+
+    @Override
+    @Transactional
+    public void actualizarCampoCaso(ContextoUsuario quien, Long campoId, CrearCampoCaso datos) {
+        CampoCaso campo = elCampoEditable(quien, campoId, "editar campos");
+        Map<String, Object> antes = Map.of("orden", campo.getOrden(),
+                "etiqueta", campo.getEtiqueta());
+        campo.setOrden(datos.orden());
+        campo.setEtiqueta(datos.etiqueta());
+        campo.setValidacion(datos.validacion());
+        camposCaso.save(campo);
+        auditoria.registrar(quien.organizacionId(), quien, "editar_campo_caso",
+                "campo_caso", campoId, antes,
+                Map.of("orden", datos.orden(), "etiqueta", datos.etiqueta()), null);
+    }
+
+    @Override
+    @Transactional
+    public void eliminarCampoCaso(ContextoUsuario quien, Long campoId) {
+        CampoCaso campo = elCampoEditable(quien, campoId, "eliminar campos");
+        camposCaso.delete(campo);
+        auditoria.registrar(quien.organizacionId(), quien, "eliminar_campo_caso",
+                "campo_caso", campoId,
+                Map.of("orden", campo.getOrden(), "etiqueta", campo.getEtiqueta()),
+                null, null);
+    }
+
+    @Override
+    @Transactional
+    public void actualizarParConsistencia(ContextoUsuario quien, Long parId,
+                                          CrearParConsistencia datos) {
+        ParConsistencia par = elParEditable(quien, parId, "editar pares de consistencia");
+        // El par nuevo tiene que seguir siendo de esta versión, igual que al crearlo.
+        exigirDeLaVersion(par.getVersionBancoId(), datos.preguntaAId());
+        exigirDeLaVersion(par.getVersionBancoId(), datos.preguntaBId());
+
+        Map<String, Object> antes = Map.of("preguntaAId", par.getPreguntaAId(),
+                "preguntaBId", par.getPreguntaBId());
+        par.setPreguntaAId(datos.preguntaAId());
+        par.setPreguntaBId(datos.preguntaBId());
+        par.setDiferenciaMaxima(datos.diferenciaMaxima());
+        par.setPenalizacionPorcentaje(datos.penalizacionPorcentaje());
+        par.setSeparacionMinimaItems(datos.separacionMinimaItems());
+        par.setCondicion(datos.condicion());
+        pares.save(par);
+        auditoria.registrar(quien.organizacionId(), quien, "editar_par_consistencia",
+                "par_consistencia", parId, antes,
+                Map.of("preguntaAId", datos.preguntaAId(), "preguntaBId", datos.preguntaBId()),
+                null);
+    }
+
+    @Override
+    @Transactional
+    public void eliminarParConsistencia(ContextoUsuario quien, Long parId) {
+        ParConsistencia par = elParEditable(quien, parId, "eliminar pares de consistencia");
+        pares.delete(par);
+        auditoria.registrar(quien.organizacionId(), quien, "eliminar_par_consistencia",
+                "par_consistencia", parId,
+                Map.of("preguntaAId", par.getPreguntaAId(), "preguntaBId", par.getPreguntaBId()),
+                null, null);
+    }
+
+    /**
+     * Descarta un borrador entero: se borra de verdad, con sus hijas.
+     *
+     * <p>Es la única cosa del banco que se borra, y puede serlo porque un BORRADOR nunca
+     * llegó a nadie: solo una versión PUBLICADA se le asigna a un candidato. Lo que el
+     * append-only protege es lo que alguien pudo ver, y aquí no hay nada de eso.
+     *
+     * <p>Aun así se mira antes si alguna evaluación sin empezar lo apunta: si algún día
+     * algo cambiara, mejor un 409 que una FK rota. La comprobación no cubre las ya
+     * iniciadas —no hay consulta para eso y en un borrador no pueden existir—; si las
+     * hubiera, la FK sería la que hablase.
+     */
+    @Override
+    @Transactional
+    public void descartarBorrador(ContextoUsuario quien, Long versionBancoId) {
+        VersionBanco version = laVersionPropia(quien, versionBancoId);
+        exigirBorrador(version, "descartar la versión");
+        int apuntando = evaluaciones.findByVersionBancoNivelIdAndIniciadaEnIsNull(versionBancoId).size();
+        if (apuntando > 0) {
+            throw new IllegalStateException("No se descarta: hay " + apuntando
+                    + " evaluación(es) apuntando a esta versión");
+        }
+
+        List<Long> idsPreguntas = preguntas.findByVersionBancoIdOrderByOrden(versionBancoId)
+                .stream().map(Pregunta::getId).toList();
+        pares.deleteByVersionBancoId(versionBancoId);
+        if (!idsPreguntas.isEmpty()) {
+            opciones.deleteByPreguntaIdIn(idsPreguntas);
+            rangos.deleteByPreguntaIdIn(idsPreguntas);
+            camposCaso.deleteByPreguntaIdIn(idsPreguntas);
+            preguntaDimensiones.deleteByPreguntaIdIn(idsPreguntas);
+        }
+        preguntas.deleteByVersionBancoId(versionBancoId);
+        versiones.delete(version);
+
+        auditoria.registrar(quien.organizacionId(), quien, "descartar_borrador_banco",
+                "version_banco", versionBancoId,
+                Map.of("etiqueta", version.getEtiqueta(), "preguntas", idsPreguntas.size()),
+                null, null);
+    }
+
+    // ---------- La corrección editorial de una publicada ----------
+    // Una errata en un enunciado que el candidato está leyendo se corrige hoy, no en la
+    // versión siguiente. Lo que no se toca por aquí es la clave —ni el valor de un EF-4,
+    // ni el puntaje de un SJT-R, ni el peso, ni el tipo, ni cuántos campos pide un CD—
+    // porque eso cambiaría la nota bajo un examen en curso (RF-138). Esa frontera no la
+    // vigila un if: la dibujan los DTOs Corregir*, que no llevan esos campos.
+
+    @Override
+    @Transactional
+    public void corregirTextoPregunta(ContextoUsuario quien, Long preguntaId,
+                                      CorregirTextoPregunta datos) {
+        Pregunta pregunta = laPreguntaPropia(quien, preguntaId);
+        exigirPublicada(laVersionPropia(quien, pregunta.getVersionBancoId()));
+        Map<String, Object> antes = Map.of("enunciado", pregunta.getEnunciado());
+        if (datos.enunciado() != null) {
+            pregunta.setEnunciado(datos.enunciado());
+        }
+        if (datos.situacion() != null) {
+            pregunta.setSituacion(datos.situacion());
+        }
+        if (datos.logicaInterna() != null) {
+            pregunta.setLogicaInterna(datos.logicaInterna());
+        }
+        preguntas.save(pregunta);
+        auditoria.registrar(quien.organizacionId(), quien, "corregir_texto_pregunta",
+                "pregunta", preguntaId, antes,
+                Map.of("enunciado", pregunta.getEnunciado()), null);
+    }
+
+    @Override
+    @Transactional
+    public void corregirTextoOpcion(ContextoUsuario quien, Long opcionId,
+                                    CorregirTextoOpcion datos) {
+        Opcion opcion = opciones.findById(opcionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Opción", "id", opcionId));
+        Pregunta pregunta = laPreguntaPropia(quien, opcion.getPreguntaId());
+        exigirPublicada(laVersionPropia(quien, pregunta.getVersionBancoId()));
+        Map<String, Object> antes = Map.of("texto", opcion.getTexto());
+        opcion.setTexto(datos.texto());
+        opciones.save(opcion);
+        auditoria.registrar(quien.organizacionId(), quien, "corregir_texto_opcion",
+                "opcion", opcionId, antes, Map.of("texto", datos.texto()), null);
+    }
+
+    @Override
+    @Transactional
+    public void corregirTextoCampoCaso(ContextoUsuario quien, Long campoId,
+                                       CorregirTextoCampoCaso datos) {
+        CampoCaso campo = camposCaso.findById(campoId)
+                .orElseThrow(() -> new ResourceNotFoundException("Campo de caso", "id", campoId));
+        Pregunta pregunta = laPreguntaPropia(quien, campo.getPreguntaId());
+        exigirPublicada(laVersionPropia(quien, pregunta.getVersionBancoId()));
+        Map<String, Object> antes = Map.of("etiqueta", campo.getEtiqueta());
+        if (datos.etiqueta() != null) {
+            campo.setEtiqueta(datos.etiqueta());
+        }
+        if (datos.validacion() != null) {
+            campo.setValidacion(datos.validacion());
+        }
+        camposCaso.save(campo);
+        auditoria.registrar(quien.organizacionId(), quien, "corregir_texto_campo_caso",
+                "campo_caso", campoId, antes,
+                Map.of("etiqueta", campo.getEtiqueta()), null);
+    }
+
+    @Override
+    @Transactional
+    public void corregirTextoRango(ContextoUsuario quien, Long rangoId,
+                                   CorregirTextoRango datos) {
+        RangoPregunta rango = rangos.findById(rangoId)
+                .orElseThrow(() -> new ResourceNotFoundException("Rango", "id", rangoId));
+        Pregunta pregunta = laPreguntaPropia(quien, rango.getPreguntaId());
+        exigirPublicada(laVersionPropia(quien, pregunta.getVersionBancoId()));
+        Map<String, Object> antes = Map.of("condicion", rango.getCondicion());
+        rango.setCondicion(datos.condicion());
+        rangos.save(rango);
+        auditoria.registrar(quien.organizacionId(), quien, "corregir_texto_rango",
+                "rango_pregunta", rangoId, antes,
+                Map.of("condicion", datos.condicion()), null);
+    }
+
+    @Override
+    @Transactional
+    public void corregirTextoParConsistencia(ContextoUsuario quien, Long parId,
+                                             CorregirTextoPar datos) {
+        ParConsistencia par = pares.findById(parId)
+                .orElseThrow(() -> new ResourceNotFoundException("Par de consistencia", "id", parId));
+        exigirPublicada(laVersionPropia(quien, par.getVersionBancoId()));
+        Map<String, Object> antes = Map.of("condicion",
+                par.getCondicion() == null ? "" : par.getCondicion());
+        par.setCondicion(datos.condicion());
+        pares.save(par);
+        auditoria.registrar(quien.organizacionId(), quien, "corregir_texto_par_consistencia",
+                "par_consistencia", parId, antes,
+                Map.of("condicion", datos.condicion()), null);
+    }
+
+    @Override
+    @Transactional
+    public void corregirEtiquetaVersion(ContextoUsuario quien, Long versionBancoId,
+                                        CorregirEtiquetaVersion datos) {
+        VersionBanco version = laVersionPropia(quien, versionBancoId);
+        exigirPublicada(version);
+        Map<String, Object> antes = Map.of("etiqueta", version.getEtiqueta());
+        version.setEtiqueta(datos.etiqueta());
+        versiones.save(version);
+        auditoria.registrar(quien.organizacionId(), quien, "corregir_etiqueta_version",
+                "version_banco", versionBancoId, antes,
+                Map.of("etiqueta", datos.etiqueta()), null);
     }
 
     // ---------- La coherencia que publicar exige ----------
@@ -465,6 +806,52 @@ public class ServicioBancoPreguntasImpl implements ServicioBancoPreguntas {
         }
     }
 
+    /**
+     * La corrección editorial es solo para lo publicado: un borrador se edita entero con
+     * los PUT, y una archivada es historia que nadie vuelve a tocar.
+     */
+    private void exigirPublicada(VersionBanco version) {
+        if (!"PUBLICADA".equals(version.getEstado())) {
+            throw new IllegalStateException(
+                    "La corrección de textos es de una versión publicada; esta está "
+                            + version.getEstado()
+                            + ("BORRADOR".equals(version.getEstado())
+                                    ? ": un borrador se edita entero"
+                                    : ": una versión archivada ya no se toca"));
+        }
+    }
+
+    private Opcion laOpcionEditable(ContextoUsuario quien, Long opcionId, String accion) {
+        Opcion opcion = opciones.findById(opcionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Opción", "id", opcionId));
+        Pregunta pregunta = laPreguntaPropia(quien, opcion.getPreguntaId());
+        exigirBorrador(laVersionPropia(quien, pregunta.getVersionBancoId()), accion);
+        return opcion;
+    }
+
+    private RangoPregunta elRangoEditable(ContextoUsuario quien, Long rangoId, String accion) {
+        RangoPregunta rango = rangos.findById(rangoId)
+                .orElseThrow(() -> new ResourceNotFoundException("Rango", "id", rangoId));
+        Pregunta pregunta = laPreguntaPropia(quien, rango.getPreguntaId());
+        exigirBorrador(laVersionPropia(quien, pregunta.getVersionBancoId()), accion);
+        return rango;
+    }
+
+    private CampoCaso elCampoEditable(ContextoUsuario quien, Long campoId, String accion) {
+        CampoCaso campo = camposCaso.findById(campoId)
+                .orElseThrow(() -> new ResourceNotFoundException("Campo de caso", "id", campoId));
+        Pregunta pregunta = laPreguntaPropia(quien, campo.getPreguntaId());
+        exigirBorrador(laVersionPropia(quien, pregunta.getVersionBancoId()), accion);
+        return campo;
+    }
+
+    private ParConsistencia elParEditable(ContextoUsuario quien, Long parId, String accion) {
+        ParConsistencia par = pares.findById(parId)
+                .orElseThrow(() -> new ResourceNotFoundException("Par de consistencia", "id", parId));
+        exigirBorrador(laVersionPropia(quien, par.getVersionBancoId()), accion);
+        return par;
+    }
+
     private void exigirDeLaVersion(Long versionBancoId, Long preguntaId) {
         Pregunta pregunta = preguntas.findById(preguntaId)
                 .orElseThrow(() -> new ResourceNotFoundException("Pregunta", "id", preguntaId));
@@ -474,12 +861,30 @@ public class ServicioBancoPreguntasImpl implements ServicioBancoPreguntas {
         }
     }
 
-    // organizacionId nulo = biblioteca global: visible para cualquiera. Si tiene
-    // organización, tiene que ser la del usuario.
+    // ---------- Las dos guardas: leer resuelve, editar no ----------
+    // Con la bandera apagada, la empresa LEE el banco de la plataforma —eso contesta el
+    // resolutor— pero no lo toca: la guarda de mutación exige que la versión sea de la
+    // propia organización. Antes de la V37 el «banco global» (organizacion_id nulo) era
+    // editable desde cualquier organización; esa puerta quedó cerrada.
+
+    /** Visible para leer: la propia, o la del dueño que el resolutor contesta. */
     private VersionBanco laVersionVisible(ContextoUsuario quien, Long id) {
         VersionBanco version = versiones.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Versión del banco", "id", id));
-        if (version.getOrganizacionId() != null && !version.getOrganizacionId().equals(quien.organizacionId())) {
+        boolean propia = version.getOrganizacionId().equals(quien.organizacionId());
+        if (!propia && !version.getOrganizacionId().equals(
+                dueno.duenoDe(quien.organizacionId(), Instrumento.BANCO))) {
+            // Lo ajeno responde «no existe»: decir «prohibido» ya confirma que existe
+            throw new ResourceNotFoundException("Versión del banco", "id", id);
+        }
+        return version;
+    }
+
+    /** Editable: solo la de la propia organización. El banco compartido se lee, no se edita. */
+    private VersionBanco laVersionPropia(ContextoUsuario quien, Long id) {
+        VersionBanco version = versiones.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Versión del banco", "id", id));
+        if (!version.getOrganizacionId().equals(quien.organizacionId())) {
             throw new ResourceNotFoundException("Versión del banco", "id", id);
         }
         return version;
@@ -489,6 +894,13 @@ public class ServicioBancoPreguntasImpl implements ServicioBancoPreguntas {
         Pregunta pregunta = preguntas.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Pregunta", "id", id));
         laVersionVisible(quien, pregunta.getVersionBancoId());
+        return pregunta;
+    }
+
+    private Pregunta laPreguntaPropia(ContextoUsuario quien, Long id) {
+        Pregunta pregunta = preguntas.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Pregunta", "id", id));
+        laVersionPropia(quien, pregunta.getVersionBancoId());
         return pregunta;
     }
 }

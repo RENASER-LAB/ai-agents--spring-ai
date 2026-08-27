@@ -55,27 +55,12 @@ public class GlobalControllerAdvice {
         return problemDetail;
     }
 
-    /**
-     * Una dirección que no existe es un 404, no un 500.
-     *
-     * <p>Sin este método la pedía el {@code @ExceptionHandler(Exception.class)} de abajo y
-     * todo lo desconocido salía como «Ha ocurrido un error inesperado». {@link ManejadorErrores}
-     * ya lo resolvía bien, pero está acotado con {@code basePackageClasses} a los controladores
-     * del portal y del panel: una ruta sin controlador no cae en ninguno, así que llegaba aquí.
-     *
-     * <p>No es cosmético. Durante la auditoría del Sprint 1, {@code GET /actuator/health}
-     * devolvió 500 y pareció que el backend estaba caído cuando estaba sano; y el
-     * {@code CLAUDE.md} del portal ya avisaba de lo mismo con {@code /api/vacantes} en vez de
-     * {@code /api/v1/portal/vacantes}. Un 500 obliga a mirar los registros del servidor; un
-     * 404 se entiende leyéndolo.
-     */
-    @ExceptionHandler(NoResourceFoundException.class)
-    public ProblemDetail rutaInexistente(NoResourceFoundException ex, WebRequest request) {
-        log.debug("Ruta inexistente - Path: {}", request.getDescription(false));
+    @ExceptionHandler(IngestaNoPermitidaException.class)
+    public ProblemDetail handleIngestaNoPermitida(IngestaNoPermitidaException ex, WebRequest request) {
+        log.warn("Ingesta rechazada - Path: {}, Message: {}", request.getDescription(false), ex.getMessage());
 
-        return buildProblemDetail(HttpStatus.NOT_FOUND, "Esa dirección no existe", "ruta-inexistente",
-                "No hay nada en «" + ex.getResourcePath() + "». Revisa la ruta: la base de la API "
-                        + "es /api/v1/portal para el candidato y /api/v1/panel para el equipo");
+        return buildProblemDetail(HttpStatus.BAD_REQUEST, "Ingesta no permitida",
+                "ingesta-no-permitida", ex.getMessage());
     }
 
     @ExceptionHandler(Exception.class)

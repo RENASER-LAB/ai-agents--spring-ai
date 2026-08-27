@@ -45,17 +45,21 @@ BANCOS = {
 
 FORMATOS = ('EF-4', 'SJT-R', 'SEC', 'INV', 'DE', 'CD', 'V', 'PC')
 
-# \f es el salto de página: pdftotext lo pega al código del primer ítem de cada página,
-# y sin contemplarlo se pierden justo esos (aquí eran cuatro).
+# El salto de página (\f) no llega hasta aquí: texto_del_pdf() lo vuelve un espacio al
+# leer, porque pdftotext lo pega al primer texto de cada página: al código de un ítem, o
+# a media palabra de un campo que continúa de la página anterior. Cuando viajaba entero,
+# cinco campos de la rama suelta llegaron a la base con el \f incrustado (D41, D74, C48,
+# O21, O41; la V33 los limpió). Como espacio, una continuación de página sigue empezando
+# con blanco y el plegado la absorbe igual.
 # El ⛔ y el ★ pueden ir DELANTE del código, no solo detrás: depende de dónde caiga el ítem
 # en la página. Sin admitirlos delante, los nueve ítems eliminatorios (D52, D70, C33, C44,
 # O19, O39...) no se reconocen como cabecera, su texto se pega al ítem anterior y el banco
 # sale con nueve ítems de menos.
 CABECERA = re.compile(
-    r'^(?P<antes>[ \t\f\u2605\u26d4]*)(?P<cod>[DCO]\d{2})[ \t]*(?P<marcas>[\u2605\u26d4 \t]*)'
+    r'^(?P<antes>[ \t\u2605\u26d4]*)(?P<cod>[DCO]\d{2})[ \t]*(?P<marcas>[\u2605\u26d4 \t]*)'
     r'(?:·[ \t]*(?P<fmt>EF-4|SJT-R|SEC|INV|DE|CD|V|PC)[ \t]*)?'
     r'·[ \t]*peso[ \t]*(?P<peso>\d)(?P<resto>.*)$')
-BLOQUE = re.compile(r'^[ \t\f]*BLOQUE[ \t]+(?P<id>[A-C]\d?)[ \t]*·[ \t]*(?P<nombre>.*?)[ \t]*\(?$')
+BLOQUE = re.compile(r'^[ \t]*BLOQUE[ \t]+(?P<id>[A-C]\d?)[ \t]*·[ \t]*(?P<nombre>.*?)[ \t]*\(?$')
 
 CIRCULOS = '\u2460\u2461\u2462\u2463\u2464\u2465\u2466\u2467\u2468\u2469'
 BANDERA = '\u2691'   # ⚑ marca los elementos falsos de INV
@@ -96,6 +100,14 @@ CIERRA_CAMPOS = re.compile(r'^\s*(?:Rangos?|Validaci[oó]n)\s*:')
 DECLARACION_CAMPOS = re.compile(
     r'\d+\s*campos(?:\s+cada\s+una)?(?:\s*[×x]\s*\d+)?(?:\s*=\s*\d+\s*campos)?\s*\)?\s*:?')
 
+# Los CD multiplicados: «(4 campos × 3)» pide el bloque entero POR CADA caso, así que
+# las casillas reales son base × veces y cada una lleva delante el número de su grupo
+# («Indicador 2 · Nombre…»). El sustantivo del grupo es una decisión editorial, no un
+# parseo: se declara aquí, y un ítem multiplicado que no esté declarado es un aviso.
+# Sin esta expansión, C04 enseñaba 4 casillas para un caso que pide 12 (4 × 3).
+GRUPOS_CD = {'C04': 'Indicador', 'C19': 'Problema', 'C49': 'Iniciativa',
+             'D11': 'Indicador', 'D21': 'Reunión', 'D22': 'Problema', 'D75': 'Iniciativa'}
+
 avisos = []
 
 
@@ -116,7 +128,11 @@ def texto_del_pdf():
         salida = Path(dir_tmp) / 'banco.txt'
         subprocess.run(['pdftotext', '-layout', '-enc', 'UTF-8', str(PDF), str(salida)],
                        check=True)
-        return salida.read_text(encoding='utf-8')
+        # El salto de página, hecho espacio aquí y no en cada lector: pdftotext lo pega
+        # al primer texto de la página siguiente, y cualquier campo que cruce de página
+        # se lo llevaría dentro (así entraron los cinco de la V33). Un espacio conserva
+        # lo único que el \f significaba para el parser: la línea empieza con blanco.
+        return salida.read_text(encoding='utf-8').replace('\f', ' ')
 
 
 def trocear(lineas):
@@ -164,6 +180,13 @@ def tabla_opciones(cuerpo):
     grupos, cerrado = [], False
     for l in cuerpo:
         if not l.strip():
+            if grupos and grupos[-1]['clave'] is not None:
+                cerrado = True
+            continue
+        # El rótulo de la sub-tabla siguiente («Opción      Clave») no es texto de nadie.
+        # Sin este salto se pegaba al final de la última opción de la tabla anterior, y
+        # así llegaron a producción diez opciones terminando en «… Opción Clave».
+        if CABECERA_TABLA.match(l):
             if grupos and grupos[-1]['clave'] is not None:
                 cerrado = True
             continue
@@ -348,7 +371,7 @@ def campos_numerados(cuerpo):
         if m:
             campos.append(m.group(2).strip())
             abierto = True
-        elif abierto and linea[:1] in (' ', '\t', '\f'):
+        elif abierto and linea[:1] in (' ', '\t'):
             campos[-1] += ' ' + COLA_COLUMNA.sub('', linea).strip()
         else:
             abierto = False
@@ -457,7 +480,10 @@ def parsear_contenido(codigo, formato, cuerpo, enunciado):
         if numerados:
             campos, cuadra = numerados, len(numerados) == esperados
         else:
-            sueltos = [c.strip() for c in re.split(r'\s·\s', texto.replace('\n', ' '))
+            # ' '.join(split()) y no replace('\n', ' '): un salto de página hecho espacio
+            # más el salto de línea que lo precede dejarían un espacio doble dentro del
+            # campo. Aplanar toda corrida de blancos a uno lo evita de raíz.
+            sueltos = [c.strip() for c in re.split(r'\s·\s', ' '.join(texto.split()))
                        if c.strip()]
             # El primer trozo llega con el enunciado pegado delante («Tu día típico.
             # (5 campos) Hora en que despiertas ___»): la pregunta y el primer campo van
@@ -473,7 +499,42 @@ def parsear_contenido(codigo, formato, cuerpo, enunciado):
                 aviso(codigo, 'CD suelto sin declaración de campos reconocible: el primer '
                               'campo puede llevar el enunciado pegado')
             campos, cuadra = sueltos, esperados is not None and len(sueltos) >= 2
+
+        # La multiplicación. Dos formas de declararla: «(N campos × M)» y «Hasta M
+        # reuniones, N campos cada una». En ambas el candidato responde el bloque entero
+        # M veces, así que aquí se repite con el número de grupo delante y el total
+        # esperado pasa a ser N × M.
+        regla_pegada = None
+        veces = None
+        m_mult = re.search(r'\d+\s*campos\s*[×x]\s*(\d+)', texto)
+        m_cada = re.search(r'[Hh]asta\s+(\d+)\s+\S+.{0,40}?\d+\s*campos\s+cada\s+una',
+                           texto, re.S)
+        if m_mult:
+            veces = int(m_mult.group(1))
+        elif m_cada:
+            veces = int(m_cada.group(1))
+        if veces and veces > 1 and campos:
+            sustantivo = GRUPOS_CD.get(codigo)
+            if not sustantivo:
+                aviso(codigo, f'declara campos × {veces} pero no está en GRUPOS_CD: '
+                              'se deja sin multiplicar y hay que revisarlo')
+            else:
+                # La regla de puntaje que el documento escribe a renglón seguido del
+                # último campo no se replica por grupo: se corta y se devuelve aparte,
+                # que es material de lógica interna y el candidato no debe leerla.
+                m_regla = re.search(r'\s*(Regla especial:.*|Solo cuentan las.*)$',
+                                    campos[-1])
+                if m_regla:
+                    regla_pegada = m_regla.group(1).strip()
+                    campos[-1] = campos[-1][:m_regla.start()].strip()
+                campos = [f'{sustantivo} {g} · {c}'
+                          for g in range(1, veces + 1) for c in campos]
+                if esperados is not None:
+                    esperados *= veces
+                cuadra = len(campos) == esperados
+
         return ({'campos_esperados': esperados, 'campos': campos, 'preambulo': preambulo,
+                 'regla_especial': regla_pegada,
                  'rangos': rangos.group(1).strip() if rangos else None}, cuadra)
 
     if formato == 'V':
@@ -786,6 +847,34 @@ def main():
     if desparejados:
         aviso('varios', 'paréntesis sin pareja, huele a texto cortado: '
                         + ', '.join(desparejados))
+
+    # Y ningún carácter de control dentro de un texto. texto_del_pdf() ya vuelve espacio
+    # el único que pdftotext mete (\f), así que esto no debería saltar nunca: está para
+    # el día en que alguien cambie la extracción y el salto de página vuelva a colarse
+    # invisible, como los cinco que limpió la V33.
+    con_control = [
+        f'{x["codigo"]} ({donde})'
+        for x in items
+        for donde, t in (
+            [('enunciado', x['enunciado'])]
+            + [(f'campo {n}', c) for n, c in enumerate(x['contenido'].get('campos') or [], 1)]
+            + [(f'opción {o.get("letra", "?")}', o.get('texto', ''))
+               for o in x['contenido'].get('opciones') or []])
+        if t and re.search(r'[\x00-\x08\x0b\x0c\x0e-\x1f]', t)]
+    if con_control:
+        aviso('varios', 'caracteres de control invisibles dentro del texto: '
+                        + ', '.join(con_control))
+
+    # Y ningún texto terminando en el rótulo de una tabla («… Opción Clave»): es la
+    # firma de haber absorbido la cabecera de la sub-tabla siguiente.
+    con_rotulo = [
+        f'{x["codigo"]} (opción {o.get("letra", "?")})'
+        for x in items
+        for o in x['contenido'].get('opciones') or []
+        if re.search(r'\b(?:Opci[oó]n|Clave|Valor|Puntaje|Afirmaci[oó]n)\s*$',
+                     o.get('texto') or '')]
+    if con_rotulo:
+        aviso('varios', 'texto terminando en rótulo de tabla: ' + ', '.join(con_rotulo))
 
     repes = {c for c in (x['codigo'] for x in items)
              if [y['codigo'] for y in items].count(c) > 1}

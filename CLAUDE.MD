@@ -68,14 +68,14 @@ Perfil Integral → prueba del puesto → simulacion → validacion → decision
 
 | | |
 |---|---|
-| Base de datos | **Flyway es el dueno del esquema**: V1-V26 en `src/main/resources/db/migration`, **85 tablas de este modulo** (88 en la base contando `flyway_schema_history` y las dos del motor de agentes, `agent_run` y `vector_store`). `ddl-auto: validate` |
+| Base de datos | **Flyway es el dueno del esquema**: V1-V39 en `src/main/resources/db/migration`, **102 tablas de este modulo** (105 en la base contando `flyway_schema_history` y las dos del motor de agentes, `agent_run` y `vector_store`). `ddl-auto: validate` |
 | Codigo | Veintiun paquetes de dominio bajo `ai_engine` (ver «Como esta organizado el codigo») |
-| Tests | **394 unitarios, todos en verde (20/08/2026)**, mas los de integracion con `verify`. Ver «Correr los tests»: unitarios de la maquina y del anonimizador, migraciones contra Postgres real (Testcontainers) y flujos de punta a punta: hito 1, evaluacion, prueba, simulacion/validacion y calificacion con IA |
+| Tests | **747, todos en verde (26/08/2026, tras fusionar main)**: 645 unitarios y 102 de integracion (6 saltados, los que gastan saldo o mandan correo de verdad). Ver «Correr los tests»: unitarios de la maquina y del anonimizador, migraciones contra Postgres real (Testcontainers) y flujos de punta a punta: hito 1, evaluacion, prueba, simulacion/validacion, calificacion con IA, la vacante sin banco, las dos empresas y el tope de IA de la plataforma |
 | IA que califica | **Seis de los diez agentes del catalogo estan implementados**: datos del curriculum, evidencia, evaluador, potencial/riesgo, prueba del puesto y las preguntas de la conversacion final. Todos corren por cola de RabbitMQ contra DeepSeek. Ver [Calificacion con IA](docs/CALIFICACION-CON-IA.md) |
 | Correo | **Ya sabe salir de verdad** (`EnviadorCorreoSmtp`), pero **por defecto no sale**: `renaser.correo.transporte` vale `log` salvo que se ponga `smtp`, y entonces solo se registra en `correo_enviado`. Para encenderlo hacen falta `CORREO_TRANSPORTE=smtp`, `CORREO_REMITENTE` y una cuenta que autentique. El RNF-65 pide que salga **desde el dominio propio de Renaser**: confirmar con ellos si ya lo tienen antes de encenderlo |
 | Acceso del candidato | Entra al portal **con un enlace, sin contrasena** (`EnlaceAcceso`, `ServicioEnlaceAcceso`). El enlace se le manda por correo, asi que depende de lo de arriba |
 | Lo configurable | El plazo para responder la evaluacion dejo de estar en el codigo: es el parametro `dias_plazo_evaluacion` (14 por defecto, migracion `V22`). Se cuenta desde que sale la invitacion, no desde que se creo la evaluacion |
-| Identidad equipo | `dev-login` de desarrollo; el contrato de RENASER OS no existe aun (`ProveedorIdentidadEquipo`) |
+| Identidad equipo | **Correo y contrasena** (`POST /panel/auth/login`), cuentas solo por invitacion; RENASER OS quedo dormido y el `dev-login` esta **apagado por defecto** (lo encienden `application-local.yaml` y las pruebas). Ver «Multiempresa» |
 | Frontend | **Dos, y hacen cosas distintas.** Ver «Las dos pantallas» mas abajo |
 | Mockups | Los mantiene otra persona y **describen la version anterior** |
 
@@ -154,6 +154,64 @@ escanea que ahi hay algo que revienta, en vez de un 404 aburrido.
 `comun/exception/ManejadorErrores` que devuelva 404, y que se registre antes que el generico
 del otro paquete.
 
+### La vacante sin banco de preguntas (22/08/2026)
+Renaser pidio que en la vacante de **Administrador** el cuestionario tecnico de 20 preguntas
+valga por las dos etapas de preguntas: se carga como prueba del puesto, lo califica el agente
+`PRUEBA_PUESTO`, y el banco queda apagado **solo en esa vacante**.
+
+⚠️ **La convocatoria esta EN MARCHA.** El 23/08/2026 salieron 93 invitaciones a la prueba
+(vacante 14 en el servidor de pruebas), con cierre el **lunes 24 a las 23:59 de Lima**.
+Quedaron fuera once: tres CV cargados dos veces, tres con el correo mal escrito en el propio
+curriculum, y cinco sin contacto legible —a esos hay que llamarlos—. Antes de tocar nada de
+esta vacante, mirar en que estado esta la gente.
+
+Lo que existe para eso:
+
+- `vacante.aplica_evaluacion` (V30). Apagado, quien postula **no recibe evaluacion** y cae
+  directo en `PERFIL_POR_CONFIRMAR`: el equipo criba los curriculums y confirma el avance,
+  que crea el intento y manda el correo con el enlace de acceso.
+- Endpoints nuevos: `POST /panel/vacantes/{id}/aplicacion-evaluacion` y
+  `POST /panel/vacantes/{id}/version-pesos` (los pesos de UNA vacante; no recalcula nada).
+- **Una version de prueba sin entregables es un cuestionario**: al publicarla no rige la cuota
+  de 8-10 universales y 3-5 especificas, basta una pregunta. Con entregables la cuota sigue.
+- **La fecha de cierre de la prueba se fija en dos niveles** (V32). El plazo de la plantilla
+  se cuenta en dias y desde que cada uno empieza, asi que no servia para decir «esta
+  convocatoria cierra el domingo».
+  - **Por vacante**: `POST /panel/vacantes/{id}/cierre-prueba`. Ademas de fijarla, **mueve
+    los intentos ya abiertos**; si no, valdria solo para quien entrara despues y la tanda
+    quedaria partida en dos.
+  - **Por candidato**: `POST /panel/postulaciones/{id}/prueba/plazo`, para dar mas horas a
+    quien las pide. Marca `intento_prueba.plazo_propio`, y **a esos no les afecta mover la
+    fecha de la vacante**: perder esa excepcion habria sido silencioso.
+  - Empezar la prueba no recalcula una fecha ya puesta.
+- **El correo de la prueba es el de Ricardo** (`PRUEBA_DISPONIBLE`, migracion V29): lleva el
+  PDF del enunciado por vacante, el plazo segun la modalidad y el WhatsApp como parametro.
+- **Cada vacante puede elegir sus textos de correo** (V31, tabla `plantilla_correo_vacante`).
+  Una fila dice «para esta vacante, donde ibas a mandar el aviso X manda la plantilla Y»;
+  sin fila, sale el de siempre. Vale para cualquier aviso, no solo el de la prueba. Antes una
+  plantilla era una por organizacion y cambiar el texto de una convocatoria se lo cambiaba a
+  todas — que es lo que obligaba a publicar, mandar y restaurar a mano.
+  Se configura con `POST /panel/vacantes/{id}/plantillas-correo`.
+- El guion `scripts/cargar-prueba-administrador.py` deja todo montado por la API: preguntas
+  ADMIN_Q01..Q20, plantilla publicada con rubrica 100% de agente, pesos "la prueba vale todo"
+  asignados solo a esa vacante (y re-publica el reparto estandar para que las vacantes nuevas
+  no hereden el especial), el texto del correo de invitacion a la prueba, y el banco apagado.
+  Invitar en lote: `scripts/invitar.py --a prueba` (el correo sale del backend, con la cuenta
+  de la empresa que ya esta en sus variables de entorno). Admite `--saltar 1,2,3` para dejar
+  fuera a alguien concreto: un CV cargado dos veces es la misma persona y recibiria dos
+  enlaces, y un correo mal escrito en el curriculum solo sirve para que rebote.
+- Calificar en lote: `scripts/calificar-pruebas.py --vacante N --de-verdad`. Pide la
+  calificacion de todas las pruebas **entregadas** y enseña la tabla de notas al terminar.
+  Sin `--de-verdad` solo dice a quien se le pediria: cada una cuesta una llamada al modelo.
+  `--cuantos N` limita la tanda, que sirve para probar con una antes de lanzar noventa.
+
+El flujo entero esta cubierto por `FlujoSinBancoIT`.
+
+**Un cuestionario sin entregables SI se puede calificar** (comprobado el 23/08/2026 contra
+DeepSeek de verdad): el agente puntuo los siete criterios leyendo solo las respuestas, sin
+ningun archivo que mirar, y con notas bajas y justificadas donde el texto no decia nada. La
+duda era razonable —su instruccion habla de «la entrega»— pero no se cumplio.
+
 ### La criba de curriculums (18/08/2026)
 Contesta «llegaron cien curriculums, a quien invito primero». Antes la IA solo arrancaba
 cuando el candidato entregaba su evaluacion, asi que con una carpeta recien llegada no habia
@@ -161,7 +219,7 @@ forma de pedirla. Cuatro endpoints en `PostulacionesPanelController`:
 
 | Para que | Llamada |
 |---|---|
-| La tanda entera, ordenada de mas apto a menos | `GET /api/v1/panel/vacantes/{id}/ranking` |
+| La tanda entera, ordenada de mas apto a menos | `GET /api/v1/panel/vacantes/{id}/ranking?etapa=` · sin `etapa`, la nota de la preseleccion |
 | Primera pasada sobre todos los que no tienen nota | `POST /api/v1/panel/vacantes/{id}/criba-rapida` |
 | Segunda pasada, solo sobre la parte alta | `POST /api/v1/panel/vacantes/{id}/criba-fina` |
 | Releer un curriculum suelto | `POST /api/v1/panel/postulaciones/{id}/criba-cv` |
@@ -183,6 +241,42 @@ lo deja fallido en vez de inventar una nota. Los CVs de las semillas son de ese 
 en una base recien sembrada la criba los marca como fallidos: es correcto, no es un fallo.
 
 Ver [La criba de curriculums](docs/CRIBA-DE-CURRICULUMS.md).
+
+### El ranking por etapa y el desglose de la evaluacion (25/08/2026)
+
+Dos endpoints mas en `PostulacionesPanelController`:
+
+| Para que | Llamada |
+|---|---|
+| Ordenar la tanda por la nota de otra etapa | `GET /panel/vacantes/{id}/ranking?etapa=PRUEBA_PUESTO` |
+| Abrir la evaluacion del banco por dentro | `GET /panel/postulaciones/{id}/evaluacion` |
+
+- **`?etapa=` cambia solo con que nota se ordena.** Las ocho notas del curriculum de cada fila
+  siguen siendo las del Perfil Integral, porque son de esa etapa siempre. Los codigos salen del
+  catalogo `etapa`; uno que no este da 400. Quien no tenga nota en esa etapa sale al final, sin
+  heredar la de otra.
+- **Es una sobrecarga, no un cambio de firma, a proposito**: `cribaFina()` decide a quien
+  recalificar por la nota de preseleccion y tenia que seguir haciendolo. Sin el parametro el
+  camino es el de antes, sin una consulta de mas.
+- **El desglose es de solo lectura y nunca da 404.** Sin evaluacion asignada devuelve vacios: una
+  vacante publicada con el banco apagado es un caso normal. Lo guarda
+  `ver_respuestas_evaluacion`, que estaba en el catalogo desde V12 y **no lo comprobaba nadie**;
+  este es el primer endpoint que lo usa.
+- ⚠️ **`alineacion` sale vacia siempre**: la tabla `resultado_alineacion` existe, el panel ya la
+  lee y **ningun agente la escribe todavia**. Vacia significa «no calculado», no «todo en verde».
+- **La cuenta de la nota de la evaluacion vive en un solo sitio**,
+  `ServicioCalificacion.notaCombinada`. Estaba copiada en `PuenteCalificacionIaImpl`. Como
+  mezclar lo cerrado con lo abierto **es una interpretacion sin confirmar con el cliente**: el dia
+  que cambie tiene que cambiar a la vez para la nota de la etapa y para lo que ve el panel. No
+  volver a copiarla.
+
+Dos guiones para mirar el panel con datos y no con tablas vacias. **Escriben en la base local** y
+se pueden relanzar:
+
+| Guion | Que hace |
+|---|---|
+| `scripts/sembrar-evaluacion-local.py` | Postula, responde los ocho formatos y entrega, y deja que la IA califique. Cada abierta se responde **segun lo que pide su enunciado**: contestar lo mismo a todo daba ceros, y con razon |
+| `scripts/escenario-etapas-local.py` | Reparte candidatos por las cinco etapas calificando a mano por el camino, para que ninguna pestaña del panel se vea vacia |
 
 ### Las dos pantallas
 Ninguna vive en este repositorio: el `frontend/` de demostracion que habia aqui se borro a proposito (2e7b176) cuando el panel de verdad quedo en RENASER OS.
@@ -206,19 +300,20 @@ Las dos consultan el mismo backend, asi que ensenan el mismo orden.
 - Nada se recalcula hacia atras: cada nota queda atada a la version de pesos de su vacante.
 
 ### Correr los tests
-**394 unitarios en verde (20/08/2026).** Son dos tandas y el comando decide cual corre:
+**645 unitarios en verde (26/08/2026).** Son dos tandas y el comando decide cual corre:
 
 | Comando | Que corre | Cuantos | Necesita |
 |---|---|---:|---|
-| `./mvnw test` | unitarias con dobles y las de arquitectura | 394 | nada |
-| `./mvnw verify` | lo anterior mas las de integracion | 444 | Docker |
+| `./mvnw test` | unitarias con dobles y las de arquitectura | 645 | nada |
+| `./mvnw verify` | lo anterior mas las de integracion | 747 | Docker |
 
 Las de integracion levantan su propio PostgreSQL y su propio RabbitMQ con Testcontainers: hace
 falta el demonio de Docker encendido. El desglose completo esta en
 [docs/COMPROBACIONES-AUTOMATICAS.md](docs/COMPROBACIONES-AUTOMATICAS.md).
 
-Entre las 331 hay **8 reglas de arquitectura con ArchUnit** (la frontera del motor, las capas y
-que el estado solo lo mueva la maquina — las mismas reglas que este archivo tiene en prosa).
+Entre las unitarias hay **9 reglas de arquitectura con ArchUnit** (la frontera del motor, las capas,
+que el estado solo lo mueva la maquina, y que ningun servicio del panel busque por id suelto en un
+agregado con dueno — las mismas reglas que este archivo tiene en prosa).
 
 **El test que gasta dinero no corre solo**: `CalificacionIaRealIT` esta detras de
 `@EnabledIfEnvironmentVariable`, asi que se salta sola si no esta la variable. Ni `test` ni
@@ -231,6 +326,117 @@ RENASER_IA_REAL=si ./mvnw verify -Dit.test=CalificacionIaRealIT
 **Ruido esperado que NO es un fallo**: `Failed to check/redeclare auto-delete queue(s)` de
 RabbitMQ, y los cinco tests saltados de `CalificacionIaRealIT`. Si termina en `BUILD SUCCESS`,
 esta bien.
+
+## El perfil del candidato (25/08/2026)
+Cada persona tiene **un perfil, unico y transversal a organizaciones**: cuelga de `persona`,
+no de `usuario` (el usuario existe una vez por organizacion). Se llena solo con lo que el
+agente `DATOS_CV` lee del curriculum, el candidato lo corrige, y se reutiliza en cada
+postulacion. Paquete `perfil/` completo (V36: 6 tablas + 2 catalogos), CRUD en
+`/api/v1/portal/perfil/**`, lectura en el panel con el permiso `ver_perfil_candidato`.
+
+Reglas que no se negocian:
+- **La IA propone, nunca pisa** (RF-159): lo leido entra `origen=CURRICULUM` sin confirmar;
+  lo escrito o confirmado por la persona no se toca. El merge vive en
+  `ServicioPropuestaPerfilImpl` y sus tests son la especificacion.
+- **Una lectura por archivo** (RF-161): `archivo.contenido_hash` (SHA-256). Postular con el
+  mismo PDF copia la ficha `dato_cv` en vez de pagar otra llamada. El disparo al postular se
+  apaga con `renaser.perfil.lectura-al-postular=false` (las pruebas de calificacion lo usan).
+- **El perfil NO puntua**: no entra en notas ni rankings.
+- **La pretension salarial** va detras del permiso `ver_pretension` y sin el **no viaja ni el
+  nombre del campo** en el JSON del panel. Nunca en listas ni rankings.
+- **El borrado 29733 se lleva el perfil entero** (paso 5b de `ejecutarBorrado`); `dato_cv` se
+  queda porque sostiene lo ya evaluado. Retencion: parametro `meses_conservar_perfil` (24) y
+  el barrido diario `BarridoRetencionPerfil`.
+- Una lectura de `DATOS_CV` **sin hermanos en la tanda no arma el retrato**: la barrera de la
+  cola lo ignora hasta que una criba o una entrega encolen a los demas.
+
+El contrato para el frontend esta en [docs/APIS-PERFIL-DEL-CANDIDATO.md](docs/APIS-PERFIL-DEL-CANDIDATO.md)
+y el diseño en [docs/PROPUESTA-PERFIL-DEL-CANDIDATO.md](docs/PROPUESTA-PERFIL-DEL-CANDIDATO.md).
+**Los RF-155..170 no entran en `01-REQUISITOS-FUNCIONALES.md` hasta que Renaser los valide.**
+
+⚠️ **No encender con candidatos reales sin el texto de consentimiento nuevo**: el vigente
+cubre una postulacion concreta, no un perfil que se conserva entre convocatorias (RF-169).
+
+## Multiempresa (26/08/2026 · completo, piezas A-F)
+El sistema paso de «Renaser contrata para Renaser» a plataforma tipo Indeed: cada empresa
+se registra por invitacion de Renaser, publica sus vacantes y ve solo a sus candidatos.
+Los seis specs con el porque de cada decision estan en `docs/superpowers/specs/2026-08-25-*.md`.
+Lo que hay que saber para tocar codigo:
+
+- **La plataforma es un dato, no un literal**: `organizacion.es_plataforma` (solo una puede
+  serlo). El `findByCodigo("RENASER")` quemado ya no existe: se resuelve con
+  `findByEsPlataformaTrue`.
+- **Cuatro banderas de personalizacion** por organizacion (banco, pesos, plantillas de
+  evaluacion, pruebas), apagadas por defecto = leer el instrumento de la plataforma;
+  encender = copiarlo (`POST /panel/organizacion/personalizacion`). El UNICO punto que las
+  interpreta es `organizacion/service/DuenoDelInstrumento`: toda consulta de instrumentos
+  pasa por el. **Leer resuelve, editar no**: con la bandera apagada se VE el metodo de la
+  plataforma en solo lectura; mutar algo ajeno responde 404. Apagar archiva el banco
+  propio, nunca lo borra (RF-138).
+- **Dos logins separados**: el portal del candidato (registro publico, como siempre) y el
+  panel de empresas (`POST /panel/auth/login`), que solo autentica cuentas con
+  `usuario.es_equipo` — un candidato con su contrasena correcta recibe el mismo 401 que un
+  correo inexistente. Las cuentas del panel nacen SOLO por invitacion (tabla `invitacion`,
+  token de un solo uso, se guarda el hash). El candidato es de la plataforma: una cuenta,
+  postula a cualquier empresa, y **su postulacion nace en la organizacion de la vacante**.
+- **El alta de empresas** (`POST /panel/plataforma/empresas`, permiso
+  `administrar_plataforma` + ser la plataforma) siembra roles y matriz de permisos (sin
+  `administrar_plataforma`), parametros, textos legales en borrador y correos activos, e
+  invita al primer administrador.
+- **El aislamiento tiene dos vigilantes**: la regla de ArchUnit que prohibe `findById`
+  suelto sobre repositorios de agregados con dueno (lista `LLAMADAS_SIN_DUENO_ACORDADAS`
+  en `ArquitecturaTest`; al anadir una llamada legitima hay que escribirla ahi con su
+  porque) y `FlujoDosEmpresasIT`, que recorre el alta, el aislamiento en ambos sentidos,
+  el metodo compartido, el viaje completo del candidato en la empresa nueva (rinde el
+  examen del banco de la plataforma y la empresa ve nota, bandeja y embudo) y el borrado
+  de punta a punta. La unica pantalla que mezcla empresas es el tablon publico de
+  vacantes, a proposito.
+- **El borrado 29733 es de la plataforma**: los candidatos son cuentas de plataforma y la
+  anonimizacion cruza empresas. Desde una empresa responde 403.
+- **El consentimiento se firma con cada empresa** (pieza D, V38): al crear la cuenta se
+  consiente con la plataforma; al postular se acepta el texto PROCESO de LA EMPRESA de la
+  vacante, y la fila de `consentimiento` queda con `postulacion_id`, IP y navegador.
+  Postular exige `aceptaTratamiento` (400 sin el), el texto se lee sin token en
+  `GET /portal/vacantes/{id}/consentimiento`, y **publicar una vacante exige el texto
+  PROCESO publicado de la organizacion** — se publica por `POST /panel/textos-consentimiento`
+  (permiso `editar_textos_correo`; crea la version Y la publica). Renaser lo tiene desde la
+  V9; a las empresas nuevas el alta se lo copia en borrador.
+- **Cada llamada al modelo tiene precio** (pieza E, V38-V39): `ejecucion_ia.costo` se escribe
+  al cerrar con la tarifa vigente de `tarifa_modelo` (por proveedor+modelo, vigencia por
+  fecha; las sembradas son PROVISIONALES). La bitacora guarda el modelo QUE EL PROVEEDOR
+  REPORTA (o el pedido en esa llamada si calla), y por eso **todo modelo de
+  `application.yaml` necesita su tarifa** — la V39 sembro la del modelo rapido
+  (`deepseek-chat`, la lectura de CV) que a la V38 se le quedo fuera y dejaba ese gasto en
+  NULL; un IT recorre los modelos configurados y exige tarifa vigente para cada uno. Tope
+  mensual por organizacion: parametro `tope_mensual_ia` (ausente = sin tope; lo administra
+  Renaser, `editarParametro` se lo niega a la empresa). Al 80% un correo `TOPE_IA_AVISO`
+  una vez por mes (la marca es el parametro `aviso_tope_enviado_mes`; el aviso corre en su
+  PROPIA transaccion y su fallo se traga: una campana jamas tumba una postulacion); al 100%
+  los trabajos nuevos nacen **EN_ESPERA** —no fallan, no se publican, el candidato ve «en
+  curso»— y el sondeo de atascados los despierta cuando vuelve el cupo (tope subido o mes
+  nuevo, hora de Lima). El retrato que cierra una tanda no pasa por el tope: sus insumos ya
+  se pagaron. Consumo por empresa/mes/agente en `GET /panel/plataforma/consumo?mes=YYYY-MM`.
+- **Renaser suspende y reactiva empresas** (pieza F): `organizacion.es_activa` ahora lo leen
+  el login del panel (mensaje claro: solo se llega con la contrasena correcta), el
+  `FiltroIdentidad` (corta los tokens vivos de 8h, solo tipo EQUIPO; cuesta una consulta de
+  organizacion por peticion de panel, aceptado), el tablon publico (lista, detalle, texto
+  legal y el POST directo de postular) y **la cola de IA**: suspendida es congelada tambien
+  para el gasto — lo en vuelo termina, los trabajos NUEVOS de una suspendida nacen
+  EN_ESPERA y el barrido no la despierta ni con cupo; al reactivar, el mismo barrido lo
+  suelta todo (nada queda zombi). Los candidatos que ya estaban dentro NO se tocan: siguen
+  viendo lo suyo, y sus correos de transicion siguen saliendo.
+  Endpoints de plataforma, todos con doble llave y auditados con motivo: suspension,
+  reactivacion (la plataforma no puede suspenderse a si misma), tope-ia (en blanco = sin
+  tope) y personalizacion de otra empresa. La ficha del continente
+  (`GET /panel/plataforma/empresas`) trae estado, tope, banderas y consumo del mes — y ahi
+  se acaba lo que Renaser ve: ninguna via nueva a los datos de las empresas, a proposito.
+- Los ITs del multiempresa son dos: `FlujoDosEmpresasIT` (alta, aislamiento, viaje del
+  candidato, consentimiento por postulacion, borrado —tambien del papel firmado al
+  postular—, suspension y reactivacion) y `FlujoPlataformaIT` (la vida entera del tope con
+  la calificacion encendida y un doble del modelo que reporta lo que el proveedor real:
+  costo exacto de la pasada rapida, campana del 80, EN_ESPERA al 100, la suspendida que no
+  despierta ni con cupo, despertar al reactivar y al subir el tope, y tarifa vigente para
+  todo modelo configurado).
 
 ## El banco de preguntas v3 (19/08/2026)
 El cliente reemplazo el banco entero. Son **190 items** (85 directivo, 55 coordinacion, 50
@@ -311,7 +517,7 @@ fusiona.** El detalle esta en [docs/CI-CD.md](docs/CI-CD.md); aqui lo que hay qu
 
 | Cuando | Que corre |
 |---|---|
-| En cada PR y en cada push a `main` | `./mvnw verify` (los 444 tests), Semgrep, Gitleaks y la cobertura del codigo nuevo en SonarCloud |
+| En cada PR y en cada push a `main` | `./mvnw verify` (la tanda entera de tests), Semgrep, Gitleaks y la cobertura del codigo nuevo en SonarCloud |
 | Al fusionar a `main`, si todo quedo verde | Se construye la imagen con el `Dockerfile`, se sube a ECR y se le dice por SSM a la maquina de EC2 que se actualice. Un smoke test comprueba que responde desde internet |
 | De noche, sin bloquear a nadie | PIT (mutation testing) y fuzzing de la API con Schemathesis |
 
@@ -320,7 +526,10 @@ estatico]`, asi que con cualquiera de los dos en rojo no llega a correr. Y en Gi
 ninguna clave de AWS guardada: se usa OIDC.
 
 **Hasta agosto de 2026 esto iba a Render.** Si encuentras una referencia suelta a Render o a
-CloudAMQP en algun comentario, esta desfasada: hoy es EC2 + ECR + Amazon MQ.
+CloudAMQP en algun comentario, esta desfasada: hoy es EC2 + ECR, con la cola como un
+contenedor mas de la propia maquina. **Tambien hubo un broker de Amazon MQ** (`renaser-mq`),
+retirado el 23 de agosto de 2026 porque costaba ~$119 al mes —el 77% de la factura— por algo
+que el mismo servidor hace gratis; cualquier mencion suya tambien esta desfasada.
 
 **Semgrep** corre con las reglas de serie de Java mas tres propias en `.semgrep/`: que la IA no
 lea el curriculum sin anonimizar, que no aparezcan rutas publicas fuera de
@@ -332,7 +541,7 @@ lea el curriculum sin anonimizar, que no aparezcan rutas publicas fuera de
 | `application.yaml` | siempre, es la base: Postgres local en el 5433, RabbitMQ sin TLS | nada |
 | `application-secrets.yaml` | siempre que exista; son tus claves y no se versiona | lo importa `application.yaml` |
 | `application-local.yaml` | trabajar en tu maquina sin tocar nada compartido: cola local y archivos en memoria | **nada: es el de por defecto** (`spring.profiles.default`) |
-| `application-pruebas.yaml` | la aplicacion corriendo en EC2 (Supabase + Amazon MQ) | `SPRING_PROFILES_ACTIVE=pruebas`, lo pone `despliegue/docker-compose.yml` |
+| `application-pruebas.yaml` | la aplicacion corriendo en EC2 (Supabase + la cola de la propia maquina) | `SPRING_PROFILES_ACTIVE=pruebas`, lo pone `despliegue/docker-compose.yml` |
 
 Los perfiles son aditivos: cada uno solo escribe encima lo que cambia. Quien manda, de menos a
 mas fuerza: `application.yaml` -> `application-secrets.yaml` -> el perfil activo -> los
@@ -340,8 +549,8 @@ argumentos del comando. La tabla completa con lo que cambia cada uno esta en el
 [README](README.md#los-perfiles); esta es solo la lista de archivos.
 
 **Si nadie nombra un perfil se aplica `local`.** Antes «ninguno» era una mezcla peligrosa: base
-local, pero la cola la ponia `application-secrets.yaml` —el broker compartido— y los curriculums
-iban al bucket de verdad.
+local, pero la cola la ponia `application-secrets.yaml` —que entonces apuntaba a un broker
+compartido— y los curriculums iban al bucket de verdad.
 
 ⚠️ Eso incluye a los **tests**, que no nombran perfil: ahora corren con `local` encima. Por eso
 `application-local.yaml` solo puede cambiar DONDE se guardan las cosas, nunca lo que el sistema
@@ -359,13 +568,20 @@ es `optional:`, asi que alli todo llega por variable de entorno. La lista comple
 Un solo proyecto para dos cosas: el modulo de seleccion de personal y el motor de agentes de
 IA. **Los mantienen dos personas distintas**, asi que no comparten paquetes.
 
-**El motor de agentes** (lo lleva Ricardo) vive entero bajo `ai_engine/ai/`, organizado por
-capa: `config`, `controller`, `service`, `repository`, `dto`, `model`, `mapper`, `exception`,
-`context`, `flow`, `messaging`, `prompt`, `rag`, `supabase`. **No tocar nada de ahi dentro.**
+**El motor de agentes** vive entero bajo `ai_engine/ai/`, organizado por capa: `config`,
+`controller`, `service`, `repository`, `dto`, `model`, `mapper`, `exception`, `context`,
+`flow`, `messaging`, `prompt`, `rag`, `supabase`.
 
-Nuestro codigo usa una sola clase suya, `ai/exception/ResourceNotFoundException`, en cinco
-servicios. Es la unica dependencia que cruza la frontera, y conviene saberlo: si el la mueve
-otra vez, esos cinco imports se rompen.
+Hasta el 24/08/2026 lo llevaba Ricardo y aqui ponia **«No tocar nada de ahi dentro»**. Ya no:
+Ricardo dejo de trabajar en el motor y ahora es responsabilidad nuestra, asi que se toca como
+cualquier otra parte. Lo que **si** sigue en pie es la separacion entre los dos modulos: la
+regla de ArchUnit que solo deja cruzar la frontera por las clases de la lista `ACORDADAS`
+sigue valiendo, porque es una decision de diseno y no de reparto de trabajo.
+
+Lo que cruza la frontera esta enumerado en la lista `ACORDADAS` de `ArquitecturaTest`, y la
+regla falla si aparece algo que no este ahi. La mas usada es
+`ai/exception/ResourceNotFoundException`, en cinco servicios. Antes esta frase decia «una sola
+clase» y hoy son varias: mirar la lista, que es la que manda.
 
 **La seleccion de personal** vive en un paquete por dominio, cada uno con sus capas dentro:
 
@@ -381,7 +597,7 @@ com.renaser.ai.ai_engine.<dominio>
 | Dominio | Que guarda |
 |---|---|
 | `usuario` | Persona, usuario del equipo, roles y permisos |
-| `organizacion` | La organizacion y sus areas |
+| `organizacion` | La organizacion, sus areas, la plataforma (alta de empresas) y la personalizacion de instrumentos |
 | `solicitud` | La Solicitud de Talento y sus resultados esperados |
 | `vacante` | Vacante, puesto, catalogos y requisitos objetivos |
 | `postulacion` | La postulacion, su historial, el CV y **la maquina de estados** |
@@ -391,8 +607,8 @@ com.renaser.ai.ai_engine.<dominio>
 | `archivo` | El almacen de archivos en disco |
 | `auditoria` | El registro inmutable de quien hizo que |
 | `parametro` | Los valores que Renaser cambia sin programar |
-| `portal` | La cara del candidato: un controlador y un servicio para todo el recorrido publico |
-| `administracion` | La cara de configuracion del panel |
+| `portal` | La cara del candidato: un controlador y tres servicios por tema (la cuenta y su acceso, el tablon publico, la postulacion) |
+| `administracion` | La cara de configuracion del panel; el borrado 29733 vive aparte en `ServicioBorradoDatos` |
 | `seguridad` | Las dos puertas, tokens, contexto y permisos con alcance |
 | `comun` | El manejador de errores propio y el candado de Swagger |
 | `catalogo` | Los catalogos que el panel consulta |
@@ -438,7 +654,7 @@ Todo vive en `docs/`. Empezar por [docs/README.md](docs/README.md).
   ultimas etapas y sus tres reglas automaticas de disponibilidad.
 - [CI/CD](docs/CI-CD.md) — que se comprueba solo en cada cambio, como se despliega a AWS y que
   variables de entorno pide el servidor. **Leerlo antes de tocar `.github/workflows/`.**
-- [Comprobaciones automaticas](docs/COMPROBACIONES-AUTOMATICAS.md) — las 444 pruebas y las siete
+- [Comprobaciones automaticas](docs/COMPROBACIONES-AUTOMATICAS.md) — las 747 pruebas y las nueve
   reglas de arquitectura, una por una. Que se mira solo y que no.
 - `docs/diagramas/` — HTML autocontenidos, se abren en el navegador.
 - `docs/mockups/` — prototipos de pantalla. **Los mantiene otra persona, no editarlos.**

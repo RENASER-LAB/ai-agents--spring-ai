@@ -2,6 +2,7 @@ package com.renaser.ai.ai_engine.integracion;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.renaser.ai.ai_engine.integracion.soporte.ImagenesDeContenedores;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.DisplayName;
@@ -59,7 +60,7 @@ public class FlujoEvaluacionIT {
 
     @Container
     @ServiceConnection
-    static RabbitMQContainer rabbit = new RabbitMQContainer("rabbitmq:3-management-alpine");
+    static RabbitMQContainer rabbit = new RabbitMQContainer(ImagenesDeContenedores.RABBITMQ);
 
     @DynamicPropertySource
     static void propiedades(DynamicPropertyRegistry registro) {
@@ -74,6 +75,9 @@ public class FlujoEvaluacionIT {
         registro.add("app.archivos.tipo", () -> "memoria");
         registro.add("app.seguridad.jwt-secreto",
                 () -> "clave-de-pruebas-suficientemente-larga-para-hmac-256-bits");
+        // El dev-login quedo apagado por defecto en application.yaml: aqui se enciende
+        // explicitamente, porque estas pruebas entran al panel por el.
+        registro.add("app.seguridad.dev-login-activo", () -> "true");
         registro.add("spring.ai.deepseek.api-key", () -> "clave-de-pruebas-no-se-usa");
         // La calificacion con IA se apaga en estas pruebas: aqui no se prueba, y si estuviera
         // encendida cada entrega intentaria hablar con DeepSeek con una clave de mentira.
@@ -159,6 +163,7 @@ public class FlujoEvaluacionIT {
                         .file(cv)
                         .param("vacanteId", String.valueOf(vacanteId))
                         .param("resultadoOrgulloso", "Automaticé el cierre mensual y pasó de 3 días a 4 horas")
+                        .param("aceptaTratamiento", "true")
                         .header("Authorization", "Bearer " + tokenCandidato))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString(), "codigo");
@@ -213,6 +218,25 @@ public class FlujoEvaluacionIT {
         JsonNode primera = evaluacion.get("preguntas").get(0);
         assertThat(primera.get("posicion").asInt()).isEqualTo(1);
         assertThat(primera.get("enunciado").asText()).isNotBlank();
+
+        // Y cada caso descompuesto llega con la etiqueta de cada campo, tantas como casillas
+        // declara. Sin ellas el portal pintaba «Campo 1 de 6» y el candidato tenía que
+        // adivinar qué dato iba en cada caja.
+        int casosVistos = 0;
+        for (JsonNode p : evaluacion.get("preguntas")) {
+            if (!"CD".equals(p.get("tipo").asText())) {
+                continue;
+            }
+            casosVistos++;
+            assertThat(p.get("campos").size())
+                    .as("campos de «%s»", p.get("enunciado").asText())
+                    .isEqualTo(p.get("casosPedidos").asInt());
+            p.get("campos").forEach(campo -> {
+                assertThat(campo.get("orden").asInt()).isPositive();
+                assertThat(campo.get("etiqueta").asText()).isNotBlank();
+            });
+        }
+        assertThat(casosVistos).as("el banco Ejecutivo trae casos descompuestos").isPositive();
 
         // El orden quedó guardado: es lo que permite reproducir el examen tal como lo vio
         Long evaluacionId = evaluacion.get("id").asLong();

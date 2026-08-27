@@ -54,6 +54,7 @@ class PuenteCalificacionIaDatosTest {
     @Mock private PuestoRepository puestos;
     @Mock private DatoCvRepository datosCv;
     @Mock private ServicioTextoCv textoCv;
+    @Mock private com.renaser.ai.ai_engine.perfil.service.ServicioPropuestaPerfil propuestaPerfil;
 
     @InjectMocks
     private PuenteCalificacionIaImpl puente;
@@ -133,7 +134,8 @@ class PuenteCalificacionIaDatosTest {
         // guardar y se perdería el trabajo del agente entero por un resumen largo.
         DatoCv guardada = guardar(new ResultadoDatos(
                 "N".repeat(300), "E".repeat(300), "T".repeat(100), "R".repeat(900),
-                List.of("Excel"), 24, "P".repeat(300), "M".repeat(300), 12, "D".repeat(200)));
+                List.of("Excel"), 24, "P".repeat(300), "M".repeat(300), 12, "D".repeat(200),
+                null, null, null, null));
 
         assertThat(guardada.getNombre()).hasSize(200);
         assertThat(guardada.getEmail()).hasSize(200);
@@ -150,7 +152,7 @@ class PuenteCalificacionIaDatosTest {
         // haría que la pantalla pintara un campo con algo dentro que no dice nada.
         DatoCv guardada = guardar(new ResultadoDatos(
                 "  Camila Rojas  ", "", "   ", null, List.of("Excel"), 24,
-                null, "   ", null, ""));
+                null, "   ", null, "", null, null, null, null));
 
         assertThat(guardada.getNombre()).isEqualTo("Camila Rojas");
         assertThat(guardada.getEmail()).isNull();
@@ -200,15 +202,27 @@ class PuenteCalificacionIaDatosTest {
         return guardada.getValue();
     }
 
+    @org.junit.jupiter.api.Test
+    void loGuardadoSeProponeAlPerfil() {
+        // La misma lectura que llena dato_cv se PROPONE al perfil del candidato. Si esta
+        // llamada desapareciera, el perfil dejaria de llenarse solo y nadie veria un error.
+        ResultadoDatos resultado = conMeses(24, 12);
+        guardar(resultado);
+
+        org.mockito.Mockito.verify(propuestaPerfil)
+                .proponer(org.mockito.ArgumentMatchers.eq(POSTULACION),
+                        org.mockito.ArgumentMatchers.same(resultado));
+    }
+
     private ResultadoDatos conHabilidades(String... habilidades) {
         return new ResultadoDatos("Camila Rojas", "camila@correo.com", "999888777",
                 "Ingeniera industrial", Arrays.asList(habilidades), 96,
-                "Analista", "Fábrica S.A.", 24, "Ingeniería industrial");
+                "Analista", "Fábrica S.A.", 24, "Ingeniería industrial", null, null, null, null);
     }
 
     private ResultadoDatos conMeses(Integer total, Integer ultima) {
         return new ResultadoDatos("Camila Rojas", null, null, null, List.of("Excel"),
-                total, null, null, ultima, null);
+                total, null, null, ultima, null, null, null, null, null);
     }
 
     private Postulacion postulacion() {

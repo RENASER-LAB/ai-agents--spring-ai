@@ -1,6 +1,7 @@
 # El entorno de Pruebas: la aplicación en una máquina EC2 de AWS detrás de Caddy, la base
-# en Supabase y la cola en Amazon MQ. Se activa con SPRING_PROFILES_ACTIVE=pruebas, y quien
-# lo hace es despliegue/docker-compose.yml. Nadie lo arranca a mano en su máquina.
+# en Supabase y la cola en un contenedor RabbitMQ de esa misma máquina. Se activa con
+# SPRING_PROFILES_ACTIVE=pruebas, y quien lo hace es despliegue/docker-compose.yml. Nadie
+# lo arranca a mano en su máquina.
 #
 # Hasta agosto de 2026 esto corría en Render, y por eso puede quedar alguna referencia
 # suelta por ahí. La tubería y el servidor de verdad están descritos en docs/CI-CD.md.
@@ -78,16 +79,20 @@ spring:
     show-sql: false
 
   rabbitmq:
-    # Amazon MQ va con TLS por el 5671, no el 5672 plano del compose local: solo habla
-    # AMQPS. El host va sin «amqps://» y sin puerto — Spring arma la url él solo.
+    # El broker corre como un contenedor mas en la misma maquina, asi que el host es
+    # «rabbitmq» —el nombre del servicio del compose— y se habla en claro por la red
+    # interna: ahi el TLS no compra nada y nadie de fuera llega al puerto.
+    #
+    # Hasta agosto de 2026 esto apuntaba a Amazon MQ, que solo habla AMQPS por el 5671.
+    # Si algun dia se vuelve a un broker gestionado, son estas tres: el host (sin esquema
+    # y sin puerto, Spring arma la url el solo), RABBITMQ_PORT=5671 y RABBITMQ_SSL=true.
     host: ${RABBITMQ_HOST}
-    port: ${RABBITMQ_PORT:5671}
+    port: ${RABBITMQ_PORT:5672}
     username: ${RABBITMQ_USERNAME}
     password: ${RABBITMQ_PASSWORD}
-    # El vhost del broker. En Amazon MQ es «/» salvo que se haya creado otro.
     virtual-host: ${RABBITMQ_VHOST}
     ssl:
-      enabled: true
+      enabled: ${RABBITMQ_SSL:false}
     listener:
       simple:
         # Los ocho del archivo base salen de una base local que regala conexiones. Aquí no

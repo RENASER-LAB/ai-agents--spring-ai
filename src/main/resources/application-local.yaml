@@ -29,6 +29,10 @@ app:
     # bucket. El endpoint de enlaces firmados devuelve una url «memoria://» que el
     # navegador no abre; la descarga normal, la que sirve los bytes, funciona igual.
     tipo: memoria
+  seguridad:
+    # El dev-login SOLO existe encendido aqui y en las pruebas. En application.yaml esta
+    # apagado, que es lo que hereda cualquier entorno de verdad.
+    dev-login-activo: true
 
   seguridad:
     # Las dos llaves que en el codigo estan apagadas por defecto. Se encienden AQUI y solo

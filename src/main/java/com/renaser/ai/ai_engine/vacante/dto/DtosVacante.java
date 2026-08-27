@@ -28,9 +28,14 @@ public final class DtosVacante {
             Instant cierraEn,
             @NotNull Long responsableUsuarioId) {}
 
+    // Los últimos cuatro campos son la configuración de la vacante: qué evaluación y qué
+    // prueba tiene asignadas, qué pesos la rigen y si la evaluación del banco está encendida.
+    // El panel los necesita para enseñar el estado real sin adivinarlo.
     public record VacantePanel(Long id, String titulo, String estado, String tipoCierre,
                                Long puestoId, Long solicitudTalentoId, Long responsableUsuarioId,
-                               Instant publicadaEn, Instant cerradaEn) {}
+                               Instant publicadaEn, Instant cerradaEn, boolean aplicaEvaluacion,
+                               Long plantillaEvaluacionId, Long versionPlantillaPruebaId,
+                               Long versionPesosId) {}
 
     public record GuardarRequisito(@NotBlank String descripcion, @NotBlank String regla) {}
 
@@ -54,4 +59,28 @@ public final class DtosVacante {
 
     // Qué versión de la prueba del puesto rendirá quien llegue a esa etapa
     public record AsignarPlantillaPrueba(@NotNull Long versionPlantillaPruebaId) {}
+
+    // Encender o apagar la evaluación del banco para esta vacante. Apagada, quien postula
+    // no recibe cuestionario del banco: la prueba del puesto es su única evaluación.
+    public record AplicarEvaluacion(@NotNull Boolean aplica) {}
+
+    // Qué versión de pesos rige la decisión de esta vacante. Existe para las vacantes que
+    // reparten distinto —una sin banco pone todo en la prueba— sin tocar el reparto general.
+    public record AsignarVersionPesos(@NotNull Long versionPesosId) {}
+
+    // Qué texto de correo usa ESTA vacante en lugar del que el sistema mandaría.
+    // `avisoCodigo` es el que se sustituye (PRUEBA_DISPONIBLE, POSTULACION_AVANZA...) y
+    // `plantillaCodigo` el que sale en su lugar.
+    public record AsignarPlantillaCorreo(@NotBlank String avisoCodigo,
+                                         @NotBlank String plantillaCodigo) {}
+
+    public record PlantillaCorreoDeVacante(String avisoCodigo, String plantillaCodigo) {}
+
+    // Cuándo cierra la prueba de esta vacante, para todos. `cierraEn` vacío la quita y se
+    // vuelve a contar los días de la plantilla desde que cada uno empieza.
+    public record DefinirCierrePrueba(Instant cierraEn, @NotBlank String motivo) {}
+
+    // Cuántos intentos abiertos se movieron, y cuántos se dejaron por tener fecha propia.
+    public record CierrePruebaResponse(Instant cierraEn, int intentosMovidos,
+                                       int intentosConPlazoPropio) {}
 }

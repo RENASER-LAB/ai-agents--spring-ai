@@ -193,7 +193,8 @@ public class ServicioPostulacionesPanelImpl implements ServicioPostulacionesPane
                 throw new IllegalStateException(
                         "Esta vacante no tiene plantilla de prueba asignada: no se puede avanzar");
             }
-            prueba.crearAlEntrar(quien.organizacionId(), p.getId(), vacante.getVersionPlantillaPruebaId());
+            prueba.crearAlEntrar(quien.organizacionId(), p.getId(),
+                    vacante.getVersionPlantillaPruebaId(), vacante.getPruebaCierraEn());
         }
 
         // Al entrar a validación se crea su periodo, en POR_HABILITAR: alguien tiene que

@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.renaser.ai.ai_engine.ai.dto.RespuestaModelo;
 import com.renaser.ai.ai_engine.ai.service.ClienteModelo;
 
+import com.renaser.ai.ai_engine.integracion.soporte.ImagenesDeContenedores;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
@@ -88,7 +89,7 @@ public class FlujoCalificacionIaIT {
 
     @Container
     @ServiceConnection
-    static RabbitMQContainer rabbit = new RabbitMQContainer("rabbitmq:3-management-alpine");
+    static RabbitMQContainer rabbit = new RabbitMQContainer(ImagenesDeContenedores.RABBITMQ);
 
     @DynamicPropertySource
     static void propiedades(DynamicPropertyRegistry registro) {
@@ -98,11 +99,19 @@ public class FlujoCalificacionIaIT {
         // puede pasar a una prueba.
         registro.add("spring.rabbitmq.ssl.enabled", () -> "false");
         registro.add("spring.rabbitmq.virtual-host", () -> "/");
+        // El perfil dispara la lectura del CV al postular (RF-158). Aqui va apagado: esta
+        // prueba mide CUANDO corre DATOS_CV dentro de la criba y la calificacion, y
+        // adelantarlo al postular le cambiaria todos los conteos sin probar nada nuevo.
+        // El disparo tiene su propia prueba en FlujoPerfilIT.
+        registro.add("renaser.perfil.lectura-al-postular", () -> "false");
         // El almacen de las pruebas vive en un mapa, no en disco: no hay ningun
         // sitio donde un curriculum pueda quedarse olvidado despues de correrlas.
         registro.add("app.archivos.tipo", () -> "memoria");
         registro.add("app.seguridad.jwt-secreto",
                 () -> "clave-de-pruebas-suficientemente-larga-para-hmac-256-bits");
+        // El dev-login quedo apagado por defecto en application.yaml: aqui se enciende
+        // explicitamente, porque estas pruebas entran al panel por el.
+        registro.add("app.seguridad.dev-login-activo", () -> "true");
         registro.add("spring.ai.deepseek.api-key", () -> "clave-de-pruebas-no-se-usa");
         // Dos intentos y no tres: la prueba del fallo tiene que agotarlos, y cada intento
         // vuelve a publicar el mensaje al momento.
@@ -930,6 +939,7 @@ public class FlujoCalificacionIaIT {
                         .param("vacanteId", String.valueOf(vacanteId))
                         .param("resultadoOrgulloso",
                                 "Automaticé el cierre mensual y pasó de 3 días a 4 horas")
+                        .param("aceptaTratamiento", "true")
                         .header("Authorization", "Bearer " + tokenCandidato))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString(), "codigo");

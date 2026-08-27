@@ -1,8 +1,11 @@
 package com.renaser.ai.ai_engine.prueba.service;
 
 import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.CalificacionIaEncolada;
+import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.DefinirPlazoPrueba;
 import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.NotaCriterioResponse;
+import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.PlazoPrueba;
 import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.PonerNotaCriterio;
+import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.RespuestaDePrueba;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
 
 import java.math.BigDecimal;
@@ -29,6 +32,19 @@ public interface ServicioCalificacionPrueba {
     List<NotaCriterioResponse> verNotas(ContextoUsuario quien, Long postulacionId);
 
     /**
+     * Lo que el candidato contestó, pregunta a pregunta y en el orden en que las vio.
+     *
+     * <p>Hasta ahora sus respuestas solo las podían leer dos: el propio candidato en su
+     * portal, y el agente al calificar. Quien revisaba veía la nota y la justificación, pero
+     * no el texto que las originó — y una nota que no se puede contrastar con lo que la
+     * persona escribió no se puede discutir, solo creer.
+     *
+     * <p>Salen todas las preguntas de su versión de la plantilla, también las que dejó en
+     * blanco: que alguien no contestara la cuarta es justo lo que hay que poder ver.
+     */
+    List<RespuestaDePrueba> verRespuestas(ContextoUsuario quien, Long postulacionId);
+
+    /**
      * Le pide al agente que califique la parte de la rúbrica que le toca.
      *
      * <p>Solo los criterios marcados como verificables por agente, y solo si la prueba está
@@ -51,4 +67,20 @@ public interface ServicioCalificacionPrueba {
      * @throws IllegalStateException si falta la nota de algún criterio de la rúbrica
      */
     BigDecimal calcularNotaEtapa(ContextoUsuario quien, Long postulacionId);
+
+    /**
+     * Le fija a UN candidato la fecha en que se le cierra la prueba.
+     *
+     * <p>Hasta ahora el plazo solo se podía decir en la plantilla, en días, y contados desde
+     * que cada uno empieza: dos personas invitadas el mismo día terminaban con dos fechas
+     * distintas, y no había forma de decir «todos hasta el domingo». Esto la fija.
+     *
+     * <p>Se puede poner <b>antes o después</b> de que empiece. Si se pone antes, empezar ya
+     * no la recalcula — la fecha puesta a mano manda—; si se pone después, reemplaza a la que
+     * el reloj había calculado, que es como se le dan más horas a quien las pide.
+     *
+     * @throws IllegalStateException si la prueba ya está entregada: mover el plazo de algo
+     *                               que ya se entregó no cambia nada y engaña al que lo mira
+     */
+    PlazoPrueba definirPlazo(ContextoUsuario quien, Long postulacionId, DefinirPlazoPrueba datos);
 }

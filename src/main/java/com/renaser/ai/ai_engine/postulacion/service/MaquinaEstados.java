@@ -8,8 +8,12 @@ import com.renaser.ai.ai_engine.postulacion.repository.PostulacionRepository;
 import com.renaser.ai.ai_engine.postulacion.repository.TransicionEstadoRepository;
 
 import com.renaser.ai.ai_engine.auditoria.service.ServicioAuditoria;
+import com.renaser.ai.ai_engine.notificacion.entity.PlantillaCorreoVacante;
+import com.renaser.ai.ai_engine.notificacion.repository.PlantillaCorreoVacanteRepository;
 import com.renaser.ai.ai_engine.notificacion.service.DireccionDelCandidato;
 import com.renaser.ai.ai_engine.postulacion.service.ServicioEnlaceAcceso;
+import com.renaser.ai.ai_engine.prueba.repository.VersionPlantillaPruebaRepository;
+import com.renaser.ai.ai_engine.parametro.service.ServicioParametros;
 import com.renaser.ai.ai_engine.notificacion.service.ServicioCorreo;
 import com.renaser.ai.ai_engine.usuario.entity.Persona;
 import com.renaser.ai.ai_engine.usuario.repository.PersonaRepository;
@@ -52,6 +56,9 @@ public class MaquinaEstados {
     private final ServicioCorreo correo;
     private final DireccionDelCandidato direcciones;
     private final ServicioEnlaceAcceso enlaces;
+    private final PlantillaCorreoVacanteRepository plantillasPorVacante;
+    private final VersionPlantillaPruebaRepository versionesDePrueba;
+    private final ServicioParametros parametros;
 
     // ============ El cálculo, puro y testeable ============
 
@@ -190,6 +197,23 @@ public class MaquinaEstados {
         avisarAlCandidato(postulacion, nuevo, motivoCierre);
     }
 
+    /**
+     * El texto que usa esta vacante para este aviso, o el de siempre.
+     *
+     * <p>No comprueba que la plantilla elegida exista: eso se valida al configurarla, y si
+     * aun así faltara, {@code ServicioCorreo} lo anota y la postulación sigue — que es lo
+     * mismo que ya hace cuando falta cualquier plantilla. Un aviso perdido es malo; frenar
+     * una transición por un texto es peor.
+     */
+    private String plantillaDeLaVacante(Long vacanteId, String porDefecto) {
+        if (vacanteId == null) {
+            return porDefecto;
+        }
+        return plantillasPorVacante.findByVacanteIdAndAvisoCodigo(vacanteId, porDefecto)
+                .map(PlantillaCorreoVacante::getPlantillaCodigo)
+                .orElse(porDefecto);
+    }
+
     private void avisarAlCandidato(Postulacion postulacion, EstadoPostulacion nuevo, String motivoCierre) {
         String plantilla;
         if ("CONTRATADO".equals(nuevo.getCodigo())) {
@@ -204,12 +228,28 @@ public class MaquinaEstados {
             plantilla = "POSTULACION_NO_CONTINUA";
         } else if ("CERRADA".equals(nuevo.getCodigo())) {
             plantilla = "RETIRO_CANDIDATO".equals(motivoCierre) ? "RETIRO_CONFIRMADO" : "POSTULACION_CERRADA";
+        } else if ("PRUEBA_TURNO_CANDIDATO".equals(nuevo.getCodigo())) {
+            // La prueba del puesto tiene aviso propio: es el unico momento del recorrido en
+            // que el candidato necesita algo mas que entrar —el enunciado en PDF y a donde
+            // mandar lo que haga—, y meterlo en el aviso generico lo dejaria fuera de sitio
+            // en las otras cinco etapas.
+            plantilla = "PRUEBA_DISPONIBLE";
         } else if ("CANDIDATO".equals(nuevo.getEsperaA())) {
             // Le toca a él: hay que avisarle. Los estados internos no generan correo.
             plantilla = "POSTULACION_AVANZA";
         } else {
             return;
         }
+
+        // Y si ESTA vacante eligió otro texto para este aviso, sale el suyo. Sin fila, el de
+        // siempre: una plantilla es una por organización, y hasta que existió esto cambiar el
+        // texto de una convocatoria se lo cambiaba a todas (V31).
+        //
+        // Se guardan las DOS: `plantilla` sigue siendo el aviso que toca —de él dependen las
+        // variables que hay que rellenar— y `plantillaAUsar` es el texto que sale. Mezclarlas
+        // costó un correo con «{{plazo}}» y «{{whatsapp}}» a la vista: al sustituir el código
+        // antes de mirarlo, la prueba dejaba de reconocerse como tal.
+        String plantillaAUsar = plantillaDeLaVacante(postulacion.getVacanteId(), plantilla);
 
         Usuario usuario = usuarios.findById(postulacion.getUsuarioId()).orElse(null);
         if (usuario == null) return;
@@ -242,11 +282,75 @@ public class MaquinaEstados {
                     postulacion.getId(), e.getMessage());
         }
 
-        correo.enviar(postulacion.getOrganizacionId(), usuario.getId(), destino, plantilla,
-                Map.of("nombre", nombre == null ? "" : nombre,
-                       "vacante", vacante,
-                       "estado", nuevo.getNombre(),
-                       "enlace", enlace,
-                       "codigo", String.valueOf(postulacion.getUuid())));
+        Map<String, String> variables = new java.util.HashMap<>(Map.of(
+                "nombre", nombre == null ? "" : nombre,
+                "vacante", vacante,
+                "estado", nuevo.getNombre(),
+                "enlace", enlace,
+                "codigo", String.valueOf(postulacion.getUuid())));
+
+        // Se mira el aviso que TOCABA, no el texto elegido: lo que decide qué variables hay
+        // que rellenar es el momento del recorrido, no cómo se llame la plantilla.
+        if ("PRUEBA_DISPONIBLE".equals(plantilla)) {
+            variables.putAll(loDeLaPrueba(postulacion));
+        }
+
+        correo.enviar(postulacion.getOrganizacionId(), usuario.getId(), destino,
+                plantillaAUsar, variables);
+    }
+
+    /**
+     * El enunciado de la prueba y cuanto tiempo hay, para el aviso.
+     *
+     * <p><b>El enlace al PDF se saca del texto de la consigna con una expresion regular, y eso
+     * es provisional.</b> Lo correcto es una columna propia en {@code version_plantilla_prueba}:
+     * asi el correo no depende de como este redactado el texto, y quien reescriba la consigna
+     * no rompe el aviso sin enterarse. Se hizo asi para poder mandar los primeros correos hoy;
+     * la columna esta pendiente.
+     *
+     * <p>Si no encuentra enlace, la variable va vacia y el correo sale igual: el candidato
+     * todavia puede entrar al portal y leer la consigna ahi. Un aviso sin enlace es peor que
+     * uno con el, pero mucho mejor que ninguno.
+     */
+    /**
+     * Lo que el aviso de la prueba necesita y los demas no: el enunciado, el plazo y a donde
+     * mandar lo que se haga.
+     *
+     * <p>El enlace sale de {@code url_consigna} de la version que le toca a SU vacante, asi
+     * que dos puestos con pruebas distintas reciben cada uno la suya. Antes esto se hacia
+     * publicando una plantilla por puesto y mandando en medio: funcionaba mientras nadie mas
+     * se moviera, y quien se moviera recibia el enunciado de otro sin que nada avisara.
+     *
+     * <p>Si falta el enlace el correo sale igual, con ese hueco vacio. Un aviso incompleto es
+     * malo; no avisar de que le toca la prueba es peor.
+     */
+    private Map<String, String> loDeLaPrueba(Postulacion postulacion) {
+        String urlPdf = "";
+        String plazo = "";
+
+        var version = vacantes.findById(postulacion.getVacanteId())
+                .map(Vacante::getVersionPlantillaPruebaId)
+                .flatMap(versionesDePrueba::findById);
+        if (version.isPresent()) {
+            var v = version.get();
+            urlPdf = v.getUrlConsigna() == null ? "" : v.getUrlConsigna();
+            // Las dos modalidades cuentan el tiempo distinto: una da dias para entregar y la
+            // otra minutos de reloj. Se dice en las palabras de la que sea.
+            plazo = v.getPlazoDias() != null ? v.getPlazoDias() + " dias"
+                  : v.getDuracionMinutos() != null ? v.getDuracionMinutos() + " minutos"
+                  : "";
+            if (urlPdf.isBlank()) {
+                log.warn("La version de prueba {} no tiene enunciado publicado: el aviso de la "
+                        + "postulacion {} sale sin enlace", v.getId(), postulacion.getId());
+            }
+        }
+
+        return Map.of(
+                "enlacePrueba", urlPdf,
+                "plazo", plazo,
+                // Un telefono cambia cuando cambia quien atiende, asi que es parametro y no
+                // texto de la plantilla: se edita desde el panel, sin desplegar.
+                "whatsapp", parametros.texto(postulacion.getOrganizacionId(),
+                        "whatsapp_evidencia", ""));
     }
 }

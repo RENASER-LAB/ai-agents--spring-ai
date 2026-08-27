@@ -18,6 +18,8 @@ import com.renaser.ai.ai_engine.prueba.repository.PreguntaVersionPlantillaReposi
 import com.renaser.ai.ai_engine.prueba.repository.VarianteCambioRepository;
 import com.renaser.ai.ai_engine.prueba.repository.VersionPlantillaPruebaRepository;
 import com.renaser.ai.ai_engine.prueba.service.ServicioPlantillaPrueba;
+import com.renaser.ai.ai_engine.organizacion.service.DuenoDelInstrumento;
+import com.renaser.ai.ai_engine.organizacion.service.Instrumento;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
 
 import lombok.RequiredArgsConstructor;
@@ -49,6 +51,7 @@ public class ServicioPlantillaPruebaImpl implements ServicioPlantillaPrueba {
     private final EntregableRequeridoRepository entregablesRequeridos;
     private final CriterioRepository criterios;
     private final ServicioAuditoria auditoria;
+    private final DuenoDelInstrumento dueno;
 
     @Override
     @Transactional
@@ -67,7 +70,10 @@ public class ServicioPlantillaPruebaImpl implements ServicioPlantillaPrueba {
 
     @Override
     public List<PlantillaResponse> listarPlantillas(ContextoUsuario quien) {
-        return plantillas.findByOrganizacionIdOrderByCreadoEnDesc(quien.organizacionId()).stream()
+        // El resolutor decide de quién son las pruebas que esta organización ve: las
+        // suyas si personalizó, las de la plataforma si no.
+        return plantillas.findByOrganizacionIdOrderByCreadoEnDesc(
+                        dueno.duenoDe(quien.organizacionId(), Instrumento.PRUEBA)).stream()
                 .map(p -> new PlantillaResponse(p.getId(), p.getNombre(), p.getPuestoId(), p.isEsActiva()))
                 .toList();
     }
@@ -75,7 +81,7 @@ public class ServicioPlantillaPruebaImpl implements ServicioPlantillaPrueba {
     @Override
     @Transactional
     public Long crearVersion(ContextoUsuario quien, Long plantillaId, CrearVersion datos) {
-        PlantillaPrueba plantilla = laPlantillaVisible(quien, plantillaId);
+        PlantillaPrueba plantilla = laPlantillaPropia(quien, plantillaId);
         Integer siguiente = versiones.findByPlantillaPruebaIdOrderByVersionDesc(plantillaId).stream()
                 .findFirst().map(v -> v.getVersion() + 1).orElse(1);
 
@@ -128,8 +134,11 @@ public class ServicioPlantillaPruebaImpl implements ServicioPlantillaPrueba {
 
     @Override
     public VersionCompleta verVersion(ContextoUsuario quien, Long versionId) {
-        VersionPlantillaPrueba v = versiones.findById(versionId)
-                .orElseThrow(() -> new ResourceNotFoundException("Versión de prueba", "id", versionId));
+        // La versión completa lleva la rúbrica y sus puntos: el examen entero de una
+        // convocatoria. Antes se servía por id suelto — cualquier empresa podía leer la
+        // prueba de otra. Se deriva a su plantilla y se valida contra el dueño resuelto:
+        // con la bandera apagada se VEN las versiones de la plataforma, ninguna más.
+        VersionPlantillaPrueba v = laVersionVisible(quien, versionId);
 
         List<VarianteResponse> vs = variantes.findByVersionPlantillaPruebaId(versionId).stream()
                 .map(x -> new VarianteResponse(x.getId(), x.getTexto(), x.getOrden())).toList();
@@ -254,15 +263,33 @@ public class ServicioPlantillaPruebaImpl implements ServicioPlantillaPrueba {
 
     // ============ Apoyo ============
 
+    // Leer resuelve, editar no: con la bandera apagada la organización VE las pruebas de
+    // la plataforma —eso contesta el resolutor— pero solo edita las suyas.
+
     private PlantillaPrueba laPlantillaVisible(ContextoUsuario quien, Long id) {
         return plantillas.findByIdAndOrganizacionId(id, quien.organizacionId())
+                .or(() -> plantillas.findByIdAndOrganizacionId(
+                        id, dueno.duenoDe(quien.organizacionId(), Instrumento.PRUEBA)))
                 .orElseThrow(() -> new ResourceNotFoundException("Plantilla de prueba", "id", id));
+    }
+
+    private PlantillaPrueba laPlantillaPropia(ContextoUsuario quien, Long id) {
+        return plantillas.findByIdAndOrganizacionId(id, quien.organizacionId())
+                .orElseThrow(() -> new ResourceNotFoundException("Plantilla de prueba", "id", id));
+    }
+
+    /** Derivar al padre: la versión no sabe de organizaciones, su plantilla sí. */
+    private VersionPlantillaPrueba laVersionVisible(ContextoUsuario quien, Long id) {
+        VersionPlantillaPrueba version = versiones.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Versión de prueba", "id", id));
+        laPlantillaVisible(quien, version.getPlantillaPruebaId());
+        return version;
     }
 
     private VersionPlantillaPrueba laVersionEnBorrador(ContextoUsuario quien, Long id) {
         VersionPlantillaPrueba version = versiones.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Versión de prueba", "id", id));
-        laPlantillaVisible(quien, version.getPlantillaPruebaId());
+        laPlantillaPropia(quien, version.getPlantillaPruebaId());
         if (!"BORRADOR".equals(version.getEstado())) {
             throw new IllegalStateException("Solo se edita una versión en borrador; esta está " + version.getEstado());
         }
@@ -270,9 +297,22 @@ public class ServicioPlantillaPruebaImpl implements ServicioPlantillaPrueba {
     }
 
     // RF-83: entre 8 y 10 universales, entre 3 y 5 específicas. No hay tope de previas.
+    //
+    // La cuota rige solo cuando la prueba pide entregables: sus preguntas existen para que
+    // el candidato defienda lo que produjo. Una versión sin entregables es un cuestionario
+    // —las preguntas SON la prueba, como el técnico de Administrador— y ahí la cuota no
+    // tiene sentido; basta con que haya al menos una pregunta que responder.
     private void validarCuotaPreguntas(Long versionId) {
         List<Long> ids = preguntasElegidas.findByVersionPlantillaPruebaIdOrderByOrden(versionId).stream()
                 .map(PreguntaVersionPlantilla::getPreguntaPruebaId).toList();
+
+        if (entregablesRequeridos.findByVersionPlantillaPruebaIdOrderByOrden(versionId).isEmpty()) {
+            if (ids.isEmpty()) {
+                throw new IllegalArgumentException(
+                        "Una prueba sin entregables es un cuestionario: necesita al menos una pregunta");
+            }
+            return;
+        }
         Map<String, Long> porTipo = preguntasCatalogo.findByIdIn(ids).stream()
                 .collect(java.util.stream.Collectors.groupingBy(PreguntaPrueba::getTipo, java.util.stream.Collectors.counting()));
 

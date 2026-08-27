@@ -24,6 +24,14 @@ public class VersionPlantillaPrueba {
     private String enunciado;
     private String materiales;
     private String herramientasPermitidas;
+
+    /**
+     * El PDF del enunciado, para el correo que avisa de la prueba.
+     *
+     * <p>Columna propia y no sacado del texto de {@code materiales} con una expresion
+     * regular: asi quien reescriba la consigna no rompe el aviso sin enterarse.
+     */
+    private String urlConsigna;
     // CRONOMETRADA (lo normal) o PLAZO_ABIERTO (solo para las pruebas viejas cargadas tal cual)
     private String modalidad;
     private Integer duracionMinutos;

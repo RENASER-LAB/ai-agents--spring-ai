@@ -61,7 +61,31 @@ public final class DtosCalificacionIa {
             String ultimoPuesto,
             String ultimaEmpresa,
             Integer ultimaMesesDuracion,
-            String educacionMaxima) {
+            String educacionMaxima,
+            // Las listas del perfil (instruccion v2). Un trabajo lanzado con la v1 devuelve
+            // JSON sin ellas y llegan null: dato_cv no las necesita y el perfil simplemente
+            // no propone listas. Nada se rompe por su ausencia.
+            List<ExperienciaLeida> experiencia,
+            List<EducacionLeida> educacion,
+            List<IdiomaLeido> idiomas,
+            List<CertificacionLeida> certificaciones) {
+    }
+
+    /** Un empleo tal como lo leyo el modelo. Fechas en texto AAAA-MM: las parsea (y
+     * descarta si no cuadran) quien propone al perfil, no el deserializador. */
+    public record ExperienciaLeida(String puesto, String empresa, String desde, String hasta,
+                                   String descripcion) {
+    }
+
+    public record EducacionLeida(String titulo, String institucion, String nivel,
+                                 String desde, String hasta) {
+    }
+
+    public record IdiomaLeido(String idioma, String nivel) {
+    }
+
+    public record CertificacionLeida(String nombre, String entidad, String emitidaEn,
+                                     String venceEn) {
     }
 
     public record CriterioConPeso(String codigo, String nombre, String queMide, BigDecimal peso) {

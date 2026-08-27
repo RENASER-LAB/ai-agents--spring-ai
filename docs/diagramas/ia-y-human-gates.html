@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Qué hace la IA y dónde decide una persona</title>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --color-paper:   #f5f5f3;
+      --color-ink:     #0d0d0d;
+      --color-muted:   #70706b;
+      --color-accent:  #a43b36;
+      --font-sans:     'Geist', system-ui, sans-serif;
+      --font-serif:    'Instrument Serif', serif;
+      --font-mono:     'Geist Mono', ui-monospace, monospace;
+    }
+    body {
+      font-family: var(--font-sans);
+      background: var(--color-paper);
+      color: var(--color-ink);
+      min-height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+      padding: 3rem 2rem;
+    }
+    .frame { max-width: 1280px; width: 100%; }
+    .eyebrow {
+      font-family: var(--font-mono); font-size: 0.66rem; font-weight: 500;
+      letter-spacing: 0.18em; text-transform: uppercase;
+      color: var(--color-muted); margin-bottom: 0.5rem;
+    }
+    h1 {
+      font-family: var(--font-serif);
+      font-size: clamp(1.5rem, 2.4vw + 0.75rem, 2rem);
+      font-weight: 400; letter-spacing: -0.02em; line-height: 1.15;
+      color: var(--color-ink); margin-bottom: 0.5rem;
+    }
+    .sub {
+      font-size: 0.9rem; color: var(--color-muted);
+      margin-bottom: 1.5rem; max-width: 82ch; line-height: 1.55;
+    }
+    svg.diagrama { width: 100%; min-width: 1000px; display: block; }
+    .scroll { overflow-x: auto; }
+    .notas {
+      margin-top: 2rem; padding-top: 1.25rem;
+      border-top: 1px solid rgba(13,13,13,0.10);
+      display: grid; grid-template-columns: 1.15fr 1fr 0.95fr; gap: 1.5rem;
+    }
+    .notas h3 {
+      font-size: 0.82rem; font-weight: 600; margin-bottom: 0.4rem;
+      display: flex; align-items: center; gap: 0.45rem;
+    }
+    .dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+    .dot.ink { background: var(--color-ink); }
+    .dot.muted { background: var(--color-muted); }
+    .dot.accent { background: var(--color-accent); }
+    .notas p { font-size: 0.8rem; color: var(--color-muted); line-height: 1.55; }
+    .notas code {
+      font-family: var(--font-mono); font-size: 0.74rem; color: var(--color-ink);
+    }
+    footer {
+      margin-top: 2rem; padding-top: 0.75rem;
+      border-top: 1px solid rgba(13,13,13,0.10);
+      font-family: var(--font-mono); font-size: 0.66rem;
+      letter-spacing: 0.1em; color: var(--color-muted);
+    }
+    @media (max-width: 900px) { .notas { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="frame">
+    <p class="eyebrow">Recorrido del postulante · Sistema de selección RENASER · 2026-08-24</p>
+    <h1>Qué hace la IA y dónde decide una persona</h1>
+    <p class="sub">La fuente de esto no es la documentación: es la columna <strong>espera_a</strong> del catálogo de estados (<code style="font-family:var(--font-mono)">V9__semillas.sql</code>). <strong>SISTEMA</strong> significa que avanza solo, <strong>TALENTO</strong> y <strong>ÁREA</strong> son <em>human gates</em>, <strong>CANDIDATO</strong> es que la pelota está en su cancha. Dentro de una etapa se baja por los carriles: actúa el candidato, trabaja la máquina, decide la persona. Solo dos de los cinco tramos usan un modelo; el resto de lo automático son reglas deterministas.</p>
+
+    <div class="scroll">
+    <svg class="diagrama" viewBox="0 0 1280 880" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="gates-title gates-desc">
+      <title id="gates-title">IA y human gates en las cinco etapas</title>
+      <desc id="gates-desc">Diagrama de carriles que reparte el recorrido del postulante entre cuatro responsables: el candidato, la inteligencia artificial, los automatismos sin modelo y las personas con permiso. Las columnas son la entrada y las cinco etapas: Perfil Integral, prueba del puesto, simulación, validación práctica y decisión. La inteligencia artificial solo puntúa en dos etapas, Perfil Integral y prueba del puesto; en la simulación prepara preguntas pero no califica, y en validación y decisión no interviene. Las cinco etapas terminan en un human gate: Talento confirma las tres primeras y el responsable del área cierra la validación y toma la decisión final. El único punto donde el sistema cierra una postulación sin que intervenga una persona es la comprobación de requisitos objetivos en la entrada.</desc>
+
+      <defs>
+        <marker id="gates-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#70706b"/></marker>
+        <marker id="gates-arrow-accent" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#a43b36"/></marker>
+      </defs>
+
+      <rect width="100%" height="100%" fill="#f5f5f3"/>
+
+      <!-- ===== Franja del carril de personas: es la que responde la pregunta ===== -->
+      <rect x="160" y="480" width="1096" height="144" fill="rgba(13,13,13,0.04)"/>
+
+      <!-- ===== Cabecera de columnas ===== -->
+      <text x="228"  y="48" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.14em">ENTRADA</text>
+      <text x="388"  y="48" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.14em">ETAPA 1</text>
+      <text x="580"  y="48" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.14em">ETAPA 2</text>
+      <text x="772"  y="48" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.14em">ETAPA 3</text>
+      <text x="964"  y="48" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.14em">ETAPA 4</text>
+      <text x="1156" y="48" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.14em">ETAPA 5</text>
+
+      <text x="228"  y="72" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Postula</text>
+      <text x="388"  y="72" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Perfil Integral</text>
+      <text x="580"  y="72" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Prueba del puesto</text>
+      <text x="772"  y="72" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Simulación</text>
+      <text x="964"  y="72" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Validación práctica</text>
+      <text x="1156" y="72" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Decisión</text>
+
+      <!-- ===== Divisores de carril ===== -->
+      <line x1="24" y1="96"  x2="1256" y2="96"  stroke="rgba(13,13,13,0.18)" stroke-width="0.8"/>
+      <line x1="24" y1="224" x2="1256" y2="224" stroke="rgba(13,13,13,0.10)" stroke-width="0.8"/>
+      <line x1="24" y1="352" x2="1256" y2="352" stroke="rgba(13,13,13,0.10)" stroke-width="0.8"/>
+      <line x1="24" y1="480" x2="1256" y2="480" stroke="rgba(13,13,13,0.18)" stroke-width="0.8"/>
+      <line x1="24" y1="624" x2="1256" y2="624" stroke="rgba(13,13,13,0.18)" stroke-width="0.8"/>
+
+      <!-- Divisores de columna, muy tenues -->
+      <line x1="296"  y1="96" x2="296"  y2="624" stroke="rgba(13,13,13,0.07)" stroke-width="0.8"/>
+      <line x1="488"  y1="96" x2="488"  y2="624" stroke="rgba(13,13,13,0.07)" stroke-width="0.8"/>
+      <line x1="680"  y1="96" x2="680"  y2="624" stroke="rgba(13,13,13,0.07)" stroke-width="0.8"/>
+      <line x1="872"  y1="96" x2="872"  y2="624" stroke="rgba(13,13,13,0.07)" stroke-width="0.8"/>
+      <line x1="1064" y1="96" x2="1064" y2="624" stroke="rgba(13,13,13,0.07)" stroke-width="0.8"/>
+
+      <!-- ===== Etiquetas de carril ===== -->
+      <text x="24" y="140" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif">Candidato</text>
+      <text x="24" y="156" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace">espera_a = CANDIDATO</text>
+
+      <text x="24" y="268" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif">IA</text>
+      <text x="24" y="284" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace">espera_a = SISTEMA</text>
+      <text x="24" y="300" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace">si falla: reintenta</text>
+      <text x="24" y="312" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace">y avisa a una persona</text>
+
+      <text x="24" y="396" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif">Automatismo</text>
+      <text x="24" y="412" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace">reglas, sin modelo</text>
+
+      <text x="24" y="536" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif">Persona · gate</text>
+      <text x="24" y="552" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace">TALENTO / AREA</text>
+
+      <!-- Flecha guía: dentro de una etapa se baja -->
+      <line x1="140" y1="116" x2="140" y2="592" stroke="rgba(13,13,13,0.20)" stroke-width="0.8" stroke-dasharray="4,4" marker-end="url(#gates-arrow)"/>
+
+      <!-- ===== Flechas (antes que las cajas) ===== -->
+      <!-- El único cierre sin persona -->
+      <line x1="228" y1="460" x2="228" y2="648" stroke="#a43b36" stroke-width="1.2" marker-end="url(#gates-arrow-accent)"/>
+      <rect x="240" y="532" width="64" height="32" rx="2" fill="#f5f5f3"/>
+      <text x="244" y="544" fill="#a43b36" font-size="8" font-family="'Geist Mono', monospace">ÚNICO CIERRE</text>
+      <text x="244" y="556" fill="#a43b36" font-size="8" font-family="'Geist Mono', monospace">SIN PERSONA</text>
+
+      <!-- La vuelta del ámbar -->
+      <path d="M 1080 552 H 1068 A 8 8 0 0 1 1060 544 V 168 A 8 8 0 0 1 1068 160 H 1076"
+            fill="none" stroke="#a43b36" stroke-width="1.2" marker-end="url(#gates-arrow-accent)"/>
+      <rect x="984" y="208" width="68" height="16" rx="2" fill="#f5f5f3"/>
+      <text x="1044" y="220" fill="#a43b36" font-size="8" font-family="'Geist Mono', monospace" text-anchor="end" letter-spacing="0.08em">ÁMBAR</text>
+
+      <!-- ===================== CARRIL CANDIDATO ===================== -->
+      <!-- Etapa 1 -->
+      <rect x="312" y="116" width="152" height="88" rx="6" fill="#f5f5f3"/>
+      <rect x="312" y="116" width="152" height="88" rx="6" fill="rgba(112,112,107,0.10)" stroke="rgba(13,13,13,0.28)" stroke-width="1"/>
+      <rect x="320" y="124" width="32" height="12" rx="2" fill="none" stroke="rgba(13,13,13,0.35)" stroke-width="0.8"/>
+      <text x="336" y="133" fill="#70706b" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">CAND</text>
+      <text x="388" y="160" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Acepta y responde</text>
+      <text x="388" y="176" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">la evaluación</text>
+      <text x="388" y="192" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">PERFIL_TURNO_CANDIDATO</text>
+
+      <!-- Etapa 2 -->
+      <rect x="504" y="116" width="152" height="88" rx="6" fill="#f5f5f3"/>
+      <rect x="504" y="116" width="152" height="88" rx="6" fill="rgba(112,112,107,0.10)" stroke="rgba(13,13,13,0.28)" stroke-width="1"/>
+      <rect x="512" y="124" width="32" height="12" rx="2" fill="none" stroke="rgba(13,13,13,0.35)" stroke-width="0.8"/>
+      <text x="528" y="133" fill="#70706b" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">CAND</text>
+      <text x="580" y="160" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Entrega la prueba,</text>
+      <text x="580" y="176" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">con cronómetro</text>
+      <text x="580" y="192" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">PRUEBA_TURNO_CANDIDATO</text>
+
+      <!-- Etapa 3 -->
+      <rect x="696" y="116" width="152" height="88" rx="6" fill="#f5f5f3"/>
+      <rect x="696" y="116" width="152" height="88" rx="6" fill="rgba(112,112,107,0.10)" stroke="rgba(13,13,13,0.28)" stroke-width="1"/>
+      <rect x="704" y="124" width="32" height="12" rx="2" fill="none" stroke="rgba(13,13,13,0.35)" stroke-width="0.8"/>
+      <text x="720" y="133" fill="#70706b" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">CAND</text>
+      <text x="772" y="160" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Elige fecha</text>
+      <text x="772" y="176" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">y asiste a la sesión</text>
+      <text x="772" y="192" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">SIMULACION_TURNO_CAND.</text>
+
+      <!-- Etapa 4 -->
+      <rect x="888" y="116" width="152" height="88" rx="6" fill="#f5f5f3"/>
+      <rect x="888" y="116" width="152" height="88" rx="6" fill="rgba(112,112,107,0.10)" stroke="rgba(13,13,13,0.28)" stroke-width="1"/>
+      <rect x="896" y="124" width="32" height="12" rx="2" fill="none" stroke="rgba(13,13,13,0.35)" stroke-width="0.8"/>
+      <text x="912" y="133" fill="#70706b" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">CAND</text>
+      <text x="964" y="160" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Trabaja el periodo</text>
+      <text x="964" y="176" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">configurado</text>
+      <text x="964" y="192" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">VALIDACION_TURNO_CAND.</text>
+
+      <!-- Etapa 5: solo si sale ámbar -->
+      <rect x="1080" y="116" width="152" height="88" rx="6" fill="#f5f5f3"/>
+      <rect x="1080" y="116" width="152" height="88" rx="6" fill="rgba(13,13,13,0.02)" stroke="rgba(13,13,13,0.22)" stroke-width="1" stroke-dasharray="4,3"/>
+      <rect x="1088" y="124" width="32" height="12" rx="2" fill="none" stroke="rgba(13,13,13,0.30)" stroke-width="0.8"/>
+      <text x="1104" y="133" fill="#70706b" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">CAND</text>
+      <text x="1156" y="160" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Aporta evidencia</text>
+      <text x="1156" y="176" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">adicional · máx. 2</text>
+      <text x="1156" y="192" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">DECISION_TURNO_CAND.</text>
+
+      <!-- ===================== CARRIL IA ===================== -->
+      <!-- Entrada: la IA no interviene -->
+      <text x="228" y="292" fill="rgba(13,13,13,0.28)" font-size="12" font-family="'Geist', sans-serif" text-anchor="middle">—</text>
+
+      <!-- Etapa 1 -->
+      <rect x="312" y="244" width="152" height="88" rx="6" fill="#f5f5f3"/>
+      <rect x="312" y="244" width="152" height="88" rx="6" fill="rgba(13,13,13,0.06)" stroke="#70706b" stroke-width="1"/>
+      <rect x="320" y="252" width="24" height="12" rx="2" fill="#70706b"/>
+      <text x="332" y="261" fill="#f5f5f3" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">IA</text>
+      <text x="388" y="288" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Cuatro agentes</text>
+      <text x="388" y="304" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">puntúan y agrupan</text>
+      <text x="388" y="320" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">PERFIL_CALIFICANDO</text>
+
+      <!-- Etapa 2 -->
+      <rect x="504" y="244" width="152" height="88" rx="6" fill="#f5f5f3"/>
+      <rect x="504" y="244" width="152" height="88" rx="6" fill="rgba(13,13,13,0.06)" stroke="#70706b" stroke-width="1"/>
+      <rect x="512" y="252" width="24" height="12" rx="2" fill="#70706b"/>
+      <text x="524" y="261" fill="#f5f5f3" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">IA</text>
+      <text x="580" y="288" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Un agente califica</text>
+      <text x="580" y="304" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">el entregable</text>
+      <text x="580" y="320" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">PRUEBA_CALIFICANDO</text>
+
+      <!-- Etapa 3: apoyo, no califica -->
+      <rect x="696" y="244" width="152" height="88" rx="6" fill="#f5f5f3"/>
+      <rect x="696" y="244" width="152" height="88" rx="6" fill="rgba(13,13,13,0.02)" stroke="rgba(13,13,13,0.22)" stroke-width="1" stroke-dasharray="4,3"/>
+      <rect x="704" y="252" width="24" height="12" rx="2" fill="none" stroke="rgba(13,13,13,0.30)" stroke-width="0.8"/>
+      <text x="716" y="261" fill="#70706b" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">IA</text>
+      <text x="772" y="288" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Prepara preguntas.</text>
+      <text x="772" y="304" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">No califica nada</text>
+      <text x="772" y="320" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">no toca ninguna nota</text>
+
+      <!-- Etapas 4 y 5: la IA no interviene -->
+      <text x="964"  y="292" fill="rgba(13,13,13,0.28)" font-size="12" font-family="'Geist', sans-serif" text-anchor="middle">—</text>
+      <text x="1156" y="292" fill="rgba(13,13,13,0.28)" font-size="12" font-family="'Geist', sans-serif" text-anchor="middle">—</text>
+
+      <!-- ===================== CARRIL AUTOMATISMO ===================== -->
+      <!-- Entrada: el único cierre sin persona -->
+      <rect x="172" y="372" width="112" height="88" rx="6" fill="#f5f5f3"/>
+      <rect x="172" y="372" width="112" height="88" rx="6" fill="rgba(164,59,54,0.07)" stroke="#a43b36" stroke-width="1"/>
+      <rect x="180" y="380" width="32" height="12" rx="2" fill="none" stroke="rgba(164,59,54,0.50)" stroke-width="0.8"/>
+      <text x="196" y="389" fill="#a43b36" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">AUTO</text>
+      <text x="228" y="416" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Requisitos</text>
+      <text x="228" y="432" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">objetivos</text>
+      <text x="228" y="448" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">POSTULADA</text>
+
+      <!-- Etapa 1 -->
+      <rect x="312" y="372" width="152" height="88" rx="6" fill="#f5f5f3"/>
+      <rect x="312" y="372" width="152" height="88" rx="6" fill="#ffffff" stroke="rgba(13,13,13,0.30)" stroke-width="0.8"/>
+      <rect x="320" y="380" width="32" height="12" rx="2" fill="none" stroke="rgba(13,13,13,0.30)" stroke-width="0.8"/>
+      <text x="336" y="389" fill="#70706b" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">AUTO</text>
+      <text x="388" y="416" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Cierra si vence</text>
+      <text x="388" y="432" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">el plazo</text>
+      <text x="388" y="448" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">CERRADA · PLAZO_VENCIDO</text>
+
+      <!-- Etapa 2 -->
+      <rect x="504" y="372" width="152" height="88" rx="6" fill="#f5f5f3"/>
+      <rect x="504" y="372" width="152" height="88" rx="6" fill="#ffffff" stroke="rgba(13,13,13,0.30)" stroke-width="0.8"/>
+      <rect x="512" y="380" width="32" height="12" rx="2" fill="none" stroke="rgba(13,13,13,0.30)" stroke-width="0.8"/>
+      <text x="528" y="389" fill="#70706b" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">AUTO</text>
+      <text x="580" y="416" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Reloj agotado:</text>
+      <text x="580" y="432" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">entrega sola</text>
+      <text x="580" y="448" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">lo controla el servidor</text>
+
+      <!-- Etapa 3 -->
+      <rect x="696" y="372" width="152" height="88" rx="6" fill="#f5f5f3"/>
+      <rect x="696" y="372" width="152" height="88" rx="6" fill="#ffffff" stroke="rgba(13,13,13,0.30)" stroke-width="0.8"/>
+      <rect x="704" y="380" width="32" height="12" rx="2" fill="none" stroke="rgba(13,13,13,0.30)" stroke-width="0.8"/>
+      <text x="720" y="389" fill="#70706b" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">AUTO</text>
+      <text x="772" y="416" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">El cupo mueve</text>
+      <text x="772" y="432" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">el estado, ida y vuelta</text>
+      <text x="772" y="448" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">POR_HABILITAR ↔ TURNO</text>
+
+      <!-- Etapa 4 -->
+      <rect x="888" y="372" width="152" height="88" rx="6" fill="#f5f5f3"/>
+      <rect x="888" y="372" width="152" height="88" rx="6" fill="#ffffff" stroke="rgba(13,13,13,0.30)" stroke-width="0.8"/>
+      <rect x="896" y="380" width="32" height="12" rx="2" fill="none" stroke="rgba(13,13,13,0.30)" stroke-width="0.8"/>
+      <text x="912" y="389" fill="#70706b" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">AUTO</text>
+      <text x="964" y="416" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Métricas propias</text>
+      <text x="964" y="432" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">y fin del periodo</text>
+      <text x="964" y="448" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">terminarVencidos()</text>
+
+      <!-- Etapa 5 -->
+      <rect x="1080" y="372" width="152" height="88" rx="6" fill="#f5f5f3"/>
+      <rect x="1080" y="372" width="152" height="88" rx="6" fill="#ffffff" stroke="rgba(13,13,13,0.30)" stroke-width="0.8"/>
+      <rect x="1088" y="380" width="32" height="12" rx="2" fill="none" stroke="rgba(13,13,13,0.30)" stroke-width="0.8"/>
+      <text x="1104" y="389" fill="#70706b" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">AUTO</text>
+      <text x="1156" y="416" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Calcula el semáforo</text>
+      <text x="1156" y="432" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">como propuesta</text>
+      <text x="1156" y="448" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">pesos por versión</text>
+
+      <!-- ===================== CARRIL PERSONA · GATE ===================== -->
+      <text x="228" y="556" fill="rgba(13,13,13,0.28)" font-size="12" font-family="'Geist', sans-serif" text-anchor="middle">—</text>
+
+      <!-- Etapa 1 -->
+      <rect x="312" y="500" width="152" height="104" rx="6" fill="#f5f5f3"/>
+      <rect x="312" y="500" width="152" height="104" rx="6" fill="#ffffff" stroke="#0d0d0d" stroke-width="1.6"/>
+      <rect x="320" y="508" width="32" height="12" rx="2" fill="#0d0d0d"/>
+      <text x="336" y="517" fill="#f5f5f3" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">GATE</text>
+      <text x="388" y="548" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Talento confirma,</text>
+      <text x="388" y="564" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">sola o por lote</text>
+      <text x="388" y="584" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">confirmar_avance</text>
+      <text x="388" y="596" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">PERFIL_POR_CONFIRMAR</text>
+
+      <!-- Etapa 2 -->
+      <rect x="504" y="500" width="152" height="104" rx="6" fill="#f5f5f3"/>
+      <rect x="504" y="500" width="152" height="104" rx="6" fill="#ffffff" stroke="#0d0d0d" stroke-width="1.6"/>
+      <rect x="512" y="508" width="32" height="12" rx="2" fill="#0d0d0d"/>
+      <text x="528" y="517" fill="#f5f5f3" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">GATE</text>
+      <text x="580" y="548" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Talento revisa</text>
+      <text x="580" y="564" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">la nota y confirma</text>
+      <text x="580" y="584" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">confirmar_avance</text>
+      <text x="580" y="596" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">PRUEBA_POR_CONFIRMAR</text>
+
+      <!-- Etapa 3 -->
+      <rect x="696" y="500" width="152" height="104" rx="6" fill="#f5f5f3"/>
+      <rect x="696" y="500" width="152" height="104" rx="6" fill="#ffffff" stroke="#0d0d0d" stroke-width="1.6"/>
+      <rect x="704" y="508" width="32" height="12" rx="2" fill="#0d0d0d"/>
+      <text x="720" y="517" fill="#f5f5f3" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">GATE</text>
+      <text x="772" y="548" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Una persona califica</text>
+      <text x="772" y="564" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">la sesión entera</text>
+      <text x="772" y="584" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">calificar_simulacion</text>
+      <text x="772" y="596" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">SIMULACION_POR_CONFIRMAR</text>
+
+      <!-- Etapa 4 -->
+      <rect x="888" y="500" width="152" height="104" rx="6" fill="#f5f5f3"/>
+      <rect x="888" y="500" width="152" height="104" rx="6" fill="#ffffff" stroke="#0d0d0d" stroke-width="1.6"/>
+      <rect x="896" y="508" width="32" height="12" rx="2" fill="#0d0d0d"/>
+      <text x="912" y="517" fill="#f5f5f3" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">GATE</text>
+      <text x="964" y="548" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">El área completa</text>
+      <text x="964" y="564" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">lo no observable</text>
+      <text x="964" y="584" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">cerrar_validacion</text>
+      <text x="964" y="596" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">VALIDACION_POR_CONFIRMAR</text>
+
+      <!-- Etapa 5: el gate definitivo -->
+      <rect x="1080" y="500" width="152" height="104" rx="6" fill="#f5f5f3"/>
+      <rect x="1080" y="500" width="152" height="104" rx="6" fill="rgba(164,59,54,0.07)" stroke="#a43b36" stroke-width="1.6"/>
+      <rect x="1088" y="508" width="32" height="12" rx="2" fill="#a43b36"/>
+      <text x="1104" y="517" fill="#f5f5f3" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">GATE</text>
+      <text x="1156" y="548" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">El área decide:</text>
+      <text x="1156" y="564" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">verde, ámbar o rojo</text>
+      <text x="1156" y="584" fill="#a43b36" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">decidir_contratacion</text>
+      <text x="1156" y="596" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">DECISION_POR_CONFIRMAR</text>
+
+      <!-- ===================== FINALES ===================== -->
+      <rect x="172" y="656" width="112" height="48" rx="6" fill="rgba(164,59,54,0.07)" stroke="#a43b36" stroke-width="1"/>
+      <text x="228" y="678" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">No continúa</text>
+      <text x="228" y="692" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">NO_CONTINUA</text>
+
+      <rect x="312" y="656" width="112" height="48" rx="6" fill="rgba(13,13,13,0.05)" stroke="#70706b" stroke-width="1"/>
+      <text x="368" y="678" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Cerrada</text>
+      <text x="368" y="692" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">CERRADA</text>
+
+      <rect x="452" y="656" width="112" height="48" rx="6" fill="rgba(13,13,13,0.05)" stroke="#70706b" stroke-width="1"/>
+      <text x="508" y="678" fill="#0d0d0d" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Contratado</text>
+      <text x="508" y="692" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle">CONTRATADO</text>
+
+      <text x="608" y="674" fill="#0d0d0d" font-size="14" font-style="italic" font-family="'Instrument Serif', serif">La IA ordena en cuatro grupos y explica; descartar es siempre de una persona.</text>
+      <text x="608" y="694" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.08em">REGLA 1 · DOC 03-ESTADOS-POSTULACION</text>
+
+      <!-- ===================== LEYENDA ===================== -->
+      <line x1="24" y1="760" x2="1256" y2="760" stroke="rgba(13,13,13,0.10)" stroke-width="0.8"/>
+      <text x="24" y="780" fill="#70706b" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.14em">LEYENDA</text>
+
+      <rect x="24" y="796" width="20" height="14" rx="3" fill="rgba(112,112,107,0.10)" stroke="rgba(13,13,13,0.28)" stroke-width="1"/>
+      <text x="52" y="807" fill="#70706b" font-size="9" font-family="'Geist Mono', monospace">Le toca al candidato</text>
+
+      <rect x="228" y="796" width="20" height="14" rx="3" fill="rgba(13,13,13,0.06)" stroke="#70706b" stroke-width="1"/>
+      <text x="256" y="807" fill="#70706b" font-size="9" font-family="'Geist Mono', monospace">La IA puntúa: 2 de 5 etapas</text>
+
+      <rect x="480" y="796" width="20" height="14" rx="3" fill="rgba(13,13,13,0.02)" stroke="rgba(13,13,13,0.22)" stroke-width="1" stroke-dasharray="4,3"/>
+      <text x="508" y="807" fill="#70706b" font-size="9" font-family="'Geist Mono', monospace">IA de apoyo, sin nota</text>
+
+      <rect x="684" y="796" width="20" height="14" rx="3" fill="#ffffff" stroke="rgba(13,13,13,0.30)" stroke-width="0.8"/>
+      <text x="712" y="807" fill="#70706b" font-size="9" font-family="'Geist Mono', monospace">Automatismo, sin modelo</text>
+
+      <rect x="928" y="796" width="20" height="14" rx="3" fill="#ffffff" stroke="#0d0d0d" stroke-width="1.6"/>
+      <text x="956" y="807" fill="#70706b" font-size="9" font-family="'Geist Mono', monospace">Human gate: exige permiso</text>
+
+      <rect x="24" y="828" width="20" height="14" rx="3" fill="rgba(164,59,54,0.07)" stroke="#a43b36" stroke-width="1"/>
+      <text x="52" y="839" fill="#70706b" font-size="9" font-family="'Geist Mono', monospace">Lo excepcional: el único cierre sin persona, y la vuelta por ámbar</text>
+
+      <text x="480" y="839" fill="#70706b" font-size="9" font-family="'Geist Mono', monospace">—  ese carril no interviene en esa etapa</text>
+    </svg>
+    </div>
+
+    <div class="notas">
+      <div>
+        <h3><span class="dot ink"></span>La simulación no la califica un modelo</h3>
+        <p>Existe un <code>AgenteSimulacion</code>, y su propio javadoc lo dice: <em>no califica nada</em>. Prepara entre tres y cinco preguntas para que una persona las lea en voz alta, atadas a hechos de esa mañana. Su salida se puede tirar y volver a pedir sin que ninguna nota cambie. Quien pone las notas de la etapa 3 es una persona con <code>calificar_simulacion</code>.</p>
+      </div>
+      <div>
+        <h3><span class="dot muted"></span>La etapa 1 no siempre lleva IA</h3>
+        <p>Una vacante con <code>aplica_evaluacion = false</code> no tiene banco de preguntas: la postulación salta de <code>POSTULADA</code> a <code>PERFIL_POR_CONFIRMAR</code> sin pasar por el candidato ni por los agentes. En ese caso la etapa 1 es solo un gate humano, y la prueba del puesto es la única evaluación.</p>
+      </div>
+      <div>
+        <h3><span class="dot accent"></span>Todo gate tiene marcha atrás</h3>
+        <p>Cualquier persona con permiso puede mover una postulación en cualquier dirección, incluso a donde el sistema nunca la llevaría, siempre con motivo escrito y auditoría. Por eso los cinco gates no son solo puertas de salida: son también el punto donde se corrige lo que hizo la máquina.</p>
+      </div>
+    </div>
+
+    <footer>Fuente: estado_postulacion.espera_a (V9__semillas.sql) · MaquinaEstados · PuenteCalificacionIaImpl · PuentePruebaIaImpl · ServicioSimulacionImpl · ServicioValidacionImpl · ServicioDecisionImpl</footer>
+  </div>
+</body>
+</html>

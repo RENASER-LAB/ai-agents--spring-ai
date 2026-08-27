@@ -37,14 +37,20 @@ requisitos nuevos el 14 de agosto y cambian bastante.
 | [09 · Las APIs](09-APIS.md) | Las dos puertas, cómo entrar y qué hace cada endpoint. La referencia viva es Swagger |
 | [Curso del backend](CURSO-BACKEND.md) | Ruta para entender el código que existe, en orden. Para quien entra al proyecto |
 | [Calificación con IA](CALIFICACION-CON-IA.md) | Cómo la IA lee el currículum, califica lo abierto y arma el Perfil de Talento. Y qué pasa si falla |
+| [La rúbrica de la prueba](RUBRICA-DE-LA-PRUEBA.md) | Cómo se reparten los 100 puntos de una prueba y **quién pone cada nota**: el sistema, un agente o una persona |
 | [Criba de currículums](CRIBA-DE-CURRICULUMS.md) | Cargar una convocatoria con una carpeta de currículums, pedir que la IA los lea y ver quién es el más apto |
 | [Fallos corregidos de la criba](FALLOS-CORREGIDOS-CRIBA.md) | Los cinco fallos que salieron al pasar 190 currículums reales. Cuatro no daban error |
 | [Los siete fallos de la auditoría](FALLOS-CORREGIDOS-AUDITORIA.md) | Lo que encontró la revisión del 18/08: cuatro que tocaban dinero o decisiones de contratación, y ninguno daba error |
-| [Comprobaciones automáticas](COMPROBACIONES-AUTOMATICAS.md) | Qué se comprueba solo: 381 pruebas, 8 reglas de arquitectura y Semgrep |
+| [Comprobaciones automáticas](COMPROBACIONES-AUTOMATICAS.md) | Qué se comprueba solo: 747 pruebas, 9 reglas de arquitectura y Semgrep |
 | [Banco de preguntas v3](AVANCE-BANCO-V3-2026-08-19.md) | El banco nuevo del cliente: 190 ítems, ocho formatos y su motor de puntuación. Qué está hecho y qué falta |
+| [El perfil del candidato](PROPUESTA-PERFIL-DEL-CANDIDATO.md) | El perfil único de la persona: requisitos, historias y tablas. Implementado; los RF esperan la validación de Renaser |
+| [APIs del perfil](APIS-PERFIL-DEL-CANDIDATO.md) | El contrato para quien construya las pantallas del perfil, con las reglas que Swagger no cuenta |
+| [APIs del multiempresa](APIS-MULTIEMPRESA.md) | Qué cambia para el frontend con las empresas: lo que rompe (postular exige aceptar el tratamiento), los dos logins y la plataforma |
+| Multiempresa · [qué es de cada empresa](superpowers/specs/2026-08-25-instrumental-por-empresa-design.md) · [el aislamiento](superpowers/specs/2026-08-25-aislamiento-entre-empresas-design.md) · [la identidad y el alta](superpowers/specs/2026-08-25-identidad-y-alta-de-empresas-design.md) | Las tres piezas del cambio a plataforma (25/08): banderas de personalización con su resolutor, lo ajeno responde «no existe», y el panel entra con correo y contraseña por invitación |
+| [El perfil, para Renaser](PARA-RENASER-EL-PERFIL-DEL-CANDIDATO.md) | La explicación sin tecnicismos, para decidir si merece la pena |
 | [CI/CD](CI-CD.md) | Qué corre en cada cambio, cómo se despliega a Pruebas en AWS y qué variables de entorno hacen falta |
 | [Conectar la base a Supabase](CONEXION-SUPABASE.md) | **Retirado.** El perfil `supabase` se borró el 21/08: apuntaba tu máquina a la única base que hay, la de producción. Queda la explicación de por qué |
-- [Los curriculums dejan de vivir en el backend](ARCHIVOS-EN-BUCKET.md) — el bucket, los dos enlaces firmados, y por que un PDF en el disco del backend se pierde en el primer despliegue
+| [Los currículums dejan de vivir en el backend](ARCHIVOS-EN-BUCKET.md) | El bucket, los dos enlaces firmados, y por qué un PDF en el disco del backend se pierde en el primer despliegue |
 
 ### Diagramas
 
@@ -110,7 +116,7 @@ pasa), **sin datos** (falta evidencia) o **reserva** (no para esta vacante, pero
 | Inteligencia artificial · conversación y calificación | DeepSeek, que es un servicio externo |
 | Inteligencia artificial · búsqueda por significado | Google Gemini, que es un servicio externo |
 | Frontend | React con Vite, el de RENASER OS |
-| Identidad del equipo | RENASER OS emite el token; aquí solo se valida |
+| Identidad del equipo | Correo y contraseña, cuentas por invitación (25/08); RENASER OS quedó dormido como integración futura |
 
 **Qué sale de Renaser y qué no.** La base de datos y los archivos viven en servidores de
 Renaser. Los dos modelos son de fuera: DeepSeek califica y Google busca por significado.

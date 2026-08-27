@@ -10,6 +10,7 @@ import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.FilaRankin
 import com.renaser.ai.ai_engine.perfilintegral.entity.Criterio;
 import com.renaser.ai.ai_engine.perfilintegral.entity.NotaCriterio;
 import com.renaser.ai.ai_engine.perfilintegral.entity.NotaEtapa;
+import com.renaser.ai.ai_engine.pesos.entity.Etapa;
 import com.renaser.ai.ai_engine.perfilintegral.entity.PesoCriterio;
 import com.renaser.ai.ai_engine.perfilintegral.repository.AlertaRepository;
 import com.renaser.ai.ai_engine.perfilintegral.repository.CriterioRepository;
@@ -124,6 +125,7 @@ class ServicioPerfilIntegralPanelImplTest {
     @Mock private MaquinaEstados maquina;
     @Mock private Permisos permisos;
     @Mock private com.renaser.ai.ai_engine.perfilintegral.repository.EvaluacionRepository evaluaciones;
+    @Mock private com.renaser.ai.ai_engine.pesos.repository.EtapaRepository etapasCatalogo;
 
     @InjectMocks
     private ServicioPerfilIntegralPanelImpl servicio;
@@ -141,6 +143,49 @@ class ServicioPerfilIntegralPanelImplTest {
                 .id(3L).nombre("Analista").nivelPuestoCodigo("OPERATIVO").build()));
         lenient().when(permisos.alcanceDe(anyString()))
                 .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.TODO, 10L));
+    }
+
+    // ============ El ranking de otra etapa ============
+
+    @Test
+    void laNotaDeLaFilaEsLaDeLaEtapaPedida() {
+        candidatos(candidato(1L, "ALTA", "90"), candidato(2L, "ALTA", "40"));
+        when(etapasCatalogo.existsById("PRUEBA_PUESTO")).thenReturn(true);
+        // En la prueba el orden se invierte: quien iba segundo la bordo.
+        when(notasEtapa.findByPostulacionIdInAndEtapaCodigo(List.of(1L, 2L), "PRUEBA_PUESTO"))
+                .thenReturn(List.of(
+                        NotaEtapa.builder().postulacionId(2L).etapaCodigo("PRUEBA_PUESTO")
+                                .puntaje(new BigDecimal("95")).build()));
+
+        List<FilaRanking> filas = servicio.ranking(quien, VACANTE, "PRUEBA_PUESTO").filas();
+
+        assertThat(filas).extracting(FilaRanking::postulacionId).containsExactly(2L, 1L);
+        assertThat(filas.get(0).notaEtapa()).isEqualByComparingTo("95");
+        // Quien no rindio la prueba no hereda su nota de la preseleccion: va sin nota.
+        assertThat(filas.get(1).notaEtapa()).isNull();
+    }
+
+    @Test
+    void unaEtapaInventadaSeRechazaConLasQueExisten() {
+        // La vacante ya la sirve el @BeforeEach: el 400 llega antes de listar la tanda.
+        when(etapasCatalogo.existsById("ENTREVISTA")).thenReturn(false);
+        when(etapasCatalogo.findAllByOrderByOrdenAsc()).thenReturn(List.of(
+                Etapa.builder().codigo("PERFIL_INTEGRAL").build(),
+                Etapa.builder().codigo("PRUEBA_PUESTO").build()));
+
+        assertThatThrownBy(() -> servicio.ranking(quien, VACANTE, "ENTREVISTA"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("ENTREVISTA")
+                .hasMessageContaining("PRUEBA_PUESTO");
+    }
+
+    @Test
+    void laFirmaViejaSigueSiendoLaPreseleccionSinTocarElCatalogo() {
+        candidatos(candidato(1L, "ALTA", "90"));
+
+        servicio.ranking(quien, VACANTE);
+
+        verifyNoInteractions(etapasCatalogo);
     }
 
     // ============ El orden de la tanda ============

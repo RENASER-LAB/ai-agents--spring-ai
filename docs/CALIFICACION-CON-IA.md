@@ -96,6 +96,17 @@ envió, qué respondió, cuánto tardó, cuántos tokens gastó y, si falló, po
 Y **cada nota que se guarda apunta a la llamada que la produjo**. Es lo que permite abrir una
 nota de hace seis meses y ver exactamente de dónde salió.
 
+Desde el 25/08 esa puerta existe de verdad: `GET /panel/postulaciones/{id}/evaluacion` devuelve
+cada respuesta abierta con su nota de 0 a 4, la explicación, la evidencia que la IA citó de la
+propia respuesta y la confianza; si una persona ajustó la nota, también el motivo. De lo cerrado
+sale el promedio y cuántas preguntas fueron, no pregunta por pregunta: se corrige solo contra
+una clave y no hay nada que explicar.
+
+⚠️ **Cómo se mezclan las dos mitades no lo ha confirmado Renaser.** Hoy se ponderan por cuántas
+preguntas produjo cada una, y esa cuenta vive en un solo sitio —`ServicioCalificacion.notaCombinada`—
+a propósito: el día que el cliente decida otra cosa tiene que cambiar a la vez para la nota que
+entra en la etapa y para la que enseña el panel. Estuvo copiada en dos sitios hasta el 25/08.
+
 ---
 
 ## Cosas que el sistema hace y conviene saber

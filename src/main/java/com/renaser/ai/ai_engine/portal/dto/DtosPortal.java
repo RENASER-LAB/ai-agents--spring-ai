@@ -29,14 +29,22 @@ public final class DtosPortal {
 
     // ---------- lo que sale ----------
 
-    public record VacantePublica(Long id, String titulo, String descripcion, String proposito,
-                                 String responsabilidades, String requisitos, String modalidad,
-                                 String horario, String ubicacion, String compensacionPublica,
+    // nombreEmpresa existe porque el tablón mezcla vacantes de todas las empresas: sin
+    // él, el candidato no sabría a quién le está mandando su currículum.
+    public record VacantePublica(Long id, String titulo, String nombreEmpresa, String descripcion,
+                                 String proposito, String responsabilidades, String requisitos,
+                                 String modalidad, String horario, String ubicacion,
+                                 String compensacionPublica,
                                  List<RequisitoPublico> requisitosObjetivos) {}
 
     public record RequisitoPublico(Long id, String descripcion) {}
 
     public record TextoConsentimientoPublico(String tipo, String version, String texto) {}
+
+    // El texto legal de LA EMPRESA de una vacante, para la casilla del formulario de
+    // postular. Lleva el nombre porque es lo que la ley pide enseñar: quién va a tratar
+    // los datos. El de la plataforma (crear la cuenta) sale por textosDeConsentimiento.
+    public record ConsentimientoDeVacante(String nombreEmpresa, String version, String texto) {}
 
     public record Sesion(String token, Long usuarioId) {}
 
@@ -49,8 +57,11 @@ public final class DtosPortal {
      */
     public record AccesoPorEnlace(@NotBlank String token) {}
 
-    public record MiPostulacion(String uuid, String vacante, String estado, String estadoNombre,
-                                String grupoPrioridad, long diasSinCambio, Instant creadoEn) {}
+    // empresa por lo mismo que nombreEmpresa en el tablón: «mis postulaciones» mezcla los
+    // procesos del candidato en todas las empresas, y cada uno debe decir de quién es.
+    public record MiPostulacion(String uuid, String vacante, String empresa, String estado,
+                                String estadoNombre, String grupoPrioridad, long diasSinCambio,
+                                Instant creadoEn) {}
 
     public record PasoHistorial(String estadoAnterior, String estadoNuevo, boolean fueElSistema,
                                 Instant ocurridaEn) {}

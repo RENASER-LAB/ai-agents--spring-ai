@@ -2,6 +2,7 @@ package com.renaser.ai.ai_engine.integracion;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.renaser.ai.ai_engine.integracion.soporte.ImagenesDeContenedores;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.DisplayName;
@@ -63,7 +64,7 @@ public class FlujoHito1IT {
 
     @Container
     @ServiceConnection
-    static RabbitMQContainer rabbit = new RabbitMQContainer("rabbitmq:3-management-alpine");
+    static RabbitMQContainer rabbit = new RabbitMQContainer(ImagenesDeContenedores.RABBITMQ);
 
     // Sigue haciendo falta un sitio temporal, pero ya no para guardar curriculums: solo
     // para fabricar el archivo de 13 MB con el que se comprueba que el limite de subida
@@ -84,6 +85,9 @@ public class FlujoHito1IT {
         registro.add("app.archivos.tipo", () -> "memoria");
         registro.add("app.seguridad.jwt-secreto",
                 () -> "clave-de-pruebas-suficientemente-larga-para-hmac-256-bits");
+        // El dev-login quedo apagado por defecto en application.yaml: aqui se enciende
+        // explicitamente, porque estas pruebas entran al panel por el.
+        registro.add("app.seguridad.dev-login-activo", () -> "true");
         // El chat de agentes exige una clave para construir su bean. Aquí nadie llama al
         // modelo, pero sin este valor el contexto entero no arranca.
         registro.add("spring.ai.deepseek.api-key", () -> "clave-de-pruebas-no-se-usa");
@@ -261,6 +265,7 @@ public class FlujoHito1IT {
                         .file(cv)
                         .param("vacanteId", String.valueOf(vacanteId))
                         .param("resultadoOrgulloso", "Rediseñé el flujo de citas y bajó el ausentismo 30%")
+                        .param("aceptaTratamiento", "true")
                         .param("portafolio", "https://camila.dev")
                         .param("requisitosConfirmados", String.valueOf(requisitoId))
                         .header("Authorization", "Bearer " + tokenCandidato))

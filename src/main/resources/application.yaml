@@ -5,9 +5,9 @@ spring:
   # Si nadie dice lo contrario, «local»: todo lo que guarda estado se queda en tu maquina.
   #
   # Antes el valor por defecto era «ningun perfil», y esa era justo la combinacion peligrosa:
-  # la base salia local, pero la cola la ponia application-secrets.yaml —que apunta al broker
-  # compartido— y los curriculums iban al bucket de verdad. Arrancar sin pensar te metia a
-  # medias en un entorno compartido.
+  # la base salia local, pero la cola la ponia application-secrets.yaml —que entonces
+  # apuntaba a un broker compartido— y los curriculums iban al bucket de verdad. Arrancar
+  # sin pensar te metia a medias en un entorno compartido.
   #
   # El servidor no se ve afectado: despliegue/docker-compose.yml pone SPRING_PROFILES_ACTIVE
   # =pruebas, y un perfil activo explicito gana siempre sobre este.
@@ -79,8 +79,9 @@ spring:
       "mail.smtp.writetimeout": 10000
 
   rabbitmq:
-    # El broker de desarrollo, el del docker-compose. Para apuntar a otro —Amazon MQ, o el
-    # que haya en produccion— se sobreescriben host, puerto, usuario, contrasena, vhost y
+    # El broker de desarrollo, el del docker-compose. El servidor usa el suyo propio, otro
+    # contenedor igual, y lo configura application-pruebas.yaml con variables de entorno.
+    # Para apuntar a un tercero se sobreescriben host, puerto, usuario, contrasena, vhost y
     # ssl en application-secrets.yaml, que no se versiona. Aqui nunca va una credencial de
     # verdad: este archivo esta en git.
     host: localhost
@@ -143,6 +144,16 @@ spring:
 server:
   port: 8080
 renaser:
+  # De dónde puede leer PDFs la ingesta del RAG (POST /api/v1/rag/ingest).
+  #
+  # Vacío a propósito: así la ingesta por ruta queda APAGADA mientras nadie la configure.
+  # Antes no había directorio ninguno y la ruta del cuerpo se usaba tal cual, de modo que
+  # el endpoint leía cualquier PDF del servidor y su texto quedaba consultable por
+  # /api/v1/rag/search. Hoy la ruta tiene que caer dentro de este directorio, y encima el
+  # endpoint pide token de equipo.
+  rag:
+    directorio-base: ${RENASER_RAG_DIRECTORIO_BASE:}
+
   ai:
     chat:
       default-model: deepseek-v4-flash
@@ -220,6 +231,13 @@ renaser:
   portal:
     url: ${PORTAL_URL:https://renaser-os-postulantes.vercel.app}
 
+  # La direccion del panel de empresas, la que se pega en el correo de invitacion.
+  # No es la del portal del candidato: son dos frontends con dos logins distintos.
+  # Ese panel necesita una pantalla en /invitacion que lea el token de la URL, pida
+  # nombre y contrasena, y llame a POST /api/v1/panel/auth/invitacion.
+  panel:
+    url: ${PANEL_URL:http://localhost:5173}
+
   correo:
     transporte: ${CORREO_TRANSPORTE:log}
     # La dirección que ve el candidato. Puede no ser la misma que autentica: con un dominio
@@ -265,3 +283,8 @@ app:
     # Cuánto vive un token de candidato y uno del equipo (en minutos)
     minutos-token-candidato: 120
     minutos-token-equipo: 480
+    # El login de desarrollo emite tokens de equipo sin contraseña. Apagado aquí, que es
+    # lo que hereda todo entorno; lo encienden application-local.yaml y las pruebas,
+    # explícitamente. Encendido por defecto significaba que un despliegue que olvidara
+    # apagarlo regalaba el panel entero.
+    dev-login-activo: false

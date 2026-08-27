@@ -95,6 +95,7 @@ public class PuenteCalificacionIaImpl implements PuenteCalificacionIa {
     private static final List<String> TIPOS_ALERTA = List.of("CONTRADICCION", "DEMASIADO_IDEAL");
 
     private final PostulacionRepository postulaciones;
+    private final com.renaser.ai.ai_engine.perfil.service.ServicioPropuestaPerfil propuestaPerfil;
     private final VacanteRepository vacantes;
     private final PuestoRepository puestos;
     private final CvRepository cvs;
@@ -183,6 +184,12 @@ public class PuenteCalificacionIaImpl implements PuenteCalificacionIa {
         fila.setEjecucionIaId(ejecucionIaId);
         fila.setActualizadoEn(Instant.now());
         datosCv.save(fila);
+
+        // Lo mismo que se guardo aqui se PROPONE al perfil del candidato. Propone, no
+        // escribe encima: lo que la persona corrigio o confirmo no se toca (RF-159).
+        // Misma transaccion a proposito — si el perfil fallara, la ficha tampoco se
+        // daria por guardada y el trabajo se reintentaria entero.
+        propuestaPerfil.proponer(postulacionId, resultado);
 
         log.info("DATOS_CV: ficha de la postulación {} guardada ({})",
                 postulacionId, fila.getNombre() == null ? "sin nombre" : fila.getNombre());
@@ -604,19 +611,10 @@ public class PuenteCalificacionIaImpl implements PuenteCalificacionIa {
     private BigDecimal notaEvaluacion(Long postulacionId) {
         ServicioCalificacion.ResumenCerrado cerrado = calificacion.resumenDeLoCerrado(postulacionId);
         List<NotaRespuestaIa> abiertas = notasDeLoAbierto(abiertas(postulacion(postulacionId)));
-        BigDecimal notaAbiertas = promedioAbiertas(abiertas);
-
-        BigDecimal suma = BigDecimal.ZERO;
-        int total = 0;
-        if (cerrado.preguntas() > 0) {
-            suma = suma.add(cerrado.nota().multiply(BigDecimal.valueOf(cerrado.preguntas())));
-            total += cerrado.preguntas();
-        }
-        if (notaAbiertas != null) {
-            suma = suma.add(notaAbiertas.multiply(BigDecimal.valueOf(abiertas.size())));
-            total += abiertas.size();
-        }
-        return total == 0 ? null : suma.divide(BigDecimal.valueOf(total), 2, RoundingMode.HALF_UP);
+        // La cuenta vive en ServicioCalificacion.notaCombinada: si la interpretacion de
+        // como mezclar las mitades cambia, cambia a la vez aqui y en el desglose del panel.
+        return ServicioCalificacion.notaCombinada(cerrado,
+                abiertas.stream().map(NotaRespuestaIa::puntaje).toList());
     }
 
     /** El 0-4 de las abiertas llevado a 0-100, para poder mezclarlo con el resto. */

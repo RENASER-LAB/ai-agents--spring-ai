@@ -68,10 +68,15 @@ public class ServicioPruebaImpl implements ServicioPrueba {
 
     @Override
     @Transactional
-    public Long crearAlEntrar(Long organizacionId, Long postulacionId, Long versionPlantillaPruebaId) {
+    public Long crearAlEntrar(Long organizacionId, Long postulacionId,
+                              Long versionPlantillaPruebaId, Instant cierraEn) {
         IntentoPrueba intento = intentos.save(IntentoPrueba.builder()
                 .postulacionId(postulacionId)
                 .versionPlantillaPruebaId(versionPlantillaPruebaId)
+                // Si la vacante fija cuándo cierra su prueba, el intento nace ya con esa
+                // fecha y empezar no la recalcula. Sin ella, `venceEn` queda vacío y se
+                // cuentan los días de la plantilla al empezar, como siempre.
+                .venceEn(cierraEn)
                 .esEntregaAutomatica(false)
                 .creadoEn(Instant.now())
                 .build());
@@ -92,12 +97,16 @@ public class ServicioPruebaImpl implements ServicioPrueba {
         if (intento.getIniciadoEn() == null) {
             VersionPlantillaPrueba version = laVersion(intento);
             Instant ahora = Instant.now();
-            Instant vence = "CRONOMETRADA".equals(version.getModalidad())
-                    ? ahora.plus(version.getDuracionMinutos(), ChronoUnit.MINUTES)
-                    : ahora.plus(version.getPlazoDias(), ChronoUnit.DAYS);
 
             intento.setIniciadoEn(ahora);
-            intento.setVenceEn(vence);
+            // Si alguien ya le puso fecha de cierre a mano, esa manda: es lo que se le dijo
+            // al candidato («hasta el domingo»), y recalcularla aquí se la movería sin que
+            // nadie se enterara. Solo cuando no hay ninguna se cuenta desde ahora.
+            if (intento.getVenceEn() == null) {
+                intento.setVenceEn("CRONOMETRADA".equals(version.getModalidad())
+                        ? ahora.plus(version.getDuracionMinutos(), ChronoUnit.MINUTES)
+                        : ahora.plus(version.getPlazoDias(), ChronoUnit.DAYS));
+            }
             sortearCambio(intento, version);
             intentos.save(intento);
         }

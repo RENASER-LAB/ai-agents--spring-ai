@@ -21,6 +21,9 @@ public class IntentoPrueba {
     private Long versionPlantillaPruebaId;
     private Instant iniciadoEn;
     private Instant venceEn;
+    // A esta persona se le fijó su propia fecha de cierre: mover la de la vacante no se la
+    // toca, para que «más horas para este candidato» no se pierda (V32)
+    private boolean plazoPropio;
     private Instant entregadoEn;
     private boolean esEntregaAutomatica;
     private Long varianteCambioId;

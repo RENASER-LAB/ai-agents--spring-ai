@@ -101,7 +101,7 @@ verdad. Arrancar sin pensar te metía a medias en un entorno compartido; ahora n
 | Perfil | Base de datos | Cola | Currículums |
 |---|---|---|---|
 | `local` — **el de por defecto** | Contenedor del compose | Contenedor del compose | En memoria |
-| `pruebas` | Supabase | Amazon MQ | Bucket de Supabase |
+| `pruebas` | Supabase | Contenedor en la EC2 | Bucket de Supabase |
 
 `pruebas` no es «para probar en tu máquina»: es **el servidor desplegado**, y lo activa
 `despliegue/docker-compose.yml` con `SPRING_PROFILES_ACTIVE=pruebas`. Nunca lo arranques tú.

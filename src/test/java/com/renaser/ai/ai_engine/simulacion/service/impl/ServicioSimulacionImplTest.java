@@ -10,12 +10,15 @@ import com.renaser.ai.ai_engine.postulacion.service.MaquinaEstados;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
 import com.renaser.ai.ai_engine.seguridad.dto.FiltroAlcance;
 import com.renaser.ai.ai_engine.seguridad.service.Permisos;
+import com.renaser.ai.ai_engine.perfilintegral.entity.Alerta;
 import com.renaser.ai.ai_engine.simulacion.dto.DtosSimulacion.DecidirSobreAusente;
 import com.renaser.ai.ai_engine.simulacion.dto.DtosSimulacion.MarcarAsistencia;
 import com.renaser.ai.ai_engine.simulacion.dto.DtosSimulacion.PreguntaResponse;
 import com.renaser.ai.ai_engine.simulacion.dto.DtosSimulacion.PreguntasEncoladas;
+import com.renaser.ai.ai_engine.simulacion.dto.DtosSimulacion.RegistrarPregunta;
 import com.renaser.ai.ai_engine.simulacion.entity.InscripcionSesion;
 import com.renaser.ai.ai_engine.simulacion.entity.PreguntaGenerada;
+import com.renaser.ai.ai_engine.simulacion.entity.SesionSimulacion;
 import com.renaser.ai.ai_engine.simulacion.repository.InformacionCriticaRepository;
 import com.renaser.ai.ai_engine.simulacion.repository.InscripcionSesionRepository;
 import com.renaser.ai.ai_engine.simulacion.repository.MarcaTiempoSimulacionRepository;
@@ -105,6 +108,7 @@ class ServicioSimulacionImplTest {
     @Mock private InscripcionSesionRepository inscripciones;
     @Mock private MarcaTiempoSimulacionRepository marcas;
     @Mock private PreguntaGeneradaRepository preguntas;
+    @Mock private com.renaser.ai.ai_engine.perfilintegral.repository.AlertaRepository alertas;
     @Mock private PostulacionRepository postulaciones;
     @Mock private VacanteRepository vacantes;
     @Mock private ColaCalificacionIa cola;
@@ -121,8 +125,9 @@ class ServicioSimulacionImplTest {
     @BeforeEach
     void crearElServicio() {
         servicio = new ServicioSimulacionImpl(sesiones, sesionesVacante, responsables, tramos,
-                informacionCritica, inscripciones, marcas, preguntas, postulaciones, vacantes,
-                cola, roles, usuarioRoles, maquina, disponibilidad, parametros, auditoria, permisos);
+                informacionCritica, inscripciones, marcas, preguntas, alertas, postulaciones,
+                vacantes, cola, roles, usuarioRoles, maquina, disponibilidad, parametros,
+                auditoria, permisos);
     }
 
     // ============ Las fechas que ve el candidato ============
@@ -358,12 +363,54 @@ class ServicioSimulacionImplTest {
                 .id(INSCRIPCION).sesionSimulacionId(SESION).postulacionId(POSTULACION)
                 .esVigente(true).inscritaEn(Instant.now()).build();
         when(inscripciones.findById(INSCRIPCION)).thenReturn(Optional.of(inscripcion));
+        when(sesiones.findByIdAndOrganizacionId(SESION, ORGANIZACION)).thenReturn(
+                Optional.of(SesionSimulacion.builder()
+                        .id(SESION).organizacionId(ORGANIZACION).estado("PUBLICADA").build()));
         when(postulaciones.findById(POSTULACION)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> servicio.marcarAsistencia(QUIEN, INSCRIPCION, new MarcarAsistencia(true)))
                 .isInstanceOf(IllegalStateException.class);
 
         verifyNoInteractions(maquina);
+    }
+
+    @Test
+    @DisplayName("una inscripción cuya sesión es de otra empresa responde «no existe»")
+    void unaInscripcionDeOtraEmpresaEs404() {
+        // La fuga cerrada en la pieza B: la inscripción no guarda organización y se
+        // deriva a su sesión. Si la sesión no aparece por la organización de quien
+        // pregunta, la inscripción es ajena — y marcar asistencia TRANSICIONA la
+        // postulación de la otra empresa, así que pasar de largo aquí movía candidatos
+        // ajenos de estado.
+        InscripcionSesion inscripcion = InscripcionSesion.builder()
+                .id(INSCRIPCION).sesionSimulacionId(SESION).postulacionId(POSTULACION)
+                .esVigente(true).inscritaEn(Instant.now()).build();
+        when(inscripciones.findById(INSCRIPCION)).thenReturn(Optional.of(inscripcion));
+        when(sesiones.findByIdAndOrganizacionId(SESION, ORGANIZACION))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> servicio.marcarAsistencia(QUIEN, INSCRIPCION, new MarcarAsistencia(true)))
+                .isInstanceOf(ResourceNotFoundException.class);
+
+        verifyNoInteractions(maquina);
+    }
+
+    @Test
+    @DisplayName("una pregunta no puede citar la alerta de otra postulación")
+    void unaPreguntaNoCitaLaAlertaDeOtraPostulacion() {
+        // La sexta fuga de la pieza B: la pregunta guardaba el alertaId que llegara, y la
+        // ficha lo enseñaba después como propio — una clave foránea hacia el expediente
+        // de otra empresa. La alerta citada tiene que ser de ESTA postulación.
+        hayPostulacion(POR_CONFIRMAR);
+        alcanceDeConversacion(FiltroAlcance.Tipo.TODO);
+        when(alertas.findById(500L)).thenReturn(Optional.of(Alerta.builder()
+                .id(500L).postulacionId(POSTULACION + 1).build()));
+
+        assertThatThrownBy(() -> servicio.registrarPregunta(QUIEN, POSTULACION,
+                new RegistrarPregunta("¿Qué pasó con este riesgo?", 500L)))
+                .isInstanceOf(ResourceNotFoundException.class);
+
+        verify(preguntas, never()).save(any());
     }
 
     // ============ Qué se hace con quien no se presentó ============
@@ -434,6 +481,11 @@ class ServicioSimulacionImplTest {
                 .esVigente(true).inscritaEn(Instant.now())
                 .build();
         when(inscripciones.findById(INSCRIPCION)).thenReturn(Optional.of(inscripcion));
+        // La inscripción se deriva ahora a su sesión, que es la que tiene organización:
+        // sin esta fila, marcar cualquier cosa sobre ella respondería 404.
+        when(sesiones.findByIdAndOrganizacionId(SESION, ORGANIZACION)).thenReturn(
+                Optional.of(SesionSimulacion.builder()
+                        .id(SESION).organizacionId(ORGANIZACION).estado("PUBLICADA").build()));
         when(postulaciones.findById(POSTULACION)).thenReturn(Optional.of(postulacion));
         return inscripcion;
     }

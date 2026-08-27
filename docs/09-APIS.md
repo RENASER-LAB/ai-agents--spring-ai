@@ -1,13 +1,15 @@
 # Las APIs del sistema
 
 Sistema de selección de personal — Renaser Consulting
-Versión 1.4 · 2026-08-19 · Cubre **las cinco etapas del embudo**: postulación, Perfil Integral,
+Versión 1.5 · 2026-08-25 · Cubre **las cinco etapas del embudo**: postulación, Perfil Integral,
 prueba del puesto, simulación de trabajo, validación práctica y decisión final
 
 Este documento explica las APIs para quien las va a consumir: el frontend de RENASER OS y el
-portal del candidato. **La referencia viva es Swagger**, en `http://localhost:8080/swagger-ui.html`
-cuando la aplicación corre: ahí están los cuerpos exactos, se prueban las llamadas y siempre está
-al día porque se genera del código. Este documento cuenta lo que Swagger no cuenta: cómo entrar,
+portal del candidato. **La referencia viva es Swagger**, en `http://localhost:8081/swagger-ui.html`
+cuando la aplicación corre en local: ahí están los cuerpos exactos, se prueban las llamadas y
+siempre está al día porque se genera del código. **Es el 8081, no el 8080** — el perfil `local`
+mueve la aplicación de puerto porque el 8080 suele estar ocupado por Adminer, que responde 200 a
+todo y hace que un frontend mal apuntado parezca que funciona. Este documento cuenta lo que Swagger no cuenta: cómo entrar,
 qué puerta usar y las reglas que no se ven en un esquema.
 
 ---
@@ -19,7 +21,7 @@ Todo vive bajo `/api/v1/`, en dos zonas con reglas distintas:
 | Puerta | Quién la usa | Cómo se identifica |
 |---|---|---|
 | `/api/v1/portal/**` | El candidato | Token propio, de crear cuenta y entrar con correo y contraseña |
-| `/api/v1/panel/**` | El equipo de Renaser | Token de equipo. Lo emitirá RENASER OS; mientras no exista ese contrato, el login de desarrollo |
+| `/api/v1/panel/**` | El equipo de cada empresa, Renaser incluida | Token de equipo, con correo y contraseña. Las cuentas nacen **solo por invitación**: el panel no tiene registro público |
 
 El token va en cada llamada, en la cabecera `Authorization: Bearer <token>`.
 
@@ -38,10 +40,22 @@ la lista de correos registrados. Tras varios intentos fallidos seguidos (configu
 en 5), la entrada se bloquea unos minutos y responde **429** con la cabecera `Retry-After` y el
 campo `segundosDeEspera`, para que la pantalla pueda decir cuánto falta en vez de adivinarlo.
 
-**El equipo, mientras no hay RENASER OS:** `POST /panel/auth/dev-login` con el id de RENASER OS.
-El primer id que entre en una base recién creada se registra solo, con los roles completos del
-equipo — es el arranque de desarrollo. En producción este login se apaga con
-`app.seguridad.dev-login-activo: false`.
+**El equipo:** `POST /panel/auth/login` con correo y contraseña. Solo entran cuentas de
+equipo: un candidato con su contraseña correcta recibe el mismo 401 que un correo que no
+existe — la contraseña del portal no abre el panel. El bloqueo por intentos es el mismo que
+el del candidato. RENASER OS quedó dormido: cuando se retome será añadir un proveedor de
+identidad, no rehacer este login.
+
+**La cuenta de equipo nace por invitación.** Un administrador invita
+(`POST /panel/usuarios/invitaciones`) y el invitado abre el enlace del correo y canjea el
+token en `POST /panel/auth/invitacion`, poniendo su nombre y su contraseña — mínimo doce
+caracteres, porque una cuenta de panel ve los datos de muchas personas. El token es de un
+solo uso y caduca (parámetro `dias_invitacion`, 7 por defecto); una invitación vencida,
+revocada o ya canjeada responde siempre el mismo 401.
+
+**El login de desarrollo** (`POST /panel/auth/dev-login`) sigue existiendo para local y para
+las pruebas, y está **apagado por defecto** (`app.seguridad.dev-login-activo: false`): solo
+`application-local.yaml` y las pruebas de integración lo encienden.
 
 ## Los errores hablan claro
 
@@ -64,13 +78,14 @@ en lenguaje normal.
 
 | Método y ruta | Qué hace | Quién |
 |---|---|---|
-| GET `/vacantes` | Las vacantes publicadas | Cualquiera, sin token |
+| GET `/vacantes` | Las vacantes publicadas **de todas las empresas activas**, cada una con el nombre de la suya. Las de una empresa suspendida no salen | Cualquiera, sin token |
 | GET `/vacantes/{id}` | El detalle público, con los requisitos indispensables | Cualquiera |
-| GET `/consentimientos/textos` | Los textos vigentes de los dos consentimientos | Cualquiera |
+| GET `/vacantes/{id}/consentimiento` | El texto de tratamiento de datos **de la empresa de esa vacante**: lo que se acepta al postular, con el nombre de quien tratará los datos | Cualquiera |
+| GET `/consentimientos/textos` | Los textos vigentes de los dos consentimientos de la plataforma (los de crear la cuenta) | Cualquiera |
 | POST `/cuentas` | Crear la cuenta y registrar los consentimientos | Cualquiera |
 | POST `/auth/login` | Entrar; devuelve el token | Cualquiera |
-| POST `/postulaciones` | Postular: CV (PDF o Word, máx. 10 MB), enlaces, el resultado del que se siente orgulloso, y la confirmación de los requisitos | Candidato |
-| GET `/postulaciones` | Sus postulaciones, con estado y días sin cambio | Candidato |
+| POST `/postulaciones` | Postular: CV (PDF o Word, máx. 10 MB), enlaces, el resultado del que se siente orgulloso, la confirmación de los requisitos y `aceptaTratamiento` (obligatorio): la aceptación del texto de la empresa queda firmada con IP y navegador, a nombre de esa postulación | Candidato |
+| GET `/postulaciones` | Sus postulaciones, con la empresa de cada una, estado y días sin cambio | Candidato |
 | GET `/postulaciones/{uuid}` | El detalle de una suya, con el historial completo | Candidato |
 | POST `/postulaciones/{uuid}/retiro` | Retirarla. **No borra sus datos**: eso se pide aparte | Candidato |
 | POST `/consentimientos/futuros/retiro` | Retirar el consentimiento de futuros contactos | Candidato |
@@ -79,6 +94,10 @@ en lenguaje normal.
 | POST `/evaluacion/{uuid}/inicio` | Empezar. La primera vez elige qué preguntas le tocan | Candidato |
 | PUT `/evaluacion/{uuid}/respuestas/{preguntaId}` | Guardar una respuesta | Candidato |
 | POST `/evaluacion/{uuid}/entrega` | Entregar. Ya no se cambia, y pasa a calificarse | Candidato |
+
+**El candidato es de la plataforma.** Una sola cuenta, y con ella postula a la vacante de
+cualquier empresa: su postulación nace en la empresa de la vacante, que es la que la ve en su
+panel. El tablón de vacantes es la única pantalla que mezcla empresas — a propósito.
 
 **La evaluación es de quien la responde.** Todo entra por el código de la postulación, no por
 el id de la evaluación, y una que no es suya responde 404 — un 403 ya confirmaría que existe.
@@ -114,6 +133,11 @@ la postulación en el acto (`NO_CONTINUA`), con la regla exacta escrita en su hi
 | GET/POST `/vacantes/{id}/requisitos` · DELETE `/{requisitoId}` | Los requisitos indispensables. No se borran: se desactivan | `definir_requisitos_objetivos` |
 | POST `/vacantes/{id}/plantilla-evaluacion` | Qué evaluación responderá quien postule. **Hace falta antes de publicar** | `elegir_plantilla_evaluacion` |
 | POST `/vacantes/{id}/plantilla-prueba` | Qué prueba del puesto rendirá quien llegue a esa etapa. **Hace falta antes de publicar** | `elegir_plantilla_prueba` |
+| POST `/vacantes/{id}/aplicacion-evaluacion` | Encender o apagar la evaluación del banco en esta vacante. Apagada, quien postule cae directo en la bandeja del equipo y su única evaluación es la prueba; publicar deja de exigir plantilla de evaluación | `elegir_plantilla_evaluacion` |
+| POST `/vacantes/{id}/version-pesos` | Qué versión de pesos (publicada) rige la decisión de esta vacante. No recalcula nada hacia atrás | `publicar_version_pesos` |
+| POST `/vacantes/{id}/cierre-prueba` | Fijar cuándo cierra la prueba de esta vacante, para todos. **Mueve también los intentos ya abiertos**, salvo los de quien tenga fecha propia. Con `cierraEn` vacío se quita y se vuelven a contar los días de la plantilla | `elegir_plantilla_prueba` |
+| GET `/vacantes/{id}/plantillas-correo` | Qué avisos manda esta vacante con texto propio. Vacío = los de siempre | `ver_vacantes` |
+| POST `/vacantes/{id}/plantillas-correo` · DELETE `/{avisoCodigo}` | Hacer que esta vacante mande otro texto en lugar del aviso que le tocaba, y devolverlo al de siempre. **Una plantilla es una por organización**: sin esto, cambiar el texto de una convocatoria se lo cambia a todas | `editar_textos_correo` |
 | GET/POST `/vacantes/{id}/barreras-criticas` | Las capacidades que ningún promedio alto compensa | `definir_barreras_criticas` |
 | POST `/vacantes/{id}/publicacion` | Publicar: aparece en el portal | `publicar_vacante` |
 | POST `/vacantes/{id}/cierre` | Cerrar: frena postulaciones nuevas, **no arrastra las que van en marcha** | `cerrar_vacante` |
@@ -124,31 +148,41 @@ la postulación en el acto (`NO_CONTINUA`), con la regla exacta escrita en su hi
 |---|---|---|
 | GET `/bandeja?espera_a=` | La bandeja: todo lo que espera a `CANDIDATO`, `SISTEMA`, `TALENTO` o `AREA` | `ver_candidatos` |
 | GET `/vacantes/{id}/embudo` | Cuántas postulaciones hay en cada estado | `ver_embudo` |
-| GET `/vacantes/{id}/ranking` | La tanda ordenada de más apto a menos, con las ocho notas del currículum de cada uno. **Incluye a quien todavía no tiene nota** | `ver_embudo` |
+| GET `/vacantes/{id}/ranking?etapa=` | La tanda ordenada de más apto a menos, con las ocho notas del currículum de cada uno. **Incluye a quien todavía no tiene nota**. Sin `etapa` ordena por la del Perfil Integral; con ella, por la nota de esa etapa | `ver_embudo` |
 | GET `/postulaciones/{id}` · `/historial` | La ficha completa y el recorrido | `abrir_ficha_candidato` |
 | POST `/postulaciones/{id}/transiciones` | Mover a cualquier estado. **El motivo es obligatorio, sin excepción** | `mover_postulacion` |
 | POST `/postulaciones/{id}/confirmacion-avance` | Confirmar que avanza: el sistema calcula el estado siguiente | `confirmar_avance` |
 | GET `/postulaciones/{id}/perfil-integral` | El retrato de la IA: notas del currículum, hallazgos y avisos | `ver_perfil_integral` |
+| GET `/postulaciones/{id}/evaluacion` | El desglose del banco: cada respuesta abierta con su nota, la explicación y la evidencia que citó la IA, el promedio de lo cerrado y los semáforos de alineación. **Sin evaluación asignada devuelve vacíos, no 404**. ⚠️ `alineacion` sale vacía siempre: nadie escribe esa tabla todavía | `ver_respuestas_evaluacion` |
 | POST `/postulaciones/{id}/criba-cv` | Que la IA lea **solo el currículum** y arme el retrato con eso. Es lo que se pide con una tanda recién llegada | `ajustar_nota` |
 | POST `/postulaciones/{id}/calificacion-perfil-integral` | Calificar con todo: currículum y evaluación. Exige evaluación entregada | `ajustar_nota` |
 | POST `/postulaciones/{id}/cv` | Reemplazar el currículum desde el panel | `ajustar_nota` |
 | GET `/archivos/{id}/descarga` | Descargar el CV | `descargar_entregables` |
 
-> **Este es el único ranking que existe, y es el de la etapa 2.** Ordena por grupo de prioridad y,
-> dentro de cada grupo, por la nota del Perfil Integral. No hay ranking general con las cuatro
-> etapas dentro, ni rankings de la prueba, la simulación o la validación: esas notas se consultan
-> de una en una por candidato. La Puntuación Global sí está calculada —sale en
-> `/postulaciones/{id}/semaforo`—, pero nunca como lista ordenada. Está apuntado como decisión 6
-> en [Alcance del MVP](08-ALCANCE-DEL-MVP.md), con lo que habría que decidir antes de montarlo.
+> **Hay un ranking por etapa, y es el mismo endpoint.** `?etapa=PERFIL_INTEGRAL` —que equivale
+> a no pasarlo—, `PRUEBA_PUESTO`, `SIMULACION`, `VALIDACION` o `DECISION` cambia **solo la nota con la que se ordena**: las ocho notas del
+> currículum de cada fila siguen siendo las del Perfil Integral, porque son de esa etapa siempre.
+> Sin el parámetro se comporta exactamente como antes —así lo llama la criba fina, que decide a
+> quién recalificar por la nota de preselección—, y una etapa que no esté en el catálogo es un 400.
+> Quien no tiene nota en la etapa pedida sale al final, sin heredar la de otra.
+>
+> Sigue sin haber un ranking **general** que mezcle las cuatro etapas en una sola nota. La
+> Puntuación Global está calculada —sale en `/postulaciones/{id}/semaforo`—, pero nunca como lista
+> ordenada. Está apuntado como decisión 6 en [Alcance del MVP](08-ALCANCE-DEL-MVP.md), con lo que
+> habría que decidir antes de montarlo.
 
 ### La prueba del puesto (hito 3)
 
 | Método y ruta | Qué hace | Permiso |
 |---|---|---|
 | POST `/plantillas-prueba` · `/{id}/versiones` | Crear la plantilla y una versión en borrador | `editar_plantillas_prueba` |
-| POST `/plantillas-prueba/versiones/{id}/publicacion` | Publicar: exige 8-10 preguntas universales, 3-5 específicas, y la rúbrica sumando 100 | `editar_plantillas_prueba` |
+| POST `/plantillas-prueba/versiones/{id}/publicacion` | Publicar: exige 8-10 preguntas universales, 3-5 específicas, y la rúbrica sumando 100. **Una versión sin entregables es un cuestionario**: la cuota no rige y basta con una pregunta | `editar_plantillas_prueba` |
+| POST `/postulaciones/{id}/prueba/plazo` | Fijarle a ESE candidato su fecha de cierre, normalmente para darle más horas. **Queda marcada como suya**: mover después la fecha de la vacante no se la toca. Antes de empezar, la fecha puesta manda sobre el cálculo por días | `mover_postulacion` |
+| GET `/postulaciones/{id}/prueba/respuestas` | Lo que contestó, pregunta a pregunta. Las preguntas son **las de la versión que él vio**, en su orden, no las del catálogo de hoy: una versión publicada después puede llevar otras | `abrir_ficha_candidato` |
+| GET `/postulaciones/{id}/prueba/notas` | La rúbrica entera con lo que lleva puesto cada criterio: puntaje, explicación y **de quién viene la nota**, si de la IA o de una persona. Lo que aún no tiene nota sale en nulo | `ajustar_nota` |
 | POST `/postulaciones/{id}/prueba/criterios/{criterioId}/nota` | Poner la nota de un criterio, con explicación obligatoria | `ajustar_nota` |
-| POST `/postulaciones/{id}/prueba/calificacion` | Ponderar las notas ya puestas. Exige que estén todos los criterios | `ajustar_nota` |
+| POST `/postulaciones/{id}/prueba/calificacion-ia` | Pedirle al agente `PRUEBA_PUESTO` los criterios que la rúbrica le reserva. Tarda decenas de segundos y **no pisa ningún ajuste hecho a mano** | `ajustar_nota` |
+| POST `/postulaciones/{id}/prueba/calificacion` | Ponderar las notas ya puestas. Exige que estén todos los criterios. **Escribe**: deja la nota guardada, no es una consulta | `ajustar_nota` |
 
 **El portal del candidato es `/api/v1/portal/prueba/{codigo}`**: ver, iniciar (arranca el
 reloj), responder, subir entregables y entregar. Mismas reglas que la evaluación: nada de
@@ -236,17 +270,73 @@ el banco v4 que venga no necesitará una migración. El ciclo es
 | GET/POST `/banco-preguntas/preguntas/{id}/rangos` | Los tramos de puntaje de los ítems V | `ver` / `editar_banco_preguntas` |
 | GET/POST `/banco-preguntas/preguntas/{id}/campos-caso` | Los campos de los casos descompuestos (CD) | `ver` / `editar_banco_preguntas` |
 | GET/POST `/banco-preguntas/versiones/{id}/pares-consistencia` | Emparejar dos preguntas de la versión para vigilar contradicciones | `ver` / `editar_banco_preguntas` |
+| POST `/banco-preguntas/importaciones` | **Subir la plantilla Excel** (multipart: `archivo`, `nivelPuestoCodigo`, `etiqueta`). Crea una versión en borrador con todo el archivo; si algo no cuadra, 400 con la lista `{hoja, fila, mensaje}` y no se importa nada | `editar_banco_preguntas` |
+| GET `/banco-preguntas/dimensiones` | El catálogo de dimensiones: lo que vale escribir en la columna «Qué mide» | `ver_banco_preguntas` |
+| PUT/DELETE `/banco-preguntas/preguntas/{id}` | Reemplazar o quitar una pregunta **de un borrador**; borrarla se lleva sus opciones, campos, rangos y pares | `editar_banco_preguntas` |
+| PUT/DELETE `/banco-preguntas/opciones/{id}`, `/rangos/{id}`, `/campos-caso/{id}`, `/pares-consistencia/{id}` | Lo mismo para cada pieza de un borrador | `editar_banco_preguntas` |
+| DELETE `/banco-preguntas/versiones/{id}` | Descartar un borrador entero: se borra de verdad, con sus preguntas. Solo un borrador, que nunca se le asignó a nadie | `editar_banco_preguntas` |
+| PATCH `/banco-preguntas/preguntas/{id}/textos` | **Corregir una errata de lo ya publicado**: enunciado, situación o nota interna. La clave, el peso y la estructura no se tocan por aquí (RF-138) | `publicar_version_banco` |
+| PATCH `/banco-preguntas/opciones/{id}/textos`, `/campos-caso/{id}/textos`, `/rangos/{id}/textos`, `/pares-consistencia/{id}/textos` | Igual para el texto de cada pieza publicada; su clave nunca viaja en el cuerpo | `publicar_version_banco` |
+| PATCH `/banco-preguntas/versiones/{id}/etiqueta` | Renombrar una versión publicada | `publicar_version_banco` |
 
 ### Administración
 
 | Método y ruta | Qué hace | Permiso |
 |---|---|---|
 | GET `/areas` · POST `/areas` | Las áreas de la organización: hace falta una para registrar una solicitud | `ver_solicitudes` / `crear_usuarios_y_asignar_roles` |
-| GET/PUT `/parametros` | Los valores que Renaser cambia sin programar | `editar_parametros` |
+| GET/PUT `/parametros` | Los valores que Renaser cambia sin programar. `tope_mensual_ia` se ve pero no se edita desde aquí: lo administra la plataforma | `editar_parametros` |
 | GET/POST `/plantillas-correo` | Los textos de correo. Editar = crear versión nueva | `editar_textos_correo` |
+| GET/POST `/textos-consentimiento` | Los textos legales de la organización, con su historia. El POST crea la versión nueva **y la publica**: es lo que abre la puerta de publicar vacantes — sin texto PROCESO publicado no se reciben candidatos | `editar_textos_correo` |
 | GET `/auditoria` | El registro, paginado. No se puede modificar ni borrar | `ver_auditoria` |
-| GET `/solicitudes-borrado` · POST `/{id}/ejecucion` | Ver y ejecutar los borrados: la persona queda vacía, la trazabilidad queda | `ejecutar_borrado_datos` |
+| GET `/solicitudes-borrado` · POST `/{id}/ejecucion` | Ver y ejecutar los borrados: la persona queda vacía, la trazabilidad queda. **Solo desde la plataforma**: los candidatos son cuentas de plataforma y la anonimización cruza empresas | `ejecutar_borrado_datos`, y ser la plataforma |
 | GET/POST `/usuarios` · POST `/{id}/roles` · GET `/roles` | El equipo y sus roles. El último administrador no se puede quitar | `crear_usuarios_y_asignar_roles` |
+| GET/POST `/usuarios/invitaciones` · DELETE `/{id}` | Invitar a alguien al equipo, ver las invitaciones y revocar una sin canjear. La respuesta del POST devuelve el enlace a quien invita | `crear_usuarios_y_asignar_roles` |
+
+### La plataforma y las empresas
+
+Desde el 25/08/2026 el sistema es multiempresa: cada empresa se registra por invitación de
+Renaser, publica sus vacantes y ve solo a sus candidatos. El porqué de cada decisión está en
+`docs/superpowers/specs/2026-08-25-*.md`.
+
+| Método y ruta | Qué hace | Permiso |
+|---|---|---|
+| GET `/plataforma/empresas` | La ficha del continente: cada empresa con su estado (activa o suspendida), su tope de IA, sus banderas de personalización y su consumo del mes corriente | `administrar_plataforma`, y ser la plataforma |
+| POST `/plataforma/empresas` | Dar de alta una empresa: nace con roles, parámetros, textos legales en borrador, correos activos y el tope de IA si se pide (`topeMensualIa` opcional), y con la invitación de su primer administrador ya enviada | `administrar_plataforma`, y ser la plataforma |
+| POST `/plataforma/empresas/{id}/suspension` | Suspenderla, con motivo: su equipo no entra —ni con tokens vivos—, sus vacantes salen del tablón, y los candidatos que ya estaban dentro conservan acceso y datos. La plataforma no puede suspenderse a sí misma | `administrar_plataforma`, y ser la plataforma |
+| POST `/plataforma/empresas/{id}/reactivacion` | Reactivarla, con motivo: todo vuelve tal cual | `administrar_plataforma`, y ser la plataforma |
+| PUT `/plataforma/empresas/{id}/tope-ia` | Poner, subir o quitar (`tope` en blanco) el tope mensual de IA. Lo que quedó en espera lo despierta solo el sondeo de la cola | `administrar_plataforma`, y ser la plataforma |
+| POST/DELETE `/plataforma/empresas/{id}/personalizacion/{instrumento}` | Encender o apagar la personalización **de otra empresa**, con motivo, cuando ella lo pide fuera del sistema. Misma copia y misma auditoría que si lo hiciera ella | `administrar_plataforma`, y ser la plataforma |
+| GET `/plataforma/consumo?mes=YYYY-MM` | El consumo de IA del mes por empresa y por agente: total, tokens y llamadas. Con estos números Renaser factura fuera del sistema | `administrar_plataforma`, y ser la plataforma |
+| GET `/organizacion/personalizacion` | Qué instrumentos tiene propios esta organización, bandera por bandera | `personalizar_instrumentos` |
+| POST `/organizacion/personalizacion` | Encender una bandera (`BANCO`, `PESOS`, `PLANTILLA_EVALUACION`, `PRUEBA`): copia el instrumento publicado de la plataforma y desde ahí se lee y edita lo propio | `personalizar_instrumentos` |
+| DELETE `/organizacion/personalizacion/{instrumento}` | Apagarla: se vuelve a leer el de la plataforma. La copia propia se archiva, nunca se borra | `personalizar_instrumentos` |
+
+Con la bandera apagada la empresa **lee** el instrumento de la plataforma —los listados del
+panel enseñan el método de Renaser en solo lectura, y una mejora de Renaser llega sola— pero
+no lo edita: mutar algo ajeno responde 404. Lo operativo (vacantes, solicitudes,
+postulaciones, sesiones) jamás se comparte: lo de otra empresa responde «no existe».
+
+**Renaser administra el continente, no el contenido.** Los endpoints de plataforma llegan a
+la ficha de la empresa —estado, tope, banderas, consumo— y ahí se acaban: no existe ningún
+camino desde la plataforma hacia los candidatos, notas, alertas ni decisiones de una
+empresa, y esa ausencia es el diseño (pieza F). La única grieta consciente es el borrado de
+la ley 29733, que ya se ejecuta desde la plataforma porque el candidato es una cuenta de
+plataforma; queda auditado y es el único.
+
+### El perfil del candidato
+
+Nuevo desde el 25/08/2026. El candidato tiene un perfil único —de la persona, no de la
+postulación— que se llena solo con su currículum y que él corrige. **El contrato completo,
+con las reglas que Swagger no cuenta, está en
+[APIS-PERFIL-DEL-CANDIDATO.md](APIS-PERFIL-DEL-CANDIDATO.md).** En corto:
+
+| Método y ruta | Qué hace | Permiso |
+|---|---|---|
+| GET/PUT `/portal/perfil` · GET `/portal/perfil/descarga` | El dueño ve su perfil entero y lo descarga (ley 29733). Vacío responde 200, nunca 404. El PUT **reemplaza** la cabecera, no la fusiona | El propio token; lo ajeno es 404 |
+| POST/PUT/DELETE + POST `/{id}/confirmacion` en `/portal/perfil/experiencia`, `/educacion`, `/idiomas`, `/certificaciones` · PUT `/orden` solo en las dos primeras | Añadir, corregir, borrar y dar por bueno lo que se sacó del currículum | El propio token |
+| POST y DELETE `/portal/perfil/enlaces` | **Solo esas dos**: un enlace no lleva origen ni confirmación, así que no se edita — se borra y se crea | El propio token |
+| GET `/portal/catalogos/niveles-educativos` · `/niveles-idioma` | Los desplegables, para no escribirlos a mano. Devuelven `codigo` y `nombre` ya ordenados: no hay campo `orden` | Token de candidato |
+| GET `/panel/postulaciones/{id}/perfil` | La trayectoria del candidato sin abrir su archivo. **No puntúa** | `ver_perfil_candidato`; la pretensión solo con `ver_pretension` |
 
 ---
 
@@ -272,8 +362,19 @@ punta a punta hoy mismo, con personas poniendo las notas.
 candidato y lo que viaja en sus rutas.
 
 **El módulo de agentes IA** (`/api/v1/agent-runs`, `/flows`, `/rag`, `/supabase`) es otra zona,
-del proyecto original de agentes, y hoy queda abierta como estaba. Se endurecerá cuando gane
-autenticación propia.
+del proyecto original de agentes. **Desde el 24/08/2026 pide token de equipo**, el mismo del
+panel; antes estaba abierta a cualquiera.
+
+Lo que obligó a cerrarla: `POST /api/v1/rag/ingest` recibía una ruta del sistema de ficheros
+del servidor, la leía, y su texto quedaba consultable por `GET /api/v1/rag/search`. Sin token.
+Cualquier PDF de la máquina se podía sacar desde internet.
+
+Ahora la ingesta pide además que la ruta caiga dentro de `renaser.rag.directorio-base`, y esa
+propiedad **viene vacía a propósito**: mientras nadie la configure, la ingesta por ruta está
+apagada. No hay ningún cliente que la use.
+
+El contrato (`/v3/api-docs`) y Swagger siguen siendo públicos: el fuzzing nocturno los lee
+antes de tener token.
 
 ---
 

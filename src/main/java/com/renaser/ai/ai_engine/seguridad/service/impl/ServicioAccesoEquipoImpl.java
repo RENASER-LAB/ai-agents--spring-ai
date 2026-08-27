@@ -2,8 +2,13 @@ package com.renaser.ai.ai_engine.seguridad.service.impl;
 
 import com.renaser.ai.ai_engine.organizacion.entity.Organizacion;
 import com.renaser.ai.ai_engine.organizacion.repository.OrganizacionRepository;
+import com.renaser.ai.ai_engine.parametro.service.ServicioParametros;
 import com.renaser.ai.ai_engine.seguridad.config.PropiedadesSeguridad;
+import com.renaser.ai.ai_engine.seguridad.dto.DtosSeguridad.Login;
 import com.renaser.ai.ai_engine.seguridad.dto.DtosSeguridad.Sesion;
+import com.renaser.ai.ai_engine.seguridad.exception.CredencialesInvalidasException;
+import com.renaser.ai.ai_engine.seguridad.exception.DemasiadosIntentosException;
+import com.renaser.ai.ai_engine.seguridad.service.IntentosLogin;
 import com.renaser.ai.ai_engine.seguridad.service.ProveedorIdentidadEquipo;
 import com.renaser.ai.ai_engine.seguridad.service.ServicioAccesoEquipo;
 import com.renaser.ai.ai_engine.seguridad.service.ServicioToken;
@@ -17,6 +22,7 @@ import com.renaser.ai.ai_engine.usuario.repository.UsuarioRolRepository;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,13 +43,74 @@ public class ServicioAccesoEquipoImpl implements ServicioAccesoEquipo {
     private final UsuarioRepository usuarios;
     private final RolRepository roles;
     private final UsuarioRolRepository usuarioRoles;
+    private final IntentosLogin intentos;
+    private final ServicioParametros parametros;
+    private final PasswordEncoder codificador;
+
+    @Override
+    @Transactional
+    public Sesion entrar(Login datos) {
+        long esperaPendiente = intentos.segundosDeBloqueo(datos.correo());
+        if (esperaPendiente > 0) {
+            throw new DemasiadosIntentosException(esperaPendiente);
+        }
+        // Los umbrales de bloqueo salen de la plataforma: antes de autenticar no se sabe
+        // de qué empresa es quien escribe, y estos números no son de los que cada empresa
+        // personaliza — son la defensa del login, que es uno solo.
+        Long plataformaId = plataforma().getId();
+        int maximo = parametros.entero(plataformaId, "intentos_login_max", 5);
+        int minutosBloqueo = parametros.entero(plataformaId, "minutos_bloqueo_login", 15);
+
+        // El correo puede existir en varias organizaciones (candidato en la plataforma y
+        // reclutador en una empresa, por ejemplo). Solo cuentan las cuentas de EQUIPO:
+        // esa es la línea que impide que un candidato entre al panel con su contraseña.
+        List<Usuario> candidatas = usuarios.equipoPorCorreo(datos.correo());
+        if (candidatas.isEmpty()) {
+            // Comparación señuelo: sin ella, un correo sin cuenta contesta al instante
+            // (ningún BCrypt que comprobar) y uno con cuenta tarda lo que tarda BCrypt.
+            // El mensaje no distingue los dos casos; el reloj tampoco debería.
+            codificador.matches(datos.contrasena(), hashSenuelo());
+        }
+        Usuario usuario = candidatas.stream()
+                .filter(Usuario::isEsActivo)
+                .filter(u -> u.getContrasenaHash() != null
+                        && codificador.matches(datos.contrasena(), u.getContrasenaHash()))
+                .findFirst()
+                .orElse(null);
+
+        if (usuario == null) {
+            intentos.registrarFallo(datos.correo(), maximo, minutosBloqueo);
+            // El mismo mensaje exista o no la cuenta, sea candidato o no sea nadie
+            throw new CredencialesInvalidasException("Correo o contraseña incorrectos");
+        }
+
+        // Una organización suspendida queda congelada, y lo primero que congela es la
+        // puerta (pieza F; era el hueco que señaló el QA de la fase 1). El mensaje aquí
+        // SÍ es claro, al revés que el genérico de arriba: solo se llega con la
+        // contraseña correcta, así que no le regala nada a un desconocido — y a quien es
+        // de la casa le ahorra pelearse con una contraseña que sí funciona.
+        Organizacion organizacion = organizaciones.findById(usuario.getOrganizacionId())
+                .orElse(null);
+        if (organizacion == null || !organizacion.isEsActiva()) {
+            log.warn("Login rechazado: la organización {} está suspendida",
+                    usuario.getOrganizacionId());
+            throw new CredencialesInvalidasException(
+                    "La organización está suspendida: contacta a Renaser");
+        }
+
+        intentos.registrarExito(datos.correo());
+        usuario.setUltimoAccesoEn(Instant.now());
+        usuarios.save(usuario);
+        return new Sesion(tokens.emitir(usuario.getId(), usuario.getOrganizacionId(), "EQUIPO"),
+                usuario.getId());
+    }
 
     @Override
     @Transactional
     public Sesion devLogin(String usuarioRenaserOsId) {
         if (!propiedades.isDevLoginActivo()) {
-            throw new IllegalStateException("El login de desarrollo está apagado: la identidad "
-                    + "del equipo viene de RENASER OS");
+            throw new IllegalStateException("El login de desarrollo está apagado: el panel "
+                    + "entra con correo y contraseña");
         }
         Usuario usuario = proveedor.autenticarDesarrollo(null, usuarioRenaserOsId)
                 .orElseGet(() -> arrancarPrimerUsuario(usuarioRenaserOsId));
@@ -55,9 +122,8 @@ public class ServicioAccesoEquipoImpl implements ServicioAccesoEquipo {
     // equipo no se pueden crear usuarios. El primer id que entre por el dev-login se
     // crea con los roles operativos completos. Solo pasa una vez y solo en desarrollo.
     private Usuario arrancarPrimerUsuario(String usuarioRenaserOsId) {
-        Organizacion org = organizaciones.findByCodigo("RENASER")
-                .orElseThrow(() -> new IllegalStateException("Falta la organización semilla RENASER"));
-        if (!usuarios.findByOrganizacionIdAndUsuarioRenaserOsIdIsNotNull(org.getId()).isEmpty()) {
+        Organizacion org = plataforma();
+        if (!usuarios.findByOrganizacionIdAndEsEquipoTrue(org.getId()).isEmpty()) {
             // Ya hay equipo: un id desconocido no entra, se crea desde administración
             throw new IllegalArgumentException("Ese id de RENASER OS no está registrado en el sistema");
         }
@@ -69,6 +135,7 @@ public class ServicioAccesoEquipoImpl implements ServicioAccesoEquipo {
                 .organizacionId(org.getId())
                 .personaId(persona.getId())
                 .usuarioRenaserOsId(usuarioRenaserOsId)
+                .esEquipo(true)
                 .esActivo(true)
                 .creadoEn(Instant.now())
                 .build());
@@ -80,4 +147,32 @@ public class ServicioAccesoEquipoImpl implements ServicioAccesoEquipo {
         }
         return usuario;
     }
+
+    private Organizacion plataforma() {
+        return organizaciones.findByEsPlataformaTrue()
+                .orElseThrow(() -> new IllegalStateException(
+                        "Ninguna organización está marcada como plataforma"));
+    }
+
+    /**
+     * Un hash de nada, calculado una vez con el codificador de verdad para que la
+     * comparación señuelo cueste lo mismo que una real. Perezoso y no en el constructor:
+     * codificar en el arranque retrasaría a quien no va a fallar ningún login.
+     */
+    private String hashSenuelo() {
+        String hash = senuelo;
+        if (hash == null) {
+            // Azar y no un literal: el contenido da igual (el resultado de la comparación
+            // se descarta), pero un texto fijo parece una contraseña quemada — al analizador
+            // estático y a cualquiera que lea. Aleatorio no hay nada que «revocar».
+            byte[] bytesAlAzar = new byte[32];
+            AZAR.nextBytes(bytesAlAzar);
+            hash = codificador.encode(java.util.Base64.getEncoder().encodeToString(bytesAlAzar));
+            senuelo = hash;
+        }
+        return hash;
+    }
+
+    private volatile String senuelo;
+    private static final java.security.SecureRandom AZAR = new java.security.SecureRandom();
 }

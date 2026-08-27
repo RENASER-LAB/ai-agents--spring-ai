@@ -104,6 +104,16 @@ public interface ColaCalificacionIa {
      *
      * @return true si quedó algo en la cola; false si ya está calificada o hay un trabajo vivo
      */
+    /**
+     * Pide SOLO la lectura de datos del currículum (agente DATOS_CV), sin calificar nada.
+     *
+     * <p>Existe para el perfil del candidato: al postular se lee el currículum para
+     * proponerle sus datos, y calificar sigue siendo una decisión aparte (y de pago) que
+     * toma el panel. Idempotente como los demás: si esa postulación ya tiene su ficha
+     * leída, no se paga otra lectura.
+     */
+    boolean encolarDatosCv(Long postulacionId);
+
     boolean encolarPruebaPuesto(Long postulacionId);
 
     /**
@@ -173,6 +183,21 @@ public interface ColaCalificacionIa {
      * @return una entrada por postulación pedida, siempre; nunca falta ninguna
      */
     java.util.Map<Long, Estado> estadoDe(java.util.List<Long> postulacionIds);
+
+    /**
+     * En qué punto va <b>solo la lectura del currículum</b> (agente {@code DATOS_CV}) de una
+     * postulación.
+     *
+     * <p>Existe porque {@link #comoVa} contesta otra pregunta: cómo va el RETRATO, mirando
+     * los cuatro agentes juntos. Servía para el ranking y no sirve para esto — un evaluador
+     * que falla dejaba «FALLIDA» aunque el currículum se hubiera leído perfectamente, y un
+     * retrato terminado sin ficha nunca se distinguía de uno en marcha. El perfil del
+     * candidato le enseña al dueño en qué punto está SU archivo, y ahí esas dos respuestas
+     * no son intercambiables.
+     *
+     * @return SIN_EMPEZAR (nadie la ha pedido), EN_CURSO, TERMINADA o FALLIDA
+     */
+    String comoVaLaLectura(Long postulacionId);
 
     /**
      * En qué punto va la calificación de un candidato.

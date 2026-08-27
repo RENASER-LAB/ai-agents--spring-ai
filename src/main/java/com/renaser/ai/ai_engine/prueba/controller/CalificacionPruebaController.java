@@ -36,6 +36,13 @@ public class CalificacionPruebaController {
         return servicio.verNotas(permisos.actual(), postulacionId);
     }
 
+    @GetMapping("/respuestas")
+    @PreAuthorize("@permisos.tiene('abrir_ficha_candidato')")
+    @Operation(summary = "Lo que contestó el candidato, pregunta a pregunta")
+    public List<RespuestaDePrueba> verRespuestas(@PathVariable Long postulacionId) {
+        return servicio.verRespuestas(permisos.actual(), postulacionId);
+    }
+
     @PostMapping("/calificacion-ia")
     @PreAuthorize("@permisos.tiene('ajustar_nota')")
     @Operation(summary = "Pedirle al agente PRUEBA_PUESTO que califique los criterios que la "
@@ -50,6 +57,16 @@ public class CalificacionPruebaController {
     public void ponerNota(@PathVariable Long postulacionId, @PathVariable Long criterioId,
                           @Valid @RequestBody PonerNotaCriterio datos) {
         servicio.ponerNota(permisos.actual(), postulacionId, criterioId, datos);
+    }
+
+    @PostMapping("/plazo")
+    @PreAuthorize("@permisos.tiene('mover_postulacion')")
+    @Operation(summary = "Fijarle a ESTE candidato la fecha en que se le cierra la prueba. "
+            + "Sirve para dar la misma fecha a toda una tanda —«hasta el domingo»— y para "
+            + "darle más horas a quien las pide. El motivo es obligatorio y queda auditado")
+    public PlazoPrueba definirPlazo(@PathVariable Long postulacionId,
+                                    @Valid @RequestBody DefinirPlazoPrueba datos) {
+        return servicio.definirPlazo(permisos.actual(), postulacionId, datos);
     }
 
     @PostMapping("/calificacion")

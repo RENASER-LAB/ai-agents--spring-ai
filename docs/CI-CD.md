@@ -47,6 +47,7 @@ Si el nocturno sale rojo, alguien lo revisa por la mañana. No bloquea PRs.
 |---|---|---|
 | `SONAR_TOKEN` | Secreto | Lo genera SonarCloud al importar el repositorio |
 | ~~`RENDER_DEPLOY_HOOK`~~ | — | **Ya no hace falta.** El despliegue va a AWS |
+| ~~`PRUEBAS_URL`~~ | — | **Ya no hace falta.** La dirección de Pruebas está escrita en el propio `ci.yml` |
 
 **Y no hay ninguna clave de AWS guardada en GitHub**, a propósito. Se usa OIDC: GitHub firma
 un token de un solo uso, AWS lo verifica y devuelve credenciales que caducan en minutos. Una
@@ -79,7 +80,6 @@ sts:AssumeRoleWithWebIdentity*, el `sub` real se lee en CloudTrail, buscando el 
 La imagen se sube con **dos etiquetas**: `latest`, que es la que despliega, y el SHA del
 commit. Esa segunda es la que permite volver atrás: sin ella «la versión anterior» no tiene
 nombre y revertir obliga a reconstruir desde el código.
-| ~~`PRUEBAS_URL`~~ | — | **Ya no hace falta.** La dirección de Pruebas está escrita en el propio `ci.yml` |
 
 ## Las variables de entorno de la aplicación
 
@@ -93,7 +93,7 @@ La lista completa, con de qué clave sale cada valor, está en
 | Variable | Cuidado |
 |---|---|
 | `SPRING_DATASOURCE_URL` | La cadena **directa** de Supabase, puerto **5432** — la del pooler de transacciones (6543) rompe las migraciones de Flyway |
-| `RABBITMQ_HOST` | El host de Amazon MQ **sin `amqps://` y sin puerto**. Y el puerto es el **5671**, con `SPRING_RABBITMQ_SSL_ENABLED=true` |
+| `RABBITMQ_HOST` | **`rabbitmq`**, el nombre del servicio del compose — el broker es otro contenedor de la misma máquina. Ni puerto ni TLS hacen falta aquí: `application-pruebas.yaml` ya trae 5672 en claro |
 | `JWT_SECRETO` | Una clave nueva de 32+ caracteres, **distinta** de la local: si se reutiliza, un token emitido en la máquina de cualquiera vale en producción |
 
 ## Configuración que se hace una sola vez
@@ -116,9 +116,11 @@ La lista completa, con de qué clave sale cada valor, está en
    ```
 2. **Supabase** (el proyecto de Pruebas ya existe): en el SQL Editor, ejecutar
    `create extension if not exists vector;`. Copiar la cadena de conexión directa.
-3. **La cola**: ya está creada en **Amazon MQ** (`renaser-mq`, RabbitMQ 4.2). El usuario y
-   la contraseña se pusieron al crear el broker y **no se pueden recuperar desde AWS**: los
-   guarda el propio RabbitMQ.
+3. **La cola**: no hay nada que crear. RabbitMQ 4.2 es un contenedor más del compose de
+   despliegue y se levanta con todo lo demás; el usuario y la contraseña salen del `.env`
+   —los genera `despliegue/armar-env.sh`— y el broker crea ese usuario en su primer
+   arranque. Hasta agosto de 2026 esto era un broker de Amazon MQ que costaba ~$119 al mes;
+   el porqué del cambio está en [`despliegue/README.md`](../despliegue/README.md).
 4. **AWS**: la instancia, el repositorio de imágenes y el rol `github-despliegue` ya existen.
    El paso a paso, con lo que cuesta al mes y por qué se eligió cada cosa, está en
    [`despliegue/README.md`](../despliegue/README.md).

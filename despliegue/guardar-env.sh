@@ -6,9 +6,9 @@
 # Las variables vivian solo en /opt/renaser/.env, un archivo dentro del disco de la instancia.
 # Eso tiene dos problemas y ninguno se ve hasta que duele:
 #
-#   - Si la maquina se pierde, se pierden con ella. Dentro hay dos claves que NO se pueden
+#   - Si la maquina se pierde, se pierden con ella. Dentro hay claves que NO se pueden
 #     recuperar de ningun sitio: el JWT_SECRETO se genero al desplegar y no esta en ningun
-#     otro lado, y la contraseña del broker la guarda el propio RabbitMQ, no la API de AWS.
+#     otro lado, y la contraseña del broker solo la conocen el .env y el propio RabbitMQ.
 #   - No hay forma de mirarlas ni cambiarlas sin entrar por terminal. La consola de AWS no
 #     muestra archivos de dentro de una instancia, asi que no hay ninguna pantalla que abrir.
 #

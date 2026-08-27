@@ -58,6 +58,14 @@ public final class DtosEvaluacion {
      * <p><b>No es clave</b> y por eso puede salir (RF-53): el enunciado que el candidato ya
      * está leyendo dice ese mismo número entre paréntesis. Dice cuántas casillas llenar, no
      * qué poner en ellas ni cuánto vale ponerlo.
+     *
+     * <p>{@code campos} es <b>qué pide cada casilla</b>, en el orden en que se muestran:
+     * «¿Existía un formato de control diario? (no / uno que armé yo / …)». También lo traen
+     * solo los CD; en el resto va vacío. Sin él, el portal pintaba «Campo 1 de 6» y el
+     * candidato tenía que adivinar qué dato iba en cada caja. Cada campo viaja con su
+     * {@code orden} porque la respuesta guarda lo escrito bajo esa clave, y con la etiqueta
+     * <b>y nada más</b>: la regla de validación de un campo («si cierre y sueño son la misma
+     * hora → bandera») es de puertas adentro, como la lógica interna.
      */
     public record PreguntaCandidato(
             Long id,
@@ -66,10 +74,14 @@ public final class DtosEvaluacion {
             String enunciado,
             String situacion,
             Short casosPedidos,
+            List<CampoCandidato> campos,
             List<OpcionCandidato> opciones,
             String respuestaTexto,
             Long respuestaOpcionId,
             Map<String, Object> respuestaDetalle) {}
+
+    /** Un campo de un caso descompuesto, tal como se le enseña: su lugar y su etiqueta. */
+    public record CampoCandidato(Integer orden, String etiqueta) {}
 
     /** La evaluación completa, con su avance. */
     public record EvaluacionCandidato(
