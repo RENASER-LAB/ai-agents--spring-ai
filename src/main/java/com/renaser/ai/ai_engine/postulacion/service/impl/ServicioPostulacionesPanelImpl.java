@@ -72,6 +72,14 @@ public class ServicioPostulacionesPanelImpl implements ServicioPostulacionesPane
             throw new IllegalArgumentException("espera_a tiene que ser CANDIDATO, SISTEMA, TALENTO o AREA");
         }
         FiltroAlcance alcance = permisos.alcanceDe("ver_candidatos");
+        // PROPIO no alcanza a nadie aquí: en el panel ninguna postulación es de quien mira.
+        // Sin esta línea la consulta recibiría un filtro nulo —responsableOFiltroNulo solo
+        // distingue SUS_VACANTES— y enseñaría la bandeja entera, justo lo contrario. No era
+        // alcanzable mientras el reparto se tocaba a mano en la base; desde que los permisos se
+        // editan por el panel, basta un PUT sobre ver_candidatos.
+        if (alcance.noAlcanzaANadieEnElPanel()) {
+            return List.of();
+        }
         Map<String, EstadoPostulacion> catalogo = catalogoEstados();
         List<Postulacion> filas = postulaciones.bandeja(
                 quien.organizacionId(), esperaA, alcance.responsableOFiltroNulo());

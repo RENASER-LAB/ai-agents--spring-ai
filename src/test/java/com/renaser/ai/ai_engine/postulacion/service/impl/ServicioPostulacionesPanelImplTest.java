@@ -41,6 +41,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 /**
@@ -268,6 +269,23 @@ class ServicioPostulacionesPanelImplTest {
 
         assertThat(servicio.bandeja(quien, "TALENTO")).isEmpty();
         verify(usuarios, never()).findById(any());
+    }
+
+    @Test
+    @DisplayName("Con ver_candidatos en PROPIO la bandeja sale vacía, no entera")
+    void conPropioLaBandejaSaleVacia() {
+        // En el panel ninguna postulación es de quien mira: son candidatos. Sin tratar PROPIO
+        // aparte, la consulta recibía un filtro nulo —responsableOFiltroNulo solo distingue
+        // SUS_VACANTES— y enseñaba la organización entera a quien menos alcance tiene. No era
+        // alcanzable mientras el reparto se tocaba a mano en la base; con los permisos
+        // editables desde el panel basta un PUT sobre ver_candidatos.
+        when(permisos.alcanceDe("ver_candidatos"))
+                .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.PROPIO, 10L));
+
+        assertThat(servicio.bandeja(quien, "TALENTO")).isEmpty();
+
+        verify(postulaciones, never()).bandeja(any(), anyString(), any());
+        verifyNoInteractions(nombres);
     }
 
     @Test

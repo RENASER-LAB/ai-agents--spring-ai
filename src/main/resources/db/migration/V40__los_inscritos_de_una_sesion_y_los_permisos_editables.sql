@@ -19,12 +19,13 @@ INSERT INTO permiso (codigo, etiqueta, grupo, orden) VALUES
 -- redefinir lo que ese rol significa es otra bastante mayor. Quien escribe en rol_permiso
 -- puede concederse todo, así que sigue la regla del doc 04 —el Administrador administra, no
 -- opera el proceso— y arranca solo en ese rol.
--- Orden 12 y no 6, que es donde le tocaría por parentesco con crear_roles: el 6 ya lo ocupa
--- editar_banco_preguntas desde la V12. La columna no tiene único y nada fallaría, pero dos
--- permisos con el mismo orden salen en el panel en el orden que quiera la base, y el grupo
+-- Orden 14 y no 6, que es donde le tocaría por parentesco con crear_roles: el 6 lo ocupa
+-- editar_banco_preguntas desde la V12, y el 12 y el 13 los tomó la V37 del multiempresa
+-- mientras esto estaba en marcha. La columna no tiene único y nada fallaría, pero dos permisos
+-- con el mismo orden salen en el panel en el orden que quiera la base, y el grupo
 -- CONFIGURACION ya arrastra una colisión así en el 11.
 INSERT INTO permiso (codigo, etiqueta, grupo, orden) VALUES
-    ('administrar_permisos', 'Cambiar qué puede cada rol y con qué alcance', 'CONFIGURACION', 12);
+    ('administrar_permisos', 'Cambiar qué puede cada rol y con qué alcance', 'CONFIGURACION', 14);
 
 -- ---------- 3 · El reparto inicial ----------
 INSERT INTO rol_permiso (rol_id, permiso_id, alcance)

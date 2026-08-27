@@ -29,7 +29,7 @@ requisitos nuevos el 14 de agosto y cambian bastante.
 | [01 · Requisitos funcionales](01-REQUISITOS-FUNCIONALES.md) | RF-01 a RF-154. Qué hace el sistema |
 | [02 · Requisitos no funcionales](02-REQUISITOS-NO-FUNCIONALES.md) | RNF-01 a RNF-66. Tecnología, seguridad, rendimiento |
 | [03 · Estados de la postulación](03-ESTADOS-POSTULACION.md) | Los 18 estados de una postulación y sus transiciones |
-| [04 · Roles y permisos](04-ROLES-Y-PERMISOS.md) | Los 75 permisos, acción por acción |
+| [04 · Roles y permisos](04-ROLES-Y-PERMISOS.md) | Los 77 permisos, acción por acción. En la base hay 71 sembrados |
 | [05 · Modelo de datos](05-MODELO-DE-DATOS.md) | Las 93 tablas por área y por qué el modelo es así. Se lee |
 | [06 · Inventario de pantallas](06-INVENTARIO-DE-PANTALLAS-MOCKUPS.md) | Las 21 pantallas base, estados, ventanas, campos y datos de los mockups |
 | [07 · Diccionario de datos](07-DICCIONARIO-DE-DATOS.md) | Cada tabla con todas sus columnas, tipos y claves. Se consulta |
@@ -41,7 +41,7 @@ requisitos nuevos el 14 de agosto y cambian bastante.
 | [Criba de currículums](CRIBA-DE-CURRICULUMS.md) | Cargar una convocatoria con una carpeta de currículums, pedir que la IA los lea y ver quién es el más apto |
 | [Fallos corregidos de la criba](FALLOS-CORREGIDOS-CRIBA.md) | Los cinco fallos que salieron al pasar 190 currículums reales. Cuatro no daban error |
 | [Los siete fallos de la auditoría](FALLOS-CORREGIDOS-AUDITORIA.md) | Lo que encontró la revisión del 18/08: cuatro que tocaban dinero o decisiones de contratación, y ninguno daba error |
-| [Comprobaciones automáticas](COMPROBACIONES-AUTOMATICAS.md) | Qué se comprueba solo: 786 pruebas, 9 reglas de arquitectura y Semgrep |
+| [Comprobaciones automáticas](COMPROBACIONES-AUTOMATICAS.md) | Qué se comprueba solo: 787 pruebas, 9 reglas de arquitectura y Semgrep |
 | [Banco de preguntas v3](AVANCE-BANCO-V3-2026-08-19.md) | El banco nuevo del cliente: 190 ítems, ocho formatos y su motor de puntuación. Qué está hecho y qué falta |
 | [El perfil del candidato](PROPUESTA-PERFIL-DEL-CANDIDATO.md) | El perfil único de la persona: requisitos, historias y tablas. Implementado; los RF esperan la validación de Renaser |
 | [APIs del perfil](APIS-PERFIL-DEL-CANDIDATO.md) | El contrato para quien construya las pantallas del perfil, con las reglas que Swagger no cuenta |

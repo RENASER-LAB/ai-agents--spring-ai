@@ -828,7 +828,7 @@ class ServicioSimulacionImplTest {
         @Test
         @DisplayName("Con los dos permisos y alcances distintos, el conteo va por el de inscritos")
         void elConteoSigueAlPermisoDeInscritosYNoAlDeCrear() {
-            // El reparto que la V37 no siembra pero que un PUT desde el panel de permisos deja
+            // El reparto que la V40 no siembra pero que un PUT desde el panel de permisos deja
             // montado en un momento: crear sesiones en TODO y ver inscritos en SUS_VACANTES.
             // Abre todas las sesiones —por el primero— pero solo cuenta a los suyos, porque
             // contar inscritos es ver inscritos. Si el conteo siguiera al permiso con que se

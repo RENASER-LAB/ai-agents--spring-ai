@@ -1,7 +1,7 @@
 # Roles y permisos
 
 Sistema de selección de personal — Renaser Consulting
-Versión 2.0 · 2026-08-15
+Versión 2.1 · 2026-08-27 · Con el multiempresa y los permisos editables por API
 
 Este documento dice **quién puede hacer qué**, acción por acción.
 
@@ -71,6 +71,15 @@ es simplemente un conjunto de permisos con nombre.
 motivo escrito y deja fila de auditoría. Como los permisos se releen en cada petición, lo que
 se cambie ahí vale desde la siguiente llamada de cada afectado: **no hace falta desplegar ni
 volver a entrar**.
+
+Lo que **sí** hace falta desplegar es un permiso nuevo: el catálogo solo crece con una
+migración, y por eso este documento y la base no dicen el mismo número. Aquí se enumeran **77
+permisos**, que es el sistema completo; en la base hay **71 sembrados** (ver
+[07-DICCIONARIO-DE-DATOS.md](07-DICCIONARIO-DE-DATOS.md), que sigue al código). La diferencia
+son sobre todo el Radar y las métricas, todavía sin construir. En sentido contrario también
+falta algo: cuatro permisos que existen en la base —`ver_banco_preguntas`,
+`corregir_contacto_candidato`, `ver_perfil_candidato` y `ver_pretension`— llegaron con un
+arreglo o una función concreta y nadie volvió a añadir su fila a estas tablas.
 
 ---
 
@@ -265,8 +274,19 @@ resultado de esa persona es quien la va a tener en su equipo.
 | **Crear usuarios y asignar roles** | ○ | ○ | ○ | ○ | ● |
 | **Crear roles nuevos** | ○ | ○ | ○ | ○ | ● |
 | **Cambiar qué puede cada rol y con qué alcance** | ○ | ○ | ○ | ○ | ● |
+| **Personalizar los instrumentos de evaluación** | ○ | ○ | ○ | ○ | ● |
+| **Dar de alta y administrar empresas** | ○ | ○ | ○ | ○ | ● ‡ |
 | **Editar parámetros del sistema** | ○ | ○ | ○ | ● | ● |
 | **Ver el registro de auditoría** | ○ | ○ | ○ | ● | ● |
+
+‡ Las dos filas de los instrumentos y del alta de empresas llegaron con el multiempresa
+(`V37`), y no significan lo mismo. **Personalizar los instrumentos** lo tiene el
+Administrador de cualquier empresa: es
+adaptar a la suya el banco, las plantillas y los pesos que la plataforma le prestó. **Dar de
+alta empresas** lo tiene **solo el Administrador de la empresa dueña de la plataforma** —hoy,
+Renaser—: es la operación de Renaser como dueña del producto, no una función del panel de un
+cliente. El alta de una empresa copia los roles de la plataforma y ese permiso lo excluye a
+propósito, o cada cliente nuevo nacería pudiendo dar de alta a los demás.
 
 La división es simple: **Talento prepara, Dirección aprueba, Administrador administra.**
 
@@ -295,14 +315,24 @@ funcionales): el backend lo verifica en cada llamada, no basta con esconder boto
 
 ---
 
-## El aislamiento por organización
+## El aislamiento entre empresas
 
 Encima de todos los permisos hay una regla que **no se puede desactivar**: nadie ve datos de una
-organización que no sea la suya.
+empresa que no sea la suya.
 
-Hoy solo existe Renaser, pero el sistema se diseñó para admitir clientes de consultoría. El
-aislamiento por organización es **una regla de seguridad desde la primera versión**, no algo que
-se añada el día que llegue el primer cliente. No aparece como casilla en ningún rol.
+Se escribió como regla de seguridad desde la primera versión, cuando la única empresa era
+Renaser, precisamente para no tener que añadirla el día que llegara el primer cliente. **Ese
+día ya llegó** (`V37`, 25/08/2026): cada empresa crea sus vacantes y ve solo a sus candidatos,
+y Renaser es además la **dueña de la plataforma** —la que da de alta a las demás y les presta
+los instrumentos—. La regla no aparece como casilla en ningún rol: no se concede ni se revoca.
+
+En la base la tabla sigue llamándose `organizacion`, así que en el código y en el diccionario
+de datos se lee esa palabra; en el producto y en las pantallas, «empresa». Es lo mismo.
+
+⚠️ **Un alcance no sustituye al aislamiento.** `TODO` significa «todo lo de mi empresa», nunca
+«todo». Un permiso concedido en `TODO` a un rol de ACME no le enseña ni una fila de Renaser, y
+por eso el candado del último `administrar_permisos` cuenta dentro de cada empresa: si contara
+en toda la base, la primera en quedarse sin él dependería de que otra lo conservara.
 
 ---
 
@@ -401,7 +431,7 @@ una que el servidor haga cumplir.
 
 ### 2 · Que la pantalla se vuelva ilegible
 
-Son **75 permisos**. Con una casilla por cada uno y sin agrupar, nadie entiende qué está
+Son **77 permisos**. Con una casilla por cada uno y sin agrupar, nadie entiende qué está
 marcando, y la pantalla se usa mal o se deja de usar.
 
 **Cómo se evita:**
@@ -412,7 +442,7 @@ marcando, y la pantalla se usa mal o se deja de usar.
 - Un interruptor por grupo para marcar o desmarcar todo el bloque.
 
 ```
-  ROL · Equipo de Talento              54 de 75 permisos
+  ROL · Equipo de Talento              54 de 77 permisos
 
   Vacantes                                    [8/9] v
      [x] Ver vacantes
@@ -421,11 +451,19 @@ marcando, y la pantalla se usa mal o se deja de usar.
      [ ] Elegir la version de pesos
      ...
 
-  Configuracion                               [4/15] >
+  Configuracion                               [4/17] >
   Candidatos                                  [7/7]  >
 
                             [ Ver el sistema como este rol ]
 ```
+
+Los denominadores de este boceto son los del **catálogo diseñado**, que es lo que enumera este
+documento. La pantalla de verdad los sacará de la tabla `permiso`, así que dirá otros números:
+en `Configuracion`, 15 casillas y no 17 —de las diseñadas faltan por construir la vigencia de
+los componentes, el periodo de conservación y el poder de bloqueo del Evaluador de Estándar, y
+en cambio hay una que esta tabla no enumera, `ver_banco_preguntas`—. No es un descuadre del
+boceto: es la misma diferencia entre lo diseñado y lo construido que explica el principio del
+documento.
 
 **Vista previa.** El botón *"ver el sistema como este rol"* muestra qué pantallas y botones
 tendría esa persona. Sin eso se marcan casillas a ciegas y no se sabe qué cambió hasta que

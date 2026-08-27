@@ -243,7 +243,7 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
      * <p>Va por {@code ver_inscritos_simulacion} y no por el permiso con que se llegó a la
      * sesión, porque contar inscritos es ver inscritos: si se resolviera con el otro, un rol
      * con crear sesiones en TODO y ver inscritos acotado vería «6» en la sesión y dos filas al
-     * abrirla. Ese reparto no es el que siembra la V37, pero es un solo PUT desde el panel de
+     * abrirla. Ese reparto no es el que siembra la V40, pero es un solo PUT desde el panel de
      * permisos —que es justo lo que esta rama abre—.
      *
      * <p>Nulo significa que no tiene el permiso, y entonces el conteo va entero: no puede abrir
