@@ -312,13 +312,9 @@ class ArquitecturaTest {
             // El guardián laVisible de cada panel: la postulación ya se resolvió con
             // findByIdAndOrganizacionId; su vacante se pide por id solo para comprobar el
             // alcance SUS_VACANTES. Derivar al padre en su forma más pura.
-            "ServicioPostulacionesPanelImpl#laVisible",
-            "ServicioPerfilIntegralPanelImpl#laVisible",
-            "ServicioDecisionImpl#laVisible",
             // Llegó con el desglose de la evaluación (PR #38, en paralelo al multiempresa):
             // mismo patrón exacto que los de arriba. La regla lo denunció al fusionar — que
             // es justo para lo que existe — y la lectura confirmó que deriva del padre.
-            "ServicioDesgloseEvaluacionImpl#laVisible",
             // Derivan de una postulación o vacante ya validada por su guardián: la
             // vacante de la postulación, el puesto de la vacante, la plantilla que la
             // vacante tiene asignada (y que se validó contra el dueño al asignarla).
@@ -326,7 +322,6 @@ class ArquitecturaTest {
             "ServicioPostulacionesPanelImpl#ficha",
             "ServicioPerfilIntegralPanelImpl#pesosDe",
             "ServicioPerfilIntegralPanelImpl#ranking",
-            "ServicioPerfilIntegralPanelImpl#vacanteVisible",
             "ServicioDecisionImpl#calcular",
             "ServicioDecisionImpl#decidir",
             "ServicioEvaluacionImpl#crearAlPostular",

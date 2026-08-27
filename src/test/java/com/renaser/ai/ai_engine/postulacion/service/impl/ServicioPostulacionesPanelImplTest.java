@@ -35,6 +35,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
@@ -70,6 +71,7 @@ class ServicioPostulacionesPanelImplTest {
     @Mock private com.renaser.ai.ai_engine.postulacion.repository.EstadoPostulacionRepository estados;
     @Mock private com.renaser.ai.ai_engine.postulacion.repository.TransicionEstadoRepository transiciones;
     @Mock private com.renaser.ai.ai_engine.vacante.repository.VacanteRepository vacantes;
+    @Mock private com.renaser.ai.ai_engine.vacante.service.AlcanceSobreLaVacante alcanceVacante;
     @Mock private com.renaser.ai.ai_engine.usuario.repository.UsuarioRepository usuarios;
     @Mock private NombresDeUsuarios nombres;
     @Mock private com.renaser.ai.ai_engine.postulacion.repository.CvRepository cvs;
@@ -296,9 +298,8 @@ class ServicioPostulacionesPanelImplTest {
         // anonimización. Antes se pedía la persona a mano y un personaId nulo reventaba con
         // un error de acceso a datos —un 500 por un candidato sin persona—; ahora no.
         Postulacion p = postulacion(1L, 901L, VACANTE);
-        when(postulaciones.findByIdAndOrganizacionId(1L, ORGANIZACION)).thenReturn(Optional.of(p));
-        when(permisos.alcanceDe("abrir_ficha_candidato"))
-                .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.TODO, 10L));
+        when(alcanceVacante.laPostulacionVisible(any(), eq(1L), eq("abrir_ficha_candidato")))
+                .thenReturn(p);
         when(usuarios.findById(901L)).thenReturn(Optional.of(
                 com.renaser.ai.ai_engine.usuario.entity.Usuario.builder()
                         .id(901L).organizacionId(ORGANIZACION)
@@ -321,11 +322,10 @@ class ServicioPostulacionesPanelImplTest {
     @Test
     @DisplayName("La ficha de una postulación que no es suya responde 404, no 403")
     void laFichaAjenaNoSeAbre() {
-        Postulacion ajena = postulacion(1L, 901L, VACANTE);
-        when(postulaciones.findByIdAndOrganizacionId(1L, ORGANIZACION)).thenReturn(Optional.of(ajena));
-        when(permisos.alcanceDe("abrir_ficha_candidato"))
-                .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.SUS_VACANTES, 10L));
-        when(vacantes.findById(VACANTE)).thenReturn(Optional.of(vacante()));  // sin responsable
+        // Que una postulación de vacante ajena no se alcance lo decide y lo prueba
+        // AlcanceSobreLaVacante. Aquí lo que importa es que su no llega hasta arriba.
+        when(alcanceVacante.laPostulacionVisible(any(), eq(1L), eq("abrir_ficha_candidato")))
+                .thenThrow(new ResourceNotFoundException("Postulación", "id", 1L));
 
         assertThatThrownBy(() -> servicio.ficha(quien, 1L))
                 .as("un 403 confirmaría que esa postulación existe")
@@ -393,10 +393,9 @@ class ServicioPostulacionesPanelImplTest {
             Postulacion p = new Postulacion();
             p.setId(1L);
             p.setOrganizacionId(ORGANIZACION);
-            lenient().when(permisos.alcanceDe("corregir_contacto_candidato"))
-                    .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.TODO, 10L));
-            lenient().when(postulaciones.findByIdAndOrganizacionId(1L, ORGANIZACION))
-                    .thenReturn(java.util.Optional.of(p));
+            lenient().when(alcanceVacante.laPostulacionVisible(
+                            any(), eq(1L), eq("corregir_contacto_candidato")))
+                    .thenReturn(p);
             lenient().when(datosCv.findByPostulacionId(1L)).thenReturn(java.util.Optional.of(ficha));
             return ficha;
         }

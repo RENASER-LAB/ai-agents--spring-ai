@@ -51,7 +51,7 @@ class ServicioDesgloseEvaluacionImplTest {
     private static final long ORGANIZACION = 1L;
 
     @Mock private PostulacionRepository postulaciones;
-    @Mock private VacanteRepository vacantes;
+    @Mock private com.renaser.ai.ai_engine.vacante.service.AlcanceSobreLaVacante alcance;
     @Mock private EvaluacionRepository evaluaciones;
     @Mock private RespuestaRepository respuestas;
     @Mock private PreguntaRepository preguntas;
@@ -177,8 +177,7 @@ class ServicioDesgloseEvaluacionImplTest {
 
     @Test
     void unaPostulacionDeOtraOrganizacionNoExiste() {
-        when(postulaciones.findByIdAndOrganizacionId(POSTULACION, ORGANIZACION))
-                .thenReturn(Optional.empty());
+        noAlcanza();
 
         assertThatThrownBy(() -> servicio.ver(quien, POSTULACION))
                 .isInstanceOf(ResourceNotFoundException.class);
@@ -187,12 +186,10 @@ class ServicioDesgloseEvaluacionImplTest {
     @Test
     void fueraDeSusVacantesTampocoExiste() {
         // El mismo control que el resto del panel: para quien solo ve sus vacantes,
-        // una postulación ajena no es un 403 que confirma que existe — es un 404.
-        conPostulacion(EVALUACION);
-        when(permisos.alcanceDe("ver_respuestas_evaluacion"))
-                .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.SUS_VACANTES, 10L));
-        when(vacantes.findById(3L)).thenReturn(Optional.of(
-                Vacante.builder().id(3L).responsableUsuarioId(99L).build()));
+        // una postulación ajena no es un 403 que confirma que existe — es un 404. Quién
+        // alcanza qué lo decide AlcanceSobreLaVacante, y allí tiene sus pruebas; aquí se
+        // comprueba que su no llega hasta arriba sin envolverse en otra cosa.
+        noAlcanza();
 
         assertThatThrownBy(() -> servicio.ver(quien, POSTULACION))
                 .isInstanceOf(ResourceNotFoundException.class);
@@ -233,11 +230,22 @@ class ServicioDesgloseEvaluacionImplTest {
         assertThat(servicio.ver(quien, POSTULACION).notaEvaluacion()).isNull();
     }
 
+    /** La postulación tal como la devuelve el guardián del alcance. */
     private void conPostulacion(Long evaluacionId) {
-        when(postulaciones.findByIdAndOrganizacionId(POSTULACION, ORGANIZACION))
-                .thenReturn(Optional.of(Postulacion.builder()
+        when(alcance.laPostulacionVisible(org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.eq(POSTULACION),
+                org.mockito.ArgumentMatchers.eq("ver_respuestas_evaluacion")))
+                .thenReturn(Postulacion.builder()
                         .id(POSTULACION).organizacionId(ORGANIZACION).vacanteId(3L)
-                        .evaluacionId(evaluacionId).build()));
+                        .evaluacionId(evaluacionId).build());
+    }
+
+    /** El guardián dice que no, sin distinguir de otra empresa de fuera de alcance. */
+    private void noAlcanza() {
+        when(alcance.laPostulacionVisible(org.mockito.ArgumentMatchers.any(),
+                org.mockito.ArgumentMatchers.eq(POSTULACION),
+                org.mockito.ArgumentMatchers.eq("ver_respuestas_evaluacion")))
+                .thenThrow(new ResourceNotFoundException("Postulación", "id", POSTULACION));
     }
 
     private void conEvaluacion(String estado) {

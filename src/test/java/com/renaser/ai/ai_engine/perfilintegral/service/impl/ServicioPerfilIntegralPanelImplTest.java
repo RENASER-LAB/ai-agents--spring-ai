@@ -60,6 +60,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyIterable;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -104,6 +105,7 @@ class ServicioPerfilIntegralPanelImplTest {
 
     @Mock private PostulacionRepository postulaciones;
     @Mock private VacanteRepository vacantes;
+    @Mock private com.renaser.ai.ai_engine.vacante.service.AlcanceSobreLaVacante alcanceVacante;
     @Mock private PerfilTalentoRepository perfiles;
     @Mock private HallazgoPerfilRepository hallazgos;
     @Mock private NotaCriterioRepository notasCriterio;
@@ -143,6 +145,21 @@ class ServicioPerfilIntegralPanelImplTest {
                 .id(3L).nombre("Analista").nivelPuestoCodigo("OPERATIVO").build()));
         lenient().when(permisos.alcanceDe(anyString()))
                 .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.TODO, 10L));
+        // El guardián deja pasar por defecto: qué alcanza quien mira se decide y se prueba en
+        // AlcanceSobreLaVacante. Los tests que quieren un no lo dicen ellos.
+        lenient().when(alcanceVacante.laVacanteVisible(
+                        org.mockito.ArgumentMatchers.any(),
+                        org.mockito.ArgumentMatchers.eq(VACANTE), anyString()))
+                .thenReturn(Vacante.builder()
+                        .id(VACANTE).organizacionId(ORGANIZACION).puestoId(3L).versionPesosId(2L)
+                        .titulo("Analista de procesos").responsableUsuarioId(10L).build());
+        lenient().when(alcanceVacante.laPostulacionVisible(
+                        org.mockito.ArgumentMatchers.any(),
+                        org.mockito.ArgumentMatchers.anyLong(), anyString()))
+                .thenAnswer(i -> postulaciones
+                        .findByIdAndOrganizacionId(i.getArgument(1), ORGANIZACION)
+                        .orElseThrow(() -> new ResourceNotFoundException(
+                                "Postulación", "id", i.getArgument(1))));
     }
 
     // ============ El ranking de otra etapa ============
@@ -488,17 +505,17 @@ class ServicioPerfilIntegralPanelImplTest {
         // ver_embudo. Un rol con ajustar_nota limitado a sus vacantes y ver_embudo sin
         // límite podía cribar una convocatoria ajena. Hoy ningún rol sembrado tiene esa
         // forma, pero los roles se configuran desde el panel.
-        when(permisos.alcanceDe("ajustar_nota"))
-                .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.SUS_VACANTES, 10L));
-        // La vacante es de otra persona del equipo.
-        when(vacantes.findById(VACANTE)).thenReturn(Optional.of(Vacante.builder()
-                .id(VACANTE).organizacionId(ORGANIZACION).puestoId(3L).versionPesosId(2L)
-                .titulo("Analista de procesos").responsableUsuarioId(77L).build()));
+        // La vacante es de otra persona del equipo, así que el guardián dice que no —pero
+        // solo si se le pregunta por ajustar_nota, que es el permiso del endpoint.
+        when(alcanceVacante.laVacanteVisible(any(), eq(VACANTE), eq("ajustar_nota")))
+                .thenThrow(new ResourceNotFoundException("Vacante", "id", VACANTE));
 
         assertThatThrownBy(() -> servicio.cribaRapida(quien, VACANTE))
                 .isInstanceOf(ResourceNotFoundException.class);
 
         verify(cola, never()).encolarCribaRapida(anyLong());
+        // Y lo que fija esta prueba: se pregunta por el permiso del endpoint, no por el otro.
+        verify(alcanceVacante, never()).laVacanteVisible(any(), eq(VACANTE), eq("ver_embudo"));
     }
 
     // ============ Apoyo ============

@@ -30,6 +30,7 @@ import com.renaser.ai.ai_engine.seguridad.dto.FiltroAlcance;
 import com.renaser.ai.ai_engine.seguridad.service.Permisos;
 import com.renaser.ai.ai_engine.vacante.entity.Vacante;
 import com.renaser.ai.ai_engine.vacante.repository.VacanteRepository;
+import com.renaser.ai.ai_engine.vacante.service.AlcanceSobreLaVacante;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -52,6 +53,7 @@ public class ServicioPostulacionesPanelImpl implements ServicioPostulacionesPane
     private final EstadoPostulacionRepository estados;
     private final TransicionEstadoRepository transiciones;
     private final VacanteRepository vacantes;
+    private final AlcanceSobreLaVacante alcanceVacante;
     private final UsuarioRepository usuarios;
     private final NombresDeUsuarios nombres;
     private final CvRepository cvs;
@@ -266,31 +268,12 @@ public class ServicioPostulacionesPanelImpl implements ServicioPostulacionesPane
                 Duration.between(p.getMovidoEn(), Instant.now()).toDays());
     }
 
-    // El alcance SUS_VACANTES se comprueba contra el responsable de la vacante:
-    // es el único vínculo usuario-vacante que existe en el hito 1
     private Postulacion laVisible(ContextoUsuario quien, Long postulacionId, String permiso) {
-        Postulacion p = postulaciones.findByIdAndOrganizacionId(postulacionId, quien.organizacionId())
-                .orElseThrow(() -> new ResourceNotFoundException("Postulación", "id", postulacionId));
-        FiltroAlcance alcance = permisos.alcanceDe(permiso);
-        if (alcance.tipo() == FiltroAlcance.Tipo.SUS_VACANTES) {
-            boolean esSuya = vacantes.findById(p.getVacanteId())
-                    .map(v -> quien.usuarioId().equals(v.getResponsableUsuarioId()))
-                    .orElse(false);
-            if (!esSuya) {
-                throw new ResourceNotFoundException("Postulación", "id", postulacionId);
-            }
-        }
-        return p;
+        return alcanceVacante.laPostulacionVisible(quien, postulacionId, permiso);
     }
 
     private void vacanteVisible(ContextoUsuario quien, Long vacanteId, String permiso) {
-        Vacante v = vacantes.findByIdAndOrganizacionId(vacanteId, quien.organizacionId())
-                .orElseThrow(() -> new ResourceNotFoundException("Vacante", "id", vacanteId));
-        FiltroAlcance alcance = permisos.alcanceDe(permiso);
-        if (alcance.tipo() == FiltroAlcance.Tipo.SUS_VACANTES
-                && !quien.usuarioId().equals(v.getResponsableUsuarioId())) {
-            throw new ResourceNotFoundException("Vacante", "id", vacanteId);
-        }
+        alcanceVacante.laVacanteVisible(quien, vacanteId, permiso);
     }
 
     /**
