@@ -302,6 +302,13 @@ class ArquitecturaTest {
      * no por organización; y el borrado 29733 es de la plataforma y ya pasó su aduana.
      */
     private static final Set<String> LLAMADAS_SIN_DUENO_ACORDADAS = Set.of(
+            // El guardián compartido, al que están migrando los laVisible de cada panel: la
+            // postulación ya se resolvió con findByIdAndOrganizacionId y su vacante se pide por
+            // id solo para saber de quién es. Es el mismo caso de los de abajo, en un solo
+            // sitio. Ojo al escribirlo: tiene que ser vacantes.findById(...) literal, porque
+            // esta regla recorre las LLAMADAS y una referencia a método (vacantes::findById)
+            // se le escapa sin que nadie lo haya decidido.
+            "AlcanceSobreLaVacante#alcanzaA",
             // El guardián laVisible de cada panel: la postulación ya se resolvió con
             // findByIdAndOrganizacionId; su vacante se pide por id solo para comprobar el
             // alcance SUS_VACANTES. Derivar al padre en su forma más pura.
