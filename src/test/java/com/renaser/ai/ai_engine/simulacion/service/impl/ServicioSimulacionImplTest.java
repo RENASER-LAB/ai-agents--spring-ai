@@ -125,6 +125,7 @@ class ServicioSimulacionImplTest {
     @Mock private com.renaser.ai.ai_engine.perfilintegral.repository.AlertaRepository alertas;
     @Mock private PostulacionRepository postulaciones;
     @Mock private VacanteRepository vacantes;
+    @Mock private com.renaser.ai.ai_engine.vacante.service.AlcanceSobreLaVacante alcanceVacante;
     @Mock private NombresDeUsuarios nombres;
     @Mock private ColaCalificacionIa cola;
     @Mock private RolRepository roles;
@@ -141,7 +142,8 @@ class ServicioSimulacionImplTest {
     void crearElServicio() {
         servicio = new ServicioSimulacionImpl(sesiones, sesionesVacante, responsables, tramos,
                 informacionCritica, inscripciones, marcas, preguntas, alertas, postulaciones,
-                vacantes, nombres, cola, roles, usuarioRoles, maquina, disponibilidad, parametros,
+                vacantes, alcanceVacante, nombres, cola, roles, usuarioRoles, maquina,
+                disponibilidad, parametros,
                 auditoria, permisos);
     }
 
@@ -214,8 +216,7 @@ class ServicioSimulacionImplTest {
     @Test
     @DisplayName("una postulación de otra organización no existe para quien pregunta")
     void noSePidenPreguntasDeOtraOrganizacion() {
-        when(postulaciones.findByIdAndOrganizacionId(POSTULACION, ORGANIZACION))
-                .thenReturn(Optional.empty());
+        fueraDeAlcance("hacer_conversacion_final");
 
         assertThatThrownBy(() -> servicio.generarPreguntas(QUIEN, POSTULACION))
                 .isInstanceOf(ResourceNotFoundException.class);
@@ -226,8 +227,7 @@ class ServicioSimulacionImplTest {
     @Test
     @DisplayName("sin el permiso de la conversación final no se llega a pedir nada")
     void sinPermisoNoSePideNada() {
-        hayPostulacion(POR_CONFIRMAR);
-        when(permisos.alcanceDe("hacer_conversacion_final"))
+        when(alcanceVacante.laPostulacionVisible(any(), eq(POSTULACION), eq("hacer_conversacion_final")))
                 .thenThrow(new AccessDeniedException("No tienes el permiso «hacer_conversacion_final»"));
 
         assertThatThrownBy(() -> servicio.generarPreguntas(QUIEN, POSTULACION))
@@ -239,10 +239,7 @@ class ServicioSimulacionImplTest {
     @Test
     @DisplayName("con alcance «sus vacantes», la de otro responsable tampoco existe")
     void conAlcanceDeSusVacantesLaDeOtroNoSeVe() {
-        hayPostulacion(POR_CONFIRMAR);
-        alcanceDeConversacion(FiltroAlcance.Tipo.SUS_VACANTES);
-        when(vacantes.findById(VACANTE)).thenReturn(Optional.of(
-                Vacante.builder().id(VACANTE).responsableUsuarioId(OTRO_USUARIO).build()));
+        fueraDeAlcance("hacer_conversacion_final");
 
         assertThatThrownBy(() -> servicio.generarPreguntas(QUIEN, POSTULACION))
                 .as("un 404 también significa «esto no es tuyo»: nadie provoca una llamada al "
@@ -255,8 +252,7 @@ class ServicioSimulacionImplTest {
     @Test
     @DisplayName("cuando la cola acepta, se contesta que quedó pedido y que tarda")
     void seEncolaYSeAvisaQueTarda() {
-        hayPostulacion(POR_CONFIRMAR);
-        alcanceDeConversacion(FiltroAlcance.Tipo.TODO);
+        hayPostulacion(POR_CONFIRMAR, "hacer_conversacion_final");
         when(cola.encolarPreguntasSimulacion(POSTULACION)).thenReturn(true);
 
         PreguntasEncoladas respuesta = servicio.generarPreguntas(QUIEN, POSTULACION);
@@ -270,8 +266,7 @@ class ServicioSimulacionImplTest {
     @Test
     @DisplayName("lo que la cola rechaza no se anuncia como pedido")
     void loQueLaColaRechazaNoSeAnunciaComoPedido() {
-        hayPostulacion(POR_CONFIRMAR);
-        alcanceDeConversacion(FiltroAlcance.Tipo.TODO);
+        hayPostulacion(POR_CONFIRMAR, "hacer_conversacion_final");
         when(cola.encolarPreguntasSimulacion(POSTULACION)).thenReturn(false);
 
         PreguntasEncoladas respuesta = servicio.generarPreguntas(QUIEN, POSTULACION);
@@ -285,8 +280,7 @@ class ServicioSimulacionImplTest {
     @Test
     @DisplayName("cada pregunta viaja con el motivo del que salió")
     void lasPreguntasLlevanSuMotivo() {
-        hayPostulacion(POR_CONFIRMAR);
-        alcanceDeConversacion(FiltroAlcance.Tipo.TODO);
+        hayPostulacion(POR_CONFIRMAR, "hacer_conversacion_final");
         when(preguntas.findByPostulacionIdOrderByOrden(POSTULACION)).thenReturn(List.of(
                 PreguntaGenerada.builder()
                         .id(1L).postulacionId(POSTULACION).orden(1)
@@ -461,8 +455,7 @@ class ServicioSimulacionImplTest {
         // La sexta fuga de la pieza B: la pregunta guardaba el alertaId que llegara, y la
         // ficha lo enseñaba después como propio — una clave foránea hacia el expediente
         // de otra empresa. La alerta citada tiene que ser de ESTA postulación.
-        hayPostulacion(POR_CONFIRMAR);
-        alcanceDeConversacion(FiltroAlcance.Tipo.TODO);
+        hayPostulacion(POR_CONFIRMAR, "hacer_conversacion_final");
         when(alertas.findById(500L)).thenReturn(Optional.of(Alerta.builder()
                 .id(500L).postulacionId(POSTULACION + 1).build()));
 
@@ -478,8 +471,7 @@ class ServicioSimulacionImplTest {
     @Test
     @DisplayName("cerrar a un ausente lo saca del proceso con motivo de persona, no del sistema")
     void cerrarAlAusenteLoSacaConMotivoDePersona() {
-        Postulacion postulacion = hayPostulacion(ESPERANDO);
-        alcanceDeDecidir(FiltroAlcance.Tipo.TODO);
+        Postulacion postulacion = hayPostulacion(ESPERANDO, "decidir_sobre_ausente");
 
         servicio.decidirSobreAusente(QUIEN, POSTULACION,
                 new DecidirSobreAusente("CERRAR", "No se presentó ni avisó"));
@@ -491,8 +483,7 @@ class ServicioSimulacionImplTest {
     @Test
     @DisplayName("darle otra fecha no lo mueve a mano: lo mueve el recálculo de disponibilidad")
     void darleOtraFechaLoDejaAlRecalculo() {
-        hayPostulacion(ESPERANDO);
-        alcanceDeDecidir(FiltroAlcance.Tipo.TODO);
+        hayPostulacion(ESPERANDO, "decidir_sobre_ausente");
 
         servicio.decidirSobreAusente(QUIEN, POSTULACION,
                 new DecidirSobreAusente("OTRA_FECHA", "Avisó que estaba enfermo"));
@@ -504,8 +495,7 @@ class ServicioSimulacionImplTest {
     @Test
     @DisplayName("no se decide sobre quien no está esperando que se decida")
     void noSeDecideSobreQuienNoEstaEsperando() {
-        hayPostulacion(POR_CONFIRMAR);
-        alcanceDeDecidir(FiltroAlcance.Tipo.TODO);
+        hayPostulacion(POR_CONFIRMAR, "decidir_sobre_ausente");
 
         assertThatThrownBy(() -> servicio.decidirSobreAusente(QUIEN, POSTULACION,
                 new DecidirSobreAusente("CERRAR", "Me equivoqué de ficha")))
@@ -527,11 +517,24 @@ class ServicioSimulacionImplTest {
                 .build();
     }
 
-    private Postulacion hayPostulacion(String estadoCodigo) {
+    /**
+     * La postulación tal como la devuelve el guardián del alcance.
+     *
+     * <p>Qué postulaciones alcanza quien mira ya no se decide aquí: lo decide
+     * {@code AlcanceSobreLaVacante}, y allí tiene sus pruebas. Lo que se comprueba en esta
+     * clase es por qué permiso se le pregunta y qué se hace con lo que conteste.
+     */
+    private Postulacion hayPostulacion(String estadoCodigo, String permiso) {
         Postulacion postulacion = postulacionEn(estadoCodigo);
-        when(postulaciones.findByIdAndOrganizacionId(POSTULACION, ORGANIZACION))
-                .thenReturn(Optional.of(postulacion));
+        when(alcanceVacante.laPostulacionVisible(any(), eq(POSTULACION), eq(permiso)))
+                .thenReturn(postulacion);
         return postulacion;
+    }
+
+    /** El guardián dice que no: mismo 404 que si la postulación no existiera. */
+    private void fueraDeAlcance(String permiso) {
+        when(alcanceVacante.laPostulacionVisible(any(), eq(POSTULACION), eq(permiso)))
+                .thenThrow(new ResourceNotFoundException("Postulación", "id", POSTULACION));
     }
 
     /**
@@ -561,16 +564,6 @@ class ServicioSimulacionImplTest {
     private void alcanceDeAsistencia() {
         when(permisos.alcanceDe("marcar_asistencia"))
                 .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.TODO, USUARIO));
-    }
-
-    private void alcanceDeConversacion(FiltroAlcance.Tipo tipo) {
-        when(permisos.alcanceDe("hacer_conversacion_final"))
-                .thenReturn(new FiltroAlcance(tipo, USUARIO));
-    }
-
-    private void alcanceDeDecidir(FiltroAlcance.Tipo tipo) {
-        when(permisos.alcanceDe("decidir_sobre_ausente"))
-                .thenReturn(new FiltroAlcance(tipo, USUARIO));
     }
 
     // ============ La lista de sesiones del panel ============
