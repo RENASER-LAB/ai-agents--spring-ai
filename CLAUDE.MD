@@ -113,13 +113,18 @@ proposito, no trabajo olvidado:
 Otros placeholders puestos a proposito: los **umbrales de los grupos de prioridad (80 y 65)** son
 parametro editable y Renaser no los ha confirmado.
 
-⚠️ Conocido y **ya no tan lejano**: `FiltroAlcance.responsableOFiltroNulo()` trata el alcance
-`PROPIO` igual que `TODO` —devuelve nulo y no filtra—, y lo usa la bandeja del panel
-(`ServicioPostulacionesPanelImpl`). Antes hacia falta entrar a la base para poner un `PROPIO`
-en un permiso de panel; **desde la V40 basta un `PUT` de `administrar_permisos`**, que acepta
-los tres valores. Ninguna semilla lo pone asi, pero ya no es «inalcanzable»: es un cambio de
-configuracion sin desplegar. La simulacion si distingue los tres casos (ver
-`ServicioSimulacionImpl.alcanzaA`); la bandeja todavia no.
+**El alcance de una fila lo decide un solo sitio**: `AlcanceSobreLaVacante` (paquete `vacante`).
+Antes «con `SUS_VACANTES` solo alcanzas lo de tus vacantes» estaba escrito catorce veces en
+nueve clases de siete modulos, y doce de ellas **dejaban pasar `PROPIO`** —solo probaban «es
+`SUS_VACANTES`»—, o sea acceso completo justo para quien menos alcance tiene. Con la V40 eso
+dejo de ser inalcanzable: `administrar_permisos` acepta los tres valores por `PUT`, sin
+desplegar. Hoy el guardian trata los tres casos con un `switch` sobre el enum, para que un
+cuarto valor rompa la compilacion en vez de colarse.
+
+⚠️ Lo que queda de aquello: `FiltroAlcance.responsableOFiltroNulo()` sigue devolviendo nulo con
+`PROPIO` igual que con `TODO`. Su unico uso —la bandeja, en `ServicioPostulacionesPanelImpl`—
+ya lo trata aparte con `noAlcanzaANadieEnElPanel()`, y el javadoc del metodo avisa. Quien lo
+use en un sitio nuevo tiene que hacer lo mismo.
 
 **Los agentes de la calificacion ya NO corren en fila** (20/08/2026): los tres que no
 dependen de nadie —datos del CV, evidencia y evaluador— van a la vez, y el que arma el

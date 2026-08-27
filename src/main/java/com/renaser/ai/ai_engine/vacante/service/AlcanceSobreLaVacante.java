@@ -112,9 +112,13 @@ public class AlcanceSobreLaVacante {
             case SUS_VACANTES -> vacante
                     .map(v -> quien.usuarioId().equals(v.getResponsableUsuarioId()))
                     .orElse(false);
-            // De momento pasa, como pasaba en los catorce sitios de los que salió esto. Cambia
-            // en el commit siguiente, que es donde tiene sus pruebas.
-            case PROPIO -> true;
+            // PROPIO no alcanza a nadie en el panel: quien mira nunca es el candidato de la
+            // fila. Los catorce sitios de los que salió esto lo dejaban pasar —solo probaban
+            // «es SUS_VACANTES»—, y eso daba acceso completo justo a quien menos alcance
+            // tiene. No era alcanzable mientras el reparto se editaba a mano en la base; con
+            // los permisos editables desde el panel basta un PUT. Es lo mismo que ya decían
+            // FiltroAlcance#noAlcanzaANadieEnElPanel y los endpoints de la simulación.
+            case PROPIO -> false;
         };
     }
 }

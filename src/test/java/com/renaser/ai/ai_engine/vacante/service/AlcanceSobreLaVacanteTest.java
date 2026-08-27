@@ -182,6 +182,40 @@ class AlcanceSobreLaVacanteTest {
         verify(permisos, never()).alcanceDe("ver_embudo");
     }
 
+    @Test
+    @DisplayName("Con PROPIO no se alcanza nada, y ni se pregunta de quién es la vacante")
+    void conPropioNoSeAlcanzaNada() {
+        // PROPIO quiere decir «lo tuyo», y en el panel nada de esto es de quien mira: son
+        // candidatos, y /panel/** exige un token de equipo. Los catorce guardianes de los que
+        // salió esta clase lo dejaban pasar —solo probaban «es SUS_VACANTES»— y le daban
+        // acceso completo justo a quien menos alcance tiene. Mientras el reparto se editaba a
+        // mano en la base no era alcanzable; desde que los permisos se cambian por el panel,
+        // basta un PUT sobre cualquiera de esos permisos.
+        hayPostulacion();
+        conAlcance(FiltroAlcance.Tipo.PROPIO);
+
+        assertThatThrownBy(() -> alcance.laPostulacionVisible(QUIEN, POSTULACION, PERMISO))
+                .isInstanceOf(ResourceNotFoundException.class);
+
+        verifyNoInteractions(vacantes);
+    }
+
+    @Test
+    @DisplayName("Ni siquiera la postulación de quien pregunta: en el panel no se mira a sí mismo")
+    void conPropioNiLaDeUnoMismo() {
+        // El caso que un lector espera que pase, y no pasa a propósito: aunque la postulación
+        // fuera del propio usuario, esto es el panel. Un candidato mirando lo suyo entra por
+        // el portal, que tiene su propia comprobación contra el usuario de la fila.
+        when(postulaciones.findByIdAndOrganizacionId(POSTULACION, ORGANIZACION))
+                .thenReturn(Optional.of(Postulacion.builder()
+                        .id(POSTULACION).organizacionId(ORGANIZACION).vacanteId(VACANTE)
+                        .usuarioId(QUIEN_MIRA).build()));
+        conAlcance(FiltroAlcance.Tipo.PROPIO);
+
+        assertThatThrownBy(() -> alcance.laPostulacionVisible(QUIEN, POSTULACION, PERMISO))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
     // ============ La vacante ============
 
     @Test
@@ -211,6 +245,20 @@ class AlcanceSobreLaVacanteTest {
     }
 
     // ============ El lote ============
+
+    @Test
+    @DisplayName("Con PROPIO tampoco se alcanza una vacante")
+    void conPropioTampocoLaVacante() {
+        when(permisos.alcanceDe(PERMISO))
+                .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.PROPIO, QUIEN_MIRA));
+        when(vacantes.findByIdAndOrganizacionId(VACANTE, ORGANIZACION)).thenReturn(Optional.of(
+                Vacante.builder().id(VACANTE).organizacionId(ORGANIZACION)
+                        .responsableUsuarioId(QUIEN_MIRA).build()));
+
+        assertThatThrownBy(() -> alcance.laVacanteVisible(QUIEN, VACANTE, PERMISO))
+                .as("ni la que dirige: PROPIO no habla de vacantes, habla de filas suyas")
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
 
     @Test
     @DisplayName("Sobre una tanda la vacante sale del mapa ya cargado, sin ir a la base")
