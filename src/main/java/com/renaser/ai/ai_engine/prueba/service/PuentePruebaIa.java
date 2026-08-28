@@ -40,12 +40,19 @@ public interface PuentePruebaIa {
     InsumoPrueba insumoPrueba(Long postulacionId);
 
     /**
-     * Guarda las notas y deja la prueba lista para que una persona la confirme.
+     * Guarda las notas del modelo, deja la prueba en {@code PRUEBA_POR_CONFIRMAR} y, si la
+     * rúbrica quedó entera, calcula también la nota de la etapa.
      *
-     * <p><b>No calcula la nota de la etapa.</b> Eso lo hace {@code calcularNotaEtapa} cuando
-     * están todos los criterios, y aquí casi nunca lo están: los de método {@code PERSONA}
-     * siguen vacíos y los que el modelo no pudo juzgar, también. Sumar media rúbrica daría
-     * una nota baja que parece un juicio y es un hueco.
+     * <p><b>Solo entera.</b> Si a algún criterio le falta el puntaje no se suma nada, y el
+     * registro dice cuál falta: sumar media rúbrica daría una nota baja que parece un juicio
+     * y es un hueco. Los de método {@code PERSONA} siguen vacíos por diseño, así que lo
+     * normal es que no se sume — pero una rúbrica de puros criterios de agente sí queda
+     * completa aquí, y antes se quedaba sin nota esperando a que alguien la pidiera desde el
+     * panel.
+     *
+     * <p>El resto del razonamiento —por qué se comprueba antes de sumar en vez de intentar y
+     * atrapar, y por qué se pondera aunque la postulación ya se haya movido— vive donde se
+     * decide, en la implementación.
      */
     void guardarNotasPrueba(Long postulacionId, Long ejecucionIaId, ResultadoPrueba resultado);
 }
