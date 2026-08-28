@@ -77,6 +77,37 @@ public class RegistroTrabajosIa {
     }
 
     /**
+     * Crea un trabajo que cuelga de una VACANTE, no de una postulación (el REDACTOR).
+     *
+     * <p>Regenerar es legítimo —cada generación pedida es un trabajo nuevo—, así que lo
+     * TERMINADO o FALLIDO no exime: solo frena uno VIVO, para que dos clics seguidos no
+     * paguen dos llamadas por el mismo borrador.
+     */
+    @Transactional
+    public Optional<TrabajoIa> crearParaVacante(Long organizacionId, String agenteCodigo,
+                                                Long vacanteId, String modo) {
+        boolean vivo = trabajos
+                .findFirstByReferenciaTablaAndReferenciaIdAndAgenteCodigoOrderByIdDesc(
+                        "vacante", vacanteId, agenteCodigo)
+                .map(t -> "PENDIENTE".equals(t.getEstado()) || "EN_CURSO".equals(t.getEstado())
+                        || "EN_ESPERA".equals(t.getEstado()))
+                .orElse(false);
+        if (vivo) {
+            return Optional.empty();
+        }
+        return Optional.of(trabajos.save(TrabajoIa.builder()
+                .organizacionId(organizacionId)
+                .agenteCodigo(agenteCodigo)
+                .modo(modo)
+                .referenciaTabla("vacante")
+                .referenciaId(vacanteId)
+                .estado("PENDIENTE")
+                .intentos(0)
+                .creadoEn(Instant.now())
+                .build()));
+    }
+
+    /**
      * <b>La barrera.</b> Crea el trabajo que cierra la etapa, pero solo si los que corren a
      * la vez ya acabaron todos.
      *

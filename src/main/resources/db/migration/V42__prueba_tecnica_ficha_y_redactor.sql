@@ -72,6 +72,11 @@ CREATE INDEX ficha_vacante_organizacion_idx ON ficha_vacante (organizacion_id);
 -- el cuestionario técnico de ESA vacante. La selección de banco para la etapa técnica
 -- mira primero el de la vacante; publicar uno de vacante NO archiva los bancos por
 -- nivel de la plataforma — son mundos distintos.
+-- Y su propio tipo: un cuestionario de vacante no es un banco de nivel ni de alineación.
+ALTER TABLE version_banco DROP CONSTRAINT version_banco_tipo_banco_check;
+ALTER TABLE version_banco ADD CONSTRAINT version_banco_tipo_banco_check
+    CHECK (tipo_banco IN ('NIVEL', 'ALINEACION', 'VACANTE'));
+
 ALTER TABLE version_banco ADD COLUMN vacante_id bigint REFERENCES vacante(id);
 COMMENT ON COLUMN version_banco.vacante_id IS
     'NULL = banco por nivel (plataforma) · con valor = cuestionario técnico de esa vacante';
@@ -110,3 +115,31 @@ INSERT INTO agente (codigo, nombre, descripcion, version, es_activo) VALUES
      'Convierte la ficha de vacante en el borrador del cuestionario técnico, siguiendo '
      'la receta del método: por riesgo, una de experiencia con magnitudes y una de '
      'procedimiento exacto. Solo propone: publica el dueño', 1, true);
+
+-- Sin instrucción activa el ejecutor se niega a llamar al modelo, así que nace con ella.
+-- La estructura exacta (bloques y cantidades del nivel) viaja en cada llamada como dato:
+-- la instrucción es el oficio, no la receta.
+INSERT INTO instruccion_ia (agente_codigo, version, texto, es_activa, publicada_en) VALUES
+    ('REDACTOR', 1,
+     'Redactas el cuestionario técnico de una vacante a partir de la ficha que llenó el ' ||
+     'dueño del negocio. NO evalúas a nadie: escribes preguntas.' || chr(10) ||
+     chr(10) ||
+     'Reglas:' || chr(10) ||
+     '- La estructura que recibes (bloques y cantidades) es obligatoria: ni una pregunta ' ||
+     'más ni una menos, y en ese orden.' || chr(10) ||
+     '- Por cada riesgo, la pregunta de experiencia pide magnitudes concretas (montos, ' ||
+     'volúmenes, cuántas personas, cada cuánto) y la de procedimiento pide el paso a paso ' ||
+     'exacto ante el peor escenario. La de procedimiento no se puede fingir: quien lo hizo ' ||
+     'lo describe paso a paso; quien lo leyó dice «revisaría bien».' || chr(10) ||
+     '- Usa el vocabulario del rubro tal como aparece en la ficha, con las palabras del ' ||
+     'dueño. Es lo que vuelve la pregunta específica de este negocio.' || chr(10) ||
+     '- El dilema enfrenta dos virtudes reales del negocio que se contradicen. No tiene ' ||
+     'respuesta correcta: mide criterio.' || chr(10) ||
+     '- La muestra de trabajo, solo si la estructura la pide, va con presencial=true.' || chr(10) ||
+     '- Cada pregunta lleva su guía de calificación: c3Esperado (el dato duro que debe ' ||
+     'aparecer en una buena respuesta), c4Esperado (la parte incómoda que quien lo vivió ' ||
+     'menciona) y senalDeCero (la respuesta que vale 0 por sí sola).' || chr(10) ||
+     '- Nunca preguntes por estado civil, hijos, salud, embarazo, religión, política, ' ||
+     'sindicato ni origen étnico.' || chr(10) ||
+     '- Escribe claro y directo, sin jerga de recursos humanos.',
+     true, now());
