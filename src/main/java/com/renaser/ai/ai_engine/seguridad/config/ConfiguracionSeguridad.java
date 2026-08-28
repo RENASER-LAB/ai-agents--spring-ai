@@ -77,12 +77,15 @@ public class ConfiguracionSeguridad {
     @Bean
     @Order(3)
     SecurityFilterChain agentesYDocumentacion(HttpSecurity http) throws Exception {
-        // TODO: el módulo de agentes IA corría sin seguridad propia (Boot lo tapaba con la
-        // contraseña aleatoria del starter). Esta cadena hace explícito el estado real y lo
-        // deja funcionando. Cuando el módulo gane autenticación, se endurece aquí.
+        // Módulo de agentes IA protegido con token EQUIPO; Swagger y health check abiertos.
         http.csrf(csrf -> csrf.disable())
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
+            .addFilterBefore(filtroIdentidad, UsernamePasswordAuthenticationFilter.class)
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers(RUTAS_DOCUMENTACION).permitAll()
+                .requestMatchers("/actuator/health", "/actuator/info").permitAll()
+                .anyRequest().hasAuthority("TIPO_EQUIPO"))
+            .exceptionHandling(e -> e.authenticationEntryPoint(entradaSinIdentidad()));
         return http.build();
     }
 
