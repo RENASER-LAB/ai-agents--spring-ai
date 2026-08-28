@@ -8,6 +8,9 @@ import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.DisplayName;
 import com.renaser.ai.ai_engine.integracion.soporte.RespuestaV3;
+import com.renaser.ai.ai_engine.prueba.dto.DtosPruebaIa.NotaCriterioPruebaIa;
+import com.renaser.ai.ai_engine.prueba.dto.DtosPruebaIa.ResultadoPrueba;
+import com.renaser.ai.ai_engine.prueba.service.PuentePruebaIa;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,6 +29,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.rabbitmq.RabbitMQContainer;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
@@ -90,6 +94,7 @@ public class FlujoPruebaIT {
     @Autowired MockMvc mvc;
     @Autowired JdbcTemplate jdbc;
     @Autowired SondeoVencimientos sondeo;
+    @Autowired PuentePruebaIa puente;
     final ObjectMapper json = new ObjectMapper();
 
     static String tokenTalento;
@@ -442,7 +447,110 @@ public class FlujoPruebaIT {
         assertThat(intento.get("es_entrega_automatica")).isEqualTo(true);
     }
 
+    /**
+     * Que la nota de la etapa salga sola cuando el agente deja la rúbrica entera.
+     *
+     * <p>Contra la base de verdad, y no con dobles, porque lo que hay que comprobar es
+     * justo lo que un doble da por supuesto: que la comprobación de «¿está entera?» —que
+     * lee de la base— ve las notas que ese mismo trabajo acaba de guardar y todavía no ha
+     * confirmado. Si no las viera, la rúbrica parecería incompleta siempre y no se sumaría
+     * nunca, que es el fallo que esto vino a arreglar.
+     *
+     * <p>Y comprueba lo otro que un doble no puede: que la transacción llega entera al
+     * final. La suma lanza cuando le falta un criterio, y si esa excepción escapara se
+     * perderían las notas del modelo recién guardadas.
+     */
+    @DisplayName("Al terminar el agente, la nota de la etapa sale sola si la rúbrica quedó entera")
+    @Test
+    @Order(8)
+    void alTerminarElAgenteLaNotaDeEtapaSaleSolaSiLaRubricaQuedoEntera() throws Exception {
+        long id = otraPostulacionEnCalificando("califica-ia@correo.pe");
+
+        // 1 · El modelo solo pudo juzgar uno de los dos criterios, que es lo normal. Se
+        // guarda lo que trajo y la etapa se queda sin nota: media rúbrica no es un juicio.
+        puente.guardarNotasPrueba(id, null, new ResultadoPrueba(
+                List.of(new NotaCriterioPruebaIa("RESULTADO", new BigDecimal("60"),
+                        "El buscador filtra por ingrediente", "El README lo demuestra")),
+                new BigDecimal("80")));
+
+        assertThat(cuantasNotasDeCriterio(id)).isEqualTo(1);
+        assertThat(laNotaDeEtapa(id)).isNull();
+        // Aun sin nota, la prueba pasa a manos de una persona: esconderla sería peor.
+        assertThat(jdbc.queryForObject("select estado_codigo from postulacion where id = ?",
+                String.class, id)).isEqualTo("PRUEBA_POR_CONFIRMAR");
+
+        // 2 · Llega la segunda nota y la rúbrica queda entera. La de CALIDAD es una fila
+        // nueva y la de RESULTADO una que se reescribe: las dos tienen que estar a la vista
+        // de la comprobación dentro de la misma transacción que las escribió.
+        puente.guardarNotasPrueba(id, null, new ResultadoPrueba(
+                List.of(new NotaCriterioPruebaIa("RESULTADO", new BigDecimal("60"),
+                                "El buscador filtra por ingrediente", null),
+                        new NotaCriterioPruebaIa("CALIDAD", new BigDecimal("30"),
+                                "Código legible, sin pruebas", null)),
+                new BigDecimal("80")));
+
+        assertThat(cuantasNotasDeCriterio(id)).isEqualTo(2);
+        assertThat(laNotaDeEtapa(id)).isEqualTo(90.0);
+        assertThat(jdbc.queryForMap("select version_pesos_id from nota_etapa where postulacion_id = ?", id)
+                .get("version_pesos_id")).isNotNull();
+
+        // 3 · El mismo trabajo otra vez, que es lo que hace la cola al reintentar. Ni una
+        // fila de más ni una excepción que se lleve por delante lo ya guardado.
+        puente.guardarNotasPrueba(id, null, new ResultadoPrueba(
+                List.of(new NotaCriterioPruebaIa("RESULTADO", new BigDecimal("60"),
+                                "El buscador filtra por ingrediente", null),
+                        new NotaCriterioPruebaIa("CALIDAD", new BigDecimal("30"),
+                                "Código legible, sin pruebas", null)),
+                new BigDecimal("80")));
+
+        assertThat(jdbc.queryForObject(
+                "select count(*) from nota_etapa where postulacion_id = ? and etapa_codigo = 'PRUEBA_PUESTO'",
+                Integer.class, id)).isEqualTo(1);
+        assertThat(cuantasNotasDeCriterio(id)).isEqualTo(2);
+        assertThat(laNotaDeEtapa(id)).isEqualTo(90.0);
+    }
+
     // ============ Apoyo ============
+
+    /** La nota de la etapa de la prueba, o null si todavía no hay ninguna. */
+    private Double laNotaDeEtapa(long postulacionId) {
+        return jdbc.queryForList(
+                        "select puntaje from nota_etapa where postulacion_id = ? "
+                                + "and etapa_codigo = 'PRUEBA_PUESTO'", Double.class, postulacionId)
+                .stream().findFirst().orElse(null);
+    }
+
+    private int cuantasNotasDeCriterio(long postulacionId) {
+        return jdbc.queryForObject("select count(*) from nota_criterio where postulacion_id = ?",
+                Integer.class, postulacionId);
+    }
+
+    /**
+     * Otra candidata en el punto exacto donde arranca el agente: la prueba entregada y la
+     * postulación en {@code PRUEBA_CALIFICANDO}. El camino hasta ahí ya lo recorre la prueba
+     * de más arriba, así que aquí se pone el punto de partida y no se vuelve a andar.
+     */
+    private long otraPostulacionEnCalificando(String correo) throws Exception {
+        String token = crearCandidatoYEntrar(correo);
+        MockMultipartFile cv = new MockMultipartFile("cv", "cv.pdf", "application/pdf", "x".getBytes());
+        String codigo = leer(mvc.perform(multipart("/api/v1/portal/postulaciones")
+                        .file(cv)
+                        .param("vacanteId", String.valueOf(vacanteId))
+                        .param("resultadoOrgulloso", "Un resultado del que me siento orgullosa")
+                        .param("aceptaTratamiento", "true")
+                        .header("Authorization", "Bearer " + token))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString(), "codigo");
+
+        long id = jdbc.queryForObject("select id from postulacion where uuid = ?::uuid", Long.class, codigo);
+        jdbc.update("update postulacion set estado_codigo = 'PRUEBA_CALIFICANDO' where id = ?", id);
+        jdbc.update("""
+                insert into intento_prueba (postulacion_id, version_plantilla_prueba_id, iniciado_en,
+                                            vence_en, entregado_en)
+                values (?, ?, now() - interval '3 hours', now() - interval '1 hour',
+                        now() - interval '2 hours')""", id, versionPruebaId);
+        return id;
+    }
 
     private long prepararVacantePublicada() throws Exception {
         jdbc.update("INSERT INTO area (organizacion_id, nombre, es_activa) VALUES (1, 'Ingeniería', true)");

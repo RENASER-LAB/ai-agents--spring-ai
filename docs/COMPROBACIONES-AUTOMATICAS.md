@@ -47,20 +47,20 @@ demás de la calificación se prueba con un doble del modelo y no gasta nada.
 
 ---
 
-## 871 pruebas
+## 877 pruebas
 
-Contadas de correrlas el 27/08/2026 (con el multiempresa, los inscritos de la simulación, los
-permisos editables y el guardián común del alcance), no de recordarlas: el desglose sale de
-los informes de surefire y failsafe, y suma exacto.
+Contadas de correrlas el 28/08/2026 (con el multiempresa, los inscritos de la simulación, los
+permisos editables, el guardián común del alcance y la nota de la prueba), no de recordarlas: el
+desglose sale de los informes de surefire y failsafe, y suma exacto.
 
 | Qué | Cuántas | Necesita |
 |---|---:|---|
-| Unitarias, con dobles | 659 | nada |
+| Unitarias, con dobles | 664 | nada |
 | Arquitectura | 12 | nada |
 | Las fórmulas del banco v3 | 22 | nada |
 | El validador de las respuestas v3 | 21 | nada |
 | El perfil del candidato (paquete `perfil`: merge, lectura, CRUD, retención, borrado) | 51 | nada |
-| Integración, de punta a punta | 100 | Docker |
+| Integración, de punta a punta | 101 | Docker |
 | Contra el proveedor de verdad, y el envío de correo | 6 | Docker o SMTP, y su bandera |
 
 El multiempresa (25/08) sumó 39 unitarias: 31 de la implementación —el login del panel, las
@@ -140,9 +140,26 @@ dejaron de repetir la mecánica y pasaron a comprobar que se delega y con qué p
 `ServicioPerfilPanelImplTest` tiene una menos y no una más.
 
 Y de paso deja al descubierto una cuenta vieja: **este trabajo no tocó ni un archivo de
-`integracion/` y failsafe cuenta hoy 106**, así que las 103 que decía esta tabla ya venían
+`integracion/` y failsafe contaba entonces 106**, así que las 103 que decía esta tabla ya venían
 cortas — no son tres pruebas nuevas. Las cifras solo se sostienen recontando los `<testcase>`,
 nunca restando la de ayer de la de hoy.
+
+La nota de la prueba (28/08) sumó **5 unitarias y 1 de integración**, y lo interesante es por qué
+hacen falta las dos clases de prueba. Las cinco de `PuentePruebaIaPonderaTest` fijan la regla —la
+rúbrica entera suma; a la que le falta un criterio, no; un cero es una nota puesta; una fila de
+nota sin puntaje cuenta como que falta; y sin rúbrica ni se consulta la base—, pero **llaman al
+método por reflexión**, así que seguirían verdes aunque nadie lo llamara. Y los **39 tests que ya
+existían del puente nunca preparaban `notasCriterio.findByPostulacionId`**: el doble devolvía
+lista vacía y **todos** recorrían la rama de «la rúbrica no está entera». Entre unos y otros, la
+rama que suma no la guardaba nadie. Por eso la de integración, `FlujoPruebaIT` con `@Order(8)`,
+contra PostgreSQL de verdad: una nota → sin nota de etapa; la segunda → nota 90; el mismo trabajo
+otra vez → sigue habiendo una sola fila. **Se comprobó que se pone rojo al comentar la llamada**,
+que es la única prueba de que un test prueba algo. **No se borra pensando que las unitarias la
+cubren.**
+
+⚠️ Los totales de la tabla salen de correr `./mvnw -B verify` (770 unitarias y 107 de
+integración, 0 fallos); **el reparto por filas sale de dónde viven las seis pruebas nuevas**, no
+de un reconteo de los `<testcase>`. El próximo reconteo manda sobre esto.
 
 ⚠️ Al recontar, **no sirve el atributo `tests=`** de los XML de surefire: con clases anidadas
 (`@Nested`) subcuenta, y por eso dos filas de esta tabla llevaban tiempo mal —las fórmulas
