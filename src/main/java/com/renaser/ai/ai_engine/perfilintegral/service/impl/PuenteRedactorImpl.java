@@ -101,7 +101,11 @@ public class PuenteRedactorImpl implements PuenteRedactor {
         versionesBanco.findFirstByVacanteIdAndEstado(vacanteId, "BORRADOR")
                 .ifPresent(anterior -> {
                     anterior.setEstado("ARCHIVADA");
-                    versionesBanco.save(anterior);
+                    // saveAndFlush a propósito: Hibernate ordena los INSERT antes que los
+                    // UPDATE al hacer flush, y sin esto el borrador nuevo se insertaría con
+                    // el viejo aún en BORRADOR — dos vivos a la vez, y el índice parcial
+                    // único de V42 revienta la transacción.
+                    versionesBanco.saveAndFlush(anterior);
                     log.info("El borrador {} de la vacante {} queda archivado: lo reemplaza "
                             + "una generación nueva", anterior.getId(), vacanteId);
                 });

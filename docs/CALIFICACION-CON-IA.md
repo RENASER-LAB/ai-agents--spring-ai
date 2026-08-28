@@ -195,6 +195,23 @@ no puede borrarlo. Solo se rehacen las que nadie llegó a hacer.
 
 ---
 
+## El agente que no califica a nadie: el REDACTOR
+
+El agente número once (`V42`) es distinto a todos los demás en dos cosas. **No trabaja sobre
+una postulación sino sobre una vacante**: convierte la ficha que llenó el dueño (las 10
+preguntas del método CAZATALENTOS) en el borrador del cuestionario técnico de la etapa 2, con
+la estructura fija del nivel (DIR 12 · SUP 10 · OPE 8) y la guía de calificación de cada
+pregunta (C3 esperado, C4 esperado, señal de 0). Y **su texto no entra en ninguna nota**: lo
+que escribe no toca a ningún candidato hasta que el dueño lo revisa y lo publica — la regla
+del sistema que lo hace admisible.
+
+Corre por la misma cola que los demás, con el mismo tope mensual y los mismos reintentos. Lo
+que devuelve pasa por una aduana (la receta del método, en `RecetaCuestionarioTecnico`): si
+el borrador no cuadra, se le devuelve UNA vez con los errores delante; si persiste, el
+trabajo queda FALLIDO y visible — un borrador a medias jamás se guarda como si estuviera
+bien. El detalle del flujo completo está en
+[el diseño del ciclo 1](DISENO-PRUEBA-TECNICA-FICHA-Y-REDACTOR.md).
+
 ## Cómo apagarlo
 
 `renaser.ai.calificacion.habilitada: false` en la configuración. Con eso la postulación se

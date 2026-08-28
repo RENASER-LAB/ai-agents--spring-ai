@@ -150,7 +150,9 @@ public class ServicioCuestionarioTecnicoImpl implements ServicioCuestionarioTecn
         versionesBanco.findFirstByVacanteIdAndEstado(vacante.getId(), "PUBLICADA")
                 .ifPresent(saliente -> {
                     saliente.setEstado("ARCHIVADA");
-                    versionesBanco.save(saliente);
+                    // saveAndFlush: el índice parcial único (una PUBLICADA por vacante) no
+                    // perdona que el borrador pase a PUBLICADA antes de que esta se archive.
+                    versionesBanco.saveAndFlush(saliente);
                     auditoria.registrar(quien.organizacionId(), quien,
                             "archivar_cuestionario_tecnico", "version_banco", saliente.getId(),
                             Map.of("estado", "PUBLICADA"), Map.of("estado", "ARCHIVADA"),

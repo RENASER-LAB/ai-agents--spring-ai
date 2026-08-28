@@ -526,6 +526,31 @@ después.
 
 Cerrar una vacante **detiene las postulaciones nuevas pero no cierra las que van a mitad**.
 
+## `ficha_vacante`
+
+La ficha del método CAZATALENTOS (`V42`): las 10 preguntas al dueño y sus salidas. Una por
+vacante; es el insumo del agente REDACTOR. Ver `docs/DISENO-PRUEBA-TECNICA-FICHA-Y-REDACTOR.md`.
+
+| Columna | Tipo | Oblig. | Qué guarda |
+|---|---|---|---|
+| `id` | bigint | sí | Clave |
+| `vacante_id` | bigint | sí | Única: una ficha por vacante |
+| `organizacion_id` | bigint | sí | |
+| `q1_resultado` … `q10_espejo` | text | no | Las 10 respuestas del dueño, con sus palabras. Q10 (espejo) solo aplica si ya contrató antes |
+| `gente_en_empresa` / `gente_a_cargo` | integer | no | Los números de Q5, aparte del texto: de ellos se deriva el tamaño |
+| `riesgo_1` … `riesgo_4` | text | no | **El orden es la velocidad de daño** y lo decide el dueño: manda en el cuestionario |
+| `eliminatoria_1` / `eliminatoria_2` | text | no | Máximo 2, regla del método |
+| `requerimiento_1` … `requerimiento_3` | text | no | Lo imprescindible de Q9, máximo 3 |
+| `familias` | text | no | `F1`..`F7` separadas por coma (diccionarios de textura, ciclo 4). **No es** el catálogo `familia` de puestos: son taxonomías distintas |
+| `tamano` | text | no | Derivado: ≤30 `MICRO` · 31–200 `MEDIA` · 200+ `GRANDE`. La única dependencia de la etapa 2 hacia la 1: elige los pesos de pilar de DIRECCION |
+| `estado` | text | sí | `BORRADOR` (a medias) o `COMPLETA` (calculado al guardar; es lo que permite generar) |
+| `actualizado_en` | timestamptz | sí | Contra esto se computa «el cuestionario quedó desactualizado» |
+
+**Clave primaria:** `id` · **Único:** `vacante_id` · **Apunta a:** `vacante`, `organizacion`
+
+Casi todo admite NULL a propósito: `BORRADOR` es «a medias mientras el dueño la piensa», y qué
+la vuelve `COMPLETA` lo decide el servicio, no la base.
+
 ## `plantilla_correo_vacante`
 
 Qué texto de correo usa **esta** vacante en lugar del que el sistema mandaría. Sin fila, sale
@@ -938,12 +963,13 @@ Una versión del banco, en borrador o publicada.
 |---|---|---|---|
 | `id` | bigint | sí | Clave |
 | `organizacion_id` | bigint | no | **Vacío en la biblioteca global de Renaser** |
-| `tipo_banco` | text | sí | `NIVEL` o `ALINEACION` |
+| `tipo_banco` | text | sí | `NIVEL`, `ALINEACION` o `VACANTE` (`V42`: el cuestionario técnico de una vacante) |
 | `nivel_puesto_codigo` | text | no | Solo si `tipo_banco` es `NIVEL` |
 | `etiqueta` | text | sí | |
-| `estado` | text | sí | `BORRADOR` o `PUBLICADA` |
+| `estado` | text | sí | `BORRADOR`, `PUBLICADA` o `ARCHIVADA` |
 | `publicada_por_usuario_id` | bigint | no | |
 | `publicada_en` | timestamptz | no | |
+| `vacante_id` | bigint | no | `V42`. Vacío = banco por nivel, como siempre. Con valor = cuestionario técnico de ESA vacante (método CAZATALENTOS etapa 2). Índices parciales: a lo sumo un `BORRADOR` y una `PUBLICADA` por vacante |
 | `metodo_calificacion` | text | no | `V41`. Vacío = motor de claves versionadas (v0.1 y v3) · `CRITERIOS` = conteo C1..C4 del banco CAZATALENTOS. Es lo que decide qué motor califica |
 
 **Clave primaria:** `id`
@@ -982,6 +1008,7 @@ Una pregunta dentro de una versión.
 | `c3_esperado` | text | no | Solo `ABIERTA` (`V41`): qué cuenta como dato duro en esta pregunta. La guía del evaluador; el candidato no la ve |
 | `c4_esperado` | text | no | Solo `ABIERTA`: qué cuenta como la parte incómoda |
 | `senal_de_cero` | text | no | Solo `ABIERTA`: si la respuesta la cumple, el puntaje es 0 y se acaba el cálculo. En la eliminatoria, cumplirla es además descarte |
+| `presencial` | boolean | sí | `V42`. La muestra de trabajo del cuestionario técnico: se guarda pero **jamás se envía al candidato** — regala el diagnóstico del negocio. Es del dueño, para su entrevista |
 
 **Clave primaria:** `id` · **Único:** `version_banco_id` + `codigo`
 
@@ -1181,7 +1208,7 @@ Cuántas preguntas de cada tipo y dimensión entran.
 |---|---|---|---|
 | `id` | bigint | sí | Clave |
 | `plantilla_evaluacion_id` | bigint | sí | |
-| `tipo_banco` | text | sí | `NIVEL` o `ALINEACION` |
+| `tipo_banco` | text | sí | `NIVEL`, `ALINEACION` o `VACANTE` (`V42`: el cuestionario técnico de una vacante) |
 | `tipo_pregunta` | text | no | Vacío si no importa el tipo |
 | `dimension_codigo` | text | no | Vacío si no importa la dimensión |
 | `cantidad_min` | integer | sí | |
@@ -1969,9 +1996,10 @@ Una versión de todos los pesos.
 | `id` | bigint | sí | Clave |
 | `organizacion_id` | bigint | sí | |
 | `etiqueta` | text | sí | |
-| `estado` | text | sí | `BORRADOR` o `PUBLICADA` |
+| `estado` | text | sí | `BORRADOR`, `PUBLICADA` o `ARCHIVADA` |
 | `publicada_por_usuario_id` | bigint | no | |
 | `publicada_en` | timestamptz | no | |
+| `vacante_id` | bigint | no | `V42`. Vacío = banco por nivel, como siempre. Con valor = cuestionario técnico de ESA vacante (método CAZATALENTOS etapa 2). Índices parciales: a lo sumo un `BORRADOR` y una `PUBLICADA` por vacante |
 
 **Clave primaria:** `id` · **Único:** `organizacion_id` + `etiqueta`
 
@@ -2105,7 +2133,7 @@ calificación guarda con qué versión se produjo.
 
 ## `agente`
 
-El catálogo de los nueve, con su versión.
+El catálogo de los agentes (once desde `V42`), con su versión.
 
 | Columna | Tipo | Oblig. | Qué guarda |
 |---|---|---|---|
