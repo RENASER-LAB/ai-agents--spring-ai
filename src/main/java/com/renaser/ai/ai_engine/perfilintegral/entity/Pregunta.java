@@ -54,4 +54,8 @@ public class Pregunta {
 
     /** Si la respuesta la cumple, el puntaje es 0 y se acaba el cálculo. */
     private String senalDeCero;
+
+    // La muestra de trabajo del cuestionario técnico: se guarda pero jamás se envía al
+    // candidato — es del dueño, para su entrevista presencial.
+    private boolean presencial;
 }
