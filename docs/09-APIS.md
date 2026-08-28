@@ -203,8 +203,8 @@ del área— se ven solo las propias, y una ajena responde 404.
 | GET `/postulaciones/{id}/prueba/respuestas` | Lo que contestó, pregunta a pregunta. Las preguntas son **las de la versión que él vio**, en su orden, no las del catálogo de hoy: una versión publicada después puede llevar otras | `abrir_ficha_candidato` |
 | GET `/postulaciones/{id}/prueba/notas` | La rúbrica entera con lo que lleva puesto cada criterio: puntaje, explicación y **de quién viene la nota**, si de la IA o de una persona. Lo que aún no tiene nota sale en nulo | `ajustar_nota` |
 | POST `/postulaciones/{id}/prueba/criterios/{criterioId}/nota` | Poner la nota de un criterio, con explicación obligatoria | `ajustar_nota` |
-| POST `/postulaciones/{id}/prueba/calificacion-ia` | Pedirle al agente `PRUEBA_PUESTO` los criterios que la rúbrica le reserva. Tarda decenas de segundos y **no pisa ningún ajuste hecho a mano** | `ajustar_nota` |
-| POST `/postulaciones/{id}/prueba/calificacion` | Ponderar las notas ya puestas. Exige que estén todos los criterios. **Escribe**: deja la nota guardada, no es una consulta | `ajustar_nota` |
+| POST `/postulaciones/{id}/prueba/calificacion-ia` | Pedirle al agente `PRUEBA_PUESTO` los criterios que la rúbrica le reserva. Tarda decenas de segundos y **no pisa ningún ajuste hecho a mano**. Al acabar, si la rúbrica quedó entera **deja también la nota de la etapa** | `ajustar_nota` |
+| POST `/postulaciones/{id}/prueba/calificacion` | Ponderar las notas ya puestas. Exige que estén todos los criterios. **Escribe**: deja la nota guardada, no es una consulta. Desde el 28/08 **ya no es el único camino**: si el agente deja la rúbrica entera, la nota sale sola y esta llamada solo la reescribe con lo mismo. Sigue haciendo falta cuando los últimos criterios los pone una persona | `ajustar_nota` |
 
 **El portal del candidato es `/api/v1/portal/prueba/{codigo}`**: ver, iniciar (arranca el
 reloj), responder, subir entregables y entregar. Mismas reglas que la evaluación: nada de

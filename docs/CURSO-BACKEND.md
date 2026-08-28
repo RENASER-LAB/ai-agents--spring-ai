@@ -22,7 +22,7 @@ línea de cada archivo que se citan más abajo son de ese día y recontar la cab
 recontarlos todos engañaría más que ayudar. Lo que ha cambiado desde entonces, para que nadie
 se lleve una sorpresa: las migraciones llegan a la **`V40`** y las tablas de selección son
 **102** —`invitacion` y `tarifa_modelo`, del multiempresa, más las que ya había—, y las pruebas
-son **871 en total**: 765 unitarias (las 645 de la tabla son de ese día) y 106 de integración.
+son **877 en total**: 770 unitarias (las 645 de la tabla son de ese día) y 107 de integración.
 El desglose al día está en [Comprobaciones automáticas](COMPROBACIONES-AUTOMATICAS.md).
 
 ⚠️ Los documentos de `docs/` describen el sistema completo (93 tablas, 77 permisos). El código

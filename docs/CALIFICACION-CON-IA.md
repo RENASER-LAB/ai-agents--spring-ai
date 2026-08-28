@@ -156,7 +156,7 @@ quien lleva la vacante.
 
 | Agente | Qué hace |
 |---|---|
-| **Prueba del puesto** | Lee la entrega del candidato y le pone nota a los criterios de la rúbrica. Al terminar, la prueba pasa a «por confirmar», que es donde una persona la revisa |
+| **Prueba del puesto** | Lee la entrega del candidato y le pone nota a los criterios de la rúbrica. Al terminar, la prueba pasa a «por confirmar», que es donde una persona la revisa — y si la rúbrica quedó entera, **la nota de la prueba sale sola** (ver abajo) |
 | **Conversación final** | Escribe entre tres y cinco preguntas para los quince minutos que cierran la simulación. **No pone ninguna nota** |
 
 ### Quién mira cada criterio de la prueba lo dice la rúbrica
@@ -165,6 +165,28 @@ Cada criterio de una prueba declara cómo se comprueba: con el sistema, con un a
 una persona. **El agente solo ve los suyos.** Si una prueba se califica mirando un video y
 todos sus criterios son de persona, el agente ni siquiera llama al modelo, y quien apriete el
 botón recibe esa respuesta.
+
+### La nota de la prueba sale sola si la rúbrica quedó entera (28/08/2026)
+
+Una cosa es la nota de **cada criterio** y otra la nota de **la prueba**: la suma de todos los
+criterios, que es la que sale en el ranking y con la que se ordena a la gente. El agente ponía la
+primera y **nunca la segunda**: había que pedirla a mano desde el panel, y casi nadie se
+acordaba. En producción quedaron **19 pruebas corregidas sin su nota**, que en el panel se veían
+igual que las que nadie había corregido.
+
+Ahora, en cuanto el agente termina:
+
+- **Si todos los criterios tienen puntaje, la nota sale sola.** Pasa cuando la rúbrica es toda de
+  agente, y también cuando una persona ya había puesto los suyos antes. Un cero cuenta como nota
+  puesta; un criterio al que nadie le puso número, no.
+- **Si falta alguno, no sale, y el registro dice cuál falta por su nombre.** Sumar media rúbrica
+  daría un número bajo que parece un juicio y es un hueco. Saber cuál falta importa: uno de
+  método «persona» es lo normal, y uno de agente que el modelo no supo juzgar es otra cosa que se
+  arregla de otra manera.
+
+El botón del panel para ponderar sigue existiendo y sigue haciendo falta: es lo que cierra las
+pruebas cuyos últimos criterios los pone una persona, y **es lo único que rescata las 19 que ya
+quedaron atascadas** — esto arregla las que se corrijan de aquí en adelante, no las de antes.
 
 ### Lo que no se puede leer no se puntúa
 
