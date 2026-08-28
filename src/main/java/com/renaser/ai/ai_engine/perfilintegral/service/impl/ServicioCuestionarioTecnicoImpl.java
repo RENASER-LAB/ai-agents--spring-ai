@@ -1,9 +1,7 @@
 package com.renaser.ai.ai_engine.perfilintegral.service.impl;
 
 import com.renaser.ai.ai_engine.ai.exception.ResourceNotFoundException;
-import com.renaser.ai.ai_engine.ai.repository.TrabajoIaRepository;
 import com.renaser.ai.ai_engine.ai.service.ColaCalificacionIa;
-import com.renaser.ai.ai_engine.ai.service.impl.AgenteRedactor;
 import com.renaser.ai.ai_engine.auditoria.service.ServicioAuditoria;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosCuestionarioTecnico.CorregirPreguntaTecnica;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosCuestionarioTecnico.CuestionarioResponse;
@@ -38,7 +36,6 @@ public class ServicioCuestionarioTecnicoImpl implements ServicioCuestionarioTecn
     private final FichaVacanteRepository fichas;
     private final VersionBancoRepository versionesBanco;
     private final PreguntaRepository preguntas;
-    private final TrabajoIaRepository trabajos;
     private final ColaCalificacionIa cola;
     private final ServicioAuditoria auditoria;
 
@@ -87,7 +84,7 @@ public class ServicioCuestionarioTecnicoImpl implements ServicioCuestionarioTecn
                 version.map(VersionBanco::getId).orElse(null),
                 version.map(VersionBanco::getEstado).orElse(null),
                 desactualizado,
-                generacionDe(vacante.getId()),
+                cola.comoVaElRedactor(vacante.getId()),
                 lasPreguntas);
     }
 
@@ -167,18 +164,6 @@ public class ServicioCuestionarioTecnicoImpl implements ServicioCuestionarioTecn
         auditoria.registrar(quien.organizacionId(), quien, "publicar_cuestionario_tecnico",
                 "version_banco", borrador.getId(),
                 Map.of("estado", "BORRADOR"), Map.of("estado", "PUBLICADA"), null);
-    }
-
-    // El último trabajo del REDACTOR sobre esta vacante, contado para el panel.
-    private String generacionDe(Long vacanteId) {
-        return trabajos.findFirstByReferenciaTablaAndReferenciaIdAndAgenteCodigoOrderByIdDesc(
-                        "vacante", vacanteId, AgenteRedactor.CODIGO_AGENTE)
-                .map(t -> switch (t.getEstado()) {
-                    case "PENDIENTE", "EN_CURSO", "EN_ESPERA" -> "EN_CURSO";
-                    case "FALLIDO" -> "FALLIDA";
-                    default -> "LISTA";
-                })
-                .orElse("SIN_PEDIR");
     }
 
     private Vacante laDeLaOrganizacion(ContextoUsuario quien, Long id) {

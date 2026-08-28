@@ -70,6 +70,12 @@ public interface ColaCalificacionIa {
     boolean encolarRedactor(Long organizacionId, Long vacanteId);
 
     /**
+     * Cómo va la generación del cuestionario de una vacante, contada para el panel:
+     * SIN_PEDIR · EN_CURSO (incluye EN_ESPERA por tope: va a salir) · FALLIDA · LISTA.
+     */
+    String comoVaElRedactor(Long vacanteId);
+
+    /**
      * Arranca la criba: leer el currículum y armar el Perfil de Talento con solo eso.
      *
      * <p>Es el mismo recorrido que el de arriba, pero para quien todavía no ha respondido

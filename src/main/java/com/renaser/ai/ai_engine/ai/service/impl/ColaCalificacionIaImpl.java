@@ -200,6 +200,18 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
         return true;
     }
 
+    @Override
+    public String comoVaElRedactor(Long vacanteId) {
+        return trabajos.findFirstByReferenciaTablaAndReferenciaIdAndAgenteCodigoOrderByIdDesc(
+                        "vacante", vacanteId, AgenteRedactor.CODIGO_AGENTE)
+                .map(t -> switch (t.getEstado()) {
+                    case "PENDIENTE", "EN_CURSO", "EN_ESPERA" -> "EN_CURSO";
+                    case "FALLIDO" -> "FALLIDA";
+                    default -> "LISTA";
+                })
+                .orElse("SIN_PEDIR");
+    }
+
     private boolean apagada(Long postulacionId) {
         if (!habilitada) {
             log.warn("La calificación con IA está apagada por configuración: la postulación {} "
