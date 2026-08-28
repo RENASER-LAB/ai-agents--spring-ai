@@ -94,6 +94,8 @@ public class ServicioBancoPreguntasImpl implements ServicioBancoPreguntas {
         // personalizó, el de la plataforma si no. Ya no existen filas «globales» sin dueño.
         return versiones.findByOrganizacionIdOrderByCreadoEnDesc(
                         dueno.duenoDe(quien.organizacionId(), Instrumento.BANCO)).stream()
+                // Los cuestionarios de vacante no se mezclan en este panel: tienen el suyo.
+                .filter(v -> v.getVacanteId() == null)
                 .map(versionBancoMapper::toResponse)
                 .toList();
     }
@@ -910,7 +912,18 @@ public class ServicioBancoPreguntasImpl implements ServicioBancoPreguntas {
             // Lo ajeno responde «no existe»: decir «prohibido» ya confirma que existe
             throw new ResourceNotFoundException("Versión del banco", "id", id);
         }
+        sinCuestionariosDeVacante(version, id);
         return version;
+    }
+
+    // Los cuestionarios técnicos de vacante tienen su propia puerta
+    // (/vacantes/{id}/cuestionario-tecnico), con su aduana y sus permisos de vacante.
+    // Por aquí no se llega a ellos ni para leer: este publicar se saltaría la receta,
+    // y este archivar los retiraría sin la guarda de candidatos a medio camino.
+    private static void sinCuestionariosDeVacante(VersionBanco version, Long id) {
+        if (version.getVacanteId() != null) {
+            throw new ResourceNotFoundException("Versión del banco", "id", id);
+        }
     }
 
     /** Editable: solo la de la propia organización. El banco compartido se lee, no se edita. */
@@ -920,6 +933,7 @@ public class ServicioBancoPreguntasImpl implements ServicioBancoPreguntas {
         if (!version.getOrganizacionId().equals(quien.organizacionId())) {
             throw new ResourceNotFoundException("Versión del banco", "id", id);
         }
+        sinCuestionariosDeVacante(version, id);
         return version;
     }
 

@@ -143,3 +143,14 @@ INSERT INTO instruccion_ia (agente_codigo, version, texto, es_activa, publicada_
      'sindicato ni origen étnico.' || chr(10) ||
      '- Escribe claro y directo, sin jerga de recursos humanos.',
      true, now());
+
+-- El respaldo en base del doble clic: el chequeo de «hay uno vivo» del código es
+-- check-then-insert, y dos peticiones a la vez lo pasan las dos. Este índice hace que la
+-- segunda reviente en el insert y nadie pague dos llamadas por el mismo borrador.
+CREATE UNIQUE INDEX trabajo_ia_vivo_por_referencia_idx
+    ON trabajo_ia (referencia_tabla, referencia_id, agente_codigo)
+    WHERE postulacion_id IS NULL AND estado IN ('PENDIENTE', 'EN_CURSO', 'EN_ESPERA');
+
+-- Y el amarre que faltaba: un banco es de vacante si y solo si dice serlo.
+ALTER TABLE version_banco ADD CONSTRAINT version_banco_vacante_amarrada_check
+    CHECK ((tipo_banco = 'VACANTE') = (vacante_id IS NOT NULL));

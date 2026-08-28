@@ -191,8 +191,17 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
                     + "del cuestionario de la vacante {} no se encola", vacanteId);
             return false;
         }
-        Optional<TrabajoIa> creado = registro.crearParaVacante(
-                organizacionId, AgenteRedactor.CODIGO_AGENTE, vacanteId, FINA);
+        Optional<TrabajoIa> creado;
+        try {
+            creado = registro.crearParaVacante(
+                    organizacionId, AgenteRedactor.CODIGO_AGENTE, vacanteId, FINA);
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            // El doble clic de verdad: dos peticiones pasaron el chequeo a la vez y el
+            // índice único frenó a esta. Para el panel es lo mismo que «ya hay uno vivo».
+            log.info("Generación duplicada de la vacante {} frenada por el índice: ya hay "
+                    + "un trabajo vivo", vacanteId);
+            return false;
+        }
         if (creado.isEmpty()) {
             return false;
         }

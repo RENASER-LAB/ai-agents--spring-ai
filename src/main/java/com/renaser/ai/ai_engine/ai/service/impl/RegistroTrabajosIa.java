@@ -95,7 +95,10 @@ public class RegistroTrabajosIa {
         if (vivo) {
             return Optional.empty();
         }
-        return Optional.of(trabajos.save(TrabajoIa.builder()
+        // saveAndFlush: si dos peticiones pasaron el chequeo a la vez, el índice único
+        // parcial de V42 revienta AQUÍ (dentro de esta transacción) y quien llama lo
+        // convierte en «no se encoló» — no en dos llamadas pagadas.
+        return Optional.of(trabajos.saveAndFlush(TrabajoIa.builder()
                 .organizacionId(organizacionId)
                 .agenteCodigo(agenteCodigo)
                 .modo(modo)

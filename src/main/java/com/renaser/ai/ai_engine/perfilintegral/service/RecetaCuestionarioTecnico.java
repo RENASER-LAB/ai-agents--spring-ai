@@ -32,7 +32,7 @@ public final class RecetaCuestionarioTecnico {
     // «política» y «salud» van como frase compuesta a propósito: «políticas de crédito» y
     // «salud financiera» son preguntas legítimas de administración.
     private static final List<String> PROHIBIDO = List.of(
-            "estado civil", "hijos", "embaraz", "religi", "sindica", "etnic",
+            "estado civil", "hijos", "embaraz", "religi", "sindicato", "sindical", "etnic",
             "partido politic", "afiliacion politic", "ideologia",
             "estado de salud", "tu salud", "su salud", "enfermedad");
 
@@ -124,9 +124,12 @@ public final class RecetaCuestionarioTecnico {
                         + "son obligatorios)");
             }
 
-            String enunciado = sinAcentos(p.enunciado());
+            // El candidato ve el enunciado y puede ver el rótulo del bloque: los dos
+            // se revisan. («sindicato/sindical» y no «sindica»: la sindicatura es un
+            // término legítimo de administración.)
+            String visible = sinAcentos(p.enunciado()) + " " + sinAcentos(p.bloqueEtiqueta());
             for (String tabu : PROHIBIDO) {
-                if (enunciado.contains(tabu)) {
+                if (visible.contains(tabu)) {
                     errores.add(fila + ": toca un tema prohibido («" + tabu + "») — no se "
                             + "pregunta estado civil, hijos, salud, embarazo, religión, "
                             + "política, sindicato ni origen étnico");

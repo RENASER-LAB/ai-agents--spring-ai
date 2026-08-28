@@ -53,8 +53,9 @@ son ciclos posteriores y este documento no los diseña — solo les deja la puer
 
 ## Flujo 2 · De la ficha al cuestionario aprobado
 
-1. «Generar» encola un trabajo en la misma fila de IA, con el mismo **tope mensual**. Si
-   el tope está agotado, se avisa ahí mismo y no se encola nada.
+1. «Generar» encola un trabajo en la misma fila de IA, con el mismo **tope mensual**. Con
+   el tope agotado el trabajo queda EN_ESPERA y despierta solo al recuperar cupo (ver
+   Flujo 3).
 2. El **REDACTOR** recibe la ficha y la estructura fija del nivel (DIR 12 · SUP 10 ·
    OPE 8) y escribe el borrador según la receta mecánica de la clienta: 2 de experiencia
    y escala; por riesgo —en el orden del dueño— una de experiencia con magnitudes y una
@@ -78,7 +79,7 @@ son ciclos posteriores y este documento no los diseña — solo les deja la puer
 
 | Situación | Qué pasa |
 |---|---|
-| Tope mensual agotado | Aviso inmediato, nada encolado |
+| Tope mensual agotado | El trabajo queda EN_ESPERA (el panel lo enseña como generación en curso) y despierta solo cuando la organización recupera cupo — la misma mecánica que toda la IA del sistema. Nada se pierde ni se paga de más |
 | La generación falla | La fila reintenta (solo FALLIDO reintenta, como hoy); agotados los reintentos, «falló, vuelve a intentar» |
 | El borrador no pasa la aduana | Se devuelve al agente con el error; si persiste, fallo visible |
 | El dueño regenera | Las veces que quiera antes de aprobar; cada intento cuesta una llamada, el tope frena |

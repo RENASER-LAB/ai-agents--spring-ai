@@ -62,14 +62,15 @@ public class ServicioFichaVacanteImpl implements ServicioFichaVacante {
         exigirOrden(datos.requerimiento1(), datos.requerimiento2(), datos.requerimiento3(), null,
                 "los requerimientos se llenan en orden: no puede haber el 2 sin el 1");
 
-        FichaVacante ficha = fichas.findByVacanteId(vacante.getId())
+        java.util.Optional<FichaVacante> existente = fichas.findByVacanteId(vacante.getId());
+        String estadoAnterior = existente.map(FichaVacante::getEstado).orElse("(nueva)");
+        FichaVacante ficha = existente
                 .orElseGet(() -> FichaVacante.builder()
                         .vacanteId(vacante.getId())
                         .organizacionId(quien.organizacionId())
                         .estado("BORRADOR")
                         .creadoEn(Instant.now())
                         .build());
-        String estadoAnterior = ficha.getEstado();
 
         ficha.setQ1Resultado(datos.q1Resultado());
         ficha.setQ2Riesgo(datos.q2Riesgo());
@@ -100,7 +101,7 @@ public class ServicioFichaVacanteImpl implements ServicioFichaVacante {
 
         auditoria.registrar(quien.organizacionId(), quien, "guardar_ficha_vacante",
                 "ficha_vacante", ficha.getId(),
-                Map.of("estado", estadoAnterior == null ? "(nueva)" : estadoAnterior),
+                Map.of("estado", estadoAnterior),
                 Map.of("estado", ficha.getEstado(),
                        "tamano", ficha.getTamano() == null ? "(sin derivar)" : ficha.getTamano()),
                 null);

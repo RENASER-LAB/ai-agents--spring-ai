@@ -126,6 +126,7 @@ class PuenteRedactorImplTest {
             }
             return v;
         });
+        when(versionesBanco.saveAndFlush(any())).thenAnswer(i -> i.getArgument(0));
 
         puente.guardarBorrador(VACANTE, new ResultadoRedactor(List.of(
                 new PreguntaGenerada("T01", "EXPERIENCIA", "Experiencia y escala",
@@ -135,11 +136,13 @@ class PuenteRedactorImplTest {
                         "¿Qué necesitarías conocer en 30 días?", null, null, null, true))));
 
         assertThat(anterior.getEstado()).isEqualTo("ARCHIVADA");
+        // El archivado va con saveAndFlush a propósito (el orden de flush de Hibernate
+        // rompería el índice de un-borrador-vivo); la creación va con save normal.
+        org.mockito.Mockito.verify(versionesBanco).saveAndFlush(anterior);
 
         ArgumentCaptor<VersionBanco> version = ArgumentCaptor.forClass(VersionBanco.class);
-        org.mockito.Mockito.verify(versionesBanco, org.mockito.Mockito.times(2))
-                .save(version.capture());
-        VersionBanco creada = version.getAllValues().get(1);
+        org.mockito.Mockito.verify(versionesBanco).save(version.capture());
+        VersionBanco creada = version.getValue();
         assertThat(creada.getTipoBanco()).isEqualTo("VACANTE");
         assertThat(creada.getMetodoCalificacion()).isEqualTo("CRITERIOS");
         assertThat(creada.getVacanteId()).isEqualTo(VACANTE);

@@ -788,4 +788,36 @@ class ServicioBancoPreguntasImplTest {
             assertThat(opcion.getValor()).isEqualByComparingTo("2");
         }
     }
+
+    @org.junit.jupiter.api.Nested
+    @DisplayName("Los cuestionarios de vacante tienen su propia puerta")
+    class BancoDeVacanteFueraDeAqui {
+
+        private VersionBanco deVacante(String estado) {
+            return VersionBanco.builder()
+                    .id(VERSION).organizacionId(ORGANIZACION)
+                    .tipoBanco("VACANTE").nivelPuestoCodigo("DIRECCION")
+                    .vacanteId(77L).metodoCalificacion("CRITERIOS")
+                    .etiqueta("Cuestionario técnico · Administrador").estado(estado)
+                    .build();
+        }
+
+        @Test
+        @DisplayName("publicar por aquí un banco de vacante responde «no existe»: se saltaría la receta")
+        void publicarNoLoVe() {
+            when(versiones.findById(VERSION)).thenReturn(Optional.of(deVacante("BORRADOR")));
+
+            assertThatThrownBy(() -> servicio.publicarVersion(quien, VERSION))
+                    .isInstanceOf(com.renaser.ai.ai_engine.ai.exception.ResourceNotFoundException.class);
+        }
+
+        @Test
+        @DisplayName("archivar por aquí tampoco: se saltaría la guarda de candidatos a medio camino")
+        void archivarNoLoVe() {
+            when(versiones.findById(VERSION)).thenReturn(Optional.of(deVacante("PUBLICADA")));
+
+            assertThatThrownBy(() -> servicio.archivarVersion(quien, VERSION))
+                    .isInstanceOf(com.renaser.ai.ai_engine.ai.exception.ResourceNotFoundException.class);
+        }
+    }
 }

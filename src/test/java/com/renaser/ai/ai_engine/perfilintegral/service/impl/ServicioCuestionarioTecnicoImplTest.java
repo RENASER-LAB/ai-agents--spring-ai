@@ -176,6 +176,25 @@ class ServicioCuestionarioTecnicoImplTest {
     }
 
     @Nested
+    @DisplayName("Una vacante de otra organización ni aparece")
+    class VacanteAjena {
+
+        @Test
+        @DisplayName("ver, generar y publicar responden «no existe», nunca «prohibido»")
+        void nadaAjenoSeVe() {
+            when(vacantes.findByIdAndOrganizacionId(VACANTE, ORG)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> servicio.ver(quien, VACANTE))
+                    .isInstanceOf(ResourceNotFoundException.class);
+            assertThatThrownBy(() -> servicio.generar(quien, VACANTE))
+                    .isInstanceOf(ResourceNotFoundException.class);
+            assertThatThrownBy(() -> servicio.publicar(quien, VACANTE))
+                    .isInstanceOf(ResourceNotFoundException.class);
+            verify(cola, never()).encolarRedactor(any(), any());
+        }
+    }
+
+    @Nested
     @DisplayName("Corregir")
     class Corregir {
 

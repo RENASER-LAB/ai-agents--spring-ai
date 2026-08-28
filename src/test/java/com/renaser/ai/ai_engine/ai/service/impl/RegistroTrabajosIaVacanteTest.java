@@ -46,14 +46,14 @@ class RegistroTrabajosIaVacanteTest {
             assertThat(registro.crearParaVacante(1L, "REDACTOR", 50L, "FINA"))
                     .as(estado).isEmpty();
         }
-        verify(trabajos, never()).save(any());
+        verify(trabajos, never()).saveAndFlush(any());
     }
 
     @Test
     @DisplayName("Lo TERMINADO no exime: regenerar crea un trabajo nuevo")
     void loTerminadoNoExime() {
         conUltimo("TERMINADO");
-        when(trabajos.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(trabajos.saveAndFlush(any())).thenAnswer(i -> i.getArgument(0));
 
         Optional<TrabajoIa> creado = registro.crearParaVacante(1L, "REDACTOR", 50L, "FINA");
 
@@ -68,7 +68,7 @@ class RegistroTrabajosIaVacanteTest {
     @DisplayName("El primero de todos también se crea")
     void elPrimeroSeCrea() {
         conUltimo(null);
-        when(trabajos.save(any())).thenAnswer(i -> i.getArgument(0));
+        when(trabajos.saveAndFlush(any())).thenAnswer(i -> i.getArgument(0));
 
         assertThat(registro.crearParaVacante(1L, "REDACTOR", 50L, "FINA")).isPresent();
     }

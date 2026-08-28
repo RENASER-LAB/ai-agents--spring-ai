@@ -1208,7 +1208,7 @@ Cuántas preguntas de cada tipo y dimensión entran.
 |---|---|---|---|
 | `id` | bigint | sí | Clave |
 | `plantilla_evaluacion_id` | bigint | sí | |
-| `tipo_banco` | text | sí | `NIVEL`, `ALINEACION` o `VACANTE` (`V42`: el cuestionario técnico de una vacante) |
+| `tipo_banco` | text | sí | `NIVEL` o `ALINEACION` (su CHECK no admite `VACANTE`: una plantilla no pide preguntas del cuestionario de una vacante) |
 | `tipo_pregunta` | text | no | Vacío si no importa el tipo |
 | `dimension_codigo` | text | no | Vacío si no importa la dimensión |
 | `cantidad_min` | integer | sí | |
@@ -1996,10 +1996,9 @@ Una versión de todos los pesos.
 | `id` | bigint | sí | Clave |
 | `organizacion_id` | bigint | sí | |
 | `etiqueta` | text | sí | |
-| `estado` | text | sí | `BORRADOR`, `PUBLICADA` o `ARCHIVADA` |
+| `estado` | text | sí | `BORRADOR` o `PUBLICADA` |
 | `publicada_por_usuario_id` | bigint | no | |
 | `publicada_en` | timestamptz | no | |
-| `vacante_id` | bigint | no | `V42`. Vacío = banco por nivel, como siempre. Con valor = cuestionario técnico de ESA vacante (método CAZATALENTOS etapa 2). Índices parciales: a lo sumo un `BORRADOR` y una `PUBLICADA` por vacante |
 
 **Clave primaria:** `id` · **Único:** `organizacion_id` + `etiqueta`
 
