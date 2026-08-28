@@ -184,6 +184,43 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
         return encolarSuelto(postulacionId, AgenteSimulacion.CODIGO_AGENTE);
     }
 
+    @Override
+    public boolean encolarRedactor(Long organizacionId, Long vacanteId) {
+        if (!habilitada) {
+            log.warn("La calificación con IA está apagada por configuración: la generación "
+                    + "del cuestionario de la vacante {} no se encola", vacanteId);
+            return false;
+        }
+        Optional<TrabajoIa> creado;
+        try {
+            creado = registro.crearParaVacante(
+                    organizacionId, AgenteRedactor.CODIGO_AGENTE, vacanteId, FINA);
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            // El doble clic de verdad: dos peticiones pasaron el chequeo a la vez y el
+            // índice único frenó a esta. Para el panel es lo mismo que «ya hay uno vivo».
+            log.info("Generación duplicada de la vacante {} frenada por el índice: ya hay "
+                    + "un trabajo vivo", vacanteId);
+            return false;
+        }
+        if (creado.isEmpty()) {
+            return false;
+        }
+        frenarOPublicar(creado.get(), organizacionId);
+        return true;
+    }
+
+    @Override
+    public String comoVaElRedactor(Long vacanteId) {
+        return trabajos.findFirstByReferenciaTablaAndReferenciaIdAndAgenteCodigoOrderByIdDesc(
+                        "vacante", vacanteId, AgenteRedactor.CODIGO_AGENTE)
+                .map(t -> switch (t.getEstado()) {
+                    case "PENDIENTE", "EN_CURSO", "EN_ESPERA" -> "EN_CURSO";
+                    case "FALLIDO" -> "FALLIDA";
+                    default -> "LISTA";
+                })
+                .orElse("SIN_PEDIR");
+    }
+
     private boolean apagada(Long postulacionId) {
         if (!habilitada) {
             log.warn("La calificación con IA está apagada por configuración: la postulación {} "
@@ -538,17 +575,27 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
         if (creado.isEmpty()) {
             return false;
         }
+        frenarOPublicar(creado.get(), organizacionId);
+        return true;
+    }
+
+    /**
+     * El destino de todo trabajo recién creado: EN_ESPERA si la organización está
+     * suspendida o sin cupo, y a la cola si no. Lo comparten los trabajos por postulación
+     * y los de vacante (el REDACTOR): el tope frena lo nuevo venga de donde venga.
+     */
+    private void frenarOPublicar(TrabajoIa trabajo, Long organizacionId) {
         // La suspensión se mira primero: es una lectura por clave primaria, y a una
         // organización congelada no se le paga ni la suma del consumo del mes.
         String freno = suspendida(organizacionId) ? "está suspendida"
                 : tope.sinCupo(organizacionId) ? "agotó su tope mensual de IA" : null;
-        if (freno != null && registro.dejarEnEspera(creado.get().getId())) {
+        if (freno != null && registro.dejarEnEspera(trabajo.getId())) {
             log.warn("La organización {} {}: el trabajo {} ({}) queda EN_ESPERA hasta que "
                             + "el barrido la encuentre con cupo y activa",
-                    organizacionId, freno, creado.get().getId(), agente);
-            return true;
+                    organizacionId, freno, trabajo.getId(), trabajo.getAgenteCodigo());
+            return;
         }
-        publicador.publicar(creado.get().getId());
+        publicador.publicar(trabajo.getId());
         // El aviso del 80% se dispara donde el gasto crece: al encolar con cupo. Manda
         // una sola vez por mes y jamás rompe el encolado: corre en su propia transacción
         // (REQUIRES_NEW) y cualquier tropiezo suyo se anota y se traga — la postulación
@@ -558,9 +605,8 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
         } catch (RuntimeException e) {
             log.error("El aviso del 80% del tope de IA de la organización {} falló y se ignora: "
                     + "el encolado del trabajo {} sigue en pie. Motivo: {}",
-                    organizacionId, creado.get().getId(), mensaje(e));
+                    organizacionId, trabajo.getId(), mensaje(e));
         }
-        return true;
     }
 
     /**

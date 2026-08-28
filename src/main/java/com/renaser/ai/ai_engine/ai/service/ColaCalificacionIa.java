@@ -58,6 +58,24 @@ public interface ColaCalificacionIa {
     boolean reencolarEvaluador(Long postulacionId);
 
     /**
+     * Encola al REDACTOR: generar el borrador del cuestionario técnico de una vacante.
+     *
+     * <p>El único trabajo de la cola que no cuelga de una postulación: su referencia es la
+     * vacante. Regenerar es legítimo (cada clic del dueño es un trabajo nuevo), pero uno
+     * VIVO frena al siguiente para que dos clics seguidos no paguen dos llamadas.
+     *
+     * @return true si quedó en la cola (o EN_ESPERA por tope); false si hay uno vivo o la
+     *         calificación con IA está apagada.
+     */
+    boolean encolarRedactor(Long organizacionId, Long vacanteId);
+
+    /**
+     * Cómo va la generación del cuestionario de una vacante, contada para el panel:
+     * SIN_PEDIR · EN_CURSO (incluye EN_ESPERA por tope: va a salir) · FALLIDA · LISTA.
+     */
+    String comoVaElRedactor(Long vacanteId);
+
+    /**
      * Arranca la criba: leer el currículum y armar el Perfil de Talento con solo eso.
      *
      * <p>Es el mismo recorrido que el de arriba, pero para quien todavía no ha respondido

@@ -146,6 +146,7 @@ public class CopiadorDeInstrumentosImpl implements CopiadorDeInstrumentos {
                     .c3Esperado(p.getC3Esperado())
                     .c4Esperado(p.getC4Esperado())
                     .senalDeCero(p.getSenalDeCero())
+                    .presencial(p.isPresencial())
                     .creadoEn(ahora)
                     .build());
             mapaPreguntas.put(p.getId(), copia.getId());

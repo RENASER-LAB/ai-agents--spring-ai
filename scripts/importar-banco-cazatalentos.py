@@ -14,12 +14,15 @@ no reemplaza las anteriores.
     python3 scripts/importar-banco-cazatalentos.py --usuario TU_UID
     python3 scripts/importar-banco-cazatalentos.py --usuario TU_UID --api http://localhost:8081
 
-Necesita el dev-login encendido (apagado por defecto desde multiempresa) y el backend
-local en el 8081 — el 8080 suele ser Adminer, que responde 200 a todo y esconde el fallo.
+En local necesita el dev-login encendido (apagado por defecto desde multiempresa) y el
+backend en el 8081 — el 8080 suele ser Adminer, que responde 200 a todo y esconde el fallo.
+Contra produccion no hay dev-login: pasar un token Bearer real con --token o la variable
+RENASER_TOKEN (sacado de la sesion del panel), y --api con la URL del backend desplegado.
 """
 
 import argparse
 import json
+import os
 import sys
 import urllib.error
 import urllib.request
@@ -79,17 +82,40 @@ def formulario(campos, archivo_nombre, archivo_bytes):
 
 def main():
     opciones = argparse.ArgumentParser(description=__doc__)
-    opciones.add_argument("--usuario", required=True,
+    opciones.add_argument("--usuario",
                           help="usuarioRenaserOsId para el dev-login local")
     opciones.add_argument("--api", default="http://localhost:8081",
                           help="backend local (8081; el 8080 suele ser Adminer)")
+    opciones.add_argument("--token", default=os.environ.get("RENASER_TOKEN"),
+                          help="token Bearer ya emitido (produccion, donde no hay "
+                               "dev-login); tambien via la variable RENASER_TOKEN")
+    opciones.add_argument("--correo", default=os.environ.get("RENASER_PANEL_CORREO"),
+                          help="login real con correo y contrasena de cuenta de equipo; "
+                               "la clave va en la variable RENASER_PANEL_CLAVE, nunca como argumento")
     args = opciones.parse_args()
 
-    codigo, sesion = llamar(args.api, "POST", "/api/v1/panel/auth/dev-login", None,
-                            {"usuarioRenaserOsId": args.usuario})
-    if codigo != 200:
-        sys.exit(f"No se pudo entrar como «{args.usuario}»: {sesion}")
-    token = sesion["token"]
+    if args.token:
+        token = args.token
+    elif args.correo:
+        clave = os.environ.get("RENASER_PANEL_CLAVE")
+        if not clave:
+            sys.exit("Falta la contrasena: ponla en la variable RENASER_PANEL_CLAVE "
+                     "(read -s RENASER_PANEL_CLAVE && export RENASER_PANEL_CLAVE) para no dejarla "
+                     "en el historial de la terminal.")
+        codigo, sesion = llamar(args.api, "POST", "/api/v1/panel/auth/login", None,
+                                {"correo": args.correo, "contrasena": clave})
+        if codigo != 200:
+            sys.exit(f"No se pudo entrar como «{args.correo}»: {sesion}")
+        token = sesion["token"]
+    elif args.usuario:
+        codigo, sesion = llamar(args.api, "POST", "/api/v1/panel/auth/dev-login", None,
+                                {"usuarioRenaserOsId": args.usuario})
+        if codigo != 200:
+            sys.exit(f"No se pudo entrar como «{args.usuario}»: {sesion}")
+        token = sesion["token"]
+    else:
+        sys.exit("Hace falta --usuario (local, dev-login) o --token / RENASER_TOKEN "
+                 "(produccion).")
 
     fallo = False
     for archivo, nivel, etiqueta in BANCOS:

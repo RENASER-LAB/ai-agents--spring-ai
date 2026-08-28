@@ -37,11 +37,16 @@ public interface VersionBancoRepository extends JpaRepository<VersionBanco, Long
             select v from VersionBanco v
              where v.tipoBanco = :tipoBanco and v.estado = 'PUBLICADA' and v.id <> :salvoId
                and ((:nivel is null and v.nivelPuestoCodigo is null) or v.nivelPuestoCodigo = :nivel)
-               and v.organizacionId = :organizacionId""")
+               and v.organizacionId = :organizacionId
+               and v.vacanteId is null""")
     List<VersionBanco> findPublicadasHermanas(@Param("tipoBanco") String tipoBanco,
                                               @Param("nivel") String nivel,
                                               @Param("organizacionId") Long organizacionId,
                                               @Param("salvoId") Long salvoId);
 
     List<VersionBanco> findByOrganizacionIdAndEstado(Long organizacionId, String estado);
+
+    // El cuestionario técnico de una vacante: a lo sumo un BORRADOR y una PUBLICADA
+    // (índices parciales de V42).
+    java.util.Optional<VersionBanco> findFirstByVacanteIdAndEstado(Long vacanteId, String estado);
 }

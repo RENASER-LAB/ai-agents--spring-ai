@@ -1,7 +1,10 @@
 package com.renaser.ai.ai_engine.vacante.controller;
 
+import com.renaser.ai.ai_engine.vacante.service.ServicioFichaVacante;
 import com.renaser.ai.ai_engine.vacante.service.ServicioVacantesPanel;
 
+import com.renaser.ai.ai_engine.vacante.dto.DtosFichaVacante.FichaResponse;
+import com.renaser.ai.ai_engine.vacante.dto.DtosFichaVacante.GuardarFicha;
 import com.renaser.ai.ai_engine.vacante.dto.DtosVacante.*;
 import com.renaser.ai.ai_engine.seguridad.service.Permisos;
 import io.swagger.v3.oas.annotations.Operation;
@@ -22,6 +25,7 @@ import java.util.Map;
 public class VacantesPanelController {
 
     private final ServicioVacantesPanel servicio;
+    private final ServicioFichaVacante fichaVacante;
     private final Permisos permisos;
 
     // ---------- Puestos ----------
@@ -113,6 +117,25 @@ public class VacantesPanelController {
     public CierrePruebaResponse definirCierrePrueba(@PathVariable Long id,
                                                     @Valid @RequestBody DefinirCierrePrueba datos) {
         return servicio.definirCierrePrueba(permisos.actual(), id, datos);
+    }
+
+    // ---------- La ficha de vacante (método CAZATALENTOS) ----------
+
+    @GetMapping("/vacantes/{id}/ficha")
+    @PreAuthorize("@permisos.tiene('ver_vacantes')")
+    @Operation(summary = "La ficha del método CAZATALENTOS: las 10 preguntas al dueño y "
+            + "sus salidas. COMPLETA es lo que permite generar el cuestionario técnico")
+    public FichaResponse ficha(@PathVariable Long id) {
+        return fichaVacante.ver(permisos.actual(), id);
+    }
+
+    @PutMapping("/vacantes/{id}/ficha")
+    @PreAuthorize("@permisos.tiene('editar_vacante')")
+    @Operation(summary = "Guardar la ficha, a medias o completa. El tamaño (MICRO/MEDIA/"
+            + "GRANDE) se deriva solo y la respuesta sugiere la versión de pesos que toca")
+    public FichaResponse guardarFicha(@PathVariable Long id,
+                                      @Valid @RequestBody GuardarFicha datos) {
+        return fichaVacante.guardar(permisos.actual(), id, datos);
     }
 
     // ---------- Los textos de correo de esta vacante ----------

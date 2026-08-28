@@ -23,6 +23,11 @@ public interface TrabajoIaRepository extends JpaRepository<TrabajoIa, Long> {
     Optional<TrabajoIa> findFirstByPostulacionIdAndAgenteCodigoOrderByIdDesc(
             Long postulacionId, String agenteCodigo);
 
+    // Los trabajos que no cuelgan de una postulación (el REDACTOR trabaja por vacante):
+    // se buscan por su referencia.
+    Optional<TrabajoIa> findFirstByReferenciaTablaAndReferenciaIdAndAgenteCodigoOrderByIdDesc(
+            String referenciaTabla, Long referenciaId, String agenteCodigo);
+
     // Los que el sondeo tiene que volver a empujar: o nadie recogió el mensaje, o quien lo
     // recogió se murió a mitad. Ver ReintentoTrabajosIa.
     List<TrabajoIa> findByEstadoAndCreadoEnBefore(String estado, Instant limite);

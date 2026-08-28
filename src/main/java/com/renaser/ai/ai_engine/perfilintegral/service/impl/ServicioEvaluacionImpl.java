@@ -354,8 +354,14 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
      * y no cambia, aunque vuelva a entrar tres días después.
      */
     private void armarOrden(Evaluacion evaluacion) {
+        // La muestra de trabajo PRESENCIAL jamás viaja en un formulario: regala el
+        // diagnóstico del negocio a todo el que postule. Hoy ningún examen apunta a un
+        // banco de vacante, pero este es el único sitio que arma exámenes y el filtro
+        // vive aquí para que reutilizar el portal (ciclo 2) no la sirva por accidente.
         List<Pregunta> finales = preguntas.findByVersionBancoIdOrderByOrden(
-                evaluacion.getVersionBancoNivelId());
+                        evaluacion.getVersionBancoNivelId()).stream()
+                .filter(p -> !p.isPresencial())
+                .toList();
         if (finales.isEmpty()) {
             throw new IllegalStateException(
                     "El banco de preguntas de este nivel no tiene ninguna pregunta: "

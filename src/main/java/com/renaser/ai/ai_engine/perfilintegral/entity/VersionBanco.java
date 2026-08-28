@@ -29,4 +29,7 @@ public class VersionBanco {
 
     /** NULL = motor de claves versionadas (v0.1 y v3) · CRITERIOS = conteo C1..C4 (CAZATALENTOS). */
     private String metodoCalificacion;
+
+    /** NULL = banco por nivel (plataforma) · con valor = cuestionario técnico de esa vacante. */
+    private Long vacanteId;
 }
