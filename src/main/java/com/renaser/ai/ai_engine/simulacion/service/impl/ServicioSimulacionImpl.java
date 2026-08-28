@@ -23,6 +23,7 @@ import com.renaser.ai.ai_engine.usuario.repository.UsuarioRolRepository;
 import com.renaser.ai.ai_engine.usuario.service.NombresDeUsuarios;
 import com.renaser.ai.ai_engine.vacante.entity.Vacante;
 import com.renaser.ai.ai_engine.vacante.repository.VacanteRepository;
+import com.renaser.ai.ai_engine.vacante.service.AlcanceSobreLaVacante;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -74,6 +75,7 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
     private final AlertaRepository alertas;
     private final PostulacionRepository postulaciones;
     private final VacanteRepository vacantes;
+    private final AlcanceSobreLaVacante alcanceVacante;
     private final NombresDeUsuarios nombres;
     private final ColaCalificacionIa cola;
     private final RolRepository roles;
@@ -321,44 +323,19 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
     /**
      * Si este usuario puede ver esta inscripción, según el alcance que su rol tenga hoy.
      *
-     * <p>Los tres casos del enum están cubiertos a propósito, y no solo el que hoy se
-     * siembra. El reparto de {@code rol_permiso} se edita desde el panel: si mañana alguien
-     * pone {@code PROPIO} en este permiso, el que falte un caso aquí no daría un error — daría
-     * la lista entera, que es exactamente lo contrario de lo que esa configuración pide.
+     * <p>La regla la decide {@link AlcanceSobreLaVacante}, que es donde vive para todo el
+     * panel. Aquí se le pasa el mapa de vacantes ya cargado: sobre una tanda, preguntar por
+     * cada fila convertiría la lista en una consulta por elemento.
      */
     private boolean alcanzaA(ContextoUsuario quien, FiltroAlcance alcance, Postulacion p,
                              Map<Long, Vacante> porVacante) {
-        return alcanzaA(quien, alcance, p, id -> Optional.ofNullable(porVacante.get(id)));
+        return alcanceVacante.alcanzaA(quien, alcance, p,
+                id -> Optional.ofNullable(porVacante.get(id)));
     }
 
-    /**
-     * Lo mismo para una postulación suelta, cuando no hay tanda con la que ir.
-     *
-     * <p>Las dos comparten cuerpo a propósito: qué significa que una vacante sea tuya se
-     * escribe una sola vez, y lo único que cambia es de dónde sale la vacante —de un mapa ya
-     * cargado o de la base—.
-     */
+    /** Lo mismo para una postulación suelta, cuando no hay tanda con la que ir. */
     private boolean alcanzaA(ContextoUsuario quien, FiltroAlcance alcance, Postulacion p) {
-        return alcanzaA(quien, alcance, p, vacantes::findById);
-    }
-
-    private boolean alcanzaA(ContextoUsuario quien, FiltroAlcance alcance, Postulacion p,
-                             Function<Long, Optional<Vacante>> laVacante) {
-        if (p == null) {
-            return false;
-        }
-        return switch (alcance.tipo()) {
-            case TODO -> true;
-            case SUS_VACANTES -> laVacante.apply(p.getVacanteId())
-                    .map(v -> quien.usuarioId().equals(v.getResponsableUsuarioId()))
-                    .orElse(false);
-            // PROPIO no alcanza a nadie aquí, igual que no abre ninguna sesión ni lista
-            // ninguna: esto es el panel, y quien mira nunca es el candidato de la fila. Antes
-            // devolvía la inscripción propia de quien llamaba —inalcanzable, porque el panel
-            // exige TIPO_EQUIPO— y eso dejaba a los tres endpoints diciendo cosas distintas
-            // para el mismo alcance.
-            case PROPIO -> false;
-        };
+        return alcanceVacante.alcanzaA(quien, alcance, p);
     }
 
     @Override
@@ -769,18 +746,7 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
     }
 
     private Postulacion laVisible(ContextoUsuario quien, Long postulacionId, String permiso) {
-        Postulacion p = postulaciones.findByIdAndOrganizacionId(postulacionId, quien.organizacionId())
-                .orElseThrow(() -> new ResourceNotFoundException("Postulación", "id", postulacionId));
-        FiltroAlcance alcance = permisos.alcanceDe(permiso);
-        if (alcance.tipo() == FiltroAlcance.Tipo.SUS_VACANTES) {
-            boolean esSuya = vacantes.findById(p.getVacanteId())
-                    .map(v -> quien.usuarioId().equals(v.getResponsableUsuarioId()))
-                    .orElse(false);
-            if (!esSuya) {
-                throw new ResourceNotFoundException("Postulación", "id", postulacionId);
-            }
-        }
-        return p;
+        return alcanceVacante.laPostulacionVisible(quien, postulacionId, permiso);
     }
 
     /**

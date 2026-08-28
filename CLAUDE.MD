@@ -70,7 +70,7 @@ Perfil Integral → prueba del puesto → simulacion → validacion → decision
 |---|---|
 | Base de datos | **Flyway es el dueno del esquema**: V1-V40 en `src/main/resources/db/migration`, **102 tablas de este modulo** (105 en la base contando `flyway_schema_history` y las dos del motor de agentes, `agent_run` y `vector_store`). `ddl-auto: validate` |
 | Codigo | Veintiun paquetes de dominio bajo `ai_engine` (ver «Como esta organizado el codigo») |
-| Tests | **787, todos en verde (27/08/2026, tras fusionar main)**: 684 unitarios y 103 de integracion (de esos 103, 6 se saltan: los que gastan saldo o mandan correo de verdad). Ver «Correr los tests»: unitarios de la maquina y del anonimizador, migraciones contra Postgres real (Testcontainers) y flujos de punta a punta: hito 1, evaluacion, prueba, simulacion/validacion, calificacion con IA, la vacante sin banco, las dos empresas y el tope de IA de la plataforma |
+| Tests | **877, todos en verde (28/08/2026)**: 770 unitarios y 107 de integracion (de esos 107, 6 se saltan: los que gastan saldo o mandan correo de verdad). Ver «Correr los tests»: unitarios de la maquina y del anonimizador, migraciones contra Postgres real (Testcontainers) y flujos de punta a punta: hito 1, evaluacion, prueba, simulacion/validacion, calificacion con IA, la vacante sin banco, las dos empresas y el tope de IA de la plataforma |
 | IA que califica | **Seis de los diez agentes del catalogo estan implementados**: datos del curriculum, evidencia, evaluador, potencial/riesgo, prueba del puesto y las preguntas de la conversacion final. Todos corren por cola de RabbitMQ contra DeepSeek. Ver [Calificacion con IA](docs/CALIFICACION-CON-IA.md) |
 | Correo | **Ya sabe salir de verdad** (`EnviadorCorreoSmtp`), pero **por defecto no sale**: `renaser.correo.transporte` vale `log` salvo que se ponga `smtp`, y entonces solo se registra en `correo_enviado`. Para encenderlo hacen falta `CORREO_TRANSPORTE=smtp`, `CORREO_REMITENTE` y una cuenta que autentique. El RNF-65 pide que salga **desde el dominio propio de Renaser**: confirmar con ellos si ya lo tienen antes de encenderlo |
 | Acceso del candidato | Entra al portal **con un enlace, sin contrasena** (`EnlaceAcceso`, `ServicioEnlaceAcceso`). El enlace se le manda por correo, asi que depende de lo de arriba |
@@ -88,7 +88,7 @@ decide quien lleva la vacante.
 
 | Agente | Que hace | Por donde se pide |
 |---|---|---|
-| `PRUEBA_PUESTO` | Puntua los criterios de la rubrica **marcados como `AGENTE`**; los de `PERSONA` los sigue poniendo alguien. Al terminar mueve la postulacion a `PRUEBA_POR_CONFIRMAR` | `POST /api/v1/panel/postulaciones/{id}/prueba/calificacion-ia` |
+| `PRUEBA_PUESTO` | Puntua los criterios de la rubrica **marcados como `AGENTE`**; los de `PERSONA` los sigue poniendo alguien. Al terminar mueve la postulacion a `PRUEBA_POR_CONFIRMAR` y, **si la rubrica quedo entera, deja tambien la nota de la etapa** (28/08/2026, ver abajo) | `POST /api/v1/panel/postulaciones/{id}/prueba/calificacion-ia` |
 | `SIMULACION` | Escribe entre tres y cinco preguntas para la conversacion final, sacadas de las contradicciones entre lo que dijo y lo que se le vio hacer. **No puntua nada** | `POST /api/v1/panel/postulaciones/{id}/conversacion-final/generar` |
 
 Dos cosas que no son obvias:
@@ -99,6 +99,44 @@ Dos cosas que no son obvias:
   fundada de la inventada.
 - **Una pregunta ya contestada no se borra.** Volver a pedir las preguntas rehace solo las que
   nadie llego a hacer.
+
+### La prueba queda con nota en cuanto su rubrica esta entera (28/08/2026)
+
+El agente guardaba la nota de **cada criterio**, y la de la **etapa** —la suma ponderada, la que
+sale en el ranking y con la que se ordena— **no se calculaba nunca**. En la base de produccion
+eso dejo **19 pruebas corregidas sin nota de etapa**, que en el panel se ven igual que las que
+nadie ha corregido.
+
+Ahora `ponderarSiLaRubricaEstaEntera` suma **solo si todos los criterios tienen puntaje**; si
+falta alguno no suma y **nombra cual** en el registro. La decision vieja no se revierte: casi
+ninguna rubrica esta completa cuando el modelo acaba —los de metodo `PERSONA` siguen vacios por
+diseno— y media rubrica da un numero bajo que parece un juicio y es un hueco. Lo que cambia es
+que «casi ninguna» no es «ninguna»: una rubrica de puros criterios de agente queda entera en
+cuanto el modelo termina.
+
+⚠️ **Se comprueba antes de sumar, no se intenta y se atrapa.** `calcularNotaEtapa` lanza cuando
+falta un criterio, y esto corre dentro de la transaccion que acaba de guardar las notas del
+modelo: dejar salir esa excepcion marcaria rollback y **se perderian esas notas**.
+
+⚠️ **Un cero es una nota puesta, y una fila de nota sin puntaje cuenta como que falta.** La
+guarda nueva es mas estricta que la del propio `calcularNotaEtapa`, que solo mira si la fila
+existe: con el `puntaje` en nulo su suma reventaria.
+
+⚠️ **Hay una carrera conocida y se reporta, no se arregla.** El agente y el boton del panel
+(`POST /postulaciones/{id}/prueba/calificacion`) pueden insertar la nota a la vez; uno choca con
+la clave unica y su transaccion cae con las notas dentro. **Se cura sola**: el trabajo se
+republica y el reintento las vuelve a guardar. Es una ventana de milisegundos y arreglarla cuesta
+mas de lo que evita.
+
+⚠️ **La rama que suma no la guardaba ningun test, y por eso hay uno de integracion.** Los 39
+tests que ya existian del puente nunca preparaban `notasCriterio.findByPostulacionId`, asi que el
+doble devolvia lista vacia y **todos** iban por la rama de «la rubrica no esta entera»; y los
+cinco unitarios nuevos llaman al metodo por reflexion, asi que seguirian verdes aunque nadie lo
+llamara. `FlujoPruebaIT` (`@Order(8)`) lo comprueba contra la base de verdad. **No lo borres
+pensando que los unitarios lo cubren.**
+
+**Esto arregla las pruebas que se corrijan de aqui en adelante.** Las 19 ya atascadas siguen
+necesitando que alguien las pondere una vez desde el panel.
 
 **Lo que falta y no es codigo** — son decisiones de Renaser que los documentos defieren a
 proposito, no trabajo olvidado:
@@ -113,13 +151,18 @@ proposito, no trabajo olvidado:
 Otros placeholders puestos a proposito: los **umbrales de los grupos de prioridad (80 y 65)** son
 parametro editable y Renaser no los ha confirmado.
 
-⚠️ Conocido y **ya no tan lejano**: `FiltroAlcance.responsableOFiltroNulo()` trata el alcance
-`PROPIO` igual que `TODO` —devuelve nulo y no filtra—, y lo usa la bandeja del panel
-(`ServicioPostulacionesPanelImpl`). Antes hacia falta entrar a la base para poner un `PROPIO`
-en un permiso de panel; **desde la V40 basta un `PUT` de `administrar_permisos`**, que acepta
-los tres valores. Ninguna semilla lo pone asi, pero ya no es «inalcanzable»: es un cambio de
-configuracion sin desplegar. La simulacion si distingue los tres casos (ver
-`ServicioSimulacionImpl.alcanzaA`); la bandeja todavia no.
+**El alcance de una fila lo decide un solo sitio**: `AlcanceSobreLaVacante` (paquete `vacante`).
+Antes «con `SUS_VACANTES` solo alcanzas lo de tus vacantes» estaba escrito catorce veces en
+nueve clases de siete modulos, y doce de ellas **dejaban pasar `PROPIO`** —solo probaban «es
+`SUS_VACANTES`»—, o sea acceso completo justo para quien menos alcance tiene. Con la V40 eso
+dejo de ser inalcanzable: `administrar_permisos` acepta los tres valores por `PUT`, sin
+desplegar. Hoy el guardian trata los tres casos con un `switch` sobre el enum, para que un
+cuarto valor rompa la compilacion en vez de colarse.
+
+⚠️ Lo que queda de aquello: `FiltroAlcance.responsableOFiltroNulo()` sigue devolviendo nulo con
+`PROPIO` igual que con `TODO`. Su unico uso —la bandeja, en `ServicioPostulacionesPanelImpl`—
+ya lo trata aparte con `noAlcanzaANadieEnElPanel()`, y el javadoc del metodo avisa. Quien lo
+use en un sitio nuevo tiene que hacer lo mismo.
 
 **Los agentes de la calificacion ya NO corren en fila** (20/08/2026): los tres que no
 dependen de nadie —datos del CV, evidencia y evaluador— van a la vez, y el que arma el
@@ -297,6 +340,15 @@ Las dos consultan el mismo backend, asi que ensenan el mismo orden.
   `postulacion.estado_codigo` a mano.
 - El alcance se aplica dentro de las consultas con `Permisos.alcanceDe`. Un 404 tambien
   significa «esto no es tuyo».
+- **Que una postulacion o una vacante sea tuya lo decide `AlcanceSobreLaVacante`, y solo el.**
+  Un servicio nuevo que necesite acotar por vacante lo inyecta y llama a
+  `laPostulacionVisible`, `laVacanteVisible` o `alcanzaA` — **no** vuelve a escribir el
+  `== SUS_VACANTES`. Esa linea estuvo copiada catorce veces y doce se dejaban `PROPIO` sin
+  tratar; la version del guardian es un `switch` sobre el enum, asi que un alcance nuevo rompe
+  la compilacion en un sitio en vez de colarse en doce. Lo que **no** pasa por ahi, y no es un
+  descuido: la **sesion de simulacion**, que sirve a varias vacantes a la vez y lleva su propia
+  regla (`tocaUnaVacanteSuya`, y el conteo con su cuarto caso en `contarInscritos`); y la
+  **solicitud de talento**, cuyo dueno es alguien del equipo (`ServicioSolicitudesImpl`).
 - El esquema solo cambia con una migracion nueva. **Nunca** editar una ya aplicada.
 - **Antes de numerar una migracion, mirar cual es la mas alta que existe** — y no solo en tu
   rama. Ricardo tambien crea migraciones: la de simulacion y validacion tuvo que pasar de `V16`
@@ -308,12 +360,12 @@ Las dos consultan el mismo backend, asi que ensenan el mismo orden.
 - Nada se recalcula hacia atras: cada nota queda atada a la version de pesos de su vacante.
 
 ### Correr los tests
-**684 unitarios en verde (27/08/2026).** Son dos tandas y el comando decide cual corre:
+**770 unitarios en verde (28/08/2026).** Son dos tandas y el comando decide cual corre:
 
 | Comando | Que corre | Cuantos | Necesita |
 |---|---|---:|---|
-| `./mvnw test` | unitarias con dobles y las de arquitectura | 684 | nada |
-| `./mvnw verify` | lo anterior mas las de integracion | 787 | Docker |
+| `./mvnw test` | unitarias con dobles y las de arquitectura | 770 | nada |
+| `./mvnw verify` | lo anterior mas las de integracion | 877 | Docker |
 
 Las de integracion levantan su propio PostgreSQL y su propio RabbitMQ con Testcontainers: hace
 falta el demonio de Docker encendido. El desglose completo esta en
@@ -643,7 +695,7 @@ com.renaser.ai.ai_engine.<dominio>
 | `usuario` | Persona, usuario del equipo, roles y permisos |
 | `organizacion` | La organizacion, sus areas, la plataforma (alta de empresas) y la personalizacion de instrumentos |
 | `solicitud` | La Solicitud de Talento y sus resultados esperados |
-| `vacante` | Vacante, puesto, catalogos y requisitos objetivos |
+| `vacante` | Vacante, puesto, catalogos y requisitos objetivos. Aqui vive tambien `AlcanceSobreLaVacante`, que decide para todo el panel que filas alcanza cada alcance |
 | `postulacion` | La postulacion, su historial, el CV y **la maquina de estados** |
 | `pesos` | Las versiones de pesos del embudo |
 | `consentimiento` | Textos legales, consentimientos y solicitudes de borrado |
@@ -703,7 +755,7 @@ Todo vive en `docs/`. Empezar por [docs/README.md](docs/README.md).
   ultimas etapas y sus tres reglas automaticas de disponibilidad.
 - [CI/CD](docs/CI-CD.md) — que se comprueba solo en cada cambio, como se despliega a AWS y que
   variables de entorno pide el servidor. **Leerlo antes de tocar `.github/workflows/`.**
-- [Comprobaciones automaticas](docs/COMPROBACIONES-AUTOMATICAS.md) — las 787 pruebas y las nueve
+- [Comprobaciones automaticas](docs/COMPROBACIONES-AUTOMATICAS.md) — las 877 pruebas y las nueve
   reglas de arquitectura, una por una. Que se mira solo y que no.
 - `docs/diagramas/` — HTML autocontenidos, se abren en el navegador.
 - `docs/mockups/` — prototipos de pantalla. **Los mantiene otra persona, no editarlos.**

@@ -22,7 +22,7 @@ línea de cada archivo que se citan más abajo son de ese día y recontar la cab
 recontarlos todos engañaría más que ayudar. Lo que ha cambiado desde entonces, para que nadie
 se lleve una sorpresa: las migraciones llegan a la **`V40`** y las tablas de selección son
 **102** —`invitacion` y `tarifa_modelo`, del multiempresa, más las que ya había—, y las pruebas
-son **786 en total**: 683 unitarias (las 645 de la tabla son de ese día) y 103 de integración.
+son **877 en total**: 770 unitarias (las 645 de la tabla son de ese día) y 107 de integración.
 El desglose al día está en [Comprobaciones automáticas](COMPROBACIONES-AUTOMATICAS.md).
 
 ⚠️ Los documentos de `docs/` describen el sistema completo (93 tablas, 77 permisos). El código
@@ -157,6 +157,14 @@ Nueve archivos, de menor a mayor. Es el dominio que más se malentiende.
 | 29 | `seguridad/config/ConfiguracionSeguridad.java` | 94 | Qué URL es pública y cuál no |
 
 Con el `dev-login` sacas un token y ya puedes probar cualquier endpoint desde Swagger.
+
+Falta una pieza que no está en este paquete: `vacante/service/AlcanceSobreLaVacante.java` (124
+líneas). `FiltroAlcance` dice **qué es** un alcance; este dice **qué filas alcanza** cada uno en
+el panel, y es el único sitio donde eso se decide. Vive en `vacante` y no en `seguridad` porque
+para contestar necesita la vacante y su responsable. Léelo justo después del 25 y con
+`AlcanceSobreLaVacanteTest` al lado: hasta el 27/08 esa regla estaba copiada en catorce sitios
+y en doce se dejaba `PROPIO` sin tratar, que es el tipo de fallo que no rompe nada y solo se
+nota cuando alguien ve lo que no debía.
 
 Al terminar sabrás: **por qué el alcance se aplica dentro de la consulta y no filtrando después.**
 

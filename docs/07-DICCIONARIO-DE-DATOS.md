@@ -218,7 +218,7 @@ del área y el Equipo de Talento: lo que cambia es hasta dónde llega.
 
 **Esta tabla ya se escribe por la API** (`V40`), con `administrar_permisos`: `PUT` para conceder
 con alcance y `POST …/revocacion` para quitar, cada uno con motivo escrito y su fila de
-auditoría. Dos consecuencias para quien lea esta ficha:
+auditoría. Tres consecuencias para quien lea esta ficha:
 
 - **`creado_en` es cuándo se concedió el permiso, no cuándo cambió el alcance.** Subir un
   `SUS_VACANTES` a `TODO` deja la fecha como estaba a propósito: cuándo cambió y por qué lo dice
@@ -226,6 +226,17 @@ auditoría. Dos consecuencias para quien lea esta ficha:
 - **Nadie relee esto en diferido.** `FiltroIdentidad` lo consulta en cada petición y no hay
   caché en medio, así que un cambio vale desde la siguiente llamada del afectado — sin desplegar
   y sin que vuelva a entrar. Ponerle caché a `ServicioContexto` rompería justo eso.
+- **`PROPIO` en un permiso que se acota por vacante no lo acota: lo apaga.** Es el alcance del
+  portal —lo que es de quien mira— y en el panel nada lo es: la bandeja sale vacía y cualquier
+  `{id}` responde 404. Lo decide un solo sitio, `AlcanceSobreLaVacante`, para todo lo que
+  cuelga de una postulación o de una vacante. No vale para todos los permisos: en
+  `ver_solicitudes` la fila sí tiene dueño dentro del equipo y con `PROPIO` se ven las propias;
+  y hay servicios que piden el alcance y lo descartan —lo usan solo para que quien no tenga el
+  permiso reciba un 403—, como `ver_banco_preguntas` y `elegir_plantilla_evaluacion`, que
+  ordenan catálogos de la organización y no filas de una vacante, o `descargar_entregables`.
+  **Que un alcance esté sembrado no significa que se aplique**, y esta ficha no puede decir
+  cuál: eso se mira en el servicio. Los tres valores pasan el `CHECK` de la `V2` y los tres los
+  acepta el `PUT`, así que ponerlos es configuración válida y no un error.
 
 **El último `administrar_permisos` de una organización no se puede revocar**: dejaría el reparto
 sin nadie que pudiera volver a tocarlo, y de ahí solo se sale entrando a la base a mano. El

@@ -41,7 +41,6 @@ import com.renaser.ai.ai_engine.postulacion.repository.EstadoPostulacionReposito
 import com.renaser.ai.ai_engine.postulacion.repository.PostulacionRepository;
 import com.renaser.ai.ai_engine.postulacion.service.MaquinaEstados;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
-import com.renaser.ai.ai_engine.seguridad.dto.FiltroAlcance;
 import com.renaser.ai.ai_engine.seguridad.service.Permisos;
 import com.renaser.ai.ai_engine.usuario.entity.Persona;
 import com.renaser.ai.ai_engine.usuario.entity.Usuario;
@@ -51,6 +50,7 @@ import com.renaser.ai.ai_engine.vacante.entity.Puesto;
 import com.renaser.ai.ai_engine.vacante.entity.Vacante;
 import com.renaser.ai.ai_engine.vacante.repository.PuestoRepository;
 import com.renaser.ai.ai_engine.vacante.repository.VacanteRepository;
+import com.renaser.ai.ai_engine.vacante.service.AlcanceSobreLaVacante;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -84,6 +84,7 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
 
     private final PostulacionRepository postulaciones;
     private final VacanteRepository vacantes;
+    private final AlcanceSobreLaVacante alcanceVacante;
     private final PerfilTalentoRepository perfiles;
     private final HallazgoPerfilRepository hallazgos;
     private final NotaCriterioRepository notasCriterio;
@@ -105,7 +106,6 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
     private final MaquinaEstados maquina;
     private final com.renaser.ai.ai_engine.perfilintegral.repository.EvaluacionRepository evaluaciones;
     private final com.renaser.ai.ai_engine.pesos.repository.EtapaRepository etapasCatalogo;
-    private final Permisos permisos;
 
     // El orden de la tanda. Manda el grupo, no la nota: quien llega a la nota arrastrando un
     // riesgo crítico no va por delante de quien llega sin ninguno, y ordenar por número
@@ -690,14 +690,9 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
      * dejaría de ser cierto sin que nadie tocara una línea de código.
      */
     private Vacante vacanteVisible(ContextoUsuario quien, Long vacanteId, String permiso) {
-        Vacante vacante = vacantes.findById(vacanteId)
-                .filter(v -> quien.organizacionId().equals(v.getOrganizacionId()))
-                .orElseThrow(() -> new ResourceNotFoundException("Vacante", "id", vacanteId));
-        FiltroAlcance alcance = permisos.alcanceDe(permiso);
-        if (alcance.tipo() == FiltroAlcance.Tipo.SUS_VACANTES
-                && !quien.usuarioId().equals(vacante.getResponsableUsuarioId())) {
-            throw new ResourceNotFoundException("Vacante", "id", vacanteId);
-        }
+        // El findById + filter por organización de antes era findByIdAndOrganizacionId escrito
+        // a mano: el guardián usa la consulta derivada, que dice lo mismo en una sola pasada.
+        Vacante vacante = alcanceVacante.laVacanteVisible(quien, vacanteId, permiso);
         return vacante;
     }
 
@@ -801,17 +796,6 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
 
     /** La postulación, comprobando organización y alcance del permiso. */
     private Postulacion laVisible(ContextoUsuario quien, Long postulacionId, String permiso) {
-        Postulacion p = postulaciones.findByIdAndOrganizacionId(postulacionId, quien.organizacionId())
-                .orElseThrow(() -> new ResourceNotFoundException("Postulación", "id", postulacionId));
-        FiltroAlcance alcance = permisos.alcanceDe(permiso);
-        if (alcance.tipo() == FiltroAlcance.Tipo.SUS_VACANTES) {
-            boolean esSuya = vacantes.findById(p.getVacanteId())
-                    .map(v -> quien.usuarioId().equals(v.getResponsableUsuarioId()))
-                    .orElse(false);
-            if (!esSuya) {
-                throw new ResourceNotFoundException("Postulación", "id", postulacionId);
-            }
-        }
-        return p;
+        return alcanceVacante.laPostulacionVisible(quien, postulacionId, permiso);
     }
 }

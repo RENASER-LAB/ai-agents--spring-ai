@@ -52,6 +52,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -61,6 +62,7 @@ import java.util.stream.Collectors;
 @Slf4j
 public class PuentePruebaIaImpl implements PuentePruebaIa {
 
+    private static final String ETAPA = "PRUEBA_PUESTO";
     private static final String CALIFICANDO = "PRUEBA_CALIFICANDO";
     private static final String POR_CONFIRMAR = "PRUEBA_POR_CONFIRMAR";
     private static final BigDecimal CIEN = BigDecimal.valueOf(100);
@@ -372,27 +374,51 @@ public class PuentePruebaIaImpl implements PuentePruebaIa {
                         + "La rúbrica entera tiene {}", guardadas, deAgente, postulacionId,
                 rubrica.size());
 
-        cerrarLaCalificacion(postulacion, guardadas);
+        cerrarLaCalificacion(postulacion, rubrica, guardadas);
     }
 
     /**
-     * Deja la prueba en manos de una persona.
+     * Deja la prueba lista para una persona, y le pone nota si ya se puede.
      *
-     * <p><b>La nota de la etapa no se calcula aquí.</b> Casi nunca están todos los criterios:
-     * los de método persona siguen vacíos por diseño, y los que el modelo no pudo juzgar
-     * también. Sumar media rúbrica daría un número bajo que parece un juicio y es un hueco.
-     * La suma la pide el panel cuando la rúbrica está completa.
+     * <p><b>La nota de la etapa se calcula aquí SOLO si la rúbrica quedó entera.</b> Antes no
+     * se calculaba nunca, y el motivo era bueno: casi nunca están todos los criterios —los de
+     * método persona siguen vacíos por diseño, y los que el modelo no pudo juzgar también— y
+     * sumar media rúbrica daría un número bajo que parece un juicio y es un hueco.
+     *
+     * <p>Pero «casi nunca» no es «nunca»: <b>una rúbrica cuyos criterios son todos de agente
+     * queda completa en cuanto el modelo termina</b>, y entonces la nota no dependía de nada
+     * más que de que alguien se acordara de pedirla desde el panel. Nadie se acordaba: en la
+     * base de producción había diecinueve pruebas corregidas y sin una sola nota de etapa, y
+     * en el ranking se veían como si no se hubieran corregido.
+     *
+     * <p><b>Se comprueba antes de sumar, no se intenta y se atrapa.</b> {@code
+     * calcularNotaEtapa} lanza cuando falta un criterio, y esto corre dentro de la transacción
+     * que acaba de guardar las notas: dejar salir esa excepción marcaría un rollback y se
+     * perderían las notas del modelo. Que es exactamente lo contrario de lo que se busca.
      *
      * <p><b>Se mueve aunque no se haya guardado ninguna nota.</b> Puede pasar: una entrega
      * que es solo un video no da para puntuar nada por texto. Dejarla en «calificando» sería
      * esconderla, y hace falta justo lo contrario: que alguien la vea. Quien la abra
      * encuentra la rúbrica entera sin notas, que es exactamente lo que ocurrió.
      */
-    private void cerrarLaCalificacion(Postulacion postulacion, int guardadas) {
+    private void cerrarLaCalificacion(Postulacion postulacion, List<Criterio> rubrica,
+                                      int guardadas) {
         if (guardadas == 0) {
             log.warn("PRUEBA_PUESTO no pudo puntuar ningún criterio de la postulación {}: la "
                     + "rúbrica queda entera para una persona", postulacion.getId());
         }
+        /*
+         * ⚠️ **Antes de mirar el estado, y a propósito.** Dos líneas más abajo, la transición
+         * SÍ se salta si alguien movió la postulación mientras el trabajo estaba en la cola:
+         * moverla entonces la devolvería hacia atrás. Ponderar no es lo mismo. La nota de la
+         * etapa no es un paso del proceso: es un dato que faltaba, y sigue faltando esté donde
+         * esté la persona. Dejar de calcularla porque el trabajo llegó tarde reproduce
+         * exactamente el agujero que este método viene a tapar.
+         *
+         * Y la suma no pisa el criterio de nadie: incluye los ajustes a mano, porque el modelo
+         * no toca lo que tiene `ajustadaPorUsuarioId`.
+         */
+        ponderarSiLaRubricaEstaEntera(postulacion, rubrica);
         // Solo desde donde tiene sentido. Si alguien la movió a mano mientras el trabajo
         // estaba en la cola, no se la devuelve hacia atrás.
         if (!CALIFICANDO.equals(postulacion.getEstadoCodigo())) {
@@ -401,6 +427,47 @@ public class PuentePruebaIaImpl implements PuentePruebaIa {
             return;
         }
         maquina.transicionar(postulacion, POR_CONFIRMAR, null, null, true, false, null);
+    }
+
+    /**
+     * Suma la rúbrica si no le falta ni un criterio.
+     *
+     * <p>Mira las notas que hay en la base y no las que este trabajo acaba de guardar: parte de
+     * la rúbrica puede llevar puesta la nota de una persona desde antes, y contar solo lo del
+     * modelo dejaría sin sumar justo las mixtas que sí están completas.
+     *
+     * <p>Un criterio sin puntaje cuenta como que falta. Una fila de nota puede existir sin
+     * puntaje —se crea al ajustarla— y darla por puesta sumaría un hueco como si fuera un cero.
+     */
+    private void ponderarSiLaRubricaEstaEntera(Postulacion postulacion, List<Criterio> rubrica) {
+        if (rubrica.isEmpty()) {
+            return;
+        }
+        Set<Long> conNota = notasCriterio.findByPostulacionId(postulacion.getId()).stream()
+                .filter(n -> n.getPuntaje() != null)
+                .map(NotaCriterio::getCriterioId)
+                .collect(Collectors.toSet());
+
+        List<String> faltan = rubrica.stream()
+                .filter(c -> !conNota.contains(c.getId()))
+                .map(Criterio::getNombre)
+                .toList();
+        if (!faltan.isEmpty()) {
+            /*
+             * Se nombran, no se cuentan. Quien lea este registro para entender por qué una
+             * prueba no tiene nota necesita saber CUÁL falta: puede ser uno de método persona
+             * —lo normal— o uno de agente que el modelo no supo juzgar, que es otra cosa y se
+             * arregla de otra manera. Un «faltan 2 de 7» obliga a ir a mirar a la base.
+             */
+            log.info("La prueba de la postulación {} queda sin nota de etapa: de sus {} "
+                            + "criterios falta(n) {}", postulacion.getId(), rubrica.size(),
+                    String.join(", ", faltan));
+            return;
+        }
+
+        BigDecimal nota = calificacion.calcularNotaEtapa(postulacion, ETAPA, rubrica);
+        log.info("La prueba de la postulación {} queda con nota {}: la rúbrica entera ({} "
+                + "criterios) tiene puntaje", postulacion.getId(), nota, rubrica.size());
     }
 
     // ==================== Apoyo ====================
