@@ -193,6 +193,39 @@ class CalificacionCuestionarioTecnicoTest {
     }
 
     @Test
+    @DisplayName("las respuestas para el panel salen en el orden del cuestionario, con su nota")
+    void lasRespuestasParaElPanel() {
+        cuestionarioCon(3, List.of(4, 3), true);
+
+        var vistas = servicio.respuestasDe(postulacion);
+
+        // Las tres puntuables, no la presencial: al candidato nunca se le envió.
+        assertThat(vistas).hasSize(3);
+        assertThat(vistas.get(0).texto()).isEqualTo("lo que escribió");
+        assertThat(vistas.get(0).puntaje()).isEqualByComparingTo("4");
+        // La que dejó en blanco también se emite: omitirla la haría invisible al revisarla.
+        assertThat(vistas.get(2).texto()).isNull();
+        assertThat(vistas.get(2).puntaje()).isNull();
+    }
+
+    @Test
+    @DisplayName("sin cuestionario, no hay respuestas que enseñar")
+    void sinCuestionarioNoHayRespuestas() {
+        assertThat(servicio.respuestasDe(Postulacion.builder()
+                .id(POSTULACION).vacanteId(VACANTE).evaluacionTecnicaId(null).build())).isEmpty();
+    }
+
+    @Test
+    @DisplayName("un cuestionario sin preguntas puntuables no escribe una nota inventada")
+    void sinPreguntasPuntuablesNoHayNota() {
+        when(preguntas.findByVersionBancoIdOrderByOrden(CUESTIONARIO)).thenReturn(List.of());
+
+        servicio.calificarEtapa(postulacion);
+
+        verify(notasEtapa, never()).save(any());
+    }
+
+    @Test
     @DisplayName("sin cuestionario técnico no hace nada: esa etapa la califica la prueba")
     void sinCuestionarioNoSeMete() {
         servicio.calificarEtapa(Postulacion.builder()
