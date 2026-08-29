@@ -236,12 +236,20 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
         if (!"BORRADOR".equals(vacante.getEstado())) {
             throw new IllegalStateException("Solo se publica una vacante en borrador; está " + vacante.getEstado());
         }
-        // Sin plantilla no hay con qué armar la evaluación de quien postule. El error tiene
-        // que salir aquí, al publicar, y no en la cara del primer candidato. Una vacante
-        // con la evaluación apagada no la necesita: su única evaluación es la prueba.
-        if (vacante.isAplicaEvaluacion() && vacante.getPlantillaEvaluacionId() == null) {
-            throw new IllegalStateException(
-                    "Antes de publicar hay que elegir la plantilla de evaluación de esta vacante");
+        // Sin banco publicado del nivel no hay con qué armar la evaluación de quien postule.
+        // El error tiene que salir aquí, al publicar, y no en la cara del primer candidato.
+        // Una vacante con la evaluación apagada no lo necesita: su única evaluación es la
+        // prueba.
+        //
+        // ⚠️ Antes esta guarda pedía la PLANTILLA, y pedía lo que no hacía falta: desde que
+        // se retiraron las cuotas, la plantilla no decide qué preguntas caen —solo el tiempo
+        // y la vigencia— y hay una publicada por nivel, así que elegirla era una pregunta con
+        // una sola respuesta legal. Lo que de verdad falta cuando no hay examen posible es el
+        // banco, y ese error salía en crearAlPostular, o sea encima del candidato.
+        //
+        // Con la evaluación apagada no hace falta: su única evaluación es la prueba.
+        if (vacante.isAplicaEvaluacion()) {
+            exigirBancoDelNivel(vacante);
         }
         // "Es obligatoria para todo puesto" (RF-73), pero desde el ciclo 2 hay DOS formas de
         // cumplirlo y la vacante dice cuál usa: la prueba del puesto de siempre, o el
@@ -339,13 +347,10 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
         if ("CERRADA".equals(vacante.getEstado())) {
             throw new IllegalStateException("Una vacante cerrada no se edita");
         }
-        // Encenderla en una vacante ya publicada y sin plantilla dejaría al siguiente
+        // Encenderla en una vacante ya publicada y sin banco del nivel dejaría al siguiente
         // candidato chocando contra un error al postular: el aviso tiene que salir aquí.
-        if (aplica && "PUBLICADA".equals(vacante.getEstado())
-                && vacante.getPlantillaEvaluacionId() == null) {
-            throw new IllegalStateException(
-                    "Esta vacante está publicada y no tiene plantilla de evaluación: hay que "
-                            + "elegirla antes de volver a encender la evaluación");
+        if (aplica && "PUBLICADA".equals(vacante.getEstado())) {
+            exigirBancoDelNivel(vacante);
         }
         boolean anterior = vacante.isAplicaEvaluacion();
         vacante.setAplicaEvaluacion(aplica);
@@ -475,6 +480,55 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                     + "rinde en su etapa técnica no se cambia: todos sus candidatos se miden "
                     + "con la misma vara. Para estrenar otro instrumento, ábrelo en la "
                     + "siguiente convocatoria.");
+        }
+    }
+
+    /**
+     * Sin banco de preguntas publicado para el nivel del puesto no hay examen que servir.
+     *
+     * <p>Es la misma búsqueda que hace {@code ServicioEvaluacionImpl.crearAlPostular} cuando
+     * alguien postula, adelantada al momento de publicar: allí el fallo es un 500 en la cara
+     * de quien acaba de mandar su currículum, y aquí es una frase para quien todavía puede
+     * arreglarlo.
+     *
+     * <p>⚠️ <b>No mira {@code vacante.isAplicaEvaluacion()}, y es a propósito.</b> Al
+     * ENCENDER la evaluación la vacante todavía la tiene apagada —el {@code set} viene
+     * después—, así que preguntárselo aquí dejaría pasar justo el caso que esto existe para
+     * frenar. Decide quien llama, que es el único que sabe si la evaluación va a estar
+     * encendida cuando esto termine.
+     */
+    private void exigirBancoDelNivel(Vacante vacante) {
+        Puesto puesto = puestos.findById(vacante.getPuestoId())
+                .orElseThrow(() -> new IllegalStateException(
+                        "La vacante apunta a un puesto que no existe"));
+        String nivel = puesto.getNivelPuestoCodigo();
+        if (versionesBanco.laPublicadaDelNivel(
+                dueno.duenoDe(vacante.getOrganizacionId(), Instrumento.BANCO), "NIVEL", nivel)
+                .isEmpty()) {
+            throw new IllegalStateException("No hay ningún banco de preguntas publicado para el "
+                    + "nivel " + nivel + ": quien postule no tendría evaluación que responder. "
+                    + "Publica uno en Configuración, o apaga la evaluación del banco en esta "
+                    + "vacante y quédate con la prueba del puesto");
+        }
+        /*
+         * ⚠️ Las DOS cosas que `crearAlPostular` resuelve, no solo el banco.
+         *
+         * Mientras la vacante estaba obligada a elegir plantilla, este camino no existía:
+         * `asignarPlantillaEvaluacion` ya la había validado contra dueño y nivel. Desde que
+         * se resuelve sola hace falta comprobarla aquí, o el `IllegalStateException` de
+         * `laPlantilla()` sale como un 500 en `POST /portal/postulaciones` — que es
+         * exactamente el fallo que esta guarda existe para adelantar.
+         *
+         * Los dos instrumentos resuelven su dueño por separado, así que una empresa con
+         * plantillas propias puede tener banco de un nivel y no plantilla del mismo.
+         */
+        if (plantillas.laPublicadaDelNivel(
+                dueno.duenoDe(vacante.getOrganizacionId(), Instrumento.PLANTILLA_EVALUACION),
+                nivel).isEmpty()) {
+            throw new IllegalStateException("No hay ninguna plantilla de evaluación publicada "
+                    + "para el nivel " + nivel + ": quien postule no podría empezar su "
+                    + "evaluación. Publica una, o apaga la evaluación del banco en esta "
+                    + "vacante y quédate con la prueba del puesto");
         }
     }
 

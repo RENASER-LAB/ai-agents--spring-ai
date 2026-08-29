@@ -121,9 +121,33 @@ public class ServicioBancoPreguntasImpl implements ServicioBancoPreguntas {
         // Publicar retira a la que reemplaza. El selector del candidato coge la PUBLICADA
         // más reciente, así que dejar dos publicadas del mismo nivel "funciona", pero el
         // estado miente — y el estado es lo único que el panel ve.
-        for (VersionBanco saliente : versiones.findPublicadasHermanas(
+        List<VersionBanco> salientes = versiones.findPublicadasHermanas(
                 version.getTipoBanco(), version.getNivelPuestoCodigo(),
-                version.getOrganizacionId(), version.getId())) {
+                version.getOrganizacionId(), version.getId());
+
+        /*
+         * El tiempo objetivo se hereda de la que se reemplaza.
+         *
+         * ⚠️ Sin esto el número se pierde en la primera actualización del banco y no
+         * vuelve: nada lo escribe salvo la V44 —ni el importador de Excel, que no lo trae,
+         * ni crearVersion— y no hay endpoint para editarlo. Publicar la v4 de Dirección
+         * archivaría la v3 con sus 60 minutos y dejaría el examen leyendo el de la
+         * plantilla de evaluación, que es justamente el valor que la V44 vino a corregir.
+         *
+         * Se hereda de la más reciente, que es la que regía. Solo si la nueva no trae uno
+         * propio: el día que se pueda escribir, lo escrito manda.
+         */
+        if (version.getMinutosObjetivo() == null) {
+            salientes.stream()
+                    .filter(v -> v.getMinutosObjetivo() != null)
+                    .max(Comparator.comparing(VersionBanco::getPublicadaEn))
+                    .ifPresent(previa -> {
+                        version.setMinutosObjetivo(previa.getMinutosObjetivo());
+                        versiones.save(version);
+                    });
+        }
+
+        for (VersionBanco saliente : salientes) {
             archivarYRepuntar(quien, saliente, version,
                     "reemplazada al publicar la versión " + version.getId());
         }

@@ -118,6 +118,11 @@ public class CopiadorDeInstrumentosImpl implements CopiadorDeInstrumentos {
                 // Sin esto, un banco CAZATALENTOS copiado caería al motor de claves y
                 // calificaría a todos con 0 en silencio: el método viaja con la versión.
                 .metodoCalificacion(vieja.getMetodoCalificacion())
+                // Y el tiempo, por lo mismo: son SUS preguntas las que se tardan en
+                // responder. Sin esta línea la copia nace en null y el examen de la
+                // empresa nueva cae al minutaje de la plantilla, que es el que la V44
+                // vino a corregir.
+                .minutosObjetivo(vieja.getMinutosObjetivo())
                 .build());
         sumar(conteos, "version_banco", 1);
 

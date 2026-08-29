@@ -63,6 +63,8 @@ class ServicioVacantesPanelImplTest {
     private static final Long ORGANIZACION = 1L;
     private static final Long VACANTE = 40L;
     private static final Long VERSION_PESOS = 9L;
+    private static final Long PUESTO = 5L;
+    private static final String NIVEL = "EJECUCION";
 
     private static final ContextoUsuario QUIEN = new ContextoUsuario(
             12L, 3L, ORGANIZACION, "EQUIPO", List.of(2L), Map.of());
@@ -107,6 +109,26 @@ class ServicioVacantesPanelImplTest {
                                 ORGANIZACION, "PROCESO"))
                 .thenReturn(Optional.of(com.renaser.ai.ai_engine.consentimiento.entity
                         .TextoConsentimiento.builder().id(70L).tipo("PROCESO").build()));
+
+        // El puesto de la vacante y el banco publicado de su nivel: sin los dos, publicar
+        // con la evaluacion encendida falla, y eso lo comprueba su propia prueba apagando
+        // este mock. Lenient porque la mitad de estas pruebas no llegan a mirarlos.
+        org.mockito.Mockito.lenient()
+                .when(puestos.findById(PUESTO))
+                .thenReturn(Optional.of(com.renaser.ai.ai_engine.vacante.entity.Puesto.builder()
+                        .id(PUESTO).nivelPuestoCodigo(NIVEL).build()));
+        org.mockito.Mockito.lenient()
+                .when(versionesBanco.laPublicadaDelNivel(ORGANIZACION, "NIVEL", NIVEL))
+                .thenReturn(Optional.of(com.renaser.ai.ai_engine.perfilintegral.entity.VersionBanco
+                        .builder().id(15L).tipoBanco("NIVEL").nivelPuestoCodigo(NIVEL)
+                        .estado("PUBLICADA").minutosObjetivo(35).build()));
+        // Y su plantilla, que publicar tambien exige: crearAlPostular resuelve las dos.
+        org.mockito.Mockito.lenient()
+                .when(plantillas.laPublicadaDelNivel(ORGANIZACION, NIVEL))
+                .thenReturn(Optional.of(
+                        com.renaser.ai.ai_engine.perfilintegral.entity.PlantillaEvaluacion
+                                .builder().id(3L).nivelPuestoCodigo(NIVEL)
+                                .estado("PUBLICADA").build()));
     }
 
     private Vacante vacante(String estado, boolean aplicaEvaluacion, Long plantillaEvaluacionId) {
@@ -116,6 +138,7 @@ class ServicioVacantesPanelImplTest {
                 .estado(estado)
                 .aplicaEvaluacion(aplicaEvaluacion)
                 .plantillaEvaluacionId(plantillaEvaluacionId)
+                .puestoId(PUESTO)
                 .versionPlantillaPruebaId(31L)
                 .build();
         when(vacantes.findByIdAndOrganizacionId(VACANTE, ORGANIZACION)).thenReturn(Optional.of(v));
@@ -136,13 +159,61 @@ class ServicioVacantesPanelImplTest {
     }
 
     @Test
-    @DisplayName("con la evaluación encendida, publicar sin plantilla sigue frenado")
-    void conEvaluacionLaPlantillaSigueSiendoObligatoria() {
+    @DisplayName("con la evaluación encendida se publica SIN plantilla: la resuelve el nivel")
+    void conEvaluacionYaNoHaceFaltaElegirPlantilla() {
+        // Era una pregunta con una sola respuesta legal —hay una plantilla publicada por
+        // nivel, y asignarPlantillaEvaluacion ya rechazaba las de otro— y encima la plantilla
+        // dejo de decidir que preguntas caen cuando se retiraron las cuotas. Bloquear la
+        // publicacion por ella era pedir algo que el sistema sabe calcular.
+        Vacante v = vacante("BORRADOR", true, null);
+
+        servicio.publicar(QUIEN, VACANTE);
+
+        assertThat(v.getEstado()).isEqualTo("PUBLICADA");
+        verify(vacantes).save(v);
+    }
+
+    @Test
+    @DisplayName("con la evaluación encendida y sin banco del nivel, publicar se frena")
+    void conEvaluacionElBancoSiEsObligatorio() {
+        // Lo que de verdad falta cuando no hay examen posible es el BANCO, y ese error salia
+        // en crearAlPostular: encima del candidato que acababa de mandar su curriculum.
         vacante("BORRADOR", true, null);
+        when(versionesBanco.laPublicadaDelNivel(ORGANIZACION, "NIVEL", NIVEL))
+                .thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> servicio.publicar(QUIEN, VACANTE))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("plantilla de evaluación");
+                .hasMessageContaining("banco de preguntas publicado para el nivel " + NIVEL);
+    }
+
+    @Test
+    @DisplayName("sin banco del nivel pero con la evaluación apagada, se publica igual")
+    void sinBancoPeroSinEvaluacionSePublica() {
+        // Su unica evaluacion es la prueba del puesto: exigirle un banco seria frenarla por
+        // algo que nadie va a responder.
+        Vacante v = vacante("BORRADOR", false, null);
+        org.mockito.Mockito.lenient()
+                .when(versionesBanco.laPublicadaDelNivel(ORGANIZACION, "NIVEL", NIVEL))
+                .thenReturn(Optional.empty());
+
+        servicio.publicar(QUIEN, VACANTE);
+
+        assertThat(v.getEstado()).isEqualTo("PUBLICADA");
+    }
+
+    @Test
+    @DisplayName("sin plantilla publicada del nivel también se frena, y lo dice")
+    void conEvaluacionLaPlantillaDelNivelTambienHaceFalta() {
+        // ⚠️ `crearAlPostular` resuelve DOS instrumentos y los dos pueden faltar. Mientras la
+        // vacante estaba obligada a elegir plantilla este camino no existía; desde que se
+        // resuelve sola, no comprobarla aquí deja el error para el primer candidato.
+        vacante("BORRADOR", true, null);
+        when(plantillas.laPublicadaDelNivel(ORGANIZACION, NIVEL)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> servicio.publicar(QUIEN, VACANTE))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("plantilla de evaluación publicada para el nivel " + NIVEL);
     }
 
     @Test
@@ -180,13 +251,28 @@ class ServicioVacantesPanelImplTest {
     }
 
     @Test
-    @DisplayName("volver a encenderla en una vacante publicada exige plantilla elegida")
-    void encenderlaPublicadaSinPlantillaAvisaAqui() {
+    @DisplayName("volver a encenderla en una vacante publicada exige banco del nivel")
+    void encenderlaPublicadaSinBancoAvisaAqui() {
+        // El aviso tiene que salir aqui: encenderla sin banco dejaria al siguiente candidato
+        // chocando contra un error al postular.
         vacante("PUBLICADA", false, null);
+        when(versionesBanco.laPublicadaDelNivel(ORGANIZACION, "NIVEL", NIVEL))
+                .thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> servicio.definirAplicacionEvaluacion(QUIEN, VACANTE, true))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("plantilla de evaluación");
+                .hasMessageContaining("banco de preguntas publicado");
+    }
+
+    @Test
+    @DisplayName("con banco del nivel, encenderla en una publicada ya no pide plantilla")
+    void encenderlaPublicadaConBancoBasta() {
+        Vacante v = vacante("PUBLICADA", false, null);
+
+        servicio.definirAplicacionEvaluacion(QUIEN, VACANTE, true);
+
+        assertThat(v.isAplicaEvaluacion()).isTrue();
+        verify(vacantes).save(v);
     }
 
     @Test

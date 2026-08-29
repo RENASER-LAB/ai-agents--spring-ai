@@ -130,9 +130,8 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
     @Transactional
     public Long crearAlPostular(Long organizacionId, Long usuarioId, Long plantillaEvaluacionId,
                                 String nivelPuestoCodigo) {
-        PlantillaEvaluacion plantilla = plantillas.findById(plantillaEvaluacionId)
-                .orElseThrow(() -> new IllegalStateException(
-                        "La vacante apunta a una plantilla de evaluación que no existe"));
+        PlantillaEvaluacion plantilla = laPlantilla(organizacionId, plantillaEvaluacionId,
+                nivelPuestoCodigo);
 
         // La versión del banco se fija AHORA. Si mañana se publica otra, este candidato sigue
         // atado a la suya: su nota nunca cambia sola después (RF-138). De quién es el banco
@@ -196,15 +195,59 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
                 .usuarioId(usuarioId)
                 .versionBancoNivelId(cuestionario.getId())
                 .proposito(CUESTIONARIO_TECNICO)
-                // Lo que diga la vacante, o nada: sin cronómetro rige el plazo de días de
-                // siempre. Cuando entre la rama que le pone minutos al banco (V43), aquí se
-                // encadena su valor como respaldo y esta línea es el único sitio que cambia.
-                .minutosObjetivo(minutosDeLaVacante)
+                // Lo que diga la vacante, y si no lo dice, lo que diga su cuestionario.
+                // Es el encadenado que el ciclo 2 dejó anotado aquí para cuando entrara la
+                // rama de los minutos del banco (V44): sin cronómetro en ninguno de los dos
+                // rige el plazo de días de siempre.
+                //
+                // ⚠️ Hoy la segunda mitad no llega a dispararse: un cuestionario de vacante
+                // nace sin minutos —el REDACTOR no los escribe, la V44 solo siembra los de
+                // tipo NIVEL, y la herencia de `publicarVersion` no lo alcanza porque
+                // `findPublicadasHermanas` filtra `vacanteId is null`—. Se deja escrito
+                // porque es la lectura correcta el día que un cuestionario los tenga, y
+                // porque el valor es el mismo (null) mientras tanto.
+                .minutosObjetivo(minutosDeLaVacante != null
+                        ? minutosDeLaVacante
+                        : cuestionario.getMinutosObjetivo())
                 .estado("PENDIENTE")
                 .venceEn(Instant.now().plus(diasDePlazo(organizacionId), ChronoUnit.DAYS))
                 .creadoEn(Instant.now())
                 .build());
         return evaluacion.getId();
+    }
+
+    /**
+     * La plantilla de esta evaluación: la que la vacante fijó, o la del nivel si no fijó
+     * ninguna.
+     *
+     * <p><b>La vacante ya no está obligada a elegirla.</b> Era una pregunta con una sola
+     * respuesta legal: hay una plantilla publicada por nivel, y
+     * {@code asignarPlantillaEvaluacion} ya rechazaba cualquiera cuyo nivel no fuera el del
+     * puesto. Con las cuotas retiradas la plantilla tampoco decide qué preguntas caen, así
+     * que obligar a elegirla solo servía para bloquear la publicación de la vacante.
+     *
+     * <p>{@code plantillaEvaluacionId} sigue entrando y sigue mandando cuando viene: es el
+     * escape para fijar otra a mano el día que haya dos del mismo nivel.
+     *
+     * <p>⚠️ <b>El dueño se resuelve, no se asume.</b> Sin
+     * {@link DuenoDelInstrumento} una empresa evaluaría con la plantilla de otra — es el
+     * mismo cuidado que ya tiene el banco tres líneas más abajo, y lo que
+     * {@code asignarPlantillaEvaluacion} hace desde la V37.
+     */
+    private PlantillaEvaluacion laPlantilla(Long organizacionId, Long plantillaEvaluacionId,
+                                            String nivelPuestoCodigo) {
+        if (plantillaEvaluacionId != null) {
+            return plantillas.findById(plantillaEvaluacionId)
+                    .orElseThrow(() -> new IllegalStateException(
+                            "La vacante apunta a una plantilla de evaluación que no existe"));
+        }
+        return plantillas
+                .laPublicadaDelNivel(
+                        dueno.duenoDe(organizacionId, Instrumento.PLANTILLA_EVALUACION),
+                        nivelPuestoCodigo)
+                .orElseThrow(() -> new IllegalStateException(
+                        "No hay una plantilla de evaluación publicada para el nivel "
+                                + nivelPuestoCodigo));
     }
 
     // ============ Leer y responder ============
@@ -591,16 +634,35 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
     // ============ Pintar ============
 
     /**
-     * Cuánto tiempo tiene quien responde este examen.
+     * Cuánto tiempo tiene quien responde este examen. Tres sitios, en este orden.
      *
-     * <p>⚠️ <b>Los suyos primero, y la plantilla solo si no los tiene.</b> Un cuestionario
-     * técnico no tiene plantilla —la V43 lo permite— y preguntársela con un id nulo revienta
-     * con «The given id must not be null» en la cara del candidato: lo cazó la prueba de
-     * integración del ciclo 2 en cuanto alguien abrió su cuestionario.
+     * <p><b>Los suyos primero.</b> El cuestionario técnico congela sus minutos al crearse: la
+     * evaluación no sabe de qué vacante viene, y resolverlos al pintar movería el reloj de
+     * quien ya está respondiendo si alguien edita la vacante a mitad de tanda.
+     *
+     * <p><b>Después el banco</b>, que es quien de verdad lo determina: son sus 21, 18 o 15
+     * preguntas las que se tardan en responder. La plantilla dejó de elegir cuáles caen cuando
+     * se retiraron las cuotas (ver {@link #armarOrden}), y mientras el número vivía allí nadie
+     * lo miraba: DIRECCION estuvo once días en 45 minutos contra los 50-60 que pide el
+     * documento de la clienta, y no había pantalla donde se viera.
+     *
+     * <p>⚠️ <b>Y la plantilla al final, que tampoco sobra.</b> Los bancos v3 y v0.1 son
+     * anteriores a la V44 y no tienen minutos propios; las evaluaciones ya rendidas cuelgan de
+     * ellos y sin esta rama se quedarían sin tiempo al abrirlas.
+     *
+     * <p>⚠️ <b>La guarda del id nulo es obligatoria.</b> Un cuestionario técnico no tiene
+     * plantilla —la V43 lo permite— y preguntársela con un id nulo revienta con «The given id
+     * must not be null» en la cara del candidato: lo cazó la prueba de integración del ciclo 2
+     * en cuanto alguien abrió su cuestionario.
      */
     private Integer minutosDe(Evaluacion evaluacion) {
         if (evaluacion.getMinutosObjetivo() != null) {
             return evaluacion.getMinutosObjetivo();
+        }
+        Integer delBanco = versionesBanco.findById(evaluacion.getVersionBancoNivelId())
+                .map(VersionBanco::getMinutosObjetivo).orElse(null);
+        if (delBanco != null) {
+            return delBanco;
         }
         if (evaluacion.getPlantillaEvaluacionId() == null) {
             return null;
