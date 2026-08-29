@@ -50,10 +50,10 @@ public class Vacante {
     private Instant pruebaCierraEn;
     // Qué se rinde en la etapa técnica: PLANTILLA (la prueba del puesto de siempre) o
     // CUESTIONARIO_TECNICO (el banco CAZATALENTOS de esta vacante). Uno de los dos, nunca
-    // los dos, y se declara: preparar un cuestionario no cambia solo lo que rinde nadie (V44)
+    // los dos, y se declara: preparar un cuestionario no cambia solo lo que rinde nadie (V43)
     @Builder.Default
     private String instrumentoEtapaTecnica = "PLANTILLA";
-    // Minutos del candidato en la etapa técnica. Vacío: los del instrumento elegido (V44)
+    // Minutos del candidato en la etapa técnica. Vacío: los del instrumento elegido (V43)
     private Integer minutosEtapaTecnica;
     private Long responsableUsuarioId;
     private Instant publicadaEn;

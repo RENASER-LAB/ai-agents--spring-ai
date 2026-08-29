@@ -177,7 +177,7 @@ public class ServicioPostulacionesPanelImpl implements ServicioPostulacionesPane
         // que la evaluación del hito 2 — la versión queda fijada aquí y no cambia aunque
         // después se publique otra (RF-90).
         //
-        // Desde el ciclo 2 hay DOS instrumentos y la vacante dice cuál usa (V44): la prueba
+        // Desde el ciclo 2 hay DOS instrumentos y la vacante dice cuál usa (V43): la prueba
         // del puesto de siempre, con su intento y sus entregables, o el cuestionario técnico
         // CAZATALENTOS, que es un examen de preguntas abiertas como el del banco. Uno de los
         // dos, nunca los dos, y el que no se use ni se mira.

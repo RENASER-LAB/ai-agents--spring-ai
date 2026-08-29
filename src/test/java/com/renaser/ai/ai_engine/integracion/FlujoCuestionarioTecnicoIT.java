@@ -105,7 +105,7 @@ public class FlujoCuestionarioTecnicoIT {
 
         vacanteId = crearVacanteEnBorrador();
 
-        // Por defecto, lo de siempre: ninguna vacante cambia de comportamiento por la V44.
+        // Por defecto, lo de siempre: ninguna vacante cambia de comportamiento por la V43.
         assertThat(jdbc.queryForObject(
                 "select instrumento_etapa_tecnica from vacante where id = ?", String.class, vacanteId))
                 .isEqualTo("PLANTILLA");

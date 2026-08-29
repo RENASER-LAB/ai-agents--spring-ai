@@ -2593,7 +2593,7 @@ Lo que **no** cabe en una restricción y hay que probar en el código está en
 
 ---
 
-## Lo que añadió el ciclo 2 de la prueba técnica (V44)
+## Lo que añadió el ciclo 2 de la prueba técnica (V43)
 
 Que la etapa técnica de cada vacante se rinda con uno de dos instrumentos, y que el
 cuestionario CAZATALENTOS se pueda contestar de verdad.

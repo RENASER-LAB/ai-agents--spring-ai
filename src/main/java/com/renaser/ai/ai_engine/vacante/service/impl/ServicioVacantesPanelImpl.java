@@ -39,7 +39,7 @@ import java.util.Objects;
 @RequiredArgsConstructor
 public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
 
-    /** Los dos instrumentos de la etapa técnica. Uno por vacante, nunca los dos (V44). */
+    /** Los dos instrumentos de la etapa técnica. Uno por vacante, nunca los dos (V43). */
     public static final String PLANTILLA = "PLANTILLA";
     public static final String CUESTIONARIO_TECNICO = "CUESTIONARIO_TECNICO";
 

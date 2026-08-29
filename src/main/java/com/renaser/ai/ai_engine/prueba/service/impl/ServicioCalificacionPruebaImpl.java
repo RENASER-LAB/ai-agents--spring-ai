@@ -87,7 +87,7 @@ public class ServicioCalificacionPruebaImpl implements ServicioCalificacionPrueb
     /**
      * Si esta postulación rinde el cuestionario técnico en vez de la prueba del puesto.
      *
-     * <p>Lo dice su vacante (V44), y de ahí salen las cuatro bifurcaciones de este servicio:
+     * <p>Lo dice su vacante (V43), y de ahí salen las cuatro bifurcaciones de este servicio:
      * sin ellas, las cuatro pantallas del panel responden 404 sobre un {@code intento_prueba}
      * que no existe, y el equipo se queda sin poder leer ni recalificar lo que su candidato
      * escribió.

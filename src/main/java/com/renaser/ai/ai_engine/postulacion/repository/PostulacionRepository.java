@@ -61,6 +61,6 @@ public interface PostulacionRepository extends JpaRepository<Postulacion, Long> 
     // postulación se conoce por el intento, no al revés.
     Optional<Postulacion> findByEvaluacionId(Long evaluacionId);
 
-    /** La dueña del cuestionario técnico: cuelga de otra columna que la del perfil integral (V44). */
+    /** La dueña del cuestionario técnico: cuelga de otra columna que la del perfil integral (V43). */
     Optional<Postulacion> findByEvaluacionTecnicaId(Long evaluacionTecnicaId);
 }

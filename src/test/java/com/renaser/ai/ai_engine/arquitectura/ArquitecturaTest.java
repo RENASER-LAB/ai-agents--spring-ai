@@ -326,12 +326,12 @@ class ArquitecturaTest {
             "ServicioDecisionImpl#decidir",
             "ServicioEvaluacionImpl#crearAlPostular",
             "ServicioEvaluacionImpl#pintar",
-            // Qué instrumento rinde esta postulación en su etapa técnica (V44). La postulación
+            // Qué instrumento rinde esta postulación en su etapa técnica (V43). La postulación
             // ya salió de `laVisible`, que resolvió alcance y organización; su vacante es por
             // fuerza de esa misma empresa, y solo se le pregunta una cosa: si es la prueba del
             // puesto o el cuestionario. Mismo caso que los `ficha` de aquí arriba.
             "ServicioCalificacionPruebaImpl#rindeElCuestionario",
-            // Los minutos del examen salieron de `pintar` a su propio método (V44): a él se
+            // Los minutos del examen salieron de `pintar` a su propio método (V43): a él se
             // llega desde `pintar`, y a `pintar` desde `laMia`, que ya filtró por la persona
             // que pregunta. Es la misma decisión de la línea de arriba, y se anota aquí y no
             // se hereda porque esta regla mira el método que hace la llamada, no el camino.

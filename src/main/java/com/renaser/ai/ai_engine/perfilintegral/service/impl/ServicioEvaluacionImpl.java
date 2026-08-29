@@ -89,7 +89,7 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
     public static final String PARAMETRO_PLAZO = "dias_plazo_evaluacion";
     static final int DIAS_DE_PLAZO_POR_DEFECTO = 14;
 
-    /** Los dos propósitos de un examen: el banco por nivel, o el cuestionario de una vacante (V44). */
+    /** Los dos propósitos de un examen: el banco por nivel, o el cuestionario de una vacante (V43). */
     public static final String PERFIL_INTEGRAL = "PERFIL_INTEGRAL";
     public static final String CUESTIONARIO_TECNICO = "CUESTIONARIO_TECNICO";
 
@@ -166,7 +166,7 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
      *
      * <ul>
      *   <li><b>Sin plantilla.</b> Un cuestionario de vacante no tiene ninguna: nace para esa
-     *       vacante, dura lo que ella diga y no se reutiliza. La V44 lo permite y su CHECK
+     *       vacante, dura lo que ella diga y no se reutiliza. La V43 lo permite y su CHECK
      *       sigue exigiéndosela al perfil integral.
      *   <li><b>El banco es el de la vacante</b>, no el publicado del nivel. Se fija ahora,
      *       igual que allí: si mañana el dueño regenera el cuestionario, este candidato sigue
@@ -594,7 +594,7 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
      * Cuánto tiempo tiene quien responde este examen.
      *
      * <p>⚠️ <b>Los suyos primero, y la plantilla solo si no los tiene.</b> Un cuestionario
-     * técnico no tiene plantilla —la V44 lo permite— y preguntársela con un id nulo revienta
+     * técnico no tiene plantilla —la V43 lo permite— y preguntársela con un id nulo revienta
      * con «The given id must not be null» en la cara del candidato: lo cazó la prueba de
      * integración del ciclo 2 en cuanto alguien abrió su cuestionario.
      */
@@ -685,7 +685,7 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
      * La postulación y el examen que se le pide, comprobando que ambos son de quien pregunta.
      *
      * <p>Una postulación puede tener dos: el del banco por nivel (etapa 1) y el cuestionario
-     * técnico de su vacante (etapa 2), en columnas distintas desde la V44. El propósito elige
+     * técnico de su vacante (etapa 2), en columnas distintas desde la V43. El propósito elige
      * de cuál se habla; lo demás —incluido el 404 de «no es tuya», que no distingue entre no
      * existir y ser de otro— es idéntico para los dos.
      */

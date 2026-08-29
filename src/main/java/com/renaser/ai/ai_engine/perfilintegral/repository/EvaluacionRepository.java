@@ -19,7 +19,7 @@ public interface EvaluacionRepository extends JpaRepository<Evaluacion, Long> {
      * <p>Los dos exámenes vencen distinto: el del perfil integral se da por VENCIDA y cierra
      * la postulación; el cuestionario técnico se ENTREGA como esté, y lo que no contestó
      * cuenta cero. Sin filtrar por propósito, cada barrido se llevaría por delante los del
-     * otro (V44).
+     * otro (V43).
      */
     List<Evaluacion> findByPropositoAndEstadoInAndVenceEnBefore(
             String proposito, List<String> estados, Instant momento);
