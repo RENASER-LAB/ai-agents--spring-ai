@@ -317,6 +317,7 @@ public class ServicioPostulacionPortalImpl implements ServicioPostulacionPortal 
         String nombreEstado = nombrePorEstado.getOrDefault(p.getEstadoCodigo(), p.getEstadoCodigo());
         long dias = Duration.between(p.getMovidoEn(), Instant.now()).toDays();
         return new MiPostulacion(p.getUuid().toString(), titulo, empresa, p.getEstadoCodigo(),
-                nombreEstado, p.getGrupoPrioridad(), dias, p.getCreadoEn());
+                nombreEstado, p.getGrupoPrioridad(), dias, p.getCreadoEn(),
+                vacante.map(Vacante::getInstrumentoEtapaTecnica).orElse(null));
     }
 }
