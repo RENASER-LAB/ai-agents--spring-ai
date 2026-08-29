@@ -24,6 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -73,6 +74,63 @@ public class CalificacionCuestionarioTecnico {
     private final NotaRespuestaRepository notasRespuesta;
     private final NotaEtapaRepository notasEtapa;
     private final VacanteRepository vacantes;
+
+    /**
+     * Una pregunta del cuestionario con lo que el candidato escribió, para el panel.
+     *
+     * <p>Sale de aquí y no del paquete de la prueba porque las respuestas viven en las tablas
+     * de la evaluación. Lleva su nota si ya la tiene: es lo que el equipo necesita para leer
+     * y decidir, y lo que la pantalla de la prueba ya sabe pintar.
+     *
+     * <p>⚠️ Sin la guía de calificación: esa es del dueño y se ve al preparar la vacante, no
+     * pegada a lo que contestó una persona concreta.
+     */
+    public record RespuestaDelCuestionario(Long preguntaId, String codigo, Integer orden,
+                                           String enunciado, String texto, Instant respondidaEn,
+                                           BigDecimal puntaje, String explicacion,
+                                           String evidenciaCitada) {}
+
+    /**
+     * Lo que escribió el candidato en su cuestionario técnico, en el orden del cuestionario.
+     *
+     * <p>Se emite también lo que dejó en blanco: saber que no contestó la cuarta es parte de
+     * lo que se revisa, y omitirla la haría invisible. La PRESENCIAL no está — nunca se le
+     * envió.
+     */
+    @Transactional(readOnly = true)
+    public List<RespuestaDelCuestionario> respuestasDe(Postulacion postulacion) {
+        if (postulacion.getEvaluacionTecnicaId() == null) {
+            return List.of();
+        }
+        Evaluacion evaluacion = evaluaciones.findById(postulacion.getEvaluacionTecnicaId())
+                .orElse(null);
+        if (evaluacion == null) {
+            return List.of();
+        }
+        Map<Long, Respuesta> porPregunta = respuestas.findByEvaluacionId(evaluacion.getId()).stream()
+                .collect(Collectors.toMap(Respuesta::getPreguntaId, Function.identity(), (a, b) -> a));
+        Map<Long, NotaRespuesta> notaPorRespuesta = notasRespuesta
+                .findByRespuestaIdIn(porPregunta.values().stream().map(Respuesta::getId).toList())
+                .stream()
+                .collect(Collectors.toMap(NotaRespuesta::getRespuestaId, Function.identity()));
+
+        List<RespuestaDelCuestionario> salida = new ArrayList<>();
+        for (Pregunta p : preguntas.findByVersionBancoIdOrderByOrden(evaluacion.getVersionBancoNivelId())) {
+            if (!p.isEsPuntuable()) {
+                continue;
+            }
+            Respuesta r = porPregunta.get(p.getId());
+            NotaRespuesta nota = r == null ? null : notaPorRespuesta.get(r.getId());
+            salida.add(new RespuestaDelCuestionario(p.getId(), p.getCodigo(), p.getOrden(),
+                    p.getEnunciado(),
+                    r == null ? null : r.getTexto(),
+                    r == null ? null : r.getRespondidaEn(),
+                    nota == null ? null : nota.getPuntaje(),
+                    nota == null ? null : nota.getExplicacion(),
+                    nota == null ? null : nota.getEvidenciaCitada()));
+        }
+        return salida;
+    }
 
     /**
      * Escribe la nota de la etapa técnica de esta postulación, si ya se puede.

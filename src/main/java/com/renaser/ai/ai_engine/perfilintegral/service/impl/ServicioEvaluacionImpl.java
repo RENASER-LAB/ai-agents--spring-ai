@@ -481,12 +481,18 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
      * el examen seguiría abierto en el servidor para siempre; es la clase de fallo que no da
      * ninguna señal. Gemelo de {@code ServicioPrueba.entregarVencidos}, y como él se entrega
      * <b>incompleto</b>: lo que no contestó cuenta cero.
+     *
+     * <p>⚠️ <b>También los que nunca se abrieron</b> (PENDIENTE), y no solo los empezados.
+     * Un cuestionario nace ya con su plazo de días puesto: si nadie lo abre, vence,
+     * {@link #exigirAbierta} deja de permitir empezarlo y ningún otro barrido lo mira —el del
+     * perfil integral filtra por su propósito—. Sin esta línea esa persona se queda en su
+     * turno para siempre, sin nota y sin cierre, y nada del sistema vuelve a tocarla.
      */
     @Override
     @Transactional
     public void entregarTecnicasVencidas() {
         for (Evaluacion evaluacion : evaluaciones.findByPropositoAndEstadoInAndVenceEnBefore(
-                CUESTIONARIO_TECNICO, List.of("EN_CURSO"), Instant.now())) {
+                CUESTIONARIO_TECNICO, List.of("PENDIENTE", "EN_CURSO"), Instant.now())) {
             postulaciones.findByEvaluacionTecnicaId(evaluacion.getId()).ifPresent(postulacion -> {
                 // Quien se retiró o quedó fuera deja su cuestionario sin entregar, y ese
                 // cuestionario vence igual: sin esta comprobación se intentaría mover una

@@ -296,6 +296,77 @@ public class FlujoCuestionarioTecnicoIT {
                 java.math.BigDecimal.class, postulacionId)).isEqualByComparingTo("75.00");
     }
 
+    @Test
+    @Order(8)
+    @DisplayName("El panel puede leer lo que escribió, y recalcular su nota")
+    void elPanelLeeYRecalcula() throws Exception {
+        // ⚠️ Estas pantallas respondían 404 sobre un `intento_prueba` que no existe: el
+        // equipo se quedaba sin poder leer ni recalificar a su propio candidato.
+        conTokenGet("/api/v1/panel/postulaciones/" + postulacionId + "/prueba/respuestas", tokenEquipo)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(3))
+                .andExpect(jsonPath("$[0].respuesta").value(
+                        org.hamcrest.Matchers.containsString("San Isidro")));
+
+        // La rúbrica no aplica —esto no se puntúa por apartados— pero la pantalla se abre.
+        conTokenGet("/api/v1/panel/postulaciones/" + postulacionId + "/prueba/notas", tokenEquipo)
+                .andExpect(status().isOk());
+
+        // Y el recálculo es la palanca del equipo cuando la nota no salió sola.
+        conToken(post("/api/v1/panel/postulaciones/" + postulacionId + "/prueba/calificacion"),
+                tokenEquipo, null)
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    @Order(9)
+    @DisplayName("A quien nunca lo abre se le acaba el plazo, y no queda colgado")
+    void alQueNuncaLoAbreNoSeLeDejaColgado() throws Exception {
+        // Otro candidato llega a la etapa y no entra nunca. Su examen nace PENDIENTE con el
+        // plazo puesto; al vencer, `exigirAbierta` ya no le deja empezarlo.
+        String otroToken = crearCandidatoYEntrar("tercero@correo.pe");
+        MockMultipartFile cv = new MockMultipartFile("cv", "cv.pdf",
+                "application/pdf", "contenido".getBytes());
+        String codigo = leer(mvc.perform(multipart("/api/v1/portal/postulaciones")
+                        .file(cv)
+                        .param("vacanteId", String.valueOf(vacanteId))
+                        .param("resultadoOrgulloso", "Llevé la caja chica de una obra dos años")
+                        .param("aceptaTratamiento", "true")
+                        .header("Authorization", "Bearer " + otroToken))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString(), "codigo");
+        long otraId = jdbc.queryForObject("select id from postulacion where uuid = ?::uuid",
+                Long.class, codigo);
+        avanzarHasta(otraId, "PRUEBA_TURNO_CANDIDATO");
+
+        Long suExamen = jdbc.queryForObject(
+                "select evaluacion_tecnica_id from postulacion where id = ?", Long.class, otraId);
+        assertThat(jdbc.queryForObject("select estado from evaluacion where id = ?",
+                String.class, suExamen)).isEqualTo("PENDIENTE");
+
+        // Se le pasa el plazo sin haberlo abierto.
+        jdbc.update("update evaluacion set vence_en = now() - interval '1 day' where id = ?", suExamen);
+        contexto.getBean(com.renaser.ai.ai_engine.perfilintegral.service.ServicioEvaluacion.class)
+                .entregarTecnicasVencidas();
+
+        // Se entrega en blanco y sigue su camino: sin esto se quedaba en su turno para
+        // siempre, sin nota y sin cierre, y ningún barrido volvía a mirarlo.
+        assertThat(jdbc.queryForObject("select estado from evaluacion where id = ?",
+                String.class, suExamen)).isEqualTo("TERMINADA");
+        assertThat(jdbc.queryForObject("select estado_codigo from postulacion where id = ?",
+                String.class, otraId)).isEqualTo("PRUEBA_CALIFICANDO");
+
+        // Y su nota es un cero de verdad, no un hueco: no contestó nada.
+        contexto.getBean(com.renaser.ai.ai_engine.perfilintegral.service.impl
+                        .CalificacionCuestionarioTecnico.class)
+                .calificarEtapa(contexto.getBean(
+                        com.renaser.ai.ai_engine.postulacion.repository.PostulacionRepository.class)
+                        .findById(otraId).orElseThrow());
+        assertThat(jdbc.queryForObject(
+                "select puntaje from nota_etapa where postulacion_id = ? and etapa_codigo = ?",
+                java.math.BigDecimal.class, otraId, "PRUEBA_PUESTO")).isEqualByComparingTo("0.00");
+    }
+
     // ============ Apoyo ============
 
     /** Corre la calificación de la etapa igual que al terminar el agente. */
@@ -357,13 +428,17 @@ public class FlujoCuestionarioTecnicoIT {
 
     /** Avanza la postulación a mano hasta el estado pedido, como haría el equipo. */
     private void avanzarHasta(String estado) throws Exception {
+        avanzarHasta(postulacionId, estado);
+    }
+
+    private void avanzarHasta(long cual, String estado) throws Exception {
         for (int vuelta = 0; vuelta < 12; vuelta++) {
             String actual = jdbc.queryForObject("select estado_codigo from postulacion where id = ?",
-                    String.class, postulacionId);
+                    String.class, cual);
             if (estado.equals(actual)) {
                 return;
             }
-            conToken(post("/api/v1/panel/postulaciones/" + postulacionId + "/confirmacion-avance"),
+            conToken(post("/api/v1/panel/postulaciones/" + cual + "/confirmacion-avance"),
                     tokenEquipo, "{\"motivo\": \"sigue en carrera\"}")
                     .andExpect(status().isOk());
         }

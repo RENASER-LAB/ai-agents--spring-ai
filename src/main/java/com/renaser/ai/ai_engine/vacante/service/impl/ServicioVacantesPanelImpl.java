@@ -33,6 +33,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -419,8 +420,12 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                     + "son más de cero; para usar los del instrumento elegido se dejan vacíos");
         }
 
+        // ⚠️ Los minutos son parte de la vara, no un ajuste cosmético: cada examen los
+        // congela al crearse, así que bajarlos a mitad de tanda deja a los de antes con una
+        // hora y a los de después con diez minutos, ordenados en la misma lista.
         String anterior = vacante.getInstrumentoEtapaTecnica();
-        if (!anterior.equals(instrumento)) {
+        if (!anterior.equals(instrumento)
+                || !Objects.equals(vacante.getMinutosEtapaTecnica(), minutos)) {
             exigirVaraQuietaDelInstrumento(vacante);
         }
         vacante.setInstrumentoEtapaTecnica(instrumento);
@@ -571,6 +576,15 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
             if (datos.cierraEn().isBefore(Instant.now())) {
                 throw new IllegalArgumentException(
                         "Esa fecha ya pasó: fijarla entregaría sola la prueba de todos");
+            }
+            // Sin plantilla de prueba no hay nada que cerrar con una fecha. Desde el ciclo 2
+            // es un camino normal —una vacante con cuestionario técnico se publica sin ella—
+            // y no un borrador a medias: antes reventaba con «The given id must not be null»,
+            // el error crudo de Spring Data en la cara de quien usa el panel.
+            if (vacante.getVersionPlantillaPruebaId() == null) {
+                throw new IllegalStateException("Esta vacante no rinde una prueba del puesto, "
+                        + "así que no hay una fecha de cierre que fijarle: su etapa técnica es "
+                        + "el cuestionario, y su tiempo son los minutos de la vacante");
             }
             // Y no tiene sentido sobre un cronómetro: ahí el plazo son los minutos que corren
             // desde que cada uno empieza, y una fecha fija los anularía sin decirlo.

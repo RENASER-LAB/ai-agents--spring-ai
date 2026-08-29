@@ -2589,3 +2589,26 @@ Lo que **no** cabe en una restricción y hay que probar en el código está en
 - [Estados de la postulación](03-ESTADOS-POSTULACION.md) — los 18 estados y sus transiciones
 - [Roles y permisos](04-ROLES-Y-PERMISOS.md) — los 77 permisos
 - [Diagrama del modelo](diagramas/modelo-de-datos.html) — se abre en el navegador
+
+
+---
+
+## Lo que añadió el ciclo 2 de la prueba técnica (V44)
+
+Que la etapa técnica de cada vacante se rinda con uno de dos instrumentos, y que el
+cuestionario CAZATALENTOS se pueda contestar de verdad.
+
+| Tabla · columna | Qué guarda |
+|---|---|
+| `vacante.instrumento_etapa_tecnica` | `PLANTILLA` (la prueba del puesto de siempre) o `CUESTIONARIO_TECNICO` (el banco de tipo VACANTE de esta vacante). Por defecto `PLANTILLA`: es lo que hacían todas las vacantes hasta esta migración. **Se declara, no se deduce** de si hay un cuestionario publicado |
+| `vacante.minutos_etapa_tecnica` | Cuánto tiempo tiene el candidato en esa etapa. NULL = el del instrumento elegido |
+| `postulacion.evaluacion_tecnica_id` | El examen de la etapa técnica. NULL con la prueba del puesto, que va por `intento_prueba`. La columna `evaluacion_id` sigue siendo la del perfil integral: son dos exámenes y no se pisan |
+| `evaluacion.proposito` | `PERFIL_INTEGRAL` o `CUESTIONARIO_TECNICO`. Decide de qué columna de la postulación cuelga y qué barrido de vencimientos lo cierra |
+| `evaluacion.plantilla_evaluacion_id` | Deja de ser obligatoria: un cuestionario de vacante no tiene plantilla. Un CHECK conserva la exigencia para los del perfil integral, que es donde importaba |
+| `evaluacion.minutos_objetivo` | Los minutos con los que nació este examen, **congelados al crearlo**: así editar la vacante no le mueve el reloj a quien ya está respondiendo |
+| `agente` | Uno más: `EVALUADOR_TECNICO`. Cuenta los mismos cuatro criterios que el del banco, pero por su propio carril — compartir el código habría dejado sin calificar al perfil integral |
+
+⚠️ **`evaluacion.version_banco_nivel_id` se quedó con un nombre corto**: en un cuestionario
+técnico guarda un banco de tipo VACANTE, no uno por nivel. Se dejó así a propósito —renombrarlo
+tocaba los ocho sitios que ya lo leen sin que ninguno cambiara de comportamiento— y el CHECK de
+la V42 impide confundir los dos tipos.

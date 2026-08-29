@@ -331,6 +331,7 @@ public class PuenteCalificacionIaImpl implements PuenteCalificacionIa {
      * (C3, C4 y la señal de 0) viaja igual, porque vive en la propia {@code pregunta}.
      */
     @Override
+    @Transactional(readOnly = true)
     public InsumoRespuestas insumoRespuestasTecnicas(Long postulacionId) {
         Postulacion postulacion = postulacion(postulacionId);
         Puesto puesto = puesto(vacante(postulacion));

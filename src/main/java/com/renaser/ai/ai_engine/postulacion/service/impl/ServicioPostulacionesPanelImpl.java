@@ -185,10 +185,18 @@ public class ServicioPostulacionesPanelImpl implements ServicioPostulacionesPane
             Vacante vacante = vacantes.findById(p.getVacanteId())
                     .orElseThrow(() -> new IllegalStateException("La vacante de esta postulación ya no existe"));
             if (CUESTIONARIO_TECNICO.equals(vacante.getInstrumentoEtapaTecnica())) {
-                p.setEvaluacionTecnicaId(evaluaciones.crearTecnicaAlEntrar(
-                        quien.organizacionId(), p.getUsuarioId(), vacante.getId(),
-                        vacante.getMinutosEtapaTecnica()));
-                postulaciones.save(p);
+                // ⚠️ Solo si no tiene ya el suyo. Volver a entrar en la etapa —pasa cuando se
+                // retrocede una postulación y se la vuelve a avanzar— crearía un segundo
+                // examen y dejaría el primero, con sus respuestas y sus notas, sin dueño. El
+                // intento de la prueba del puesto no puede duplicarse porque su tabla lo
+                // impide con una clave única; aquí la columna admite cualquier id, así que la
+                // regla la pone este `if`.
+                if (p.getEvaluacionTecnicaId() == null) {
+                    p.setEvaluacionTecnicaId(evaluaciones.crearTecnicaAlEntrar(
+                            quien.organizacionId(), p.getUsuarioId(), vacante.getId(),
+                            vacante.getMinutosEtapaTecnica()));
+                    postulaciones.save(p);
+                }
             } else {
                 if (vacante.getVersionPlantillaPruebaId() == null) {
                     throw new IllegalStateException(

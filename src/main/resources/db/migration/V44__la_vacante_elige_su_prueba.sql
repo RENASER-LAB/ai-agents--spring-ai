@@ -62,6 +62,11 @@ COMMENT ON COLUMN vacante.minutos_etapa_tecnica IS
 ALTER TABLE postulacion
     ADD COLUMN evaluacion_tecnica_id bigint REFERENCES evaluacion(id);
 
+-- El barrido del cronómetro pregunta por esta columna cada minuto: sin índice, cada vuelta
+-- recorre la tabla de postulaciones entera.
+CREATE INDEX postulacion_evaluacion_tecnica_idx ON postulacion (evaluacion_tecnica_id)
+    WHERE evaluacion_tecnica_id IS NOT NULL;
+
 COMMENT ON COLUMN postulacion.evaluacion_tecnica_id IS
     'El examen de la etapa técnica cuando la vacante usa el cuestionario CAZATALENTOS. '
     'NULL con la prueba del puesto de siempre, que va por intento_prueba.';
