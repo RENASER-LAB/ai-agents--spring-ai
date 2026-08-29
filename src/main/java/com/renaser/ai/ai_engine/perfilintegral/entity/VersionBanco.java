@@ -30,6 +30,13 @@ public class VersionBanco {
     /** NULL = motor de claves versionadas (v0.1 y v3) · CRITERIOS = conteo C1..C4 (CAZATALENTOS). */
     private String metodoCalificacion;
 
+    /**
+     * Cuánto se espera que dure responder este banco. NULL = usar el de la plantilla de
+     * evaluación, que es de donde salía antes de la V44: los bancos archivados no lo tienen
+     * y sus evaluaciones ya rendidas siguen leyendo el suyo.
+     */
+    private Integer minutosObjetivo;
+
     /** NULL = banco por nivel (plataforma) · con valor = cuestionario técnico de esa vacante. */
     private Long vacanteId;
 }

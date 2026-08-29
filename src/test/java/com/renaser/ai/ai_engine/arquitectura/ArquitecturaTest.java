@@ -335,8 +335,19 @@ class ArquitecturaTest {
             // llega desde `pintar`, y a `pintar` desde `laMia`, que ya filtró por la persona
             // que pregunta. Es la misma decisión de la línea de arriba, y se anota aquí y no
             // se hereda porque esta regla mira el método que hace la llamada, no el camino.
+            // Y el mismo caso para `laPlantilla`, que la V44 extrajo de `crearAlPostular`
+            // cuando la plantilla dejó de elegirse en la vacante. La regla lo denunció al
+            // perder el nombre que lo amparaba — que es exactamente para lo que existe — y la
+            // lectura confirma que no cambió nada: laPlantilla busca la que la vacante fijó, ya
+            // validada contra el dueño al asignarla, y su otra rama sí pasa por
+            // DuenoDelInstrumento; minutosDe lee la plantilla de una evaluación que laMia() ya
+            // resolvió contra quien pregunta.
+            "ServicioEvaluacionImpl#laPlantilla",
             "ServicioEvaluacionImpl#minutosDe",
             "ServicioVacantesPanelImpl#asignarPlantillaEvaluacion",
+            // El puesto de una vacante que laDeLaOrganizacion() ya validó: el mismo patrón,
+            // línea por línea, que asignarPlantillaEvaluacion aquí arriba.
+            "ServicioVacantesPanelImpl#exigirBancoDelNivel",
             "ServicioVacantesPanelImpl#definirCierrePrueba",
             "ServicioVacantesPanelImpl#fechaDeCierreDe",
             "ServicioPruebaImpl#laVersion",

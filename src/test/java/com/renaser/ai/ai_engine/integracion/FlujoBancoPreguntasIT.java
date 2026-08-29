@@ -269,9 +269,23 @@ public class FlujoBancoPreguntasIT {
                  "esPuntuable":true,"orden":1,"peso":1}""");
         opcion(unica, "{\"letra\":\"a\",\"texto\":\"Más yo\",\"valor\":2}");
         opcion(unica, "{\"letra\":\"b\",\"texto\":\"Menos yo\",\"valor\":-2}");
+        // El v4 rige con 40 minutos: es lo que hay que ver viajar al v5.
+        jdbc.update("update version_banco set minutos_objetivo = 40 where id = ?", versionV4);
+
         mvc.perform(post("/api/v1/panel/banco-preguntas/versiones/" + versionV5 + "/publicacion")
                         .header("Authorization", "Bearer " + tokenEquipo))
                 .andExpect(status().isOk());
+
+        /*
+         * ⚠️ El tiempo se hereda de la que se reemplaza, y sin esto se perdía en la primera
+         * actualización del banco: nada lo escribe salvo la migración —ni el importador de
+         * Excel, que no lo trae, ni crearVersion— y no hay endpoint para editarlo. Publicar
+         * el v5 dejaba el examen leyendo el minutaje de la plantilla de evaluación, que es
+         * justamente el valor que la V44 vino a corregir.
+         */
+        assertThat(jdbc.queryForObject(
+                "select minutos_objetivo from version_banco where id = " + versionV5, Integer.class))
+                .isEqualTo(40);
 
         // El v4 salió de circulación y la evaluación sin empezar viaja al v5 sin que nadie la toque
         assertThat(jdbc.queryForObject(

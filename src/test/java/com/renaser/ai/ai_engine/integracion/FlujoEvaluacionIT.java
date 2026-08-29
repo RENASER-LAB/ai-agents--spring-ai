@@ -313,6 +313,44 @@ public class FlujoEvaluacionIT {
         assertThat(nota.get("version_pesos_id")).isNotNull();
     }
 
+    @DisplayName("El tiempo del examen sale del banco, y sin él se cae a la plantilla")
+    @Test
+    @Order(6)
+    void elTiempoSaleDelBancoYLaPlantillaEsElRespaldo() throws Exception {
+        // Desde la V44 los minutos viven en el banco: son SUS preguntas las que se tardan en
+        // responder, y la plantilla dejó de elegir cuáles caen cuando se retiraron las cuotas.
+        Long evaluacionId = jdbc.queryForObject(
+                "select evaluacion_id from postulacion where uuid = ?::uuid",
+                Long.class, codigoPostulacion);
+        Long bancoId = jdbc.queryForObject(
+                "select version_banco_nivel_id from evaluacion where id = ?",
+                Long.class, evaluacionId);
+        Integer deLaPlantilla = jdbc.queryForObject(
+                "select pe.minutos_objetivo from evaluacion e"
+                        + " join plantilla_evaluacion pe on pe.id = e.plantilla_evaluacion_id"
+                        + " where e.id = ?",
+                Integer.class, evaluacionId);
+
+        jdbc.update("update version_banco set minutos_objetivo = 33 where id = ?", bancoId);
+        mvc.perform(get("/api/v1/portal/evaluacion/" + codigoPostulacion)
+                        .header("Authorization", "Bearer " + tokenCandidato))
+                .andExpect(jsonPath("$.minutosObjetivo").value(33));
+
+        // ⚠️ El respaldo no sobra: los bancos v3 y v0.1 son anteriores a la V44 y no tienen
+        // minutos propios, y las evaluaciones ya rendidas cuelgan de ellos. Sin esta rama se
+        // quedarían sin tiempo al abrirlas, que es peor que enseñar el de antes.
+        Integer original = jdbc.queryForObject(
+                "select minutos_objetivo from version_banco where id = ?", Integer.class, bancoId);
+        jdbc.update("update version_banco set minutos_objetivo = null where id = ?", bancoId);
+        mvc.perform(get("/api/v1/portal/evaluacion/" + codigoPostulacion)
+                        .header("Authorization", "Bearer " + tokenCandidato))
+                .andExpect(jsonPath("$.minutosObjetivo").value(deLaPlantilla));
+
+        // Se deja como estaba: hoy este es el @Order más alto de su clase, pero la garantía
+        // no cruza de clase y FlujoBancoPreguntasIT escribe esta misma columna.
+        jdbc.update("update version_banco set minutos_objetivo = ? where id = ?", original, bancoId);
+    }
+
     @DisplayName("La evaluación de otro candidato no se ve")
     @Test
     @Order(5)

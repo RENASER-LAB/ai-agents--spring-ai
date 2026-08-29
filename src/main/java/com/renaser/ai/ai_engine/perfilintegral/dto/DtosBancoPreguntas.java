@@ -35,12 +35,16 @@ public final class DtosBancoPreguntas {
             String nivelPuestoCodigo,
             @NotBlank String etiqueta) {}
 
+    // minutosObjetivo sale aquí para que el panel diga cuánto durará el examen sin pedir nada
+    // más: quien configura una vacante necesita esa cifra junto al nombre del banco. NULL en
+    // los bancos anteriores a la V44, que lo siguen leyendo de su plantilla de evaluación.
     public record VersionBancoResponse(
             Long id,
             String tipoBanco,
             String nivelPuestoCodigo,
             String etiqueta,
             String estado,
+            Integer minutosObjetivo,
             Instant publicadaEn) {}
 
     // Los 14 formatos: los 6 del banco v0.1 (siguen siendo válidos porque hay preguntas
