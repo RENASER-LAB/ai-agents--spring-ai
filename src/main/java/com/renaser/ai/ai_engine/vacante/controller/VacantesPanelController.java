@@ -91,6 +91,17 @@ public class VacantesPanelController {
         servicio.asignarPlantillaPrueba(permisos.actual(), id, datos.versionPlantillaPruebaId());
     }
 
+    @PostMapping("/vacantes/{id}/instrumento-tecnico")
+    @PreAuthorize("@permisos.tiene('elegir_plantilla_prueba')")
+    @Operation(summary = "Qué se rinde en la etapa técnica de esta vacante: la prueba del "
+            + "puesto (PLANTILLA) o el cuestionario CAZATALENTOS (CUESTIONARIO_TECNICO), y en "
+            + "cuántos minutos. Uno de los dos, y hace falta tenerlo listo antes de publicar")
+    public void elegirInstrumentoTecnico(@PathVariable Long id,
+                                         @Valid @RequestBody ElegirInstrumentoTecnico datos) {
+        servicio.elegirInstrumentoTecnico(permisos.actual(), id, datos.instrumento(),
+                datos.minutos());
+    }
+
     @PostMapping("/vacantes/{id}/aplicacion-evaluacion")
     @PreAuthorize("@permisos.tiene('elegir_plantilla_evaluacion')")
     @Operation(summary = "Encender o apagar la evaluación del banco en esta vacante. Apagada, "

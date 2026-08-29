@@ -2,6 +2,7 @@ package com.renaser.ai.ai_engine.vacante.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 
 import java.time.Instant;
 
@@ -59,6 +60,18 @@ public final class DtosVacante {
 
     // Qué versión de la prueba del puesto rendirá quien llegue a esa etapa
     public record AsignarPlantillaPrueba(@NotNull Long versionPlantillaPruebaId) {}
+
+    /**
+     * Qué se rinde en la etapa técnica y en cuánto tiempo.
+     *
+     * <p>`minutos` vacío = los del instrumento elegido, que es lo que hacían todas las
+     * vacantes antes de que esto existiera. El valor exacto lo valida el servicio, que es
+     * quien conoce los dos instrumentos.
+     */
+    public record ElegirInstrumentoTecnico(
+            @NotBlank String instrumento,
+            @Positive(message = "los minutos de la etapa técnica son más de cero")
+            Integer minutos) {}
 
     // Encender o apagar la evaluación del banco para esta vacante. Apagada, quien postula
     // no recibe cuestionario del banco: la prueba del puesto es su única evaluación.

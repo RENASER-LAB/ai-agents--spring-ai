@@ -94,6 +94,10 @@ class ServicioCalificacionPruebaImplTest {
     @Mock private VersionPesosRepository versionesPesos;
     @Mock private ColaCalificacionIa cola;
     @Mock private ServicioAuditoria auditoria;
+    @Mock private com.renaser.ai.ai_engine.vacante.repository.VacanteRepository vacantes;
+    @Mock private com.renaser.ai.ai_engine.perfilintegral.service.impl
+            .CalificacionCuestionarioTecnico cuestionarioTecnico;
+    @Mock private com.renaser.ai.ai_engine.perfilintegral.repository.NotaEtapaRepository notasEtapa;
 
     private ServicioCalificacionPruebaImpl servicio;
 
@@ -101,7 +105,7 @@ class ServicioCalificacionPruebaImplTest {
     void crearElServicio() {
         servicio = new ServicioCalificacionPruebaImpl(postulaciones, alcanceVacante, intentos, criterios,
                 preguntasElegidas, preguntasCatalogo, respuestas, notasCriterio, versionesPesos,
-                cola, auditoria, calificacion);
+                cola, auditoria, vacantes, cuestionarioTecnico, notasEtapa, calificacion);
     }
 
     // ============ Quién puede pedirlo ============

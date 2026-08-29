@@ -121,6 +121,7 @@ public class PuenteCalificacionIaImpl implements PuenteCalificacionIa {
     private final ServicioParametros parametros;
     private final MaquinaEstados maquina;
     private final CalificacionCriterios calificacionCriterios;
+    private final CalificacionCuestionarioTecnico calificacionTecnica;
 
     @Override
     public Long organizacionDe(Long postulacionId) {
@@ -318,7 +319,25 @@ public class PuenteCalificacionIaImpl implements PuenteCalificacionIa {
         // El método del banco viaja en el insumo: es lo que le dice al agente con qué
         // formato responder — criterios en CRITERIOS, puntaje directo en el resto.
         return new InsumoRespuestas(puesto.getNombre(), puesto.getNivelPuestoCodigo(),
-                calificacionCriterios.metodoDe(postulacion), abiertas(postulacion));
+                calificacionCriterios.metodoDe(postulacion),
+                abiertas(postulacion.getEvaluacionId()));
+    }
+
+    /**
+     * Lo mismo, pero del cuestionario técnico de la vacante (etapa 2).
+     *
+     * <p>El único cambio es de qué examen se leen las respuestas. El método es siempre
+     * CRITERIOS —lo fija la V42 al crear el banco de la vacante— y la guía de cada pregunta
+     * (C3, C4 y la señal de 0) viaja igual, porque vive en la propia {@code pregunta}.
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public InsumoRespuestas insumoRespuestasTecnicas(Long postulacionId) {
+        Postulacion postulacion = postulacion(postulacionId);
+        Puesto puesto = puesto(vacante(postulacion));
+        return new InsumoRespuestas(puesto.getNombre(), puesto.getNivelPuestoCodigo(),
+                CalificacionCriterios.METODO,
+                abiertas(postulacion.getEvaluacionTecnicaId()));
     }
 
     /**
@@ -328,11 +347,11 @@ public class PuenteCalificacionIaImpl implements PuenteCalificacionIa {
      * modelo generativo no puede tocarlas (RF-147). Las de estilo y consistencia tampoco
      * están: no suman nota por diseño.
      */
-    private List<RespuestaAbierta> abiertas(Postulacion postulacion) {
-        if (postulacion.getEvaluacionId() == null) {
+    private List<RespuestaAbierta> abiertas(Long evaluacionId) {
+        if (evaluacionId == null) {
             return List.of();
         }
-        List<Respuesta> suyas = respuestas.findByEvaluacionId(postulacion.getEvaluacionId()).stream()
+        List<Respuesta> suyas = respuestas.findByEvaluacionId(evaluacionId).stream()
                 .filter(r -> r.getOpcionId() == null && !esVacio(r.getTexto()))
                 .toList();
         if (suyas.isEmpty()) {
@@ -364,15 +383,45 @@ public class PuenteCalificacionIaImpl implements PuenteCalificacionIa {
     public void guardarNotasAbiertas(Long postulacionId, Long ejecucionIaId,
                                      ResultadoEvaluador resultado) {
         Postulacion postulacion = postulacion(postulacionId);
-        List<Long> mias = abiertas(postulacion).stream().map(RespuestaAbierta::respuestaId).toList();
+        guardarNotasDe(postulacion, postulacion.getEvaluacionId(), ejecucionIaId, resultado,
+                CalificacionCriterios.METODO.equals(calificacionCriterios.metodoDe(postulacion)),
+                false);
+    }
+
+    /**
+     * Las notas del cuestionario técnico.
+     *
+     * <p>Mismo cuerpo, otro examen, y al final otra nota de etapa: la de PRUEBA_PUESTO en vez
+     * de la del perfil integral.
+     */
+    @Override
+    @Transactional
+    public void guardarNotasTecnicas(Long postulacionId, Long ejecucionIaId,
+                                     ResultadoEvaluador resultado) {
+        Postulacion postulacion = postulacion(postulacionId);
+        guardarNotasDe(postulacion, postulacion.getEvaluacionTecnicaId(), ejecucionIaId,
+                resultado, true, true);
+    }
+
+    /** Poner la nota de etapa del cuestionario técnico sin pasar por el modelo. */
+    @Override
+    @Transactional
+    public void cerrarNotaTecnica(Long postulacionId) {
+        calificacionTecnica.calificarEtapa(postulacion(postulacionId));
+    }
+
+    private void guardarNotasDe(Postulacion postulacion, Long evaluacionId, Long ejecucionIaId,
+                                ResultadoEvaluador resultado, boolean porCriterios,
+                                boolean tecnico) {
+        Long postulacionId = postulacion.getId();
+        List<Long> mias = abiertas(evaluacionId).stream()
+                .map(RespuestaAbierta::respuestaId).toList();
 
         // En un banco CRITERIOS el agente no trae puntaje: trae los criterios, y el número
         // lo cuenta el código. Para la regla dura (R11) hace falta saber de qué pregunta es
         // cada respuesta, así que se resuelve el mapa una vez.
-        boolean porCriterios = CalificacionCriterios.METODO
-                .equals(calificacionCriterios.metodoDe(postulacion));
         Map<Long, Pregunta> preguntaDeRespuesta = porCriterios
-                ? preguntaPorRespuesta(postulacion) : Map.of();
+                ? preguntaPorRespuesta(evaluacionId) : Map.of();
 
         // Para saber al final si quedó todo cubierto: lo que se guardó ahora más lo que ya
         // estaba ajustado a mano (eso no se pisa, pero cuenta como calificado).
@@ -437,8 +486,8 @@ public class PuenteCalificacionIaImpl implements PuenteCalificacionIa {
             cubiertas.add(nota.respuestaId());
             guardadas++;
         }
-        log.info("EVALUADOR: {} de {} respuestas abiertas calificadas en la postulación {}",
-                guardadas, mias.size(), postulacionId);
+        log.info("{}: {} de {} respuestas calificadas en la postulación {}",
+                tecnico ? "EVALUADOR_TECNICO" : "EVALUADOR", guardadas, mias.size(), postulacionId);
 
         if (porCriterios) {
             // En un banco CRITERIOS media rúbrica no es una nota, y la cola solo reintenta
@@ -453,13 +502,17 @@ public class PuenteCalificacionIaImpl implements PuenteCalificacionIa {
                         + "): sin la tanda completa no hay nota de etapa, se reintenta");
             }
             // La nota de etapa sale de estas calificaciones, así que se recalcula aquí.
-            calificacionCriterios.calificarEtapa(postulacion);
+            if (tecnico) {
+                calificacionTecnica.calificarEtapa(postulacion);
+            } else {
+                calificacionCriterios.calificarEtapa(postulacion);
+            }
         }
     }
 
-    /** De qué pregunta es cada respuesta de la evaluación de esta postulación. */
-    private Map<Long, Pregunta> preguntaPorRespuesta(Postulacion postulacion) {
-        List<Respuesta> suyas = respuestas.findByEvaluacionId(postulacion.getEvaluacionId());
+    /** De qué pregunta es cada respuesta de un examen. */
+    private Map<Long, Pregunta> preguntaPorRespuesta(Long evaluacionId) {
+        List<Respuesta> suyas = respuestas.findByEvaluacionId(evaluacionId);
         Map<Long, Pregunta> porId = preguntas.findByIdIn(
                         suyas.stream().map(Respuesta::getPreguntaId).toList()).stream()
                 .collect(Collectors.toMap(Pregunta::getId, Function.identity()));
@@ -478,7 +531,7 @@ public class PuenteCalificacionIaImpl implements PuenteCalificacionIa {
         Puesto puesto = puesto(vacante);
 
         ServicioCalificacion.ResumenCerrado cerrado = calificacion.resumenDeLoCerrado(postulacionId);
-        List<RespuestaAbierta> abiertas = abiertas(postulacion);
+        List<RespuestaAbierta> abiertas = abiertas(postulacion.getEvaluacionId());
         List<NotaRespuestaIa> notasAbiertas = notasDeLoAbierto(abiertas);
 
         return new InsumoPerfil(
@@ -684,7 +737,7 @@ public class PuenteCalificacionIaImpl implements PuenteCalificacionIa {
      */
     private BigDecimal notaEvaluacion(Long postulacionId) {
         ServicioCalificacion.ResumenCerrado cerrado = calificacion.resumenDeLoCerrado(postulacionId);
-        List<NotaRespuestaIa> abiertas = notasDeLoAbierto(abiertas(postulacion(postulacionId)));
+        List<NotaRespuestaIa> abiertas = notasDeLoAbierto(abiertas(postulacion(postulacionId).getEvaluacionId()));
         // La cuenta vive en ServicioCalificacion.notaCombinada: si la interpretacion de
         // como mezclar las mitades cambia, cambia a la vez aqui y en el desglose del panel.
         return ServicioCalificacion.notaCombinada(cerrado,

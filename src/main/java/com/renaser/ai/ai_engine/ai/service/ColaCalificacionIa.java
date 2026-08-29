@@ -148,6 +148,18 @@ public interface ColaCalificacionIa {
     boolean encolarPruebaPuesto(Long postulacionId);
 
     /**
+     * Calificar el cuestionario técnico que acaba de entregar el candidato.
+     *
+     * <p>⚠️ <b>Va por su propio carril y no por el del evaluador del banco</b>, aunque los dos
+     * cuenten los mismos cuatro criterios. Reutilizar aquel código rompía tres cosas a la vez,
+     * todas en silencio: la cola deduplica por el último trabajo de cada agente —el del perfil
+     * integral no volvería a correr—, la barrera que espera a los demás para armar el retrato
+     * contaría mal, y el atajo que se salta la calificación cuando no hay evaluación entregada
+     * se tragaría este trabajo en las vacantes con la evaluación del banco apagada.
+     */
+    boolean encolarCuestionarioTecnico(Long postulacionId);
+
+    /**
      * Pide las preguntas de la conversación final de la simulación.
      *
      * <p>No califica nada: prepara el guion de los quince minutos finales de la sesión. Se

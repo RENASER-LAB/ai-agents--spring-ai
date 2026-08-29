@@ -110,6 +110,10 @@ en lenguaje normal.
 | POST `/evaluacion/{uuid}/inicio` | Empezar. La primera vez elige qué preguntas le tocan | Candidato |
 | PUT `/evaluacion/{uuid}/respuestas/{preguntaId}` | Guardar una respuesta | Candidato |
 | POST `/evaluacion/{uuid}/entrega` | Entregar. Ya no se cambia, y pasa a calificarse | Candidato |
+| GET `/cuestionario-tecnico/{uuid}` | Su cuestionario técnico, cuando la vacante rinde ese instrumento: las preguntas **sin la PRESENCIAL** y sin la guía de calificación | Candidato |
+| POST `/cuestionario-tecnico/{uuid}/inicio` | Empezar. Aquí arranca el reloj, si la vacante fijó minutos | Candidato |
+| PUT `/cuestionario-tecnico/{uuid}/respuestas/{preguntaId}` | Guardar una respuesta. Solo texto: aquí no se suben archivos | Candidato |
+| POST `/cuestionario-tecnico/{uuid}/entrega` | Entregar. Pasa a `PRUEBA_CALIFICANDO` y lo califica el agente EVALUADOR_TECNICO | Candidato |
 
 **El candidato es de la plataforma.** Una sola cuenta, y con ella postula a la vacante de
 cualquier empresa: su postulación nace en la empresa de la vacante, que es la que la ve en su
@@ -162,6 +166,7 @@ del área— se ven solo las propias, y una ajena responde 404.
 | GET `/vacantes/{id}/cuestionario-tecnico` | El cuestionario de la vacante: el borrador si hay, si no la publicada, con el estado de la generación (SIN_PEDIR·EN_CURSO·FALLIDA·LISTA) y si quedó desactualizado respecto a la ficha | `ver_vacantes` |
 | POST `/vacantes/{id}/cuestionario-tecnico/generacion` | Pedir al agente REDACTOR el borrador (202). Exige la ficha COMPLETA; con una generación viva o la IA apagada responde `encolada=false`. Cuenta contra el tope mensual de IA | `editar_vacante` |
 | PUT `/vacantes/{id}/cuestionario-tecnico/preguntas/{preguntaId}` | Corregir una pregunta del borrador con las palabras del dueño (enunciado y guía C3/C4/señal) | `editar_vacante` |
+| POST `/vacantes/{id}/instrumento-tecnico` | Qué se rinde en la etapa técnica de esta vacante —`PLANTILLA` (la prueba del puesto) o `CUESTIONARIO_TECNICO` (el cuestionario CAZATALENTOS)— y en cuántos minutos. **Uno de los dos, nunca los dos**: publicar exige tener listo el que se eligió, y cambiarlo con candidatos dentro se frena (misma vara para todos). Minutos vacíos = los del instrumento | `elegir_plantilla_prueba` |
 | POST `/vacantes/{id}/cuestionario-tecnico/publicacion` | Publicar el borrador: el acto humano que vuelve real el cuestionario. Re-pasa la aduana entera (cantidades del nivel, presencial donde toca, guía completa, temas prohibidos) y archiva la publicada anterior **de esta vacante** — los bancos por nivel ni se miran | `editar_vacante` |
 | GET `/vacantes/{id}/plantillas-correo` | Qué avisos manda esta vacante con texto propio. Vacío = los de siempre | `ver_vacantes` |
 | POST `/vacantes/{id}/plantillas-correo` · DELETE `/{avisoCodigo}` | Hacer que esta vacante mande otro texto en lugar del aviso que le tocaba, y devolverlo al de siempre. **Una plantilla es una por organización**: sin esto, cambiar el texto de una convocatoria se lo cambia a todas | `editar_textos_correo` |

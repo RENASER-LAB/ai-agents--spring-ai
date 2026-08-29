@@ -86,6 +86,23 @@ public interface PuenteCalificacionIa {
 
     void guardarNotasAbiertas(Long postulacionId, Long ejecucionIaId, ResultadoEvaluador resultado);
 
+    // ---------- El cuestionario técnico de la vacante (etapa 2) ----------
+    // Lo mismo contra el otro examen de la postulación. El método es siempre CRITERIOS y la
+    // guía de cada pregunta viaja igual, porque vive en la propia `pregunta`.
+
+    InsumoRespuestas insumoRespuestasTecnicas(Long postulacionId);
+
+    void guardarNotasTecnicas(Long postulacionId, Long ejecucionIaId, ResultadoEvaluador resultado);
+
+    /**
+     * Cerrar la nota del cuestionario técnico sin pasar por el modelo.
+     *
+     * <p>Para quien entregó sin escribir nada: no hay ninguna respuesta que calificar, pero sí
+     * hay nota que poner — todo ceros. Sin esto, esa postulación se quedaría en
+     * PRUEBA_CALIFICANDO para siempre.
+     */
+    void cerrarNotaTecnica(Long postulacionId);
+
     // ==================== POTENCIAL_RIESGO ====================
 
     /** Todo lo ya calificado, que es de donde sale el Perfil de Talento. */

@@ -27,6 +27,8 @@ import com.renaser.ai.ai_engine.prueba.entity.IntentoPrueba;
 import com.renaser.ai.ai_engine.prueba.repository.IntentoPruebaRepository;
 import com.renaser.ai.ai_engine.prueba.service.ServicioCalificacionPrueba;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
+
+import static com.renaser.ai.ai_engine.vacante.service.impl.ServicioVacantesPanelImpl.CUESTIONARIO_TECNICO;
 import com.renaser.ai.ai_engine.seguridad.service.Permisos;
 import com.renaser.ai.ai_engine.vacante.service.AlcanceSobreLaVacante;
 
@@ -59,6 +61,10 @@ public class ServicioCalificacionPruebaImpl implements ServicioCalificacionPrueb
     private final VersionPesosRepository versionesPesos;
     private final ColaCalificacionIa cola;
     private final ServicioAuditoria auditoria;
+    private final com.renaser.ai.ai_engine.vacante.repository.VacanteRepository vacantes;
+    private final com.renaser.ai.ai_engine.perfilintegral.service.impl
+            .CalificacionCuestionarioTecnico cuestionarioTecnico;
+    private final com.renaser.ai.ai_engine.perfilintegral.repository.NotaEtapaRepository notasEtapa;
     private final CalificacionPorCriterio calificacion;
 
     @Override
@@ -78,9 +84,32 @@ public class ServicioCalificacionPruebaImpl implements ServicioCalificacionPrueb
         }).toList();
     }
 
+    /**
+     * Si esta postulación rinde el cuestionario técnico en vez de la prueba del puesto.
+     *
+     * <p>Lo dice su vacante (V43), y de ahí salen las cuatro bifurcaciones de este servicio:
+     * sin ellas, las cuatro pantallas del panel responden 404 sobre un {@code intento_prueba}
+     * que no existe, y el equipo se queda sin poder leer ni recalificar lo que su candidato
+     * escribió.
+     */
+    private boolean rindeElCuestionario(Postulacion postulacion) {
+        return vacantes.findById(postulacion.getVacanteId())
+                .map(v -> CUESTIONARIO_TECNICO.equals(v.getInstrumentoEtapaTecnica()))
+                .orElse(false);
+    }
+
     @Override
     public List<RespuestaDePrueba> verRespuestas(ContextoUsuario quien, Long postulacionId) {
         Postulacion postulacion = laVisible(quien, postulacionId, "abrir_ficha_candidato");
+        if (rindeElCuestionario(postulacion)) {
+            // El mismo contrato: para quien lee, son preguntas con lo que contestó. Que unas
+            // vengan de una plantilla de prueba y otras del cuestionario de la vacante es
+            // cosa nuestra, no de la pantalla.
+            return cuestionarioTecnico.respuestasDe(postulacion).stream()
+                    .map(r -> new RespuestaDePrueba(r.preguntaId(), r.codigo(), r.orden(),
+                            "ABIERTA", r.enunciado(), r.texto(), r.respondidaEn()))
+                    .toList();
+        }
         IntentoPrueba intento = intentos.findByPostulacionId(postulacion.getId())
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Prueba del puesto", "postulación", postulacionId));
@@ -116,6 +145,25 @@ public class ServicioCalificacionPruebaImpl implements ServicioCalificacionPrueb
     @Override
     public CalificacionIaEncolada calificarConIa(ContextoUsuario quien, Long postulacionId) {
         Postulacion postulacion = laVisible(quien, postulacionId, "ajustar_nota");
+
+        // ⚠️ Con el cuestionario técnico, este botón es la ÚNICA forma de recuperar una
+        // calificación que no salió: si la IA estaba apagada al entregar, o el modelo devolvió
+        // notas inservibles, la postulación se queda en PRUEBA_CALIFICANDO y su etapa —el 30%
+        // de la decisión— desaparecería en silencio del puntaje final.
+        if (rindeElCuestionario(postulacion)) {
+            if (postulacion.getEvaluacionTecnicaId() == null) {
+                throw new IllegalStateException("Esta persona todavía no tiene cuestionario "
+                        + "técnico: se le crea al avanzarla a la etapa de la prueba");
+            }
+            if (!cola.encolarCuestionarioTecnico(postulacionId)) {
+                return new CalificacionIaEncolada("SIN_CAMBIOS",
+                        "No se pidió nada: o ya lo calificó el agente, o hay un trabajo en "
+                                + "marcha ahora mismo, o la calificación con IA está apagada.");
+            }
+            return new CalificacionIaEncolada("ENCOLADA",
+                    "La calificación del cuestionario técnico quedó en cola. Tarda decenas de "
+                            + "segundos: vuelve a consultar la nota para verla.");
+        }
 
         // Lo indispensable, dicho aquí y no tres reintentos después. El agente se plantaría
         // igual al pedir el insumo, pero entonces el mensaje se quedaría en el registro en
@@ -189,6 +237,17 @@ public class ServicioCalificacionPruebaImpl implements ServicioCalificacionPrueb
     @Transactional
     public BigDecimal calcularNotaEtapa(ContextoUsuario quien, Long postulacionId) {
         Postulacion postulacion = laVisible(quien, postulacionId, "ajustar_nota");
+        // El cuestionario técnico no se pondera por rúbrica: su nota es el índice sobre las
+        // calificaciones de sus respuestas. Recalcularlo aquí le da al equipo la misma
+        // palanca que tiene con la prueba del puesto — pedirlo cuando ya están las notas.
+        if (rindeElCuestionario(postulacion)) {
+            cuestionarioTecnico.calificarEtapa(postulacion);
+            return notasEtapa.findByPostulacionIdAndEtapaCodigo(postulacion.getId(), ETAPA)
+                    .map(n -> n.getPuntaje())
+                    .orElseThrow(() -> new IllegalStateException(
+                            "Todavía no se puede poner la nota: falta la calificación de "
+                                    + "alguna respuesta del cuestionario"));
+        }
         // Se delega en la versión compartida a propósito. Aquí hubo una copia de la misma
         // suma, y la copia se desvió: sumaba TODAS las notas de criterio de la postulación
         // en vez de las de esta rúbrica. Como `nota_criterio` es una sola tabla para las tres
@@ -236,7 +295,17 @@ public class ServicioCalificacionPruebaImpl implements ServicioCalificacionPrueb
 
     // ============ Apoyo ============
 
+    /**
+     * La rúbrica con la que se puntúa esta prueba.
+     *
+     * <p>⚠️ El cuestionario técnico <b>no tiene</b>: se califica pregunta a pregunta contando
+     * criterios, no repartiendo cien puntos entre unos cuantos apartados. Devolver vacío en vez
+     * de reventar es lo que deja que la pantalla de notas se abra igual y enseñe lo que sí hay.
+     */
     private List<Criterio> laRubricaDe(Postulacion postulacion) {
+        if (rindeElCuestionario(postulacion)) {
+            return List.of();
+        }
         IntentoPrueba intento = intentos.findByPostulacionId(postulacion.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Prueba del puesto", "postulación", postulacion.getId()));
         return criterios.findByVersionPlantillaPruebaId(intento.getVersionPlantillaPruebaId());

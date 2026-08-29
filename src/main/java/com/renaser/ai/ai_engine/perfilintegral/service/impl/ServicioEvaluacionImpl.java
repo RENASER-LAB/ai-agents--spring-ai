@@ -89,6 +89,10 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
     public static final String PARAMETRO_PLAZO = "dias_plazo_evaluacion";
     static final int DIAS_DE_PLAZO_POR_DEFECTO = 14;
 
+    /** Los dos propósitos de un examen: el banco por nivel, o el cuestionario de una vacante (V43). */
+    public static final String PERFIL_INTEGRAL = "PERFIL_INTEGRAL";
+    public static final String CUESTIONARIO_TECNICO = "CUESTIONARIO_TECNICO";
+
     private final EvaluacionRepository evaluaciones;
     private final PlantillaEvaluacionRepository plantillas;
     private final VersionBancoRepository versionesBanco;
@@ -154,6 +158,55 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
         return evaluacion.getId();
     }
 
+    /**
+     * El examen de la etapa técnica, cuando la vacante rinde el cuestionario CAZATALENTOS.
+     *
+     * <p>Hermano de {@link #crearAlPostular}, y las diferencias son las que separan a los dos
+     * instrumentos:
+     *
+     * <ul>
+     *   <li><b>Sin plantilla.</b> Un cuestionario de vacante no tiene ninguna: nace para esa
+     *       vacante, dura lo que ella diga y no se reutiliza. La V43 lo permite y su CHECK
+     *       sigue exigiéndosela al perfil integral.
+     *   <li><b>El banco es el de la vacante</b>, no el publicado del nivel. Se fija ahora,
+     *       igual que allí: si mañana el dueño regenera el cuestionario, este candidato sigue
+     *       atado al suyo (RF-138).
+     *   <li><b>Sin {@code vigenteHasta}.</b> La vigencia existe para reutilizar un examen del
+     *       banco en otra postulación de la misma persona; este no se reutiliza jamás.
+     *   <li><b>Los minutos se congelan aquí.</b> {@code Evaluacion} no sabe de qué vacante
+     *       viene, y resolverlos al pintar movería el reloj de quien ya está respondiendo si
+     *       alguien edita la vacante a mitad de tanda.
+     * </ul>
+     *
+     * <p>Se crea al ENTRAR en la etapa y no al postular, como el intento de la prueba del
+     * puesto: hasta que el equipo no lo avanza, no hay nada que rendir.
+     */
+    @Override
+    @Transactional
+    public Long crearTecnicaAlEntrar(Long organizacionId, Long usuarioId, Long vacanteId,
+                                     Integer minutosDeLaVacante) {
+        VersionBanco cuestionario = versionesBanco
+                .findFirstByVacanteIdAndEstado(vacanteId, "PUBLICADA")
+                .orElseThrow(() -> new IllegalStateException(
+                        "Esta vacante rinde el cuestionario técnico y no tiene ninguno "
+                                + "publicado: no hay con qué armar el examen"));
+
+        Evaluacion evaluacion = evaluaciones.save(Evaluacion.builder()
+                .organizacionId(organizacionId)
+                .usuarioId(usuarioId)
+                .versionBancoNivelId(cuestionario.getId())
+                .proposito(CUESTIONARIO_TECNICO)
+                // Lo que diga la vacante, o nada: sin cronómetro rige el plazo de días de
+                // siempre. Cuando entre la rama que le pone minutos al banco (V43), aquí se
+                // encadena su valor como respaldo y esta línea es el único sitio que cambia.
+                .minutosObjetivo(minutosDeLaVacante)
+                .estado("PENDIENTE")
+                .venceEn(Instant.now().plus(diasDePlazo(organizacionId), ChronoUnit.DAYS))
+                .creadoEn(Instant.now())
+                .build());
+        return evaluacion.getId();
+    }
+
     // ============ Leer y responder ============
 
     @Override
@@ -176,11 +229,72 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
         return pintar(evaluacion);
     }
 
+    // ============ El cuestionario técnico de la vacante (etapa 2) ============
+    //
+    // Los cuatro verbos del portal, contra el otro examen de la misma postulación. Delegan
+    // en el mismo cuerpo que la evaluación del banco: `pintar`, `armarOrden` —que ya filtra
+    // la pregunta PRESENCIAL, y su comentario dice que el filtro se puso para esto—,
+    // `guardarLaRespuesta` con su carrera resuelta y `exigirAbierta`. Lo único que cambia es
+    // de qué columna de la postulación se saca el examen, y adónde va al entregarse.
+
+    @Override
+    public EvaluacionCandidato verTecnico(ContextoUsuario quien, UUID uuidPostulacion) {
+        return pintar(laMia(quien, uuidPostulacion, CUESTIONARIO_TECNICO).getRight());
+    }
+
+    /**
+     * Empezar el cuestionario técnico: aquí es donde arranca el reloj.
+     *
+     * <p>⚠️ <b>El cronómetro se congela al empezar, no al crear.</b> {@code venceEn} nació
+     * con el plazo de días de siempre; si la vacante fijó minutos, desde este instante manda
+     * el más cercano de los dos. Es el mismo gesto que {@code ServicioPruebaImpl.iniciar}, y
+     * el motivo es el mismo: el tiempo cuenta desde que la persona abre el examen, no desde
+     * que el equipo la avanzó.
+     */
+    @Override
+    @Transactional
+    public EvaluacionCandidato iniciarTecnico(ContextoUsuario quien, UUID uuidPostulacion) {
+        Evaluacion evaluacion = laMia(quien, uuidPostulacion, CUESTIONARIO_TECNICO).getRight();
+        exigirAbierta(evaluacion);
+
+        if (evaluacion.getIniciadaEn() == null) {
+            armarOrden(evaluacion);
+            Instant ahora = Instant.now();
+            evaluacion.setIniciadaEn(ahora);
+            evaluacion.setEstado("EN_CURSO");
+            if (evaluacion.getMinutosObjetivo() != null) {
+                Instant porElReloj = ahora.plus(evaluacion.getMinutosObjetivo(), ChronoUnit.MINUTES);
+                if (evaluacion.getVenceEn() == null || porElReloj.isBefore(evaluacion.getVenceEn())) {
+                    evaluacion.setVenceEn(porElReloj);
+                }
+            }
+            evaluaciones.save(evaluacion);
+        }
+        return pintar(evaluacion);
+    }
+
+    @Override
+    @Transactional
+    public void responderTecnico(ContextoUsuario quien, UUID uuidPostulacion, Long preguntaId,
+                                 Responder datos) {
+        responderEn(laMia(quien, uuidPostulacion, CUESTIONARIO_TECNICO).getRight(),
+                preguntaId, datos);
+    }
+
     @Override
     @Transactional
     public void responder(ContextoUsuario quien, UUID uuidPostulacion, Long preguntaId,
                           Responder datos) {
-        Evaluacion evaluacion = laMia(quien, uuidPostulacion).getRight();
+        responderEn(laMia(quien, uuidPostulacion).getRight(), preguntaId, datos);
+    }
+
+    /**
+     * Guardar una respuesta en el examen que sea.
+     *
+     * <p>Lo comparten los dos instrumentos: las reglas de qué se puede responder y cómo son
+     * del formato de la pregunta, no de para qué etapa es el examen.
+     */
+    private void responderEn(Evaluacion evaluacion, Long preguntaId, Responder datos) {
         exigirAbierta(evaluacion);
         if (evaluacion.getIniciadaEn() == null) {
             throw new IllegalStateException("Hay que empezar la evaluación antes de responder");
@@ -312,11 +426,96 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
         return new EntregaResponse("TERMINADA", respondidas, total);
     }
 
+    /**
+     * Entregar el cuestionario técnico.
+     *
+     * <p>Mismo gesto que la entrega del banco, con tres diferencias que son las que separan
+     * a las dos etapas: va a {@code PRUEBA_CALIFICANDO} y no a {@code PERFIL_CALIFICANDO},
+     * no hay nada cerrado que puntuar —todas sus preguntas son abiertas— y encola al
+     * evaluador técnico, que corre por su propio carril.
+     */
+    @Override
+    @Transactional
+    public EntregaResponse entregarTecnico(ContextoUsuario quien, UUID uuidPostulacion) {
+        var par = laMia(quien, uuidPostulacion, CUESTIONARIO_TECNICO);
+        Postulacion postulacion = par.getLeft();
+        Evaluacion evaluacion = par.getRight();
+        exigirAbierta(evaluacion);
+
+        int total = ordenes.findByEvaluacionIdOrderByPosicion(evaluacion.getId()).size();
+        int respondidas = respuestas.findByEvaluacionId(evaluacion.getId()).size();
+        if (total == 0) {
+            throw new IllegalStateException("Este cuestionario todavía no se ha empezado");
+        }
+        if (respondidas < total) {
+            throw new IllegalArgumentException(
+                    "Faltan " + (total - respondidas) + " preguntas por responder");
+        }
+        cerrarYEncolarTecnico(postulacion, evaluacion);
+        return new EntregaResponse("TERMINADA", respondidas, total);
+    }
+
+    /**
+     * Cerrar el cuestionario técnico y mandarlo a calificar.
+     *
+     * <p>Lo comparten la entrega del candidato y el barrido del reloj. El barrido cierra lo
+     * que haya: quien no contestó una pregunta se lleva un cero por ella, que es lo que dice
+     * el método —no contestar es un cero, no media prueba.
+     */
+    private void cerrarYEncolarTecnico(Postulacion postulacion, Evaluacion evaluacion) {
+        evaluacion.setEstado("TERMINADA");
+        evaluacion.setTerminadaEn(Instant.now());
+        evaluaciones.save(evaluacion);
+
+        // Transición del sistema: no hay persona detrás y por eso no lleva motivo escrito.
+        maquina.transicionar(postulacion, "PRUEBA_CALIFICANDO", null, null, true, false, null);
+
+        // Nada que puntuar aquí: las doce preguntas son abiertas y las califica el modelo.
+        colaIa.encolarCuestionarioTecnico(postulacion.getId());
+    }
+
+    /**
+     * Los cuestionarios técnicos a los que se les acabó el tiempo se entregan solos.
+     *
+     * <p>⚠️ <b>Sin esto el cronómetro no existe.</b> La pantalla enseñaría el reloj en cero y
+     * el examen seguiría abierto en el servidor para siempre; es la clase de fallo que no da
+     * ninguna señal. Gemelo de {@code ServicioPrueba.entregarVencidos}, y como él se entrega
+     * <b>incompleto</b>: lo que no contestó cuenta cero.
+     *
+     * <p>⚠️ <b>También los que nunca se abrieron</b> (PENDIENTE), y no solo los empezados.
+     * Un cuestionario nace ya con su plazo de días puesto: si nadie lo abre, vence,
+     * {@link #exigirAbierta} deja de permitir empezarlo y ningún otro barrido lo mira —el del
+     * perfil integral filtra por su propósito—. Sin esta línea esa persona se queda en su
+     * turno para siempre, sin nota y sin cierre, y nada del sistema vuelve a tocarla.
+     */
+    @Override
+    @Transactional
+    public void entregarTecnicasVencidas() {
+        for (Evaluacion evaluacion : evaluaciones.findByPropositoAndEstadoInAndVenceEnBefore(
+                CUESTIONARIO_TECNICO, List.of("PENDIENTE", "EN_CURSO"), Instant.now())) {
+            postulaciones.findByEvaluacionTecnicaId(evaluacion.getId()).ifPresent(postulacion -> {
+                // Quien se retiró o quedó fuera deja su cuestionario sin entregar, y ese
+                // cuestionario vence igual: sin esta comprobación se intentaría mover una
+                // postulación ya cerrada.
+                if (maquina.yaTermino(postulacion)) {
+                    return;
+                }
+                log.info("Se acabó el tiempo del cuestionario técnico {}: se entrega como esté",
+                        evaluacion.getId());
+                cerrarYEncolarTecnico(postulacion, evaluacion);
+            });
+        }
+    }
+
     @Override
     @Transactional
     public void cerrarVencidas() {
-        for (Evaluacion evaluacion : evaluaciones.findByEstadoInAndVenceEnBefore(
-                List.of("PENDIENTE", "EN_CURSO"), Instant.now())) {
+        // ⚠️ Solo las del perfil integral. Las técnicas tienen su propio barrido, que las
+        // ENTREGA en vez de darlas por vencidas: si cayeran aquí, se marcarían VENCIDA, su
+        // `findByEvaluacionId` no encontraría postulación —cuelgan de la otra columna— y el
+        // candidato se quedaría sin nota y sin cierre, en silencio.
+        for (Evaluacion evaluacion : evaluaciones.findByPropositoAndEstadoInAndVenceEnBefore(
+                PERFIL_INTEGRAL, List.of("PENDIENTE", "EN_CURSO"), Instant.now())) {
             evaluacion.setEstado("VENCIDA");
             evaluaciones.save(evaluacion);
 
@@ -391,10 +590,28 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
 
     // ============ Pintar ============
 
+    /**
+     * Cuánto tiempo tiene quien responde este examen.
+     *
+     * <p>⚠️ <b>Los suyos primero, y la plantilla solo si no los tiene.</b> Un cuestionario
+     * técnico no tiene plantilla —la V43 lo permite— y preguntársela con un id nulo revienta
+     * con «The given id must not be null» en la cara del candidato: lo cazó la prueba de
+     * integración del ciclo 2 en cuanto alguien abrió su cuestionario.
+     */
+    private Integer minutosDe(Evaluacion evaluacion) {
+        if (evaluacion.getMinutosObjetivo() != null) {
+            return evaluacion.getMinutosObjetivo();
+        }
+        if (evaluacion.getPlantillaEvaluacionId() == null) {
+            return null;
+        }
+        return plantillas.findById(evaluacion.getPlantillaEvaluacionId())
+                .map(PlantillaEvaluacion::getMinutosObjetivo).orElse(null);
+    }
+
     private EvaluacionCandidato pintar(Evaluacion evaluacion) {
         List<OrdenPregunta> orden = ordenes.findByEvaluacionIdOrderByPosicion(evaluacion.getId());
-        Integer minutos = plantillas.findById(evaluacion.getPlantillaEvaluacionId())
-                .map(PlantillaEvaluacion::getMinutosObjetivo).orElse(null);
+        Integer minutos = minutosDe(evaluacion);
 
         if (orden.isEmpty()) {
             // Todavía no ha empezado: no hay preguntas que enseñar
@@ -459,15 +676,30 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
 
     // ============ Apoyo ============
 
-    /** La postulación y su evaluación, comprobando que ambas son de quien pregunta. */
+    /** La postulación y su evaluación del perfil integral, si ambas son de quien pregunta. */
     private Par laMia(ContextoUsuario quien, UUID uuid) {
+        return laMia(quien, uuid, PERFIL_INTEGRAL);
+    }
+
+    /**
+     * La postulación y el examen que se le pide, comprobando que ambos son de quien pregunta.
+     *
+     * <p>Una postulación puede tener dos: el del banco por nivel (etapa 1) y el cuestionario
+     * técnico de su vacante (etapa 2), en columnas distintas desde la V43. El propósito elige
+     * de cuál se habla; lo demás —incluido el 404 de «no es tuya», que no distingue entre no
+     * existir y ser de otro— es idéntico para los dos.
+     */
+    private Par laMia(ContextoUsuario quien, UUID uuid, String proposito) {
         Postulacion postulacion = postulaciones.findByUuid(uuid)
                 .filter(p -> p.getUsuarioId().equals(quien.usuarioId()))
                 .orElseThrow(() -> new ResourceNotFoundException("Postulación", "código", uuid));
-        if (postulacion.getEvaluacionId() == null) {
+        Long evaluacionId = CUESTIONARIO_TECNICO.equals(proposito)
+                ? postulacion.getEvaluacionTecnicaId()
+                : postulacion.getEvaluacionId();
+        if (evaluacionId == null) {
             throw new ResourceNotFoundException("Evaluación", "postulación", uuid);
         }
-        Evaluacion evaluacion = evaluaciones.findById(postulacion.getEvaluacionId())
+        Evaluacion evaluacion = evaluaciones.findById(evaluacionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Evaluación", "postulación", uuid));
         return new Par(postulacion, evaluacion);
     }

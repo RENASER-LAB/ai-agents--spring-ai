@@ -35,6 +35,17 @@ public interface ServicioVacantesPanel {
     void asignarPlantillaPrueba(ContextoUsuario quien, Long id, Long versionPlantillaPruebaId);
 
     /**
+     * Qué se rinde en la etapa técnica de esta vacante, y en cuántos minutos.
+     *
+     * <p>{@code PLANTILLA} = la prueba del puesto de siempre · {@code CUESTIONARIO_TECNICO} =
+     * el cuestionario CAZATALENTOS aprobado para esta vacante. Uno de los dos, nunca los dos:
+     * publicar exige tener listo el que se haya elegido. Con {@code minutos} vacío rige el
+     * tiempo del instrumento elegido.
+     */
+    void elegirInstrumentoTecnico(ContextoUsuario quien, Long id, String instrumento,
+                                  Integer minutos);
+
+    /**
      * Encender o apagar la evaluación del banco para esta vacante.
      *
      * <p>Apagada, quien postule no recibe cuestionario: su postulación va directa a la
