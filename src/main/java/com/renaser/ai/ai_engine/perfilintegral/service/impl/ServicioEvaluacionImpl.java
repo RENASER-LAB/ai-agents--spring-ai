@@ -584,10 +584,28 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
 
     // ============ Pintar ============
 
+    /**
+     * Cuánto tiempo tiene quien responde este examen.
+     *
+     * <p>⚠️ <b>Los suyos primero, y la plantilla solo si no los tiene.</b> Un cuestionario
+     * técnico no tiene plantilla —la V44 lo permite— y preguntársela con un id nulo revienta
+     * con «The given id must not be null» en la cara del candidato: lo cazó la prueba de
+     * integración del ciclo 2 en cuanto alguien abrió su cuestionario.
+     */
+    private Integer minutosDe(Evaluacion evaluacion) {
+        if (evaluacion.getMinutosObjetivo() != null) {
+            return evaluacion.getMinutosObjetivo();
+        }
+        if (evaluacion.getPlantillaEvaluacionId() == null) {
+            return null;
+        }
+        return plantillas.findById(evaluacion.getPlantillaEvaluacionId())
+                .map(PlantillaEvaluacion::getMinutosObjetivo).orElse(null);
+    }
+
     private EvaluacionCandidato pintar(Evaluacion evaluacion) {
         List<OrdenPregunta> orden = ordenes.findByEvaluacionIdOrderByPosicion(evaluacion.getId());
-        Integer minutos = plantillas.findById(evaluacion.getPlantillaEvaluacionId())
-                .map(PlantillaEvaluacion::getMinutosObjetivo).orElse(null);
+        Integer minutos = minutosDe(evaluacion);
 
         if (orden.isEmpty()) {
             // Todavía no ha empezado: no hay preguntas que enseñar
