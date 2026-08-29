@@ -315,3 +315,23 @@ posibilidad de auditarlo después.
 - Nueve de las diez repreguntas (las de la etapa 1), en el mismo documento.
 - Cómo encaja esto en el sistema que ya está construido (plantillas de prueba, rúbrica,
   versionado).
+
+---
+
+## Qué está construido, a 28/08/2026
+
+**Ciclo 1 (V42).** La ficha de vacante y el agente REDACTOR: el dueño contesta las diez
+preguntas en su panel, la IA escribe el borrador siguiendo la receta de arriba, él lo corrige
+con sus palabras y lo publica. El cuestionario aprobado es un banco ligado a esa vacante.
+
+**Ciclo 2 (V43).** Que se pueda rendir. Cada vacante elige, en borrador, qué se rinde en su
+etapa técnica —esta prueba o la del puesto de siempre, nunca las dos— y en cuántos minutos;
+publicar exige tener listo el que eligió. El candidato la contesta en su portal sin ver la
+pregunta presencial ni la guía de calificación, el agente `EVALUADOR_TECNICO` cuenta sus
+criterios y el índice queda como nota de la etapa.
+
+**Lo que falta.** La textura y sus siete diccionarios, la repregunta de esta etapa, el índice
+combinado (45/55) y el corte automático en 65: hoy el equipo avanza a mano desde el ranking,
+que es lo que se pidió mientras el método se calibra. Y en el panel, la palanca para elegir el
+instrumento y la pantalla del candidato están pendientes: por ahora el backend lo sirve todo,
+pero nadie lo ve.

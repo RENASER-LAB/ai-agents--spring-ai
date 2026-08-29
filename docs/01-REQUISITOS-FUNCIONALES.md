@@ -615,6 +615,18 @@ versionadas.
 Es **obligatoria para todo puesto**. Un portafolio no sustituye demostrar la capacidad con un
 problema nuevo.
 
+⚠️ **Desde la V43 hay dos formas de cumplirlo, y la vacante elige una.** La prueba del puesto
+descrita aquí abajo, o el **cuestionario técnico** del método CAZATALENTOS
+([su documento](CAZATALENTOS-PRUEBA-TECNICA.md)): preguntas escritas para esa vacante concreta,
+sobre los riesgos del cargo y el rubro de la empresa. Lo que no se puede es publicar una
+vacante sin ninguna de las dos — el requisito sigue siendo obligatorio; lo que dejó de estar
+fijado es con qué se cumple.
+
+Con el cuestionario técnico el candidato **no entrega ningún archivo**: solo escribe. La única
+parte de «producir algo» que trae ese método es la muestra de trabajo, que va marcada como
+presencial, jamás se le envía y se resuelve en la entrevista con el dueño. Quien necesite un
+entregable revisable elige la prueba del puesto.
+
 **RF-73** Toda prueba tiene cuatro momentos: **comprende**, **produce**, **explica**, **se
 adapta**.
 

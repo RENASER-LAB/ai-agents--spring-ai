@@ -488,7 +488,7 @@ agente que la produjo.
 | `familia` | Las siete familias de trabajo | codigo, nombre |
 | `familia_afin` | Qué familias se parecen lo bastante para reutilizar evaluaciones | familia_codigo, familia_afin_codigo |
 | `puesto` | El catálogo de puestos, con su nivel y su familia | organizacion_id, codigo, nombre, nivel_puesto_codigo, familia_codigo |
-| `vacante` | Una convocatoria concreta | organizacion_id, solicitud_talento_id, puesto_id, titulo, descripcion, tipo_cierre, plazas, cierra_en, estado, version_pesos_id, version_plantilla_prueba_id, plantilla_evaluacion_id, responsable_usuario_id |
+| `vacante` | Una convocatoria concreta | organizacion_id, solicitud_talento_id, puesto_id, titulo, descripcion, tipo_cierre, plazas, cierra_en, estado, version_pesos_id, version_plantilla_prueba_id, plantilla_evaluacion_id, **instrumento_etapa_tecnica**, **minutos_etapa_tecnica**, responsable_usuario_id |
 | `requisito_objetivo` | Lo único que puede detener una postulación sin que intervenga nadie | vacante_id, descripcion, regla, es_activo |
 | `barrera_critica` | Lo que ningún promedio alto compensa, definido por vacante | vacante_id, descripcion, es_activa |
 | `evaluador_estandar` | Quién revisa que la urgencia no baje el nivel, en esta vacante | vacante_id, usuario_id, puede_bloquear, asignado_por_usuario_id |
@@ -537,7 +537,7 @@ prospectos que podrían encajar, y eso es una búsqueda por parecido, no por igu
 | Tabla | Para qué existe | Columnas que importan |
 |---|---|---|
 | `estado_postulacion` | Catálogo cerrado de los 18 estados | codigo, nombre, etapa_codigo, momento_codigo, espera_a, orden, es_final |
-| `postulacion` | Un usuario en una vacante. Tiene un solo estado a la vez, nunca dos | organizacion_id, uuid, usuario_id, vacante_id, estado_codigo, grupo_prioridad, motivo_cierre, evaluacion_id, rondas_evidencia_usadas, movido_en |
+| `postulacion` | Un usuario en una vacante. Tiene un solo estado a la vez, nunca dos | organizacion_id, uuid, usuario_id, vacante_id, estado_codigo, grupo_prioridad, motivo_cierre, evaluacion_id, **evaluacion_tecnica_id**, rondas_evidencia_usadas, movido_en |
 | `transicion_estado` | Cada cambio de estado, guardado aparte. **No se modifica ni se borra nunca** | postulacion_id, estado_anterior_codigo, estado_nuevo_codigo, usuario_id, rol_id, es_sistema, es_por_lote, motivo, ocurrida_en |
 
 El estado guarda **etapa** y **momento** aparte, y por eso el siguiente estado se calcula en vez
@@ -655,9 +655,20 @@ minutos. `vigencia_meses` es lo que decide cuánto tiempo se puede reutilizar lo
 
 Esta área es la que cuelga del usuario y no de la postulación.
 
+⚠️ **Desde la V43 una postulación puede tener dos exámenes** y `evaluacion` sirve a los dos:
+el del banco por nivel (etapa 1, que cuelga de `postulacion.evaluacion_id` y se reutiliza entre
+postulaciones mientras esté vigente) y el cuestionario técnico de su vacante (etapa 2, que
+cuelga de `postulacion.evaluacion_tecnica_id` y no se reutiliza jamás). Los distingue
+`proposito`, que además decide qué barrido de vencimientos los cierra: el del perfil integral
+los da por vencidos, el técnico los **entrega** como estén.
+
+El cuestionario técnico es el único que puede no tener `plantilla_evaluacion_id` —no hay
+plantilla que le corresponda—, y un CHECK conserva la exigencia para los del perfil integral.
+Su `version_banco_nivel_id` guarda un banco de tipo VACANTE pese al nombre de la columna.
+
 | Tabla | Para qué existe | Columnas que importan |
 |---|---|---|
-| `evaluacion` | Las respuestas de un usuario a una plantilla concreta | organizacion_id, usuario_id, plantilla_evaluacion_id, version_banco_nivel_id, version_banco_alineacion_id, reutiliza_de_evaluacion_id, estado, vence_en, iniciada_en, terminada_en, vigente_hasta |
+| `evaluacion` | Un examen de una persona: el del banco por nivel, o el cuestionario técnico de una vacante | organizacion_id, usuario_id, plantilla_evaluacion_id, version_banco_nivel_id, version_banco_alineacion_id, reutiliza_de_evaluacion_id, **proposito**, **minutos_objetivo**, estado, vence_en, iniciada_en, terminada_en, vigente_hasta |
 | `orden_pregunta` | En qué orden se le mostró cada pregunta y sus opciones. Sin esto no se puede reproducir el examen | evaluacion_id, pregunta_id, posicion, orden_opciones |
 | `respuesta` | Lo que contestó | evaluacion_id, pregunta_id, opcion_id, texto, segundos, respondida_en |
 | `nota_respuesta` | El puntaje de esa respuesta y **por qué** | respuesta_id, puntaje, explicacion, evidencia_citada, confianza, ejecucion_ia_id, ajustada_por_usuario_id, motivo_ajuste |

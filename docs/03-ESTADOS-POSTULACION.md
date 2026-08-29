@@ -117,6 +117,21 @@ Que el cronómetro esté corriendo no es un estado: el intento guarda cuándo em
 vence. Un candidato que aún no ha entrado y otro con el reloj corriendo están en el mismo
 estado, y la diferencia la dice el intento.
 
+⚠️ **Los mismos tres estados, dos instrumentos distintos.** Desde la V43 cada vacante elige
+qué se rinde en esta etapa: la prueba del puesto de siempre —enunciado, entregables, el
+cronómetro de su plantilla— o el **cuestionario técnico** que el dueño aprobó para ella, que
+se contesta escribiendo y cuyo reloj son los minutos que fijó la vacante. Uno de los dos,
+nunca los dos.
+
+El recorrido de estados no cambia, y por eso se documenta aquí y no aparte: entra en
+`PRUEBA_TURNO_CANDIDATO`, entrega, pasa a `PRUEBA_CALIFICANDO` y sale por
+`PRUEBA_POR_CONFIRMAR`. Lo que cambia es qué encuentra al entrar y quién le pone la nota — el
+agente de la prueba o el `EVALUADOR_TECNICO`.
+
+Y hay un caso que sí se comporta distinto: a quien **nunca abre** su cuestionario y se le pasa
+el plazo, el sistema se lo entrega en blanco y su nota es un cero. En la prueba del puesto, un
+intento que nunca se empezó no vence solo.
+
 ### Etapa 4 — Simulación de trabajo
 
 | Estado | Espera a | Qué pasó |

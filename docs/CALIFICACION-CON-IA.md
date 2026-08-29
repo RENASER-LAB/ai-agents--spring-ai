@@ -234,6 +234,36 @@ trabajo queda FALLIDO y visible — un borrador a medias jamás se guarda como s
 bien. El detalle del flujo completo está en
 [el diseño del ciclo 1](DISENO-PRUEBA-TECNICA-FICHA-Y-REDACTOR.md).
 
+## El que califica la etapa técnica: el EVALUADOR_TECNICO
+
+El agente número doce (`V43`) hace lo mismo que el evaluador del banco CAZATALENTOS —contar
+los cuatro criterios de cada respuesta, sin poner el número— pero sobre el cuestionario
+técnico que el REDACTOR escribió para una vacante. Reutiliza su mismo formato palabra por
+palabra: el contrato con el modelo es idéntico, y tener dos copias de la misma regla es como
+acaban divergiendo.
+
+⚠️ **Entonces, ¿por qué un agente aparte?** Porque el código del agente es la llave con la que
+la cola ordena su trabajo, y compartirlo rompía tres cosas a la vez, las tres en silencio:
+
+1. La cola no repite lo hecho mirando el **último** trabajo de cada agente en esa postulación.
+   Con los dos exámenes bajo el mismo código, encolar el del perfil integral encontraría el
+   técnico ya terminado y **no correría nunca**: una postulación sin nota de currículum y sin
+   ningún error a la vista.
+2. La barrera que espera a que todos acaben para armar el Perfil de Talento cuenta al
+   evaluador: contaría un trabajo que no es suyo y se dispararía a destiempo.
+3. El atajo que se salta la calificación cuando no hay evaluación entregada mira la columna
+   del perfil integral. En una vacante con la evaluación del banco apagada —legal, y lo más
+   probable con el cuestionario técnico— se tragaría el trabajo con un mensaje informativo.
+
+Un código propio los resuelve por construcción. Y cuando el candidato entrega **sin escribir
+nada** —el reloj entrega lo que haya— no se le pregunta al modelo: no hay nada que calificar,
+pero la nota sí se pone, y es todo ceros.
+
+**Si la calificación no sale**, el equipo tiene la misma palanca que con la prueba del puesto:
+volver a pedirla desde la ficha del candidato, o recalcular la etapa cuando las notas ya
+están. Sin eso, una postulación se quedaría en «calificando» y su etapa —el 30% de la
+decisión— desaparecería del puntaje final sin decir nada.
+
 ## Cómo apagarlo
 
 `renaser.ai.calificacion.habilitada: false` en la configuración. Con eso la postulación se
