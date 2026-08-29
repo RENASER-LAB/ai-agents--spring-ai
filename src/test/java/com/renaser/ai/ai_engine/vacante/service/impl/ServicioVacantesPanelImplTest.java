@@ -83,6 +83,7 @@ class ServicioVacantesPanelImplTest {
     @Mock private ServicioAuditoria auditoria;
     @Mock private com.renaser.ai.ai_engine.organizacion.service.DuenoDelInstrumento dueno;
     @Mock private com.renaser.ai.ai_engine.postulacion.repository.PostulacionRepository postulaciones;
+    @Mock private com.renaser.ai.ai_engine.perfilintegral.repository.VersionBancoRepository versionesBanco;
 
     private ServicioVacantesPanelImpl servicio;
 
@@ -90,8 +91,8 @@ class ServicioVacantesPanelImplTest {
     void crearElServicio() {
         servicio = new ServicioVacantesPanelImpl(vacantes, puestos, requisitos, solicitudes,
                 versionesPesos, plantillas, versionesPrueba, plantillasPrueba, plantillasCorreo,
-                plantillasPorVacante, textosConsentimiento, intentos, auditoria, dueno,
-                postulaciones);
+                plantillasPorVacante, textosConsentimiento, intentos, versionesBanco, auditoria,
+                dueno, postulaciones);
         // En estas pruebas la organizacion no personaliza nada: el resolutor contesta
         // que el dueño de todo instrumento es ella misma (aqui hace de plataforma).
         org.mockito.Mockito.lenient()

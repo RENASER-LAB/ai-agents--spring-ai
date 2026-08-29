@@ -10,6 +10,7 @@ import com.renaser.ai.ai_engine.vacante.service.ServicioVacantesPanel;
 import com.renaser.ai.ai_engine.vacante.dto.DtosVacante.*;
 import com.renaser.ai.ai_engine.perfilintegral.entity.PlantillaEvaluacion;
 import com.renaser.ai.ai_engine.perfilintegral.repository.PlantillaEvaluacionRepository;
+import com.renaser.ai.ai_engine.perfilintegral.repository.VersionBancoRepository;
 import com.renaser.ai.ai_engine.pesos.entity.VersionPesos;
 import com.renaser.ai.ai_engine.pesos.repository.VersionPesosRepository;
 import com.renaser.ai.ai_engine.prueba.entity.VersionPlantillaPrueba;
@@ -37,6 +38,10 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
 
+    /** Los dos instrumentos de la etapa técnica. Uno por vacante, nunca los dos (V44). */
+    public static final String PLANTILLA = "PLANTILLA";
+    public static final String CUESTIONARIO_TECNICO = "CUESTIONARIO_TECNICO";
+
     private final VacanteRepository vacantes;
     private final PuestoRepository puestos;
     private final RequisitoObjetivoRepository requisitos;
@@ -49,6 +54,7 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
     private final PlantillaCorreoVacanteRepository plantillasPorVacante;
     private final TextoConsentimientoRepository textosConsentimiento;
     private final IntentoPruebaRepository intentos;
+    private final VersionBancoRepository versionesBanco;
     private final ServicioAuditoria auditoria;
     private final DuenoDelInstrumento dueno;
     private final com.renaser.ai.ai_engine.postulacion.repository.PostulacionRepository postulaciones;
@@ -236,11 +242,12 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
             throw new IllegalStateException(
                     "Antes de publicar hay que elegir la plantilla de evaluación de esta vacante");
         }
-        // "Es obligatoria para todo puesto" (RF-73): mismo motivo que la evaluación.
-        if (vacante.getVersionPlantillaPruebaId() == null) {
-            throw new IllegalStateException(
-                    "Antes de publicar hay que elegir la prueba del puesto de esta vacante");
-        }
+        // "Es obligatoria para todo puesto" (RF-73), pero desde el ciclo 2 hay DOS formas de
+        // cumplirlo y la vacante dice cuál usa: la prueba del puesto de siempre, o el
+        // cuestionario técnico que el dueño aprobó para ella. Lo que no se puede es publicar
+        // sin ninguna de las dos, porque entonces el candidato llega a su etapa técnica y no
+        // encuentra nada que rendir.
+        exigirInstrumentoTecnico(vacante);
         // El requisito del día uno de la pieza A: sin texto legal publicado con SU nombre,
         // la empresa no recibe candidatos — al postular se firma ese texto (ley 29733), y
         // no puede firmarse lo que no existe. Renaser lo tiene publicado desde la V9; a
@@ -374,6 +381,96 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                 "vacante", id,
                 anterior == null ? null : Map.of("versionPesosId", String.valueOf(anterior)),
                 Map.of("versionPesosId", String.valueOf(versionPesosId)), null);
+    }
+
+    /**
+     * Qué rinde esta vacante en su etapa técnica, y cuánto tiempo tiene el candidato.
+     *
+     * <p><b>Uno de los dos, nunca los dos.</b> O la prueba del puesto de siempre —enunciado,
+     * cronómetro, entregables— o el cuestionario técnico que el REDACTOR escribió para esta
+     * vacante y el dueño aprobó. Lo que se elija es lo que el candidato encuentra cuando le
+     * toca la etapa, y de ahí sale su nota.
+     *
+     * <p>Se declara aquí y no se deduce de si hay un cuestionario publicado: preparar uno
+     * «por si acaso» no puede cambiar en silencio lo que va a rendir la gente.
+     *
+     * <p>⚠️ <b>La misma vara para todos</b> ({@link #exigirVaraQuieta}): cambiar de
+     * instrumento con candidatos ya dentro dejaría a unos medidos con un examen y a otros con
+     * otro, en la misma lista. Ojo a la línea exacta: la guarda frena desde la primera
+     * postulación, no desde la primera rendición — es más estricta de lo que pide la regla, y
+     * se deja así a propósito, igual que en las otras tres decisiones de la vacante.
+     *
+     * <p>Los minutos son de la vacante y solo de esta etapa. Vacíos, rige lo que diga el
+     * instrumento elegido; los del banco del perfil integral viajan con el banco y no se
+     * tocan desde aquí.
+     */
+    @Override
+    @Transactional
+    public void elegirInstrumentoTecnico(ContextoUsuario quien, Long id,
+                                         String instrumento, Integer minutos) {
+        Vacante vacante = laDeLaOrganizacion(quien, id);
+        if (!PLANTILLA.equals(instrumento) && !CUESTIONARIO_TECNICO.equals(instrumento)) {
+            throw new IllegalArgumentException(
+                    "El instrumento de la etapa técnica es «" + PLANTILLA + "» o «"
+                            + CUESTIONARIO_TECNICO + "»; llegó «" + instrumento + "»");
+        }
+        if (minutos != null && minutos <= 0) {
+            throw new IllegalArgumentException("Los minutos de la etapa técnica, si se fijan, "
+                    + "son más de cero; para usar los del instrumento elegido se dejan vacíos");
+        }
+
+        String anterior = vacante.getInstrumentoEtapaTecnica();
+        if (!anterior.equals(instrumento)) {
+            exigirVaraQuietaDelInstrumento(vacante);
+        }
+        vacante.setInstrumentoEtapaTecnica(instrumento);
+        vacante.setMinutosEtapaTecnica(minutos);
+        vacantes.save(vacante);
+        auditoria.registrar(quien.organizacionId(), quien, "elegir_instrumento_tecnico",
+                "vacante", id,
+                Map.of("instrumentoEtapaTecnica", anterior),
+                Map.of("instrumentoEtapaTecnica", instrumento,
+                        "minutosEtapaTecnica", String.valueOf(minutos)), null);
+    }
+
+    /**
+     * Que la vacante tenga con qué llenar su etapa técnica antes de publicarse.
+     *
+     * <p>El mensaje dice cuál falta según lo que la vacante haya declarado: mandar a «elige
+     * la prueba del puesto» a quien eligió el cuestionario técnico lleva a la pantalla
+     * equivocada.
+     */
+    private void exigirInstrumentoTecnico(Vacante vacante) {
+        if (CUESTIONARIO_TECNICO.equals(vacante.getInstrumentoEtapaTecnica())) {
+            versionesBanco.findFirstByVacanteIdAndEstado(vacante.getId(), "PUBLICADA")
+                    .orElseThrow(() -> new IllegalStateException(
+                            "Esta vacante rinde el cuestionario técnico y todavía no hay ninguno "
+                                    + "publicado: apruébalo antes de publicar la vacante"));
+            return;
+        }
+        if (vacante.getVersionPlantillaPruebaId() == null) {
+            throw new IllegalStateException(
+                    "Antes de publicar hay que elegir la prueba del puesto de esta vacante");
+        }
+    }
+
+    /**
+     * Gemela de {@link #exigirVaraQuieta} para el instrumento, que es texto y no un id.
+     *
+     * <p>No se pudo reutilizar aquella tal cual —compara {@code Long}— pero la regla, la
+     * línea (la primera postulación) y el mensaje son los mismos a propósito: quien lea los
+     * dos tiene que ver la misma decisión, no dos parecidas.
+     */
+    private void exigirVaraQuietaDelInstrumento(Vacante vacante) {
+        if ("BORRADOR".equals(vacante.getEstado())) {
+            return;
+        }
+        if (postulaciones.countByVacanteId(vacante.getId()) > 0) {
+            throw new IllegalStateException("Esta vacante ya tiene postulantes y lo que se "
+                    + "rinde en su etapa técnica no se cambia: todos sus candidatos se miden "
+                    + "con la misma vara. Para estrenar otro instrumento, ábrelo en la "
+                    + "siguiente convocatoria.");
+        }
     }
 
     /**

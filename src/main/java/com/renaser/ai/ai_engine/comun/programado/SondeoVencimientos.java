@@ -43,6 +43,15 @@ public class SondeoVencimientos {
             log.error("El sondeo de pruebas vencidas falló, se reintenta en el próximo ciclo", e);
         }
         try {
+            // El cronómetro del cuestionario técnico vive aquí y en ningún otro sitio: sin
+            // esta llamada la pantalla enseñaría el reloj en cero y el examen seguiría
+            // abierto en el servidor para siempre, sin dar ninguna señal.
+            evaluacion.entregarTecnicasVencidas();
+        } catch (Exception e) {
+            log.error("El sondeo de cuestionarios técnicos vencidos falló, se reintenta en el "
+                    + "próximo ciclo", e);
+        }
+        try {
             // Un periodo de validación que se acaba no cierra la postulación: la pasa a
             // esperar a que una persona complete las métricas que no se alimentaron solas.
             validacion.terminarVencidos();

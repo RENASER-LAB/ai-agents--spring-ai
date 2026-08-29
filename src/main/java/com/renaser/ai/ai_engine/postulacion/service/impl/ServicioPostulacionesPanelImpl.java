@@ -18,6 +18,9 @@ import com.renaser.ai.ai_engine.usuario.repository.UsuarioRepository;
 import com.renaser.ai.ai_engine.usuario.service.NombresDeUsuarios;
 import com.renaser.ai.ai_engine.postulacion.service.ServicioPostulacionesPanel;
 import com.renaser.ai.ai_engine.prueba.service.ServicioPrueba;
+import com.renaser.ai.ai_engine.perfilintegral.service.ServicioEvaluacion;
+
+import static com.renaser.ai.ai_engine.perfilintegral.service.impl.ServicioEvaluacionImpl.CUESTIONARIO_TECNICO;
 import com.renaser.ai.ai_engine.simulacion.service.ServicioDisponibilidadSimulacion;
 import com.renaser.ai.ai_engine.validacion.service.ServicioValidacion;
 import com.renaser.ai.ai_engine.postulacion.dto.DtosPostulacion.*;
@@ -63,6 +66,7 @@ public class ServicioPostulacionesPanelImpl implements ServicioPostulacionesPane
     private final MaquinaEstados maquina;
     private final Permisos permisos;
     private final ServicioPrueba prueba;
+    private final ServicioEvaluacion evaluaciones;
     private final ServicioValidacion validacion;
     private final ServicioDisponibilidadSimulacion disponibilidad;
     private final DatoCvRepository datosCv;
@@ -169,18 +173,30 @@ public class ServicioPostulacionesPanelImpl implements ServicioPostulacionesPane
                         "Desde " + p.getEstadoCodigo() + " no hay un avance que calcular: "
                                 + "usa una transición manual con motivo"));
 
-        // Al entrar a su turno para la prueba, se le crea el intento: mismo patrón que la
-        // evaluación del hito 2, la versión de la plantilla queda fijada aquí y no cambia
-        // aunque después se publique otra (RF-90).
+        // Al entrar a su turno para la prueba, se le crea lo que vaya a rendir: mismo patrón
+        // que la evaluación del hito 2 — la versión queda fijada aquí y no cambia aunque
+        // después se publique otra (RF-90).
+        //
+        // Desde el ciclo 2 hay DOS instrumentos y la vacante dice cuál usa (V44): la prueba
+        // del puesto de siempre, con su intento y sus entregables, o el cuestionario técnico
+        // CAZATALENTOS, que es un examen de preguntas abiertas como el del banco. Uno de los
+        // dos, nunca los dos, y el que no se use ni se mira.
         if ("PRUEBA_TURNO_CANDIDATO".equals(siguiente.getCodigo())) {
             Vacante vacante = vacantes.findById(p.getVacanteId())
                     .orElseThrow(() -> new IllegalStateException("La vacante de esta postulación ya no existe"));
-            if (vacante.getVersionPlantillaPruebaId() == null) {
-                throw new IllegalStateException(
-                        "Esta vacante no tiene plantilla de prueba asignada: no se puede avanzar");
+            if (CUESTIONARIO_TECNICO.equals(vacante.getInstrumentoEtapaTecnica())) {
+                p.setEvaluacionTecnicaId(evaluaciones.crearTecnicaAlEntrar(
+                        quien.organizacionId(), p.getUsuarioId(), vacante.getId(),
+                        vacante.getMinutosEtapaTecnica()));
+                postulaciones.save(p);
+            } else {
+                if (vacante.getVersionPlantillaPruebaId() == null) {
+                    throw new IllegalStateException(
+                            "Esta vacante no tiene plantilla de prueba asignada: no se puede avanzar");
+                }
+                prueba.crearAlEntrar(quien.organizacionId(), p.getId(),
+                        vacante.getVersionPlantillaPruebaId(), vacante.getPruebaCierraEn());
             }
-            prueba.crearAlEntrar(quien.organizacionId(), p.getId(),
-                    vacante.getVersionPlantillaPruebaId(), vacante.getPruebaCierraEn());
         }
 
         // Al entrar a validación se crea su periodo, en POR_HABILITAR: alguien tiene que

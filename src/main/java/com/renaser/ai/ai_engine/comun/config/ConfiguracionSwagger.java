@@ -6,6 +6,7 @@ import com.renaser.ai.ai_engine.catalogo.controller.CatalogoController;
 import com.renaser.ai.ai_engine.decision.controller.DecisionPanelController;
 import com.renaser.ai.ai_engine.perfilintegral.controller.BancoPreguntasController;
 import com.renaser.ai.ai_engine.perfilintegral.controller.EvaluacionPortalController;
+import com.renaser.ai.ai_engine.perfilintegral.controller.CuestionarioTecnicoPortalController;
 import com.renaser.ai.ai_engine.perfilintegral.controller.PlantillasEvaluacionController;
 import com.renaser.ai.ai_engine.pesos.controller.PesosController;
 import com.renaser.ai.ai_engine.prueba.controller.CalificacionPruebaController;
@@ -60,6 +61,7 @@ public class ConfiguracionSwagger {
             PanelAuthController.class,
             CatalogoController.class,
             EvaluacionPortalController.class,
+            CuestionarioTecnicoPortalController.class,
             BancoPreguntasController.class,
             PlantillasEvaluacionController.class,
             PesosController.class,

@@ -27,6 +27,9 @@ public class Postulacion {
     private String motivoCierre;
     // Columna suelta: la tabla evaluacion llega en el hito 2
     private Long evaluacionId;
+    // El examen de la etapa técnica cuando la vacante usa el cuestionario CAZATALENTOS.
+    // Vacío con la prueba del puesto de siempre, que va por intento_prueba (V44)
+    private Long evaluacionTecnicaId;
     private Integer rondasEvidenciaUsadas;
     // Cuándo cambió de estado por última vez: alimenta el cierre por inactividad
     private Instant movidoEn;

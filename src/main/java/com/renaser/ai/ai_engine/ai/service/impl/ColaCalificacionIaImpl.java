@@ -177,6 +177,14 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
     }
 
     @Override
+    public boolean encolarCuestionarioTecnico(Long postulacionId) {
+        if (apagada(postulacionId)) {
+            return false;
+        }
+        return encolarSuelto(postulacionId, AgenteCuestionarioTecnico.CODIGO_AGENTE);
+    }
+
+    @Override
     public boolean encolarPreguntasSimulacion(Long postulacionId) {
         if (apagada(postulacionId)) {
             return false;
