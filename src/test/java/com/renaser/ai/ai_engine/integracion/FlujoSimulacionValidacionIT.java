@@ -573,9 +573,13 @@ public class FlujoSimulacionValidacionIT {
     private long prepararVacante() throws Exception {
         jdbc.update("INSERT INTO area (organizacion_id, nombre, es_activa) VALUES (1, 'Soporte', true)");
         Long areaId = jdbc.queryForObject("SELECT id FROM area ORDER BY id DESC LIMIT 1", Long.class);
+        long puestoId = Long.parseLong(leer(conToken(post("/api/v1/panel/puestos"), tokenTalento, """
+                {"codigo": "SOPORTE_L1", "nombre": "Soporte nivel 1",
+                 "nivelPuestoCodigo": "EJECUCION", "familiaCodigo": "OPERACIONES"}""")
+                .andReturn().getResponse().getContentAsString(), "id"));
 
         long solicitudId = Long.parseLong(leer(conToken(post("/api/v1/panel/solicitudes"), tokenTalento, """
-                {"areaId": %d, "urgencia": "NORMAL",
+                {"areaId": %d, "puestoId": %d, "urgencia": "NORMAL",
                  "nivelPuestoCodigo": "EJECUCION", "familiaCodigo": "OPERACIONES",
                  "resultadoPrincipal": "Sostener la atención de soporte",
                  "motivo": "El equipo no cubre los turnos",
@@ -586,16 +590,11 @@ public class FlujoSimulacionValidacionIT {
                    {"descripcion": "Bajar el tiempo de respuesta", "indicador": "menos de 2 horas"},
                    {"descripcion": "Cubrir los turnos", "indicador": "sin huecos"},
                    {"descripcion": "Documentar casos", "indicador": "base al día"}
-                 ]}""".formatted(areaId))
+                 ]}""".formatted(areaId, puestoId))
                 .andReturn().getResponse().getContentAsString(), "id"));
 
         conToken(post("/api/v1/panel/solicitudes/" + solicitudId + "/aprobacion"), tokenTalento,
                 "{\"motivo\":\"Hay presupuesto\"}").andExpect(status().isOk());
-
-        long puestoId = Long.parseLong(leer(conToken(post("/api/v1/panel/puestos"), tokenTalento, """
-                {"codigo": "SOPORTE_L1", "nombre": "Soporte nivel 1",
-                 "nivelPuestoCodigo": "EJECUCION", "familiaCodigo": "OPERACIONES"}""")
-                .andReturn().getResponse().getContentAsString(), "id"));
 
         long id = Long.parseLong(leer(conToken(post("/api/v1/panel/vacantes"), tokenTalento, """
                 {"solicitudTalentoId": %d, "puestoId": %d,

@@ -14,9 +14,13 @@ import com.renaser.ai.ai_engine.prueba.entity.VersionPlantillaPrueba;
 import com.renaser.ai.ai_engine.prueba.repository.IntentoPruebaRepository;
 import com.renaser.ai.ai_engine.prueba.repository.VersionPlantillaPruebaRepository;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
+import com.renaser.ai.ai_engine.solicitud.entity.SolicitudTalento;
 import com.renaser.ai.ai_engine.solicitud.repository.SolicitudTalentoRepository;
 import com.renaser.ai.ai_engine.vacante.dto.DtosVacante.AsignarPlantillaCorreo;
 import com.renaser.ai.ai_engine.vacante.dto.DtosVacante.DefinirCierrePrueba;
+import com.renaser.ai.ai_engine.vacante.dto.DtosVacante.GuardarPuesto;
+import com.renaser.ai.ai_engine.vacante.dto.DtosVacante.GuardarVacante;
+import com.renaser.ai.ai_engine.vacante.entity.Puesto;
 import com.renaser.ai.ai_engine.vacante.entity.Vacante;
 import com.renaser.ai.ai_engine.vacante.repository.PuestoRepository;
 import com.renaser.ai.ai_engine.vacante.repository.RequisitoObjetivoRepository;
@@ -27,6 +31,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
@@ -36,6 +41,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -143,6 +149,106 @@ class ServicioVacantesPanelImplTest {
                 .build();
         when(vacantes.findByIdAndOrganizacionId(VACANTE, ORGANIZACION)).thenReturn(Optional.of(v));
         return v;
+    }
+
+    // ============ El puesto nace con la solicitud ============
+
+    @Test
+    @DisplayName("genera un código legible y resuelve colisiones dentro de la empresa")
+    void generaCodigoDePuesto() {
+        when(puestos.existsByOrganizacionIdAndCodigo(ORGANIZACION, "COORDINADOR_DE_SEDE"))
+                .thenReturn(true);
+        when(puestos.existsByOrganizacionIdAndCodigo(ORGANIZACION, "COORDINADOR_DE_SEDE_2"))
+                .thenReturn(false);
+        when(puestos.save(any())).thenAnswer(invocacion -> {
+            Puesto puesto = invocacion.getArgument(0);
+            puesto.setId(PUESTO);
+            return puesto;
+        });
+
+        servicio.crearPuesto(QUIEN,
+                new GuardarPuesto(null, "Coordinador de Sede", "SUPERVISION", "OPERACIONES"));
+
+        ArgumentCaptor<Puesto> guardado = ArgumentCaptor.forClass(Puesto.class);
+        verify(puestos).save(guardado.capture());
+        assertThat(guardado.getValue().getCodigo()).isEqualTo("COORDINADOR_DE_SEDE_2");
+    }
+
+    @Test
+    @DisplayName("la vacante hereda el puesto de su solicitud")
+    void heredaElPuestoDeLaSolicitud() {
+        SolicitudTalento solicitud = solicitud(PUESTO);
+        when(solicitudes.findByIdAndOrganizacionId(30L, ORGANIZACION))
+                .thenReturn(Optional.of(solicitud));
+        when(puestos.findByIdAndOrganizacionId(PUESTO, ORGANIZACION))
+                .thenReturn(Optional.of(puestoActivo()));
+        when(versionesPesos.findFirstByOrganizacionIdAndEstadoOrderByPublicadaEnDesc(
+                ORGANIZACION, "PUBLICADA"))
+                .thenReturn(Optional.of(VersionPesos.builder().id(VERSION_PESOS).build()));
+        when(vacantes.save(any())).thenAnswer(invocacion -> invocacion.getArgument(0));
+
+        servicio.crear(QUIEN, guardar(null));
+
+        ArgumentCaptor<Vacante> guardada = ArgumentCaptor.forClass(Vacante.class);
+        verify(vacantes).save(guardada.capture());
+        assertThat(guardada.getValue().getPuestoId()).isEqualTo(PUESTO);
+    }
+
+    @Test
+    @DisplayName("una solicitud moderna rechaza que el cliente cambie su puesto")
+    void rechazaUnPuestoDistintoAlDeLaSolicitud() {
+        when(solicitudes.findByIdAndOrganizacionId(30L, ORGANIZACION))
+                .thenReturn(Optional.of(solicitud(PUESTO)));
+
+        assertThatThrownBy(() -> servicio.crear(QUIEN, guardar(99L)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("no coincide");
+    }
+
+    @Test
+    @DisplayName("una solicitud histórica adopta el puesto elegido al crear la vacante")
+    void resuelveElPuestoDeUnaSolicitudHistorica() {
+        SolicitudTalento solicitud = solicitud(null);
+        when(solicitudes.findByIdAndOrganizacionId(30L, ORGANIZACION))
+                .thenReturn(Optional.of(solicitud));
+        when(puestos.findByIdAndOrganizacionId(PUESTO, ORGANIZACION))
+                .thenReturn(Optional.of(puestoActivo()));
+        when(versionesPesos.findFirstByOrganizacionIdAndEstadoOrderByPublicadaEnDesc(
+                ORGANIZACION, "PUBLICADA"))
+                .thenReturn(Optional.of(VersionPesos.builder().id(VERSION_PESOS).build()));
+        when(vacantes.save(any())).thenAnswer(invocacion -> invocacion.getArgument(0));
+
+        servicio.crear(QUIEN, guardar(PUESTO));
+
+        assertThat(solicitud.getPuestoId()).isEqualTo(PUESTO);
+        assertThat(solicitud.getNivelPuestoCodigo()).isEqualTo(NIVEL);
+        assertThat(solicitud.getFamiliaCodigo()).isEqualTo("OPERACIONES");
+        verify(solicitudes).save(solicitud);
+    }
+
+    private SolicitudTalento solicitud(Long puestoId) {
+        return SolicitudTalento.builder()
+                .id(30L)
+                .organizacionId(ORGANIZACION)
+                .puestoId(puestoId)
+                .estado("ABIERTA")
+                .build();
+    }
+
+    private Puesto puestoActivo() {
+        return Puesto.builder()
+                .id(PUESTO)
+                .organizacionId(ORGANIZACION)
+                .nivelPuestoCodigo(NIVEL)
+                .familiaCodigo("OPERACIONES")
+                .esActivo(true)
+                .build();
+    }
+
+    private GuardarVacante guardar(Long puestoId) {
+        return new GuardarVacante(30L, puestoId, "Coordinador de sede", "Descripción",
+                null, null, null, null, null, null, null, "MANUAL", 1,
+                null, null, QUIEN.usuarioId());
     }
 
     // ============ Publicar ============

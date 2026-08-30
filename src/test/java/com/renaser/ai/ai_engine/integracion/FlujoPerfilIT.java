@@ -492,9 +492,15 @@ public class FlujoPerfilIT {
             jdbc.update("insert into area (organizacion_id, nombre, es_activa) "
                     + "select 1, 'Área ' || (random()*100000)::int, true");
             Long areaId = jdbc.queryForObject("select max(id) from area", Long.class);
+            long puestoId = Long.parseLong(leer(conToken(post("/api/v1/panel/puestos"),
+                    tokenEquipo, """
+                    {"codigo": "DEV_%d", "nombre": "Desarrollador web",
+                     "nivelPuestoCodigo": "EJECUCION", "familiaCodigo": "TECNOLOGIA"}"""
+                    .formatted(System.nanoTime()))
+                    .andReturn().getResponse().getContentAsString(), "id"));
             long solicitudId = Long.parseLong(leer(conToken(post("/api/v1/panel/solicitudes"),
                     tokenEquipo, """
-                    {"areaId": %d, "urgencia": "NORMAL",
+                    {"areaId": %d, "puestoId": %d, "urgencia": "NORMAL",
                      "nivelPuestoCodigo": "EJECUCION", "familiaCodigo": "TECNOLOGIA",
                      "resultadoPrincipal": "Sostener el portal",
                      "motivo": "Falta gente", "consecuenciaNoContratar": "Retraso",
@@ -504,17 +510,11 @@ public class FlujoPerfilIT {
                        {"descripcion": "Publicar", "indicador": "en producción"},
                        {"descripcion": "Reducir bugs", "indicador": "la mitad"},
                        {"descripcion": "Documentar", "indicador": "docs al día"}
-                     ]}""".formatted(areaId))
+                     ]}""".formatted(areaId, puestoId))
                     .andReturn().getResponse().getContentAsString(), "id"));
             conToken(post("/api/v1/panel/solicitudes/" + solicitudId + "/aprobacion"),
                     tokenEquipo, "{\"motivo\":\"Hay presupuesto\"}").andExpect(status().isOk());
 
-            long puestoId = Long.parseLong(leer(conToken(post("/api/v1/panel/puestos"),
-                    tokenEquipo, """
-                    {"codigo": "DEV_%d", "nombre": "Desarrollador web",
-                     "nivelPuestoCodigo": "EJECUCION", "familiaCodigo": "TECNOLOGIA"}"""
-                    .formatted(System.nanoTime()))
-                    .andReturn().getResponse().getContentAsString(), "id"));
             long id = Long.parseLong(leer(conToken(post("/api/v1/panel/vacantes"), tokenEquipo, """
                     {"solicitudTalentoId": %d, "puestoId": %d,
                      "titulo": "Desarrollador web", "descripcion": "Portal",

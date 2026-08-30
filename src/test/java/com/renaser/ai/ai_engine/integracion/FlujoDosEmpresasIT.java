@@ -206,9 +206,13 @@ public class FlujoDosEmpresasIT {
                 .andExpect(status().isCreated());
         Long areaId = jdbc.queryForObject(
                 "select id from area where organizacion_id = " + acmeId, Long.class);
+        long puestoId = Long.parseLong(leer(conToken(post("/api/v1/panel/puestos"), tokenAcme, """
+                {"codigo": "OPS_WEB", "nombre": "Analista de operaciones",
+                 "nivelPuestoCodigo": "EJECUCION", "familiaCodigo": "TECNOLOGIA"}""")
+                .andReturn().getResponse().getContentAsString(), "id"));
 
         solicitudAcmeId = Long.parseLong(leer(conToken(post("/api/v1/panel/solicitudes"), tokenAcme, """
-                {"areaId": %d, "urgencia": "NORMAL",
+                {"areaId": %d, "puestoId": %d, "urgencia": "NORMAL",
                  "nivelPuestoCodigo": "EJECUCION", "familiaCodigo": "TECNOLOGIA",
                  "resultadoPrincipal": "Sostener la operación",
                  "motivo": "El equipo no da abasto",
@@ -219,15 +223,10 @@ public class FlujoDosEmpresasIT {
                    {"descripcion": "Cubrir la demanda", "indicador": "sin atrasos"},
                    {"descripcion": "Documentar procesos", "indicador": "al día"},
                    {"descripcion": "Reducir errores", "indicador": "a la mitad"}
-                 ]}""".formatted(areaId, anaId))
+                 ]}""".formatted(areaId, puestoId, anaId))
                 .andReturn().getResponse().getContentAsString(), "id"));
         conToken(post("/api/v1/panel/solicitudes/" + solicitudAcmeId + "/aprobacion"), tokenAcme,
                 "{\"motivo\":\"Hay presupuesto\"}").andExpect(status().isOk());
-
-        long puestoId = Long.parseLong(leer(conToken(post("/api/v1/panel/puestos"), tokenAcme, """
-                {"codigo": "OPS_WEB", "nombre": "Analista de operaciones",
-                 "nivelPuestoCodigo": "EJECUCION", "familiaCodigo": "TECNOLOGIA"}""")
-                .andReturn().getResponse().getContentAsString(), "id"));
 
         // Crear la vacante ya usa el método compartido: los pesos por defecto que le
         // tocan son los publicados de la PLATAFORMA, porque ACME no personalizó nada.
@@ -440,9 +439,15 @@ public class FlujoDosEmpresasIT {
                 plataformaId);
         Long areaPlataforma = jdbc.queryForObject(
                 "select id from area where organizacion_id = " + plataformaId, Long.class);
+        jdbc.update("INSERT INTO puesto (organizacion_id, codigo, nombre, nivel_puesto_codigo, "
+                        + "familia_codigo, es_activo) VALUES (?, 'TALENTO_PLATAFORMA', "
+                        + "'Talento de plataforma', 'EJECUCION', 'TECNOLOGIA', true)",
+                plataformaId);
+        Long puestoPlataforma = jdbc.queryForObject(
+                "select id from puesto where organizacion_id = " + plataformaId, Long.class);
         long solicitudPlataforma = Long.parseLong(leer(
                 conToken(post("/api/v1/panel/solicitudes"), tokenPlataforma, """
-                {"areaId": %d, "urgencia": "NORMAL",
+                {"areaId": %d, "puestoId": %d, "urgencia": "NORMAL",
                  "nivelPuestoCodigo": "EJECUCION", "familiaCodigo": "TECNOLOGIA",
                  "resultadoPrincipal": "Cubrir el puesto",
                  "motivo": "Rotación", "consecuenciaNoContratar": "Sobrecarga",
@@ -451,7 +456,7 @@ public class FlujoDosEmpresasIT {
                    {"descripcion": "Cubrir", "indicador": "listo"},
                    {"descripcion": "Formar", "indicador": "listo"},
                    {"descripcion": "Entregar", "indicador": "listo"}
-                 ]}""".formatted(areaPlataforma))
+                 ]}""".formatted(areaPlataforma, puestoPlataforma))
                 .andReturn().getResponse().getContentAsString(), "id"));
         conTokenGet("/api/v1/panel/solicitudes/" + solicitudPlataforma, tokenAcme)
                 .andExpect(status().isNotFound());

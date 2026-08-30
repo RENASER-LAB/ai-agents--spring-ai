@@ -200,8 +200,12 @@ public class FlujoPlataformaIT {
                 .andExpect(status().isCreated());
         Long areaId = jdbc.queryForObject(
                 "select id from area where organizacion_id = " + acmeId, Long.class);
+        long puestoId = Long.parseLong(leer(conToken(post("/api/v1/panel/puestos"), tokenAcme, """
+                {"codigo": "OPS_WEB", "nombre": "Analista de operaciones",
+                 "nivelPuestoCodigo": "EJECUCION", "familiaCodigo": "TECNOLOGIA"}""")
+                .andReturn().getResponse().getContentAsString(), "id"));
         long solicitudId = Long.parseLong(leer(conToken(post("/api/v1/panel/solicitudes"), tokenAcme, """
-                {"areaId": %d, "urgencia": "NORMAL",
+                {"areaId": %d, "puestoId": %d, "urgencia": "NORMAL",
                  "nivelPuestoCodigo": "EJECUCION", "familiaCodigo": "TECNOLOGIA",
                  "resultadoPrincipal": "Sostener la operación",
                  "motivo": "El equipo no da abasto",
@@ -212,14 +216,10 @@ public class FlujoPlataformaIT {
                    {"descripcion": "Cubrir la demanda", "indicador": "sin atrasos"},
                    {"descripcion": "Documentar procesos", "indicador": "al día"},
                    {"descripcion": "Reducir errores", "indicador": "a la mitad"}
-                 ]}""".formatted(areaId, anaId))
+                 ]}""".formatted(areaId, puestoId, anaId))
                 .andReturn().getResponse().getContentAsString(), "id"));
         conToken(post("/api/v1/panel/solicitudes/" + solicitudId + "/aprobacion"), tokenAcme,
                 "{\"motivo\":\"Hay presupuesto\"}").andExpect(status().isOk());
-        long puestoId = Long.parseLong(leer(conToken(post("/api/v1/panel/puestos"), tokenAcme, """
-                {"codigo": "OPS_WEB", "nombre": "Analista de operaciones",
-                 "nivelPuestoCodigo": "EJECUCION", "familiaCodigo": "TECNOLOGIA"}""")
-                .andReturn().getResponse().getContentAsString(), "id"));
         vacanteAcmeId = Long.parseLong(leer(conToken(post("/api/v1/panel/vacantes"), tokenAcme, """
                 {"solicitudTalentoId": %d, "puestoId": %d,
                  "titulo": "Analista de operaciones", "descripcion": "Turno completo",

@@ -124,8 +124,16 @@ public class FlujoHito1IT {
         jdbc.update("INSERT INTO area (organizacion_id, nombre, es_activa) VALUES (1, 'Tecnología', true)");
         Long areaId = jdbc.queryForObject("SELECT id FROM area LIMIT 1", Long.class);
 
+        // El puesto nace antes que la solicitud. El panel no conoce ni escribe el código:
+        // el servidor lo deriva del nombre y mantiene la clasificación en un solo sitio.
+        long puestoId = Long.parseLong(leer(conToken(post("/api/v1/panel/puestos"), tokenEquipo,
+                """
+                {"nombre": "Desarrollador web",
+                 "nivelPuestoCodigo": "EJECUCION", "familiaCodigo": "TECNOLOGIA"}""")
+                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString(), "id"));
+
         String solicitud = """
-                {"areaId": %d, "urgencia": "NORMAL",
+                {"areaId": %d, "puestoId": %d, "urgencia": "NORMAL",
                  "nivelPuestoCodigo": "EJECUCION", "familiaCodigo": "TECNOLOGIA",
                  "resultadoPrincipal": "Sostener el desarrollo del portal",
                  "motivo": "El equipo actual no llega a los plazos",
@@ -136,9 +144,16 @@ public class FlujoHito1IT {
                    {"descripcion": "Publicar el portal", "indicador": "en producción"},
                    {"descripcion": "Reducir bugs", "indicador": "la mitad de errores"},
                    {"descripcion": "Documentar el módulo", "indicador": "docs al día"}
-                 ]}""".formatted(areaId);
+                 ]}""".formatted(areaId, puestoId);
         solicitudId = Long.parseLong(leer(conToken(post("/api/v1/panel/solicitudes"), tokenEquipo, solicitud)
                 .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString(), "id"));
+
+        conTokenGet("/api/v1/panel/solicitudes", tokenEquipo)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].puestoId").value(puestoId))
+                .andExpect(jsonPath("$[0].puestoNombre").value("Desarrollador web"))
+                .andExpect(jsonPath("$[0].nivelPuestoCodigo").value("EJECUCION"))
+                .andExpect(jsonPath("$[0].familiaCodigo").value("TECNOLOGIA"));
 
         // Sin aprobación de Dirección, la vacante no se puede crear
         conToken(post("/api/v1/panel/solicitudes/" + solicitudId + "/aprobacion"), tokenEquipo,
@@ -162,17 +177,11 @@ public class FlujoHito1IT {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("NO_EXISTE")));
 
-        long puestoId = Long.parseLong(leer(conToken(post("/api/v1/panel/puestos"), tokenEquipo,
-                """
-                {"codigo": "DEV_WEB", "nombre": "Desarrollador web",
-                 "nivelPuestoCodigo": "EJECUCION", "familiaCodigo": "TECNOLOGIA"}""")
-                .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString(), "id"));
-
         vacanteId = Long.parseLong(leer(conToken(post("/api/v1/panel/vacantes"), tokenEquipo,
                 """
-                {"solicitudTalentoId": %d, "puestoId": %d,
+                {"solicitudTalentoId": %d,
                  "titulo": "Desarrollador web", "descripcion": "Portal de talento",
-                 "tipoCierre": "PERMANENTE", "responsableUsuarioId": 1}""".formatted(solicitudId, puestoId))
+                 "tipoCierre": "PERMANENTE", "responsableUsuarioId": 1}""".formatted(solicitudId))
                 .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString(), "id"));
 
         requisitoId = Long.parseLong(leer(conToken(

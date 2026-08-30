@@ -13,7 +13,7 @@ public final class DtosVacante {
 
     public record GuardarVacante(
             @NotNull Long solicitudTalentoId,
-            @NotNull Long puestoId,
+            Long puestoId,
             @NotBlank String titulo,
             @NotBlank String descripcion,
             String proposito,
@@ -45,7 +45,7 @@ public final class DtosVacante {
 
     public record RequisitoPanel(Long id, String descripcion, String regla, boolean esActivo) {}
 
-    public record GuardarPuesto(@NotBlank String codigo, @NotBlank String nombre,
+    public record GuardarPuesto(String codigo, @NotBlank String nombre,
                                 @NotBlank String nivelPuestoCodigo, @NotBlank String familiaCodigo) {}
 
     // Listar puestos NO puede devolver `GuardarPuesto`: ese es el cuerpo de entrada y no

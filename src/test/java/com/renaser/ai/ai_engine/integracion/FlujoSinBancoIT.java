@@ -142,8 +142,12 @@ public class FlujoSinBancoIT {
         // La vacante, con la evaluación apagada y sin plantilla de evaluación
         jdbc.update("INSERT INTO area (organizacion_id, nombre, es_activa) VALUES (1, 'Administración', true)");
         Long areaId = jdbc.queryForObject("SELECT id FROM area ORDER BY id DESC LIMIT 1", Long.class);
+        long puestoId = Long.parseLong(leer(conToken(post("/api/v1/panel/puestos"), tokenTalento, """
+                {"codigo": "ADMIN_SIN_BANCO", "nombre": "Administrador",
+                 "nivelPuestoCodigo": "SUPERVISION", "familiaCodigo": "OPERACIONES"}""")
+                .andReturn().getResponse().getContentAsString(), "id"));
         long solicitudId = Long.parseLong(leer(conToken(post("/api/v1/panel/solicitudes"), tokenTalento, """
-                {"areaId": %d, "urgencia": "PRIORITARIA",
+                {"areaId": %d, "puestoId": %d, "urgencia": "PRIORITARIA",
                  "nivelPuestoCodigo": "SUPERVISION", "familiaCodigo": "OPERACIONES",
                  "resultadoPrincipal": "Una operación con procesos e indicadores",
                  "motivo": "Los errores se detectan cuando ya escalaron",
@@ -154,14 +158,10 @@ public class FlujoSinBancoIT {
                    {"descripcion": "Procesos implantados", "indicador": "cada uno con su checklist"},
                    {"descripcion": "Menos errores y reprocesos", "indicador": "reducción medible"},
                    {"descripcion": "Menos decisiones escaladas", "indicador": "suben solo las que tocan"}
-                 ]}""".formatted(areaId))
+                 ]}""".formatted(areaId, puestoId))
                 .andReturn().getResponse().getContentAsString(), "id"));
         conToken(post("/api/v1/panel/solicitudes/" + solicitudId + "/aprobacion"), tokenTalento,
                 "{\"motivo\":\"Aprobada\"}").andExpect(status().isOk());
-        long puestoId = Long.parseLong(leer(conToken(post("/api/v1/panel/puestos"), tokenTalento, """
-                {"codigo": "ADMIN_SIN_BANCO", "nombre": "Administrador",
-                 "nivelPuestoCodigo": "SUPERVISION", "familiaCodigo": "OPERACIONES"}""")
-                .andReturn().getResponse().getContentAsString(), "id"));
         vacanteId = Long.parseLong(leer(conToken(post("/api/v1/panel/vacantes"), tokenTalento, """
                 {"solicitudTalentoId": %d, "puestoId": %d,
                  "titulo": "Administrador", "descripcion": "Control de la operación",

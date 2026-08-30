@@ -31,7 +31,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.text.Normalizer;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 
@@ -65,9 +67,12 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
     @Override
     @Transactional
     public Long crearPuesto(ContextoUsuario quien, GuardarPuesto datos) {
+        String codigo = datos.codigo() == null || datos.codigo().isBlank()
+                ? codigoDisponible(quien.organizacionId(), datos.nombre())
+                : datos.codigo().trim();
         Puesto puesto = puestos.save(Puesto.builder()
                 .organizacionId(quien.organizacionId())
-                .codigo(datos.codigo())
+                .codigo(codigo)
                 .nombre(datos.nombre())
                 .nivelPuestoCodigo(datos.nivelPuestoCodigo())
                 .familiaCodigo(datos.familiaCodigo())
@@ -75,8 +80,25 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                 .creadoEn(Instant.now())
                 .build());
         auditoria.registrar(quien.organizacionId(), quien, "crear_puesto",
-                "puesto", puesto.getId(), null, Map.of("codigo", datos.codigo()), null);
+                "puesto", puesto.getId(), null, Map.of("codigo", codigo), null);
         return puesto.getId();
+    }
+
+    private String codigoDisponible(Long organizacionId, String nombre) {
+        String base = Normalizer.normalize(nombre, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "")
+                .toUpperCase(Locale.ROOT)
+                .replaceAll("[^A-Z0-9]+", "_")
+                .replaceAll("^_+|_+$", "");
+        if (base.isBlank()) {
+            base = "PUESTO";
+        }
+        String candidato = base;
+        int sufijo = 2;
+        while (puestos.existsByOrganizacionIdAndCodigo(organizacionId, candidato)) {
+            candidato = base + "_" + sufijo++;
+        }
+        return candidato;
     }
 
     @Override
@@ -103,8 +125,7 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                     "La solicitud tiene que estar aprobada (ABIERTA) antes de crear la vacante; está "
                             + solicitud.getEstado());
         }
-        puestos.findByIdAndOrganizacionId(datos.puestoId(), quien.organizacionId())
-                .orElseThrow(() -> new ResourceNotFoundException("Puesto", "id", datos.puestoId()));
+        Puesto puesto = puestoParaVacante(quien, solicitud, datos.puestoId());
 
         // La versión de pesos publicada vigente. Elegir otra es de Dirección (hito 2).
         // De quién son los pesos lo contesta el resolutor: los de la plataforma mientras
@@ -117,7 +138,7 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
         Vacante vacante = vacantes.save(Vacante.builder()
                 .organizacionId(quien.organizacionId())
                 .solicitudTalentoId(solicitud.getId())
-                .puestoId(datos.puestoId())
+                .puestoId(puesto.getId())
                 .titulo(datos.titulo())
                 .descripcion(datos.descripcion())
                 .proposito(datos.proposito())
@@ -144,6 +165,32 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                 "vacante", vacante.getId(), null,
                 Map.of("titulo", datos.titulo(), "solicitud", solicitud.getId()), null);
         return vacante.getId();
+    }
+
+    private Puesto puestoParaVacante(ContextoUsuario quien, SolicitudTalento solicitud,
+                                     Long puestoRecibido) {
+        Long puestoId = solicitud.getPuestoId();
+        if (puestoId != null && puestoRecibido != null && !puestoId.equals(puestoRecibido)) {
+            throw new IllegalStateException("El puesto enviado no coincide con el de la solicitud");
+        }
+        if (puestoId == null) {
+            if (puestoRecibido == null) {
+                throw new IllegalStateException("Esta solicitud histórica necesita que se elija un puesto");
+            }
+            puestoId = puestoRecibido;
+        }
+        Long puestoResuelto = puestoId;
+        Puesto puesto = puestos.findByIdAndOrganizacionId(puestoResuelto, quien.organizacionId())
+                .orElseThrow(() -> new ResourceNotFoundException("Puesto", "id", puestoResuelto));
+        if (!puesto.isEsActivo()) {
+            throw new IllegalStateException("El puesto seleccionado está inactivo");
+        }
+        if (solicitud.getPuestoId() == null) {
+            solicitud.setPuestoId(puesto.getId());
+            solicitud.setNivelPuestoCodigo(puesto.getNivelPuestoCodigo());
+            solicitud.setFamiliaCodigo(puesto.getFamiliaCodigo());
+        }
+        return puesto;
     }
 
     @Override
