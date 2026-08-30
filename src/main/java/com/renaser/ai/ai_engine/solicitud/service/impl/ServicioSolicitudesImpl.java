@@ -9,6 +9,8 @@ import com.renaser.ai.ai_engine.seguridad.dto.FiltroAlcance;
 import com.renaser.ai.ai_engine.seguridad.service.Permisos;
 import com.renaser.ai.ai_engine.solicitud.entity.*;
 import com.renaser.ai.ai_engine.solicitud.repository.*;
+import com.renaser.ai.ai_engine.vacante.entity.Puesto;
+import com.renaser.ai.ai_engine.vacante.repository.PuestoRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -16,6 +18,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -23,20 +28,30 @@ public class ServicioSolicitudesImpl implements ServicioSolicitudes {
 
     private final SolicitudTalentoRepository solicitudes;
     private final ResultadoEsperadoRepository resultados;
+    private final PuestoRepository puestos;
     private final ServicioAuditoria auditoria;
     private final Permisos permisos;
 
     @Override
     @Transactional
     public Long crear(ContextoUsuario quien, CrearSolicitud datos) {
+        Puesto puesto = puestos.findByIdAndOrganizacionId(datos.puestoId(), quien.organizacionId())
+                .orElseThrow(() -> new ResourceNotFoundException("Puesto", "id", datos.puestoId()));
+        if (!puesto.isEsActivo()) {
+            throw new IllegalStateException("El puesto seleccionado está inactivo");
+        }
+        exigirCoincidencia("nivel", datos.nivelPuestoCodigo(), puesto.getNivelPuestoCodigo());
+        exigirCoincidencia("familia", datos.familiaCodigo(), puesto.getFamiliaCodigo());
+
         SolicitudTalento solicitud = solicitudes.save(SolicitudTalento.builder()
                 .organizacionId(quien.organizacionId())
                 .origen("DIRECTA")
                 .urgencia(datos.urgencia())
                 .estado("BORRADOR")
                 .areaId(datos.areaId())
-                .nivelPuestoCodigo(datos.nivelPuestoCodigo())
-                .familiaCodigo(datos.familiaCodigo())
+                .puestoId(puesto.getId())
+                .nivelPuestoCodigo(puesto.getNivelPuestoCodigo())
+                .familiaCodigo(puesto.getFamiliaCodigo())
                 .resultadoPrincipal(datos.resultadoPrincipal())
                 .motivo(datos.motivo())
                 .consecuenciaNoContratar(datos.consecuenciaNoContratar())
@@ -65,7 +80,8 @@ public class ServicioSolicitudesImpl implements ServicioSolicitudes {
 
         auditoria.registrar(quien.organizacionId(), quien, "crear_solicitud",
                 "solicitud_talento", solicitud.getId(), null,
-                Map.of("estado", "BORRADOR", "urgencia", datos.urgencia()), null);
+                Map.of("estado", "BORRADOR", "urgencia", datos.urgencia(),
+                        "puesto", puesto.getId()), null);
         return solicitud.getId();
     }
 
@@ -78,7 +94,14 @@ public class ServicioSolicitudesImpl implements ServicioSolicitudes {
             default -> solicitudes.findByOrganizacionIdAndResponsableUsuarioIdOrderByCreadoEnDesc(
                     quien.organizacionId(), quien.usuarioId());
         };
-        return filas.stream().map(this::comoResumen).toList();
+        Map<Long, Puesto> puestosPorId = puestos.findAllById(filas.stream()
+                        .map(SolicitudTalento::getPuestoId)
+                        .filter(Objects::nonNull)
+                        .distinct()
+                        .toList())
+                .stream()
+                .collect(Collectors.toMap(Puesto::getId, Function.identity()));
+        return filas.stream().map(s -> comoResumen(s, puestosPorId.get(s.getPuestoId()))).toList();
     }
 
     @Override
@@ -87,7 +110,7 @@ public class ServicioSolicitudesImpl implements ServicioSolicitudes {
         List<ResultadoEsperadoDto> rs = resultados.findBySolicitudTalentoIdOrderByOrden(id).stream()
                 .map(r -> new ResultadoEsperadoDto(r.getDescripcion(), r.getIndicador()))
                 .toList();
-        return new SolicitudDetalle(comoResumen(s), s.getMotivo(), s.getConsecuenciaNoContratar(),
+        return new SolicitudDetalle(comoResumen(s, puestoDe(s, quien.organizacionId())), s.getMotivo(), s.getConsecuenciaNoContratar(),
                 s.getAnalisisCapacidad(), s.getCapacidadesIndispensables(), s.getCapacidadesAprendibles(),
                 s.getRequeridaPara(), s.getNivelPuestoCodigo(), s.getFamiliaCodigo(), rs);
     }
@@ -130,8 +153,23 @@ public class ServicioSolicitudesImpl implements ServicioSolicitudes {
         return s;
     }
 
-    private SolicitudResumen comoResumen(SolicitudTalento s) {
+    private Puesto puestoDe(SolicitudTalento solicitud, Long organizacionId) {
+        if (solicitud.getPuestoId() == null) {
+            return null;
+        }
+        return puestos.findByIdAndOrganizacionId(solicitud.getPuestoId(), organizacionId).orElse(null);
+    }
+
+    private void exigirCoincidencia(String campo, String recibido, String esperado) {
+        if (recibido != null && !recibido.isBlank() && !recibido.equals(esperado)) {
+            throw new IllegalArgumentException("El " + campo + " enviado no coincide con el puesto seleccionado");
+        }
+    }
+
+    private SolicitudResumen comoResumen(SolicitudTalento s, Puesto puesto) {
         return new SolicitudResumen(s.getId(), s.getEstado(), s.getUrgencia(), s.getAreaId(),
+                s.getPuestoId(), puesto == null ? null : puesto.getNombre(),
+                s.getNivelPuestoCodigo(), s.getFamiliaCodigo(),
                 s.getResultadoPrincipal(), s.getCreadoEn());
     }
 }

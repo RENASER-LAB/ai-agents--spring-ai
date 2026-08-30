@@ -462,9 +462,13 @@ public class FlujoCuestionarioTecnicoIT {
     private long crearVacanteEnBorrador() throws Exception {
         jdbc.update("INSERT INTO area (organizacion_id, nombre, es_activa) VALUES (1, 'Administración', true)");
         Long areaId = jdbc.queryForObject("SELECT id FROM area LIMIT 1", Long.class);
+        long puestoId = Long.parseLong(leer(conToken(post("/api/v1/panel/puestos"), tokenEquipo, """
+                {"codigo": "ADM_SEDES", "nombre": "Administrador de sedes",
+                 "nivelPuestoCodigo": "EJECUCION", "familiaCodigo": "TECNOLOGIA"}""")
+                .andReturn().getResponse().getContentAsString(), "id"));
 
         long solicitudId = Long.parseLong(leer(conToken(post("/api/v1/panel/solicitudes"), tokenEquipo, """
-                {"areaId": %d, "urgencia": "NORMAL",
+                {"areaId": %d, "puestoId": %d, "urgencia": "NORMAL",
                  "nivelPuestoCodigo": "EJECUCION", "familiaCodigo": "TECNOLOGIA",
                  "resultadoPrincipal": "Que la caja cuadre todos los días",
                  "motivo": "Los arqueos salen con faltantes y nadie responde",
@@ -475,16 +479,11 @@ public class FlujoCuestionarioTecnicoIT {
                    {"descripcion": "Arqueo diario sin faltantes", "indicador": "faltantes por mes"},
                    {"descripcion": "Cuadre contra sistema", "indicador": "cierres cuadrados"},
                    {"descripcion": "Informe mensual", "indicador": "informe entregado"}
-                 ]}""".formatted(areaId))
+                 ]}""".formatted(areaId, puestoId))
                 .andReturn().getResponse().getContentAsString(), "id"));
 
         conToken(post("/api/v1/panel/solicitudes/" + solicitudId + "/aprobacion"), tokenEquipo,
                 "{\"motivo\":\"Hay presupuesto\"}").andExpect(status().isOk());
-
-        long puestoId = Long.parseLong(leer(conToken(post("/api/v1/panel/puestos"), tokenEquipo, """
-                {"codigo": "ADM_SEDES", "nombre": "Administrador de sedes",
-                 "nivelPuestoCodigo": "EJECUCION", "familiaCodigo": "TECNOLOGIA"}""")
-                .andReturn().getResponse().getContentAsString(), "id"));
 
         return Long.parseLong(leer(conToken(post("/api/v1/panel/vacantes"), tokenEquipo, """
                 {"solicitudTalentoId": %d, "puestoId": %d,

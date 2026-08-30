@@ -10,4 +10,5 @@ import java.util.Optional;
 public interface PuestoRepository extends JpaRepository<Puesto, Long> {
     List<Puesto> findByOrganizacionIdAndEsActivoTrueOrderByNombre(Long organizacionId);
     Optional<Puesto> findByIdAndOrganizacionId(Long id, Long organizacionId);
+    boolean existsByOrganizacionIdAndCodigo(Long organizacionId, String codigo);
 }

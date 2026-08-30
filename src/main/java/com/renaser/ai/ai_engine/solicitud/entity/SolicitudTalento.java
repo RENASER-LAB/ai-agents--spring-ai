@@ -21,6 +21,7 @@ public class SolicitudTalento {
     private String urgencia;
     private String estado;
     private Long areaId;
+    private Long puestoId;
     private String nivelPuestoCodigo;
     private String familiaCodigo;
     private String resultadoPrincipal;

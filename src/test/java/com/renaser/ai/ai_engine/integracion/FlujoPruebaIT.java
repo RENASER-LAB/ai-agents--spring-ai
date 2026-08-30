@@ -555,9 +555,13 @@ public class FlujoPruebaIT {
     private long prepararVacantePublicada() throws Exception {
         jdbc.update("INSERT INTO area (organizacion_id, nombre, es_activa) VALUES (1, 'Ingeniería', true)");
         Long areaId = jdbc.queryForObject("SELECT id FROM area ORDER BY id DESC LIMIT 1", Long.class);
+        long puestoId = Long.parseLong(leer(conToken(post("/api/v1/panel/puestos"), tokenTalento, """
+                {"codigo": "DEV_BUSCADOR", "nombre": "Desarrollador buscador",
+                 "nivelPuestoCodigo": "EJECUCION", "familiaCodigo": "TECNOLOGIA"}""")
+                .andReturn().getResponse().getContentAsString(), "id"));
 
         long solicitudId = Long.parseLong(leer(conToken(post("/api/v1/panel/solicitudes"), tokenTalento, """
-                {"areaId": %d, "urgencia": "NORMAL",
+                {"areaId": %d, "puestoId": %d, "urgencia": "NORMAL",
                  "nivelPuestoCodigo": "EJECUCION", "familiaCodigo": "TECNOLOGIA",
                  "resultadoPrincipal": "Sostener el desarrollo del buscador",
                  "motivo": "El equipo no llega a los plazos",
@@ -568,16 +572,11 @@ public class FlujoPruebaIT {
                    {"descripcion": "Publicar el buscador", "indicador": "en producción"},
                    {"descripcion": "Reducir bugs", "indicador": "la mitad"},
                    {"descripcion": "Documentar", "indicador": "docs al día"}
-                 ]}""".formatted(areaId))
+                 ]}""".formatted(areaId, puestoId))
                 .andReturn().getResponse().getContentAsString(), "id"));
 
         conToken(post("/api/v1/panel/solicitudes/" + solicitudId + "/aprobacion"), tokenTalento,
                 "{\"motivo\":\"Hay presupuesto\"}").andExpect(status().isOk());
-
-        long puestoId = Long.parseLong(leer(conToken(post("/api/v1/panel/puestos"), tokenTalento, """
-                {"codigo": "DEV_BUSCADOR", "nombre": "Desarrollador buscador",
-                 "nivelPuestoCodigo": "EJECUCION", "familiaCodigo": "TECNOLOGIA"}""")
-                .andReturn().getResponse().getContentAsString(), "id"));
 
         long id = Long.parseLong(leer(conToken(post("/api/v1/panel/vacantes"), tokenTalento, """
                 {"solicitudTalentoId": %d, "puestoId": %d,

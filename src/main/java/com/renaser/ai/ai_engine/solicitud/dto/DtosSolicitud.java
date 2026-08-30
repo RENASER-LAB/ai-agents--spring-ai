@@ -15,6 +15,7 @@ public final class DtosSolicitud {
 
     public record CrearSolicitud(
             @NotNull Long areaId,
+            @NotNull Long puestoId,
             @NotBlank String urgencia,
             String nivelPuestoCodigo,
             String familiaCodigo,
@@ -36,6 +37,8 @@ public final class DtosSolicitud {
     public record ResultadoEsperadoDto(@NotBlank String descripcion, String indicador) {}
 
     public record SolicitudResumen(Long id, String estado, String urgencia, Long areaId,
+                                   Long puestoId, String puestoNombre,
+                                   String nivelPuestoCodigo, String familiaCodigo,
                                    String resultadoPrincipal, Instant creadoEn) {}
 
     public record SolicitudDetalle(SolicitudResumen resumen, String motivo,
