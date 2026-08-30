@@ -130,7 +130,8 @@ que **dice**.
 
 Qué se añade:
 
-- La prueba del puesto **cronometrada**, con el reloj corriendo en el servidor
+- La prueba del puesto **cronometrada**, con el reloj corriendo en el servidor — o, si la
+  vacante lo eligió, el **cuestionario técnico** que la IA escribe para ella
 - El cambio a mitad, con varias variantes y en un minuto que no se puede adivinar
 - Los entregables que se piden, cada uno con su regla, y el aviso de que falta alguno
 - La explicación de cómo lo hizo
