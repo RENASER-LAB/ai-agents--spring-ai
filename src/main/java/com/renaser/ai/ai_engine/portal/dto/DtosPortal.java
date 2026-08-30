@@ -59,9 +59,18 @@ public final class DtosPortal {
 
     // empresa por lo mismo que nombreEmpresa en el tablón: «mis postulaciones» mezcla los
     // procesos del candidato en todas las empresas, y cada uno debe decir de quién es.
+    /**
+     * Una postulación suya, como la ve el candidato.
+     *
+     * <p>{@code instrumentoEtapaTecnica} dice qué rendirá cuando le toque la etapa de la
+     * prueba: {@code PLANTILLA} (la prueba del puesto, con su enunciado y sus entregables) o
+     * {@code CUESTIONARIO_TECNICO} (preguntas escritas para esa vacante). Los dos comparten
+     * los mismos estados, así que sin este dato el portal no sabría a qué pantalla llevarlo
+     * y tendría que adivinarlo pidiendo un examen y mirando si responde 404.
+     */
     public record MiPostulacion(String uuid, String vacante, String empresa, String estado,
                                 String estadoNombre, String grupoPrioridad, long diasSinCambio,
-                                Instant creadoEn) {}
+                                Instant creadoEn, String instrumentoEtapaTecnica) {}
 
     public record PasoHistorial(String estadoAnterior, String estadoNuevo, boolean fueElSistema,
                                 Instant ocurridaEn) {}

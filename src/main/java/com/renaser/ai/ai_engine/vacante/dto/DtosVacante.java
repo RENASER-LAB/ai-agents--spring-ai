@@ -29,14 +29,17 @@ public final class DtosVacante {
             Instant cierraEn,
             @NotNull Long responsableUsuarioId) {}
 
-    // Los últimos cuatro campos son la configuración de la vacante: qué evaluación y qué
-    // prueba tiene asignadas, qué pesos la rigen y si la evaluación del banco está encendida.
-    // El panel los necesita para enseñar el estado real sin adivinarlo.
+    // Los últimos campos son la configuración de la vacante: qué evaluación y qué prueba
+    // tiene asignadas, qué pesos la rigen, si la evaluación del banco está encendida, y qué
+    // se rinde en su etapa técnica. El panel los necesita para enseñar el estado real sin
+    // adivinarlo — sin `instrumentoEtapaTecnica` no puede pintar qué eligió esta vacante, y
+    // tendría que deducirlo mirando si hay un cuestionario publicado, que no es lo mismo.
     public record VacantePanel(Long id, String titulo, String estado, String tipoCierre,
                                Long puestoId, Long solicitudTalentoId, Long responsableUsuarioId,
                                Instant publicadaEn, Instant cerradaEn, boolean aplicaEvaluacion,
                                Long plantillaEvaluacionId, Long versionPlantillaPruebaId,
-                               Long versionPesosId) {}
+                               Long versionPesosId, String instrumentoEtapaTecnica,
+                               Integer minutosEtapaTecnica) {}
 
     public record GuardarRequisito(@NotBlank String descripcion, @NotBlank String regla) {}
 

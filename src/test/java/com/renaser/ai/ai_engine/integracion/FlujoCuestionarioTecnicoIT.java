@@ -123,6 +123,14 @@ public class FlujoCuestionarioTecnicoIT {
         conToken(post("/api/v1/panel/vacantes/" + vacanteId + "/instrumento-tecnico"), tokenEquipo,
                 "{\"instrumento\": \"CUESTIONARIO_TECNICO\", \"minutos\": 45}")
                 .andExpect(status().isOk());
+
+        // Y el panel lo puede LEER: sin esto tendría que deducir qué eligió la vacante
+        // mirando si hay un cuestionario publicado, que no es lo mismo —se puede preparar uno
+        // sin usarlo— y dejaría la pantalla adivinando.
+        conTokenGet("/api/v1/panel/vacantes/" + vacanteId, tokenEquipo)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.instrumentoEtapaTecnica").value("CUESTIONARIO_TECNICO"))
+                .andExpect(jsonPath("$.minutosEtapaTecnica").value(45));
         conToken(post("/api/v1/panel/vacantes/" + vacanteId + "/publicacion"), tokenEquipo, null)
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.detail").value(
@@ -162,6 +170,12 @@ public class FlujoCuestionarioTecnicoIT {
                 .andReturn().getResponse().getContentAsString(), "codigo");
         postulacionId = jdbc.queryForObject("select id from postulacion where uuid = ?::uuid",
                 Long.class, codigoPostulacion);
+
+        // El candidato sabe qué va a rendir: los dos instrumentos comparten los mismos
+        // estados, así que sin este dato su portal no sabría a qué pantalla llevarlo.
+        conTokenGet("/api/v1/portal/postulaciones", tokenCandidato)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].instrumentoEtapaTecnica").value("CUESTIONARIO_TECNICO"));
 
         // Con la evaluación del banco apagada no hay examen de etapa 1: va directo a la
         // bandeja del equipo (V30). Se le avanza a mano hasta su turno en la prueba.

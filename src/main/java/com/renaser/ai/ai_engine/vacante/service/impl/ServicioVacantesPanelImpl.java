@@ -732,6 +732,7 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                 v.getPuestoId(), v.getSolicitudTalentoId(), v.getResponsableUsuarioId(),
                 v.getPublicadaEn(), v.getCerradaEn(), v.isAplicaEvaluacion(),
                 v.getPlantillaEvaluacionId(), v.getVersionPlantillaPruebaId(),
-                v.getVersionPesosId());
+                v.getVersionPesosId(), v.getInstrumentoEtapaTecnica(),
+                v.getMinutosEtapaTecnica());
     }
 }

@@ -101,7 +101,7 @@ en lenguaje normal.
 | POST `/cuentas` | Crear la cuenta y registrar los consentimientos | Cualquiera |
 | POST `/auth/login` | Entrar; devuelve el token | Cualquiera |
 | POST `/postulaciones` | Postular: CV (PDF o Word, máx. 10 MB), enlaces, el resultado del que se siente orgulloso, la confirmación de los requisitos y `aceptaTratamiento` (obligatorio): la aceptación del texto de la empresa queda firmada con IP y navegador, a nombre de esa postulación | Candidato |
-| GET `/postulaciones` | Sus postulaciones, con la empresa de cada una, estado y días sin cambio | Candidato |
+| GET `/postulaciones` | Sus postulaciones, con la empresa de cada una, estado, días sin cambio y **qué rendirá en la etapa técnica** (`instrumentoEtapaTecnica`: la prueba del puesto o el cuestionario) | Candidato |
 | GET `/postulaciones/{uuid}` | El detalle de una suya, con el historial completo | Candidato |
 | POST `/postulaciones/{uuid}/retiro` | Retirarla. **No borra sus datos**: eso se pide aparte | Candidato |
 | POST `/consentimientos/futuros/retiro` | Retirar el consentimiento de futuros contactos | Candidato |
@@ -166,6 +166,7 @@ del área— se ven solo las propias, y una ajena responde 404.
 | GET `/vacantes/{id}/cuestionario-tecnico` | El cuestionario de la vacante: el borrador si hay, si no la publicada, con el estado de la generación (SIN_PEDIR·EN_CURSO·FALLIDA·LISTA) y si quedó desactualizado respecto a la ficha | `ver_vacantes` |
 | POST `/vacantes/{id}/cuestionario-tecnico/generacion` | Pedir al agente REDACTOR el borrador (202). Exige la ficha COMPLETA; con una generación viva o la IA apagada responde `encolada=false`. Cuenta contra el tope mensual de IA | `editar_vacante` |
 | PUT `/vacantes/{id}/cuestionario-tecnico/preguntas/{preguntaId}` | Corregir una pregunta del borrador con las palabras del dueño (enunciado y guía C3/C4/señal) | `editar_vacante` |
+| GET `/vacantes/{id}` | La vacante con su configuración: qué evaluación y qué prueba tiene, sus pesos, y **qué instrumento y cuántos minutos** rigen su etapa técnica | `ver_vacantes` |
 | POST `/vacantes/{id}/instrumento-tecnico` | Qué se rinde en la etapa técnica de esta vacante —`PLANTILLA` (la prueba del puesto) o `CUESTIONARIO_TECNICO` (el cuestionario CAZATALENTOS)— y en cuántos minutos. **Uno de los dos, nunca los dos**: publicar exige tener listo el que se eligió, y cambiarlo con candidatos dentro se frena (misma vara para todos). Minutos vacíos = los del instrumento | `elegir_plantilla_prueba` |
 | POST `/vacantes/{id}/cuestionario-tecnico/publicacion` | Publicar el borrador: el acto humano que vuelve real el cuestionario. Re-pasa la aduana entera (cantidades del nivel, presencial donde toca, guía completa, temas prohibidos) y archiva la publicada anterior **de esta vacante** — los bancos por nivel ni se miran | `editar_vacante` |
 | GET `/vacantes/{id}/plantillas-correo` | Qué avisos manda esta vacante con texto propio. Vacío = los de siempre | `ver_vacantes` |
