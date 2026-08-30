@@ -109,9 +109,14 @@ empezar y hasta cuándo se puede terminar.
 
 | Estado | Espera a | Qué pasó |
 |---|:--:|---|
-| `PRUEBA_TURNO_CANDIDATO` | 🔵 | Está habilitada. Cuando entra y confirma, **el cronómetro corre** |
-| `PRUEBA_CALIFICANDO` | ⚙️ | Entregó. La IA califica el entregable y su explicación |
+| `PRUEBA_TURNO_CANDIDATO` | 🔵 | Está habilitada. Cuando entra y confirma —o, en el cuestionario, cuando la abre—, **el cronómetro corre** |
+| `PRUEBA_CALIFICANDO` | ⚙️ | Entregó. La IA califica lo que hizo |
 | `PRUEBA_POR_CONFIRMAR` | 🟡 | Una persona confirma si avanza |
+
+⚠️ **Los tres estados sirven a las DOS formas de esta etapa**, y por eso el estado no basta para
+saber qué se le enseña a nadie: hay que mirar `vacante.instrumento_etapa_tecnica`. Con
+`PLANTILLA` rinde la prueba del puesto de siempre; con `CUESTIONARIO_TECNICO`, el cuestionario
+que la IA escribió para esa vacante. Es el mismo recorrido con distinto contenido.
 
 Que el cronómetro esté corriendo no es un estado: el intento guarda cuándo empezó y cuándo
 vence. Un candidato que aún no ha entrado y otro con el reloj corriendo están en el mismo

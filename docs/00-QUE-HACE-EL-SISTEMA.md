@@ -84,11 +84,20 @@ ve a los candidatos de sus vacantes, no a los de las demás.
 
 ### 8 · La prueba del puesto
 
-Quien sigue hace una prueba del puesto con reloj. **A mitad cambia algo** —una restricción nueva,
-un dato que aparece— para ver cómo reacciona cuando el plan se rompe.
+Quien sigue rinde una prueba con reloj. Aquí empieza a verse lo que **hace**, no lo que dice.
 
-Entrega lo que se le pidió, que puede ser más de una cosa, y explica cómo lo hizo. Aquí empieza a
-verse lo que **hace**, no lo que dice.
+**Cada vacante elige de qué forma, y solo una de las dos:**
+
+- **La prueba del puesto de siempre.** Un encargo con reloj en el que **a mitad cambia algo**
+  —una restricción nueva, un dato que aparece— para ver cómo reacciona cuando el plan se rompe.
+  Entrega lo que se le pidió, que puede ser más de una cosa, y explica cómo lo hizo.
+- **El cuestionario técnico**, escrito por la IA para ese puesto y esa empresa a partir de lo
+  que cuenta el dueño del trabajo. Se contesta escribiendo: **aquí no se entrega ningún
+  archivo**. Cada respuesta se mide por si relata un episodio real, si fue suyo, si trae un dato
+  duro y si se moja con lo incómodo.
+
+Quien crea la vacante lo decide antes de publicarla, y ya no lo puede cambiar en cuanto alguien
+la ha rendido.
 
 ### 9 · La simulación de trabajo
 
