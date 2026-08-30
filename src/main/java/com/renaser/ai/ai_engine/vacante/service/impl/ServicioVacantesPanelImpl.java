@@ -89,7 +89,8 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                 .replaceAll("\\p{M}", "")
                 .toUpperCase(Locale.ROOT)
                 .replaceAll("[^A-Z0-9]+", "_")
-                .replaceAll("^_+|_+$", "");
+                .replaceAll("^_+", "")
+                .replaceAll("_+$", "");
         if (base.isBlank()) {
             base = "PUESTO";
         }
