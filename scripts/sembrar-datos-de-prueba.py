@@ -37,18 +37,23 @@ PUESTOS = [
     ("CX_ANALISTA", "Analista de experiencia", "EJECUCION", "CRECIMIENTO"),
 ]
 
-# (nombre, apellidos, cumple_requisitos)
+# (nombre, apellidos, cumple_requisitos, ubigeo)
+#
+# La ciudad se pide al crear la cuenta y es el codigo de ubigeo de la provincia. Van
+# REPARTIDAS y no todas iguales porque el ranking se filtra por ciudad: con diez candidatos
+# de Lima, el filtro se ve pero no se puede probar. Hay dos de Lima a proposito —para que
+# haya un grupo con mas de uno— y un «EXT», que es quien postula desde fuera del Peru.
 CANDIDATOS = [
-    ("Camila", "Torres Rivas", True),
-    ("Diego", "Salazar Núñez", True),
-    ("Fernanda", "Quispe Mamani", True),
-    ("Joaquín", "Vargas Ureta", True),
-    ("Valeria", "Ríos Castro", True),
-    ("Mateo", "Ibáñez Flores", True),
-    ("Lucía", "Chávez Paredes", True),
-    ("Andrés", "Molina Guzmán", False),   # no confirma el requisito: se descarta solo
-    ("Renata", "Espinoza León", True),
-    ("Sebastián", "Cárdenas Rojo", True),
+    ("Camila", "Torres Rivas", True, "1501"),        # Lima — Lima
+    ("Diego", "Salazar Núñez", True, "0401"),        # Arequipa — Arequipa
+    ("Fernanda", "Quispe Mamani", True, "0801"),     # Cusco — Cusco
+    ("Joaquín", "Vargas Ureta", True, "1301"),       # La Libertad — Trujillo
+    ("Valeria", "Ríos Castro", True, "EXT"),         # fuera del Peru
+    ("Mateo", "Ibáñez Flores", True, "0701"),        # Callao
+    ("Lucía", "Chávez Paredes", True, "0402"),       # Arequipa — Camaná
+    ("Andrés", "Molina Guzmán", False, "1501"),      # no confirma el requisito: se descarta solo
+    ("Renata", "Espinoza León", True, "2101"),       # Puno — Puno
+    ("Sebastián", "Cárdenas Rojo", True, "1201"),    # Junín — Huancayo
 ]
 
 ORGULLOS = [
@@ -322,9 +327,12 @@ def sembrar(api, uid_equipo):
 
     solicitudes = []
     for area, puesto_cod, destino, urgencia, resultado, motivo, consecuencia, analisis in guion:
+        # El puesto es obligatorio desde que la solicitud nace con él, y de el salen el
+        # nivel y la familia: mandarlos aparte hacia que el backend los comparase con los
+        # del puesto y rechazase la solicitud —«el nivel enviado no coincide»—. Se callan
+        # a proposito, no se olvidaron.
         s = api.post("/panel/solicitudes", {
-            "areaId": areas[area], "urgencia": urgencia,
-            "nivelPuestoCodigo": "EJECUCION", "familiaCodigo": "TECNOLOGIA",
+            "areaId": areas[area], "puestoId": puestos[puesto_cod], "urgencia": urgencia,
             "resultadoPrincipal": resultado, "motivo": motivo,
             "consecuenciaNoContratar": consecuencia, "analisisCapacidad": analisis,
             "responsableUsuarioId": yo,
@@ -376,7 +384,7 @@ def sembrar(api, uid_equipo):
     token_equipo = api.token
     postulaciones = []
 
-    for i, (nombre, apellidos, cumple) in enumerate(CANDIDATOS):
+    for i, (nombre, apellidos, cumple, ubigeo) in enumerate(CANDIDATOS):
         correo = f"{nombre.lower()}.{apellidos.split()[0].lower()}@ejemplo.pe"
         vacante = vacantes[i % len(vacantes)]
 
@@ -385,6 +393,7 @@ def sembrar(api, uid_equipo):
             api.post("/portal/cuentas", {
                 "nombre": nombre, "apellidos": apellidos, "correo": correo,
                 "contrasena": "Demo12345!", "aceptaProceso": True,
+                "ciudadUbigeo": ubigeo,
                 "aceptaFuturosContactos": i % 3 != 0,
             })
         except RuntimeError:
@@ -398,6 +407,9 @@ def sembrar(api, uid_equipo):
             "vacanteId": (None, str(vacante["id"])),
             "resultadoOrgulloso": (None, random.choice(ORGULLOS)),
             "portafolio": (None, f"https://{nombre.lower()}.dev"),
+            # Aceptar el texto de la empresa de ESTA vacante es condicion para postular, y
+            # es distinto del consentimiento de la cuenta: son dos responsables de datos.
+            "aceptaTratamiento": (None, "true"),
         }
         # Quien no confirma el requisito queda descartado en el acto: es el único
         # descarte automático del sistema, y conviene que se vea en los datos.
