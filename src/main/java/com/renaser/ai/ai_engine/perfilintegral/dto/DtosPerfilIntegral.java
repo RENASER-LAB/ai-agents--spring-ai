@@ -47,9 +47,18 @@ public final class DtosPerfilIntegral {
     // El peso viaja con la nota, y no es decoracion: es lo que explica de donde sale el
     // numero final. Un 90 en un criterio que pesa 25 y un 90 en uno que pesa 5 se leen
     // igual en pantalla y no valen lo mismo.
+    // confianza va de 0 a 100, igual que el puntaje —no de 0 a 1—. Lo fija el prompt del
+    // agente («numero de 0 a 100») y lo hace cumplir PuenteCalificacionIaImpl, que acota a
+    // CIEN antes de guardar. La columna numeric(5,2) no lo demuestra por sí sola: admitiría
+    // un 999,99. Quien la pinte no tiene que multiplicar por nada.
+    //
+    // motivoAjuste no-nulo significa exactamente una cosa: esta nota la corrigió una
+    // persona. Lo garantiza un CHECK en nota_criterio —ajustada_por_usuario_id sin motivo
+    // no entra—, así que basta mirar este campo para saber que hubo mano humana detrás.
     public record NotaCriterioResponse(String criterio, BigDecimal puntaje,
                                        BigDecimal maximo, BigDecimal peso,
-                                       String explicacion, String origen) {}
+                                       String explicacion, String origen,
+                                       BigDecimal confianza, String motivoAjuste) {}
 
     // Una alerta no descarta a nadie: es una pregunta para la conversación final.
     public record AlertaResponse(String tipo, String descripcion, Instant creadoEn) {}
@@ -108,6 +117,10 @@ public final class DtosPerfilIntegral {
      * {@code calificados} los que ya tienen retrato, {@code enCurso} los que la IA está
      * mirando ahora, y {@code fallidos} aquellos en los que falló y <b>no se les inventó una
      * nota</b> —normalmente un currículum escaneado, del que no se puede sacar texto—.
+     * <p>{@code puedeVerPretension} dice si esta petición pudo siquiera consultar el sueldo
+     * que pide cada candidato. Viaja porque sin él una columna vacía tiene dos lecturas que
+     * no se distinguen desde el navegador —nadie lo declaró, o tu rol no puede verlo— y la
+     * pantalla se ve obligada a nombrar las dos sin afirmar ninguna.
      */
     public record RankingVacante(
             Long vacanteId,
@@ -119,6 +132,7 @@ public final class DtosPerfilIntegral {
             int calificados,
             int enCurso,
             int fallidos,
+            boolean puedeVerPretension,
             List<FilaRanking> filas) {}
 
     /**
@@ -152,7 +166,18 @@ public final class DtosPerfilIntegral {
             int fortalezas,
             int alertas,
             Instant actualizadoEn,
-            List<NotaCriterioResponse> notasCriterio) {}
+            List<NotaCriterioResponse> notasCriterio,
+            // Dónde vive, ya escrito para leer: «Arequipa — Camaná». Sale de
+            // persona.ciudad_ubigeo, no del texto libre del perfil, para que filtrar por
+            // ciudad compare códigos y no las seis formas de escribir «Lima».
+            String ciudad,
+            String ciudadCodigo,
+            // La pretensión SOLO viaja con el permiso ver_pretension; sin él los tres
+            // vienen en null. La V36 lo dejó escrito: si apareciera junto a la nota para
+            // todo el mundo, pesaría en la decisión, que es justo lo que se evita.
+            BigDecimal pretensionMin,
+            BigDecimal pretensionMax,
+            String pretensionMoneda) {}
 
     // ============ El desglose de la evaluación del banco ============
 

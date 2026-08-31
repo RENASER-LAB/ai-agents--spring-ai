@@ -199,7 +199,7 @@ public class FlujoSinBancoIT {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                         {"nombre":"Elena","apellidos":"Ramos","correo":"elena.admin@correo.pe",
-                         "contrasena":"unaClaveLarga123","aceptaProceso":true,
+                         "contrasena":"unaClaveLarga123","ciudadUbigeo":"1501","aceptaProceso":true,
                          "aceptaFuturosContactos":false}"""))
                 .andExpect(status().isCreated());
         tokenCandidato = leer(mvc.perform(post("/api/v1/portal/auth/login")
@@ -351,7 +351,7 @@ public class FlujoSinBancoIT {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                         {"nombre":"Cand","apellidos":"Prueba","correo":"%s",
-                         "contrasena":"unaClaveLarga123","aceptaProceso":true,
+                         "contrasena":"unaClaveLarga123","ciudadUbigeo":"1501","aceptaProceso":true,
                          "aceptaFuturosContactos":false}""".formatted(correo)))
                 .andExpect(status().isCreated());
         String token = leer(mvc.perform(post("/api/v1/portal/auth/login")

@@ -15,11 +15,15 @@ public final class DtosPortal {
 
     // ---------- lo que entra ----------
 
+    // ciudadUbigeo es obligatoria y solo se pide aquí: a quien ya tiene cuenta no se le
+    // vuelve a preguntar nunca. Es el único momento en que sale gratis —el formulario ya
+    // está abierto— y sin ella el panel no puede filtrar la tanda por dónde vive nadie.
     public record CrearCuenta(
             @NotBlank String nombre,
             @NotBlank String apellidos,
             @NotBlank @Email String correo,
             @NotBlank @Size(min = 8, message = "La contraseña necesita al menos 8 caracteres") String contrasena,
+            @NotBlank(message = "Hay que decir dónde vives") String ciudadUbigeo,
             @NotNull Boolean aceptaProceso,
             Boolean aceptaFuturosContactos) {}
 

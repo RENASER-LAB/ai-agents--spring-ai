@@ -462,7 +462,7 @@ public class FlujoBancoPreguntasIT {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                         {"nombre":"Bruno","apellidos":"Salas","correo":"bruno@correo.pe",
-                         "contrasena":"unaClaveLarga123","aceptaProceso":true,
+                         "contrasena":"unaClaveLarga123","ciudadUbigeo":"1501","aceptaProceso":true,
                          "aceptaFuturosContactos":false}"""))
                 .andExpect(status().isCreated());
         return leer(mvc.perform(post("/api/v1/portal/auth/login")
