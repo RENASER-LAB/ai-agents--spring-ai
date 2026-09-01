@@ -137,8 +137,8 @@ tienen cuenta en este sistema.
         v
   hace la prueba
   del puesto             ------>    cronometro corriendo
-  (60 a 120 min)                    cambio inesperado en un momento
-                                    que no siempre es el mismo
+  (los minutos los                  cambio inesperado en un momento
+   pone la empresa)                 que no siempre es el mismo
         |
         v
   asiste a la
@@ -624,16 +624,48 @@ preguntas previas, preguntas posteriores, cambio inesperado, rúbrica y método 
 **RF-75** El cronómetro arranca cuando el candidato confirma que empieza, y **no se detiene**,
 salvo reglas de accesibilidad aprobadas.
 
-**RF-76** La duración va de **60 a 120 minutos** y es configurable por plantilla.
+**RF-76** La duración es **configurable**, y quien la fija es la empresa dueña de la prueba. Se
+declara en la plantilla, y **la vacante puede decir otra** para su etapa técnica: entonces manda
+la de la vacante. Lo único que el sistema impone es un **piso de 5 minutos**.
+
+> ⚠️ **Aquí decía «de 60 a 120 minutos», y ese rango se retiró el 31/08/2026.** Lo decidió
+> Renaser: manda el tiempo que ponga la empresa, no un rango que el sistema imponga. Hasta ese
+> día, publicar una versión de plantilla con 45 o con 180 minutos se rechazaba, y esa validación
+> ya no existe.
+>
+> **Por qué queda un piso, y por qué son cinco.** Desde que los minutos de la vacante rigen
+> también la prueba del puesto, cualquier prueba puede volverse cronometrada — y un uno ahí es
+> una prueba que el barrido de vencidos entrega sola sesenta segundos después de que el
+> candidato la abra, con la pantalla todavía cargando. Cinco es el mismo número en los dos
+> sitios que lo comprueban: publicar la versión, y fijar los minutos de la vacante.
+>
+> **Lo que el rango sostenía sin que nadie lo dijera:** que el cambio inesperado del RF-77
+> siempre cupiera dentro del reloj. Ver [Defectos conocidos](DEFECTOS-CONOCIDOS.md).
 
 **RF-77** El cambio inesperado tiene **una o varias variantes**, y el momento en que aparece se
 sortea dentro de un rango configurable. **No se fija «a la mitad»**, para que no se aprenda el
 patrón.
 
+> ⚠️ **Hoy nada comprueba que ese rango quepa dentro de la prueba**, ni en la base ni en el
+> código, y con pocos minutos el cambio no se revela nunca. Está abierto y descrito en
+> [Defectos conocidos](DEFECTOS-CONOCIDOS.md).
+
 **RF-78** El sistema arranca con once plantillas cargadas: Dirección de unidad, Coordinación de
 Operaciones, Talento y Recursos Humanos, Crecimiento y Marketing, Compra de Medios, Desarrollo
 de Software, Producto y Experiencia de Usuario, Diseño Gráfico, Edición de Video, Ventas, y
 Seguimiento y Experiencia del Cliente.
+
+> ⚠️ **Este requisito sigue vigente y hoy NO se cumple así.** Nadie decidió lo contrario: es que
+> **ninguna migración inserta ni una sola plantilla de prueba**. Una base recién creada arranca
+> con la tabla vacía, y las pruebas que existen se han cargado **por la API, con los guiones de
+> `scripts/`** (`cargar-prueba-administrador.py` es el que hay en el repositorio). Los documentos
+> del modelo decían durante meses que estaban «sembradas»; no lo estaban.
+>
+> Que se carguen por guion en vez de por migración no es un descuido a medias: **el contenido de
+> una prueba lo escribe Renaser y todavía no está escrito**, así que sembrar once plantillas
+> vacías con sus nombres habría dejado once cáscaras que nadie puede rendir. Lo que falta para
+> cumplir este requisito de verdad es el contenido, no el `INSERT` — y es la misma decisión
+> pendiente que describe [Alcance del MVP](08-ALCANCE-DEL-MVP.md).
 
 **RF-79** Las pruebas se configuran desde el sistema. **No están escritas en el código.**
 

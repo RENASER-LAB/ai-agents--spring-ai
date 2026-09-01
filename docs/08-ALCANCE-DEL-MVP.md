@@ -203,10 +203,15 @@ tocar nada, porque son dos tablas nuevas colgando de la respuesta.
 cronómetro y el cambio a mitad son la mejora que Renaser quiere. Las cinco pruebas enviadas son
 anteriores y valen como modelo de contenido, no de formato.
 
-Pero eso deja una decisión nueva encima de la mesa, y es de Renaser: **una prueba cronometrada
-dura de 60 a 120 minutos, y lo que piden esas cinco no cabe ahí.** «Un MVP funcional más un video
-de 5 minutos más un documento» no se hace en dos horas. Ni un documento de cinco páginas con
-plano e imágenes de referencia.
+Pero eso deja una decisión nueva encima de la mesa, y es de Renaser: **lo que piden esas cinco no
+cabe en una sesión con reloj.** «Un MVP funcional más un video de 5 minutos más un documento» no
+se hace de una sentada. Ni un documento de cinco páginas con plano e imágenes de referencia.
+
+⚠️ Esto decía «una prueba cronometrada dura de 60 a 120 minutos», y **ese rango se retiró el
+31/08/2026**: lo decidió Renaser, manda el tiempo que ponga la empresa y solo queda un piso de 5
+minutos. Así que ya no hay ningún número que obligue a encoger nada — pero **la decisión sigue
+siendo suya y sigue sin tomarse**, y alargar el reloj no convierte un encargo de varios días en
+una prueba con cronómetro.
 
 Ponerle reloj a estas pruebas no es cronometrarlas: es **rehacer el encargo mucho más pequeño**.
 Alguien de Renaser tiene que reescribir al menos una, y decidir qué se conserva de la original.

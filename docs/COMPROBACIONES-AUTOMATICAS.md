@@ -47,11 +47,27 @@ demás de la calificación se prueba con un doble del modelo y no gasta nada.
 
 ---
 
-## 877 pruebas
+## 1072 pruebas
 
-Contadas de correrlas el 28/08/2026 (con el multiempresa, los inscritos de la simulación, los
-permisos editables, el guardián común del alcance y la nota de la prueba), no de recordarlas: el
-desglose sale de los informes de surefire y failsafe, y suma exacto.
+Contadas de correr `./mvnw verify` el **01/09/2026**: **930 unitarias y 142 de integración**.
+
+⚠️ **El total está al día; la tabla de abajo no.** Su reparto por filas es el del recuento del
+28/08/2026 (877 = 770 + 107), antes del módulo de vacantes —los tiempos de la etapa técnica, la
+edición de las plantillas de prueba, el CRUD de áreas y la guía de calificación—, y esas casi
+doscientas pruebas nuevas **no están repartidas por sus filas**. Se deja así a propósito en vez de
+estimarlas: un reparto inventado es peor que un reparto viejo declarado como tal. Lo que sí es
+verdad de las nuevas y conviene saber dónde vive:
+
+| Qué se comprueba | Dónde |
+|---|---|
+| Las áreas, con dobles y contra Postgres real | `AreasDeLaOrganizacionTest` · `FlujoAreasIT` |
+| Editar y quitar sobre versiones en borrador | `ServicioPlantillaPruebaEdicionTest` · `ServicioPlantillaPruebaListadoTest` |
+| El reloj de la etapa técnica y sus dos instrumentos | `ServicioPruebaImplTest` · `ServicioEvaluacionImplTest` · `RelojDeLaEtapaTecnicaQaTest` |
+| Que la guía de calificación no pueda mandar sobre la rúbrica | `AgentePruebaPuestoGuiaHostilTest` |
+
+⚠️ **Uno de esos tests está saltado a propósito y señala un defecto abierto**: el método
+`elCambioInesperadoCabeDentroDelReloj` de `RelojDeLaEtapaTecnicaQaTest`. La clase **no** está
+saltada entera —sus otros dos casos pasan—. Ver [Defectos conocidos](DEFECTOS-CONOCIDOS.md).
 
 | Qué | Cuántas | Necesita |
 |---|---:|---|
@@ -157,9 +173,10 @@ otra vez → sigue habiendo una sola fila. **Se comprobó que se pone rojo al co
 que es la única prueba de que un test prueba algo. **No se borra pensando que las unitarias la
 cubren.**
 
-⚠️ Los totales de la tabla salen de correr `./mvnw -B verify` (770 unitarias y 107 de
-integración, 0 fallos); **el reparto por filas sale de dónde viven las seis pruebas nuevas**, no
-de un reconteo de los `<testcase>`. El próximo reconteo manda sobre esto.
+⚠️ Los totales de la tabla salen de correr `./mvnw -B verify` **el 28/08/2026** (770 unitarias y
+107 de integración, 0 fallos); **el reparto por filas sale de dónde viven las seis pruebas
+nuevas**, no de un reconteo de los `<testcase>`. El próximo reconteo manda sobre esto. El total de
+hoy es otro —930 + 142, medido el 01/09/2026— y está arriba.
 
 ⚠️ Al recontar, **no sirve el atributo `tests=`** de los XML de surefire: con clases anidadas
 (`@Nested`) subcuenta, y por eso dos filas de esta tabla llevaban tiempo mal —las fórmulas

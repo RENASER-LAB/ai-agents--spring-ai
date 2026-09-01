@@ -68,9 +68,9 @@ Perfil Integral → prueba del puesto → simulacion → validacion → decision
 
 | | |
 |---|---|
-| Base de datos | **Flyway es el dueno del esquema**: V1-V40 en `src/main/resources/db/migration`, **102 tablas de este modulo** (105 en la base contando `flyway_schema_history` y las dos del motor de agentes, `agent_run` y `vector_store`). `ddl-auto: validate` |
+| Base de datos | **Flyway es el dueno del esquema**: V1-V46 en `src/main/resources/db/migration`, **102 tablas de este modulo** (105 en la base contando `flyway_schema_history` y las dos del motor de agentes, `agent_run` y `vector_store`). De la V41 a la V46 nace **una sola tabla** (`ficha_vacante`, V42); el resto son columnas y datos, asi que el conteo de arriba se quedo en la V40 y hay que recontarlo. `ddl-auto: validate` |
 | Codigo | Veintiun paquetes de dominio bajo `ai_engine` (ver «Como esta organizado el codigo») |
-| Tests | **877, todos en verde (28/08/2026)**: 770 unitarios y 107 de integracion (de esos 107, 6 se saltan: los que gastan saldo o mandan correo de verdad). Ver «Correr los tests»: unitarios de la maquina y del anonimizador, migraciones contra Postgres real (Testcontainers) y flujos de punta a punta: hito 1, evaluacion, prueba, simulacion/validacion, calificacion con IA, la vacante sin banco, las dos empresas y el tope de IA de la plataforma |
+| Tests | **1072 en verde (01/09/2026)**, `./mvnw verify` completo: 930 unitarios y 142 de integracion (de esos 142, 6 se saltan: los que gastan saldo o mandan correo de verdad). Ver «Correr los tests»: unitarios de la maquina y del anonimizador, migraciones contra Postgres real (Testcontainers) y flujos de punta a punta: hito 1, evaluacion, prueba, simulacion/validacion, calificacion con IA, la vacante sin banco, las areas, las dos empresas y el tope de IA de la plataforma |
 | IA que califica | **Seis de los diez agentes del catalogo estan implementados**: datos del curriculum, evidencia, evaluador, potencial/riesgo, prueba del puesto y las preguntas de la conversacion final. Todos corren por cola de RabbitMQ contra DeepSeek. Ver [Calificacion con IA](docs/CALIFICACION-CON-IA.md) |
 | Correo | **Ya sabe salir de verdad** (`EnviadorCorreoSmtp`), pero **por defecto no sale**: `renaser.correo.transporte` vale `log` salvo que se ponga `smtp`, y entonces solo se registra en `correo_enviado`. Para encenderlo hacen falta `CORREO_TRANSPORTE=smtp`, `CORREO_REMITENTE` y una cuenta que autentique. El RNF-65 pide que salga **desde el dominio propio de Renaser**: confirmar con ellos si ya lo tienen antes de encenderlo |
 | Acceso del candidato | Entra al portal **con un enlace, sin contrasena** (`EnlaceAcceso`, `ServicioEnlaceAcceso`). El enlace se le manda por correo, asi que depende de lo de arriba |
@@ -99,6 +99,174 @@ Dos cosas que no son obvias:
   fundada de la inventada.
 - **Una pregunta ya contestada no se borra.** Volver a pedir las preguntas rehace solo las que
   nadie llego a hacer.
+
+### Los minutos de la vacante rigen los DOS instrumentos (31/08/2026)
+
+`vacante.minutos_etapa_tecnica` existe desde la V43, pero **cuando la vacante rendia la prueba
+del puesto era un no-op**: se guardaba, se auditaba, el panel lo enseñaba y **no lo leia nadie**.
+Ahora lo leen los dos instrumentos de la etapa: el cuestionario tecnico y la prueba del puesto.
+
+- ⚠️ **Se resuelven AL EMPEZAR el examen, no al crearlo.** Es la decision que hace todo lo demas:
+  corregir el numero en la ficha alcanza a **todo el que aun no haya abierto el suyo**, tenga ya
+  su examen creado o no. Congelarlo al crear era lo que hacia el cuestionario tecnico y dejaba a
+  media tanda con el valor viejo sin que nadie pudiera verlo desde el panel.
+- ⚠️ **Gana el plazo mas cercano, y solo un cronometro puede acercarlo.** Entre una fecha de
+  cierre ya fijada y `ahora + minutos`, manda el que caiga antes. **Los dias de un plazo abierto
+  NO acercan nada**: la fecha de cierre existe para decir «esta convocatoria cierra el 30» a
+  todos a la vez (V32), y compararla contra los dias del plazo se la recortaria a quien abriera
+  pronto —el dia 2 se le cerraria el 9— devolviendo los vencimientos distintos por candidato que
+  la V32 vino a eliminar. **Fue una regresion, la encontro un QA y esta arreglada**; el caso vive
+  en `RelojDeLaEtapaTecnicaQaTest`. `plazoPropio` tampoco se toca.
+- **Con minutos de vacante la prueba es cronometrada de hecho**, diga lo que diga la plantilla, y
+  eso es lo que se le enseña al candidato. La fila de la plantilla no se toca: la misma version
+  la puede rendir otra vacante que no fije nada. Y viajan a la pantalla **los dos datos** —los
+  minutos y la fecha— siempre que existan los dos: elegir uno y callar el otro era el fallo.
+- **Se retiro la validacion de 60-120 minutos** al publicar una version de prueba. Lo decidio
+  Renaser: manda el tiempo que ponga la empresa. Queda un **piso de 5 minutos**, y ahora hace mas
+  falta que antes — cualquier prueba puede volverse cronometrada, y con un minuto el barrido la
+  entrega sola antes de que la pantalla acabe de cargar. Cinco es el mismo numero en los dos
+  sitios: publicar la version, y fijar los minutos de la vacante.
+- **La guarda de «la misma vara para todos» corrio su linea**: de «hay alguna postulacion» a
+  **«alguien ya EMPEZO su etapa tecnica»**. Postular no es rendir, y quien no ha abierto nada no
+  ha visto ningun enunciado ni ningun reloj. Con la linea vieja, un solo curriculum dentro dejaba
+  la vacante congelada hasta la siguiente convocatoria. ⚠️ Se preguntan **los dos** instrumentos,
+  no el que la vacante tenga puesto: una vacante que ya cambio antes puede tener gente que
+  empezo con el otro.
+- ⚠️ **`evaluacion.minutos_objetivo` es desde hoy un vestigio.** Nadie la escribe ni la lee en
+  esta etapa. Se conserva por las filas anteriores que la traen llena. **No apoyarse en ella ni
+  como respaldo**: vaciar los minutos en la vacante es valido —«usa los del instrumento»— y un
+  respaldo asi resolveria al numero congelado en vez de caer al cuestionario.
+- ⚠️ **Lo que el rango 60-120 sostenia sin decirlo**: que el cambio inesperado siempre cupiera
+  dentro del reloj. Hoy no lo garantiza nada. Ver [Defectos conocidos](docs/DEFECTOS-CONOCIDOS.md).
+
+### Una version de prueba se compone entera antes de publicarla (31/08/2026 · V46)
+
+Una version en borrador solo se podia **añadir**: cada pregunta, entregable, criterio o variante
+mal puesto se quedaba ahi, y una rubrica que se pasaba de 100 no habia forma de deshacerla.
+Ahora hay **doce endpoints** de correccion y borrado, mas dos que no lo son:
+
+| Que | Ruta |
+|---|---|
+| Las versiones de una plantilla, borradores incluidos | `GET /plantillas-prueba/{id}/versiones` |
+| Subir el ENUNCIADO en PDF o Word | `POST /plantillas-prueba/versiones/{id}/consigna` |
+| Reemplazar los datos de la version | `PUT /versiones/{id}` |
+| Quitar una pregunta elegida | `DELETE /versiones/{id}/preguntas/{preguntaId}` |
+| Corregir y quitar cada pieza | `PUT` y `DELETE` sobre `/entregables/{id}`, `/rubrica/{id}`, `/variantes/{id}` |
+| Reordenar, la lista entera de una vez | `PUT /versiones/{id}/{preguntas,entregables,variantes,rubrica}/orden` |
+
+- ⚠️ **Todo esto es SOLO en `BORRADOR`.** Publicada responde 409 y la salida a un error sigue
+  siendo una version nueva: no hay «despublicar» (RF-138). Lo que cambia es que **antes** de
+  publicar ya no hay operaciones irreversibles.
+- ⚠️ **Quitar una pregunta borra la ELECCION, no la pregunta.** `pregunta_prueba` es un catalogo
+  que varias versiones eligen a la vez, y hay respuestas apuntandola por clave ajena.
+- **Estas si se auditan una por una**, aunque los `agregar*` de al lado no lo hagan: lo que se
+  añade se ve en la version y se puede quitar; lo que se quita no deja rastro en ninguna parte.
+- **El enunciado subido no exime de nada**: publicar sigue exigiendo preguntas, entregables y
+  rubrica, porque de ese archivo no sale ninguna nota. ⚠️ Su enlace **caduca a los 180 dias** y
+  solo se puede volver a subir en borrador: ver [Defectos conocidos](docs/DEFECTOS-CONOCIDOS.md).
+
+### La prueba le dice al agente que la califica que mirar (31/08/2026 · V46)
+
+`instruccion_ia` es **una para todo el mundo** —esa tabla no tiene `organizacion_id`— asi que la
+instruccion de `PRUEBA_PUESTO` solo puede hablar del oficio de calificar. Quien sabe que
+distingue un buen tablero de control de uno malo en el rubro de ESTA empresa es quien escribio la
+prueba. Ahora lo puede escribir: `version_plantilla_prueba.guia_calificacion`, texto libre de
+hasta 2000 caracteres.
+
+- **Vive en la VERSION**, no en la organizacion ni en la vacante, por lo mismo que la rubrica: se
+  congela al publicar y viaja con la copia entre empresas. Una prueba publicada califica igual
+  hoy que dentro de un año, y eso incluye con que guia.
+- ⚠️ **Orienta, no sustituye.** La rubrica sigue siendo la unica fuente de los 100 y el agente
+  sigue devolviendo nota **por criterio**. Un texto que pida «califica sobre 100» no tiene donde
+  escribirse: `PuentePruebaIaImpl.guardarNotasPrueba` descarta codigos que no esten en la rubrica,
+  los reservados a una persona y la nota sin explicacion, y acota el puntaje al maximo. **Esa es
+  la red de verdad**, no el envoltorio del prompt.
+- ⚠️ **Va en el `system`, cerrada con un rotulo que lleva una marca sorteada en cada
+  calificacion.** Quien escribe la guia —dias antes, sin verla nunca— no puede reproducir el
+  rotulo, asi que no puede fingir el cierre y escribir detras haciendolo pasar por instruccion
+  del sistema. **Sustituye al saneado de rayas**, que no servia de dos maneras: solo miraba el
+  guion ASCII, y **degradaba en vez de borrar** —`--- FIN ---` quedaba en `-- FIN --`, el mismo
+  rotulo con las mismas palabras—. Enumerar caracteres es una carrera que se pierde.
+- ⚠️ **Y ya no viaja tambien cruda en el insumo.** El insumo se serializa como el mensaje del
+  usuario: dejarla ahi mandaba el texto **dos veces**, una envuelta y otra entera y sin tocar,
+  con lo que todo el envoltorio del `system` era decorativo. Lo demostro un QA leyendo el
+  volcado. No se pierde el rastro: `EjecucionIa.envio` guarda el `system` entero, guia incluida.
+- **Los rotulos de la bitacora llevan la misma clase de marca** (`EjecutorAgenteIaImpl`). No
+  protegen al modelo —nunca se le mandan—: protegen a quien abre el registro meses despues, para
+  que un texto de usuario no pueda inventarse secciones dentro de el.
+- **El tope de 2000 esta en cuatro sitios y ninguno sobra**: el `@Size` del contrato, el CHECK de
+  la V46 (el unico en los caminos que no pasan por el DTO —la copia entre empresas y las cargas
+  por SQL—), el mensaje entendible del servicio, y el recorte al armar el prompt.
+
+⚠️ **Fuga conocida y abierta**: el catalogo `pregunta_prueba` se lee **sin filtrar por empresa** y
+las preguntas especificas SON el texto del examen. Ver
+[Defectos conocidos](docs/DEFECTOS-CONOCIDOS.md).
+
+### Las areas se administran desde el panel (31/08/2026 · sin migracion)
+
+Las areas son la estructura de la empresa y **sin una no se puede registrar una Solicitud de
+Talento**, pero solo se podian listar y crear: no habia como renombrarlas, retirarlas ni
+borrarlas. Ahora el CRUD esta entero en `AdministracionController` y en
+`ServicioAdministracionImpl`. **No hizo falta ninguna migracion**: `area.es_activa` existe desde
+la V2 y solo estaba a medio usar —se escribia `true` al crear y nadie lo volvia a tocar—.
+
+| Verbo y ruta | Permiso |
+|---|---|
+| `GET /panel/areas` (solo activas, como siempre) | `ver_solicitudes` |
+| `GET /panel/areas/todas` | `crear_usuarios_y_asignar_roles` |
+| `POST /panel/areas` | `crear_usuarios_y_asignar_roles` |
+| `PUT /panel/areas/{id}` | `crear_usuarios_y_asignar_roles` |
+| `POST /panel/areas/{id}/desactivacion` · `/reactivacion` | `crear_usuarios_y_asignar_roles` |
+| `GET /panel/areas/{id}/impacto` | `crear_usuarios_y_asignar_roles` |
+| `POST /panel/areas/{id}/borrado` | `crear_usuarios_y_asignar_roles` |
+
+- ⚠️ **`GET /areas` no cambio, y no debe cambiar.** Sigue filtrando por activa porque es la
+  lista que llena el desplegable de la solicitud: una area retirada ahi seria una solicitud
+  nueva colgada de algo que la empresa dio por cerrado. La lista con las retiradas es **una
+  ruta aparte** y no un parametro de la primera, para que ese contrato no se pueda aflojar por
+  descuido. Sin esa segunda ruta, desactivar seria un viaje sin retorno.
+- ⚠️ **Borrar exige reasignar, y esto sale de las claves ajenas.** `solicitud_talento.area_id`
+  (NOT NULL) y `usuario.area_id` (admite NULL) apuntan a `area(id)` y **ninguna declara
+  `ON DELETE`**: Postgres aplica NO ACTION y el DELETE falla mientras quede una fila, tambien
+  contra la que admite nulo. `borrarArea` mueve primero las dos cosas al area de destino y borra
+  despues, todo en una transaccion. Sin destino solo se admite si el area esta vacia, y si no lo
+  esta responde **409 con los dos recuentos dentro**, nunca un error crudo de clave ajena.
+  Vaciar `usuario.area_id` esta descartado a proposito: contenta a Postgres y pierde el dato.
+- ⚠️ **La ultima area activa no se puede retirar.** Registrar una Solicitud de Talento exige un
+  area, y la solicitud es el paso previo a cualquier vacante: sin ninguna activa, la empresa no
+  puede volver a contratar y no hay pantalla que lo explique.
+- ⚠️ **Un area es de una empresa y solo de una, y las claves ajenas no lo comprueban.** Solo
+  exigen que el area exista. Dar de alta a alguien (`crearUsuario`) o registrar una solicitud
+  (`ServicioSolicitudesImpl`) contra un area ajena daba un 201 y dejaba una fila **invisible para
+  todo lo que consulta por organizacion** —incluido el recuento que decide si un area se puede
+  borrar—. Las dos puertas lo comprueban ahora y responden «no existe».
+- ⚠️ **Los tres `flush()` de `borrarArea` NO son lo que salva el borrado**, y conviene saberlo
+  antes de apoyarse en ellos: se probo quitandolos y `FlujoAreasIT` siguio en verde, porque
+  Hibernate ya vuelca los UPDATE antes que los DELETE. Quien impide el error de clave ajena es
+  la guarda que rechaza el borrado mientras quede algo por mover. Se quedan por explicitud y
+  porque el margen es estrecho —un `@Modifying` en lote, o un insert en la mezcla (ahi Hibernate
+  SI inserta antes de actualizar), cambian el orden—, no como red.
+- **Los permisos se quedan como estaban a falta de una migracion.** Un `administrar_areas`
+  propio seria mas fino, pero el catalogo de permisos solo crece con una migracion y los
+  numeros estan repartidos a mano entre ramas. Escribir es `crear_usuarios_y_asignar_roles`,
+  que es con lo que ya se administra el resto de la estructura del equipo —usuarios, roles e
+  invitaciones—. Si algun dia se anade el permiso propio, el unico sitio a tocar es la seccion
+  de areas del controlador.
+- Auditoria en las cinco escrituras (`crear_area`, `renombrar_area`, `desactivar_area`,
+  `reactivar_area`, `borrar_area`). La del borrado lleva el nombre del area y los dos
+  recuentos porque **es lo unico que sobrevive**: despues del DELETE nada permite reconstruir
+  de donde venian esas solicitudes. Renombrar al mismo nombre, o apagar lo ya apagado, no
+  escriben nada.
+- El nombre repetido se rechaza antes de llegar al `UNIQUE (organizacion_id, nombre)` de la V2,
+  y la comprobacion es **sensible a mayusculas igual que la restriccion**: una `IgnoreCase`
+  seria mas estricta que la base y rechazaria nombres que si caben.
+- Pruebas, en dos capas. `AreasDeLaOrganizacionTest` (19 unitarias): con dobles no hay clave
+  ajena que reventar, asi que comprueban que el guardian corta antes (`never().delete(...)`),
+  que es lo que hace que nadie vea el error crudo. Y **`FlujoAreasIT` (10 casos, Postgres real)**
+  es la red de debajo: ademas del 409 con sus recuentos y del borrado con reasignacion de punta
+  a punta, **borra un area por SQL directo saltandose el servicio entero** y exige que la base se
+  niegue por las DOS claves ajenas. Ese caso es el que avisaria si algun dia alguien relaja esas
+  restricciones y el borrado deja solicitudes huerfanas.
 
 ### La prueba queda con nota en cuanto su rubrica esta entera (28/08/2026)
 
@@ -146,7 +314,7 @@ proposito, no trabajo olvidado:
 | Un **facilitador designado** para la simulacion | La persona que observa la sesion presencial y marca los eventos. El sistema ya sabe que *roles* pueden hacerlo, y es cambiable desde el panel sin desplegar |
 | La **matriz de informacion critica** de una sesion real | La lista de datos que no se le dan al candidato salvo que pregunte. La mecanica esta construida; el contenido lo escribe Renaser |
 | La **figura contractual** de la validacion productiva | El requisito dice literalmente «la figura contractual aprobada por Renaser». Hoy hay un placeholder: `CONTRATO_TEMPORAL_EN_REVISION` |
-| El **contenido real de una prueba del puesto** | Renaser tiene que reescribir una en formato de dos horas |
+| El **contenido real de una prueba del puesto** | Renaser tiene que reescribir una pensada para rendirse de una sentada — **y decidir cuantos minutos**, desde que el rango 60-120 se retiro (31/08/2026) |
 
 Otros placeholders puestos a proposito: los **umbrales de los grupos de prioridad (80 y 65)** son
 parametro editable y Renaser no los ha confirmado.
@@ -360,12 +528,12 @@ Las dos consultan el mismo backend, asi que ensenan el mismo orden.
 - Nada se recalcula hacia atras: cada nota queda atada a la version de pesos de su vacante.
 
 ### Correr los tests
-**770 unitarios en verde (28/08/2026).** Son dos tandas y el comando decide cual corre:
+**930 unitarios en verde (01/09/2026).** Son dos tandas y el comando decide cual corre:
 
 | Comando | Que corre | Cuantos | Necesita |
 |---|---|---:|---|
-| `./mvnw test` | unitarias con dobles y las de arquitectura | 770 | nada |
-| `./mvnw verify` | lo anterior mas las de integracion | 877 | Docker |
+| `./mvnw test` | unitarias con dobles y las de arquitectura | 930 | nada |
+| `./mvnw verify` | lo anterior mas las de integracion | 930 + 142 | Docker |
 
 Las de integracion levantan su propio PostgreSQL y su propio RabbitMQ con Testcontainers: hace
 falta el demonio de Docker encendido. El desglose completo esta en
@@ -386,6 +554,12 @@ RENASER_IA_REAL=si ./mvnw verify -Dit.test=CalificacionIaRealIT
 **Ruido esperado que NO es un fallo**: `Failed to check/redeclare auto-delete queue(s)` de
 RabbitMQ, y los cinco tests saltados de `CalificacionIaRealIT`. Si termina en `BUILD SUCCESS`,
 esta bien.
+
+⚠️ **Hay ademas UNA unitaria saltada a proposito, y no es ruido: es un defecto abierto.** El
+metodo `elCambioInesperadoCabeDentroDelReloj` de `RelojDeLaEtapaTecnicaQaTest` — la clase **no**
+esta saltada entera, sus otros dos casos pasan y son la red de los dos defectos hermanos que si
+se arreglaron. Cuando se decida que hacer se le quita el `@Disabled` y tiene que pasar. Ver
+[Defectos conocidos](docs/DEFECTOS-CONOCIDOS.md).
 
 ## El perfil del candidato (25/08/2026)
 Cada persona tiene **un perfil, unico y transversal a organizaciones**: cuelga de `persona`,
@@ -755,8 +929,11 @@ Todo vive en `docs/`. Empezar por [docs/README.md](docs/README.md).
   ultimas etapas y sus tres reglas automaticas de disponibilidad.
 - [CI/CD](docs/CI-CD.md) — que se comprueba solo en cada cambio, como se despliega a AWS y que
   variables de entorno pide el servidor. **Leerlo antes de tocar `.github/workflows/`.**
-- [Comprobaciones automaticas](docs/COMPROBACIONES-AUTOMATICAS.md) — las 877 pruebas y las nueve
+- [Comprobaciones automaticas](docs/COMPROBACIONES-AUTOMATICAS.md) — las 1072 pruebas y las nueve
   reglas de arquitectura, una por una. Que se mira solo y que no.
+- [Defectos conocidos](docs/DEFECTOS-CONOCIDOS.md) — **lo que esta roto, se sabe y sigue
+  abierto.** Que le pasa a una persona de verdad, por que pasa y que haria falta para
+  arreglarlo. **Mirarlo antes de invitar a una tanda de candidatos.**
 - `docs/diagramas/` — HTML autocontenidos, se abren en el navegador.
 - `docs/mockups/` — prototipos de pantalla. **Los mantiene otra persona, no editarlos.**
 - `docs/insumos/` — documentos originales del cliente y notas de analisis.
@@ -824,9 +1001,13 @@ no de formato. De mirarlas salio que los entregables sean una tabla y no un text
 pide de uno a cuatro, cada uno con su regla— y que `version_plantilla_prueba` tenga `modalidad`,
 que existe solo para poder cargarlas y adaptarlas.
 
-⚠️ **Una prueba cronometrada dura 60-120 minutos y lo que piden esas cinco no cabe ahi.** Un
-producto funcional mas un video no se hace en dos horas. Ponerles reloj obliga a **encoger el
-encargo**, y eso lo tiene que reescribir Renaser: sin eso el hito 3 no tiene contenido.
+⚠️ **Lo que piden esas cinco no cabe en una sesion con reloj.** Un producto funcional mas un
+video no se hace de una sentada. Ponerles reloj obliga a **encoger el encargo**, y eso lo tiene
+que reescribir Renaser: sin eso el hito 3 no tiene contenido.
+
+Esto decia «dura 60-120 minutos», y **ese rango se retiro el 31/08/2026** por decision de
+Renaser: manda el tiempo que ponga la empresa y solo queda un piso de 5 minutos. El bloqueo **no
+se movio** — ahora Renaser decide ademas cuantos minutos son.
 
 ## Sistema susceptible a cambios
 El cliente realiza cambios recurrentemente, ya sea en métricas, en datos, en permisos de roles, diseñar el sistema para que admita todo tipo de cambios inesperados, y que todo sea personalizable para el rol de dirección o admin. Que pueda ver y editar todo. 

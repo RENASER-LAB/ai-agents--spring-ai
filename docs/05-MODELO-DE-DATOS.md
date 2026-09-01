@@ -730,9 +730,16 @@ Sirven como modelo de contenido y de tono, no de formato.
 `modalidad` se queda para poder cargar esas cinco y adaptarlas dentro del sistema, no como una
 opción que se ofrezca en una vacante nueva.
 
-⚠️ **Ojo con el tamaño del encargo.** Una prueba cronometrada dura de 60 a 120 minutos, y esas
-cinco piden cosas que no caben ahí: un producto funcional más un video, o un documento de cinco
-páginas más un plano. Ponerles reloj obliga a **encoger el encargo**, no solo a cronometrarlo.
+⚠️ **Ojo con el tamaño del encargo.** Esas cinco piden cosas que no caben en una sesión con
+reloj: un producto funcional más un video, o un documento de cinco páginas más un plano. Ponerles
+reloj obliga a **encoger el encargo**, no solo a cronometrarlo, y eso lo tiene que reescribir
+Renaser.
+
+Antes esta advertencia se apoyaba en que el sistema imponía de 60 a 120 minutos. **Ese rango se
+retiró el 31/08/2026** —decisión de Renaser: manda el tiempo que ponga la empresa, y solo queda
+un piso de 5 minutos—, así que hoy nada impide publicar una prueba de cuatro horas. **La
+advertencia no se va con él**: el problema nunca fue el límite, es que un encargo de varios días
+no se convierte en una prueba con reloj alargando el reloj.
 
 **Los entregables son una tabla, no un texto.** Cada prueba real pide de uno a cuatro entregables
 distintos, cada uno con su regla: «video, máximo 5 minutos», «documento, máximo 1 página»,
@@ -748,6 +755,11 @@ entregar tarde**.
 minutos, y al empezar el intento se sortea uno concreto y una variante. Los dos quedan guardados
 en `intento_prueba`. Si el minuto fuera siempre el mismo, el segundo candidato ya sabría cuándo
 llega.
+
+⚠️ **Nada comprueba que ese rango quepa dentro de la prueba**, ni la base ni el código. Lo hacía
+cierto en la práctica el rango de 60 a 120 minutos que se exigía al publicar, y ese rango se
+retiró. Con pocos minutos el reloj cierra antes y el cambio no se revela nunca. Defecto abierto:
+[Defectos conocidos](DEFECTOS-CONOCIDOS.md).
 
 Las preguntas de la prueba eran antes 17 fijas para todos. Ahora hay un catálogo con tres tipos
 —las que se responden **antes** de producir, las **universales** y las **del puesto**— y cada
@@ -1013,11 +1025,21 @@ Datos que se cargan con la primera migración, no a mano:
 - Las **236 preguntas** del banco, como primera versión publicada del banco de la
   plataforma — desde la `V37` no hay filas «globales» sin dueño: compartir es leer las de
   la plataforma
-- Las **once plantillas de prueba**, con sus tiempos y sus variantes de cambio
 - Una **plantilla de evaluación** por nivel y familia
 - Una primera **versión de pesos** con 40 / 30 / 15 / 15
 - Una **política de conservación** con su valor por defecto
 - Los **parámetros** y las **plantillas de correo**
+
+⚠️ **Las plantillas de prueba NO están en esta lista, y aquí decía que sí.** Ninguna migración
+inserta una sola fila en `plantilla_prueba` ni en `version_plantilla_prueba`: una base recién
+creada arranca con las dos tablas **vacías**. Este documento se desmentía a sí mismo unas líneas
+más abajo —«falta fijar los nombres definitivos de los puestos antes de cargar los datos
+iniciales»— y la de abajo era la frase verdadera.
+
+Las pruebas que existen se han cargado **por la API, con los guiones de `scripts/`**, que crean
+la plantilla, su versión en borrador, las preguntas, los entregables y la rúbrica, y la publican.
+Es a propósito: el contenido de una prueba lo escribe Renaser y sembrar once cáscaras con sus
+nombres no habría dejado ninguna que se pueda rendir. Corregido el 01/09/2026.
 
 ---
 

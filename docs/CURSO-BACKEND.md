@@ -20,9 +20,10 @@ para comprobar nada. Por eso ahora apunta a `main`.
 **El censo es una foto del 25/08 y no se ha vuelto a tomar entera**, porque los números de
 línea de cada archivo que se citan más abajo son de ese día y recontar la cabecera sin
 recontarlos todos engañaría más que ayudar. Lo que ha cambiado desde entonces, para que nadie
-se lleve una sorpresa: las migraciones llegan a la **`V40`** y las tablas de selección son
-**102** —`invitacion` y `tarifa_modelo`, del multiempresa, más las que ya había—, y las pruebas
-son **877 en total**: 770 unitarias (las 645 de la tabla son de ese día) y 107 de integración.
+se lleve una sorpresa: las migraciones llegan a la **`V46`** —de la `V41` en adelante solo nace
+una tabla, `ficha_vacante`, así que el 102 de aquel día se quedó a un paso— y las pruebas son
+**1072 en total** (01/09/2026): 930 unitarias (las 645 de la tabla son del 25/08) y 142 de
+integración.
 El desglose al día está en [Comprobaciones automáticas](COMPROBACIONES-AUTOMATICAS.md).
 
 ⚠️ Los documentos de `docs/` describen el sistema completo (93 tablas, 77 permisos). El código
