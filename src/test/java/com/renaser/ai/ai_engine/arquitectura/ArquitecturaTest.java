@@ -326,6 +326,18 @@ class ArquitecturaTest {
             "ServicioDecisionImpl#decidir",
             "ServicioEvaluacionImpl#crearAlPostular",
             "ServicioEvaluacionImpl#pintar",
+            // Las tres de dentro de una lambda. Ninguna se habia mirado nunca: la regla
+            // reventaba antes de contarlas (ver sinEnvoltorioDeLambda), asi que llevaban
+            // desde que se escribieron sin que nadie las leyera. Las tres derivan de un
+            // padre ya validado, igual que las de arriba:
+            //  · el puesto de la vacante de una postulacion que ya paso por su guardian;
+            //  · la barrera critica, que ademas se filtra por la vacante de la postulacion
+            //    en la misma linea —es la comprobacion del dueno, escrita ahi mismo—;
+            //  · el archivo del CV de una postulacion de la persona cuyo borrado se esta
+            //    ejecutando, en un metodo que exige rol de plataforma.
+            "ServicioPerfilIntegralPanelImpl#lambda->PuestoRepository",
+            "ServicioDecisionImpl#lambda->BarreraCriticaRepository",
+            "ServicioBorradoDatosImpl#lambda->ArchivoRepository",
             // Qué instrumento rinde esta postulación en su etapa técnica (V43). La postulación
             // ya salió de `laVisible`, que resolvió alcance y organización; su vacante es por
             // fuerza de esa misma empresa, y solo se le pregunta una cosa: si es la prueba del
@@ -425,9 +437,17 @@ class ArquitecturaTest {
                                             llamada.getTargetOwner().getName())) {
                                 continue;
                             }
-                            String donde = clase.getSimpleName() + "#"
-                                    + sinEnvoltorioDeLambda(llamada.getOrigin().getName());
-                            if (LLAMADAS_SIN_DUENO_ACORDADAS.contains(donde)) {
+                            String origen = sinEnvoltorioDeLambda(llamada.getOrigin().getName());
+                            String donde = clase.getSimpleName() + "#" + origen;
+                            // Cuando la lambda llega sin nombre de metodo no hay con que
+                            // firmar el acuerdo por metodo: el numero de la lambda baila con
+                            // cualquier edicion de la clase. Se firma por el repositorio al
+                            // que llama, que no baila y sigue diciendo cual es la llamada.
+                            String firma = origen.startsWith("lambda$")
+                                    ? clase.getSimpleName() + "#lambda->"
+                                            + llamada.getTargetOwner().getSimpleName()
+                                    : donde;
+                            if (LLAMADAS_SIN_DUENO_ACORDADAS.contains(firma)) {
                                 continue;
                             }
                             eventos.add(SimpleConditionEvent.violated(clase, donde
@@ -444,10 +464,20 @@ class ArquitecturaTest {
         regla.check(codigo);
     }
 
-    /** Una llamada dentro de una lambda llega como {@code lambda$metodo$0}: se firma con el método. */
+    /**
+     * Una llamada dentro de una lambda llega como {@code lambda$metodo$0}: se firma con el
+     * metodo.
+     *
+     * <p>No todas traen metodo. Segun quien compile, una lambda puede llegar como
+     * {@code lambda$0} a secas —sin nada entre los dos {@code $}, porque no hay dos—, y
+     * recortar a ciegas reventaba con un {@code StringIndexOutOfBounds} que tumbaba la regla
+     * entera: en vez de contar las llamadas sospechosas, el test moria antes de mirar
+     * ninguna. Sin nombre de metodo que sacar, se devuelve el origen tal cual.
+     */
     private static String sinEnvoltorioDeLambda(String nombreDeOrigen) {
-        if (nombreDeOrigen.startsWith("lambda$")) {
-            return nombreDeOrigen.substring("lambda$".length(), nombreDeOrigen.lastIndexOf('$'));
+        int ultimo = nombreDeOrigen.lastIndexOf('$');
+        if (nombreDeOrigen.startsWith("lambda$") && ultimo > "lambda$".length()) {
+            return nombreDeOrigen.substring("lambda$".length(), ultimo);
         }
         return nombreDeOrigen;
     }

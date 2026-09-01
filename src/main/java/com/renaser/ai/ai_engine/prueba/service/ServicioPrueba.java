@@ -18,6 +18,11 @@ public interface ServicioPrueba {
     /**
      * Le crea el intento al candidato que entra en su turno de la prueba.
      *
+     * <p>Si ya tiene uno —retroceder la postulación y volver a avanzarla pasa en el panel—
+     * se reutiliza en vez de intentar crear otro, que la clave única de la tabla rechaza.
+     * Al que todavía no ha abierto su prueba se le pone la versión que la vacante rinde hoy;
+     * al que ya la abrió no se le toca, porque su versión quedó fijada al empezar (RF-90).
+     *
      * @param cierraEn cuándo cierra la prueba de su vacante, o {@code null} para contar los
      *                 días de la plantilla desde que empiece (V32)
      */
