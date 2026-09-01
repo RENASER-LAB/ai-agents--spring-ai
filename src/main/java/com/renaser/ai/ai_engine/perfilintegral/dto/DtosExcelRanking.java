@@ -3,7 +3,9 @@ package com.renaser.ai.ai_engine.perfilintegral.dto;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
 
+import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Lo que se pide y lo que se lleva quien quiere el ranking en una hoja de cálculo.
@@ -32,6 +34,36 @@ public final class DtosExcelRanking {
             @NotEmpty List<Long> postulacionIds,
             String filtroDescrito) {}
 
-    /** El archivo y cómo se llama. El nombre lleva la fecha, porque estas hojas se guardan. */
-    public record ExcelDeRanking(String nombreArchivo, byte[] contenido) {}
+    /**
+     * El archivo y cómo se llama. El nombre lleva la fecha, porque estas hojas se guardan.
+     *
+     * <p>Los tres métodos van escritos a mano y no son ceremonia: un {@code record} con un
+     * array dentro compara la REFERENCIA del array, así que dos volcados idénticos saldrían
+     * distintos y el mismo volcado guardado dos veces saldría igual solo por casualidad.
+     * Nadie los compara hoy; la trampa se desarma antes de que alguien lo haga.
+     *
+     * <p>{@code toString} dice el nombre y cuánto pesa, y <b>nunca el contenido</b>: son
+     * decenas de miles de bytes binarios, y un registro que los vuelque no se puede leer.
+     */
+    public record ExcelDeRanking(String nombreArchivo, byte[] contenido) {
+
+        @Override
+        public boolean equals(Object otro) {
+            return otro instanceof ExcelDeRanking o
+                    && Objects.equals(nombreArchivo, o.nombreArchivo)
+                    && Arrays.equals(contenido, o.contenido);
+        }
+
+        @Override
+        public int hashCode() {
+            return 31 * Objects.hashCode(nombreArchivo) + Arrays.hashCode(contenido);
+        }
+
+        @Override
+        public String toString() {
+            return "ExcelDeRanking[nombreArchivo=" + nombreArchivo
+                    + ", contenido=" + (contenido == null ? "ausente" : contenido.length + " bytes")
+                    + "]";
+        }
+    }
 }
