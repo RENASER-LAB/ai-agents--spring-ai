@@ -59,7 +59,10 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
      *
      * <p>Es el único que sí depende de los demás: arma el Perfil de Talento con lo que ellos
      * dejaron. Es el mismo en las dos pasadas y tiene que seguir siéndolo, porque además es
-     * quien mueve la postulación a {@code PERFIL_POR_CONFIRMAR}.
+     * quien mueve la postulación a {@code PERFIL_POR_CONFIRMAR} <b>si al terminar sigue en el
+     * Perfil Integral</b>: a quien ya avanzaron desde el panel mientras esto calificaba no se
+     * le mueve, y el trabajo se da por terminado igual — la tanda se mide por las filas de
+     * {@code trabajo_ia}, nunca por el estado de la postulación.
      */
     private static final String ULTIMO = AgentePotencialRiesgo.CODIGO_AGENTE;
 
