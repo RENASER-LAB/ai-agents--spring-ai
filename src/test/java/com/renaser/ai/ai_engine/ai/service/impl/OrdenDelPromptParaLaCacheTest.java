@@ -173,12 +173,23 @@ class OrdenDelPromptParaLaCacheTest {
         verify(ejecuciones).save(captor.capture());
 
         String envio = captor.getValue().getEnvio();
-        assertThat(envio).startsWith("=== INSTRUCCIÓN ===");
-        assertThat(envio.indexOf("=== DATOS ==="))
+        /*
+         * ⚠️ Los rótulos llevan una marca sorteada, y por eso aquí se buscan por patrón.
+         *
+         * Es de la bitácora, no del prompt: al modelo se le mandan `sistema` y `contenido`
+         * por separado y esta cadena no viaja nunca, así que **la caché de DeepSeek no se
+         * entera** — que es justo lo que esta clase cuida. La marca está para que un texto
+         * de usuario que acabe dentro no pueda escribir su propia sección «INSTRUCCIÓN» y
+         * dejar el registro sin forma de leerse.
+         *
+         * Lo que se comprueba sigue siendo lo mismo: el orden.
+         */
+        assertThat(envio).containsPattern("^=== INSTRUCCIÓN · [a-z0-9]+ ===");
+        assertThat(envio.indexOf("=== DATOS · "))
                 .as("los datos del candidato van después de la instrucción")
-                .isGreaterThan(envio.indexOf("=== INSTRUCCIÓN ==="));
+                .isGreaterThan(envio.indexOf("=== INSTRUCCIÓN · "));
         assertThat(envio.indexOf("Ana Perez"))
                 .as("el currículum aparece solo en la parte de datos")
-                .isGreaterThan(envio.indexOf("=== DATOS ==="));
+                .isGreaterThan(envio.indexOf("=== DATOS · "));
     }
 }

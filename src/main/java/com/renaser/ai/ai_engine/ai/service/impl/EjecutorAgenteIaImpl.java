@@ -12,6 +12,9 @@ import com.renaser.ai.ai_engine.ai.service.ClienteModelo;
 import com.renaser.ai.ai_engine.ai.service.EjecutorAgenteIa;
 
 import lombok.RequiredArgsConstructor;
+
+import java.math.BigInteger;
+import java.security.SecureRandom;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.json.JsonMapper;
@@ -23,6 +26,9 @@ import java.time.Instant;
 @RequiredArgsConstructor
 @Slf4j
 public class EjecutorAgenteIaImpl implements EjecutorAgenteIa {
+
+    /** Sortea la marca de los rótulos de la bitácora. Ver dónde se usa. */
+    private static final SecureRandom AZAR = new SecureRandom();
 
     private final AgenteRepository agentes;
     private final InstruccionIaRepository instrucciones;
@@ -53,7 +59,22 @@ public class EjecutorAgenteIaImpl implements EjecutorAgenteIa {
 
         String sistema = instruccion.getTexto() + "\n\n" + formato;
         String contenido = json.writeValueAsString(insumo);
-        String envio = "=== INSTRUCCIÓN ===\n" + sistema + "\n\n=== DATOS ===\n" + contenido;
+        /*
+         * ⚠️ Los rótulos llevan una marca sorteada, y no es adorno.
+         *
+         * Esta cadena es la bitácora: es lo que se abre meses después para saber con qué se
+         * calificó a alguien. Con rótulos fijos, cualquier texto de usuario que llegue al
+         * `sistema` o a los datos —la guía de calificación de una prueba, una respuesta del
+         * candidato— puede escribir «=== INSTRUCCIÓN ===» dentro y dejar el registro con
+         * secciones que nadie puso, sin forma de saber cuál es la de verdad. Con la marca,
+         * las de verdad son las tres que la llevan, y lo demás es contenido.
+         *
+         * No protege al modelo —estos rótulos nunca se le mandan: van en `envio`, no en
+         * `sistema` ni en `contenido`—; protege a quien lee el registro.
+         */
+        String marca = new BigInteger(40, AZAR).toString(36);
+        String envio = "=== INSTRUCCIÓN · " + marca + " ===\n" + sistema
+                + "\n\n=== DATOS · " + marca + " ===\n" + contenido;
 
         long empezo = System.nanoTime();
         RespuestaModelo respuesta = null;
