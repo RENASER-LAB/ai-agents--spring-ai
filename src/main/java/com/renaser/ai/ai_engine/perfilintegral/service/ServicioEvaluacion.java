@@ -31,9 +31,12 @@ public interface ServicioEvaluacion {
      * <p>Se crea al ENTRAR en la etapa —no al postular— porque hasta que el equipo no lo
      * avanza no hay nada que rendir, igual que el intento de la prueba del puesto. Sin
      * plantilla y contra el cuestionario publicado de esa vacante.
+     *
+     * <p>⚠️ <b>No recibe los minutos y no es un olvido.</b> Los recibía, y los congelaba en
+     * la fila. Se preguntan ahora al empezar el examen, para que corregirlos en la vacante
+     * alcance a todo el que aún no lo haya abierto — la misma regla que la prueba del puesto.
      */
-    Long crearTecnicaAlEntrar(Long organizacionId, Long usuarioId, Long vacanteId,
-                              Integer minutosDeLaVacante);
+    Long crearTecnicaAlEntrar(Long organizacionId, Long usuarioId, Long vacanteId);
 
     EvaluacionCandidato ver(ContextoUsuario quien, UUID uuidPostulacion);
 

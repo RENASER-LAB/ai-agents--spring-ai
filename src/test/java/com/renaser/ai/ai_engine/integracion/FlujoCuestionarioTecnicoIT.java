@@ -192,12 +192,18 @@ public class FlujoCuestionarioTecnicoIT {
         assertThat(jdbc.queryForObject("select count(*) from intento_prueba where postulacion_id = ?",
                 Integer.class, postulacionId)).isZero();
 
-        // Sin plantilla, y con los minutos que dijo la vacante.
+        // Sin plantilla, y ⚠️ SIN minutos congelados.
+        //
+        // Aquí se guardaban los 45 de la vacante, y esa fila era el reloj. Ya no: el examen
+        // se los pregunta a su vacante cuando el candidato lo abre. La diferencia no es de
+        // estilo — mientras esta columna mandara, corregir los minutos entre este avance y esa
+        // apertura se guardaba, se auditaba y no le llegaba a nadie que ya estuviera avanzado.
+        // El siguiente test lo cambia de verdad y comprueba que sí le llega.
         assertThat(jdbc.queryForMap("select plantilla_evaluacion_id, proposito, minutos_objetivo "
                 + "from evaluacion where id = " + tecnica))
                 .containsEntry("plantilla_evaluacion_id", null)
                 .containsEntry("proposito", "CUESTIONARIO_TECNICO")
-                .containsEntry("minutos_objetivo", 45);
+                .containsEntry("minutos_objetivo", null);
     }
 
     @Test
@@ -208,6 +214,19 @@ public class FlujoCuestionarioTecnicoIT {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.estado").value("PENDIENTE"))
                 .andExpect(jsonPath("$.total").value(0));
+
+        // ⚠️ El equipo corrige los minutos DESPUÉS de haberlo avanzado y ANTES de que él
+        // abra nada: 45 se quedan en 20. El panel lo acepta porque nadie de esta vacante ha
+        // empezado todavía —esa es la línea de la guarda—, y lo que se comprueba abajo es que
+        // la promesa se cumple: a este candidato, que ya tiene su examen creado, le llega.
+        conToken(post("/api/v1/panel/vacantes/" + vacanteId + "/instrumento-tecnico"), tokenEquipo,
+                "{\"instrumento\": \"CUESTIONARIO_TECNICO\", \"minutos\": 20}")
+                .andExpect(status().isOk());
+        // Y su fila sigue sin minutos: no hay ningún sitio donde se haya vuelto a congelar.
+        assertThat(jdbc.queryForObject("""
+                select minutos_objetivo from evaluacion
+                 where id = (select evaluacion_tecnica_id from postulacion where id = ?)""",
+                Integer.class, postulacionId)).isNull();
 
         String cuerpo = mvc.perform(post("/api/v1/portal/cuestionario-tecnico/"
                         + codigoPostulacion + "/inicio")
@@ -225,11 +244,17 @@ public class FlujoCuestionarioTecnicoIT {
         assertThat(cuerpo).doesNotContain("c3Esperado", "c4Esperado", "senalDeCero",
                 "número de sedes", "No da ninguna cifra");
 
-        // El reloj arrancó al empezar, no al crearse: 45 minutos desde ahora.
+        // El reloj arrancó al empezar, no al crearse — y son los 20 minutos de AHORA, no los
+        // 45 con los que se le creó el examen. Acotado por los dos lados: con solo el tope de
+        // arriba, los 45 viejos también habrían pasado.
         assertThat(jdbc.queryForObject("""
-                select vence_en < now() + interval '46 minutes'
+                select vence_en between now() + interval '19 minutes'
+                                     and now() + interval '21 minutes'
                   from evaluacion where id = (select evaluacion_tecnica_id from postulacion where id = ?)""",
                 Boolean.class, postulacionId)).isTrue();
+        // Y la pantalla enseña el mismo número que aplica el servidor: si dijera 45 mientras
+        // el examen cierra a los 20, sería la misma contradicción mirando al revés.
+        assertThat(visto.get("minutosObjetivo").asInt()).isEqualTo(20);
     }
 
     @Test

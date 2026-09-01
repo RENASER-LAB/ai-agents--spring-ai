@@ -192,9 +192,11 @@ public class ServicioPostulacionesPanelImpl implements ServicioPostulacionesPane
                 // impide con una clave única; aquí la columna admite cualquier id, así que la
                 // regla la pone este `if`.
                 if (p.getEvaluacionTecnicaId() == null) {
+                    // Sin los minutos: los pregunta el examen a su vacante cuando el
+                    // candidato lo abre, no ahora. Así, corregirlos entre este avance y esa
+                    // apertura sigue alcanzándole.
                     p.setEvaluacionTecnicaId(evaluaciones.crearTecnicaAlEntrar(
-                            quien.organizacionId(), p.getUsuarioId(), vacante.getId(),
-                            vacante.getMinutosEtapaTecnica()));
+                            quien.organizacionId(), p.getUsuarioId(), vacante.getId()));
                     postulaciones.save(p);
                 }
             } else {

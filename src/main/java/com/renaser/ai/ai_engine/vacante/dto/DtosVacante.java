@@ -2,7 +2,7 @@ package com.renaser.ai.ai_engine.vacante.dto;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.Min;
 
 import java.time.Instant;
 
@@ -70,10 +70,15 @@ public final class DtosVacante {
      * <p>`minutos` vacío = los del instrumento elegido, que es lo que hacían todas las
      * vacantes antes de que esto existiera. El valor exacto lo valida el servicio, que es
      * quien conoce los dos instrumentos.
+     *
+     * <p>⚠️ <b>El suelo es de cinco minutos, no de uno.</b> Estos minutos convierten
+     * cualquier prueba en cronometrada, así que un uno aquí es una prueba que el barrido
+     * entrega sola sesenta segundos después de que el candidato la abra. Es el mismo suelo
+     * que exige publicar una versión de plantilla.
      */
     public record ElegirInstrumentoTecnico(
             @NotBlank String instrumento,
-            @Positive(message = "los minutos de la etapa técnica son más de cero")
+            @Min(value = 5, message = "la etapa técnica dura al menos 5 minutos")
             Integer minutos) {}
 
     // Encender o apagar la evaluación del banco para esta vacante. Apagada, quien postula
