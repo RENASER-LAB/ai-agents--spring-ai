@@ -18,7 +18,7 @@ import java.util.regex.Pattern;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Que la semilla de ubigeo de la V46 siga siendo el mapa del Perú y no una lista cualquiera.
+ * Que la semilla de ubigeo siga siendo el mapa del Perú y no una lista cualquiera.
  *
  * <p><b>Por qué hace falta una prueba para 222 filas escritas a mano.</b> Nadie revisa 196
  * provincias leyéndolas. Cuando alguien añada, corrija o mueva una —y va a pasar: los
@@ -40,8 +40,29 @@ import static org.assertj.core.api.Assertions.assertThat;
 @DisplayName("La semilla de ubigeo sigue siendo el mapa del Perú")
 class UbigeoSemillaTest {
 
-    private static final Path V46 = Path.of(
-            "src/main/resources/db/migration/V46__la_ciudad_del_candidato.sql");
+    /**
+     * La migración de la ciudad, buscada por su NOMBRE y no por su número.
+     *
+     * <p>Estaba fijada a «V46» y se rompió el día que otra rama llegó antes con ese número y
+     * esta tuvo que renumerar. El número de una migración depende de quién mergee primero;
+     * el nombre, no.
+     */
+    private static final Path MIGRACION = migracionDeLaCiudad();
+
+    private static Path migracionDeLaCiudad() {
+        Path carpeta = Path.of("src/main/resources/db/migration");
+        try (var archivos = Files.list(carpeta)) {
+            return archivos
+                    .filter(f -> f.getFileName().toString().endsWith("__la_ciudad_del_candidato.sql"))
+                    .findFirst()
+                    .orElseThrow(() -> new AssertionError(
+                            "No hay ninguna migración «__la_ciudad_del_candidato.sql» en " + carpeta
+                                    + ". Si se renombró, este test hay que actualizarlo; si se "
+                                    + "borró, la semilla de ubigeo ya no existe."));
+        } catch (IOException e) {
+            throw new AssertionError("No se pudo listar " + carpeta.toAbsolutePath(), e);
+        }
+    }
 
     /** Fuera del Perú: nivel 1 y sin padre, pero no es un departamento. */
     private static final String EXTRANJERO = "EXT";
@@ -202,7 +223,7 @@ class UbigeoSemillaTest {
     // ========================================================================
 
     /**
-     * Las filas de ubigeo que siembra la V46.
+     * Las filas de ubigeo que siembra la migración de la ciudad.
      *
      * <p>Comprueba que encontró algo antes de devolverlo: si la migración se renombra o el
      * formato del insert cambia, un parser mudo dejaría todas las pruebas de arriba en verde
@@ -211,9 +232,9 @@ class UbigeoSemillaTest {
     private List<Lugar> leerla() {
         String sql;
         try {
-            sql = Files.readString(V46, StandardCharsets.UTF_8);
+            sql = Files.readString(MIGRACION, StandardCharsets.UTF_8);
         } catch (IOException e) {
-            throw new AssertionError("No se pudo leer " + V46.toAbsolutePath()
+            throw new AssertionError("No se pudo leer " + MIGRACION.toAbsolutePath()
                     + ". Si la migración se renombró, esta prueba se queda sin nada que "
                     + "comprobar y pasaría en verde mirando el vacío", e);
         }
@@ -226,7 +247,7 @@ class UbigeoSemillaTest {
         }
 
         assertThat(lugares)
-                .as("El parser no reconoció ninguna fila en " + V46 + ": o cambió el formato "
+                .as("El parser no reconoció ninguna fila en " + MIGRACION + ": o cambió el formato "
                         + "del insert, o la semilla ya no está ahí")
                 .hasSize(DEPARTAMENTOS + 1 + PROVINCIAS);
         return lugares;
