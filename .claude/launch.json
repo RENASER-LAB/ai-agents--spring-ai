@@ -2,10 +2,10 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "ai-engine-local",
+      "name": "backend-prueba-local",
       "runtimeExecutable": "./mvnw",
-      "runtimeArgs": ["spring-boot:test-run"],
-      "port": 8081
+      "runtimeArgs": ["spring-boot:test-run", "-Dspring-boot.run.profiles=local", "-Dspring-boot.run.jvmArguments=-Dserver.port=8082"],
+      "port": 8082
     }
   ]
 }

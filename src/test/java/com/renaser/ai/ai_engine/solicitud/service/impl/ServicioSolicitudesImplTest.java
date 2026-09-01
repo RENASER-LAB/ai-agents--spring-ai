@@ -1,6 +1,8 @@
 package com.renaser.ai.ai_engine.solicitud.service.impl;
 
 import com.renaser.ai.ai_engine.auditoria.service.ServicioAuditoria;
+import com.renaser.ai.ai_engine.organizacion.entity.Area;
+import com.renaser.ai.ai_engine.organizacion.repository.AreaRepository;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
 import com.renaser.ai.ai_engine.seguridad.service.Permisos;
 import com.renaser.ai.ai_engine.solicitud.dto.DtosSolicitud.CrearSolicitud;
@@ -35,12 +37,14 @@ class ServicioSolicitudesImplTest {
 
     private static final long ORGANIZACION = 1L;
     private static final long PUESTO = 7L;
+    private static final long AREA = 2L;
     private static final ContextoUsuario QUIEN = new ContextoUsuario(
             12L, 3L, ORGANIZACION, "EQUIPO", List.of(2L), Map.of());
 
     @Mock private SolicitudTalentoRepository solicitudes;
     @Mock private ResultadoEsperadoRepository resultados;
     @Mock private PuestoRepository puestos;
+    @Mock private AreaRepository areas;
     @Mock private ServicioAuditoria auditoria;
     @Mock private Permisos permisos;
 
@@ -48,7 +52,8 @@ class ServicioSolicitudesImplTest {
 
     @BeforeEach
     void preparar() {
-        servicio = new ServicioSolicitudesImpl(solicitudes, resultados, puestos, auditoria, permisos);
+        servicio = new ServicioSolicitudesImpl(
+                solicitudes, resultados, puestos, areas, auditoria, permisos);
     }
 
     @Test
@@ -56,6 +61,11 @@ class ServicioSolicitudesImplTest {
     void derivaLaClasificacionDelPuesto() {
         when(puestos.findByIdAndOrganizacionId(PUESTO, ORGANIZACION))
                 .thenReturn(Optional.of(puesto(true)));
+        // El área también se comprueba contra la organización: la clave ajena solo exige que
+        // exista, y sin este filtro una solicitud podía nacer colgada del área de otra empresa.
+        when(areas.findByIdAndOrganizacionId(AREA, ORGANIZACION))
+                .thenReturn(Optional.of(Area.builder().id(AREA).organizacionId(ORGANIZACION)
+                        .nombre("Operaciones").esActiva(true).build()));
         when(solicitudes.save(any())).thenAnswer(invocacion -> {
             SolicitudTalento solicitud = invocacion.getArgument(0);
             solicitud.setId(41L);
@@ -107,7 +117,7 @@ class ServicioSolicitudesImplTest {
 
     private CrearSolicitud solicitud(String nivel, String familia) {
         return new CrearSolicitud(
-                2L, PUESTO, "NORMAL", nivel, familia,
+                AREA, PUESTO, "NORMAL", nivel, familia,
                 "Coordinar la sede", "Crecimiento", "Se frena la operación", null,
                 "La carga no se puede redistribuir", null, null, null, null, null, 12L,
                 List.of(

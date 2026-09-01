@@ -167,11 +167,36 @@ public class AdministracionController {
         invitaciones.revocar(permisos.actual(), id);
     }
 
+    // ---------- Áreas ----------
+    //
+    // Dos permisos y no uno, a propósito. LEER las activas es `ver_solicitudes` porque esa
+    // lista es un insumo del día a día: quien registra una solicitud tiene que elegir un área,
+    // y pedirle para eso el permiso de administrar dejaría el formulario sin desplegable.
+    // ESCRIBIR —y ver también las retiradas— es `crear_usuarios_y_asignar_roles`, que es el
+    // permiso con el que ya se administra la estructura de la organización: el equipo, sus
+    // roles y sus invitaciones. Un área es esa misma estructura.
+    //
+    // Un permiso propio (`administrar_areas`) sería más fino, pero el catálogo de permisos
+    // solo crece con una migración y los números de migración están repartidos a mano entre
+    // varias ramas. Si algún día se añade, el sitio a cambiar es esta sección y nada más.
+
     @GetMapping("/areas")
     @PreAuthorize("@permisos.tiene('ver_solicitudes')")
     @Operation(summary = "Las áreas activas: hace falta una para registrar una solicitud")
     public List<AreaPanel> areas() {
         return servicio.areas(permisos.actual());
+    }
+
+    // Ruta aparte y no un `?incluirInactivas=true` sobre la de arriba: así el contrato de
+    // `GET /areas` no puede cambiar por descuido —una inactiva colada en el desplegable de la
+    // solicitud es una solicitud nueva colgada de un área cerrada— y cada lista lleva el
+    // permiso que le toca sin condicionarlo al valor de un parámetro.
+    @GetMapping("/areas/todas")
+    @PreAuthorize("@permisos.tiene('crear_usuarios_y_asignar_roles')")
+    @Operation(summary = "Todas las áreas, activas y desactivadas. Es la única forma de volver "
+            + "a encender una: la lista normal filtra por activas")
+    public List<AreaPanel> todasLasAreas() {
+        return servicio.todasLasAreas(permisos.actual());
     }
 
     @PostMapping("/areas")
@@ -180,6 +205,50 @@ public class AdministracionController {
     @Operation(summary = "Crear un área (estructura de la organización: la administra el Administrador)")
     public Map<String, Long> crearArea(@Valid @RequestBody CrearArea datos) {
         return Map.of("id", servicio.crearArea(permisos.actual(), datos.nombre()));
+    }
+
+    @PutMapping("/areas/{id}")
+    @PreAuthorize("@permisos.tiene('crear_usuarios_y_asignar_roles')")
+    @Operation(summary = "Cambiarle el nombre a un área. Lo que cuelga de ella no se toca")
+    public void renombrarArea(@PathVariable Long id, @Valid @RequestBody RenombrarArea datos) {
+        servicio.renombrarArea(permisos.actual(), id, datos.nombre());
+    }
+
+    // Desactivar y reactivar son dos rutas y no un PUT con un booleano: cada una dice en su
+    // nombre qué pasa, y la de apagar es la que hay que poder buscar en un registro de acceso.
+    @PostMapping("/areas/{id}/desactivacion")
+    @PreAuthorize("@permisos.tiene('crear_usuarios_y_asignar_roles')")
+    @Operation(summary = "Retirar el área de la lista sin borrar nada. Deja de ofrecerse para "
+            + "solicitudes nuevas; lo que ya colgaba de ella sigue igual")
+    public void desactivarArea(@PathVariable Long id) {
+        servicio.desactivarArea(permisos.actual(), id);
+    }
+
+    @PostMapping("/areas/{id}/reactivacion")
+    @PreAuthorize("@permisos.tiene('crear_usuarios_y_asignar_roles')")
+    @Operation(summary = "Volver a ofrecer un área que estaba retirada")
+    public void reactivarArea(@PathVariable Long id) {
+        servicio.reactivarArea(permisos.actual(), id);
+    }
+
+    @GetMapping("/areas/{id}/impacto")
+    @PreAuthorize("@permisos.tiene('crear_usuarios_y_asignar_roles')")
+    @Operation(summary = "Qué se lleva por delante borrar esta área: cuántas solicitudes y "
+            + "cuántas personas habría que mover. Se pregunta ANTES de confirmar")
+    public ImpactoDeBorrarArea impactoDeBorrarArea(@PathVariable Long id) {
+        return servicio.impactoDeBorrar(permisos.actual(), id);
+    }
+
+    // POST y no DELETE por lo mismo que la revocación de un permiso: el motivo —y aquí también
+    // el área de destino— van en el cuerpo, y hay proxies y clientes que descartan el cuerpo de
+    // un DELETE. Ahí el destino llegaría vacío y esto contestaría que no se puede borrar algo
+    // que sí se podía.
+    @PostMapping("/areas/{id}/borrado")
+    @PreAuthorize("@permisos.tiene('crear_usuarios_y_asignar_roles')")
+    @Operation(summary = "Borrar el área de verdad, moviendo a otra las solicitudes y las "
+            + "personas que apuntaban a ella. Sin área de destino solo se admite si está vacía")
+    public void borrarArea(@PathVariable Long id, @Valid @RequestBody BorrarArea datos) {
+        servicio.borrarArea(permisos.actual(), id, datos);
     }
 
     @GetMapping("/roles")

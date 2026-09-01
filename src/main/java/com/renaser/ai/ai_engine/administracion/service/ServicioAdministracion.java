@@ -54,7 +54,32 @@ public interface ServicioAdministracion {
 
     // Las áreas reflejan la estructura de Renaser. Sin un área no se puede registrar
     // una Solicitud de Talento.
+
+    /** Las activas: es la lista que alimenta el desplegable de la solicitud. */
     List<AreaPanel> areas(ContextoUsuario quien);
 
+    /**
+     * Todas, incluidas las retiradas.
+     *
+     * <p>Va aparte de {@link #areas} y no como un parámetro de la misma porque las dos listas
+     * responden preguntas distintas y tienen permisos distintos: elegir área para una
+     * solicitud es del día a día, y ver el cementerio para reactivar algo es administrar la
+     * estructura de la empresa.
+     */
+    List<AreaPanel> todasLasAreas(ContextoUsuario quien);
+
     Long crearArea(ContextoUsuario quien, String nombre);
+
+    void renombrarArea(ContextoUsuario quien, Long areaId, String nombre);
+
+    /** Retirarla de la lista sin perder nada de lo que cuelga de ella. Se puede deshacer. */
+    void desactivarArea(ContextoUsuario quien, Long areaId);
+
+    void reactivarArea(ContextoUsuario quien, Long areaId);
+
+    /** Cuántas solicitudes y cuántas personas hay que mover para poder borrarla. */
+    ImpactoDeBorrarArea impactoDeBorrar(ContextoUsuario quien, Long areaId);
+
+    /** Borrado definitivo, reasignando antes lo que colgaba del área. */
+    void borrarArea(ContextoUsuario quien, Long areaId, BorrarArea datos);
 }

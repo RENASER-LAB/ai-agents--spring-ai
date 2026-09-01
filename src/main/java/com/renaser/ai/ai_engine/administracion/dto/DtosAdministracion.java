@@ -85,4 +85,34 @@ public final class DtosAdministracion {
     public record CrearArea(@NotBlank String nombre) {}
 
     public record AreaPanel(Long id, String nombre, boolean esActiva) {}
+
+    /** Cambiarle el nombre a un área. El resto del área —quién cuelga de ella— no se toca. */
+    public record RenombrarArea(@NotBlank String nombre) {}
+
+    /**
+     * Lo que se lleva por delante borrar un área, contado ANTES de borrarla.
+     *
+     * <p>Existe para que quien borra vea el precio antes de pagarlo: el panel lo pide al abrir
+     * la confirmación y escribe «se moverán N solicitudes y M personas» con los números de
+     * verdad. Sin esto la única forma de enterarse sería intentarlo y leer el rechazo.
+     *
+     * @param solicitudes las Solicitudes de Talento que apuntan al área (columna NOT NULL)
+     * @param usuarios    las cuentas del equipo que la tienen puesta
+     */
+    public record ImpactoDeBorrarArea(Long areaId, String nombre, long solicitudes, long usuarios) {}
+
+    /**
+     * Borrar un área de verdad, moviendo antes lo que colgaba de ella.
+     *
+     * <p>⚠️ {@code areaDestinoId} no es un adorno: las dos claves ajenas que apuntan a
+     * {@code area(id)} —{@code solicitud_talento.area_id} y {@code usuario.area_id}— están sin
+     * {@code ON DELETE}, así que Postgres aplica NO ACTION y el borrado falla mientras quede
+     * una fila. Se pide a dónde se mueve todo en vez de decidirlo aquí: una solicitud sin área
+     * no existe, y elegir el área por quien borra sería inventarle una estructura a la empresa.
+     *
+     * <p>Puede venir vacío, y entonces solo se admite si el área está vacía. Ese es el caso
+     * normal de un área creada por error.
+     */
+    public record BorrarArea(Long areaDestinoId,
+            @NotBlank(message = "Borrar un área exige un motivo escrito") String motivo) {}
 }

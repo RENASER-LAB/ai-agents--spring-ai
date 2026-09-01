@@ -14,6 +14,8 @@ import com.renaser.ai.ai_engine.usuario.entity.*;
 import com.renaser.ai.ai_engine.usuario.repository.*;
 import com.renaser.ai.ai_engine.organizacion.entity.*;
 import com.renaser.ai.ai_engine.organizacion.repository.*;
+import com.renaser.ai.ai_engine.solicitud.entity.SolicitudTalento;
+import com.renaser.ai.ai_engine.solicitud.repository.SolicitudTalentoRepository;
 import com.renaser.ai.ai_engine.administracion.service.ServicioAdministracion;
 import com.renaser.ai.ai_engine.administracion.dto.DtosAdministracion.*;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
@@ -39,6 +41,7 @@ public class ServicioAdministracionImpl implements ServicioAdministracion {
     private static final String CAMPO_CODIGO = "código";
     private static final String CAMPO_PERMISO = "permiso";
     private static final String CAMPO_ALCANCE = "alcance";
+    private static final String CAMPO_NOMBRE = "nombre";
 
     private final ParametroRepository parametros;
     private final PlantillaCorreoRepository plantillas;
@@ -47,6 +50,9 @@ public class ServicioAdministracionImpl implements ServicioAdministracion {
     private final UsuarioRepository usuarios;
     private final OrganizacionRepository organizaciones;
     private final AreaRepository areas;
+    // Las solicitudes solo se tocan para una cosa: reasignarlas cuando su área se borra.
+    // No se lee ninguna otra, y por eso no hay aquí nada del dominio de solicitudes.
+    private final SolicitudTalentoRepository solicitudes;
     private final RolRepository roles;
     private final UsuarioRolRepository usuarioRoles;
     private final TextoConsentimientoRepository textosConsentimiento;
@@ -221,6 +227,13 @@ public class ServicioAdministracionImpl implements ServicioAdministracion {
         usuarios.buscarPorCorreo(quien.organizacionId(), datos.correo()).ifPresent(u -> {
             throw new IllegalStateException("Ya existe una cuenta con ese correo");
         });
+        // ⚠️ El área, si viene, tiene que ser de esta empresa. `usuario.area_id` admite NULL y
+        // su clave ajena solo exige que el área exista: sin esta línea se podía dar de alta a
+        // alguien en la estructura de otra organización, y esa fila queda fuera de todo lo que
+        // consulta por organización —incluido el recuento que decide si un área se puede borrar—.
+        if (datos.areaId() != null) {
+            elAreaDeSuOrganizacion(quien, datos.areaId());
+        }
         Persona persona = personas.save(Persona.builder()
                 .nombre(datos.nombre()).apellidos(datos.apellidos()).creadoEn(Instant.now())
                 .build());
@@ -371,9 +384,28 @@ public class ServicioAdministracionImpl implements ServicioAdministracion {
                 .orElseThrow(() -> new ResourceNotFoundException("Permiso", CAMPO_CODIGO, codigo));
     }
 
+    // ============ Áreas ============
+    //
+    // El área es la estructura de la empresa, y sin una no se puede registrar una Solicitud
+    // de Talento: es la pieza más pequeña del sistema con las consecuencias más grandes.
+    //
+    // ⚠️ Dos tablas apuntan a `area(id)` y NINGUNA declara ON DELETE: `solicitud_talento.area_id`
+    // (NOT NULL) y `usuario.area_id` (admite NULL). Postgres aplica entonces NO ACTION, así que
+    // un DELETE revienta contra las dos —también contra la que admite nulo—. Todo lo que sigue
+    // está escrito alrededor de ese hecho.
+
     @Override
     public List<AreaPanel> areas(ContextoUsuario quien) {
-        return areas.findByOrganizacionIdAndEsActivaTrueOrderByNombre(quien.organizacionId()).stream()
+        return comoPanel(areas.findByOrganizacionIdAndEsActivaTrueOrderByNombre(quien.organizacionId()));
+    }
+
+    @Override
+    public List<AreaPanel> todasLasAreas(ContextoUsuario quien) {
+        return comoPanel(areas.findByOrganizacionIdOrderByNombre(quien.organizacionId()));
+    }
+
+    private static List<AreaPanel> comoPanel(List<Area> filas) {
+        return filas.stream()
                 .map(a -> new AreaPanel(a.getId(), a.getNombre(), a.isEsActiva()))
                 .toList();
     }
@@ -381,15 +413,247 @@ public class ServicioAdministracionImpl implements ServicioAdministracion {
     @Override
     @Transactional
     public Long crearArea(ContextoUsuario quien, String nombre) {
+        String limpio = exigirNombreLibre(quien, nombre, null);
         Area area = areas.save(Area.builder()
                 .organizacionId(quien.organizacionId())
-                .nombre(nombre.trim())
+                .nombre(limpio)
                 .esActiva(true)
                 .creadoEn(Instant.now())
                 .build());
         auditoria.registrar(quien.organizacionId(), quien, "crear_area",
-                "area", area.getId(), null, Map.of("nombre", nombre.trim()), null);
+                "area", area.getId(), null, Map.of(CAMPO_NOMBRE, limpio), null);
         return area.getId();
+    }
+
+    @Override
+    @Transactional
+    public void renombrarArea(ContextoUsuario quien, Long areaId, String nombre) {
+        Area area = elAreaDeSuOrganizacion(quien, areaId);
+        String limpio = exigirNombreLibre(quien, nombre, area.getNombre());
+
+        // Guardar el mismo nombre no es un cambio: escribirlo llenaría la auditoría de filas
+        // que no cambiaron nada y taparían las que sí. Mismo criterio que conceder un permiso
+        // con el alcance que ya tenía.
+        if (limpio.equals(area.getNombre())) {
+            return;
+        }
+
+        String anterior = area.getNombre();
+        area.setNombre(limpio);
+        areas.save(area);
+
+        // El nombre viejo solo queda aquí: la fila del área ya no lo tiene, y las solicitudes
+        // guardan el id, no el texto. Sin esta línea, un área renombrada borra su propio pasado.
+        auditoria.registrar(quien.organizacionId(), quien, "renombrar_area",
+                "area", areaId, Map.of(CAMPO_NOMBRE, anterior), Map.of(CAMPO_NOMBRE, limpio), null);
+    }
+
+    @Override
+    @Transactional
+    public void desactivarArea(ContextoUsuario quien, Long areaId) {
+        cambiarActividad(quien, areaId, false);
+    }
+
+    @Override
+    @Transactional
+    public void reactivarArea(ContextoUsuario quien, Long areaId) {
+        cambiarActividad(quien, areaId, true);
+    }
+
+    /**
+     * Encender o apagar un área.
+     *
+     * <p>Apagar es lo contrario de borrar y por eso no pide reasignar nada: lo que colgaba del
+     * área sigue colgando, y las solicitudes viejas conservan su historia. Lo único que cambia
+     * es que deja de ofrecerse para solicitudes nuevas.
+     *
+     * <p>⚠️ Un área apagada desaparece de {@code GET /areas}, que filtra por activa. Se
+     * recupera desde {@code GET /areas/todas}; sin esa segunda lista, apagar sería un viaje
+     * sin retorno.
+     *
+     * <p>⚠️ Y la última encendida no se apaga: ver el porqué dentro.
+     */
+    private void cambiarActividad(ContextoUsuario quien, Long areaId, boolean activa) {
+        Area area = elAreaDeSuOrganizacion(quien, areaId);
+        if (area.isEsActiva() == activa) {
+            return;
+        }
+        // ⚠️ La última encendida no se apaga. Registrar una solicitud de talento EXIGE un
+        // área, y la solicitud es el paso previo a cualquier vacante: sin ninguna activa, la
+        // empresa se queda sin poder empezar un proceso, y el desplegable que lo diría sale
+        // vacío sin explicar por qué. Se avisa aquí, que es donde todavía se puede no hacerlo.
+        if (!activa && areas.countByOrganizacionIdAndEsActivaTrue(quien.organizacionId()) <= 1) {
+            throw new IllegalStateException("«" + area.getNombre() + "» es la única área activa: "
+                    + "retirarla dejaría a la empresa sin poder registrar solicitudes de talento, "
+                    + "que es el paso previo a cualquier vacante. Crea otra antes de retirar esta.");
+        }
+        area.setEsActiva(activa);
+        areas.save(area);
+        auditoria.registrar(quien.organizacionId(), quien,
+                activa ? "reactivar_area" : "desactivar_area",
+                "area", areaId, Map.of(CAMPO_NOMBRE, area.getNombre()),
+                Map.of("esActiva", activa), null);
+    }
+
+    @Override
+    public ImpactoDeBorrarArea impactoDeBorrar(ContextoUsuario quien, Long areaId) {
+        Area area = elAreaDeSuOrganizacion(quien, areaId);
+        /*
+         * ⚠️ Se cuenta SIN filtrar por organización, aunque el área sí se busque filtrando.
+         *
+         * Lo que esta pantalla tiene que decir es qué se interpone entre quien administra y el
+         * borrado, y quien se interpone es la clave ajena, que no sabe de organizaciones: le
+         * basta con que la fila exista. Contando por organización, una fila ajena colgada de
+         * esta área salía como «no cuelga nada» y el borrado fallaba después. El número es un
+         * total; no dice de quién es ninguna fila.
+         */
+        return new ImpactoDeBorrarArea(areaId, area.getNombre(),
+                solicitudes.countByAreaId(areaId),
+                usuarios.countByAreaId(areaId));
+    }
+
+    /**
+     * Borrar un área de verdad, moviendo antes lo que colgaba de ella.
+     *
+     * <p>Toda la operación va en una transacción: si la reasignación se hiciera fuera y el
+     * borrado fallara, las solicitudes se habrían mudado a un área que sigue existiendo y nadie
+     * lo sabría.
+     *
+     * <p>⚠️ Vaciar {@code usuario.area_id} en vez de reasignarlo es la salida fácil —la columna
+     * admite NULL— y está descartada a propósito: satisface a Postgres y pierde el dato. Quien
+     * borra dice a dónde va la gente, o no borra.
+     */
+    @Override
+    @Transactional
+    public void borrarArea(ContextoUsuario quien, Long areaId, BorrarArea datos) {
+        Area area = elAreaDeSuOrganizacion(quien, areaId);
+        long cuantasSolicitudes = solicitudes.countByOrganizacionIdAndAreaId(quien.organizacionId(), areaId);
+        long cuantosUsuarios = usuarios.countByOrganizacionIdAndAreaId(quien.organizacionId(), areaId);
+
+        Area destino = null;
+        if (datos.areaDestinoId() != null) {
+            if (datos.areaDestinoId().equals(areaId)) {
+                throw new IllegalArgumentException(
+                        "El área de destino no puede ser la que se está borrando");
+            }
+            destino = elAreaDeSuOrganizacion(quien, datos.areaDestinoId());
+            if (!destino.isEsActiva()) {
+                // Mover a un área retirada esconde el trabajo dos veces: desaparece con el área
+                // borrada y vuelve a desaparecer en la que lo recibe.
+                throw new IllegalStateException("El área «" + destino.getNombre()
+                        + "» está desactivada: elige una activa para recibir lo que se mueve");
+            }
+        }
+
+        // El rechazo dice los dos números porque son la respuesta a «¿y ahora qué hago?»: sin
+        // ellos, quien borra solo sabe que no puede. Un error de clave ajena en la cara diría
+        // menos y además parecería una avería del sistema.
+        if (destino == null && (cuantasSolicitudes > 0 || cuantosUsuarios > 0)) {
+            throw new IllegalStateException(("No se puede borrar «%s»: %d solicitud(es) de "
+                    + "talento y %d persona(s) del equipo siguen apuntando a ella. Indica a qué "
+                    + "área se mueven, o desactívala en vez de borrarla.")
+                    .formatted(area.getNombre(), cuantasSolicitudes, cuantosUsuarios));
+        }
+
+        if (destino != null) {
+            for (SolicitudTalento solicitud : solicitudes
+                    .findByOrganizacionIdAndAreaId(quien.organizacionId(), areaId)) {
+                solicitud.setAreaId(destino.getId());
+                solicitudes.save(solicitud);
+            }
+            for (Usuario usuario : usuarios
+                    .findByOrganizacionIdAndAreaId(quien.organizacionId(), areaId)) {
+                usuario.setAreaId(destino.getId());
+                usuarios.save(usuario);
+            }
+        }
+
+        /*
+         * Bajar los UPDATE antes de pedir el DELETE. Es defensivo, y conviene decir hasta dónde
+         * llega para que nadie se confíe de más ni de menos.
+         *
+         * Hibernate ordena las sentencias del volcado por TIPO de operación y no por el orden en
+         * que se escribieron. Eso aquí juega a favor: en su orden, los UPDATE van antes que los
+         * DELETE, así que sin estos flush la reasignación baja igualmente primero y el borrado
+         * funciona. Se comprobó quitándolos y corriendo `FlujoAreasIT`: sigue en verde. O sea que
+         * hoy NO son lo que impide el error de clave ajena — quien lo impide es la guarda de
+         * arriba, que no llega hasta aquí si queda algo por mover.
+         *
+         * Se quedan porque hacen explícito el único orden correcto y porque el margen es
+         * estrecho: basta cambiar uno de esos `save` por un `@Modifying` en lote, o meter un
+         * insert en la mezcla —donde Hibernate SÍ inserta antes de actualizar, que es como se
+         * rompió el índice de «solo uno vivo» al archivar y crear un banco—, para que el orden
+         * deje de salir solo. Cuestan tres sentencias en una operación que ya es la más rara del
+         * panel.
+         */
+        areas.flush();
+        solicitudes.flush();
+        usuarios.flush();
+
+        /*
+         * La última pregunta antes del DELETE, y NO es la misma que la guarda de arriba.
+         *
+         * Aquella cuenta con `countByOrganizacionIdAndAreaId`, y la clave ajena no filtra por
+         * organización: le basta con que la fila exista. Todo lo que apunte al área y no case
+         * con el filtro —una solicitud de otra empresa, o una recién insertada por otra
+         * petición entre el recuento y esta línea— es invisible para la guarda y perfectamente
+         * visible para Postgres. Sin esto, el borrado sale con un
+         * «update or delete on table "area" violates foreign key constraint», que
+         * `ManejadorErrores` traduce a un 400 «Alguno de los datos enviados no es válido»: ni
+         * es el código correcto ni dice nada de lo que pasa.
+         *
+         * Se pregunta sin filtro y se RECHAZA; no se reasigna. Mover a un área de esta empresa
+         * el trabajo de otra sería mucho peor que negarse.
+         */
+        long quedanSolicitudes = solicitudes.countByAreaId(areaId);
+        long quedanUsuarios = usuarios.countByAreaId(areaId);
+        if (quedanSolicitudes > 0 || quedanUsuarios > 0) {
+            throw new IllegalStateException(("No se puede borrar «%s»: todavía quedan %d "
+                    + "solicitud(es) y %d persona(s) apuntando a ella que este panel no ha "
+                    + "podido mover. Vuelve a intentarlo; si sigue igual, hay filas de otra "
+                    + "organización colgando de esta área y hace falta revisarlo.")
+                    .formatted(area.getNombre(), quedanSolicitudes, quedanUsuarios));
+        }
+
+        areas.delete(area);
+
+        // Esta fila es lo ÚNICO que sobrevive al borrado: el área ya no está, y nada permite
+        // reconstruir de dónde venían esas solicitudes. Por eso lleva el nombre y los dos
+        // recuentos, no solo el id.
+        auditoria.registrar(quien.organizacionId(), quien, "borrar_area", "area", areaId,
+                Map.of(CAMPO_NOMBRE, area.getNombre(),
+                        "solicitudes", cuantasSolicitudes,
+                        "usuarios", cuantosUsuarios),
+                destino == null ? null : Map.of("areaDestinoId", destino.getId(),
+                        "areaDestino", destino.getNombre()),
+                datos.motivo());
+    }
+
+    private Area elAreaDeSuOrganizacion(ContextoUsuario quien, Long areaId) {
+        return areas.findByIdAndOrganizacionId(areaId, quien.organizacionId())
+                .orElseThrow(() -> new ResourceNotFoundException("Área", "id", areaId));
+    }
+
+    /**
+     * El nombre, limpio, y libre dentro de la organización.
+     *
+     * <p>La V2 tiene {@code UNIQUE (organizacion_id, nombre)}: dejar el choque para la base da
+     * un 400 con el nombre de una restricción dentro, y lo que ha pasado es que ese área ya
+     * existe. Se comprueba antes para poder decirlo así.
+     *
+     * @param nombreActual el que ya tiene el área que se está editando, para que renombrarla a
+     *                     sí misma no choque consigo misma. {@code null} al crear.
+     */
+    private String exigirNombreLibre(ContextoUsuario quien, String nombre, String nombreActual) {
+        String limpio = nombre.trim();
+        if (limpio.isEmpty()) {
+            throw new IllegalArgumentException("El área necesita un nombre");
+        }
+        if (!limpio.equals(nombreActual)
+                && areas.existsByOrganizacionIdAndNombre(quien.organizacionId(), limpio)) {
+            throw new IllegalStateException("Ya existe un área llamada «" + limpio + "»");
+        }
+        return limpio;
     }
 
     private void asignarRolesInterno(ContextoUsuario quien, Long usuarioId, List<String> codigos) {

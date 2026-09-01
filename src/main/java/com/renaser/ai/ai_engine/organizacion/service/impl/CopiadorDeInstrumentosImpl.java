@@ -418,6 +418,10 @@ public class CopiadorDeInstrumentosImpl implements CopiadorDeInstrumentos {
                 .materiales(versionVieja.getMateriales())
                 .herramientasPermitidas(versionVieja.getHerramientasPermitidas())
                 .urlConsigna(versionVieja.getUrlConsigna())
+                // La guía viaja con la prueba, como la rúbrica y el enunciado: dice qué mirar
+                // en ESTE instrumento, así que una copia sin ella se calificaría distinto que
+                // el original y nadie sabría por qué. Ver la V46.
+                .guiaCalificacion(versionVieja.getGuiaCalificacion())
                 .modalidad(versionVieja.getModalidad())
                 .duracionMinutos(versionVieja.getDuracionMinutos())
                 .plazoDias(versionVieja.getPlazoDias())

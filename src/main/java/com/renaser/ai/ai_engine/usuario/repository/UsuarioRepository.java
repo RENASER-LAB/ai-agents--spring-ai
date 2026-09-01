@@ -26,4 +26,16 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
     List<Usuario> equipoPorCorreo(@Param("correo") String correo);
 
     Optional<Usuario> findFirstByPersonaId(Long personaId);
+
+    // Quiénes cuelgan de un área. Hacen falta para poder borrarla: `usuario.area_id` admite
+    // NULL pero su clave ajena NO declara ON DELETE, así que Postgres aplica NO ACTION y el
+    // borrado revienta igual que contra la que no admite nulo. Contar es para avisar antes;
+    // la lista es para reasignarlos.
+    long countByOrganizacionIdAndAreaId(Long organizacionId, Long areaId);
+
+    List<Usuario> findByOrganizacionIdAndAreaId(Long organizacionId, Long areaId);
+
+    // ⚠️ SIN filtrar por organización, por lo mismo que su gemela en SolicitudTalentoRepository:
+    // la clave ajena no sabe de organizaciones y esto es lo que se pregunta justo antes de borrar.
+    long countByAreaId(Long areaId);
 }
