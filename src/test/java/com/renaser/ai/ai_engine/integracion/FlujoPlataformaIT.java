@@ -428,7 +428,7 @@ public class FlujoPlataformaIT {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                         {"nombre":"%s","apellidos":"Quispe","correo":"%s",
-                         "contrasena":"unaClaveLarga123","aceptaProceso":true,
+                         "contrasena":"unaClaveLarga123","ciudadUbigeo":"1501","aceptaProceso":true,
                          "aceptaFuturosContactos":false}""".formatted(nombre, correo)))
                 .andExpect(status().isCreated());
         String token = leer(mvc.perform(post("/api/v1/portal/auth/login")

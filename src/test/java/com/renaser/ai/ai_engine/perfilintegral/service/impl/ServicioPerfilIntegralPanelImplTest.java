@@ -128,6 +128,8 @@ class ServicioPerfilIntegralPanelImplTest {
     @Mock private Permisos permisos;
     @Mock private com.renaser.ai.ai_engine.perfilintegral.repository.EvaluacionRepository evaluaciones;
     @Mock private com.renaser.ai.ai_engine.pesos.repository.EtapaRepository etapasCatalogo;
+    @Mock private com.renaser.ai.ai_engine.perfil.repository.UbigeoRepository ubigeos;
+    @Mock private com.renaser.ai.ai_engine.perfil.repository.PerfilCandidatoRepository perfilesCandidato;
 
     @InjectMocks
     private ServicioPerfilIntegralPanelImpl servicio;
@@ -279,6 +281,99 @@ class ServicioPerfilIntegralPanelImplTest {
 
         assertThat(filas).extracting(FilaRanking::puesto).containsExactly(1, 2);
         assertThat(filas.get(0).postulacionId()).isEqualTo(2L);
+    }
+
+    // ============ La ciudad ============
+
+    @Test
+    @DisplayName("La ciudad se pinta con su departamento delante, sobre la fila ya numerada")
+    void laCiudadLlevaElDepartamentoDelante() {
+        // Hay provincias homónimas —Lima y Lima, San Martín y San Martín—, así que una
+        // columna que solo dijera «Lima» no distinguiría la capital de Cañete.
+        //
+        // Se mira sobre la lista que DEVUELVE el ranking, no sobre la de antes de ordenar:
+        // numerar copia el record campo a campo, y ciudad y ciudadCodigo son dos String
+        // vecinos que se pueden intercambiar sin que el compilador diga nada.
+        candidatos(enCiudad(candidato(1L, "ALTA", "90"), "0402"));
+        elCatalogoDice(lugar("0402", 2, "04", "Camaná"), lugar("04", 1, null, "Arequipa"));
+
+        FilaRanking fila = servicio.ranking(quien, VACANTE).filas().get(0);
+
+        assertThat(fila.ciudad()).isEqualTo("Arequipa — Camaná");
+        assertThat(fila.ciudadCodigo()).isEqualTo("0402");
+    }
+
+    @Test
+    @DisplayName("Quien vive fuera del Perú sale sin departamento inventado")
+    void elExtranjeroNoLlevaDepartamento() {
+        // EXT no cuelga de ningún departamento. Ponerle un guion delante obligaría a
+        // inventarse la mitad de la izquierda.
+        candidatos(enCiudad(candidato(1L, "ALTA", "90"), "EXT"));
+        elCatalogoDice(lugar("EXT", 1, null, "Fuera del Perú"));
+
+        FilaRanking fila = servicio.ranking(quien, VACANTE).filas().get(0);
+
+        assertThat(fila.ciudad()).isEqualTo("Fuera del Perú");
+        assertThat(fila.ciudadCodigo()).isEqualTo("EXT");
+    }
+
+    @Test
+    @DisplayName("Sin ciudad, las dos columnas van vacías — no se rellenan con el texto libre")
+    void sinCiudadNoSeInventaNada() {
+        // A quien creó su cuenta antes de que la ciudad fuera obligatoria no se le vuelve a
+        // preguntar. Su fila va vacía, y vacía se ordena al final: eso es información, no
+        // un hueco que haya que tapar con perfil_candidato.ubicacion.
+        candidatos(conNombre(candidato(1L, "ALTA", "90"), "Camila", "Reyes"));
+
+        FilaRanking fila = servicio.ranking(quien, VACANTE).filas().get(0);
+
+        assertThat(fila.ciudad()).isNull();
+        assertThat(fila.ciudadCodigo()).isNull();
+        verifyNoInteractions(ubigeos);
+    }
+
+    // ============ La pretensión ============
+
+    @Test
+    @DisplayName("Sin ver_pretension no viaja — y la consulta ni se lanza")
+    void sinElPermisoLaPretensionNoViaja() {
+        // La V36 lo dejó decidido: si la pretensión apareciera junto a la nota, pesaría en
+        // la decisión, que es justo lo que este sistema evita. La ve quien negocia.
+        candidatos(conPretension(candidato(1L, "ALTA", "90"), "2500", "3500", "PEN"));
+
+        FilaRanking fila = servicio.ranking(quien, VACANTE).filas().get(0);
+
+        assertThat(fila.pretensionMin()).isNull();
+        assertThat(fila.pretensionMax()).isNull();
+        assertThat(fila.pretensionMoneda()).isNull();
+        // No es solo no pintarla: sin permiso el dato no llega ni a la memoria de esta
+        // petición.
+        verifyNoInteractions(perfilesCandidato);
+    }
+
+    @Test
+    @DisplayName("Con ver_pretension sí viaja: la ve quien negocia, cuando toca")
+    void conElPermisoLaPretensionViaja() {
+        candidatos(conPretension(candidato(1L, "ALTA", "90"), "2500", "3500", "PEN"));
+
+        FilaRanking fila = servicio.ranking(quienTambienVeLaPretension(), VACANTE).filas().get(0);
+
+        assertThat(fila.pretensionMin()).isEqualByComparingTo("2500");
+        assertThat(fila.pretensionMax()).isEqualByComparingTo("3500");
+        assertThat(fila.pretensionMoneda()).isEqualTo("PEN");
+    }
+
+    @Test
+    @DisplayName("Quien no declaró pretensión va con los tres campos en null, no en cero")
+    void quienNoDeclaroPretensionVaVacio() {
+        // Un cero diría «pide cero», que es una frase distinta de «no lo ha dicho».
+        candidatos(conNombre(candidato(1L, "ALTA", "90"), "Camila", "Reyes"));
+        lenient().when(perfilesCandidato.findByPersonaIdIn(anyList())).thenReturn(List.of());
+
+        FilaRanking fila = servicio.ranking(quienTambienVeLaPretension(), VACANTE).filas().get(0);
+
+        assertThat(fila.pretensionMin()).isNull();
+        assertThat(fila.pretensionMoneda()).isNull();
     }
 
     // ============ La nota del currículum ============
@@ -638,11 +733,73 @@ class ServicioPerfilIntegralPanelImplTest {
 
     /** Le pone nombre, que es lo último que desempata cuando grupo y nota coinciden. */
     private Postulacion conNombre(Postulacion p, String nombre, String apellidos) {
-        Long personaId = 200L + p.getId();
-        usuariosDeLaTanda.add(Usuario.builder().id(p.getUsuarioId()).personaId(personaId).build());
-        personasDeLaTanda.add(
-                Persona.builder().id(personaId).nombre(nombre).apellidos(apellidos).build());
+        Persona persona = laPersonaDe(p);
+        persona.setNombre(nombre);
+        persona.setApellidos(apellidos);
         return p;
+    }
+
+    /** Le pone dónde vive: el código del ubigeo, que es lo que guarda la persona. */
+    private Postulacion enCiudad(Postulacion p, String ciudadUbigeo) {
+        laPersonaDe(p).setCiudadUbigeo(ciudadUbigeo);
+        return p;
+    }
+
+    /** Le pone pretensión declarada, que cuelga de su perfil y no de la postulación. */
+    private Postulacion conPretension(Postulacion p, String min, String max, String moneda) {
+        Persona persona = laPersonaDe(p);
+        lenient().when(perfilesCandidato.findByPersonaIdIn(anyList())).thenReturn(List.of(
+                com.renaser.ai.ai_engine.perfil.entity.PerfilCandidato.builder()
+                        .id(p.getId()).personaId(persona.getId())
+                        .pretensionMin(new BigDecimal(min)).pretensionMax(new BigDecimal(max))
+                        .pretensionMoneda(moneda).build()));
+        return p;
+    }
+
+    /** La persona de esa postulación, creándola con su usuario la primera vez. */
+    private Persona laPersonaDe(Postulacion p) {
+        Long personaId = 200L + p.getId();
+        return personasDeLaTanda.stream()
+                .filter(persona -> personaId.equals(persona.getId()))
+                .findFirst()
+                .orElseGet(() -> {
+                    usuariosDeLaTanda.add(Usuario.builder()
+                            .id(p.getUsuarioId()).personaId(personaId).build());
+                    Persona nueva = Persona.builder()
+                            .id(personaId).nombre("Camila").apellidos("Reyes").build();
+                    personasDeLaTanda.add(nueva);
+                    return nueva;
+                });
+    }
+
+    /**
+     * El catálogo de ubigeo, contestando solo lo que le preguntan.
+     *
+     * <p>El ranking lo consulta dos veces —primero las provincias que salen en la tanda,
+     * después los departamentos de esas provincias— y el doble tiene que distinguirlas: uno
+     * que devolviera siempre todo dejaría pasar un servicio que pidiera mal.
+     */
+    private void elCatalogoDice(com.renaser.ai.ai_engine.perfil.entity.Ubigeo... filas) {
+        lenient().when(ubigeos.findAllById(anyIterable())).thenAnswer(invocacion -> {
+            List<String> pedidos = new ArrayList<>();
+            invocacion.<Iterable<String>>getArgument(0).forEach(pedidos::add);
+            return List.of(filas).stream()
+                    .filter(u -> pedidos.contains(u.getCodigo()))
+                    .toList();
+        });
+    }
+
+    private com.renaser.ai.ai_engine.perfil.entity.Ubigeo lugar(
+            String codigo, int nivel, String padre, String nombre) {
+        return com.renaser.ai.ai_engine.perfil.entity.Ubigeo.builder()
+                .codigo(codigo).nivel((short) nivel).padre(padre).nombre(nombre).activo(true)
+                .build();
+    }
+
+    /** El mismo de siempre, pero además con el permiso que abre la pretensión. */
+    private ContextoUsuario quienTambienVeLaPretension() {
+        return new ContextoUsuario(10L, 20L, ORGANIZACION, "EQUIPO", List.of(1L),
+                Map.of("ver_embudo", "TODO", "ajustar_nota", "TODO", "ver_pretension", "TODO"));
     }
 
     private void pesos(PesoCriterio... losSuyos) {

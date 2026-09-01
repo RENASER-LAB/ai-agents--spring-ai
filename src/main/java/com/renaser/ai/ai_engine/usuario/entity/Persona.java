@@ -22,6 +22,12 @@ public class Persona {
     private String telefono;
     private String documento;
     private LocalDate fechaNacimiento;
+
+    // Dónde vive, como código del catálogo ubigeo. Vive aquí y no en perfil_candidato
+    // porque el perfil se crea perezosamente —solo cuando el agente propone datos del
+    // currículum— y la ciudad se pide en el registro, cuando esta es la única fila que hay.
+    private String ciudadUbigeo;
+
     private Instant anonimizadoEn;
     private Instant creadoEn;
 }

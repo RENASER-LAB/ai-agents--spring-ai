@@ -80,6 +80,20 @@ public final class DtosPerfil {
     public record OpcionCatalogo(String codigo, String nombre) {
     }
 
+    /**
+     * Una provincia del catálogo de ubigeo, con el departamento al que pertenece.
+     *
+     * <p>Lleva el departamento y no es un {@link OpcionCatalogo} porque hay nombres de
+     * provincia repetidos —Lima la provincia y Lima el departamento, «San Martín» en dos
+     * sitios— y un desplegable plano dejaría al candidato eligiendo a ciegas entre dos
+     * líneas idénticas. Con el departamento, la pantalla agrupa y la ambigüedad desaparece
+     * sin necesidad de dos selects encadenados.
+     *
+     * <p>{@code departamento} viene en null solo para {@code EXT}, que no cuelga de ninguno.
+     */
+    public record OpcionUbigeo(String codigo, String nombre, String departamento) {
+    }
+
     // ---------- lo que entra ----------
 
     public record EditarCabecera(

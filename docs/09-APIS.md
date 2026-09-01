@@ -49,10 +49,10 @@ inscritos tiene además un cuarto caso: quien no tiene `ver_inscritos_simulacion
 ## Cómo entrar
 
 **El candidato:** `POST /portal/cuentas` para crear la cuenta (exige aceptar el tratamiento de
-datos; el consentimiento de futuros contactos es aparte y opcional), y `POST /portal/auth/login`
-con correo y contraseña. Si no cuadran, responde **401** con el mismo texto tanto si el correo
-no existe como si la contraseña es otra: decir cuál de las dos falló le regalaría a un atacante
-la lista de correos registrados. Tras varios intentos fallidos seguidos (configurable, arranca
+datos y decir en qué ciudad vive; el consentimiento de futuros contactos es aparte y opcional), y
+`POST /portal/auth/login` con correo y contraseña. Si no cuadran, responde **401** con el mismo
+texto tanto si el correo no existe como si la contraseña es otra: decir cuál de las dos falló le
+regalaría a un atacante la lista de correos registrados. Tras varios intentos fallidos seguidos (configurable, arranca
 en 5), la entrada se bloquea unos minutos y responde **429** con la cabecera `Retry-After` y el
 campo `segundosDeEspera`, para que la pantalla pueda decir cuánto falta en vez de adivinarlo.
 
@@ -98,7 +98,8 @@ en lenguaje normal.
 | GET `/vacantes/{id}` | El detalle público, con los requisitos indispensables | Cualquiera |
 | GET `/vacantes/{id}/consentimiento` | El texto de tratamiento de datos **de la empresa de esa vacante**: lo que se acepta al postular, con el nombre de quien tratará los datos | Cualquiera |
 | GET `/consentimientos/textos` | Los textos vigentes de los dos consentimientos de la plataforma (los de crear la cuenta) | Cualquiera |
-| POST `/cuentas` | Crear la cuenta y registrar los consentimientos | Cualquiera |
+| GET `/catalogos/ubigeo` | Dónde se puede decir que uno vive: las **196 provincias** del Perú y «Fuera del Perú», cada una con su departamento, ordenadas por departamento y nombre. Es `{codigo, nombre, departamento}`, y el departamento viene vacío solo en `EXT` | Cualquiera, sin token |
+| POST `/cuentas` | Crear la cuenta y registrar los consentimientos. Desde el 31/08 pide además **la ciudad** (`ciudadUbigeo`), obligatoria: un código que el catálogo no ofrezca es un 400 | Cualquiera |
 | POST `/auth/login` | Entrar; devuelve el token | Cualquiera |
 | POST `/postulaciones` | Postular: CV (PDF o Word, máx. 10 MB), enlaces, el resultado del que se siente orgulloso, la confirmación de los requisitos y `aceptaTratamiento` (obligatorio): la aceptación del texto de la empresa queda firmada con IP y navegador, a nombre de esa postulación | Candidato |
 | GET `/postulaciones` | Sus postulaciones, con la empresa de cada una, estado, días sin cambio y **qué rendirá en la etapa técnica** (`instrumentoEtapaTecnica`: la prueba del puesto o el cuestionario) | Candidato |
@@ -118,6 +119,13 @@ en lenguaje normal.
 **El candidato es de la plataforma.** Una sola cuenta, y con ella postula a la vacante de
 cualquier empresa: su postulación nace en la empresa de la vacante, que es la que la ve en su
 panel. El tablón de vacantes es la única pantalla que mezcla empresas — a propósito.
+
+**La ciudad se pregunta una sola vez, y es la única del alta.** `ciudadUbigeo` es el único campo
+nuevo del formulario de registro, y **a quien ya tiene cuenta no se le pide nunca**: los que se
+registraron antes se quedan sin ciudad, que es un estado normal y que el panel sabe pintar. Por
+eso el catálogo es la única ruta de `/catalogos` que responde sin token —el desplegable tiene que
+cargar antes de que exista la cuenta—, y el permiso se abrió con esa ruta exacta y no con un
+comodín, para no destapar de paso los otros dos catálogos.
 
 **La evaluación es de quien la responde.** Todo entra por el código de la postulación, no por
 el id de la evaluación, y una que no es suya responde 404 — un 403 ya confirmaría que existe.
@@ -181,11 +189,12 @@ del área— se ven solo las propias, y una ajena responde 404.
 |---|---|---|
 | GET `/bandeja?espera_a=` | La bandeja: todo lo que espera a `CANDIDATO`, `SISTEMA`, `TALENTO` o `AREA` | `ver_candidatos` |
 | GET `/vacantes/{id}/embudo` | Cuántas postulaciones hay en cada estado | `ver_embudo` |
-| GET `/vacantes/{id}/ranking?etapa=` | La tanda ordenada de más apto a menos, con las ocho notas del currículum de cada uno. **Incluye a quien todavía no tiene nota**. Sin `etapa` ordena por la del Perfil Integral; con ella, por la nota de esa etapa | `ver_embudo` |
+| GET `/vacantes/{id}/ranking?etapa=` | La tanda ordenada de más apto a menos, con las ocho notas del currículum de cada uno. **Incluye a quien todavía no tiene nota**. Sin `etapa` ordena por la del Perfil Integral; con ella, por la nota de esa etapa. Cada fila trae además **dónde vive** (`ciudad`, ya escrito «Departamento — Provincia», y `ciudadCodigo`) y **su pretensión salarial**, que solo viaja con `ver_pretension` | `ver_embudo` |
+| POST `/vacantes/{id}/ranking/excel` | La tanda seleccionada, en un `.xlsx` de dos hojas —Resumen y Detalle— que se descarga como adjunto. Se le pasan `etapa`, los `postulacionIds` **ya ordenados por quien llama** y `filtroDescrito`, la frase que se pintó encima de la tabla. Solo hay columnas para `PERFIL_INTEGRAL` y `PRUEBA_PUESTO`; otra etapa es un 400 | `ver_embudo` |
 | GET `/postulaciones/{id}` · `/historial` | La ficha completa y el recorrido | `abrir_ficha_candidato` |
 | POST `/postulaciones/{id}/transiciones` | Mover a cualquier estado. **El motivo es obligatorio, sin excepción** | `mover_postulacion` |
 | POST `/postulaciones/{id}/confirmacion-avance` | Confirmar que avanza: el sistema calcula el estado siguiente | `confirmar_avance` |
-| GET `/postulaciones/{id}/perfil-integral` | El retrato de la IA: notas del currículum, hallazgos y avisos | `ver_perfil_integral` |
+| GET `/postulaciones/{id}/perfil-integral` | El retrato de la IA: notas del currículum, hallazgos y avisos. Cada nota lleva su explicación, **su confianza —de 0 a 100, la misma escala del puntaje, no de 0 a 1—** y el **motivo del ajuste**, que solo tiene valor cuando esa nota la corrigió una persona | `ver_perfil_integral` |
 | GET `/postulaciones/{id}/evaluacion` | El desglose del banco: cada respuesta abierta con su nota, la explicación y la evidencia que citó la IA, el promedio de lo cerrado y los semáforos de alineación. **Sin evaluación asignada devuelve vacíos, no 404**. ⚠️ `alineacion` sale vacía siempre: nadie escribe esa tabla todavía | `ver_respuestas_evaluacion` |
 | POST `/postulaciones/{id}/criba-cv` | Que la IA lea **solo el currículum** y arme el retrato con eso. Es lo que se pide con una tanda recién llegada | `ajustar_nota` |
 | POST `/postulaciones/{id}/calificacion-perfil-integral` | Calificar con todo: currículum y evaluación. Exige evaluación entregada | `ajustar_nota` |
@@ -203,6 +212,28 @@ del área— se ven solo las propias, y una ajena responde 404.
 > Puntuación Global está calculada —sale en `/postulaciones/{id}/semaforo`—, pero nunca como lista
 > ordenada. Está apuntado como decisión 6 en [Alcance del MVP](08-ALCANCE-DEL-MVP.md), con lo que
 > habría que decidir antes de montarlo.
+
+> **Quién ordena y quién filtra el Excel: el cliente.** El volcado no filtra ni reordena nada. Le
+> llegan los `postulacionIds` en el orden en que se quieren las filas y los escribe en ese orden,
+> porque la tanda del ranking viene ordenada por grupo de prioridad y nota —otro orden, también
+> válido, y no el que la persona estaba mirando—. Se piden por POST y no por GET porque ochenta
+> ids y la frase del filtro no caben en una URL. **No escribe nada**: lo único que crea es el
+> archivo.
+>
+> Los ids que no son de esa vacante **se descartan y se dicen al pie de la hoja**, con su número
+> y su lista; si ninguno de los pedidos es de la vacante, es un 400. La hoja **Resumen** lleva una
+> fila por candidato —con el puesto que ocupa en el ranking, no la posición en el archivo— y la
+> hoja **Detalle** una línea por criterio; no hay hoja de respuestas. El archivo baja como adjunto
+> y se llama `ranking-{etapa}-vacante-{id}-{fecha}.xlsx`, con la fecha dentro porque estas hojas
+> se guardan.
+>
+> **La columna de pretensión se explica sola.** Vacía significa dos cosas opuestas —que nadie la
+> declaró, o que el rol de quien descarga no puede verla— y solo una es verdad cada vez, así que
+> el pie lo dice. Por eso mismo el ranking devuelve `puedeVerPretension` en su cabecera: sin ese
+> booleano, la pantalla tendría que nombrar las dos posibilidades sin afirmar ninguna. Sin
+> `ver_pretension` el dato ni se consulta. Y quien tiene `ver_embudo` pero no `ajustar_nota` se
+> lleva el Detalle de la prueba resumido en una línea que explica qué permiso le falta, en vez de
+> un archivo a medio escribir.
 
 ### La prueba del puesto (hito 3)
 
@@ -440,7 +471,7 @@ con las reglas que Swagger no cuenta, está en
 | GET/PUT `/portal/perfil` · GET `/portal/perfil/descarga` | El dueño ve su perfil entero y lo descarga (ley 29733). Vacío responde 200, nunca 404. El PUT **reemplaza** la cabecera, no la fusiona | El propio token; lo ajeno es 404 |
 | POST/PUT/DELETE + POST `/{id}/confirmacion` en `/portal/perfil/experiencia`, `/educacion`, `/idiomas`, `/certificaciones` · PUT `/orden` solo en las dos primeras | Añadir, corregir, borrar y dar por bueno lo que se sacó del currículum | El propio token |
 | POST y DELETE `/portal/perfil/enlaces` | **Solo esas dos**: un enlace no lleva origen ni confirmación, así que no se edita — se borra y se crea | El propio token |
-| GET `/portal/catalogos/niveles-educativos` · `/niveles-idioma` | Los desplegables, para no escribirlos a mano. Devuelven `codigo` y `nombre` ya ordenados: no hay campo `orden` | Token de candidato |
+| GET `/portal/catalogos/niveles-educativos` · `/niveles-idioma` | Los desplegables, para no escribirlos a mano. Devuelven `codigo` y `nombre` ya ordenados: no hay campo `orden`. El tercero del grupo, `/catalogos/ubigeo`, **es el único que responde sin token**, porque su desplegable sale en el registro | Token de candidato |
 | GET `/panel/postulaciones/{id}/perfil` | La trayectoria del candidato sin abrir su archivo. **No puntúa** | `ver_perfil_candidato`; la pretensión solo con `ver_pretension` |
 
 ---

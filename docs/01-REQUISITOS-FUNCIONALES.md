@@ -383,6 +383,14 @@ encajar, **sin impedir que se publique**.
 **RF-22** Para postular hay que crear una cuenta. Los candidatos no son usuarios de RENASER OS:
 su cuenta vive en este sistema.
 
+Al crearla se pide **dónde vive**, y es obligatorio. Se elige de una lista cerrada —las 196
+provincias del Perú, más «Fuera del Perú»—, nunca se escribe a mano: quien contrata filtra la
+tanda por ciudad, y «Lima», «lima» y «Lima Cercado» escritos a mano son la misma ciudad y tres
+filtros distintos. Es el único campo que se añadió al alta, se pregunta **una sola vez** y **a
+quien ya tenía cuenta no se le pide nunca**: esos se quedan sin ciudad, que es un estado normal
+—siguen saliendo en la tanda, sin ese dato—. La lista llega hasta la provincia: el distrito no se
+pregunta, y hoy tampoco existe en el catálogo.
+
 **RF-23** El candidato ve en todo momento su etapa actual, qué le falta, la fecha límite cuando
 exista y cuánto tiempo le tomará lo siguiente.
 
@@ -937,6 +945,20 @@ sesiones sin programar y decisiones finales pendientes.
 
 **RF-129** Debajo, las vacantes con cuánta gente hay en cada etapa y cuántos días llevan sin
 avanzar.
+
+**La tanda de una vacante se ordena, se filtra y se descarga.** El panel enseña a los candidatos
+de una etapa ordenados de más apto a menos, y de cada uno dice también **dónde vive**, que es por
+lo que más se recorta una tanda cuando el puesto es presencial. La **pretensión salarial** aparece
+en esa misma lista, pero **solo para quien tenga permiso de verla** —hoy, Dirección—: para el
+resto la casilla va vacía, y la pantalla dice que va vacía por el permiso y no porque el
+candidato no pidiera sueldo. Confundir las dos cosas cambia una decisión de contratación.
+
+Esa lista, tal como quedó después de ordenarla y filtrarla, **se lleva a una hoja de cálculo**.
+El archivo respeta el orden que se estaba viendo, trae una hoja de resumen —una fila por
+candidato— y otra de detalle —una línea por criterio, con la explicación de cada nota—, y al pie
+dice con qué filtro se sacó, cuándo y cuántos candidatos son. Se descarga de las dos etapas que
+tienen algo que volcar —la preselección y la prueba del puesto—, y es lo que se manda a quien no
+entra al sistema; nunca sale de ahí una pregunta ni una respuesta de ninguna prueba.
 
 **RF-130** La ficha del candidato tiene un resumen arriba y secciones desplegables por etapa.
 **No hay que recorrer varias pantallas** para reconstruir su historia.

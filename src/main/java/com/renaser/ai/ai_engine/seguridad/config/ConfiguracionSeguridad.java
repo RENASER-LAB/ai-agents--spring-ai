@@ -41,6 +41,11 @@ public class ConfiguracionSeguridad {
                 // Lo que un candidato puede hacer ANTES de tener cuenta
                 .requestMatchers(HttpMethod.GET, "/api/v1/portal/vacantes/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/portal/consentimientos/textos").permitAll()
+                // La ciudad es obligatoria al crear la cuenta, así que su desplegable tiene
+                // que cargar ANTES de que exista el token. La ruta exacta y no
+                // /catalogos/**: los otros dos catálogos siguen pidiendo sesión, y un
+                // comodín aquí los abriría de paso sin que nadie lo decidiera.
+                .requestMatchers(HttpMethod.GET, "/api/v1/portal/catalogos/ubigeo").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/portal/cuentas").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/portal/auth/login").permitAll()
                 // El enlace del correo. Es público a la fuerza: el token que lleva ES la

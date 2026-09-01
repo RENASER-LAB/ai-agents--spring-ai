@@ -6,6 +6,10 @@ import com.renaser.ai.ai_engine.archivo.entity.Archivo;
 import com.renaser.ai.ai_engine.archivo.repository.ArchivoRepository;
 import com.renaser.ai.ai_engine.archivo.service.AlmacenArchivos;
 import com.renaser.ai.ai_engine.auditoria.service.ServicioAuditoria;
+import com.renaser.ai.ai_engine.perfil.entity.PerfilCandidato;
+import com.renaser.ai.ai_engine.perfil.entity.Ubigeo;
+import com.renaser.ai.ai_engine.perfil.repository.PerfilCandidatoRepository;
+import com.renaser.ai.ai_engine.perfil.repository.UbigeoRepository;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.AlertaResponse;
 import com.renaser.ai.ai_engine.pesos.entity.Etapa;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.CalificacionEncoladaResponse;
@@ -106,6 +110,8 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
     private final MaquinaEstados maquina;
     private final com.renaser.ai.ai_engine.perfilintegral.repository.EvaluacionRepository evaluaciones;
     private final com.renaser.ai.ai_engine.pesos.repository.EtapaRepository etapasCatalogo;
+    private final UbigeoRepository ubigeos;
+    private final PerfilCandidatoRepository perfilesCandidato;
 
     // El orden de la tanda. Manda el grupo, no la nota: quien llega a la nota arrastrando un
     // riesgo crítico no va por delante de quien llega sin ninguno, y ordenar por número
@@ -501,6 +507,21 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
                         .map(Cv::getArchivoOriginalId).filter(Objects::nonNull).toList()),
                 Archivo::getId);
 
+        // La ciudad, en el mismo bloque y por la misma razón que todo lo de arriba: son
+        // dos consultas para la tanda entera —las provincias de todos, y los departamentos
+        // de esas provincias— en vez de dos por fila.
+        Map<String, String> ciudades = ciudadesDe(personasPorId.values());
+
+        // La pretensión solo se pide si quien mira puede verla. No es solo no pintarla:
+        // sin permiso, la consulta ni se lanza, y así el dato no llega a existir en la
+        // memoria de esta petición.
+        boolean puedeVerPretension = quien.tiene("ver_pretension");
+        Map<Long, PerfilCandidato> perfilPorPersona = puedeVerPretension
+                ? perfilesCandidato.findByPersonaIdIn(personasPorId.keySet().stream().toList())
+                        .stream().collect(Collectors.toMap(PerfilCandidato::getPersonaId,
+                                Function.identity(), (a, b) -> a))
+                : Map.of();
+
         List<FilaRanking> filas = new ArrayList<>();
         int calificados = 0, enCurso = 0, fallidos = 0, conFina = 0;
 
@@ -528,6 +549,9 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
 
             Usuario usuario = usuariosPorId.get(p.getUsuarioId());
             Persona persona = usuario == null ? null : personasPorId.get(usuario.getPersonaId());
+            String ciudadCodigo = persona == null ? null : persona.getCiudadUbigeo();
+            PerfilCandidato suPerfil = persona == null ? null
+                    : perfilPorPersona.get(persona.getId());
 
             filas.add(new FilaRanking(
                     0,
@@ -553,7 +577,16 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
                     (int) suyos.stream().filter(h -> "FORTALEZA".equals(h.getTipo())).count(),
                     alertasPorPostulacion.getOrDefault(p.getId(), 0L).intValue(),
                     perfil == null ? null : perfil.getActualizadoEn(),
-                    notas));
+                    notas,
+                    // El null se pregunta aquí y no dentro del mapa: un Map.of() vacío
+                    // —el de la tanda en la que nadie declaró ciudad— revienta al
+                    // buscarle una clave nula, y sin ciudad es el estado normal de quien
+                    // creó su cuenta antes de que se pidiera.
+                    ciudadCodigo == null ? null : ciudades.get(ciudadCodigo),
+                    ciudadCodigo,
+                    suPerfil == null ? null : suPerfil.getPretensionMin(),
+                    suPerfil == null ? null : suPerfil.getPretensionMax(),
+                    suPerfil == null ? null : suPerfil.getPretensionMoneda()));
         }
 
         filas.sort(Comparator
@@ -565,6 +598,11 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
 
         // El número de la fila se pone al final, cuando ya están ordenadas: es la posición
         // en la tanda y no un dato del candidato.
+        //
+        // Copiar campo a campo es lo que exige un record para cambiar uno solo, y es
+        // frágil: dos campos seguidos del mismo tipo intercambiados compilan sin una
+        // queja. Por eso ciudad y ciudadCodigo —los dos String y vecinos— van comprobados
+        // en su propia prueba, sobre una fila YA numerada.
         List<FilaRanking> numeradas = new ArrayList<>(filas.size());
         for (int i = 0; i < filas.size(); i++) {
             FilaRanking f = filas.get(i);
@@ -574,13 +612,16 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
                     f.grupoPrioridad(), f.notaEtapa(), f.notaCurriculum(), f.adecuacion(),
                     f.potencial(), f.altoRendimiento(), f.confianzaEvidencia(), f.resumen(),
                     f.riesgosCriticos(), f.fortalezas(), f.alertas(), f.actualizadoEn(),
-                    f.notasCriterio()));
+                    f.notasCriterio(),
+                    f.ciudad(), f.ciudadCodigo(),
+                    f.pretensionMin(), f.pretensionMax(), f.pretensionMoneda()));
         }
 
         return new RankingVacante(vacanteId, vacante.getTitulo(),
                 puesto == null ? null : puesto.getNombre(),
                 puesto == null ? null : puesto.getNivelPuestoCodigo(),
-                numeradas.size(), conFina, calificados, enCurso, fallidos, numeradas);
+                numeradas.size(), conFina, calificados, enCurso, fallidos,
+                puedeVerPretension, numeradas);
     }
 
     /**
@@ -747,7 +788,47 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
                 criterio.getPuntos(),
                 pesos.get(criterio.getId()),
                 nota == null ? null : nota.getExplicacion(),
-                nota == null ? null : nota.getOrigen());
+                nota == null ? null : nota.getOrigen(),
+                // Va tal cual: 0 a 100, la misma escala del puntaje. Ver el comentario de
+                // NotaCriterioResponse.
+                nota == null ? null : nota.getConfianza(),
+                nota == null ? null : nota.getMotivoAjuste());
+    }
+
+    /**
+     * Cómo se llama la ciudad de cada una de esas personas: {@code «Arequipa — Camaná»}.
+     *
+     * <p>Devuelve el mapa código → nombre pintado, no fila a fila, porque el bucle del
+     * ranking no puede tocar la base: son dos consultas para la tanda entera —las
+     * provincias que aparecen, y los departamentos de esas provincias— por muchos
+     * candidatos que haya.
+     *
+     * <p>El departamento va delante porque hay provincias homónimas —Lima y Lima, San
+     * Martín y San Martín— y una columna que solo dijera «Lima» no distinguiría la capital
+     * de la provincia de Cañete. {@code EXT} sale solo: «Fuera del Perú» no cuelga de
+     * ningún departamento y añadirle un guion sería inventarse uno.
+     */
+    private Map<String, String> ciudadesDe(java.util.Collection<Persona> quienes) {
+        List<String> codigos = quienes.stream()
+                .map(Persona::getCiudadUbigeo)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+        if (codigos.isEmpty()) return Map.of();
+
+        List<Ubigeo> provincias = ubigeos.findAllById(codigos);
+        Map<String, String> departamentos = ubigeos.findAllById(provincias.stream()
+                        .map(Ubigeo::getPadre).filter(Objects::nonNull).distinct().toList())
+                .stream()
+                .collect(Collectors.toMap(Ubigeo::getCodigo, Ubigeo::getNombre, (a, b) -> a));
+
+        Map<String, String> pintadas = new java.util.HashMap<>();
+        for (Ubigeo u : provincias) {
+            String departamento = u.getPadre() == null ? null : departamentos.get(u.getPadre());
+            pintadas.put(u.getCodigo(),
+                    departamento == null ? u.getNombre() : departamento + " — " + u.getNombre());
+        }
+        return pintadas;
     }
 
     /**

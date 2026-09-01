@@ -88,12 +88,50 @@ Quién es alguien. Vale para el equipo de Renaser y para quien postula.
 | `telefono` | text | no | Se vacía al anonimizar |
 | `documento` | text | no | DNI o equivalente. Se vacía al anonimizar |
 | `fecha_nacimiento` | date | no | Se vacía al anonimizar |
+| `ciudad_ubigeo` | varchar(6) | no | Dónde vive, como código de `ubigeo`. Se pide al crear la cuenta |
 | `anonimizado_en` | timestamptz | no | Vacío mientras la persona conserva sus datos |
 
-**Clave primaria:** `id`
+**Clave primaria:** `id` · **Índice parcial:** `persona_ciudad_idx` sobre `ciudad_ubigeo`, solo
+donde no es nulo
 
 Todas las columnas de identidad admiten vacío **porque el borrado las vacía**. Si fueran
 obligatorias, anonimizar exigiría borrar la fila y con ella toda la trazabilidad.
+
+`ciudad_ubigeo` es la única que el borrado **no** toca hoy: el anonimizado vacía nombre,
+apellidos, teléfono, documento y fecha de nacimiento, y deja el código de la provincia puesto.
+Queda por decidir si debe vaciarse también.
+
+La ciudad vive aquí y no en `perfil_candidato` porque el perfil **se crea perezosamente** —solo
+cuando el agente propone datos sacados del currículum— y la ciudad se pide al crear la cuenta,
+cuando la única fila que existe de esa persona es esta.
+
+## `ubigeo`
+
+El catálogo geográfico del Perú, del INEI: dónde se puede decir que uno vive.
+
+| Columna | Tipo | Oblig. | Qué guarda |
+|---|---|---|---|
+| `codigo` | varchar(6) | sí | Código INEI: 2 cifras el departamento, 4 la provincia, 6 el distrito. `EXT` para fuera del Perú |
+| `nivel` | smallint | sí | 1 departamento, 2 provincia, 3 distrito. Entre 1 y 3 |
+| `padre` | varchar(6) | no | El de arriba en el árbol. Apunta a esta misma tabla. Vacío en los departamentos y en `EXT` |
+| `nombre` | text | sí | |
+| `activo` | boolean | sí | Por defecto verdadero |
+
+**Clave primaria:** `codigo` · **Sin columna `id`** · **Sin `creado_en`** · **Índice parcial:**
+`ubigeo_padre_idx` sobre `padre`, solo donde `activo`
+
+Es `varchar(6)` y no `text`, que es lo que usa el resto de los catálogos, porque el código INEI
+tiene un ancho fijo y conocido: seis cifras es el distrito, el nivel más hondo que puede existir.
+El tipo dice por sí solo que ahí no cabe una dirección escrita a mano.
+
+**Hoy están sembradas 222 filas:** los 25 departamentos, las 196 provincias y la fila `EXT`,
+«Fuera del Perú». **El distrito no está sembrado**, y el árbol está preparado para él sin migrar
+nada: cuando haga falta se insertan sus filas con `nivel = 3` y `persona.ciudad_ubigeo` no
+cambia, porque ya es `varchar(6)`. Dos columnas planas —departamento y provincia— habrían
+obligado a migrar la tabla de personas para ganar un nivel.
+
+`EXT` es una fila del catálogo y no un booleano aparte: con un booleano, «dónde vive» tendría
+dos fuentes de verdad y habría que consultar las dos para pintar una celda.
 
 ## `usuario`
 

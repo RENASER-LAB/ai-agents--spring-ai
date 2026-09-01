@@ -342,9 +342,21 @@ def cargar_cv(api, token_equipo, vacante_id, archivo: Path):
             "nombre": nombre, "apellidos": apellidos, "correo": correo,
             "contrasena": CONTRASENA, "aceptaProceso": True,
             "aceptaFuturosContactos": False,
+            # La ciudad es obligatoria al crear cuenta y no se puede sacar del nombre del
+            # archivo, que es lo unico que hay aqui. Se pone «fuera del Peru» a proposito y
+            # no una provincia inventada: quien carga una convocatoria no sabe donde vive
+            # esta gente, y adivinarselo llenaria el filtro del ranking de datos falsos.
+            # Cuando entren al portal la pueden corregir; un dato ausente se ve, uno
+            # inventado no.
+            "ciudadUbigeo": "EXT",
         })
-    except RuntimeError:
-        pass  # ya existía de una carga anterior: se entra con ella
+    except RuntimeError as fallo:
+        # Que la cuenta ya exista es lo normal al recargar una convocatoria, y se sigue con
+        # ella. Cualquier OTRO fallo se propaga: antes se tragaba todo, y cuando el portal
+        # empezo a exigir un campo nuevo el guion no reventaba aqui sino despues, en el
+        # login, con un «correo o contrasena incorrectos» que no decia nada del problema.
+        if "ya existe una cuenta" not in str(fallo).lower():
+            raise
 
     api.token = api.post("/portal/auth/login",
                          {"correo": correo, "contrasena": CONTRASENA})["token"]

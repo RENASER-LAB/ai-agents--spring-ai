@@ -11,6 +11,7 @@ import com.renaser.ai.ai_engine.notificacion.service.ServicioCorreo;
 import com.renaser.ai.ai_engine.organizacion.entity.Organizacion;
 import com.renaser.ai.ai_engine.organizacion.service.DuenoDelInstrumento;
 import com.renaser.ai.ai_engine.parametro.service.ServicioParametros;
+import com.renaser.ai.ai_engine.perfil.service.CatalogosDelPerfil;
 import com.renaser.ai.ai_engine.portal.dto.DtosPortal.CrearCuenta;
 import com.renaser.ai.ai_engine.portal.dto.DtosPortal.Login;
 import com.renaser.ai.ai_engine.portal.dto.DtosPortal.Sesion;
@@ -61,6 +62,9 @@ public class ServicioCuentaPortalImpl implements ServicioCuentaPortal {
     private final ServicioToken tokens;
     private final IntentosLogin intentos;
     private final PasswordEncoder codificador;
+    // Quién decide qué ciudades existen. Se pregunta al catálogo y no al repositorio para
+    // que «válida» signifique lo mismo aquí y en el desplegable que la persona vio.
+    private final CatalogosDelPerfil catalogos;
 
     @Override
     public List<TextoConsentimientoPublico> textosDeConsentimiento() {
@@ -80,6 +84,15 @@ public class ServicioCuentaPortalImpl implements ServicioCuentaPortal {
         if (!Boolean.TRUE.equals(datos.aceptaProceso())) {
             throw new IllegalArgumentException("Hay que aceptar el tratamiento de datos personales para crear la cuenta");
         }
+        // La ciudad se comprueba contra el catálogo y no solo contra «no viene vacía»: el
+        // día que alguien mande «Lima» en vez de «1501», el registro tiene que fallar aquí
+        // con un 400 y no dejar una persona con una ciudad que no existe, imposible de
+        // filtrar y que nadie descubre hasta que el panel pinta una celda en blanco.
+        if (!catalogos.esCiudadElegible(datos.ciudadUbigeo())) {
+            throw new IllegalArgumentException(
+                    "No existe la ciudad «" + datos.ciudadUbigeo() + "»: tiene que ser uno de "
+                            + "los códigos que devuelve /api/v1/portal/catalogos/ubigeo");
+        }
         Organizacion org = duenos.plataforma();
         usuarios.buscarPorCorreo(org.getId(), datos.correo()).ifPresent(u -> {
             throw new IllegalStateException("Ya existe una cuenta con ese correo");
@@ -88,6 +101,7 @@ public class ServicioCuentaPortalImpl implements ServicioCuentaPortal {
         Persona persona = personas.save(Persona.builder()
                 .nombre(datos.nombre())
                 .apellidos(datos.apellidos())
+                .ciudadUbigeo(datos.ciudadUbigeo())
                 .creadoEn(Instant.now())
                 .build());
 

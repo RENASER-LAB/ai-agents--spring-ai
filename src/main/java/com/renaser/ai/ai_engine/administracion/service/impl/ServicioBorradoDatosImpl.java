@@ -143,6 +143,11 @@ public class ServicioBorradoDatosImpl implements ServicioBorradoDatos {
         persona.setTelefono(null);
         persona.setDocumento(null);
         persona.setFechaNacimiento(null);
+        // La ciudad también: dice dónde vive alguien, y eso es dato personal aunque venga de
+        // una lista cerrada. Con la provincia y el resto del expediente —vacante, fechas,
+        // notas— se vuelve a señalar a una persona concreta, que es justo lo que anonimizar
+        // tiene que impedir.
+        persona.setCiudadUbigeo(null);
         persona.setAnonimizadoEn(Instant.now());
         personas.save(persona);
         if (usuario != null) {
