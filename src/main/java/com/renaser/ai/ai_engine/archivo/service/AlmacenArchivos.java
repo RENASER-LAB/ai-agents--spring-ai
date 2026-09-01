@@ -51,6 +51,30 @@ public interface AlmacenArchivos {
     Optional<EnlaceFirmado> urlDeDescarga(Archivo archivo);
 
     /**
+     * El mismo enlace, pero para el enunciado de una prueba: pensado para durar lo que dura
+     * una convocatoria.
+     *
+     * <p><b>Por qué no vale el de arriba.</b> Aquel dura cinco minutos a propósito, y el
+     * motivo está escrito en {@code PropiedadesAlmacen}: un currículum que circule por un
+     * chat es el dato de una persona. Este enlace no se le enseña a un navegador que lo abre
+     * en el momento: se <b>guarda</b> en {@code version_plantilla_prueba.url_consigna} y lo
+     * pega el correo {@code PRUEBA_DISPONIBLE}, que puede salir semanas después de la subida
+     * y que el candidato abre cuando se sienta a hacer la prueba. Con cinco minutos, ese
+     * correo sale siempre con un enlace muerto.
+     *
+     * <p><b>Y por qué se puede.</b> El enunciado no es el dato de nadie: es el examen que
+     * reciben por correo todos los candidatos de esa vacante. Antes de esto se repartía como
+     * un enlace de Drive abierto, que no caducaba nunca y lo abría cualquiera. Esto es menos
+     * público que aquello, no más.
+     *
+     * <p>Por defecto es el enlace corriente: un almacén que no sepa firmar para tanto tiempo
+     * no tiene que fingir que sí.
+     */
+    default Optional<EnlaceFirmado> urlDeConsigna(Archivo archivo) {
+        return urlDeDescarga(archivo);
+    }
+
+    /**
      * Reserva un sitio en el almacén y devuelve por dónde subir sin pasar por aquí.
      *
      * <p>La fila de {@code archivo} se crea ya, con {@code subidoEn} vacío: existe el hueco,

@@ -9,8 +9,10 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Map;
@@ -43,6 +45,14 @@ public class PlantillaPruebaController {
     @Operation(summary = "Crear una versión en borrador")
     public Map<String, Long> crearVersion(@PathVariable Long id, @Valid @RequestBody CrearVersion datos) {
         return Map.of("id", servicio.crearVersion(permisos.actual(), id, datos));
+    }
+
+    @GetMapping("/{id}/versiones")
+    @PreAuthorize("@permisos.tiene('elegir_plantilla_prueba')")
+    @Operation(summary = "Las versiones de esta plantilla, de la más nueva a la más vieja. "
+            + "Vienen todas, borradores incluidos: el estado dice cuál se puede usar")
+    public List<VersionResponse> listarVersiones(@PathVariable Long id) {
+        return servicio.listarVersiones(permisos.actual(), id);
     }
 
     @GetMapping("/versiones/{versionId}")
@@ -103,5 +113,120 @@ public class PlantillaPruebaController {
     public Map<String, Long> agregarCriterio(@PathVariable Long versionId,
                                              @Valid @RequestBody CrearCriterioRubrica datos) {
         return Map.of("id", servicio.agregarCriterioRubrica(permisos.actual(), versionId, datos));
+    }
+
+    // ---------- Corregir y quitar, solo en borrador ----------
+    // Mientras la versión no se publica se compone entera: se cambia, se quita y se
+    // reordena. Publicada, todo esto responde 409 y la salida a un error es una versión
+    // nueva — no hay «despublicar», y el porqué está en el javadoc de ServicioPlantillaPrueba.
+
+    @PutMapping("/versiones/{versionId}")
+    @PreAuthorize("@permisos.tiene('editar_plantillas_prueba')")
+    @Operation(summary = "Reemplazar los datos de una versión en borrador: enunciado, "
+            + "materiales, herramientas, modalidad, duración, plazo y los minutos del cambio")
+    public void actualizarVersion(@PathVariable Long versionId,
+                                  @Valid @RequestBody CrearVersion datos) {
+        servicio.actualizarVersion(permisos.actual(), versionId, datos);
+    }
+
+    @PostMapping(value = "/versiones/{versionId}/consigna",
+            consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("@permisos.tiene('editar_plantillas_prueba')")
+    @Operation(summary = "Subir el ENUNCIADO de la prueba como archivo (PDF o Word). Es el "
+            + "papel que lee el candidato y el que va enlazado en el correo: no crea "
+            + "preguntas, ni entregables, ni rúbrica, y publicar sigue exigiendo lo mismo")
+    public ConsignaResponse subirConsigna(@PathVariable Long versionId,
+                                          @RequestParam("archivo") MultipartFile archivo) {
+        return servicio.subirConsigna(permisos.actual(), versionId, archivo);
+    }
+
+    @DeleteMapping("/versiones/{versionId}/preguntas/{preguntaId}")
+    @PreAuthorize("@permisos.tiene('editar_plantillas_prueba')")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Quitar una pregunta de esta versión. La pregunta sigue en el "
+            + "catálogo: otras versiones pueden estar usándola")
+    public void quitarPregunta(@PathVariable Long versionId, @PathVariable Long preguntaId) {
+        servicio.quitarPregunta(permisos.actual(), versionId, preguntaId);
+    }
+
+    @PutMapping("/entregables/{entregableId}")
+    @PreAuthorize("@permisos.tiene('editar_plantillas_prueba')")
+    @Operation(summary = "Reemplazar un entregable de un borrador")
+    public void actualizarEntregable(@PathVariable Long entregableId,
+                                     @Valid @RequestBody CrearEntregableRequerido datos) {
+        servicio.actualizarEntregableRequerido(permisos.actual(), entregableId, datos);
+    }
+
+    @DeleteMapping("/entregables/{entregableId}")
+    @PreAuthorize("@permisos.tiene('editar_plantillas_prueba')")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Quitar un entregable de un borrador")
+    public void quitarEntregable(@PathVariable Long entregableId) {
+        servicio.quitarEntregableRequerido(permisos.actual(), entregableId);
+    }
+
+    @PutMapping("/rubrica/{criterioId}")
+    @PreAuthorize("@permisos.tiene('editar_plantillas_prueba')")
+    @Operation(summary = "Reemplazar un criterio de la rúbrica de un borrador")
+    public void actualizarCriterio(@PathVariable Long criterioId,
+                                   @Valid @RequestBody CrearCriterioRubrica datos) {
+        servicio.actualizarCriterioRubrica(permisos.actual(), criterioId, datos);
+    }
+
+    @DeleteMapping("/rubrica/{criterioId}")
+    @PreAuthorize("@permisos.tiene('editar_plantillas_prueba')")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Quitar un criterio de la rúbrica de un borrador: es lo que "
+            + "deshace una rúbrica que se pasó de 100 puntos")
+    public void quitarCriterio(@PathVariable Long criterioId) {
+        servicio.quitarCriterioRubrica(permisos.actual(), criterioId);
+    }
+
+    @PutMapping("/variantes/{varianteId}")
+    @PreAuthorize("@permisos.tiene('editar_plantillas_prueba')")
+    @Operation(summary = "Reemplazar el texto de una variante de un borrador")
+    public void actualizarVariante(@PathVariable Long varianteId,
+                                   @Valid @RequestBody CrearVariante datos) {
+        servicio.actualizarVariante(permisos.actual(), varianteId, datos);
+    }
+
+    @DeleteMapping("/variantes/{varianteId}")
+    @PreAuthorize("@permisos.tiene('editar_plantillas_prueba')")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Quitar una variante del cambio inesperado de un borrador")
+    public void quitarVariante(@PathVariable Long varianteId) {
+        servicio.quitarVariante(permisos.actual(), varianteId);
+    }
+
+    @PutMapping("/versiones/{versionId}/preguntas/orden")
+    @PreAuthorize("@permisos.tiene('editar_plantillas_prueba')")
+    @Operation(summary = "El orden de las preguntas elegidas, la lista entera de una vez")
+    public void reordenarPreguntas(@PathVariable Long versionId,
+                                   @Valid @RequestBody ReordenarElementos datos) {
+        servicio.reordenarPreguntas(permisos.actual(), versionId, datos);
+    }
+
+    @PutMapping("/versiones/{versionId}/entregables/orden")
+    @PreAuthorize("@permisos.tiene('editar_plantillas_prueba')")
+    @Operation(summary = "El orden de los entregables, la lista entera de una vez")
+    public void reordenarEntregables(@PathVariable Long versionId,
+                                     @Valid @RequestBody ReordenarElementos datos) {
+        servicio.reordenarEntregables(permisos.actual(), versionId, datos);
+    }
+
+    @PutMapping("/versiones/{versionId}/variantes/orden")
+    @PreAuthorize("@permisos.tiene('editar_plantillas_prueba')")
+    @Operation(summary = "El orden de las variantes, la lista entera de una vez")
+    public void reordenarVariantes(@PathVariable Long versionId,
+                                   @Valid @RequestBody ReordenarElementos datos) {
+        servicio.reordenarVariantes(permisos.actual(), versionId, datos);
+    }
+
+    @PutMapping("/versiones/{versionId}/rubrica/orden")
+    @PreAuthorize("@permisos.tiene('editar_plantillas_prueba')")
+    @Operation(summary = "El orden de los criterios de la rúbrica, la lista entera de una vez")
+    public void reordenarRubrica(@PathVariable Long versionId,
+                                 @Valid @RequestBody ReordenarElementos datos) {
+        servicio.reordenarRubrica(permisos.actual(), versionId, datos);
     }
 }

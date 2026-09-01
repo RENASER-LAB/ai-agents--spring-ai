@@ -131,6 +131,10 @@ public class PuentePruebaIaImpl implements PuentePruebaIa {
                 version.getDuracionMinutos(),
                 cambioQueLeToco(intento),
                 intento.isEsEntregaAutomatica(),
+                // Tal cual está guardada. Recortarla o limpiarla aquí sería hacerlo dos veces
+                // y en dos sitios: quien la mete en el prompt es quien tiene que cuidar de
+                // que no desplace al FORMATO, y eso pasa en AgentePruebaPuesto.
+                version.getGuiaCalificacion(),
                 rubricaParaElAgente(postulacionId, intento),
                 loQueRespondio(intento, version),
                 loQueEntrego(intento, version));

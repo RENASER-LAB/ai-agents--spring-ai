@@ -184,14 +184,27 @@ public class FlujoPruebaIT {
         conToken(post("/api/v1/panel/plantillas-prueba/versiones/" + versionPruebaId + "/publicacion"),
                 tokenTalento, null).andExpect(status().isOk());
 
-        // Una plantilla de 45 minutos no pasa: RF-76 exige entre 60 y 120
-        long versionCorta = Long.parseLong(leer(conToken(
-                post("/api/v1/panel/plantillas-prueba/" + plantillaId + "/versiones"), tokenTalento, """
+        // El rango 60-120 se retiro: una de 45 minutos ya es una decision legitima de quien
+        // escribe la prueba, y se crea sin protestar.
+        conToken(post("/api/v1/panel/plantillas-prueba/" + plantillaId + "/versiones"),
+                tokenTalento, """
                 {"enunciado":"x","modalidad":"CRONOMETRADA","duracionMinutos":45}""")
-                .andExpect(status().isCreated())
-                .andReturn().getResponse().getContentAsString(), "id"));
-        conToken(post("/api/v1/panel/plantillas-prueba/versiones/" + versionCorta + "/publicacion"),
-                tokenTalento, null).andExpect(status().isBadRequest());
+                .andExpect(status().isCreated());
+
+        // Lo que si queda es el suelo de cinco minutos, y se frena antes de guardar nada:
+        // por debajo de ahi el barrido entrega la prueba sola antes de que dé tiempo a leer
+        // el enunciado. Es el mismo suelo que valida la ficha de la vacante.
+        conToken(post("/api/v1/panel/plantillas-prueba/" + plantillaId + "/versiones"),
+                tokenTalento, """
+                {"enunciado":"x","modalidad":"CRONOMETRADA","duracionMinutos":1}""")
+                .andExpect(status().isBadRequest());
+
+        // Y una cronometrada SIN duracion no llega ni a crearse: la V15 ya lo prohibe con un
+        // CHECK, asi que la guarda de `publicarVersion` es la segunda linea y no la primera.
+        conToken(post("/api/v1/panel/plantillas-prueba/" + plantillaId + "/versiones"),
+                tokenTalento, """
+                {"enunciado":"x","modalidad":"CRONOMETRADA"}""")
+                .andExpect(status().isBadRequest());
 
         criterioId = criterioIncompleto;   // se usa el primero para poner nota más adelante junto al segundo
     }
@@ -245,6 +258,23 @@ public class FlujoPruebaIT {
 
         conTokenGet("/api/v1/portal/postulaciones", tokenCandidato)
                 .andExpect(jsonPath("$[0].estado").value("PRUEBA_TURNO_CANDIDATO"));
+
+        // La vara se puede mover MIENTRAS NADIE HAYA EMPEZADO, y esta es la comprobacion
+        // contra la base de verdad: hay una postulacion dentro, con su intento ya creado, y
+        // aun asi la vacante se deja reconfigurar. Con la linea vieja —«ninguna
+        // postulacion»— esta llamada era un 409, y una vacante con un solo curriculum dentro
+        // quedaba congelada hasta la siguiente convocatoria.
+        //
+        // Se bajan los 90 de la plantilla a 45: en el @Order(3) se comprueba que son esos 45
+        // los que le llegan al candidato.
+        conToken(post("/api/v1/panel/vacantes/" + vacanteId + "/instrumento-tecnico"), tokenTalento,
+                "{\"instrumento\": \"PLANTILLA\", \"minutos\": 45}")
+                .andExpect(status().isOk());
+
+        // Y el suelo de cinco minutos tambien rige aqui, no solo en la plantilla.
+        conToken(post("/api/v1/panel/vacantes/" + vacanteId + "/instrumento-tecnico"), tokenTalento,
+                "{\"instrumento\": \"PLANTILLA\", \"minutos\": 1}")
+                .andExpect(status().isBadRequest());
     }
 
     @DisplayName("El candidato rinde la prueba con su cronómetro")
@@ -255,8 +285,18 @@ public class FlujoPruebaIT {
                         .header("Authorization", "Bearer " + tokenCandidato))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.estadoIntento").value("EN_CURSO"))
-                .andExpect(jsonPath("$.duracionMinutos").value(90))
+                // ⚠️ 45, no los 90 de la plantilla: los minutos de la vacante mandan, y el
+                // numero que viaja a la pantalla es el que el servidor va a aplicar de
+                // verdad. Antes este campo salia de la version y la vacante no lo tocaba:
+                // la pantalla decia «90 minutos desde que empieces» y era mentira.
+                .andExpect(jsonPath("$.duracionMinutos").value(45))
                 .andReturn().getResponse().getContentAsString());
+
+        // Y en cuanto ESTA persona empezo, la vara se queda quieta: mover ahora los minutos
+        // le cambiaria el examen debajo mientras lo hace.
+        conToken(post("/api/v1/panel/vacantes/" + vacanteId + "/instrumento-tecnico"), tokenTalento,
+                "{\"instrumento\": \"PLANTILLA\", \"minutos\": 60}")
+                .andExpect(status().isConflict());
 
         // El cambio inesperado no viaja de antemano (RF-77)
         assertThat(prueba.get("cambioTexto").isNull()).isTrue();
@@ -510,7 +550,244 @@ public class FlujoPruebaIT {
         assertThat(laNotaDeEtapa(id)).isEqualTo(90.0);
     }
 
+    /**
+     * Componer un borrador equivocándose, contra la base de verdad.
+     *
+     * <p>Esto <b>no</b> lo pueden cubrir las pruebas de dobles del paquete, y por eso está
+     * aquí: lo que se comprueba es el UNIQUE (versión, orden) de la V15, que un repositorio
+     * simulado nunca levanta, y el {@code flush} entre las dos tandas del renumerado, que en
+     * un doble es una llamada vacía. Con {@code size()+1} el paso 2 de aquí abajo devolvería
+     * un 500, y un renumerado de una sola tanda fallaría en el paso 3 según en qué orden
+     * ejecutara la base los UPDATE. <b>No lo borres pensando que los unitarios lo cubren.</b>
+     */
+    @DisplayName("Un borrador se corrige y se recompone sin quedarse sin salida")
+    @Test
+    @Order(9)
+    void unBorradorSeCorrigeYSeRecompone() throws Exception {
+        long plantillaId = Long.parseLong(leer(conToken(post("/api/v1/panel/plantillas-prueba"),
+                tokenTalento, "{\"nombre\":\"Prueba que se compone a mano\"}")
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString(), "id"));
+        long borradorId = Long.parseLong(leer(conToken(
+                post("/api/v1/panel/plantillas-prueba/" + plantillaId + "/versiones"), tokenTalento, """
+                {"enunciado":"Primer intento de enunciado","modalidad":"CRONOMETRADA",
+                 "duracionMinutos":90}""")
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString(), "id"));
+        String base = "/api/v1/panel/plantillas-prueba/versiones/" + borradorId;
+
+        // 1 · Tres entregables, y se quita el del medio
+        long a = agregarEntregable(borradorId, "Primero");
+        long b = agregarEntregable(borradorId, "Segundo");
+        long c = agregarEntregable(borradorId, "Tercero");
+        conToken(delete("/api/v1/panel/plantillas-prueba/entregables/" + b), tokenTalento, null)
+                .andExpect(status().isNoContent());
+
+        // 2 · El siguiente que se agrega NO reclama el hueco del 2: pide el 4
+        long d = agregarEntregable(borradorId, "Cuarto");
+
+        // 3 · Y la lista se recompone entera, contra el UNIQUE de verdad
+        conToken(put(base + "/entregables/orden"), tokenTalento,
+                "{\"idsEnOrden\": [%d, %d, %d]}".formatted(d, c, a))
+                .andExpect(status().isOk());
+        assertThat(nombresDeEntregables(borradorId)).containsExactly("Cuarto", "Tercero", "Primero");
+
+        // 3b · `variante_cambio` es la otra tabla con UNIQUE (versión, orden): mismo camino
+        long v1 = agregarVariante(borradorId, "Se cae el sistema");
+        long v2 = agregarVariante(borradorId, "Llega un pedido urgente");
+        conToken(delete("/api/v1/panel/plantillas-prueba/variantes/" + v1), tokenTalento, null)
+                .andExpect(status().isNoContent());
+        long v3 = agregarVariante(borradorId, "El cliente cambia de idea");
+        conToken(put(base + "/variantes/orden"), tokenTalento,
+                "{\"idsEnOrden\": [%d, %d]}".formatted(v3, v2)).andExpect(status().isOk());
+        assertThat(jdbc.queryForList(
+                "select texto from variante_cambio where version_plantilla_prueba_id = ? order by orden",
+                String.class, borradorId))
+                .containsExactly("El cliente cambia de idea", "Llega un pedido urgente");
+
+        // 4 · Este borrador elige las MISMAS preguntas del catálogo que la versión ya
+        // publicada más arriba: es lo normal, el catálogo es global. Una universal de más
+        // para poder quitarla después sin bajarse de la cuota de RF-83.
+        long compartida = Long.parseLong(leer(conToken(
+                post("/api/v1/panel/plantillas-prueba/preguntas"), tokenTalento, """
+                {"codigo":"UNIV_COMPARTIDA","enunciado":"¿Qué harías distinto?","tipo":"UNIVERSAL"}""")
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString(), "id"));
+        elegir(base, compartida);
+        for (int i = 0; i < 8; i++) {
+            elegir(base, laPreguntaDelCatalogo("UNIV_P_" + i));
+        }
+        for (int i = 0; i < 3; i++) {
+            elegir(base, laPreguntaDelCatalogo("ESP_P_" + i));
+        }
+
+        // ⚠️ Quitar una pregunta de ESTA versión no la borra del catálogo ni se la quita a la
+        // otra versión que la tiene elegida. Si algún día esto empieza a fallar, el examen que
+        // se le sirve a alguien se habrá vaciado desde otra plantilla.
+        long compartidaConLaPublicada = laPreguntaDelCatalogo("UNIV_P_0");
+        conToken(delete(base + "/preguntas/" + compartidaConLaPublicada), tokenTalento, null)
+                .andExpect(status().isNoContent());
+        assertThat(jdbc.queryForObject("select count(*) from pregunta_prueba where id = ?",
+                Integer.class, compartidaConLaPublicada)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("""
+                select count(*) from pregunta_version_plantilla
+                where version_plantilla_prueba_id = ? and pregunta_prueba_id = ?""",
+                Integer.class, versionPruebaId, compartidaConLaPublicada)).isEqualTo(1);
+
+        // 5 · El callejón sin salida de la rúbrica: 60 + 40 + 40 = 140, y se deshace
+        agregarCriterio(borradorId, "RES", 60);
+        agregarCriterio(borradorId, "CAL", 40);
+        long deMas = agregarCriterio(borradorId, "SOBRA", 40);
+        conToken(post(base + "/publicacion"), tokenTalento, null).andExpect(status().isBadRequest());
+        conToken(delete("/api/v1/panel/plantillas-prueba/rubrica/" + deMas), tokenTalento, null)
+                .andExpect(status().isNoContent());
+
+        // 6 · Y los datos de la versión también se corrigen antes de publicar
+        conToken(put("/api/v1/panel/plantillas-prueba/versiones/" + borradorId), tokenTalento, """
+                {"enunciado":"El enunciado que de verdad se quería","modalidad":"CRONOMETRADA",
+                 "duracionMinutos":100,"minutoCambioMin":30,"minutoCambioMax":50}""")
+                .andExpect(status().isOk());
+        conToken(post(base + "/publicacion"), tokenTalento, null).andExpect(status().isOk());
+        conTokenGet(base, tokenTalento)
+                .andExpect(jsonPath("$.version.enunciado").value("El enunciado que de verdad se quería"))
+                .andExpect(jsonPath("$.version.duracionMinutos").value(100));
+
+        // 7 · Publicada, la puerta se cierra: 409 y no hay forma de despublicar
+        conToken(delete("/api/v1/panel/plantillas-prueba/entregables/" + d), tokenTalento, null)
+                .andExpect(status().isConflict());
+        conToken(put("/api/v1/panel/plantillas-prueba/versiones/" + borradorId), tokenTalento,
+                "{\"enunciado\":\"Otra cosa\",\"modalidad\":\"CRONOMETRADA\",\"duracionMinutos\":90}")
+                .andExpect(status().isConflict());
+        // Y la que ya estaba publicada desde el principio, igual
+        conToken(delete("/api/v1/panel/plantillas-prueba/entregables/" + entregableObligatorioId),
+                tokenTalento, null).andExpect(status().isConflict());
+    }
+
+    @DisplayName("Una prueba puede orientar a quien la califica y llevar su enunciado en un archivo")
+    @Test
+    @Order(10)
+    void laGuiaYElEnunciadoViajanConLaVersion() throws Exception {
+        /*
+         * Contra la base de verdad, que es donde vive lo que los dobles no pueden levantar:
+         * la columna `guia_calificacion` de la V46 y su CHECK de longitud. Los unitarios
+         * fijan las decisiones; esto comprueba que la columna existe, que el texto va y
+         * vuelve entero, y que el enunciado subido queda enlazado en la versión.
+         *
+         * ⚠️ El archivo es el ENUNCIADO, no la prueba. Aquí se ve: se sube y la versión
+         * sigue sin poder publicarse, porque no tiene ni preguntas ni rúbrica. Lo que exige
+         * `publicarVersion` no cambió ni una línea.
+         */
+        long plantillaId = Long.parseLong(leer(conToken(post("/api/v1/panel/plantillas-prueba"),
+                tokenTalento, "{\"nombre\":\"Prueba con guía de calificación\"}")
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString(), "id"));
+
+        String guia = "En este rubro un cierre de caja que no cuadra al céntimo es un cero, "
+                + "por muy bien explicado que esté el método.";
+        long versionId = Long.parseLong(leer(conToken(
+                post("/api/v1/panel/plantillas-prueba/" + plantillaId + "/versiones"), tokenTalento, """
+                {"enunciado":"Cierra la caja del día","modalidad":"CRONOMETRADA",
+                 "duracionMinutos":90,"guiaCalificacion":"%s"}""".formatted(guia))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString(), "id"));
+
+        String base = "/api/v1/panel/plantillas-prueba/versiones/" + versionId;
+
+        // Va y vuelve entera por la API, que es lo que el panel necesita para poder editarla.
+        String vista = conTokenGet(base, tokenTalento)
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        assertThat(json.readTree(vista).get("version").get("guiaCalificacion").asText())
+                .isEqualTo(guia);
+
+        // Y el tope: dos mil y uno no entran. Sin este 400, la fila reventaría contra el
+        // CHECK de la V46 con un mensaje que no nombra ningún campo.
+        conToken(put(base), tokenTalento, """
+                {"enunciado":"Cierra la caja del día","modalidad":"CRONOMETRADA",
+                 "duracionMinutos":90,"guiaCalificacion":"%s"}""".formatted("a".repeat(2001)))
+                .andExpect(status().isBadRequest());
+
+        // El enunciado como archivo: PDF, y queda enlazado en la versión.
+        MockMultipartFile enunciado = new MockMultipartFile(
+                "archivo", "enunciado.pdf", "application/pdf", "El caso completo".getBytes());
+        mvc.perform(multipart(base + "/consigna").file(enunciado)
+                        .header("Authorization", "Bearer " + tokenTalento))
+                .andExpect(status().isOk());
+
+        assertThat(jdbc.queryForObject(
+                "select url_consigna from version_plantilla_prueba where id = ?",
+                String.class, versionId))
+                .as("el enlace que después pega el correo PRUEBA_DISPONIBLE")
+                .isNotBlank();
+
+        // Un .txt no es un enunciado: PDF o Word, lo mismo que en el resto del sistema.
+        mvc.perform(multipart(base + "/consigna")
+                        .file(new MockMultipartFile("archivo", "enunciado.txt", "text/plain",
+                                "x".getBytes()))
+                        .header("Authorization", "Bearer " + tokenTalento))
+                .andExpect(status().isBadRequest());
+
+        // ⚠️ Y con el archivo subido la prueba SIGUE sin poder publicarse: de un PDF no sale
+        // ninguna rúbrica. Quien crea que subiendo el enunciado ya tiene la prueba montada se
+        // topa aquí con la realidad.
+        conToken(post(base + "/publicacion"), tokenTalento, null)
+                .andExpect(status().isBadRequest());
+
+        // Publicada, el enunciado ya no se cambia: es parte del examen.
+        agregarCriterio(versionId, "TODO_ES_UNO", 100);
+        long pregunta = laPreguntaDelCatalogo("UNIV_P_0");
+        elegir(base, pregunta);
+        conToken(post(base + "/publicacion"), tokenTalento, null).andExpect(status().isOk());
+
+        mvc.perform(multipart(base + "/consigna").file(enunciado)
+                        .header("Authorization", "Bearer " + tokenTalento))
+                .andExpect(status().isConflict());
+    }
+
     // ============ Apoyo ============
+
+    private long agregarEntregable(long versionId, String nombre) throws Exception {
+        return Long.parseLong(leer(conToken(
+                post("/api/v1/panel/plantillas-prueba/versiones/" + versionId + "/entregables"),
+                tokenTalento, """
+                {"nombre":"%s","detalle":"Lo que sea","formato":"ENLACE","esObligatorio":false}"""
+                        .formatted(nombre))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString(), "id"));
+    }
+
+    private long agregarVariante(long versionId, String texto) throws Exception {
+        return Long.parseLong(leer(conToken(
+                post("/api/v1/panel/plantillas-prueba/versiones/" + versionId + "/variantes"),
+                tokenTalento, "{\"texto\":\"%s\"}".formatted(texto))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString(), "id"));
+    }
+
+    private long agregarCriterio(long versionId, String codigo, int puntos) throws Exception {
+        return Long.parseLong(leer(conToken(
+                post("/api/v1/panel/plantillas-prueba/versiones/" + versionId + "/rubrica"),
+                tokenTalento, """
+                {"codigo":"%s","nombre":"Criterio %s","puntos":%d,"metodoVerificacion":"PERSONA"}"""
+                        .formatted(codigo, codigo, puntos))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString(), "id"));
+    }
+
+    private void elegir(String base, long preguntaId) throws Exception {
+        conToken(post(base + "/preguntas"), tokenTalento,
+                "{\"preguntaPruebaId\": %d}".formatted(preguntaId)).andExpect(status().isOk());
+    }
+
+    private long laPreguntaDelCatalogo(String codigo) {
+        return jdbc.queryForObject("select id from pregunta_prueba where codigo = ?", Long.class, codigo);
+    }
+
+    private List<String> nombresDeEntregables(long versionId) throws Exception {
+        String cuerpo = conTokenGet("/api/v1/panel/plantillas-prueba/versiones/" + versionId,
+                tokenTalento).andReturn().getResponse().getContentAsString();
+        return json.readTree(cuerpo).get("entregables").findValuesAsText("nombre");
+    }
 
     /** La nota de la etapa de la prueba, o null si todavía no hay ninguna. */
     private Double laNotaDeEtapa(long postulacionId) {

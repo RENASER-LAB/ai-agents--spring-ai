@@ -147,8 +147,22 @@ public class AlmacenArchivosSupabase implements AlmacenArchivos {
 
     @Override
     public Optional<EnlaceFirmado> urlDeDescarga(Archivo archivo) {
+        return firmar(archivo, Duration.ofMinutes(config.getMinutosEnlace()));
+    }
+
+    /**
+     * El enunciado de una prueba se firma para meses, no para minutos.
+     *
+     * <p>El porqué está en {@link AlmacenArchivos#urlDeConsigna}: este enlace se guarda en la
+     * versión de la plantilla y lo pega un correo que puede salir semanas después.
+     */
+    @Override
+    public Optional<EnlaceFirmado> urlDeConsigna(Archivo archivo) {
+        return firmar(archivo, Duration.ofDays(config.getDiasEnlaceConsigna()));
+    }
+
+    private Optional<EnlaceFirmado> firmar(Archivo archivo, Duration vida) {
         exigirContenido(archivo);
-        Duration vida = Duration.ofMinutes(config.getMinutosEnlace());
 
         Map<String, Object> respuesta = cliente.post()
                 .uri(objeto("/object/sign", archivo.getRuta()))

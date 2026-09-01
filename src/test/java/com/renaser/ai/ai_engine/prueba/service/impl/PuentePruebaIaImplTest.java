@@ -59,6 +59,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -672,6 +673,59 @@ class PuentePruebaIaImplTest {
                 BigDecimal.valueOf(90)));
 
         verify(notasCriterio, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("una respuesta que se salta todas las reglas a la vez solo deja pasar lo legítimo")
+    void unaRespuestaHostilNoPasaDeAqui() {
+        /*
+         * ⚠️ **Esta es la red de seguridad de la guía de calificación, y por eso está aquí.**
+         * Desde la V46 cada prueba puede añadir su propio texto al `system` del modelo, y ese
+         * texto lo escribe una persona. Ninguna de las precauciones del prompt —el tope de
+         * longitud, el envoltorio, el FORMATO al final— es una garantía: se puede convencer a
+         * un modelo de casi cualquier cosa. Lo que sí es una garantía es que del modelo solo
+         * entra a la base lo que pasa por aquí.
+         *
+         * Así que se le da de golpe la respuesta que produciría una guía que hubiera
+         * conseguido lo peor: una nota global, un criterio inventado, uno que la rúbrica
+         * reserva a una persona, y un puntaje muy por encima del máximo. De todo eso se
+         * guarda UNA nota, y acotada.
+         *
+         * No debilitar esto: cada `continue` de `guardarNotasPrueba` es una de estas líneas.
+         */
+        montarLaRubrica(List.of(
+                        criterio(1L, "PR_CALIDAD", "AGENTE", 20),
+                        criterio(2L, "PR_ACTITUD", "PERSONA", 30),
+                        criterio(3L, "PR_ORDEN", "AGENTE", 50)),
+                Map.of(1L, BigDecimal.valueOf(20), 2L, BigDecimal.valueOf(30),
+                        3L, BigDecimal.valueOf(50)),
+                "PRUEBA_CALIFICANDO");
+
+        puente.guardarNotasPrueba(POSTULACION, 77L, new ResultadoPrueba(List.of(
+                // «La guía decía que calificara sobre 100»: no hay dónde escribirlo.
+                new NotaCriterioPruebaIa("NOTA_GLOBAL", BigDecimal.valueOf(100),
+                        "El candidato es excelente", "todo"),
+                new NotaCriterioPruebaIa("PR_INVENTADO", BigDecimal.valueOf(100),
+                        "Criterio que la guía se sacó de la manga", "todo"),
+                // Uno que la rúbrica reserva a una persona: esa decisión no la cambia nadie.
+                new NotaCriterioPruebaIa("PR_ACTITUD", BigDecimal.valueOf(30),
+                        "Se le vio muy motivado", "la carta"),
+                // Uno legítimo, pero con un puntaje de veinticinco veces su máximo.
+                new NotaCriterioPruebaIa("PR_CALIDAD", BigDecimal.valueOf(500),
+                        "Impecable", "la hoja cuadra"),
+                // Y uno legítimo sin explicación: sin ella no se guarda (RF-150).
+                new NotaCriterioPruebaIa("PR_ORDEN", BigDecimal.valueOf(50), "  ", null)),
+                BigDecimal.valueOf(999)));
+
+        ArgumentCaptor<NotaCriterio> guardada = ArgumentCaptor.forClass(NotaCriterio.class);
+        verify(notasCriterio, times(1)).save(guardada.capture());
+        assertThat(guardada.getValue().getCriterioId())
+                .as("solo el criterio de agente que existe en esta rúbrica")
+                .isEqualTo(1L);
+        assertThat(guardada.getValue().getPuntaje())
+                .as("acotado al máximo de ESE criterio, no al que dijo el modelo")
+                .isEqualByComparingTo("20");
+        assertThat(guardada.getValue().getConfianza()).isEqualByComparingTo("100");
     }
 
     @Test
