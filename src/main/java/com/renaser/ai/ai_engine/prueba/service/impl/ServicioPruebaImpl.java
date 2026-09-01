@@ -79,6 +79,27 @@ public class ServicioPruebaImpl implements ServicioPrueba {
     @Transactional
     public Long crearAlEntrar(Long organizacionId, Long postulacionId,
                               Long versionPlantillaPruebaId, Instant cierraEn) {
+        // ⚠️ Solo si no tiene ya el suyo. Volver a entrar en la etapa —pasa cuando se
+        // retrocede una postulación y se la vuelve a avanzar— chocaba contra la clave única
+        // de la tabla: la inserción reventaba y el panel devolvía «ya existe un registro con
+        // postulacion_id = X», que ni dice qué pasó ni deja seguir. Se reutiliza el que ya
+        // hay, igual que el cuestionario técnico reutiliza el suyo en `confirmarAvance`.
+        IntentoPrueba existente = intentos.findByPostulacionId(postulacionId).orElse(null);
+        if (existente != null) {
+            // Quien ya abrió su prueba se queda con la versión con la que la abrió (RF-90):
+            // cambiársela debajo le movería el enunciado a mitad de camino. A quien no la ha
+            // abierto se le pone la que la vacante rinde hoy —si no, cambiarle la prueba desde
+            // la ficha no le llegaría nunca y rendiría la vieja sin que nadie lo viera— y con
+            // ella la fecha de cierre, salvo que tenga concedida la suya (`plazoPropio`, V32).
+            if (existente.getIniciadoEn() == null) {
+                existente.setVersionPlantillaPruebaId(versionPlantillaPruebaId);
+                if (!existente.isPlazoPropio()) {
+                    existente.setVenceEn(cierraEn);
+                }
+                intentos.save(existente);
+            }
+            return existente.getId();
+        }
         IntentoPrueba intento = intentos.save(IntentoPrueba.builder()
                 .postulacionId(postulacionId)
                 .versionPlantillaPruebaId(versionPlantillaPruebaId)

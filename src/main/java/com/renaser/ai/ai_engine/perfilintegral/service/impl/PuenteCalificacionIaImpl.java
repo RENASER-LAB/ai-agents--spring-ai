@@ -586,7 +586,21 @@ public class PuenteCalificacionIaImpl implements PuenteCalificacionIa {
         postulaciones.save(postulacion);
 
         // Lo último, y solo por la máquina: nunca se escribe estado_codigo a mano.
-        maquina.transicionar(postulacion, "PERFIL_POR_CONFIRMAR", null, null, true, false, null);
+        //
+        // ⚠️ Y solo si sigue en el Perfil Integral. Entre que este trabajo empieza y termina
+        // pasan minutos, y en ese rato una persona puede haberla avanzado desde el panel:
+        // mover a «por confirmar» sin mirar la devolvía a la bandeja anterior, le quitaba al
+        // candidato el turno que ya le habían dado y dejaba su intento de la prueba creado
+        // pero fuera de etapa —desde ahí, volver a avanzarla chocaba contra la clave única y
+        // el panel solo sabía decir «ya existe un registro con postulacion_id X». Lo
+        // calificado se guarda igual: lo que no se hace es mandarla donde ya no está.
+        if (maquina.sigueEnLaEtapa(postulacion, "PERFIL_INTEGRAL")) {
+            maquina.transicionar(postulacion, "PERFIL_POR_CONFIRMAR", null, null, true, false, null);
+        } else {
+            log.info("POTENCIAL_RIESGO: la postulación {} ya salió del Perfil Integral (está en "
+                    + "{}): se guarda su perfil y su nota, pero no se la mueve",
+                    postulacionId, postulacion.getEstadoCodigo());
+        }
 
         log.info("POTENCIAL_RIESGO: postulación {} calificada con {} y grupo {}",
                 postulacionId, nota, postulacion.getGrupoPrioridad());

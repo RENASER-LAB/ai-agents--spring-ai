@@ -127,6 +127,26 @@ public class MaquinaEstados {
                         .map(EstadoPostulacion::isEsFinal).orElse(false);
     }
 
+    /**
+     * Si esta postulacion sigue en la etapa en la que quien pregunta cree que esta.
+     *
+     * <p>Existe por los trabajos que tardan. Un agente empieza a calificar con la postulacion
+     * en su etapa y termina minutos despues, cuando una persona ya la ha movido desde el
+     * panel; si al cerrar la mueve igual, la devuelve a una bandeja que ya habia dejado atras
+     * —y al candidato le quita el turno que ya le habian dado, sin que nadie lo pida ni lo
+     * vea. Preguntar antes es lo que separa «guardar lo que califique» de «mandar donde crei
+     * que estaba».
+     *
+     * <p>Se compara la ETAPA y no el estado exacto a proposito: dentro de una etapa moverse
+     * es normal —una recalificacion pedida desde el panel se cierra estando ya en
+     * POR_CONFIRMAR— y exigir el estado de partida romperia ese camino en silencio.
+     */
+    public boolean sigueEnLaEtapa(Postulacion postulacion, String etapaCodigo) {
+        return postulacion.getEstadoCodigo() != null
+                && estados.findById(postulacion.getEstadoCodigo())
+                        .map(e -> etapaCodigo.equals(e.getEtapaCodigo())).orElse(false);
+    }
+
     // ============ Las operaciones con efectos ============
 
     public Optional<EstadoPostulacion> siguiente(String codigoActual) {
