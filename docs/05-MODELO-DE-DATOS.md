@@ -148,10 +148,19 @@ estado_postulacion.codigo = 'PERFIL_POR_CONFIRMAR'
 etapa.codigo              = 'PRUEBA_PUESTO'
 familia.codigo            = 'TECNOLOGIA'
 dimension.codigo          = 'INT'
+ubigeo.codigo             = '1501'
 ```
 
 Así, al mirar la tabla de postulaciones se entiende en qué estado está cada una sin cruzarla
 con nada. Con un número habría que ir a buscar qué significa el 7 cada vez.
+
+**`ubigeo` es el mismo patrón con una vuelta de tuerca.** Su código tampoco es un número
+autogenerado, pero no lo escogió este proyecto: es el del INEI, y su ancho dice a qué nivel
+pertenece —dos cifras el departamento, cuatro la provincia, seis el distrito—, así que `'1501'`
+es la provincia de Lima y se sabe que cuelga del departamento `'15'` sin consultar nada. Es el
+único catálogo con **padre**: la tabla se apunta a sí misma, y esa es la razón de que añadir el
+distrito mañana no obligue a tocar ninguna otra tabla. La fila `'EXT'` rompe el formato a
+propósito, porque «fuera del Perú» no tiene código INEI.
 
 ---
 
@@ -325,6 +334,7 @@ error del modelo de un cambio en las instrucciones que le dimos nosotros.
    PERSONAS Y ACCESO              CONFIGURACION
   persona · usuario · rol       versiones de pesos
      permiso · area              parametros · correos
+     ubigeo (donde vive)
          |                              |
          | (identidad del equipo        | (toda nota apunta
          |  viene de RENASER OS)        |  a una version)
@@ -403,14 +413,15 @@ Arranca con una sola fila. Todo lo demás la referencia, directamente o a travé
 
 ---
 
-### Personas, acceso y permisos · 7 tablas
+### Personas, acceso y permisos · 8 tablas
 
 Un rol es un conjunto de permisos con nombre guardado en la base de datos, no algo fijo en el
 código. El Administrador puede crear roles nuevos y repartir permisos sin que nadie programe.
 
 | Tabla | Para qué existe | Columnas que importan |
 |---|---|---|
-| `persona` | Quién es alguien. Vale para el equipo y para quien postula | nombre, apellidos, telefono, documento, fecha_nacimiento, anonimizado_en |
+| `persona` | Quién es alguien. Vale para el equipo y para quien postula | nombre, apellidos, telefono, documento, fecha_nacimiento, ciudad_ubigeo, anonimizado_en |
+| `ubigeo` | El catálogo geográfico del Perú (INEI): dónde se puede decir que uno vive. Es el único catálogo con padre, porque el país es un árbol | codigo, nivel, padre, nombre, activo |
 | `usuario` | Cómo entra al sistema | organizacion_id, persona_id, correo, contrasena_hash, usuario_renaser_os_id, area_id, es_activo |
 | `area` | El departamento que contrata. Hace falta para saber qué ve un responsable y para impedir que alguien sea Evaluador de Estándar de su propia área | organizacion_id, nombre |
 | `rol` | Un nombre y una lista de permisos | organizacion_id, codigo, nombre, descripcion |
@@ -422,6 +433,15 @@ código. El Administrador puede crear roles nuevos y repartir permisos sin que n
 otro. El equipo entra con el token de RENASER OS; los candidatos, con su contraseña.
 
 El `area_id` queda vacío en los candidatos, que no pertenecen a ningún departamento.
+
+**La ciudad cuelga de `persona` y no del perfil del candidato.** El perfil se crea perezosamente
+—solo cuando el agente propone datos sacados del currículum— y la ciudad se pide al crear la
+cuenta, cuando la única fila que existe de esa persona es esta. Guardarla en el perfil habría
+significado que quien todavía no subió currículum no tiene ciudad, justo lo que hace falta para
+filtrar una tanda. `perfil_candidato.ubicacion`, el texto libre que el candidato escribe sobre sí
+mismo, **sigue existiendo y sigue siendo suyo**: lo que ya no hace es decidir dónde vive nadie a
+efectos del panel, porque «Lima», «lima» y «Lima Cercado» son la misma ciudad y tres filtros
+distintos. La migración lo leyó una vez para rellenar lo que pudo y lo dejó intacto.
 
 El permiso guarda una etiqueta en lenguaje normal —«puede cerrar una vacante»— porque la
 pantalla donde se reparten permisos nunca debe mostrar nombres técnicos. Los permisos **no
@@ -1018,6 +1038,9 @@ Datos que se cargan con la primera migración, no a mano:
   área, dirección y administrador. Es como arranca el sistema, no cómo queda para siempre
 - Las **22 dimensiones**, con cuáles de ellas son obligatorias
 - Las **cinco etapas**, los **tres niveles** y las **siete familias**
+- El **ubigeo**: los **25 departamentos**, las **196 provincias** y la fila `EXT`, «Fuera del
+  Perú». **Los distritos no están sembrados** —serían el nivel 3, y son otras 1874 filas—: el
+  árbol los admite el día que hagan falta sin migrar nada
 - Los **ocho criterios** del currículum, los **diez** de la simulación y las **nueve métricas**
   de la validación
 - Las **preguntas de la prueba**: las previas, las diez universales y las del puesto
@@ -1064,6 +1087,12 @@ otra modalidad funciona desde el primer día.
 
 **Cómo responde el sistema cuando la API de RENASER OS no está.** Está decidido qué hacer en cada
 caso, pero falta el detalle de reintentos y tiempos de espera.
+
+**La ciudad sobrevive al anonimizado.** El borrado vacía nombre, apellidos, teléfono, documento y
+fecha de nacimiento, y deja puesto `persona.ciudad_ubigeo`. Nadie ha decidido todavía si una
+provincia —que agrupa a miles de personas y por sí sola no señala a ninguna— debe vaciarse
+también. Hasta que se decida, la columna se queda, y conviene saberlo antes de enseñar una tanda
+que mezcle anonimizados con quien no lo está.
 
 ---
 
