@@ -63,5 +63,23 @@ public class PropiedadesAlmacen {
          * de sobra para que el navegador lo abra y no para que ande circulando por un chat.
          */
         private int minutosEnlace = 5;
+
+        /**
+         * Cuánto vale el enlace al enunciado de una prueba.
+         *
+         * <p>Meses y no minutos, y no es que aquí se relaje la regla de arriba: es que el
+         * enunciado no es el dato de nadie. Es el examen que reciben por correo todos los
+         * candidatos de una vacante, y ese enlace se <b>guarda</b> en la versión de la
+         * plantilla — el correo puede salir semanas después de subirlo. Con cinco minutos
+         * saldría siempre muerto.
+         *
+         * <p>⚠️ Ciento ochenta días cubren de sobra una convocatoria, pero <b>caduca</b>, y
+         * subir el enunciado solo se puede sobre una versión en BORRADOR. Así que pasado ese
+         * plazo el enlace de una versión publicada deja de abrir y la salida es la de
+         * siempre: una versión nueva. Si algún día hiciera falta que no caducara, lo que hay
+         * que cambiar no es este número, es guardar el id del archivo y firmar el enlace al
+         * mandar el correo en vez de al subirlo.
+         */
+        private int diasEnlaceConsigna = 180;
     }
 }

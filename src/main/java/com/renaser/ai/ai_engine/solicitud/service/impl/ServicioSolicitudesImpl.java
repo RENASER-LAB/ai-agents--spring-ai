@@ -9,6 +9,7 @@ import com.renaser.ai.ai_engine.seguridad.dto.FiltroAlcance;
 import com.renaser.ai.ai_engine.seguridad.service.Permisos;
 import com.renaser.ai.ai_engine.solicitud.entity.*;
 import com.renaser.ai.ai_engine.solicitud.repository.*;
+import com.renaser.ai.ai_engine.organizacion.repository.AreaRepository;
 import com.renaser.ai.ai_engine.vacante.entity.Puesto;
 import com.renaser.ai.ai_engine.vacante.repository.PuestoRepository;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +30,7 @@ public class ServicioSolicitudesImpl implements ServicioSolicitudes {
     private final SolicitudTalentoRepository solicitudes;
     private final ResultadoEsperadoRepository resultados;
     private final PuestoRepository puestos;
+    private final AreaRepository areas;
     private final ServicioAuditoria auditoria;
     private final Permisos permisos;
 
@@ -42,6 +44,17 @@ public class ServicioSolicitudesImpl implements ServicioSolicitudes {
         }
         exigirCoincidencia("nivel", datos.nivelPuestoCodigo(), puesto.getNivelPuestoCodigo());
         exigirCoincidencia("familia", datos.familiaCodigo(), puesto.getFamiliaCodigo());
+
+        /*
+         * ⚠️ El área, contra la organización, igual que el puesto de arriba. La clave ajena
+         * `solicitud_talento.area_id -> area(id)` solo exige que el área exista, no que sea de
+         * esta empresa: sin esto, mandar el id de un área ajena daba un 201 y dejaba una
+         * solicitud de esta empresa colgando de la estructura de otra. Esa fila después es
+         * invisible para todo lo que consulta por organización —entre otras cosas, para el
+         * recuento que decide si un área se puede borrar—.
+         */
+        areas.findByIdAndOrganizacionId(datos.areaId(), quien.organizacionId())
+                .orElseThrow(() -> new ResourceNotFoundException("Área", "id", datos.areaId()));
 
         SolicitudTalento solicitud = solicitudes.save(SolicitudTalento.builder()
                 .organizacionId(quien.organizacionId())

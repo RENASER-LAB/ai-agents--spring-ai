@@ -9,6 +9,7 @@ import com.renaser.ai.ai_engine.notificacion.repository.PlantillaCorreoVacanteRe
 import com.renaser.ai.ai_engine.vacante.service.ServicioVacantesPanel;
 import com.renaser.ai.ai_engine.vacante.dto.DtosVacante.*;
 import com.renaser.ai.ai_engine.perfilintegral.entity.PlantillaEvaluacion;
+import com.renaser.ai.ai_engine.perfilintegral.repository.EvaluacionRepository;
 import com.renaser.ai.ai_engine.perfilintegral.repository.PlantillaEvaluacionRepository;
 import com.renaser.ai.ai_engine.perfilintegral.repository.VersionBancoRepository;
 import com.renaser.ai.ai_engine.pesos.entity.VersionPesos;
@@ -45,6 +46,13 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
     public static final String PLANTILLA = "PLANTILLA";
     public static final String CUESTIONARIO_TECNICO = "CUESTIONARIO_TECNICO";
 
+    /**
+     * El suelo del reloj de la etapa técnica, en minutos. El mismo que exige publicar una
+     * versión de plantilla: un número por debajo de esto entrega la prueba sola antes de que
+     * al candidato le dé tiempo a leer el enunciado.
+     */
+    private static final int MINUTOS_MINIMOS = 5;
+
     private final VacanteRepository vacantes;
     private final PuestoRepository puestos;
     private final RequisitoObjetivoRepository requisitos;
@@ -57,6 +65,9 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
     private final PlantillaCorreoVacanteRepository plantillasPorVacante;
     private final TextoConsentimientoRepository textosConsentimiento;
     private final IntentoPruebaRepository intentos;
+    // Solo para preguntar si alguien ya abrió su cuestionario técnico: es el otro
+    // instrumento de la etapa, y la guarda tiene que mirar los dos.
+    private final EvaluacionRepository evaluaciones;
     private final VersionBancoRepository versionesBanco;
     private final ServicioAuditoria auditoria;
     private final DuenoDelInstrumento dueno;
@@ -448,11 +459,11 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
      * <p>Se declara aquí y no se deduce de si hay un cuestionario publicado: preparar uno
      * «por si acaso» no puede cambiar en silencio lo que va a rendir la gente.
      *
-     * <p>⚠️ <b>La misma vara para todos</b> ({@link #exigirVaraQuieta}): cambiar de
-     * instrumento con candidatos ya dentro dejaría a unos medidos con un examen y a otros con
-     * otro, en la misma lista. Ojo a la línea exacta: la guarda frena desde la primera
-     * postulación, no desde la primera rendición — es más estricta de lo que pide la regla, y
-     * se deja así a propósito, igual que en las otras tres decisiones de la vacante.
+     * <p>⚠️ <b>La misma vara para todos</b>: cambiar de instrumento con gente que ya rindió
+     * dejaría a unos medidos con un examen y a otros con otro, en la misma lista. La línea
+     * es la <b>primera rendición</b>, no la primera postulación
+     * ({@link #exigirVaraQuietaDelInstrumento}): postular no es rendir, y quien todavía no
+     * ha abierto su prueba no ha visto nada que se le pueda mover debajo.
      *
      * <p>Los minutos son de la vacante y solo de esta etapa. Vacíos, rige lo que diga el
      * instrumento elegido; los del banco del perfil integral viajan con el banco y no se
@@ -468,14 +479,24 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                     "El instrumento de la etapa técnica es «" + PLANTILLA + "» o «"
                             + CUESTIONARIO_TECNICO + "»; llegó «" + instrumento + "»");
         }
-        if (minutos != null && minutos <= 0) {
-            throw new IllegalArgumentException("Los minutos de la etapa técnica, si se fijan, "
-                    + "son más de cero; para usar los del instrumento elegido se dejan vacíos");
+        if (minutos != null && minutos < MINUTOS_MINIMOS) {
+            throw new IllegalArgumentException("La etapa técnica dura al menos "
+                    + MINUTOS_MINIMOS + " minutos; para usar los del instrumento elegido se "
+                    + "dejan vacíos");
         }
 
-        // ⚠️ Los minutos son parte de la vara, no un ajuste cosmético: cada examen los
-        // congela al crearse, así que bajarlos a mitad de tanda deja a los de antes con una
-        // hora y a los de después con diez minutos, ordenados en la misma lista.
+        // ⚠️ Los minutos son parte de la vara, no un ajuste cosmético: bajarlos a mitad de
+        // tanda deja a los de antes con una hora y a los de después con diez minutos,
+        // ordenados en la misma lista.
+        //
+        // Con una diferencia respecto al instrumento: los minutos no se congelan en ningún
+        // sitio, los leen al empezar los DOS instrumentos —la prueba del puesto y el
+        // cuestionario técnico—. Por eso corregirlos alcanza a todo el que aún no haya
+        // abierto el suyo, y por eso la guarda de abajo mira quién ya empezó.
+        //
+        // ⚠️ Que los dos se comporten igual es la condición para que la guarda diga la
+        // verdad: si uno de ellos congelara, este cambio se guardaría y se auditaría sin
+        // llegarle a media tanda. Es lo que pasaba con el cuestionario hasta hoy.
         String anterior = vacante.getInstrumentoEtapaTecnica();
         if (!anterior.equals(instrumento)
                 || !Objects.equals(vacante.getMinutosEtapaTecnica(), minutos)) {
@@ -513,21 +534,34 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
     }
 
     /**
-     * Gemela de {@link #exigirVaraQuieta} para el instrumento, que es texto y no un id.
+     * Pariente de {@link #exigirVaraQuieta}, pero con la línea corrida: aquí frena la
+     * primera <b>rendición</b>, no la primera postulación.
      *
-     * <p>No se pudo reutilizar aquella tal cual —compara {@code Long}— pero la regla, la
-     * línea (la primera postulación) y el mensaje son los mismos a propósito: quien lea los
-     * dos tiene que ver la misma decisión, no dos parecidas.
+     * <p>La regla que protege es la misma —todos los candidatos de una vacante se miden con
+     * la misma vara— y por eso el mensaje se le parece. Lo que cambia es dónde cae la
+     * frontera, y cambia porque la de aquella era más estricta de lo que hace falta:
+     * <b>postular no es rendir</b>. Alguien que postuló el martes y todavía no ha abierto su
+     * prueba no ha visto ningún enunciado ni ningún reloj, así que corregir los minutos —o
+     * incluso el instrumento— no le mueve nada debajo. Con la línea vieja, una vacante con
+     * un solo currículum dentro quedaba congelada hasta la siguiente convocatoria.
+     *
+     * <p>⚠️ <b>Se preguntan los DOS instrumentos, no el que la vacante tenga puesto.</b>
+     * Cuesta una consulta más y ahorra un razonamiento frágil: una vacante que ya cambió de
+     * instrumento antes puede tener gente que empezó con el otro, y esa gente también rindió.
+     *
+     * <p>⚠️ La frontera es «empezó», no «entregó»: quien tiene la prueba abierta ahora mismo
+     * es precisamente a quien no se le puede mover el reloj.
      */
     private void exigirVaraQuietaDelInstrumento(Vacante vacante) {
         if ("BORRADOR".equals(vacante.getEstado())) {
             return;
         }
-        if (postulaciones.countByVacanteId(vacante.getId()) > 0) {
-            throw new IllegalStateException("Esta vacante ya tiene postulantes y lo que se "
-                    + "rinde en su etapa técnica no se cambia: todos sus candidatos se miden "
-                    + "con la misma vara. Para estrenar otro instrumento, ábrelo en la "
-                    + "siguiente convocatoria.");
+        if (intentos.algunoEmpezadoDeLaVacante(vacante.getId())
+                || evaluaciones.algunaTecnicaEmpezadaDeLaVacante(vacante.getId())) {
+            throw new IllegalStateException("Alguien de esta vacante ya empezó su etapa "
+                    + "técnica, y lo que se rinde ahí no se cambia con gente dentro: todos "
+                    + "sus candidatos se miden con la misma vara. Para estrenar otro "
+                    + "instrumento, ábrelo en la siguiente convocatoria.");
         }
     }
 

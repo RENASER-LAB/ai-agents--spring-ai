@@ -1,5 +1,6 @@
 package com.renaser.ai.ai_engine.prueba.service.impl;
 
+import com.renaser.ai.ai_engine.archivo.service.AlmacenArchivos;
 import com.renaser.ai.ai_engine.auditoria.service.ServicioAuditoria;
 import com.renaser.ai.ai_engine.perfilintegral.entity.Criterio;
 import com.renaser.ai.ai_engine.perfilintegral.repository.CriterioRepository;
@@ -69,13 +70,15 @@ class ServicioPlantillaPruebaImplTest {
     @Mock private ServicioAuditoria auditoria;
     @Mock private com.renaser.ai.ai_engine.organizacion.service.DuenoDelInstrumento dueno;
 
+    @Mock private AlmacenArchivos almacen;
+
     private ServicioPlantillaPruebaImpl servicio;
 
     @BeforeEach
     void crearElServicio() {
         servicio = new ServicioPlantillaPruebaImpl(plantillas, versiones, variantes,
                 preguntasCatalogo, preguntasElegidas, entregablesRequeridos, criterios,
-                auditoria, dueno);
+                auditoria, dueno, almacen);
         // En estas pruebas la organizacion no personaliza nada: el resolutor contesta
         // que el dueño de todo instrumento es ella misma (aqui hace de plataforma).
         org.mockito.Mockito.lenient()
@@ -162,5 +165,74 @@ class ServicioPlantillaPruebaImplTest {
         assertThatThrownBy(() -> servicio.publicarVersion(QUIEN, VERSION))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("universales");
+    }
+
+    // ============ Cuánto puede durar una prueba cronometrada ============
+    //
+    // El rango 60-120 se retiró: quien escribe la prueba sabe cuánto dura, y una de veinte
+    // minutos o de cuatro horas es una decisión suya. Lo que queda es un suelo de cinco, y
+    // hace más falta que antes: desde que los minutos de la vacante convierten cualquier
+    // prueba en cronometrada, un uno sería una prueba que el barrido entrega sola.
+
+    @Test
+    @DisplayName("una cronometrada de 20 minutos se publica: ya no hay mínimo de una hora")
+    void unaCronometradaCortaSePublica() {
+        VersionPlantillaPrueba version = versionEnBorrador();
+        version.setModalidad("CRONOMETRADA");
+        version.setDuracionMinutos(20);
+        when(preguntasElegidas.findByVersionPlantillaPruebaIdOrderByOrden(VERSION))
+                .thenReturn(preguntasElegidas(20));
+        when(entregablesRequeridos.findByVersionPlantillaPruebaIdOrderByOrden(VERSION))
+                .thenReturn(List.of());
+        rubricaQueSuma100();
+
+        servicio.publicarVersion(QUIEN, VERSION);
+
+        assertThat(version.getEstado()).isEqualTo("PUBLICADA");
+    }
+
+    @Test
+    @DisplayName("una cronometrada de 300 minutos se publica: ya no hay techo")
+    void unaCronometradaLargaSePublica() {
+        VersionPlantillaPrueba version = versionEnBorrador();
+        version.setModalidad("CRONOMETRADA");
+        version.setDuracionMinutos(300);
+        when(preguntasElegidas.findByVersionPlantillaPruebaIdOrderByOrden(VERSION))
+                .thenReturn(preguntasElegidas(20));
+        when(entregablesRequeridos.findByVersionPlantillaPruebaIdOrderByOrden(VERSION))
+                .thenReturn(List.of());
+        rubricaQueSuma100();
+
+        servicio.publicarVersion(QUIEN, VERSION);
+
+        assertThat(version.getEstado()).isEqualTo("PUBLICADA");
+    }
+
+    @Test
+    @DisplayName("una cronometrada de un minuto no se publica: se entregaría sola")
+    void unaCronometradaDeUnMinutoNoPasa() {
+        VersionPlantillaPrueba version = versionEnBorrador();
+        version.setModalidad("CRONOMETRADA");
+        version.setDuracionMinutos(1);
+
+        assertThatThrownBy(() -> servicio.publicarVersion(QUIEN, VERSION))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("al menos 5 minutos");
+        assertThat(version.getEstado()).isEqualTo("BORRADOR");
+    }
+
+    @Test
+    @DisplayName("⚠️ una cronometrada sin duración tampoco: el NPE saldría en la cara del candidato")
+    void unaCronometradaSinDuracionNoPasa() {
+        // Al quitar el rango, esta comprobación quedó como la única que impide publicar una
+        // cronometrada sin duración, y `iniciar` la usa sin red.
+        VersionPlantillaPrueba version = versionEnBorrador();
+        version.setModalidad("CRONOMETRADA");
+        version.setDuracionMinutos(null);
+
+        assertThatThrownBy(() -> servicio.publicarVersion(QUIEN, VERSION))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("al menos 5 minutos");
+        assertThat(version.getEstado()).isEqualTo("BORRADOR");
     }
 }

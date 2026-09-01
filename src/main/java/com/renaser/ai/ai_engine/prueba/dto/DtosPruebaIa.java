@@ -36,6 +36,17 @@ public final class DtosPruebaIa {
             String cambioInesperado,
             /* Si se le acabó el tiempo y el sistema entregó por él: explica una entrega corta */
             boolean seLeAcaboElTiempo,
+            /**
+             * La guía que escribió quien preparó esta prueba, o nulo si no escribió ninguna.
+             *
+             * <p><b>Viaja aquí pero no se usa desde aquí.</b> Este record es el insumo, y el
+             * insumo se serializa como JSON en el mensaje del usuario. Quien la coloca en el
+             * mensaje {@code system} —antes del FORMATO, nunca después— es
+             * {@code AgentePruebaPuesto}, y ahí está explicado por qué. Que además aparezca
+             * en los datos no molesta: ahí es un campo con nombre, o sea contenido, que es
+             * exactamente lo que es.
+             */
+            String guiaCalificacion,
             List<CriterioDeRubrica> criterios,
             List<RespuestaDePrueba> respuestas,
             List<EntregaDelCandidato> entregas) {

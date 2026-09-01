@@ -25,6 +25,8 @@ import com.renaser.ai.ai_engine.postulacion.entity.Postulacion;
 import com.renaser.ai.ai_engine.postulacion.repository.PostulacionRepository;
 import com.renaser.ai.ai_engine.postulacion.service.MaquinaEstados;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
+import com.renaser.ai.ai_engine.vacante.entity.Vacante;
+import com.renaser.ai.ai_engine.vacante.repository.VacanteRepository;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -47,6 +49,12 @@ import java.util.stream.Collectors;
  * <p>El reloj lo lleva el servidor: {@code venceEn} se calcula y se guarda una sola vez, al
  * iniciar. No hay pausas — cerrar la página no lo detiene — y cuando se acaba, el sondeo
  * ({@link #entregarVencidos()}) entrega lo que haya. No existe entregar tarde.
+ *
+ * <p><b>Cuánto dura la prueba lo puede decir la vacante</b> ({@code minutosEtapaTecnica}), y
+ * entonces manda sobre lo que traiga la plantilla. Se lee <b>al empezar</b>, no al crear el
+ * intento: así, mientras nadie haya abierto la suya, corregir el número en la ficha de la
+ * vacante alcanza a todos. Congelarlo al crear dejaría a media tanda con el valor viejo sin
+ * que nadie pudiera verlo desde el panel.
  */
 @Service
 @RequiredArgsConstructor
@@ -54,6 +62,7 @@ public class ServicioPruebaImpl implements ServicioPrueba {
 
     private final IntentoPruebaRepository intentos;
     private final VersionPlantillaPruebaRepository versiones;
+    private final VacanteRepository vacantes;
     private final VarianteCambioRepository variantes;
     private final PreguntaVersionPlantillaRepository preguntasElegidas;
     private final PreguntaPruebaRepository preguntasCatalogo;
@@ -74,8 +83,11 @@ public class ServicioPruebaImpl implements ServicioPrueba {
                 .postulacionId(postulacionId)
                 .versionPlantillaPruebaId(versionPlantillaPruebaId)
                 // Si la vacante fija cuándo cierra su prueba, el intento nace ya con esa
-                // fecha y empezar no la recalcula. Sin ella, `venceEn` queda vacío y se
-                // cuentan los días de la plantilla al empezar, como siempre.
+                // fecha. Sin ella, `venceEn` queda vacío y se calcula al empezar.
+                //
+                // ⚠️ Empezar SÍ puede acercarla: si el reloj de la prueba se agota antes de
+                // esa fecha, manda el reloj. Lo que no puede es alejarla — nadie gana tiempo
+                // por abrir tarde — ni tocar la de quien tiene `plazoPropio`. Ver `iniciar`.
                 .venceEn(cierraEn)
                 .esEntregaAutomatica(false)
                 .creadoEn(Instant.now())
@@ -85,32 +97,69 @@ public class ServicioPruebaImpl implements ServicioPrueba {
 
     @Override
     public MiPrueba ver(ContextoUsuario quien, UUID uuidPostulacion) {
-        return pintar(laMia(quien, uuidPostulacion).intento());
+        var par = laMia(quien, uuidPostulacion);
+        return pintar(par.intento(), minutosDeLaVacante(par.postulacion()));
     }
 
+    /**
+     * Empezar la prueba: aquí es donde arranca el reloj y se fija cuándo vence.
+     *
+     * <p><b>Gana el plazo más cercano, y solo un cronómetro puede acercarlo.</b> Antes,
+     * tener ya una fecha —la de cierre de la vacante— hacía salir sin mirar el reloj de la
+     * prueba: una prueba de noventa minutos abierta el lunes duraba hasta el domingo. Ahora
+     * se calcula el vencimiento por el reloj y se queda el que caiga antes, igual que
+     * {@code ServicioEvaluacionImpl.iniciarTecnico}.
+     *
+     * <p>⚠️ <b>«El reloj» son MINUTOS, nunca los días de la plantilla.</b> Es la línea que
+     * separa este método de una regresión silenciosa, y por eso está escrita aparte. La
+     * fecha de cierre de la vacante existe para decir «esta convocatoria cierra el 30» a
+     * todos a la vez (V32); comparar contra los días del plazo abierto se la recortaría a
+     * quien abriera pronto —el día 2 se le cerraría el 9— y volverían los vencimientos
+     * distintos por candidato que aquella migración vino a eliminar, sin que nadie lo
+     * pidiera ni pudiera verlo en el panel. {@code iniciarTecnico} ya lo hace así
+     * ({@code if (minutos != null)}); los dos instrumentos tienen que decidir igual.
+     *
+     * <p>⚠️ <b>{@code plazoPropio} no se toca.</b> Marca a quien se le concedió su propia
+     * fecha a mano —«a esta persona, más horas» (V32)—; moverla aquí borraría en silencio esa
+     * concesión, que es justo lo que la columna existe para impedir. Único matiz: si está
+     * marcado pero no hay fecha que proteger, se calcula como con cualquiera — dejarlo vacío
+     * sería un plazo infinito, que nadie concedió.
+     */
     @Override
     @Transactional
     public MiPrueba iniciar(ContextoUsuario quien, UUID uuidPostulacion) {
-        IntentoPrueba intento = laMia(quien, uuidPostulacion).intento();
+        var par = laMia(quien, uuidPostulacion);
+        IntentoPrueba intento = par.intento();
         exigirAbierto(intento);
+        Integer minutosVacante = minutosDeLaVacante(par.postulacion());
 
         if (intento.getIniciadoEn() == null) {
             VersionPlantillaPrueba version = laVersion(intento);
             Instant ahora = Instant.now();
 
             intento.setIniciadoEn(ahora);
-            // Si alguien ya le puso fecha de cierre a mano, esa manda: es lo que se le dijo
-            // al candidato («hasta el domingo»), y recalcularla aquí se la movería sin que
-            // nadie se enterara. Solo cuando no hay ninguna se cuenta desde ahora.
-            if (intento.getVenceEn() == null) {
-                intento.setVenceEn("CRONOMETRADA".equals(version.getModalidad())
-                        ? ahora.plus(version.getDuracionMinutos(), ChronoUnit.MINUTES)
-                        : ahora.plus(version.getPlazoDias(), ChronoUnit.DAYS));
+            boolean concedidaAMano = intento.isPlazoPropio() && intento.getVenceEn() != null;
+            if (!concedidaAMano) {
+                if (intento.getVenceEn() == null) {
+                    // Sin fecha no hay nada que respetar: se cuenta el plazo que toque,
+                    // minutos o días, como se ha hecho siempre.
+                    intento.setVenceEn(cuandoVenceDesde(ahora, version, minutosVacante));
+                } else {
+                    // Ya tiene fecha —la de cierre de la convocatoria—. Solo un cronómetro
+                    // la acerca; los días del plazo abierto no la tocan.
+                    Integer minutos = minutosEfectivos(version, minutosVacante);
+                    if (minutos != null) {
+                        Instant porElReloj = ahora.plus(minutos, ChronoUnit.MINUTES);
+                        if (porElReloj.isBefore(intento.getVenceEn())) {
+                            intento.setVenceEn(porElReloj);
+                        }
+                    }
+                }
             }
             sortearCambio(intento, version);
             intentos.save(intento);
         }
-        return pintar(intento);
+        return pintar(intento, minutosVacante);
     }
 
     @Override
@@ -192,6 +241,71 @@ public class ServicioPruebaImpl implements ServicioPrueba {
 
     // ============ Apoyo ============
 
+    /**
+     * Los minutos que la vacante fijó para su etapa técnica, o {@code null} si no fijó
+     * ninguno y rige lo que traiga la plantilla.
+     *
+     * <p>Se resuelve desde la postulación que ya trae {@code laMia}: el intento no guarda la
+     * vacante, y duplicarla aquí sería un segundo sitio donde se puede desincronizar.
+     *
+     * <p>⚠️ <b>Se busca por id Y organización</b>, no por id suelto. Es la regla de la pieza
+     * B, y aquí el dueño sale de la propia postulación —que {@code laMia} ya comprobó que es
+     * de quien pregunta—, no del contexto: así la cadena entera cuelga de una sola cosa
+     * verificada.
+     *
+     * <p>Una vacante que ya no existe se lee como «sin minutos propios» en vez de reventar:
+     * quien esté rindiendo tiene que poder terminar su prueba.
+     */
+    private Integer minutosDeLaVacante(Postulacion postulacion) {
+        return vacantes.findByIdAndOrganizacionId(
+                        postulacion.getVacanteId(), postulacion.getOrganizacionId())
+                .map(Vacante::getMinutosEtapaTecnica)
+                .orElse(null);
+    }
+
+    /**
+     * Cuándo vence una prueba que se abre en {@code ahora}, según el reloj que le toca.
+     *
+     * <p>El orden es único a propósito: <b>los minutos de la vacante mandan</b> sobre los de
+     * la plantilla, y solo cuando no hay ni unos ni otros se cuentan los días. De ahí sale
+     * solo el caso de una plantilla de plazo abierto a la que la vacante le pone minutos: se
+     * vuelve cronometrada de hecho, sin ninguna rama que lo diga.
+     */
+    private Instant cuandoVenceDesde(Instant ahora, VersionPlantillaPrueba version,
+                                     Integer minutosVacante) {
+        Integer minutos = minutosEfectivos(version, minutosVacante);
+        return minutos != null
+                ? ahora.plus(minutos, ChronoUnit.MINUTES)
+                : ahora.plus(version.getPlazoDias(), ChronoUnit.DAYS);
+    }
+
+    /**
+     * Los minutos que de verdad rigen: los de la vacante si los hay, y si no los de la
+     * plantilla cuando es cronometrada. {@code null} = esta prueba se mide en días.
+     *
+     * <p>⚠️ <b>Es el mismo número que se le enseña al candidato</b> ({@code pintar}). Sacar
+     * el de la pantalla de la plantilla y el del reloj de la vacante fue el fallo original:
+     * la pantalla decía «60 minutos desde que empieces» y el servidor cerraba a los 90.
+     */
+    private Integer minutosEfectivos(VersionPlantillaPrueba version, Integer minutosVacante) {
+        if (minutosVacante != null) {
+            return minutosVacante;
+        }
+        return "CRONOMETRADA".equals(version.getModalidad()) ? version.getDuracionMinutos() : null;
+    }
+
+    /**
+     * La modalidad que de verdad rige. Con minutos de la vacante siempre es cronometrada,
+     * diga lo que diga la plantilla: el reloj corre desde que se abre.
+     *
+     * <p>Solo cambia lo que se le enseña al candidato. La fila de la plantilla no se toca —
+     * la misma versión la puede rendir otra vacante que no fije minutos, y ahí sigue siendo
+     * de plazo abierto.
+     */
+    private String modalidadEfectiva(VersionPlantillaPrueba version, Integer minutosVacante) {
+        return minutosVacante != null ? "CRONOMETRADA" : version.getModalidad();
+    }
+
     private void cerrarIntento(IntentoPrueba intento, Postulacion postulacion, boolean automatica) {
         intento.setEntregadoEn(Instant.now());
         intento.setEsEntregaAutomatica(automatica);
@@ -218,7 +332,7 @@ public class ServicioPruebaImpl implements ServicioPrueba {
         intento.setMinutoCambio(minuto);
     }
 
-    private MiPrueba pintar(IntentoPrueba intento) {
+    private MiPrueba pintar(IntentoPrueba intento, Integer minutosVacante) {
         VersionPlantillaPrueba version = laVersion(intento);
         revelarCambioSiToca(intento, version);
 
@@ -253,8 +367,19 @@ public class ServicioPruebaImpl implements ServicioPrueba {
         String cambioTexto = intento.getCambioMostradoEn() == null ? null
                 : variantes.findById(intento.getVarianteCambioId()).map(VarianteCambio::getTexto).orElse(null);
 
-        return new MiPrueba(intento.getId(), estado, version.getModalidad(),
-                intento.getIniciadoEn(), intento.getVenceEn(), version.getDuracionMinutos(),
+        // ⚠️ La duración y la modalidad que viajan son las EFECTIVAS, no las de la
+        // plantilla. Es el número con el que la pantalla escribe «N minutos desde que
+        // empieces»: si dijera 60 mientras el servidor cierra a los 90 de la vacante, la
+        // pantalla estaría mintiendo — que es el fallo que esto arregla, no uno nuevo que
+        // introducir en la otra dirección.
+        //
+        // Y la modalidad va con ella porque se leen juntas: el lateral del portal pinta
+        // «Duración: 90 minutos» y justo debajo «Modalidad: PLAZO_ABIERTO», que es la misma
+        // contradicción escrita dos veces. Si la vacante puso minutos, esta prueba es
+        // cronometrada de hecho y así se dice.
+        return new MiPrueba(intento.getId(), estado, modalidadEfectiva(version, minutosVacante),
+                intento.getIniciadoEn(), intento.getVenceEn(),
+                minutosEfectivos(version, minutosVacante),
                 version.getEnunciado(), version.getMateriales(), version.getHerramientasPermitidas(),
                 cambioTexto, preguntas, entregablesCandidato);
     }

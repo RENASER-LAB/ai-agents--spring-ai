@@ -22,7 +22,10 @@ import com.renaser.ai.ai_engine.perfilintegral.service.ServicioCalificacion;
 import com.renaser.ai.ai_engine.postulacion.entity.Postulacion;
 import com.renaser.ai.ai_engine.postulacion.repository.PostulacionRepository;
 import com.renaser.ai.ai_engine.postulacion.service.MaquinaEstados;
+import com.renaser.ai.ai_engine.perfilintegral.entity.VersionBanco;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
+import com.renaser.ai.ai_engine.vacante.entity.Vacante;
+import com.renaser.ai.ai_engine.vacante.repository.VacanteRepository;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -32,6 +35,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -41,6 +45,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -72,6 +77,7 @@ class ServicioEvaluacionImplTest {
     @Mock private RespuestaRepository respuestas;
     @Mock private CampoCasoRepository campos;
     @Mock private PostulacionRepository postulaciones;
+    @Mock private VacanteRepository vacantes;
     @Mock private MaquinaEstados maquina;
     @Mock private ServicioCalificacion calificacion;
     @Mock private ColaCalificacionIa colaIa;
@@ -355,6 +361,158 @@ class ServicioEvaluacionImplTest {
                     new Responder(null, "   ", null, 12)))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("escribir");
+        }
+    }
+
+    /**
+     * El reloj del cuestionario técnico sale de la vacante y se pregunta al empezar.
+     *
+     * <p>Antes se congelaba al crear el examen, y mientras cambiar los minutos con un solo
+     * postulante dentro estuviera prohibido daba igual: el caso no existía. Al correrse esa
+     * frontera a la primera <b>rendición</b>, congelar dejaba un agujero callado — el panel
+     * aceptaba el cambio, la auditoría lo registraba, y a quien ya estaba avanzado sin haber
+     * abierto el examen no le llegaba nada.
+     *
+     * <p>Los tres casos de abajo son la regla entera: <b>a quien no ha empezado le llega, a
+     * quien ya empezó no</b>, y sin minutos en la vacante todo sigue como estaba.
+     */
+    @Nested
+    @DisplayName("Los minutos del cuestionario técnico se preguntan al empezar")
+    class ElRelojDelCuestionarioTecnico {
+
+        private static final long EVALUACION = 80L;
+        private static final long VACANTE = 7L;
+        private static final long BANCO = 500L;
+        private static final long ORGANIZACION = 1L;
+
+        /** El plazo de días con el que nace todo examen: catorce, muy lejos de cualquier reloj. */
+        private static final Instant DENTRO_DE_CATORCE_DIAS =
+                Instant.now().plus(14, java.time.temporal.ChronoUnit.DAYS);
+
+        private Evaluacion suExamen;
+
+        /**
+         * Su cuestionario técnico, tal como lo encuentra el portal.
+         *
+         * <p>⚠️ Se le pone {@code minutosObjetivo} <b>a propósito</b>, y con un número que no
+         * es el de la vacante. Es una fila anterior al cambio —las hay en producción—, y que
+         * el resultado la ignore es justo lo que estos tests comprueban: si algún día alguien
+         * vuelve a leer esa columna, aquí se entera.
+         */
+        private void suCuestionario(Integer minutosCongelados, Instant iniciadaEn) {
+            suExamen = Evaluacion.builder().id(EVALUACION).usuarioId(9L)
+                    .organizacionId(ORGANIZACION)
+                    .proposito("CUESTIONARIO_TECNICO")
+                    .versionBancoNivelId(BANCO)
+                    .minutosObjetivo(minutosCongelados)
+                    .estado(iniciadaEn == null ? "PENDIENTE" : "EN_CURSO")
+                    .iniciadaEn(iniciadaEn)
+                    .venceEn(DENTRO_DE_CATORCE_DIAS)
+                    .build();
+            when(postulaciones.findByUuid(CODIGO)).thenReturn(Optional.of(
+                    Postulacion.builder().id(50L).uuid(CODIGO).usuarioId(9L)
+                            .organizacionId(ORGANIZACION).vacanteId(VACANTE)
+                            .evaluacionTecnicaId(EVALUACION).build()));
+            when(evaluaciones.findById(EVALUACION)).thenReturn(Optional.of(suExamen));
+        }
+
+        /** Lo que la vacante dice HOY que dura su etapa técnica. */
+        private void laVacanteDice(Integer minutos) {
+            when(vacantes.findByIdAndOrganizacionId(VACANTE, ORGANIZACION)).thenReturn(
+                    Optional.of(Vacante.builder().id(VACANTE).organizacionId(ORGANIZACION)
+                            .instrumentoEtapaTecnica("CUESTIONARIO_TECNICO")
+                            .minutosEtapaTecnica(minutos).build()));
+        }
+
+        /** Una pregunta abierta basta para que el examen se pueda armar. */
+        private void elBancoTienePreguntas() {
+            when(preguntas.findByVersionBancoIdOrderByOrden(BANCO)).thenReturn(List.of(
+                    Pregunta.builder().id(1L).tipo("ABIERTA").enunciado("¿Cómo lo harías?").build()));
+        }
+
+        @Test
+        @DisplayName("a quien tiene su examen creado y sin abrir, el cambio SÍ le llega")
+        void alQueNoHaEmpezadoLeLlega() {
+            // Se le creó el examen cuando la vacante decía 60. Después alguien la corrigió a
+            // 30 —el panel lo permite porque nadie ha rendido— y esta persona abre ahora.
+            suCuestionario(60, null);
+            laVacanteDice(30);
+            elBancoTienePreguntas();
+
+            Instant antesDeEmpezar = Instant.now();
+            EvaluacionCandidato pintado = servicio.iniciarTecnico(CANDIDATA, CODIGO);
+
+            // El reloj que corre es el de la vacante, no el de la fila.
+            assertThat(suExamen.getVenceEn())
+                    .isBetween(antesDeEmpezar.plusSeconds(29 * 60),
+                            Instant.now().plusSeconds(30 * 60));
+            // Y la pantalla enseña el mismo número que aplica el servidor. Si dijera 60
+            // mientras el examen cierra a los 30, sería la misma mentira mirando al revés.
+            assertThat(pintado.minutosObjetivo()).isEqualTo(30);
+            verify(evaluaciones).save(suExamen);
+        }
+
+        @Test
+        @DisplayName("a quien ya lo abrió no se le mueve la fecha")
+        void alQueYaEmpezoNoSeLeMueve() {
+            // Empezó hace un rato con 60 minutos: su examen cierra a las y media.
+            Instant suFecha = Instant.now().plusSeconds(30 * 60);
+            suCuestionario(60, Instant.now().minusSeconds(30 * 60));
+            suExamen.setVenceEn(suFecha);
+            // Aunque la vacante dijera ahora cinco minutos —no puede: la guarda del panel lo
+            // impide en cuanto alguien empezó—, volver a entrar no le recorta nada.
+            laVacanteDice(5);
+
+            servicio.iniciarTecnico(CANDIDATA, CODIGO);
+
+            assertThat(suExamen.getVenceEn()).isEqualTo(suFecha);
+            verify(evaluaciones, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("gana el plazo más cercano: unos minutos larguísimos no alargan la fecha")
+        void nadieGanaTiempoPorAbrirTarde() {
+            suCuestionario(null, null);
+            // Treinta días en minutos, contra una fecha que cae dentro de catorce.
+            laVacanteDice(30 * 24 * 60);
+            elBancoTienePreguntas();
+
+            servicio.iniciarTecnico(CANDIDATA, CODIGO);
+
+            assertThat(suExamen.getVenceEn()).isEqualTo(DENTRO_DE_CATORCE_DIAS);
+        }
+
+        @Test
+        @DisplayName("sin minutos en la vacante manda su cuestionario, como antes")
+        void sinMinutosDeLaVacanteMandaElCuestionario() {
+            suCuestionario(null, null);
+            laVacanteDice(null);
+            when(versionesBanco.findById(BANCO)).thenReturn(Optional.of(
+                    VersionBanco.builder().id(BANCO).minutosObjetivo(40).build()));
+            elBancoTienePreguntas();
+
+            Instant antesDeEmpezar = Instant.now();
+            EvaluacionCandidato pintado = servicio.iniciarTecnico(CANDIDATA, CODIGO);
+
+            assertThat(suExamen.getVenceEn())
+                    .isBetween(antesDeEmpezar.plusSeconds(39 * 60),
+                            Instant.now().plusSeconds(40 * 60));
+            assertThat(pintado.minutosObjetivo()).isEqualTo(40);
+        }
+
+        @Test
+        @DisplayName("sin minutos en ninguno de los dos rige el plazo de días de siempre")
+        void sinMinutosEnNingunoRigeElPlazoDeDias() {
+            suCuestionario(null, null);
+            laVacanteDice(null);
+            when(versionesBanco.findById(BANCO)).thenReturn(Optional.of(
+                    VersionBanco.builder().id(BANCO).build()));
+            elBancoTienePreguntas();
+
+            EvaluacionCandidato pintado = servicio.iniciarTecnico(CANDIDATA, CODIGO);
+
+            assertThat(suExamen.getVenceEn()).isEqualTo(DENTRO_DE_CATORCE_DIAS);
+            assertThat(pintado.minutosObjetivo()).isNull();
         }
     }
 

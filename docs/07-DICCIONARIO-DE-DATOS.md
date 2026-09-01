@@ -131,12 +131,33 @@ El departamento que contrata.
 | `id` | bigint | sí | Clave |
 | `organizacion_id` | bigint | sí | |
 | `nombre` | text | sí | |
-| `es_activa` | boolean | sí | |
+| `es_activa` | boolean | sí | Un área retirada. **Sigue existiendo y conserva lo suyo**: solo desaparece de la lista con la que se registra una solicitud nueva |
 
 **Clave primaria:** `id` · **Único:** `organizacion_id` + `nombre`
 
 Hace falta para dos cosas: saber qué ve un responsable de área, e impedir que alguien sea
 Evaluador de Estándar de su propia área.
+
+**`es_activa` estuvo a medio usar hasta el 31/08/2026**: existe desde la `V2`, se escribía `true`
+al crear y nadie la volvía a tocar. Desde entonces el panel administra las áreas enteras
+—renombrar, retirar, reactivar, consultar impacto y borrar reasignando— **sin ninguna migración
+nueva**. Lo que hay que saber para tocar esta tabla:
+
+⚠️ **Dos claves ajenas apuntan aquí y ninguna declara `ON DELETE`:**
+`solicitud_talento.area_id` (obligatoria) y `usuario.area_id` (admite nulo). Postgres aplica
+entonces NO ACTION, así que un `DELETE` **revienta mientras quede una sola fila apuntando**,
+también contra la que admite nulo. Por eso borrar un área exige decir a qué otra se mudan sus
+solicitudes y sus usuarios; sin destino, solo se admite si el área está vacía.
+
+⚠️ **La última área activa de una organización no se puede retirar.** Registrar una Solicitud de
+Talento exige un área, y la solicitud es el paso previo a cualquier vacante: sin ninguna activa,
+la empresa no puede volver a contratar y no hay pantalla que lo explique.
+
+⚠️ **Un área es de una organización y solo de una.** Las dos claves ajenas comprueban que el área
+exista, no que sea de la misma empresa: dar de alta a alguien o registrar una solicitud contra un
+área ajena creaba una fila invisible para todo lo que consulta por organización —incluido el
+recuento que decide si un área se puede borrar—. Desde el 31/08/2026 las dos puertas lo
+comprueban y responden «no existe».
 
 ## `rol`
 
@@ -1499,7 +1520,10 @@ La prueba de un puesto.
 
 **Clave primaria:** `id`
 
-Arranca con **once** plantillas cargadas.
+⚠️ **Arranca VACÍA.** Aquí decía «arranca con once plantillas cargadas» y no es cierto: ninguna
+migración inserta una sola fila. Las once del requisito son un objetivo, no una semilla, y las
+pruebas que existen se cargan **por la API con los guiones de `scripts/`**. Corregido el
+01/09/2026.
 
 ## `version_plantilla_prueba`
 
@@ -1512,23 +1536,34 @@ Una versión concreta. Si tiene vacante, es una copia privada de esa vacante.
 | `vacante_id` | bigint | no | Si está, es una variante de esa vacante |
 | `version` | integer | sí | |
 | `enunciado` | text | sí | |
-| `url_consigna` | text | no | Dónde vive el enunciado completo, para que **el aviso al candidato lo lleve** (`V29`) |
+| `url_consigna` | text | no | Dónde vive el enunciado completo, para que **el aviso al candidato lo lleve** (`V29`). Se sube desde el panel mientras la versión está en `BORRADOR`; el enlace se firma para 180 días |
 | `materiales` | text | no | |
 | `herramientas_permitidas` | text | no | De dónde puede sacar información, **incluida la IA** |
 | `modalidad` | text | sí | `CRONOMETRADA` (lo normal) o `PLAZO_ABIERTO` (solo para cargar las viejas) |
-| `duracion_minutos` | integer | no | **Solo si es cronometrada.** De 60 a 120 |
+| `duracion_minutos` | integer | no | **Solo si es cronometrada.** Al menos 5; **sin techo** desde el 31/08/2026 |
 | `plazo_dias` | integer | no | **Solo si es de plazo abierto.** Días para entregar |
 | `minuto_cambio_min` | integer | no | Inicio del rango |
 | `minuto_cambio_max` | integer | no | Fin del rango |
 | `minutos_extra` | integer | no | Cuánto tiene para adaptarse tras el cambio |
+| `guia_calificacion` | text | no | Lo que esta prueba le dice al agente que la califica: qué mirar, qué pesa en este oficio, qué error descarta. **Máximo 2000 caracteres** (`V46`) |
 | `estado` | text | sí | `BORRADOR` o `PUBLICADA` |
 | `publicada_en` | timestamptz | no | |
 
 **Clave primaria:** `id` · **Único:** `plantilla_prueba_id` + `version`
 **Restricción:** si `modalidad` es `CRONOMETRADA`, `duracion_minutos` es obligatorio; si es
 `PLAZO_ABIERTO`, lo es `plazo_dias`
-**Restricción:** `minuto_cambio_min` no puede ser mayor que `minuto_cambio_max`, y los dos tienen
-que caber dentro de `duracion_minutos`
+**Restricción:** `minuto_cambio_min` no puede ser mayor que `minuto_cambio_max`
+**Restricción:** `guia_calificacion` no pasa de 2000 caracteres (`V46`)
+
+⚠️ **Aquí decía además que los dos minutos del cambio «tienen que caber dentro de
+`duracion_minutos`», y esa restricción no existe** — ni en la `V15` ni en ninguna posterior, ni
+tampoco en el código. Nunca existió. Lo que lo hacía cierto en la práctica era el rango 60-120
+que se exigía al publicar, y ese rango se retiró. Ver [Defectos conocidos](DEFECTOS-CONOCIDOS.md).
+
+⚠️ **`duracion_minutos` ya no es la última palabra sobre el reloj.** Si la vacante que rinde esta
+versión fijó `minutos_etapa_tecnica`, mandan los suyos, y la prueba se comporta como cronometrada
+aunque aquí ponga `PLAZO_ABIERTO`. Esta columna no se toca: la misma versión la puede rendir otra
+vacante que no fije nada.
 
 **Decidido el 15/08: las pruebas nuevas son `CRONOMETRADA`.** El cronómetro y el cambio a mitad
 son justo la mejora que Renaser quiere; las cinco pruebas de `insumos/pruebas-tecnicas/` son
@@ -2573,7 +2608,12 @@ Resumen de las restricciones que están repartidas por el documento:
 - Toda vacante apunta a una solicitud de talento.
 - La validación de trabajo real exige tipo de vinculación registrado.
 - Un entregable tiene archivo o enlace.
-- El rango del cambio inesperado cabe dentro de la duración de la prueba.
+- El minuto en que empieza el rango del cambio inesperado no pasa del minuto en que acaba.
+- La guía de calificación de una prueba no pasa de 2000 caracteres.
+
+⚠️ Aquí decía «el rango del cambio inesperado cabe dentro de la duración de la prueba». **Eso no
+lo impide nada**: no hay CHECK que lo diga ni comprobación en el código. Ver
+[Defectos conocidos](DEFECTOS-CONOCIDOS.md).
 
 Lo que **no** cabe en una restricción y hay que probar en el código está en
 [Modelo de datos](05-MODELO-DE-DATOS.md), en «Lo que la base impide por sí sola, y lo que no».
@@ -2605,10 +2645,43 @@ cuestionario CAZATALENTOS se pueda contestar de verdad.
 | `postulacion.evaluacion_tecnica_id` | El examen de la etapa técnica. NULL con la prueba del puesto, que va por `intento_prueba`. La columna `evaluacion_id` sigue siendo la del perfil integral: son dos exámenes y no se pisan |
 | `evaluacion.proposito` | `PERFIL_INTEGRAL` o `CUESTIONARIO_TECNICO`. Decide de qué columna de la postulación cuelga y qué barrido de vencimientos lo cierra |
 | `evaluacion.plantilla_evaluacion_id` | Deja de ser obligatoria: un cuestionario de vacante no tiene plantilla. Un CHECK conserva la exigencia para los del perfil integral, que es donde importaba |
-| `evaluacion.minutos_objetivo` | Los minutos con los que nació este examen, **congelados al crearlo**: así editar la vacante no le mueve el reloj a quien ya está respondiendo |
+| `evaluacion.minutos_objetivo` | **Vestigio.** Nació para congelar aquí los minutos al crear el examen. Hoy no la escribe nadie: el cuestionario técnico le pregunta los suyos a la vacante **al empezar**, para que corregirlos alcance a todo el que aún no haya abierto el examen. La columna sigue en la base por las filas anteriores que la traen llena |
 | `agente` | Uno más: `EVALUADOR_TECNICO`. Cuenta los mismos cuatro criterios que el del banco, pero por su propio carril — compartir el código habría dejado sin calificar al perfil integral |
 
 ⚠️ **`evaluacion.version_banco_nivel_id` se quedó con un nombre corto**: en un cuestionario
 técnico guarda un banco de tipo VACANTE, no uno por nivel. Se dejó así a propósito —renombrarlo
 tocaba los ocho sitios que ya lo leen sin que ninguno cambiara de comportamiento— y el CHECK de
 la V42 impide confundir los dos tipos.
+
+---
+
+## Lo que añadió la V46 · la prueba orienta a quien la califica
+
+Una sola columna, y ninguna tabla nueva.
+
+| Tabla · columna | Qué guarda |
+|---|---|
+| `version_plantilla_prueba.guia_calificacion` | Texto libre, máximo 2000 caracteres, que la empresa escribe para el agente `PRUEBA_PUESTO`: qué distingue un buen trabajo de uno regular en este oficio, qué error descarta, dónde suele estar la trampa |
+
+**Por qué en la versión y no en la organización ni en la vacante.** Por lo mismo que la rúbrica:
+es parte del instrumento, se congela al publicar, y viaja con la prueba cuando una empresa se
+lleva una copia de la plataforma. Una prueba publicada califica igual hoy que dentro de un año, y
+eso incluye con qué guía se calificó.
+
+⚠️ **Orienta, no sustituye.** La rúbrica sigue siendo la única fuente de los 100 puntos y el
+agente sigue devolviendo una nota **por criterio**, nunca una global ni sobre 100. Una guía que
+pida «califica sobre 100» no tiene dónde escribirse: las notas se guardan en `nota_criterio` por
+código de criterio, y lo que no está en la rúbrica se descarta al guardar.
+
+⚠️ **El tope de 2000 está en cuatro sitios y ninguno sobra.** El `@Size` del contrato REST
+devuelve un 400 antes de tocar nada; el CHECK de esta migración es el único que hay en los
+caminos que no pasan por el DTO —la copia entre organizaciones y las cargas por SQL—; el servicio
+da un mensaje que se entiende; y al armar el mensaje para el modelo se vuelve a cortar, porque
+para entonces el texto pudo entrar por cualquiera de esos caminos.
+
+**`url_consigna` no es nueva** —existe desde la `V29`— pero desde ahora se llena de otra forma:
+hay un endpoint que sube el enunciado en PDF o Word mientras la versión está en `BORRADOR`. Antes
+solo se llenaba por SQL o al clonar una prueba de la plataforma. Es el **enunciado y nada más**:
+quien lo suba sigue teniendo que definir preguntas, entregables y rúbrica, porque de ese archivo
+no sale ninguna nota. El enlace se firma para 180 días y **caduca**: ver
+[Defectos conocidos](DEFECTOS-CONOCIDOS.md).

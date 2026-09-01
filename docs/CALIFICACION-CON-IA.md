@@ -166,6 +166,30 @@ una persona. **El agente solo ve los suyos.** Si una prueba se califica mirando 
 todos sus criterios son de persona, el agente ni siquiera llama al modelo, y quien apriete el
 botón recibe esa respuesta.
 
+### La prueba le puede decir al agente qué mirar (31/08/2026)
+
+El texto con el que se le habla al modelo es **uno para todas las empresas**, así que solo puede
+hablar del oficio de calificar: cita la evidencia, no supongas lo que no dijo. No puede decir qué
+distingue un buen tablero de control de uno malo en el rubro de **esta** empresa, ni qué error de
+**esta** prueba es el que de verdad descarta. Quien sabe eso es quien escribió la prueba.
+
+Ahora lo puede escribir: cada versión de una plantilla de prueba tiene una **guía de
+calificación**, un texto de hasta 2000 caracteres que se le da al agente antes de calificar.
+Viaja con la prueba, así que una copia se califica con la misma guía que el original, y una
+prueba publicada se sigue calificando igual dentro de un año.
+
+⚠️ **Orienta, no sustituye.** La rúbrica sigue siendo la única fuente de los 100 puntos y el
+agente sigue poniendo **una nota por criterio**, nunca una global. Una guía que pida «califica
+sobre 100» no tiene dónde escribirse: al guardar se descarta todo lo que no sea un criterio de
+esa rúbrica, y lo reservado a una persona también.
+
+⚠️ **Y no puede hacerse pasar por instrucción del sistema.** La guía va anunciada —se dice de
+quién es y que es contenido— y **cerrada con un rótulo que lleva una marca sorteada en cada
+calificación**. Quien escribe la guía, días antes, no ha visto esa marca, así que no puede fingir
+el cierre y colocar órdenes detrás. Los rótulos de lo que queda escrito de cada llamada llevan la
+misma clase de marca, por lo mismo: para que un texto de usuario no pueda inventar secciones
+dentro del registro que alguien va a leer meses después.
+
 ### La nota de la prueba sale sola si la rúbrica quedó entera (28/08/2026)
 
 Una cosa es la nota de **cada criterio** y otra la nota de **la prueba**: la suma de todos los

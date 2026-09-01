@@ -30,4 +30,22 @@ public interface IntentoPruebaRepository extends JpaRepository<IntentoPrueba, Lo
               and i.postulacionId in (select p.id from Postulacion p where p.vacanteId = :vacanteId)
             """)
     List<IntentoPrueba> abiertosDeLaVacante(@Param("vacanteId") Long vacanteId);
+
+    /**
+     * ¿Alguien de esta vacante ya abrió su prueba del puesto?
+     *
+     * <p>Es la línea que decide si la etapa técnica todavía se puede reconfigurar. La
+     * frontera es {@code iniciadoEn}, no la postulación: postular no es rendir, y quien no
+     * ha abierto la prueba no ha visto ningún reloj que se le pueda mover.
+     *
+     * <p>⚠️ <b>No sirve {@link #abiertosDeLaVacante}</b>, aunque lo parezca: aquella filtra
+     * {@code entregadoEn is null} para moverles la fecha, y quien ya entregó es justamente
+     * el caso más claro de «ya se midió con esta vara».
+     */
+    @Query("""
+            select count(i) > 0 from IntentoPrueba i
+            where i.iniciadoEn is not null
+              and i.postulacionId in (select p.id from Postulacion p where p.vacanteId = :vacanteId)
+            """)
+    boolean algunoEmpezadoDeLaVacante(@Param("vacanteId") Long vacanteId);
 }

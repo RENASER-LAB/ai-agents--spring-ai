@@ -36,6 +36,8 @@ import com.renaser.ai.ai_engine.postulacion.repository.PostulacionRepository;
 import com.renaser.ai.ai_engine.postulacion.service.MaquinaEstados;
 import com.renaser.ai.ai_engine.parametro.service.ServicioParametros;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
+import com.renaser.ai.ai_engine.vacante.entity.Vacante;
+import com.renaser.ai.ai_engine.vacante.repository.VacanteRepository;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -102,6 +104,9 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
     private final RespuestaRepository respuestas;
     private final CampoCasoRepository campos;
     private final PostulacionRepository postulaciones;
+    // Solo para preguntarle cuántos minutos dura su etapa técnica, y preguntárselo cada vez.
+    // Ver `minutosDelCuestionarioTecnico`.
+    private final VacanteRepository vacantes;
     private final MaquinaEstados maquina;
     private final ServicioCalificacion calificacion;
     private final ColaCalificacionIa colaIa;
@@ -172,18 +177,27 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
      *       atado al suyo (RF-138).
      *   <li><b>Sin {@code vigenteHasta}.</b> La vigencia existe para reutilizar un examen del
      *       banco en otra postulación de la misma persona; este no se reutiliza jamás.
-     *   <li><b>Los minutos se congelan aquí.</b> {@code Evaluacion} no sabe de qué vacante
-     *       viene, y resolverlos al pintar movería el reloj de quien ya está respondiendo si
-     *       alguien edita la vacante a mitad de tanda.
+     *   <li><b>Los minutos NO se fijan aquí.</b> Se preguntan al empezar
+     *       ({@link #minutosDelCuestionarioTecnico}), y por eso este método ya no los
+     *       recibe. Ver el aviso de abajo.
      * </ul>
      *
      * <p>Se crea al ENTRAR en la etapa y no al postular, como el intento de la prueba del
      * puesto: hasta que el equipo no lo avanza, no hay nada que rendir.
+     *
+     * <p>⚠️ <b>{@code minutos_objetivo} de esta fila se quedó vacía a propósito, y la columna
+     * es desde hoy un vestigio.</b> La V43 la creó para congelar aquí el número de la
+     * vacante, cuando cambiarlo estaba prohibido en cuanto hubiera un solo postulante. Esa
+     * prohibición se aflojó —ahora la frontera es la primera <b>rendición</b>, ver
+     * {@code ServicioVacantesPanelImpl.exigirVaraQuietaDelInstrumento}— y congelar aquí
+     * volvía inalcanzable el cambio para quien ya estuviera avanzado pero no hubiera abierto
+     * el examen: el panel decía que sí, la auditoría lo registraba y a esa persona no le
+     * llegaba. La columna se conserva (hay una migración y filas anteriores que la traen
+     * llena); lo que nadie hace ya es escribirla ni leerla en esta etapa.
      */
     @Override
     @Transactional
-    public Long crearTecnicaAlEntrar(Long organizacionId, Long usuarioId, Long vacanteId,
-                                     Integer minutosDeLaVacante) {
+    public Long crearTecnicaAlEntrar(Long organizacionId, Long usuarioId, Long vacanteId) {
         VersionBanco cuestionario = versionesBanco
                 .findFirstByVacanteIdAndEstado(vacanteId, "PUBLICADA")
                 .orElseThrow(() -> new IllegalStateException(
@@ -195,20 +209,10 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
                 .usuarioId(usuarioId)
                 .versionBancoNivelId(cuestionario.getId())
                 .proposito(CUESTIONARIO_TECNICO)
-                // Lo que diga la vacante, y si no lo dice, lo que diga su cuestionario.
-                // Es el encadenado que el ciclo 2 dejó anotado aquí para cuando entrara la
-                // rama de los minutos del banco (V44): sin cronómetro en ninguno de los dos
-                // rige el plazo de días de siempre.
-                //
-                // ⚠️ Hoy la segunda mitad no llega a dispararse: un cuestionario de vacante
-                // nace sin minutos —el REDACTOR no los escribe, la V44 solo siembra los de
-                // tipo NIVEL, y la herencia de `publicarVersion` no lo alcanza porque
-                // `findPublicadasHermanas` filtra `vacanteId is null`—. Se deja escrito
-                // porque es la lectura correcta el día que un cuestionario los tenga, y
-                // porque el valor es el mismo (null) mientras tanto.
-                .minutosObjetivo(minutosDeLaVacante != null
-                        ? minutosDeLaVacante
-                        : cuestionario.getMinutosObjetivo())
+                // Sin minutos: el encadenado «lo que diga la vacante, y si no, lo que diga su
+                // cuestionario» se resolvía aquí y ahora se resuelve al empezar. Mismo orden,
+                // mismo resultado para quien abre el examen sin que nadie toque la vacante; la
+                // diferencia es que si alguien la toca antes, a esta persona sí le llega.
                 .estado("PENDIENTE")
                 .venceEn(Instant.now().plus(diasDePlazo(organizacionId), ChronoUnit.DAYS))
                 .creadoEn(Instant.now())
@@ -282,7 +286,8 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
 
     @Override
     public EvaluacionCandidato verTecnico(ContextoUsuario quien, UUID uuidPostulacion) {
-        return pintar(laMia(quien, uuidPostulacion, CUESTIONARIO_TECNICO).getRight());
+        var par = laMia(quien, uuidPostulacion, CUESTIONARIO_TECNICO);
+        return pintar(par.getRight(), minutosDelCuestionarioTecnico(par));
     }
 
     /**
@@ -293,27 +298,78 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
      * el más cercano de los dos. Es el mismo gesto que {@code ServicioPruebaImpl.iniciar}, y
      * el motivo es el mismo: el tiempo cuenta desde que la persona abre el examen, no desde
      * que el equipo la avanzó.
+     *
+     * <p>⚠️ <b>Y los minutos también se preguntan aquí</b>, no se leen de la fila. Es lo que
+     * hace que corregirlos en la ficha de la vacante alcance a todo el que aún no haya
+     * abierto su examen, tenga ya el suyo creado o no — que es exactamente lo que el panel le
+     * promete a quien los cambia. Ver {@link #minutosDelCuestionarioTecnico}.
+     *
+     * <p>Gana el plazo más cercano entre la fecha que ya había —la de los días de plazo— y
+     * {@code ahora + minutos}: nadie gana tiempo por abrir tarde.
      */
     @Override
     @Transactional
     public EvaluacionCandidato iniciarTecnico(ContextoUsuario quien, UUID uuidPostulacion) {
-        Evaluacion evaluacion = laMia(quien, uuidPostulacion, CUESTIONARIO_TECNICO).getRight();
+        var par = laMia(quien, uuidPostulacion, CUESTIONARIO_TECNICO);
+        Evaluacion evaluacion = par.getRight();
         exigirAbierta(evaluacion);
+        Integer minutos = minutosDelCuestionarioTecnico(par);
 
         if (evaluacion.getIniciadaEn() == null) {
             armarOrden(evaluacion);
             Instant ahora = Instant.now();
             evaluacion.setIniciadaEn(ahora);
             evaluacion.setEstado("EN_CURSO");
-            if (evaluacion.getMinutosObjetivo() != null) {
-                Instant porElReloj = ahora.plus(evaluacion.getMinutosObjetivo(), ChronoUnit.MINUTES);
+            if (minutos != null) {
+                Instant porElReloj = ahora.plus(minutos, ChronoUnit.MINUTES);
                 if (evaluacion.getVenceEn() == null || porElReloj.isBefore(evaluacion.getVenceEn())) {
                     evaluacion.setVenceEn(porElReloj);
                 }
             }
             evaluaciones.save(evaluacion);
         }
-        return pintar(evaluacion);
+        return pintar(evaluacion, minutos);
+    }
+
+    /**
+     * Cuánto dura el cuestionario técnico de esta postulación, preguntado <b>ahora</b>.
+     *
+     * <p>El encadenado es el que dejó escrito el ciclo 2 y no cambia: <b>lo que diga la
+     * vacante, y si no lo dice, lo que diga su cuestionario</b> ({@code version_banco}, V44).
+     * Sin cronómetro en ninguno de los dos rige el plazo de días de siempre, y esto devuelve
+     * {@code null}.
+     *
+     * <p>Lo que cambia es <b>cuándo</b> se resuelve. Antes se congelaba al crear el examen, y
+     * eso tenía sentido mientras cambiar los minutos con un solo postulante dentro estuviera
+     * prohibido: el caso no existía. Al correrse esa frontera a la primera rendición, congelar
+     * aquí dejaba fuera a quien ya estaba avanzado sin haber abierto nada — el cambio se
+     * guardaba, se auditaba, y a esa persona no le llegaba. La prueba del puesto ya se lee así
+     * ({@code ServicioPruebaImpl}); los dos instrumentos de la etapa tienen que comportarse
+     * igual o la diferencia es una trampa.
+     *
+     * <p>⚠️ <b>No se consulta {@code evaluacion.minutosObjetivo}, ni siquiera de respaldo.</b>
+     * Vaciar los minutos en la vacante es una operación válida —«usa los del instrumento»— y
+     * con un respaldo así se resolvería al número congelado en vez de caer al cuestionario:
+     * el mismo desajuste silencioso, con otro traje.
+     *
+     * <p>⚠️ <b>Por id Y organización</b>, nunca por id suelto (pieza B). El dueño sale de la
+     * propia postulación, que {@code laMia} ya comprobó que es de quien pregunta. Y una
+     * vacante que ya no existe se lee como «sin minutos propios» en vez de reventar: quien
+     * esté rindiendo tiene que poder terminar.
+     */
+    private Integer minutosDelCuestionarioTecnico(Par par) {
+        Postulacion postulacion = par.getLeft();
+        Integer deLaVacante = vacantes
+                .findByIdAndOrganizacionId(postulacion.getVacanteId(),
+                        postulacion.getOrganizacionId())
+                .map(Vacante::getMinutosEtapaTecnica)
+                .orElse(null);
+        if (deLaVacante != null) {
+            return deLaVacante;
+        }
+        return versionesBanco.findById(par.getRight().getVersionBancoNivelId())
+                .map(VersionBanco::getMinutosObjetivo)
+                .orElse(null);
     }
 
     @Override
@@ -636,9 +692,15 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
     /**
      * Cuánto tiempo tiene quien responde este examen. Tres sitios, en este orden.
      *
-     * <p><b>Los suyos primero.</b> El cuestionario técnico congela sus minutos al crearse: la
-     * evaluación no sabe de qué vacante viene, y resolverlos al pintar movería el reloj de
-     * quien ya está respondiendo si alguien edita la vacante a mitad de tanda.
+     * <p>⚠️ <b>Es la cadena del examen del banco por nivel, no la del cuestionario técnico.</b>
+     * Aquél tiene la suya ({@link #minutosDelCuestionarioTecnico}) porque su número lo dice la
+     * vacante y hay que preguntárselo al empezar, no al crear.
+     *
+     * <p><b>Los suyos primero</b> — y hoy esa rama no la enciende nadie: {@code minutosObjetivo}
+     * de la fila era el sitio donde el cuestionario técnico congelaba los suyos, y desde que
+     * dejó de congelarlos no queda quien escriba esa columna. Se conserva la lectura porque hay
+     * filas anteriores que la traen llena y devolver de golpe otro número para ellas no lo ha
+     * decidido nadie; si la columna se retira algún día, esta rama se va con ella.
      *
      * <p><b>Después el banco</b>, que es quien de verdad lo determina: son sus 21, 18 o 15
      * preguntas las que se tardan en responder. La plantilla dejó de elegir cuáles caen cuando
@@ -671,9 +733,20 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
                 .map(PlantillaEvaluacion::getMinutosObjetivo).orElse(null);
     }
 
+    /** El examen del banco por nivel, cuyo tiempo sale de {@link #minutosDe}. */
     private EvaluacionCandidato pintar(Evaluacion evaluacion) {
+        return pintar(evaluacion, minutosDe(evaluacion));
+    }
+
+    /**
+     * ⚠️ <b>Los minutos entran, no se deducen.</b> El cuestionario técnico los resuelve
+     * contra la vacante en el mismo instante en que calcula el reloj
+     * ({@link #minutosDelCuestionarioTecnico}), y tiene que enseñar ese número y no otro: si
+     * el servidor cierra a los 90 y la pantalla escribe «60 minutos», la contradicción es la
+     * misma que este trabajo vino a quitar, solo que mirando al revés.
+     */
+    private EvaluacionCandidato pintar(Evaluacion evaluacion, Integer minutos) {
         List<OrdenPregunta> orden = ordenes.findByEvaluacionIdOrderByPosicion(evaluacion.getId());
-        Integer minutos = minutosDe(evaluacion);
 
         if (orden.isEmpty()) {
             // Todavía no ha empezado: no hay preguntas que enseñar

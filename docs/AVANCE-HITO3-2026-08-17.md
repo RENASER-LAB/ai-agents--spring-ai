@@ -65,6 +65,9 @@ por código:
 - **La rúbrica suma 100**, y se comprueba al publicar, no al guardar el borrador
   (RF-89): se puede ir armando a medias sin que el sistema se queje en cada paso.
 - **Una prueba cronometrada dura de 60 a 120 minutos** (RF-76).
+  > ⚠️ **Desfasado.** Ese rango se retiró el 31/08/2026 por decisión de Renaser: manda el tiempo
+  > que ponga la empresa, y solo queda un piso de 5 minutos. Se deja escrito porque es lo que era
+  > cierto el 17/08.
 
 ### 3. El candidato rinde la prueba con su cronómetro real
 
@@ -158,6 +161,11 @@ más un documento"*, que no se hacen en dos horas. **Alguien de Renaser tiene qu
 reescribir al menos una prueba, mucho más pequeña**, antes de que haya algo real que
 un candidato pueda rendir. Sin eso, todo lo construido aquí queda probado con
 contenido de prueba, no con el contenido que se usará de verdad.
+
+> ⚠️ **El formato de 60 a 120 minutos ya no lo impone el sistema** (retirado el 31/08/2026, por
+> decisión de Renaser). **El bloqueo no se movió**: sigue haciendo falta que alguien de Renaser
+> escriba una prueba pensada para rendirse de una sentada. Lo que cambió es que ahora también
+> decide ella cuántos minutos son.
 
 ### Simulación y Validación práctica
 

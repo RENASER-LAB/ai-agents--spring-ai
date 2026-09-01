@@ -88,6 +88,7 @@ class ServicioVacantesPanelImplTest {
     @Mock private com.renaser.ai.ai_engine.consentimiento.repository.TextoConsentimientoRepository
             textosConsentimiento;
     @Mock private IntentoPruebaRepository intentos;
+    @Mock private com.renaser.ai.ai_engine.perfilintegral.repository.EvaluacionRepository evaluaciones;
     @Mock private ServicioAuditoria auditoria;
     @Mock private com.renaser.ai.ai_engine.organizacion.service.DuenoDelInstrumento dueno;
     @Mock private com.renaser.ai.ai_engine.postulacion.repository.PostulacionRepository postulaciones;
@@ -99,8 +100,8 @@ class ServicioVacantesPanelImplTest {
     void crearElServicio() {
         servicio = new ServicioVacantesPanelImpl(vacantes, puestos, requisitos, solicitudes,
                 versionesPesos, plantillas, versionesPrueba, plantillasPrueba, plantillasCorreo,
-                plantillasPorVacante, textosConsentimiento, intentos, versionesBanco, auditoria,
-                dueno, postulaciones);
+                plantillasPorVacante, textosConsentimiento, intentos, evaluaciones, versionesBanco,
+                auditoria, dueno, postulaciones);
         // En estas pruebas la organizacion no personaliza nada: el resolutor contesta
         // que el dueño de todo instrumento es ella misma (aqui hace de plataforma).
         org.mockito.Mockito.lenient()
@@ -656,5 +657,107 @@ class ServicioVacantesPanelImplTest {
         assertThatThrownBy(() -> servicio.asignarPlantillaPrueba(QUIEN, VACANTE, 31L))
                 .isInstanceOf(ResourceNotFoundException.class);
         verify(vacantes, org.mockito.Mockito.never()).save(v);
+    }
+
+    // ============ Hasta cuándo se puede tocar la etapa técnica ============
+    //
+    // La línea se corrió de «la primera postulación» a «la primera rendición». Postular no
+    // es rendir: quien no ha abierto su prueba no ha visto ni enunciado ni reloj, así que
+    // corregir los minutos no le mueve nada. Con la línea vieja, un solo currículum dentro
+    // congelaba la vacante hasta la siguiente convocatoria.
+
+    @Test
+    @DisplayName("con postulantes que aún no han empezado, la etapa técnica todavía se ajusta")
+    void conPostulantesQueNoEmpezaronSeAjusta() {
+        Vacante v = vacante("PUBLICADA", false, null);
+        v.setMinutosEtapaTecnica(60);
+        when(intentos.algunoEmpezadoDeLaVacante(VACANTE)).thenReturn(false);
+        when(evaluaciones.algunaTecnicaEmpezadaDeLaVacante(VACANTE)).thenReturn(false);
+
+        servicio.elegirInstrumentoTecnico(QUIEN, VACANTE, "PLANTILLA", 90);
+
+        assertThat(v.getMinutosEtapaTecnica()).isEqualTo(90);
+        verify(vacantes).save(v);
+    }
+
+    @Test
+    @DisplayName("en cuanto alguien abrió su prueba del puesto, la vara se queda quieta")
+    void conAlguienDentroDeLaPruebaNoSeCambia() {
+        Vacante v = vacante("PUBLICADA", false, null);
+        v.setMinutosEtapaTecnica(60);
+        when(intentos.algunoEmpezadoDeLaVacante(VACANTE)).thenReturn(true);
+
+        assertThatThrownBy(() -> servicio.elegirInstrumentoTecnico(QUIEN, VACANTE, "PLANTILLA", 90))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("misma vara");
+        verify(vacantes, org.mockito.Mockito.never()).save(v);
+    }
+
+    @Test
+    @DisplayName("el cuestionario técnico cuenta igual: quien lo abrió también rindió")
+    void conAlguienDentroDelCuestionarioNoSeCambia() {
+        // Se preguntan los dos instrumentos a propósito: una vacante que ya cambió antes
+        // puede tener gente que empezó con el otro, y esa gente también se midió.
+        Vacante v = vacante("PUBLICADA", false, null);
+        v.setInstrumentoEtapaTecnica("CUESTIONARIO_TECNICO");
+        when(intentos.algunoEmpezadoDeLaVacante(VACANTE)).thenReturn(false);
+        when(evaluaciones.algunaTecnicaEmpezadaDeLaVacante(VACANTE)).thenReturn(true);
+
+        assertThatThrownBy(() ->
+                servicio.elegirInstrumentoTecnico(QUIEN, VACANTE, "CUESTIONARIO_TECNICO", 45))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("misma vara");
+        verify(vacantes, org.mockito.Mockito.never()).save(v);
+    }
+
+    @Test
+    @DisplayName("en borrador no se pregunta nada: la vacante todavía se está escribiendo")
+    void enBorradorNiSeConsulta() {
+        Vacante v = vacante("BORRADOR", false, null);
+
+        servicio.elegirInstrumentoTecnico(QUIEN, VACANTE, "CUESTIONARIO_TECNICO", 45);
+
+        assertThat(v.getInstrumentoEtapaTecnica()).isEqualTo("CUESTIONARIO_TECNICO");
+        verify(intentos, org.mockito.Mockito.never()).algunoEmpezadoDeLaVacante(VACANTE);
+        verify(evaluaciones, org.mockito.Mockito.never()).algunaTecnicaEmpezadaDeLaVacante(VACANTE);
+    }
+
+    @Test
+    @DisplayName("guardar el mismo valor no despierta la guarda")
+    void elMismoValorNoTocaLaGuarda() {
+        // Volver a mandar lo que ya está guardado es lo que hace el panel al cambiar el
+        // desplegable sin tocar los minutos. No cambia la vara de nadie.
+        Vacante v = vacante("PUBLICADA", false, null);
+        v.setMinutosEtapaTecnica(90);
+
+        servicio.elegirInstrumentoTecnico(QUIEN, VACANTE, "PLANTILLA", 90);
+
+        verify(vacantes).save(v);
+        verify(intentos, org.mockito.Mockito.never()).algunoEmpezadoDeLaVacante(VACANTE);
+    }
+
+    @Test
+    @DisplayName("un minuto no es un plazo: el suelo son cinco")
+    void unMinutoNoEsUnPlazo() {
+        // Estos minutos convierten cualquier prueba en cronometrada, así que un uno es una
+        // prueba que el barrido entrega sola sesenta segundos después de abrirla.
+        Vacante v = vacante("BORRADOR", false, null);
+
+        assertThatThrownBy(() -> servicio.elegirInstrumentoTecnico(QUIEN, VACANTE, "PLANTILLA", 1))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("al menos 5 minutos");
+        verify(vacantes, org.mockito.Mockito.never()).save(v);
+    }
+
+    @Test
+    @DisplayName("vacío sigue siendo un valor: rige lo que traiga el instrumento")
+    void vacioSigueSiendoUnValor() {
+        Vacante v = vacante("BORRADOR", false, null);
+        v.setMinutosEtapaTecnica(90);
+
+        servicio.elegirInstrumentoTecnico(QUIEN, VACANTE, "PLANTILLA", null);
+
+        assertThat(v.getMinutosEtapaTecnica()).isNull();
+        verify(vacantes).save(v);
     }
 }
