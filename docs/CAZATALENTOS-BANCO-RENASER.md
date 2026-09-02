@@ -351,6 +351,31 @@ Se marcan sobre **el cuestionario completo**, no sobre una pregunta.
 **Dos o más banderas activas = revisión humana obligatoria antes de avanzar**, sin importar
 el puntaje.
 
+### Qué de esto está construido (02/09/2026)
+
+**Dos de las cinco, y como aviso, no como puerta.** `GET /panel/postulaciones/{id}/evaluacion`
+calcula `SIN_INCOMODIDAD` y `SOLO_NOSOTROS` contando las columnas `c1_episodio`…`c4_incomodidad`
+de `nota_respuesta`: sin IA, sin coste y sobre lo que ya estaba guardado. Se devuelven como
+`patrones`, con la frase que dice **de cuántas respuestas sale** cada uno, porque con pocas
+respuestas el patrón salta fácil y quien lo lee tiene que poder juzgarlo.
+
+Lo que **no** existe todavía: `REACTIVO`, `SIN_FRACASO` y `AMBIGUO` no se calculan; ninguna bandera
+dispara ninguna repregunta —las repreguntas del cuadro de abajo no están automatizadas—; y la
+regla de «dos o más banderas = revisión humana obligatoria» **no bloquea nada**: nada en el código
+frena un avance por esto. Hoy los dos patrones son avisos que se leen en la ficha —preguntas para
+la conversación final, como las alertas—, no una condición que el sistema haga cumplir.
+
+⚠️ **`SOLO_NOSOTROS` está implementada con «la mitad o más», no con «más de la mitad».** El
+insumo de la clienta dice *más de* la mitad; el comentario de la `V41` la abrevió a «mitad sin C2»
+y el código quedó en `sinAutoria * 2 >= total`. La diferencia es un solo caso —exactamente la
+mitad de las respuestas sin C2, que solo puede darse con un número par— y ahí lo que corre levanta
+el patrón que la clienta no pidió. **No se ha tocado el código**: queda anotado aquí para
+que se decida cuál de las dos reglas manda antes de que alguien lo lea como si fuera el requisito.
+
+Solo cuentan las respuestas que traen las cuatro señales. Mezclar las que no las tienen daría
+«nunca se incomodó» en cualquier evaluación de un banco anterior a CAZATALENTOS, que no midió nada
+de esto.
+
 ---
 
 ## Las repreguntas que le tocan a esta etapa

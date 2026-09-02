@@ -195,7 +195,7 @@ del área— se ven solo las propias, y una ajena responde 404.
 | POST `/postulaciones/{id}/transiciones` | Mover a cualquier estado. **El motivo es obligatorio, sin excepción** | `mover_postulacion` |
 | POST `/postulaciones/{id}/confirmacion-avance` | Confirmar que avanza: el sistema calcula el estado siguiente | `confirmar_avance` |
 | GET `/postulaciones/{id}/perfil-integral` | El retrato de la IA: notas del currículum, hallazgos y avisos. Cada nota lleva su explicación, **su confianza —de 0 a 100, la misma escala del puntaje, no de 0 a 1—** y el **motivo del ajuste**, que solo tiene valor cuando esa nota la corrigió una persona | `ver_perfil_integral` |
-| GET `/postulaciones/{id}/evaluacion` | El desglose del banco: cada respuesta abierta con su nota, la explicación y la evidencia que citó la IA, el promedio de lo cerrado y los semáforos de alineación. **Sin evaluación asignada devuelve vacíos, no 404**. ⚠️ `alineacion` sale vacía siempre: nadie escribe esa tabla todavía | `ver_respuestas_evaluacion` |
+| GET `/postulaciones/{id}/evaluacion` | El desglose del banco: cada respuesta abierta con su nota, la explicación y la evidencia que citó la IA, el promedio de lo cerrado y los semáforos de alineación. En un banco CAZATALENTOS cada respuesta trae además **qué pilar alimenta** (`pilar`, `pilarCodigo`) y **las cuatro señales** que el agente marcó (`senales`), y el desglose entero trae los `patrones` del cuestionario. **Sin evaluación asignada devuelve vacíos, no 404**. ⚠️ `senales` en nulo significa que **ese banco no las medía**, no que ninguna se cumpliera. ⚠️ `alineacion` sale vacía siempre: nadie escribe esa tabla todavía | `ver_respuestas_evaluacion` |
 | POST `/postulaciones/{id}/criba-cv` | Que la IA lea **solo el currículum** y arme el retrato con eso. Es lo que se pide con una tanda recién llegada | `ajustar_nota` |
 | POST `/postulaciones/{id}/calificacion-perfil-integral` | Calificar con todo: currículum y evaluación. Exige evaluación entregada | `ajustar_nota` |
 | POST `/postulaciones/{id}/cv` | Reemplazar el currículum desde el panel | `ajustar_nota` |
@@ -234,6 +234,61 @@ del área— se ven solo las propias, y una ajena responde 404.
 > `ver_pretension` el dato ni se consulta. Y quien tiene `ver_embudo` pero no `ajustar_nota` se
 > lleva el Detalle de la prueba resumido en una línea que explica qué permiso le falta, en vez de
 > un archivo a medio escribir.
+
+> **El desglose enseña de dónde sale cada 0–4, y no lo recalcula.** Desde el 02/09
+> `/postulaciones/{id}/evaluacion` devuelve, de lo que ya estaba guardado desde que se calificó,
+> tres cosas más. Ninguna es otra pasada de IA: son consultas sobre las columnas que la `V41`
+> creó justo para esto, y **ninguna nota se mueve**.
+>
+> **El pilar de cada respuesta abierta** (`pilar`, el nombre para leer —«Iniciativa (pilar)»—, y
+> `pilarCodigo`, `PIL_INICIATIVA`). Sin él las abiertas son una lista plana y no se puede
+> contestar «¿cuáles de estas sostienen Iniciativa?». Sale de `pregunta_dimension` **filtrando
+> por el prefijo `PIL_`**, que es el mismo filtro con el que `CalificacionCriterios` agrupa al
+> ponderar, y tiene que ser el mismo: una pregunta puede colgar además de alguna de las 22
+> dimensiones del catálogo viejo, y agrupar por una de esas diría que la respuesta sostiene algo
+> que **no mueve ninguna nota**. Vienen vacíos si la pregunta no cuelga de ningún pilar. Si una
+> pregunta tuviera dos pilares se queda con uno, a propósito —agrupar es repartir cada respuesta
+> en un sitio—; el banco de hoy no produce ese caso.
+>
+> **Las cuatro señales** (`senales`: `episodio`, `autoria`, `dato`, `incomodidad`, más
+> `cumpleSenalCero`). El agente declara qué vio; **el número lo pone el código**, no la
+> aritmética del modelo. ⚠️ Y no es la suma de las cuatro: `episodio` es una puerta y hay un
+> tope, como explica el aviso de más abajo. Enseñar el número sin ellas deja «3 de 4»
+> sin decir cuál faltó, que es justo lo que hay que poder discutir con la persona en la
+> conversación. Van en un objeto propio y no en cuatro campos sueltos para que **el nulo sea uno
+> solo**: o el banco las medía —y están las cuatro— o no las medía y no hay ninguna; cuatro
+> booleanos sueltos admitirían tres puestas y una vacía, que no significa nada.
+>
+> ⚠️ **`senales` en nulo no es «no cumplió ninguna»: es «este banco no las medía».** Solo el
+> banco CAZATALENTOS puntúa así; las notas de los bancos anteriores las tienen vacías y no se
+> inventan. Quien pinte cuatro casillas desmarcadas ahí convierte cada evaluación antigua en un
+> cero de cuatro que nadie le puso.
+>
+> ⚠️ **Un `0` con señales marcadas tampoco es un fallo.** El puntaje no es la suma a secas: es 0
+> si `cumpleSenalCero`, y 0 también si falta `episodio` aunque las otras tres estén, porque sin un
+> episodio concreto no hay nada que puntuar. Y una pregunta que declare tope lo recorta: la regla
+> dura de R11 —«sin ninguna cifra, el máximo de esta pregunta es 2»— sale de la propia pregunta,
+> no de un `if` por código. Por eso la señal de cero viaja junto a las cuatro: **es lo que explica
+> un cero que de otro modo parecería un error de cálculo.**
+>
+> **Los patrones del cuestionario completo** (`patrones`, con `codigo`, `titulo`, `descripcion`,
+> `deCuantas` y `total`). Son dos, y solo se ven mirando el cuestionario entero, no una respuesta:
+> `SIN_INCOMODIDAD` —ninguna respuesta marcó la cuarta señal— y `SOLO_NOSOTROS` —**más de la
+> mitad** no distinguen qué hizo él de lo que hizo su equipo—. El corte es el del documento de la
+> clienta, y no «la mitad o más»: con el corte flojo, un cuestionario partido por la mitad levanta
+> la bandera, y una bandera que salta en la mitad de los candidatos deja de señalar nada. La frase de cada uno **dice de cuántas sale**,
+> porque con pocas respuestas el patrón salta fácil y quien lo lee tiene que poder juzgarlo.
+> **No descartan a nadie**: son dos preguntas para la conversación final, igual que las alertas.
+>
+> Solo se cuentan las respuestas que traen señales. Mezclar las que no las tienen daría «nunca se
+> incomodó» en cualquier evaluación de un banco anterior, que no midió nada de esto.
+>
+> ⚠️ **`patrones` vacía se lee de dos maneras y está bien.** Habiendo respuestas abiertas, puede
+> ser que el banco no midiera las señales, o que las midiera y no saltara ninguno. La lista sola no
+> lo distingue, y no hace falta que lo haga: **el bloque `senales` de cada respuesta ya dice cuál
+> de los dos casos es**. Lo que no se puede es leer la lista vacía como «no se encontró nada» sin
+> mirar antes las respuestas — y si `abiertas` también viene vacía, no hay nada que leer: o no hay
+> evaluación asignada, o ninguna de sus preguntas era puntuable.
 
 ### La prueba del puesto (hito 3)
 

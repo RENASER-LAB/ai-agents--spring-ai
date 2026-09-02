@@ -102,6 +102,24 @@ propia respuesta y la confianza; si una persona ajustó la nota, también el mot
 sale el promedio y cuántas preguntas fueron, no pregunta por pregunta: se corrige solo contra
 una clave y no hay nada que explicar.
 
+**Y desde el 02/09, en un banco CAZATALENTOS, el número deja de ser opaco.** Lo que el evaluador
+declara —C1 episodio, C2 autoría, C3 dato duro, C4 incomodidad, y si cumple la señal de 0— ya
+estaba guardado desde que se calificó, pero no salía del backend: quien abría la ficha veía un «3»
+y no de qué estaba hecho. Ahora esa misma llamada devuelve las cuatro señales de cada respuesta,
+**qué pilar alimenta** —«Iniciativa (pilar)», leído de `pregunta_dimension` con el prefijo `PIL_`,
+el mismo filtro con que se pondera— y **dos patrones del cuestionario completo**: `SIN_INCOMODIDAD`
+(ninguna respuesta se metió en lo incómodo) y `SOLO_NOSOTROS` (en la mitad o más no se distingue lo
+suyo de lo del equipo). No hay una segunda pasada de IA en nada de esto: **son consultas sobre
+columnas ya escritas**, y ninguna nota se mueve. Como las alertas, los patrones no descartan a
+nadie: son preguntas para la conversación final.
+
+⚠️ **Que no haya señales no es que no se cumpliera ninguna.** Solo el banco CAZATALENTOS puntúa
+así; las evaluaciones de los bancos anteriores las tienen vacías porque nadie las midió. Pintar
+cuatro casillas desmarcadas en esa ficha convierte una evaluación antigua en un cero de cuatro que
+nadie le puso, y no se distingue del candidato que de verdad falló las cuatro. Por lo mismo, los
+patrones **solo se calculan sobre las respuestas que traen señales**: contar las demás daría «nunca
+se incomodó» en cualquier evaluación de un banco anterior.
+
 ⚠️ **Cómo se mezclan las dos mitades no lo ha confirmado Renaser.** Hoy se ponderan por cuántas
 preguntas produjo cada una, y esa cuenta vive en un solo sitio —`ServicioCalificacion.notaCombinada`—
 a propósito: el día que el cliente decida otra cosa tiene que cambiar a la vez para la nota que
