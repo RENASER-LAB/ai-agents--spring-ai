@@ -784,6 +784,8 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
                                            Map<Long, BigDecimal> pesos) {
         return new NotaCriterioResponse(
                 criterio.getNombre(),
+                // El nombre corto, para rotular una columna donde el largo no cabe.
+                criterio.getCodigo(),
                 nota == null ? null : nota.getPuntaje(),
                 criterio.getPuntos(),
                 pesos.get(criterio.getId()),

@@ -184,6 +184,32 @@ class ServicioPerfilIntegralPanelImplTest {
         assertThat(filas.get(1).notaEtapa()).isNull();
     }
 
+    /**
+     * El codigo del criterio viaja con la nota.
+     *
+     * <p>Existe por una razon de pantalla, no de modelo: una tabla con una columna por
+     * criterio pone «Resultados demostrables» encima de una celda que dice «40», y esa
+     * cabecera decide el ancho de la columna. Sin el nombre corto, ocho criterios sacan la
+     * tabla de la ventana.
+     *
+     * <p>Se comprueba que van los DOS y que no se confunden: el corto rotula y el largo
+     * explica.
+     */
+    @Test
+    void elCodigoDelCriterioViajaJuntoAlNombre() {
+        candidatos(candidato(1L, "ALTA", "90"));
+        pesos(peso(7L, "25"));
+        notasDeLaTanda.add(nota(1L, 7L, "80"));
+
+        List<FilaRanking> filas = servicio.ranking(quien, VACANTE).filas();
+
+        assertThat(filas.get(0).notasCriterio()).singleElement()
+                .satisfies(n -> {
+                    assertThat(n.codigo()).isEqualTo("CV_C7");
+                    assertThat(n.criterio()).isEqualTo("Criterio 7");
+                });
+    }
+
     @Test
     void unaEtapaInventadaSeRechazaConLasQueExisten() {
         // La vacante ya la sirve el @BeforeEach: el 400 llega antes de listar la tanda.
@@ -810,6 +836,10 @@ class ServicioPerfilIntegralPanelImplTest {
                 .thenReturn(List.of(losSuyos).stream()
                         .map(p -> Criterio.builder().id(p.getCriterioId())
                                 .nombre("Criterio " + p.getCriterioId())
+                                // El codigo se distingue del nombre a proposito: si los dos
+                                // dijeran lo mismo, un DTO que devolviera el largo en el
+                                // campo del corto pasaria el test sin que nadie lo viera.
+                                .codigo("CV_C" + p.getCriterioId())
                                 .puntos(new BigDecimal("100")).build())
                         .toList());
     }
