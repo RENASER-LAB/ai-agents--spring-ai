@@ -4,6 +4,9 @@ import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.Alineacion
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.DesgloseEvaluacion;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.RespuestaAbiertaVista;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.ResumenCerradas;
+import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.PatronDelCuestionario;
+import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.Senales;
+import com.renaser.ai.ai_engine.perfilintegral.entity.Dimension;
 import com.renaser.ai.ai_engine.perfilintegral.entity.Evaluacion;
 import com.renaser.ai.ai_engine.perfilintegral.entity.NotaRespuesta;
 import com.renaser.ai.ai_engine.perfilintegral.entity.Pregunta;
@@ -43,6 +46,9 @@ public class ServicioDesgloseEvaluacionImpl implements ServicioDesgloseEvaluacio
     private final PreguntaRepository preguntas;
     private final NotaRespuestaRepository notasRespuesta;
     private final ResultadoAlineacionRepository alineaciones;
+    private final com.renaser.ai.ai_engine.perfilintegral.repository.PreguntaDimensionRepository
+            preguntaDimensiones;
+    private final com.renaser.ai.ai_engine.perfilintegral.repository.DimensionRepository dimensiones;
     private final ServicioCalificacion calificacion;
     private final CalificacionCriterios calificacionCriterios;
     private final com.renaser.ai.ai_engine.perfilintegral.repository.NotaEtapaRepository notasEtapa;
@@ -56,7 +62,7 @@ public class ServicioDesgloseEvaluacionImpl implements ServicioDesgloseEvaluacio
         // pudo publicarse con la evaluación del banco apagada.
         if (postulacion.getEvaluacionId() == null) {
             return new DesgloseEvaluacion(postulacionId, null, null, null,
-                    new ResumenCerradas(BigDecimal.ZERO, 0), List.of(), List.of());
+                    new ResumenCerradas(BigDecimal.ZERO, 0), List.of(), List.of(), List.of());
         }
 
         Evaluacion evaluacion = evaluaciones.findById(postulacion.getEvaluacionId()).orElse(null);
@@ -73,7 +79,8 @@ public class ServicioDesgloseEvaluacionImpl implements ServicioDesgloseEvaluacio
                 alineaciones.findByEvaluacionId(postulacion.getEvaluacionId()).stream()
                         .map(a -> new AlineacionVista(a.getBloque(), a.getSemaforo(),
                                 a.getExplicacion()))
-                        .toList());
+                        .toList(),
+                patronesDe(abiertas));
     }
 
     /**
@@ -101,6 +108,10 @@ public class ServicioDesgloseEvaluacionImpl implements ServicioDesgloseEvaluacio
         Map<Long, NotaRespuesta> notaPorRespuesta = notasRespuesta
                 .findByRespuestaIdIn(suyas.stream().map(Respuesta::getId).toList()).stream()
                 .collect(Collectors.toMap(NotaRespuesta::getRespuestaId, Function.identity()));
+        Map<Long, String> pilarPorPregunta = pilaresDe(preguntaPorId.keySet());
+        Map<String, String> nombrePorPilar = dimensiones.findAllByOrderByOrden().stream()
+                .collect(Collectors.toMap(Dimension::getCodigo, Dimension::getNombre,
+                        (a, b) -> a));
 
         return suyas.stream()
                 .filter(r -> {
@@ -110,6 +121,7 @@ public class ServicioDesgloseEvaluacionImpl implements ServicioDesgloseEvaluacio
                 .map(r -> {
                     Pregunta p = preguntaPorId.get(r.getPreguntaId());
                     NotaRespuesta n = notaPorRespuesta.get(r.getId());
+                    String pilar = pilarPorPregunta.get(p.getId());
                     return new RespuestaAbiertaVista(
                             p.getEnunciado(),
                             p.getTipo(),
@@ -118,9 +130,53 @@ public class ServicioDesgloseEvaluacionImpl implements ServicioDesgloseEvaluacio
                             n == null ? null : n.getExplicacion(),
                             n == null ? null : n.getEvidenciaCitada(),
                             n == null ? null : n.getConfianza(),
-                            n == null ? null : n.getMotivoAjuste());
+                            n == null ? null : n.getMotivoAjuste(),
+                            pilar == null ? null : nombrePorPilar.getOrDefault(pilar, pilar),
+                            pilar,
+                            senalesDe(n));
                 })
                 .toList();
+    }
+
+    /**
+     * Qué pilar mide cada pregunta.
+     *
+     * <p>Solo los que empiezan por {@code PIL_}: una pregunta puede colgar además de alguna
+     * de las 22 dimensiones del catálogo viejo, y esas no son pilares. Es el mismo filtro
+     * que aplica {@code CalificacionCriterios} al ponderar, y tiene que ser el mismo: si
+     * aquí se agrupara por una dimensión que allí no pondera, la ficha diría que una
+     * respuesta sostiene algo que no mueve ninguna nota.
+     *
+     * <p>Si una pregunta tuviera dos pilares se queda con uno solo, y a propósito: agrupar
+     * es repartir cada respuesta en un sitio. Hoy el banco no produce ese caso.
+     */
+    private Map<Long, String> pilaresDe(java.util.Collection<Long> preguntaIds) {
+        return preguntaDimensiones.findByPreguntaIdIn(List.copyOf(preguntaIds)).stream()
+                .filter(pd -> pd.getDimensionCodigo().startsWith("PIL_"))
+                .collect(Collectors.toMap(
+                        com.renaser.ai.ai_engine.perfilintegral.entity.PreguntaDimension
+                                ::getPreguntaId,
+                        com.renaser.ai.ai_engine.perfilintegral.entity.PreguntaDimension
+                                ::getDimensionCodigo,
+                        (a, b) -> a));
+    }
+
+    /**
+     * Las cuatro señales de una nota, o nada.
+     *
+     * <p>⚠️ <b>Nada significa «este banco no las medía», no «no se cumplió ninguna».</b> Se
+     * decide por {@code c1Episodio}: las cinco columnas se escriben juntas o no se escribe
+     * ninguna, así que una sola basta para saber de qué banco viene la nota. Devolver cuatro
+     * falsos aquí convertiría cada evaluación anterior a CAZATALENTOS en un cero de cuatro.
+     */
+    private Senales senalesDe(NotaRespuesta nota) {
+        if (nota == null || nota.getC1Episodio() == null) return null;
+        return new Senales(
+                Boolean.TRUE.equals(nota.getC1Episodio()),
+                Boolean.TRUE.equals(nota.getC2Autoria()),
+                Boolean.TRUE.equals(nota.getC3Dato()),
+                Boolean.TRUE.equals(nota.getC4Incomodidad()),
+                nota.getCumpleSenalCero());
     }
 
     /**
@@ -155,5 +211,62 @@ public class ServicioDesgloseEvaluacionImpl implements ServicioDesgloseEvaluacio
     /** Un solo camino, un solo permiso: por eso va escrito aquí y no por parámetro. */
     private Postulacion laVisible(ContextoUsuario quien, Long postulacionId) {
         return alcance.laPostulacionVisible(quien, postulacionId, "ver_respuestas_evaluacion");
+    }
+
+    /**
+     * Los patrones que solo se ven mirando el cuestionario entero.
+     *
+     * <p>Son dos consultas sobre las señales ya guardadas —sin IA y sin coste—, que es
+     * exactamente para lo que la V41 las persistió: «se vuelven consultas sobre estas
+     * columnas en vez de otra pasada de IA».
+     *
+     * <p>⚠️ <b>Solo cuentan las respuestas que traen señales.</b> Mezclar las que no las
+     * tienen daría «nunca se incomodó» en cualquier evaluación de un banco anterior, que no
+     * midió nada de esto. Si no queda ninguna, no hay patrones y no es un hallazgo.
+     *
+     * <p>Ninguno descarta a nadie: son dos preguntas para la conversación final.
+     */
+    private List<PatronDelCuestionario> patronesDe(List<RespuestaAbiertaVista> abiertas) {
+        List<RespuestaAbiertaVista> conSenales = abiertas.stream()
+                .filter(a -> a.senales() != null)
+                .toList();
+        if (conSenales.isEmpty()) return List.of();
+
+        List<PatronDelCuestionario> patrones = new java.util.ArrayList<>();
+        int total = conSenales.size();
+
+        long conIncomodidad = conSenales.stream().filter(a -> a.senales().incomodidad()).count();
+        if (conIncomodidad == 0) {
+            patrones.add(new PatronDelCuestionario(
+                    "SIN_INCOMODIDAD",
+                    "No se metió en lo incómodo en ninguna respuesta",
+                    "En las " + total + " respuestas contó lo que salió bien. Ni un error "
+                            + "propio, ni una decisión que le costara. Vale la pena "
+                            + "preguntárselo en la conversación.",
+                    0, total));
+        }
+
+        long sinAutoria = conSenales.stream().filter(a -> !a.senales().autoria()).count();
+        /*
+         * ⚠️ MÁS de la mitad, no la mitad. Las tres fuentes decían cosas distintas: el
+         * documento de la clienta pide «más de la mitad de las respuestas sin C2», el
+         * comentario de la V41 lo abrevió a «mitad sin C2», y esto estaba en «la mitad o
+         * más». Difieren en un solo caso —exactamente la mitad, solo posible con un
+         * número par de respuestas— y manda la clienta, que es de quien es el requisito.
+         *
+         * Además es la lectura que hace más útil la bandera: con el corte flojo, un
+         * cuestionario partido por la mitad la levanta, y una bandera que salta en la
+         * mitad de los candidatos deja de señalar nada.
+         */
+        if (sinAutoria * 2 > total) {
+            patrones.add(new PatronDelCuestionario(
+                    "SOLO_NOSOTROS",
+                    "Cuenta lo que hizo el equipo, no lo suyo",
+                    "En " + sinAutoria + " de " + total + " respuestas no se distingue qué "
+                            + "hizo él de lo que hizo su equipo. Puede ser modestia o puede "
+                            + "ser que no fuera suyo; desde aquí no se sabe cuál.",
+                    (int) sinAutoria, total));
+        }
+        return patrones;
     }
 }

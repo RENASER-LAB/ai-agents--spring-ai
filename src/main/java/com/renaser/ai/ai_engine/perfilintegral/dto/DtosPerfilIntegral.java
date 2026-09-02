@@ -208,7 +208,25 @@ public final class DtosPerfilIntegral {
             BigDecimal notaEvaluacion,
             ResumenCerradas cerradas,
             List<RespuestaAbiertaVista> abiertas,
-            List<AlineacionVista> alineacion) {}
+            List<AlineacionVista> alineacion,
+            /**
+             * Lo que solo se ve mirando el cuestionario entero, no una respuesta.
+             *
+             * <p>Vacía cuando el banco no medía las señales, y vacía también cuando las
+             * medía y no hay ningún patrón: las dos cosas se leen igual y está bien, porque
+             * el bloque de señales de cada respuesta ya dice cuál de los dos casos es.
+             */
+            List<PatronDelCuestionario> patrones) {}
+
+    /**
+     * Un patrón del cuestionario completo.
+     *
+     * <p>Son consultas sobre las señales ya guardadas, no otra pasada de IA — es
+     * literalmente para lo que la V41 creó esas columnas. No descartan a nadie: son dos
+     * preguntas para la conversación final, como las alertas.
+     */
+    public record PatronDelCuestionario(String codigo, String titulo, String descripcion,
+                                        int deCuantas, int total) {}
 
     /** Lo cerrado no se desglosa por pregunta: se corrige solo y sale como un promedio sobre 100. */
     public record ResumenCerradas(BigDecimal nota, int preguntas) {}
@@ -226,7 +244,52 @@ public final class DtosPerfilIntegral {
             String explicacion,
             String evidenciaCitada,
             BigDecimal confianza,
-            String motivoAjuste) {}
+            String motivoAjuste,
+            /**
+             * Qué pilar alimenta esta respuesta, dicho para leer —«Iniciativa»— y su
+             * código. Vacíos si la pregunta no cuelga de ningún pilar.
+             *
+             * <p>Viajan porque sin ellos las respuestas abiertas son una lista plana y no
+             * se puede saber cuáles sostienen un pilar concreto. El vínculo existe desde
+             * la V41 en {@code pregunta_dimension}; lo que faltaba era enseñarlo.
+             */
+            String pilar,
+            String pilarCodigo,
+            /**
+             * Las cuatro señales que el agente marcó, y la de cero.
+             *
+             * <p>Lo calcula el código y no la aritmética del modelo. Enseñar el número
+             * sin ellas deja «3 de 4» sin decir cuál faltó, que es justo lo que hay que
+             * poder discutir con la persona.
+             *
+             * <p>⚠️ <b>El puntaje NO es el conteo de las cuatro, y confundirlo hace que un
+             * cero parezca un error de cálculo.</b> Ver {@code FormulasCazatalentos.puntaje}:
+             * {@code episodio} es una PUERTA —sin él el puntaje es 0 aunque las otras tres
+             * estén marcadas—, {@code cumpleSenalCero} también fuerza el 0, y cuando falta
+             * {@code dato} la pregunta puede declarar un tope que recorta el resultado
+             * (regla dura R11). Con la puerta abierta, el puntaje es 1 más las otras tres
+             * que estén.
+             *
+             * <p>⚠️ <b>Nulas no significa «ninguna se cumplió»: significa que ese banco no
+             * las medía.</b> Solo el banco CAZATALENTOS puntúa así; las notas de los bancos
+             * anteriores las tienen vacías y no se inventan. Quien las pinte tiene que
+             * distinguir las dos cosas o convertirá una evaluación antigua en un cero.
+             */
+            Senales senales) {}
+
+    /**
+     * Las cuatro señales de una respuesta del banco CAZATALENTOS, presentes o ausentes.
+     *
+     * <p>Es un tipo propio y no cuatro campos sueltos para que el nulo sea uno solo: o el
+     * banco las medía —y entonces están las cuatro— o no las medía y no hay ninguna. Cuatro
+     * booleanos sueltos admitirían tres puestas y una vacía, que no significa nada.
+     */
+    public record Senales(
+            boolean episodio,
+            boolean autoria,
+            boolean dato,
+            boolean incomodidad,
+            Boolean cumpleSenalCero) {}
 
     /** Un bloque de alineación personal con su semáforo. Un rojo no descarta a nadie por sí solo. */
     public record AlineacionVista(String bloque, String semaforo, String explicacion) {}

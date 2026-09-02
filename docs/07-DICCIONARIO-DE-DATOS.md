@@ -1130,6 +1130,17 @@ Qué dimensiones evalúa una pregunta abierta, que no tiene opciones.
 
 **Clave primaria:** `pregunta_id` + `dimension_codigo` · **Sin columna `id`**
 
+Esta tabla es la que dice **qué pilar alimenta cada respuesta abierta** en el desglose del panel
+(`GET /panel/postulaciones/{id}/evaluacion`, desde el 02/09). Se lee **filtrando por el prefijo
+`PIL_`**, y el filtro no es un detalle: una misma pregunta puede colgar además de alguna de las 22
+dimensiones del catálogo viejo, y esas no son pilares. Es el mismo filtro que aplica
+`CalificacionCriterios` al ponderar, y tiene que serlo — agrupar la ficha por una dimensión que
+allí no pondera diría que una respuesta sostiene algo que **no mueve ninguna nota**.
+
+Una pregunta sin ningún `PIL_` sale sin pilar, y eso es información, no un hueco. Y si tuviera
+dos, el panel se queda con uno solo a propósito: agrupar es repartir cada respuesta en un sitio.
+El banco de hoy no produce ese caso.
+
 ## `par_consistencia`
 
 Dos preguntas que miden lo mismo y deberían responderse parecido.
@@ -1394,13 +1405,32 @@ El puntaje de esa respuesta y por qué.
 | `ajustada_por_usuario_id` | bigint | no | |
 | `motivo_ajuste` | text | no | **Obligatorio si hay ajuste** |
 | `ajustada_en` | timestamptz | no | |
-| `c1_episodio` … `c4_incomodidad` | boolean ×4 | no | `V41`, solo bancos `CRITERIOS`: qué criterios vio el agente. El `puntaje` sale de **contarlos en código**, no de la aritmética del modelo — y con ellos las banderas del cuestionario (`SIN_INCOMODIDAD`, `SOLO_NOSOTROS`) serán consultas, no otra pasada de IA |
+| `c1_episodio` … `c4_incomodidad` | boolean ×4 | no | `V41`, solo bancos `CRITERIOS`: qué criterios vio el agente. El `puntaje` sale de **contarlos en código**, no de la aritmética del modelo. **Vacías = ese banco no las medía**, no «no cumplió ninguna» |
 | `cumple_senal_cero` | boolean | no | Si la respuesta cumple la señal de 0 de su pregunta → puntaje 0 |
 
 **Clave primaria:** `id` · **Único:** `respuesta_id`
 
 `evidencia_citada` guarda qué parte de la propia respuesta usó el agente para justificar la nota.
 Es lo que permite discutir una calificación sin releerlo todo.
+
+**Las cinco columnas de la `V41` ya llegan al panel, y los patrones del cuestionario ya son
+consultas.** Desde el 02/09 `GET /panel/postulaciones/{id}/evaluacion` devuelve las cuatro señales
+de cada respuesta y calcula sobre ellas `SIN_INCOMODIDAD` y `SOLO_NOSOTROS` — **contando filas, sin
+otra pasada de IA**, que es exactamente para lo que la `V41` las persistió. Hasta entonces se
+guardaban y no las veía nadie: el panel enseñaba el número y no de qué estaba hecho.
+
+⚠️ **Las cinco se escriben juntas o no se escribe ninguna.** `PuenteCalificacionIa` descarta la
+nota de un banco `CRITERIOS` a la que le falte cualquiera de ellas, así que basta mirar
+`c1_episodio` para saber si esa nota trae señales. Por eso el panel puede decidir con una sola
+columna si enseña el bloque o lo omite — y por eso **nunca sustituye un nulo por `false`**: las
+notas del v0.1 y del v3 no midieron nada de esto, y cuatro falsos convertirían cada evaluación
+anterior a CAZATALENTOS en un cero de cuatro que nadie le puso.
+
+⚠️ **El `puntaje` no es la suma a secas de las cuatro.** Es 0 si `cumple_senal_cero`, y 0 también
+si falta `c1_episodio` aunque las otras tres estén; y una pregunta que declare tope lo recorta —la
+regla dura de R11, «sin ninguna cifra, el máximo es 2»—. Leer el puntaje como el conteo y ver un 0
+con casillas marcadas parece un error de cálculo y no lo es: la fórmula entera vive en
+`FormulasCazatalentos.puntaje`.
 
 ## `repregunta`
 
