@@ -55,7 +55,17 @@ public final class DtosPerfilIntegral {
     // motivoAjuste no-nulo significa exactamente una cosa: esta nota la corrigió una
     // persona. Lo garantiza un CHECK en nota_criterio —ajustada_por_usuario_id sin motivo
     // no entra—, así que basta mirar este campo para saber que hubo mano humana detrás.
-    public record NotaCriterioResponse(String criterio, BigDecimal puntaje,
+    //
+    // codigo es el nombre CORTO del criterio, y viaja porque el largo no cabe donde hay
+    // que compararlos. Una tabla con una columna por criterio pone «Resultados
+    // demostrables» encima de una celda que dice «40»: la cabecera decide el ancho de la
+    // columna y el ancho decide si la tabla entera cabe en una pantalla. El codigo ya
+    // existe en la tabla `criterio` —CV_RESULTADOS, CAJA, DIVISAS— y es estable dentro de
+    // su rubrica, que es lo que un rotulo de columna necesita.
+    //
+    // Va ADEMAS del nombre, no en su lugar: el corto rotula y el largo explica. Quien
+    // pinte una columna estrecha usa el codigo y deja el nombre para el titulo emergente.
+    public record NotaCriterioResponse(String criterio, String codigo, BigDecimal puntaje,
                                        BigDecimal maximo, BigDecimal peso,
                                        String explicacion, String origen,
                                        BigDecimal confianza, String motivoAjuste) {}
