@@ -330,9 +330,38 @@ public class FlujoPruebaIT {
                 .andExpect(jsonPath("$[0].estado").value("PRUEBA_CALIFICANDO"));
     }
 
-    @DisplayName("El recorrido sigue sin saltos manuales")
+    @DisplayName("El panel ve lo que entregó: el enlace que pegó, y el que falta")
     @Test
     @Order(4)
+    void elPanelVeLoQueEntrego() throws Exception {
+        /*
+         * ⚠️ **Esto es lo que hacía falta para poder calificar a mano.** La rúbrica
+         * reserva criterios a una persona justo cuando la IA no puede leer el entregable
+         * —un vídeo, un enlace—, y hasta ahora el panel enseñaba la rúbrica y no lo que
+         * se juzgaba con ella. Se le pedía a alguien un puntaje sobre algo que la
+         * pantalla no le enseñaba.
+         *
+         * La fixtura del @Order(3) ya deja el escenario: el obligatorio entregado por
+         * enlace, y el segundo pedido sin entregar.
+         */
+        conTokenGet("/api/v1/panel/postulaciones/" + postulacionId + "/prueba/entregables", tokenTalento)
+                .andExpect(status().isOk())
+                // Salen los DOS, no solo el entregado: un hueco se leería como una lista
+                // completa, y lo que falta es justo lo que hay que ver antes de poner una
+                // nota. El segundo de esta plantilla es opcional, así que su motivo lo dice
+                // sin la coletilla del obligatorio — son dos frases distintas a propósito.
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].loEntrego").value(true))
+                .andExpect(jsonPath("$[0].esObligatorio").value(true))
+                .andExpect(jsonPath("$[0].enlace").value("https://github.com/candidata/buscador-recetas"))
+                .andExpect(jsonPath("$[1].loEntrego").value(false))
+                .andExpect(jsonPath("$[1].esObligatorio").value(false))
+                .andExpect(jsonPath("$[1].porQueNoSeVe").value("No lo entregó"));
+    }
+
+    @DisplayName("El recorrido sigue sin saltos manuales")
+    @Test
+    @Order(5)
     void elRecorridoSigueSinSaltosManuales() throws Exception {
         // Entregada la prueba: PRUEBA_CALIFICANDO -> PRUEBA_POR_CONFIRMAR
         conToken(post("/api/v1/panel/postulaciones/" + postulacionId + "/confirmacion-avance"), tokenTalento,
@@ -351,7 +380,7 @@ public class FlujoPruebaIT {
 
     @DisplayName("Talento califica la prueba criterio a criterio")
     @Test
-    @Order(5)
+    @Order(6)
     void talentoCalificaLaPruebaCriterioACriterio() throws Exception {
         // Sin todos los criterios puestos, no se puede cerrar la nota de la etapa
         conToken(post("/api/v1/panel/postulaciones/" + postulacionId + "/prueba/calificacion"), tokenTalento, null)
@@ -404,7 +433,7 @@ public class FlujoPruebaIT {
 
     @DisplayName("Se salta lo que no aplica y se toma la decisión")
     @Test
-    @Order(6)
+    @Order(7)
     void seSaltaLoQueNoAplicaYSeDecide() throws Exception {
         // Simulación y validación se pueden saltar cuando el puesto no las necesita: es una
         // transición manual con motivo, que RF-121 permite para cualquier salto. Lo que ya no
@@ -448,7 +477,7 @@ public class FlujoPruebaIT {
 
     @DisplayName("Un intento vencido se entrega solo")
     @Test
-    @Order(7)
+    @Order(8)
     void unIntentoVencidoSeEntregaSolo() throws Exception {
         // Otra postulación, esta vez dejada vencer: el sondeo debe cerrarla sin que nadie actúe.
         String correo = "vence@correo.pe";
@@ -502,7 +531,7 @@ public class FlujoPruebaIT {
      */
     @DisplayName("Al terminar el agente, la nota de la etapa sale sola si la rúbrica quedó entera")
     @Test
-    @Order(8)
+    @Order(9)
     void alTerminarElAgenteLaNotaDeEtapaSaleSolaSiLaRubricaQuedoEntera() throws Exception {
         long id = otraPostulacionEnCalificando("califica-ia@correo.pe");
 
@@ -562,7 +591,7 @@ public class FlujoPruebaIT {
      */
     @DisplayName("Un borrador se corrige y se recompone sin quedarse sin salida")
     @Test
-    @Order(9)
+    @Order(10)
     void unBorradorSeCorrigeYSeRecompone() throws Exception {
         long plantillaId = Long.parseLong(leer(conToken(post("/api/v1/panel/plantillas-prueba"),
                 tokenTalento, "{\"nombre\":\"Prueba que se compone a mano\"}")
@@ -665,7 +694,7 @@ public class FlujoPruebaIT {
 
     @DisplayName("Una prueba puede orientar a quien la califica y llevar su enunciado en un archivo")
     @Test
-    @Order(10)
+    @Order(11)
     void laGuiaYElEnunciadoViajanConLaVersion() throws Exception {
         /*
          * Contra la base de verdad, que es donde vive lo que los dobles no pueden levantar:

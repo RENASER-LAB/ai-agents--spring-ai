@@ -343,6 +343,12 @@ class ArquitecturaTest {
             // fuerza de esa misma empresa, y solo se le pregunta una cosa: si es la prueba del
             // puesto o el cuestionario. Mismo caso que los `ficha` de aquí arriba.
             "ServicioCalificacionPruebaImpl#rindeElCuestionario",
+            // El archivo de un entregable de la prueba, para decirle al panel si todavía está
+            // guardado y con qué nombre. Se llega desde `verEntregables`, que ya pasó por
+            // `laVisible` —alcance y organización resueltos— y desde ahí solo se leen archivos
+            // que cuelgan de un `entregable` del intento de ESA postulación: el dueño lo fija
+            // la cadena, no el `findById`. Mismo caso que la línea de arriba.
+            "ServicioCalificacionPruebaImpl#pintarEntrega",
             // Los minutos del examen salieron de `pintar` a su propio método (V43): a él se
             // llega desde `pintar`, y a `pintar` desde `laMia`, que ya filtró por la persona
             // que pregunta. Es la misma decisión de la línea de arriba, y se anota aquí y no
