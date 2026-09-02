@@ -191,8 +191,8 @@ class ServicioExcelRankingImplTest {
     void laNotaVaciaLoDice() {
         when(tandas.ranking(any(), eq(13L), eq("PERFIL_INTEGRAL"))).thenReturn(tanda(
                 delPerfil(427L, "Ana Quispe", new NotaCriterioResponse(
-                        "Experiencia", null, new BigDecimal("100"), new BigDecimal("25"),
-                        "no se pudo puntuar", "AGENTE", null, null))));
+                        "Experiencia", "CV_EXPERIENCIA", null, new BigDecimal("100"),
+                        new BigDecimal("25"), "no se pudo puntuar", "AGENTE", null, null))));
 
         byte[] libro = servicio.generar(quien("ver_embudo"), 13L,
                 new PedidoExcelRanking("PERFIL_INTEGRAL", List.of(427L), null)).contenido();
@@ -414,7 +414,7 @@ class ServicioExcelRankingImplTest {
     }
 
     private static NotaCriterioResponse nota(String puntaje) {
-        return new NotaCriterioResponse("Experiencia", new BigDecimal(puntaje),
+        return new NotaCriterioResponse("Experiencia", "CV_EXPERIENCIA", new BigDecimal(puntaje),
                 new BigDecimal("100"), new BigDecimal("25"), "lo dice su currículum",
                 "AGENTE", new BigDecimal("80"), null);
     }
