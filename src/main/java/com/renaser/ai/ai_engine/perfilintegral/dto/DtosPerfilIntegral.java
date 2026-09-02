@@ -248,9 +248,17 @@ public final class DtosPerfilIntegral {
             /**
              * Las cuatro señales que el agente marcó, y la de cero.
              *
-             * <p><b>El puntaje 0-4 ES el conteo de estas cuatro.</b> Lo calcula el código,
-             * no la aritmética del modelo. Enseñar el número sin ellas deja «3 de 4» sin
-             * decir cuál faltó, que es justo lo que hay que poder discutir con la persona.
+             * <p>Lo calcula el código y no la aritmética del modelo. Enseñar el número
+             * sin ellas deja «3 de 4» sin decir cuál faltó, que es justo lo que hay que
+             * poder discutir con la persona.
+             *
+             * <p>⚠️ <b>El puntaje NO es el conteo de las cuatro, y confundirlo hace que un
+             * cero parezca un error de cálculo.</b> Ver {@code FormulasCazatalentos.puntaje}:
+             * {@code episodio} es una PUERTA —sin él el puntaje es 0 aunque las otras tres
+             * estén marcadas—, {@code cumpleSenalCero} también fuerza el 0, y cuando falta
+             * {@code dato} la pregunta puede declarar un tope que recorta el resultado
+             * (regla dura R11). Con la puerta abierta, el puntaje es 1 más las otras tres
+             * que estén.
              *
              * <p>⚠️ <b>Nulas no significa «ninguna se cumplió»: significa que ese banco no
              * las medía.</b> Solo el banco CAZATALENTOS puntúa así; las notas de los bancos

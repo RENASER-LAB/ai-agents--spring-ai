@@ -247,9 +247,18 @@ public class ServicioDesgloseEvaluacionImpl implements ServicioDesgloseEvaluacio
         }
 
         long sinAutoria = conSenales.stream().filter(a -> !a.senales().autoria()).count();
-        // La mitad, que es el corte que nombra la V41. Con pocas respuestas el patrón se
-        // dispara facil, y por eso la frase dice de cuantas sale: quien lo lea juzga.
-        if (sinAutoria * 2 >= total) {
+        /*
+         * ⚠️ MÁS de la mitad, no la mitad. Las tres fuentes decían cosas distintas: el
+         * documento de la clienta pide «más de la mitad de las respuestas sin C2», el
+         * comentario de la V41 lo abrevió a «mitad sin C2», y esto estaba en «la mitad o
+         * más». Difieren en un solo caso —exactamente la mitad, solo posible con un
+         * número par de respuestas— y manda la clienta, que es de quien es el requisito.
+         *
+         * Además es la lectura que hace más útil la bandera: con el corte flojo, un
+         * cuestionario partido por la mitad la levanta, y una bandera que salta en la
+         * mitad de los candidatos deja de señalar nada.
+         */
+        if (sinAutoria * 2 > total) {
             patrones.add(new PatronDelCuestionario(
                     "SOLO_NOSOTROS",
                     "Cuenta lo que hizo el equipo, no lo suyo",

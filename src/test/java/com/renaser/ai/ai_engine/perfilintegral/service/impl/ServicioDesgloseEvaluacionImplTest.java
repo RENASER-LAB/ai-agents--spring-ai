@@ -318,8 +318,11 @@ class ServicioDesgloseEvaluacionImplTest {
     }
 
     /**
-     * El 0-4 ES el conteo de las cuatro señales, así que se enseñan una a una: «3 de 4» sin
-     * decir cuál faltó no se puede discutir con la persona.
+     * Las cuatro se enseñan una a una: «3 de 4» sin decir cuál faltó no se puede discutir
+     * con la persona.
+     *
+     * <p>⚠️ El puntaje NO es su conteo: {@code episodio} es una puerta y hay un tope cuando
+     * falta el dato. Por eso viajan las cuatro además del número, y no en su lugar.
      */
     @Test
     void lasCuatroSenalesViajanUnaAUna() {
@@ -396,13 +399,19 @@ class ServicioDesgloseEvaluacionImplTest {
         assertThat(d.patrones()).noneMatch(p -> p.codigo().equals("SIN_INCOMODIDAD"));
     }
 
-    /** La mitad es el corte que nombra la V41, y la frase dice de cuántas sale. */
+    /**
+     * ⚠️ MÁS de la mitad, no la mitad. Es lo que pide el documento de la clienta —la V41 lo
+     * abrevió a «mitad» y el código llegó a estar en «mitad o más»—, y es la lectura que
+     * hace útil la bandera: con el corte flojo, un cuestionario partido por la mitad la
+     * levanta, y una bandera que salta en la mitad de los candidatos no señala nada.
+     */
     @Test
-    void soloNosotrosSaleAPartirDeLaMitadSinAutoria() {
+    void soloNosotrosPideMasDeLaMitadSinAutoria() {
         conPostulacion(EVALUACION);
         conEvaluacion("ENTREGADA");
         conCerradas("0", 0);
         dosRespuestas();
+        // Una de dos es exactamente la mitad: NO basta.
         when(notasRespuesta.findByRespuestaIdIn(List.of(1L, 2L))).thenReturn(List.of(
                 notaConSenales(1L, "3", true, false, true, true),
                 notaConSenales(2L, "4", true, true, true, true)));
@@ -410,12 +419,28 @@ class ServicioDesgloseEvaluacionImplTest {
 
         DesgloseEvaluacion d = servicio.ver(quien, POSTULACION);
 
+        assertThat(d.patrones()).noneMatch(p -> p.codigo().equals("SOLO_NOSOTROS"));
+    }
+
+    @Test
+    void conLasDosSinAutoriaSiSale() {
+        conPostulacion(EVALUACION);
+        conEvaluacion("ENTREGADA");
+        conCerradas("0", 0);
+        dosRespuestas();
+        when(notasRespuesta.findByRespuestaIdIn(List.of(1L, 2L))).thenReturn(List.of(
+                notaConSenales(1L, "3", true, false, true, true),
+                notaConSenales(2L, "3", true, false, true, true)));
+        sinPilares();
+
+        DesgloseEvaluacion d = servicio.ver(quien, POSTULACION);
+
         assertThat(d.patrones()).filteredOn(p -> p.codigo().equals("SOLO_NOSOTROS"))
                 .singleElement()
                 .satisfies(p -> {
-                    assertThat(p.deCuantas()).isEqualTo(1);
+                    assertThat(p.deCuantas()).isEqualTo(2);
                     assertThat(p.total()).isEqualTo(2);
-                    assertThat(p.descripcion()).contains("1 de 2");
+                    assertThat(p.descripcion()).contains("2 de 2");
                 });
     }
 
