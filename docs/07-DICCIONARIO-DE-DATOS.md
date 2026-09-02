@@ -857,8 +857,8 @@ Cualquier cosa que se puntúa, de la etapa que sea.
 | Columna | Tipo | Oblig. | Qué guarda |
 |---|---|---|---|
 | `id` | bigint | sí | Clave |
-| `codigo` | text | sí | `RESULTADOS_DEMOSTRABLES` |
-| `nombre` | text | sí | |
+| `codigo` | text | sí | El nombre corto: `CV_RESULTADOS`, `CV_EVIDENCIA`, `CAJA`. **Es lo que el panel rotula**, así que se lee en pantalla |
+| `nombre` | text | sí | El nombre largo: «Resultados demostrables». Es el que explica, no el que cabe |
 | `descripcion` | text | no | |
 | `etapa_codigo` | text | sí | A qué etapa pertenece |
 | `version_plantilla_prueba_id` | bigint | no | **Solo los de la prueba del puesto** |
@@ -874,6 +874,14 @@ PostgreSQL dos NULL no chocan en un índice único, así que los ocho criterios 
 —que tienen `version_plantilla_prueba_id` vacío— se podrían insertar repetidos con el mismo
 código y nada se quejaría. La alternativa es un índice único parcial sobre `codigo` cuando la
 columna es nula.
+
+**`codigo` dejó de ser solo interno**: desde el 02/09 sale en `/panel/vacantes/{id}/ranking` y en
+`/panel/postulaciones/{id}/perfil-integral`, junto al `nombre` y no en su lugar. Es el rótulo de
+una tabla que pone una columna por criterio, donde el nombre largo no cabe encima de una celda de
+dos dígitos. Que sea único dentro de su rúbrica es justamente lo que un rótulo necesita — pero
+**solo dentro de ella**: el único es por `codigo` + `version_plantilla_prueba_id`, así que dos
+plantillas de prueba distintas pueden tener cada una su `CAJA` y no son el mismo criterio.
+Cambiarle el código a un criterio ya sembrado le cambia el rótulo a todo el que lo mire.
 
 `metodo_verificacion` dice **quién puede comprobar ese criterio**. El tiempo lo mide el sistema;
 la argumentación la califica un agente; el criterio visual lo califica un agente y lo revisa una

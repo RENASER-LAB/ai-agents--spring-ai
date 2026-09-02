@@ -189,17 +189,37 @@ del área— se ven solo las propias, y una ajena responde 404.
 |---|---|---|
 | GET `/bandeja?espera_a=` | La bandeja: todo lo que espera a `CANDIDATO`, `SISTEMA`, `TALENTO` o `AREA` | `ver_candidatos` |
 | GET `/vacantes/{id}/embudo` | Cuántas postulaciones hay en cada estado | `ver_embudo` |
-| GET `/vacantes/{id}/ranking?etapa=` | La tanda ordenada de más apto a menos, con las ocho notas del currículum de cada uno. **Incluye a quien todavía no tiene nota**. Sin `etapa` ordena por la del Perfil Integral; con ella, por la nota de esa etapa. Cada fila trae además **dónde vive** (`ciudad`, ya escrito «Departamento — Provincia», y `ciudadCodigo`) y **su pretensión salarial**, que solo viaja con `ver_pretension` | `ver_embudo` |
+| GET `/vacantes/{id}/ranking?etapa=` | La tanda ordenada de más apto a menos, con las ocho notas del currículum de cada uno. **Incluye a quien todavía no tiene nota**. Sin `etapa` ordena por la del Perfil Integral; con ella, por la nota de esa etapa. Cada fila trae además **dónde vive** (`ciudad`, ya escrito «Departamento — Provincia», y `ciudadCodigo`) y **su pretensión salarial**, que solo viaja con `ver_pretension`. Cada una de las ocho notas trae **los dos nombres del criterio**: el largo en `criterio` y el corto en `codigo` | `ver_embudo` |
 | POST `/vacantes/{id}/ranking/excel` | La tanda seleccionada, en un `.xlsx` de dos hojas —Resumen y Detalle— que se descarga como adjunto. Se le pasan `etapa`, los `postulacionIds` **ya ordenados por quien llama** y `filtroDescrito`, la frase que se pintó encima de la tabla. Solo hay columnas para `PERFIL_INTEGRAL` y `PRUEBA_PUESTO`; otra etapa es un 400 | `ver_embudo` |
 | GET `/postulaciones/{id}` · `/historial` | La ficha completa y el recorrido | `abrir_ficha_candidato` |
 | POST `/postulaciones/{id}/transiciones` | Mover a cualquier estado. **El motivo es obligatorio, sin excepción** | `mover_postulacion` |
 | POST `/postulaciones/{id}/confirmacion-avance` | Confirmar que avanza: el sistema calcula el estado siguiente | `confirmar_avance` |
-| GET `/postulaciones/{id}/perfil-integral` | El retrato de la IA: notas del currículum, hallazgos y avisos. Cada nota lleva su explicación, **su confianza —de 0 a 100, la misma escala del puntaje, no de 0 a 1—** y el **motivo del ajuste**, que solo tiene valor cuando esa nota la corrigió una persona | `ver_perfil_integral` |
+| GET `/postulaciones/{id}/perfil-integral` | El retrato de la IA: notas del currículum, hallazgos y avisos. Cada nota lleva su explicación, **su confianza —de 0 a 100, la misma escala del puntaje, no de 0 a 1—** y el **motivo del ajuste**, que solo tiene valor cuando esa nota la corrigió una persona. Y lleva **los dos nombres del criterio**: `criterio` es el largo y `codigo` el corto | `ver_perfil_integral` |
 | GET `/postulaciones/{id}/evaluacion` | El desglose del banco: cada respuesta abierta con su nota, la explicación y la evidencia que citó la IA, el promedio de lo cerrado y los semáforos de alineación. **Sin evaluación asignada devuelve vacíos, no 404**. ⚠️ `alineacion` sale vacía siempre: nadie escribe esa tabla todavía | `ver_respuestas_evaluacion` |
 | POST `/postulaciones/{id}/criba-cv` | Que la IA lea **solo el currículum** y arme el retrato con eso. Es lo que se pide con una tanda recién llegada | `ajustar_nota` |
 | POST `/postulaciones/{id}/calificacion-perfil-integral` | Calificar con todo: currículum y evaluación. Exige evaluación entregada | `ajustar_nota` |
 | POST `/postulaciones/{id}/cv` | Reemplazar el currículum desde el panel | `ajustar_nota` |
 | GET `/archivos/{id}/descarga` | Descargar el CV | `descargar_entregables` |
+
+> **Cada nota de criterio viaja con dos nombres, y no sobra ninguno.** `criterio` es el largo
+> —«Resultados demostrables»— y `codigo` el corto —`CV_RESULTADOS`, `CV_EVIDENCIA`—, el mismo que
+> la tabla `criterio` ya guardaba desde que se sembraron los ocho. Salen los dos en `/ranking` y en
+> `/perfil-integral`, y el corto **no reemplaza al largo**: el corto rotula y el largo explica.
+>
+> El corto existe porque comparar candidatos se hace en una tabla con **una columna por criterio**,
+> y la cabecera es lo que decide el ancho de esa columna. Poner «Resultados demostrables» encima de
+> una celda que dice `40` le da a la columna el ancho del título y no el del dato; con los ocho
+> nombres largos, la tabla se sale de la ventana. Con el código cabe.
+>
+> Y el largo no se puede tirar: `CV_EVIDENCIA` no le dice nada a quien no se sabe la rúbrica de
+> memoria, y una pantalla que solo enseñe el código obliga a adivinar qué se está puntuando.
+> Quien pinte una columna estrecha usa el código y **deja el nombre para el título emergente**.
+>
+> El código sirve de rótulo porque es estable dentro de su rúbrica: `criterio` lo tiene único por
+> `codigo` + `version_plantilla_prueba_id`. **No es un identificador global**: dos rúbricas de
+> prueba distintas pueden tener cada una su `CAJA` sin ser el mismo criterio, así que sirve para
+> nombrar dentro de la tabla que se está mirando y no para casar criterios entre rúbricas. En
+> estos dos endpoints los ocho son siempre los del currículum, que son globales.
 
 > **Hay un ranking por etapa, y es el mismo endpoint.** `?etapa=PERFIL_INTEGRAL` —que equivale
 > a no pasarlo—, `PRUEBA_PUESTO`, `SIMULACION`, `VALIDACION` o `DECISION` cambia **solo la nota con la que se ordena**: las ocho notas del
