@@ -62,6 +62,10 @@ class ServicioDesgloseEvaluacionImplTest {
     // Devuelve null por defecto = banco sin método CRITERIOS: el camino clásico de estos tests.
     @Mock private CalificacionCriterios calificacionCriterios;
     @Mock private com.renaser.ai.ai_engine.perfilintegral.repository.NotaEtapaRepository notasEtapa;
+    @Mock private com.renaser.ai.ai_engine.perfilintegral.repository.PreguntaDimensionRepository
+            preguntaDimensiones;
+    @Mock private com.renaser.ai.ai_engine.perfilintegral.repository.DimensionRepository
+            dimensiones;
 
     @InjectMocks
     private ServicioDesgloseEvaluacionImpl servicio;
@@ -266,6 +270,193 @@ class ServicioDesgloseEvaluacionImplTest {
         when(preguntas.findByIdIn(List.of(preguntaId))).thenReturn(List.of(
                 Pregunta.builder().id(preguntaId).enunciado(enunciado).tipo(tipo)
                         .esPuntuable(true).build()));
+        lenient().when(alineaciones.findByEvaluacionId(EVALUACION)).thenReturn(List.of());
+    }
+
+    // ============ El pilar, las señales y los patrones ============
+
+    /**
+     * Cada respuesta dice qué pilar alimenta.
+     *
+     * <p>Sin esto las abiertas son una lista plana y no se puede saber cuáles sostienen
+     * «Iniciativa». El vínculo existe desde la V41; lo que faltaba era enseñarlo.
+     */
+    @Test
+    void cadaRespuestaDiceQuePilarAlimenta() {
+        conPostulacion(EVALUACION);
+        conEvaluacion("ENTREGADA");
+        conCerradas("0", 0);
+        respuestaAbierta(1L, 7L, "Cuenta una vez que propusiste algo", "V", "Propuse X");
+        when(notasRespuesta.findByRespuestaIdIn(List.of(1L))).thenReturn(List.of());
+        conPilar(7L, "PIL_INICIATIVA", "Iniciativa (pilar)");
+
+        DesgloseEvaluacion d = servicio.ver(quien, POSTULACION);
+
+        assertThat(d.abiertas().get(0).pilarCodigo()).isEqualTo("PIL_INICIATIVA");
+        assertThat(d.abiertas().get(0).pilar()).isEqualTo("Iniciativa (pilar)");
+    }
+
+    /**
+     * ⚠️ Una pregunta puede colgar además de alguna de las 22 dimensiones del catálogo
+     * viejo, y esas NO son pilares. Es el mismo filtro que aplica CalificacionCriterios al
+     * ponderar: agrupar por una dimensión que allí no pondera diría que una respuesta
+     * sostiene algo que no mueve ninguna nota.
+     */
+    @Test
+    void unaDimensionQueNoEsPilarNoAgrupaNada() {
+        conPostulacion(EVALUACION);
+        conEvaluacion("ENTREGADA");
+        conCerradas("0", 0);
+        respuestaAbierta(1L, 7L, "Pregunta", "V", "Respuesta");
+        when(notasRespuesta.findByRespuestaIdIn(List.of(1L))).thenReturn(List.of());
+        conPilar(7L, "ORIENTACION_LOGRO", "Orientación al logro");
+
+        DesgloseEvaluacion d = servicio.ver(quien, POSTULACION);
+
+        assertThat(d.abiertas().get(0).pilarCodigo()).isNull();
+        assertThat(d.abiertas().get(0).pilar()).isNull();
+    }
+
+    /**
+     * El 0-4 ES el conteo de las cuatro señales, así que se enseñan una a una: «3 de 4» sin
+     * decir cuál faltó no se puede discutir con la persona.
+     */
+    @Test
+    void lasCuatroSenalesViajanUnaAUna() {
+        conPostulacion(EVALUACION);
+        conEvaluacion("ENTREGADA");
+        conCerradas("0", 0);
+        respuestaAbierta(1L, 7L, "Pregunta", "V", "Respuesta");
+        conNotaConSenales(1L, "3", true, true, true, false);
+        sinPilares();
+
+        DesgloseEvaluacion d = servicio.ver(quien, POSTULACION);
+
+        assertThat(d.abiertas().get(0).senales().episodio()).isTrue();
+        assertThat(d.abiertas().get(0).senales().autoria()).isTrue();
+        assertThat(d.abiertas().get(0).senales().dato()).isTrue();
+        assertThat(d.abiertas().get(0).senales().incomodidad()).isFalse();
+    }
+
+    /**
+     * ⚠️ **El caso que convertiría una evaluación antigua en un cero.** Los bancos
+     * anteriores a CAZATALENTOS no medían las señales y sus notas las tienen vacías.
+     * Devolver cuatro falsos ahí diría que el candidato no cumplió ninguna.
+     */
+    @Test
+    void unBancoQueNoMedIaLasSenalesNoDevuelveCuatroFalsos() {
+        conPostulacion(EVALUACION);
+        conEvaluacion("ENTREGADA");
+        conCerradas("0", 0);
+        respuestaAbierta(1L, 7L, "Pregunta", "V", "Respuesta");
+        when(notasRespuesta.findByRespuestaIdIn(List.of(1L))).thenReturn(List.of(
+                NotaRespuesta.builder().respuestaId(1L).puntaje(new BigDecimal("3"))
+                        .explicacion("Sin señales: banco anterior").build()));
+        sinPilares();
+
+        DesgloseEvaluacion d = servicio.ver(quien, POSTULACION);
+
+        assertThat(d.abiertas().get(0).senales()).isNull();
+        assertThat(d.abiertas().get(0).puntaje()).isEqualByComparingTo("3");
+        // Y sin señales tampoco hay patrones: no se afirma «nunca se incomodó» sobre un
+        // banco que jamás midió la incomodidad.
+        assertThat(d.patrones()).isEmpty();
+    }
+
+    @Test
+    void nuncaSeIncomodoSaleCuandoNingunaRespuestaMarcaLaCuarta() {
+        conPostulacion(EVALUACION);
+        conEvaluacion("ENTREGADA");
+        conCerradas("0", 0);
+        dosRespuestas();
+        when(notasRespuesta.findByRespuestaIdIn(List.of(1L, 2L))).thenReturn(List.of(
+                notaConSenales(1L, "3", true, true, true, false),
+                notaConSenales(2L, "3", true, true, true, false)));
+        sinPilares();
+
+        DesgloseEvaluacion d = servicio.ver(quien, POSTULACION);
+
+        assertThat(d.patrones()).extracting(p -> p.codigo()).contains("SIN_INCOMODIDAD");
+        assertThat(d.patrones()).noneMatch(p -> p.codigo().equals("SOLO_NOSOTROS"));
+    }
+
+    @Test
+    void unaSolaRespuestaIncomoda_yElPatronNoSale() {
+        conPostulacion(EVALUACION);
+        conEvaluacion("ENTREGADA");
+        conCerradas("0", 0);
+        dosRespuestas();
+        when(notasRespuesta.findByRespuestaIdIn(List.of(1L, 2L))).thenReturn(List.of(
+                notaConSenales(1L, "4", true, true, true, true),
+                notaConSenales(2L, "3", true, true, true, false)));
+        sinPilares();
+
+        DesgloseEvaluacion d = servicio.ver(quien, POSTULACION);
+
+        assertThat(d.patrones()).noneMatch(p -> p.codigo().equals("SIN_INCOMODIDAD"));
+    }
+
+    /** La mitad es el corte que nombra la V41, y la frase dice de cuántas sale. */
+    @Test
+    void soloNosotrosSaleAPartirDeLaMitadSinAutoria() {
+        conPostulacion(EVALUACION);
+        conEvaluacion("ENTREGADA");
+        conCerradas("0", 0);
+        dosRespuestas();
+        when(notasRespuesta.findByRespuestaIdIn(List.of(1L, 2L))).thenReturn(List.of(
+                notaConSenales(1L, "3", true, false, true, true),
+                notaConSenales(2L, "4", true, true, true, true)));
+        sinPilares();
+
+        DesgloseEvaluacion d = servicio.ver(quien, POSTULACION);
+
+        assertThat(d.patrones()).filteredOn(p -> p.codigo().equals("SOLO_NOSOTROS"))
+                .singleElement()
+                .satisfies(p -> {
+                    assertThat(p.deCuantas()).isEqualTo(1);
+                    assertThat(p.total()).isEqualTo(2);
+                    assertThat(p.descripcion()).contains("1 de 2");
+                });
+    }
+
+    // ---------- Ayudas ----------
+
+    private void conPilar(Long preguntaId, String codigo, String nombre) {
+        when(preguntaDimensiones.findByPreguntaIdIn(List.of(preguntaId))).thenReturn(List.of(
+                com.renaser.ai.ai_engine.perfilintegral.entity.PreguntaDimension.builder()
+                        .preguntaId(preguntaId).dimensionCodigo(codigo).build()));
+        lenient().when(dimensiones.findAllByOrderByOrden()).thenReturn(List.of(
+                com.renaser.ai.ai_engine.perfilintegral.entity.Dimension.builder()
+                        .codigo(codigo).nombre(nombre).build()));
+    }
+
+    private void sinPilares() {
+        lenient().when(preguntaDimensiones.findByPreguntaIdIn(anyList())).thenReturn(List.of());
+        lenient().when(dimensiones.findAllByOrderByOrden()).thenReturn(List.of());
+    }
+
+    private NotaRespuesta notaConSenales(Long respuestaId, String puntaje, boolean c1,
+                                         boolean c2, boolean c3, boolean c4) {
+        return NotaRespuesta.builder().respuestaId(respuestaId)
+                .puntaje(new BigDecimal(puntaje)).explicacion("Lo que vio el agente")
+                .c1Episodio(c1).c2Autoria(c2).c3Dato(c3).c4Incomodidad(c4).build();
+    }
+
+    private void conNotaConSenales(Long respuestaId, String puntaje, boolean c1, boolean c2,
+                                   boolean c3, boolean c4) {
+        when(notasRespuesta.findByRespuestaIdIn(List.of(respuestaId)))
+                .thenReturn(List.of(notaConSenales(respuestaId, puntaje, c1, c2, c3, c4)));
+    }
+
+    private void dosRespuestas() {
+        when(respuestas.findByEvaluacionId(EVALUACION)).thenReturn(List.of(
+                Respuesta.builder().id(1L).evaluacionId(EVALUACION).preguntaId(7L)
+                        .texto("Primera").build(),
+                Respuesta.builder().id(2L).evaluacionId(EVALUACION).preguntaId(8L)
+                        .texto("Segunda").build()));
+        when(preguntas.findByIdIn(List.of(7L, 8L))).thenReturn(List.of(
+                Pregunta.builder().id(7L).enunciado("Una").tipo("V").esPuntuable(true).build(),
+                Pregunta.builder().id(8L).enunciado("Otra").tipo("V").esPuntuable(true).build()));
         lenient().when(alineaciones.findByEvaluacionId(EVALUACION)).thenReturn(List.of());
     }
 }
