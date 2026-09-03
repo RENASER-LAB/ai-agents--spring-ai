@@ -80,7 +80,19 @@ public class ServicioCalificacionPruebaImpl implements ServicioCalificacionPrueb
 
     @Override
     public List<NotaCriterioResponse> verNotas(ContextoUsuario quien, Long postulacionId) {
-        Postulacion postulacion = laVisible(quien, postulacionId, "ajustar_nota");
+        /*
+          ⚠️ **Leer el desglose ya no pide el permiso de CORREGIRLO.** Pedía `ajustar_nota`,
+          que solo tienen Talento y Dirección, así que Responsable de Área abría el embudo de
+          su vacante, veía la nota de cada candidato —y desde hoy también las columnas de la
+          rúbrica en la tabla— y al pulsar la fila se topaba con un 403 sobre el desglose de
+          esa misma nota.
+
+          Ahora pide `abrir_ficha_candidato`, que es exactamente esto —abrir la ficha de
+          alguien— y que Responsable de Área ya tiene con alcance SUS_VACANTES. Es el mismo
+          permiso con el que `verEntregables`, aquí abajo, deja ver lo que el candidato
+          entregó. **Escribir no se toca**: `ajustarNota` sigue pidiendo `ajustar_nota`.
+        */
+        Postulacion postulacion = laVisible(quien, postulacionId, "abrir_ficha_candidato");
         List<Criterio> rubrica = laRubricaDe(postulacion);
         Map<Long, NotaCriterio> notasPorCriterio = notasCriterio.findByPostulacionId(postulacionId).stream()
                 .collect(Collectors.toMap(NotaCriterio::getCriterioId, Function.identity()));
@@ -400,7 +412,10 @@ public class ServicioCalificacionPruebaImpl implements ServicioCalificacionPrueb
         }
         IntentoPrueba intento = intentos.findByPostulacionId(postulacion.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Prueba del puesto", "postulación", postulacion.getId()));
-        return criterios.findByVersionPlantillaPruebaId(intento.getVersionPlantillaPruebaId());
+        // Ordenada: esto acaba en una pantalla y en las columnas del ranking, y sin `orden`
+        // la rúbrica sale como la devuelva la base, que puede cambiar entre dos peticiones.
+        return criterios.findByVersionPlantillaPruebaIdOrderByOrden(
+                intento.getVersionPlantillaPruebaId());
     }
 
     private Postulacion laVisible(ContextoUsuario quien, Long postulacionId, String permiso) {

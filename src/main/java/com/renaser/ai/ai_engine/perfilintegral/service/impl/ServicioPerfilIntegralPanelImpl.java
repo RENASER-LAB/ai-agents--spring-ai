@@ -57,9 +57,13 @@ import com.renaser.ai.ai_engine.vacante.repository.VacanteRepository;
 import com.renaser.ai.ai_engine.vacante.service.AlcanceSobreLaVacante;
 
 import lombok.RequiredArgsConstructor;
+import com.renaser.ai.ai_engine.prueba.entity.IntentoPrueba;
+
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+
+import static com.renaser.ai.ai_engine.vacante.service.impl.ServicioVacantesPanelImpl.CUESTIONARIO_TECNICO;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -85,6 +89,15 @@ import java.util.stream.Collectors;
 public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPanel {
 
     private static final String ETAPA = "PERFIL_INTEGRAL";
+
+    /**
+     * La etapa cuyos criterios NO son los ocho globales.
+     *
+     * <p>Los del currículum valen para cualquier vacante; los de la prueba del puesto son de
+     * la plantilla con la que se midió a ese candidato, así que dos vacantes traen columnas
+     * distintas. Ver {@code rubricasDeLaPrueba}.
+     */
+    private static final String ETAPA_TECNICA = "PRUEBA_PUESTO";
 
     private final PostulacionRepository postulaciones;
     private final VacanteRepository vacantes;
@@ -112,6 +125,7 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
     private final com.renaser.ai.ai_engine.pesos.repository.EtapaRepository etapasCatalogo;
     private final UbigeoRepository ubigeos;
     private final PerfilCandidatoRepository perfilesCandidato;
+    private final com.renaser.ai.ai_engine.prueba.repository.IntentoPruebaRepository intentos;
 
     // El orden de la tanda. Manda el grupo, no la nota: quien llega a la nota arrastrando un
     // riesgo crítico no va por delante de quien llega sin ninguno, y ordenar por número
@@ -134,7 +148,7 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
         Map<Long, BigDecimal> pesos = pesosDe(postulacion);
         List<NotaCriterioResponse> notas = criterios
                 .findByEtapaCodigoAndVersionPlantillaPruebaIdIsNullOrderByOrden(ETAPA).stream()
-                .map(c -> pintarNota(c, notaPorCriterio.get(c.getId()), pesos))
+                .map(c -> pintarNota(c, notaPorCriterio.get(c.getId()), pesos.get(c.getId())))
                 .toList();
 
         List<HallazgoResponse> lista = perfil == null ? List.of()
@@ -485,6 +499,19 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
                 .findByPerfilTalentoIdIn(perfilPorPostulacion.values().stream()
                         .map(PerfilTalento::getId).toList()).stream()
                 .collect(Collectors.groupingBy(HallazgoPerfil::getPerfilTalentoId));
+        /*
+          Las columnas de la pestaña «Prueba del puesto» son las de SU rúbrica, no los ocho
+          del currículum. Hasta aquí las cinco pestañas enseñaban las mismas ocho columnas,
+          que en la técnica eran ocho criterios del CV con pinta de ser de la prueba.
+
+          Dos consultas para la tanda entera —los intentos, y las rúbricas de las versiones
+          que aparezcan—, nunca una por fila: es la misma regla que sigue todo lo de arriba.
+          Fuera de esa etapa el mapa se queda vacío y no se consulta nada.
+        */
+        boolean laTecnica = ETAPA_TECNICA.equals(etapa);
+        Map<Long, List<Criterio>> rubricaPorPostulacion =
+                laTecnica ? rubricasDeLaPrueba(vacante, ids) : Map.of();
+
         Map<Long, List<NotaCriterio>> notasPorPostulacion = notasCriterio.findByPostulacionIdIn(ids)
                 .stream().collect(Collectors.groupingBy(NotaCriterio::getPostulacionId));
         Map<Long, NotaEtapa> etapaPorPostulacion = porPostulacion(
@@ -543,8 +570,34 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
                     .getOrDefault(p.getId(), List.of()).stream()
                     .collect(Collectors.toMap(NotaCriterio::getCriterioId, Function.identity(),
                             (a, b) -> a));
-            List<NotaCriterioResponse> notas = delCurriculum.stream()
-                    .map(c -> pintarNota(c, notaPorCriterio.get(c.getId()), pesos))
+            /*
+              En la prueba del puesto reparte los cien puntos la propia rúbrica —`puntos` de
+              cada criterio—, no `peso_criterio`, que solo tiene filas para los ocho globales
+              del CV y aquí devolvería nulo en todas. Es además el mismo número que ya usa la
+              ficha para decir «lo que más pesa»: si divergieran, la tabla y el párrafo de
+              debajo se contradirían en la misma pantalla.
+            */
+            /*
+              ⚠️ **En la etapa técnica las columnas NUNCA son las del currículum**, ni
+              siquiera cuando esta fila no tiene rúbrica que enseñar. Quien aún no ha
+              rendido —o rinde el cuestionario técnico, que no tiene rúbrica— sale sin
+              criterios, y eso es un hueco honesto: caer a los ocho del CV pintaría ocho
+              columnas del currículum bajo una cabecera que dice «prueba».
+            */
+            List<Criterio> suRubrica = laTecnica
+                    ? rubricaPorPostulacion.getOrDefault(p.getId(), List.of())
+                    : delCurriculum;
+            /*
+              El peso: en la prueba lo reparte la propia rúbrica —los `puntos` de cada
+              criterio, que suman 100—, y en el currículum `peso_criterio`, que solo tiene
+              filas para los ocho globales y aquí devolvería nulo en todas. Los `puntos` son
+              además el mismo número con el que la ficha dice «lo que más pesa»: si
+              divergieran, la tabla y el párrafo de debajo se contradirían en la misma
+              pantalla.
+            */
+            List<NotaCriterioResponse> notas = suRubrica.stream()
+                    .map(c -> pintarNota(c, notaPorCriterio.get(c.getId()),
+                            laTecnica ? c.getPuntos() : pesos.get(c.getId())))
                     .toList();
 
             Usuario usuario = usuariosPorId.get(p.getUsuarioId());
@@ -780,15 +833,74 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
                 .collect(Collectors.toSet());
     }
 
+    /**
+     * Con qué rúbrica se midió a cada candidato de esta tanda.
+     *
+     * <p>Los criterios de la prueba del puesto <b>son de su plantilla</b>, no globales: dos
+     * vacantes traen columnas distintas, y por eso la cabecera de la tabla se arma de lo que
+     * llegue en las filas y nunca de una lista escrita a mano.
+     *
+     * <p>Dos consultas para la tanda entera —los intentos, y las rúbricas de las versiones
+     * que aparezcan—, nunca una por fila. Es la misma regla por la que existe
+     * {@code ciudadesDe}: el bucle del ranking no toca la base.
+     *
+     * <p>Tres caminos devuelven el mapa vacío, y ninguno es un error:
+     * <ul>
+     *   <li><b>El cuestionario técnico</b> no tiene rúbrica: se califica pregunta a pregunta
+     *       contando criterios, no repartiendo cien puntos entre unos apartados. Lo mismo que
+     *       ya hace {@code ServicioCalificacionPruebaImpl.laRubricaDe}.</li>
+     *   <li><b>Nadie ha abierto todavía su prueba</b>, que es lo normal en una tanda que
+     *       sigue en perfil integral.</li>
+     *   <li><b>Una versión sin criterios</b>, que es una plantilla a medio escribir.</li>
+     * </ul>
+     *
+     * <p>Y quien no salga en el mapa se queda sin columnas, no con las del currículum.
+     */
+    private Map<Long, List<Criterio>> rubricasDeLaPrueba(Vacante vacante, List<Long> ids) {
+        if (ids.isEmpty()
+                || CUESTIONARIO_TECNICO.equals(vacante.getInstrumentoEtapaTecnica())) {
+            return Map.of();
+        }
+
+        Map<Long, Long> versionPorPostulacion = intentos.findByPostulacionIdIn(ids).stream()
+                .filter(i -> i.getVersionPlantillaPruebaId() != null)
+                .collect(Collectors.toMap(IntentoPrueba::getPostulacionId,
+                        IntentoPrueba::getVersionPlantillaPruebaId, (a, b) -> a));
+        if (versionPorPostulacion.isEmpty()) return Map.of();
+
+        // Agrupadas por versión, con el orden en que se escribió la rúbrica: es el orden en
+        // que la persona que calificó las vio, y el que tienen que llevar las columnas.
+        Map<Long, List<Criterio>> porVersion = criterios
+                .findByVersionPlantillaPruebaIdInOrderByOrden(
+                        Set.copyOf(versionPorPostulacion.values()))
+                .stream()
+                .collect(Collectors.groupingBy(Criterio::getVersionPlantillaPruebaId));
+
+        Map<Long, List<Criterio>> porPostulacion = new java.util.HashMap<>();
+        versionPorPostulacion.forEach((postulacionId, version) -> {
+            List<Criterio> rubrica = porVersion.get(version);
+            if (rubrica != null && !rubrica.isEmpty()) porPostulacion.put(postulacionId, rubrica);
+        });
+        return porPostulacion;
+    }
+
+    /**
+     * Un criterio con su nota, listo para la tabla.
+     *
+     * <p>⚠️ <b>El peso llega resuelto y no se saca de un mapa aquí</b>: en el currículum sale
+     * de {@code peso_criterio} —la versión de pesos de la vacante y el nivel de su puesto— y
+     * en la prueba del puesto de los {@code puntos} de la propia rúbrica. Son dos orígenes
+     * distintos para el mismo hueco, y el que decide es quien llama.
+     */
     private NotaCriterioResponse pintarNota(Criterio criterio, NotaCriterio nota,
-                                           Map<Long, BigDecimal> pesos) {
+                                           BigDecimal peso) {
         return new NotaCriterioResponse(
                 criterio.getNombre(),
                 // El nombre corto, para rotular una columna donde el largo no cabe.
                 criterio.getCodigo(),
                 nota == null ? null : nota.getPuntaje(),
                 criterio.getPuntos(),
-                pesos.get(criterio.getId()),
+                peso,
                 nota == null ? null : nota.getExplicacion(),
                 nota == null ? null : nota.getOrigen(),
                 // Va tal cual: 0 a 100, la misma escala del puntaje. Ver el comentario de

@@ -123,7 +123,7 @@ class ServicioExcelRankingImplTest {
         when(notasDeLaPrueba.verNotas(any(), eq(450L)))
                 .thenReturn(List.of(deRubrica("Comprensión", 6.0, 10.0)));
 
-        byte[] libro = servicio.generar(quien("ver_embudo", "ajustar_nota"), 13L,
+        byte[] libro = servicio.generar(quien("ver_embudo", "abrir_ficha_candidato"), 13L,
                 new PedidoExcelRanking("PRUEBA_PUESTO", List.of(450L, 427L), null)).contenido();
 
         assertThat(columna(libro, "Resumen", 1).subList(1, 3))
@@ -215,7 +215,7 @@ class ServicioExcelRankingImplTest {
         // laRubricaDe corta con List.of() porque ese instrumento no se puntúa por criterios.
         when(notasDeLaPrueba.verNotas(any(), eq(427L))).thenReturn(List.of());
 
-        byte[] libro = servicio.generar(quien("ver_embudo", "ajustar_nota"), 13L,
+        byte[] libro = servicio.generar(quien("ver_embudo", "abrir_ficha_candidato"), 13L,
                 new PedidoExcelRanking("PRUEBA_PUESTO", List.of(427L), null)).contenido();
 
         assertThat(celda(libro, "Detalle", 1, 0)).isEqualTo("Ana Quispe");
@@ -236,7 +236,7 @@ class ServicioExcelRankingImplTest {
         when(notasDeLaPrueba.verNotas(any(), eq(450L)))
                 .thenReturn(List.of(deRubrica("Comprensión", 6.0, 10.0)));
 
-        byte[] libro = servicio.generar(quien("ver_embudo", "ajustar_nota"), 13L,
+        byte[] libro = servicio.generar(quien("ver_embudo", "abrir_ficha_candidato"), 13L,
                 new PedidoExcelRanking("PRUEBA_PUESTO", List.of(427L, 450L), null)).contenido();
 
         assertThat(celda(libro, "Detalle", 1, 1)).contains("Todavía no tiene prueba del puesto");
@@ -246,7 +246,7 @@ class ServicioExcelRankingImplTest {
     }
 
     @Test
-    @DisplayName("sin «ajustar_nota» el Detalle lo explica en vez de tumbar el archivo con un 403")
+    @DisplayName("sin el permiso de la ficha el Detalle lo explica en vez de tumbar el archivo")
     void sinElPermisoDeLaRubricaElDetalleLoExplica() {
         when(tandas.ranking(any(), eq(13L), eq("PRUEBA_PUESTO"))).thenReturn(tanda(
                 deLaPrueba(427L, "Ana Quispe", nota("90"))));
@@ -254,10 +254,16 @@ class ServicioExcelRankingImplTest {
         byte[] libro = servicio.generar(quien("ver_embudo"), 13L,
                 new PedidoExcelRanking("PRUEBA_PUESTO", List.of(427L), null)).contenido();
 
-        // Ni se le pregunta: verNotas exige «ajustar_nota» y lanzaría AccessDeniedException
-        // en el primer candidato, dejando sin Excel a quien sí puede ver el embudo.
+        /*
+          Ni se le pregunta: verNotas exige «abrir_ficha_candidato» y lanzaría
+          AccessDeniedException en el primer candidato, dejando sin Excel a quien sí puede
+          ver el embudo.
+
+          ⚠️ **Este permiso tiene que ser el mismo que pide verNotas.** Cuando eran
+          distintos, este Excel negaba un detalle que la pantalla sí enseñaba.
+        */
         verifyNoInteractions(notasDeLaPrueba);
-        assertThat(celda(libro, "Detalle", 1, 1)).contains("ajustar_nota");
+        assertThat(celda(libro, "Detalle", 1, 1)).contains("abrir_ficha_candidato");
         // El Resumen sale entero igual.
         assertThat(celda(libro, "Resumen", 1, 1)).isEqualTo("Ana Quispe");
     }
