@@ -11,7 +11,13 @@ import com.renaser.ai.ai_engine.pesos.repository.VersionPesosRepository;
 import com.renaser.ai.ai_engine.postulacion.entity.Postulacion;
 import com.renaser.ai.ai_engine.postulacion.repository.PostulacionRepository;
 import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.CalificacionIaEncolada;
+import com.renaser.ai.ai_engine.archivo.entity.Archivo;
 import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.DefinirPlazoPrueba;
+import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.EntregaDeLaPrueba;
+import com.renaser.ai.ai_engine.prueba.entity.Entregable;
+import com.renaser.ai.ai_engine.prueba.entity.EntregableRequerido;
+import com.renaser.ai.ai_engine.prueba.repository.EntregableRepository;
+import com.renaser.ai.ai_engine.prueba.repository.EntregableRequeridoRepository;
 import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.NotaCriterioResponse;
 import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.PlazoPrueba;
 import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.PonerNotaCriterio;
@@ -38,6 +44,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Comparator;
+import java.util.Optional;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -66,6 +74,9 @@ public class ServicioCalificacionPruebaImpl implements ServicioCalificacionPrueb
             .CalificacionCuestionarioTecnico cuestionarioTecnico;
     private final com.renaser.ai.ai_engine.perfilintegral.repository.NotaEtapaRepository notasEtapa;
     private final CalificacionPorCriterio calificacion;
+    private final EntregableRepository entregables;
+    private final EntregableRequeridoRepository entregablesRequeridos;
+    private final com.renaser.ai.ai_engine.archivo.repository.ArchivoRepository archivos;
 
     @Override
     public List<NotaCriterioResponse> verNotas(ContextoUsuario quien, Long postulacionId) {
@@ -96,6 +107,87 @@ public class ServicioCalificacionPruebaImpl implements ServicioCalificacionPrueb
         return vacantes.findById(postulacion.getVacanteId())
                 .map(v -> CUESTIONARIO_TECNICO.equals(v.getInstrumentoEtapaTecnica()))
                 .orElse(false);
+    }
+
+    /**
+     * Lo que subió, entregable a entregable. Ver {@link ServicioCalificacionPrueba}.
+     *
+     * <p>Es el mismo recorrido que hace {@code PuentePruebaIaImpl.loQueEntrego} para armar el
+     * insumo del agente —los pedidos de su versión, y de cada uno la última que subió—, y por
+     * eso repite sus tres guardas sobre el archivo: borrado, sin ruta, o ya inexistente. Un
+     * archivo que ya no está tiene que decirlo con palabras, no ofrecer una descarga que
+     * contesta 404.
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public List<EntregaDeLaPrueba> verEntregables(ContextoUsuario quien, Long postulacionId) {
+        Postulacion postulacion = laVisible(quien, postulacionId, "abrir_ficha_candidato");
+        // El cuestionario técnico se contesta escribiendo: no hay nada que subir, y eso es
+        // una lista vacía y no un error. Lo mismo que hace `laRubricaDe`.
+        if (rindeElCuestionario(postulacion)) {
+            return List.of();
+        }
+        IntentoPrueba intento = intentos.findByPostulacionId(postulacion.getId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Prueba del puesto", "postulación", postulacionId));
+
+        // Ver el CONTENIDO —el enlace que pegó, o el archivo— pide el mismo permiso que
+        // descargarlo. Sin él se sigue diciendo qué entregó y cuándo, que es lo que necesita
+        // quien solo lleva el seguimiento.
+        boolean puedeVerElContenido = quien.tiene("descargar_entregables");
+
+        List<Entregable> subidos = entregables.findByIntentoPruebaId(intento.getId());
+        return entregablesRequeridos
+                .findByVersionPlantillaPruebaIdOrderByOrden(intento.getVersionPlantillaPruebaId())
+                .stream()
+                .map(requerido -> pintarEntrega(requerido, ultimaVersionDe(subidos, requerido),
+                        puedeVerElContenido))
+                .toList();
+    }
+
+    /** De un pedido, la última que subió: pudo entregarlo tres veces y vale la última. */
+    private Optional<Entregable> ultimaVersionDe(List<Entregable> subidos,
+                                                 EntregableRequerido requerido) {
+        return subidos.stream()
+                .filter(e -> requerido.getId().equals(e.getEntregableRequeridoId()))
+                .max(Comparator.comparing(e -> e.getVersion() == null ? 0 : e.getVersion()));
+    }
+
+    private EntregaDeLaPrueba pintarEntrega(EntregableRequerido requerido,
+                                            Optional<Entregable> entregado,
+                                            boolean puedeVerElContenido) {
+        if (entregado.isEmpty()) {
+            return new EntregaDeLaPrueba(requerido.getId(), requerido.getNombre(),
+                    requerido.getDetalle(), requerido.getFormato(), requerido.isEsObligatorio(),
+                    false, null, null, null, null, null,
+                    requerido.isEsObligatorio() ? "No lo entregó, y era obligatorio"
+                                                : "No lo entregó");
+        }
+        Entregable e = entregado.get();
+        if (!puedeVerElContenido) {
+            return new EntregaDeLaPrueba(requerido.getId(), requerido.getNombre(),
+                    requerido.getDetalle(), requerido.getFormato(), requerido.isEsObligatorio(),
+                    true, null, null, null, e.getVersion(), e.getSubidoEn(),
+                    "Hace falta el permiso «descargar_entregables» para abrirlo");
+        }
+        if (e.getArchivoId() == null) {
+            return new EntregaDeLaPrueba(requerido.getId(), requerido.getNombre(),
+                    requerido.getDetalle(), requerido.getFormato(), requerido.isEsObligatorio(),
+                    true, e.getEnlace(), null, null, e.getVersion(), e.getSubidoEn(), null);
+        }
+        Archivo archivo = archivos.findById(e.getArchivoId()).orElse(null);
+        // Las mismas tres guardas del puente del agente: un archivo borrado, sin ruta o que ya
+        // no existe se dice, no se ofrece una descarga que va a contestar 404.
+        if (archivo == null || archivo.getBorradoEn() != null || archivo.getRuta() == null) {
+            return new EntregaDeLaPrueba(requerido.getId(), requerido.getNombre(),
+                    requerido.getDetalle(), requerido.getFormato(), requerido.isEsObligatorio(),
+                    true, e.getEnlace(), null, null, e.getVersion(), e.getSubidoEn(),
+                    "El archivo ya no está guardado");
+        }
+        return new EntregaDeLaPrueba(requerido.getId(), requerido.getNombre(),
+                requerido.getDetalle(), requerido.getFormato(), requerido.isEsObligatorio(),
+                true, e.getEnlace(), archivo.getId(), archivo.getNombreOriginal(),
+                e.getVersion(), e.getSubidoEn(), null);
     }
 
     @Override

@@ -199,7 +199,8 @@ del área— se ven solo las propias, y una ajena responde 404.
 | POST `/postulaciones/{id}/criba-cv` | Que la IA lea **solo el currículum** y arme el retrato con eso. Es lo que se pide con una tanda recién llegada | `ajustar_nota` |
 | POST `/postulaciones/{id}/calificacion-perfil-integral` | Calificar con todo: currículum y evaluación. Exige evaluación entregada | `ajustar_nota` |
 | POST `/postulaciones/{id}/cv` | Reemplazar el currículum desde el panel | `ajustar_nota` |
-| GET `/archivos/{id}/descarga` | Descargar el CV | `descargar_entregables` |
+| GET `/archivos/{id}/descarga` | Bajar un archivo por su id —el CV, o un entregable de la prueba—. **Los bytes pasan por el backend**: es el camino que funciona en todos los entornos, y el único en local | `descargar_entregables` |
+| GET `/archivos/{id}/enlace` | Un **enlace firmado** para bajarlo del bucket sin pasar por el backend, con su caducidad. ⚠️ **En local devuelve una url `memoria://` que ningún navegador abre**, y responde 200: quien lo llame tiene que mirar el esquema de la url, no esperar un error, y caer a `/descarga` | `descargar_entregables` |
 
 > **Hay un ranking por etapa, y es el mismo endpoint.** `?etapa=PERFIL_INTEGRAL` —que equivale
 > a no pasarlo—, `PRUEBA_PUESTO`, `SIMULACION`, `VALIDACION` o `DECISION` cambia **solo la nota con la que se ordena**: las ocho notas del
@@ -300,6 +301,7 @@ del área— se ven solo las propias, y una ajena responde 404.
 | POST `/plantillas-prueba/versiones/{id}/publicacion` | Publicar: exige 8-10 preguntas universales, 3-5 específicas, y la rúbrica sumando 100. **Una versión sin entregables es un cuestionario**: la cuota no rige y basta con una pregunta. La duración, si es cronometrada, **al menos 5 minutos y sin techo** (el rango 60-120 se retiró el 31/08/2026) | `editar_plantillas_prueba` |
 | POST `/postulaciones/{id}/prueba/plazo` | Fijarle a ESE candidato su fecha de cierre, normalmente para darle más horas. **Queda marcada como suya**: mover después la fecha de la vacante no se la toca. Antes de empezar, la fecha puesta manda sobre el cálculo por días | `mover_postulacion` |
 | GET `/postulaciones/{id}/prueba/respuestas` | Lo que contestó, pregunta a pregunta. Las preguntas son **las de la versión que él vio**, en su orden, no las del catálogo de hoy: una versión publicada después puede llevar otras | `abrir_ficha_candidato` |
+| GET `/postulaciones/{id}/prueba/entregables` | **Lo que subió**: los archivos y los enlaces que la prueba pedía, entregados o no —que falte un obligatorio es lo que hay que ver antes de poner una nota—. De cada uno, **la última versión**: pudo entregarlo tres veces. ⚠️ El `enlace` y el `archivoId` **viajan solo con `descargar_entregables`**; sin él se dice qué entregó y cuándo, y `porQueNoSeVe` explica el hueco. Con cuestionario técnico devuelve **lista vacía, no 404** | `abrir_ficha_candidato` |
 | GET `/postulaciones/{id}/prueba/notas` | La rúbrica entera con lo que lleva puesto cada criterio: puntaje, explicación y **de quién viene la nota**, si de la IA o de una persona. Lo que aún no tiene nota sale en nulo | `ajustar_nota` |
 | POST `/postulaciones/{id}/prueba/criterios/{criterioId}/nota` | Poner la nota de un criterio, con explicación obligatoria | `ajustar_nota` |
 | POST `/postulaciones/{id}/prueba/calificacion-ia` | Pedirle al agente `PRUEBA_PUESTO` los criterios que la rúbrica le reserva. Tarda decenas de segundos y **no pisa ningún ajuste hecho a mano**. Al acabar, si la rúbrica quedó entera **deja también la nota de la etapa** | `ajustar_nota` |

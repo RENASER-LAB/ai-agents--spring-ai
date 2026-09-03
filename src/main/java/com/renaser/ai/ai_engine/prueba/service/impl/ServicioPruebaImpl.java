@@ -205,10 +205,20 @@ public class ServicioPruebaImpl implements ServicioPrueba {
     @Transactional
     public void subirEntregableArchivo(ContextoUsuario quien, UUID uuidPostulacion, Long entregableRequeridoId,
                                        MultipartFile archivo) {
-        IntentoPrueba intento = laMia(quien, uuidPostulacion).intento();
-        EntregableRequerido requerido = exigirFormato(intento, entregableRequeridoId, "ARCHIVO");
-        Archivo guardado = almacen.guardar(quien.organizacionId(), archivo);
-        guardarEntregable(intento, requerido, guardado.getId(), null);
+        Par par = laMia(quien, uuidPostulacion);
+        EntregableRequerido requerido = exigirFormato(par.intento(), entregableRequeridoId, "ARCHIVO");
+        /*
+         * ⚠️ **La organización de la VACANTE, no la de quien sube.** `quien` es el candidato, y
+         * la suya es la plataforma: todas las cuentas del portal nacen ahí. El panel busca el
+         * archivo con `findByIdAndOrganizacionId` usando la de la empresa de la vacante, así
+         * que sellarlo con la del candidato lo deja invisible —404— para cualquier empresa que
+         * no sea la plataforma. Hoy no se nota porque RENASER es las dos cosas.
+         *
+         * Es el mismo criterio que ya sigue el currículum al postular, y por el mismo motivo:
+         * arrastra todo lo que el panel de la empresa tiene que poder ver.
+         */
+        Archivo guardado = almacen.guardar(par.postulacion().getOrganizacionId(), archivo);
+        guardarEntregable(par.intento(), requerido, guardado.getId(), null);
     }
 
     @Override

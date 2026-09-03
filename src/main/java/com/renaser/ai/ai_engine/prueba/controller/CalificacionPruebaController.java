@@ -43,6 +43,17 @@ public class CalificacionPruebaController {
         return servicio.verRespuestas(permisos.actual(), postulacionId);
     }
 
+    @GetMapping("/entregables")
+    @PreAuthorize("@permisos.tiene('abrir_ficha_candidato')")
+    @Operation(summary = "Lo que subió: los archivos y los enlaces que la prueba pedía, "
+            + "entregados o no. El enlace y el id del archivo viajan solo con "
+            + "«descargar_entregables»; sin él se dice qué entregó y cuándo, y el porqué de que "
+            + "no se vea el contenido. El archivo se abre con /archivos/{id}/enlace o "
+            + "/archivos/{id}/descarga, que exigen ese mismo permiso")
+    public List<EntregaDeLaPrueba> verEntregables(@PathVariable Long postulacionId) {
+        return servicio.verEntregables(permisos.actual(), postulacionId);
+    }
+
     @PostMapping("/calificacion-ia")
     @PreAuthorize("@permisos.tiene('ajustar_nota')")
     @Operation(summary = "Pedirle al agente PRUEBA_PUESTO que califique los criterios que la "

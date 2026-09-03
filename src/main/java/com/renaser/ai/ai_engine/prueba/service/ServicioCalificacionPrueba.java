@@ -2,6 +2,7 @@ package com.renaser.ai.ai_engine.prueba.service;
 
 import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.CalificacionIaEncolada;
 import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.DefinirPlazoPrueba;
+import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.EntregaDeLaPrueba;
 import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.NotaCriterioResponse;
 import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.PlazoPrueba;
 import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.PonerNotaCriterio;
@@ -43,6 +44,22 @@ public interface ServicioCalificacionPrueba {
      * blanco: que alguien no contestara la cuarta es justo lo que hay que poder ver.
      */
     List<RespuestaDePrueba> verRespuestas(ContextoUsuario quien, Long postulacionId);
+    /**
+     * Lo que subió: los archivos y los enlaces que la prueba le pedía.
+     *
+     * <p><b>Sin esto, la rúbrica pedía juzgar algo que la pantalla no enseñaba.</b> Los
+     * entregables solo los leían dos: el propio candidato en su portal, y el agente al armar
+     * su insumo. Quien tenía que poner a mano la nota de un criterio —los que la rúbrica le
+     * reserva a una persona, como la sustentación en vídeo— no tenía dónde ver el vídeo.
+     *
+     * <p>Salen todos los pedidos, entregados o no, y de cada uno <b>la última versión</b>:
+     * puede haber entregado tres veces antes de que se acabara el plazo, y lo que vale es la
+     * última.
+     *
+     * <p>Con el cuestionario técnico devuelve la lista vacía, no un error: esa modalidad se
+     * contesta escribiendo y no tiene nada que subir.
+     */
+    List<EntregaDeLaPrueba> verEntregables(ContextoUsuario quien, Long postulacionId);
 
     /**
      * Le pide al agente que califique la parte de la rúbrica que le toca.
