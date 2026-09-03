@@ -533,6 +533,7 @@ class ServicioCalificacionPruebaImplTest {
                     .orden(i + 1)
                     .build());
         }
-        when(criterios.findByVersionPlantillaPruebaId(VERSION_PLANTILLA)).thenReturn(rubrica);
+        when(criterios.findByVersionPlantillaPruebaIdOrderByOrden(VERSION_PLANTILLA))
+                .thenReturn(rubrica);
     }
 }

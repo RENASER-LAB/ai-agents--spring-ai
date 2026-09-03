@@ -7,6 +7,7 @@ import com.renaser.ai.ai_engine.archivo.service.AlmacenArchivos;
 import com.renaser.ai.ai_engine.auditoria.service.ServicioAuditoria;
 import com.renaser.ai.ai_engine.parametro.service.ServicioParametros;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.FilaRanking;
+import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.NotaCriterioResponse;
 import com.renaser.ai.ai_engine.perfilintegral.entity.Criterio;
 import com.renaser.ai.ai_engine.perfilintegral.entity.NotaCriterio;
 import com.renaser.ai.ai_engine.perfilintegral.entity.NotaEtapa;
@@ -62,6 +63,7 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.ArgumentMatchers.anyIterable;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.anyMap;
@@ -130,6 +132,7 @@ class ServicioPerfilIntegralPanelImplTest {
     @Mock private com.renaser.ai.ai_engine.pesos.repository.EtapaRepository etapasCatalogo;
     @Mock private com.renaser.ai.ai_engine.perfil.repository.UbigeoRepository ubigeos;
     @Mock private com.renaser.ai.ai_engine.perfil.repository.PerfilCandidatoRepository perfilesCandidato;
+    @Mock private com.renaser.ai.ai_engine.prueba.repository.IntentoPruebaRepository intentos;
 
     @InjectMocks
     private ServicioPerfilIntegralPanelImpl servicio;
@@ -231,6 +234,105 @@ class ServicioPerfilIntegralPanelImplTest {
         servicio.ranking(quien, VACANTE);
 
         verifyNoInteractions(etapasCatalogo);
+    }
+
+    // ============ Las columnas de la prueba del puesto ============
+
+    /**
+     * En la etapa técnica las columnas son las de SU rúbrica.
+     *
+     * <p>Hasta aquí las cinco pestañas devolvían los mismos ocho criterios del currículum, así
+     * que en «Prueba del puesto» se veían ocho columnas del CV bajo una cabecera que decía
+     * «prueba». Los de una prueba son de su plantilla: dos vacantes traen columnas distintas.
+     *
+     * <p>Y el <b>peso</b> sale de los {@code puntos} de la rúbrica —que suman 100— y no de
+     * {@code peso_criterio}, que solo tiene filas para los ocho globales: pedirle el peso
+     * aquí devolvería nulo en todas las columnas.
+     */
+    @Test
+    void enLaPruebaLasColumnasSonLasDeSuRubrica() {
+        candidatos(candidato(1L, "ALTA", "90"));
+        pesos(peso(7L, "25"));
+        laRubricaDeLaPrueba(1L, criterioDePrueba(50L, "CAJA", "Manejo y control de caja", "20"),
+                criterioDePrueba(51L, "DIVISAS", "Conocimiento de divisas", "15"));
+        notasDeLaTanda.add(nota(1L, 50L, "18"));
+        when(etapasCatalogo.existsById("PRUEBA_PUESTO")).thenReturn(true);
+
+        List<FilaRanking> filas = servicio.ranking(quien, VACANTE, "PRUEBA_PUESTO").filas();
+
+        assertThat(filas.get(0).notasCriterio())
+                .extracting(NotaCriterioResponse::codigo)
+                .containsExactly("CAJA", "DIVISAS");
+        assertThat(filas.get(0).notasCriterio().get(0).peso()).isEqualByComparingTo("20");
+        assertThat(filas.get(0).notasCriterio().get(0).maximo()).isEqualByComparingTo("20");
+        assertThat(filas.get(0).notasCriterio().get(0).puntaje()).isEqualByComparingTo("18");
+        // Sin calificar todavía: la columna existe y sale hueca, que no es lo mismo que
+        // desaparecer de la lista.
+        assertThat(filas.get(0).notasCriterio().get(1).puntaje()).isNull();
+    }
+
+    /**
+     * Quien aún no ha rendido sale sin criterios, no con los del currículum.
+     *
+     * <p>Es el estado normal de una tanda a medio recorrer: casi todos siguen en perfil
+     * integral. Antes esto reventaba la pestaña entera —{@code laRubricaDe} lanza un 404
+     * cuando no hay intento— y caer a los ocho del CV sería peor todavía: ocho columnas del
+     * currículum debajo de una cabecera que dice «prueba».
+     */
+    @Test
+    void quienNoHaRendidoLaPruebaSaleSinCriterios() {
+        candidatos(candidato(1L, "ALTA", "90"), candidato(2L, "ALTA", "80"));
+        pesos(peso(7L, "25"));
+        laRubricaDeLaPrueba(1L, criterioDePrueba(50L, "CAJA", "Manejo y control de caja", "100"));
+        when(etapasCatalogo.existsById("PRUEBA_PUESTO")).thenReturn(true);
+
+        List<FilaRanking> filas = servicio.ranking(quien, VACANTE, "PRUEBA_PUESTO").filas();
+
+        assertThat(filas).hasSize(2);
+        assertThat(porId(filas, 1L).notasCriterio()).hasSize(1);
+        assertThat(porId(filas, 2L).notasCriterio()).isEmpty();
+    }
+
+    /**
+     * El cuestionario técnico no tiene rúbrica, y eso son cero columnas.
+     *
+     * <p>Se califica pregunta a pregunta contando criterios, no repartiendo cien puntos entre
+     * unos apartados. Es lo mismo que ya hace {@code ServicioCalificacionPruebaImpl}: devolver
+     * vacío en vez de reventar es lo que deja que la pestaña se abra igual.
+     */
+    @Test
+    void elCuestionarioTecnicoNoTraeColumnasDeRubrica() {
+        candidatos(candidato(1L, "ALTA", "90"));
+        pesos(peso(7L, "25"));
+        laVacanteRindeElCuestionarioTecnico();
+        when(etapasCatalogo.existsById("PRUEBA_PUESTO")).thenReturn(true);
+
+        List<FilaRanking> filas = servicio.ranking(quien, VACANTE, "PRUEBA_PUESTO").filas();
+
+        assertThat(filas.get(0).notasCriterio()).isEmpty();
+        verifyNoInteractions(intentos);
+    }
+
+    /**
+     * La nota del currículum sigue siendo la del currículum.
+     *
+     * <p>Es la cicatriz de un 675 sobre 100: {@code nota_criterio} es de las tres etapas y
+     * sumar sin filtrar por rúbrica mezcla las notas de la prueba con las del CV. Aquí la
+     * misma postulación tiene notas de las dos, y la cifra del retrato solo puede contar las
+     * ocho globales.
+     */
+    @Test
+    void laNotaDelCurriculumNoCuentaLosCriteriosDeLaPrueba() {
+        candidatos(candidato(1L, "ALTA", "90"));
+        pesos(peso(7L, "100"));
+        laRubricaDeLaPrueba(1L, criterioDePrueba(50L, "CAJA", "Manejo y control de caja", "100"));
+        notasDeLaTanda.add(nota(1L, 7L, "60"));    // del currículum
+        notasDeLaTanda.add(nota(1L, 50L, "90"));   // de la prueba
+        when(etapasCatalogo.existsById("PRUEBA_PUESTO")).thenReturn(true);
+
+        List<FilaRanking> filas = servicio.ranking(quien, VACANTE, "PRUEBA_PUESTO").filas();
+
+        assertThat(filas.get(0).notaCurriculum()).isEqualByComparingTo("60");
     }
 
     // ============ El orden de la tanda ============
@@ -842,6 +944,46 @@ class ServicioPerfilIntegralPanelImplTest {
                                 .codigo("CV_C" + p.getCriterioId())
                                 .puntos(new BigDecimal("100")).build())
                         .toList());
+    }
+
+    /** La fila de ese candidato, buscada por su id: el orden lo decide el ranking. */
+    private FilaRanking porId(List<FilaRanking> filas, Long postulacionId) {
+        return filas.stream().filter(f -> f.postulacionId().equals(postulacionId))
+                .findFirst().orElseThrow();
+    }
+
+    /**
+     * Esa postulación rindió la prueba del puesto, con esta rúbrica.
+     *
+     * <p>La rúbrica cuelga de la versión de la plantilla que abrió el candidato, no de la
+     * vacante: por eso hacen falta las dos consultas, el intento y sus criterios.
+     */
+    private void laRubricaDeLaPrueba(Long postulacionId, Criterio... rubrica) {
+        lenient().when(intentos.findByPostulacionIdIn(anyList())).thenReturn(List.of(
+                com.renaser.ai.ai_engine.prueba.entity.IntentoPrueba.builder()
+                        .postulacionId(postulacionId).versionPlantillaPruebaId(VERSION_PRUEBA)
+                        .build()));
+        lenient().when(criterios.findByVersionPlantillaPruebaIdInOrderByOrden(anyCollection()))
+                .thenReturn(List.of(rubrica));
+    }
+
+    private static final Long VERSION_PRUEBA = 9L;
+
+    private Criterio criterioDePrueba(Long id, String codigo, String nombre, String puntos) {
+        return Criterio.builder().id(id).codigo(codigo).nombre(nombre)
+                .etapaCodigo("PRUEBA_PUESTO").versionPlantillaPruebaId(VERSION_PRUEBA)
+                .puntos(new BigDecimal(puntos)).build();
+    }
+
+    /** Esta vacante rinde el cuestionario técnico y no la prueba del puesto (V43). */
+    private void laVacanteRindeElCuestionarioTecnico() {
+        when(alcanceVacante.laVacanteVisible(
+                        org.mockito.ArgumentMatchers.any(),
+                        org.mockito.ArgumentMatchers.eq(VACANTE), anyString()))
+                .thenReturn(Vacante.builder()
+                        .id(VACANTE).organizacionId(ORGANIZACION).puestoId(3L).versionPesosId(2L)
+                        .titulo("Analista de procesos").responsableUsuarioId(10L)
+                        .instrumentoEtapaTecnica("CUESTIONARIO_TECNICO").build());
     }
 
     private PesoCriterio peso(Long criterioId, String valor) {

@@ -14,6 +14,17 @@ public interface IntentoPruebaRepository extends JpaRepository<IntentoPrueba, Lo
 
     Optional<IntentoPrueba> findByPostulacionId(Long postulacionId);
 
+    /**
+     * Los intentos de una tanda entera, de una sola consulta.
+     *
+     * <p>Es lo que deja que el ranking sepa con qué versión de la plantilla se midió cada
+     * candidato sin preguntarlo fila a fila. Quien todavía no ha llegado a la etapa técnica
+     * simplemente no sale en la lista: <b>no</b> es un error, es lo normal en una tanda a
+     * medio recorrer, y por eso esto devuelve una lista y no revienta como
+     * {@link #findByPostulacionId}.
+     */
+    List<IntentoPrueba> findByPostulacionIdIn(java.util.Collection<Long> postulacionIds);
+
     // Los que ya vencieron y nadie entregó: el sondeo los cierra solo (RF: "no existe
     // entregar tarde").
     List<IntentoPrueba> findByEntregadoEnIsNullAndIniciadoEnIsNotNullAndVenceEnBefore(Instant momento);
