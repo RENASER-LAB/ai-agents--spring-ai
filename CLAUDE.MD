@@ -2,9 +2,9 @@
 Generar la documentacion detallada, con palabras basicas del español, breve. Diseñado para que el usuario lo pueda leer y entender. El objetivo de los documentos no es que sean grandes, sino, entendibles.
 
 ## Respuestas
-Responde en el chat de manera breve, corta y directa, eliminando puntos innecesarios y ambiguedades, tambien eliminando partes de código amenos que sea muy necesario o la pregunta del usuario sea muy especifica del código. Si para 
+Habla en cuestion de flujos, sin tecnisismos, como para explicarle al cliente., tambien eliminando partes de código amenos que sea muy necesario o la pregunta del usuario sea muy especifica del código. Si para 
 implementar algo es necesario alguna acción por parte de mi, como por ejemplo: Ejecutar un script en la base de datos. Entonces me das una sección que se llamará "Flujo de Implementación" en la cual me darás los pasos especificos que 
-debo de cumplir en orden para poder realizar la implementación adecuadamente. Si tengo que tomar decisiones damelos en una nueva sección que diga "Decisiones" para asi evitar confundirlo con texto normal, dentro de esa sección me dirás lo que tengo que decidir o la informacion que tengo que darte.
+debo de cumplir en orden para poder realizar la implementación adecuadamente. Si tengo que tomar decisiones damelos en una nueva sección que diga "Decisiones" para asi evitar confundirlo con texto normal, dentro de esa sección me dirás lo que tengo que decidir o la informacion que tengo que darte. 
 
 ## Como preguntar
 No uses el vocabulario de los documentos del cliente al hacer preguntas: sus terminos son
@@ -1010,7 +1010,7 @@ Renaser: manda el tiempo que ponga la empresa y solo queda un piso de 5 minutos.
 se movio** — ahora Renaser decide ademas cuantos minutos son.
 
 ## Sistema susceptible a cambios
-El cliente realiza cambios recurrentemente, ya sea en métricas, en datos, en permisos de roles, diseñar el sistema para que admita todo tipo de cambios inesperados, y que todo sea personalizable para el rol de dirección o admin. Que pueda ver y editar todo. 
+El cliente realiza cambios recurrentemente, ya sea en métricas, en datos, en permisos de roles, diseñar el sistema para que admita todo tipo de cambios inesperados, y que todo sea personalizable para el rol de dirección o admin. Que pueda ver y editar todo. Prioriza que el codigo tenga bajo acoplamiento y alta cohesion.
 
 ## Git
 No crees commits poro favor, para poder visualizar los cambios que se realizaron, yo creo commits y los pr. No lo hagas amenos que te lo pida explicitamente
@@ -1048,6 +1048,11 @@ Reglas al escribirlo:
 Keep responses focused, brief, and concise. Keep disclaimers and caveats short, and spend most of the response on the main answer. When asked to explain something, give a high-level summary unless an in-depth explanation is specifically requested.
 
 Before your first tool call, say in one sentence what you're about to do. While working, give a brief update only when you find something important or change direction. When you finish, lead with the outcome: your first sentence should answer "what happened" or "what did you find," with supporting detail after it for readers who want it.
+
+## Workflow de los worktrees
+En cada workflow generalmente trabajaremos un modulo distinto. Al finalizar la implementacion lanza siempre un Agente QA que analice el código en busca de bugs, errores de lógica, errores con otros componentes preguntandose siempre si los cambios o lo implementado rompería algo en el sistema. Que ejecute los tests,pruebas de integracion y flujos. Cuando termine, se crea un PR, se espera a que el CI/CD de github actions termine, si está todo correcto sin errores lanza otro agente de Documentacion, actualizará la documentacion del proyecto con lo implementado. Una vez terminado eso recien yo haré el merge. 
+
+Al estar probando ya sea para test/pruebas o que yo quiera que ejecutes el backend creas una base de datos en docker temporal, de manera que no se toque o modifique la principal que es reaser-reclutamiento, esto con el objetivo de evitar que se apliquen migraciones y haya conflictos. Si el worktree es de frontend entonces se crea tambien pruebas e2e con playwright
 
 
 
