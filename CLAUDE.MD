@@ -68,9 +68,9 @@ Perfil Integral → prueba del puesto → simulacion → validacion → decision
 
 | | |
 |---|---|
-| Base de datos | **Flyway es el dueno del esquema**: V1-V46 en `src/main/resources/db/migration`, **102 tablas de este modulo** (105 en la base contando `flyway_schema_history` y las dos del motor de agentes, `agent_run` y `vector_store`). De la V41 a la V46 nace **una sola tabla** (`ficha_vacante`, V42); el resto son columnas y datos, asi que el conteo de arriba se quedo en la V40 y hay que recontarlo. `ddl-auto: validate` |
+| Base de datos | **Flyway es el dueno del esquema**: V1-V48 en `src/main/resources/db/migration`, **102 tablas de este modulo** (105 en la base contando `flyway_schema_history` y las dos del motor de agentes, `agent_run` y `vector_store`). De la V41 a la V48 nacen **dos tablas** (`ficha_vacante`, V42, y `ubigeo`, V47); el resto son columnas y datos —la V48 solo reetiqueta filas—, asi que el conteo de arriba se quedo en la V40 y hay que recontarlo. `ddl-auto: validate` |
 | Codigo | Veintiun paquetes de dominio bajo `ai_engine` (ver «Como esta organizado el codigo») |
-| Tests | **1072 en verde (01/09/2026)**, `./mvnw verify` completo: 930 unitarios y 142 de integracion (de esos 142, 6 se saltan: los que gastan saldo o mandan correo de verdad). Ver «Correr los tests»: unitarios de la maquina y del anonimizador, migraciones contra Postgres real (Testcontainers) y flujos de punta a punta: hito 1, evaluacion, prueba, simulacion/validacion, calificacion con IA, la vacante sin banco, las areas, las dos empresas y el tope de IA de la plataforma |
+| Tests | **1150 en verde (02/09/2026)**, `./mvnw verify` completo: 1007 unitarios y 143 de integracion (de esos 143, 6 se saltan: los que gastan saldo o mandan correo de verdad). Ver «Correr los tests»: unitarios de la maquina y del anonimizador, migraciones contra Postgres real (Testcontainers) y flujos de punta a punta: hito 1, evaluacion, prueba, simulacion/validacion, calificacion con IA, la vacante sin banco, las areas, las dos empresas y el tope de IA de la plataforma |
 | IA que califica | **Seis de los diez agentes del catalogo estan implementados**: datos del curriculum, evidencia, evaluador, potencial/riesgo, prueba del puesto y las preguntas de la conversacion final. Todos corren por cola de RabbitMQ contra DeepSeek. Ver [Calificacion con IA](docs/CALIFICACION-CON-IA.md) |
 | Correo | **Ya sabe salir de verdad** (`EnviadorCorreoSmtp`), pero **por defecto no sale**: `renaser.correo.transporte` vale `log` salvo que se ponga `smtp`, y entonces solo se registra en `correo_enviado`. Para encenderlo hacen falta `CORREO_TRANSPORTE=smtp`, `CORREO_REMITENTE` y una cuenta que autentique. El RNF-65 pide que salga **desde el dominio propio de Renaser**: confirmar con ellos si ya lo tienen antes de encenderlo |
 | Acceso del candidato | Entra al portal **con un enlace, sin contrasena** (`EnlaceAcceso`, `ServicioEnlaceAcceso`). El enlace se le manda por correo, asi que depende de lo de arriba |
@@ -99,6 +99,82 @@ Dos cosas que no son obvias:
   fundada de la inventada.
 - **Una pregunta ya contestada no se borra.** Volver a pedir las preguntas rehace solo las que
   nadie llego a hacer.
+
+### El panel ve lo que el candidato entrego (02/09/2026 · V48)
+
+`GET /panel/postulaciones/{id}/prueba/entregables`. Hasta hoy los entregables los leian **dos**:
+el propio candidato en su portal, y el agente al armar su insumo. Quien tiene que poner a mano la
+nota de un criterio —los que la rubrica reserva a una `PERSONA`, que son justo los que el modelo
+no puede leer: un video, un enlace— **no tenia donde ver el video**. Se le pedia un puntaje sobre
+algo que ninguna pantalla le enseñaba.
+
+- **Salen todos los pedidos de su version, entregados o no**, y de cada uno **la ultima**: se
+  puede entregar tres veces antes de que cierre el plazo. Un hueco en la lista no se lee; se lee
+  una lista mas corta, que parece completa, y que falte un obligatorio es justo lo que hay que ver
+  antes de poner una nota.
+- ⚠️ **Son DOS permisos, no uno.** Listar pide `abrir_ficha_candidato`; el `enlace` y el
+  `archivoId` viajan **solo con `descargar_entregables`**. El archivo ya lo pedia —las dos rutas
+  de `/archivos` lo exigen—, y **el enlace tenia que pedir lo mismo**: en la prueba de marketing
+  la sustentacion en video se entrega pegando una direccion, asi que repartirla con el permiso
+  flojo abre por la puerta de al lado lo que la otra cierra. Sin ese permiso se sigue diciendo
+  QUE entrego y CUANDO, y `porQueNoSeVe` explica el hueco con palabras: un hueco callado y un «no
+  entrego» se leen igual y no son lo mismo.
+- **Con el cuestionario tecnico devuelve lista vacia, no 404.** Esa modalidad se contesta
+  escribiendo y no tiene nada que subir; ni siquiera se busca el intento. Lo mismo que hace
+  `laRubricaDe`.
+- **Repite las tres guardas de `PuentePruebaIaImpl.loQueEntrego`** —archivo borrado, sin ruta, o
+  que ya no existe—. Un archivo que no esta se dice; no se ofrece una descarga que va a contestar
+  404.
+- `ServicioCalificacionPruebaImpl#pintarEntrega` entra en la lista `LLAMADAS_SIN_DUENO_ACORDADAS`
+  de `ArquitecturaTest`: se llega desde `verEntregables`, que ya paso por `laVisible`, y desde ahi
+  solo se leen archivos que cuelgan de un `entregable` del intento de ESA postulacion. El dueno lo
+  fija la cadena, no el `findById`.
+
+#### ⚠️ La V48: el archivo del entregable era de la plataforma, no de la empresa
+
+`subirEntregableArchivo` sellaba el archivo con la organizacion de **quien lo sube**, y quien lo
+sube es el candidato: todas las cuentas del portal nacen en la organizacion plataforma. El panel,
+en cambio, lo busca con `findByIdAndOrganizacionId` usando la organizacion **de la empresa de la
+vacante** (`ServicioPostulacionesPanelImpl.elVisible`). Para cualquier empresa que no sea la
+plataforma, abrir o descargar un entregable respondia **404 sobre un archivo que el candidato si
+subio**.
+
+El curriculum nunca lo tuvo: `ServicioPostulacionPortalImpl` sella con la organizacion de la
+vacante, y lo dice en un comentario. Al escribir la subida de entregables se perdio esa regla.
+
+⚠️ **Es la fuga que solo aparece con la segunda empresa.** RENASER es a la vez la plataforma y la
+unica empresa con vacantes, asi que las dos organizaciones son la misma y los dos caminos
+coinciden por casualidad. **La pantalla de entregables del panel es la primera que la habria
+destapado**, y llega en esta misma rama.
+
+⚠️ **Su test usa DOS organizaciones distintas a proposito** (`ServicioPruebaImplTest`). Con la
+misma en los dos lados pasaria en verde con el fallo dentro, que es exactamente lo que llevaba
+pasando desde que se escribio la subida.
+
+La migracion **reetiqueta solo los archivos que cuelgan de un `entregable`, y solo cuando
+difieren**: no toca los curriculums, que ya estan bien, ni los materiales de las plantillas de
+prueba, que son de la empresa que escribio la plantilla y no de ninguna vacante. Es idempotente y
+**no añade ninguna tabla**.
+
+#### ⚠️ El enlace firmado no falla en local: contesta 200 con una url que nadie abre
+
+`AlmacenArchivosEnMemoria.urlDeDescarga` devuelve `Optional.of("memoria://" + ruta)`, asi que
+`GET /archivos/{id}/enlace` responde **200**. El `IllegalStateException` de
+`enlaceDeArchivo` —«el almacen de archivos de este entorno no reparte enlaces»— **no se dispara
+nunca con el perfil `local`**, que es el de por defecto. Quien llame a ese endpoint tiene que
+mirar **el esquema de la url** y caer a `/archivos/{id}/descarga` cuando no sea `http`/`https`;
+esperar un error es esperar algo que no llega. `application-local.yaml` ya lo decia en el bloque
+de `app.archivos`, y ahora lo dice tambien `docs/09-APIS.md` en las dos filas.
+
+⚠️ **Y por eso el camino del bucket queda sin comprobar de punta a punta.** Lo verificado es la
+descarga, que es la unica que existe en local; que el enlace firmado sirva bytes de verdad se
+afirma por construccion. Un fallo en la firma de Supabase pasaria por aqui sin que nadie se
+entere.
+
+⚠️ **Pendiente: con formato `CUALQUIERA` se quedan dos entregas y solo viaja una.** Quien pega un
+enlace y luego sube un archivo deja **dos filas del mismo pedido**, y de cada pedido sale la
+ultima version: la anterior no sale por ningun sitio, ni en el panel ni para el agente.
+Arreglarlo pide mandar el historial del pedido, no su ultima fila.
 
 ### Los minutos de la vacante rigen los DOS instrumentos (31/08/2026)
 
@@ -528,12 +604,17 @@ Las dos consultan el mismo backend, asi que ensenan el mismo orden.
 - Nada se recalcula hacia atras: cada nota queda atada a la version de pesos de su vacante.
 
 ### Correr los tests
-**930 unitarios en verde (01/09/2026).** Son dos tandas y el comando decide cual corre:
+**1007 unitarios en verde (02/09/2026).** Son dos tandas y el comando decide cual corre:
 
 | Comando | Que corre | Cuantos | Necesita |
 |---|---|---:|---|
-| `./mvnw test` | unitarias con dobles y las de arquitectura | 930 | nada |
-| `./mvnw verify` | lo anterior mas las de integracion | 930 + 142 | Docker |
+| `./mvnw test` | unitarias con dobles y las de arquitectura | 1007 | nada |
+| `./mvnw verify` | lo anterior mas las de integracion | 1007 + 143 | Docker |
+
+⚠️ **El numero es el que Maven imprime al final, no el que sale de sumar los informes.** Con `-q`
+esa linea no aparece y hay que ir a `target/*-reports/`, donde los `.txt` y el atributo `tests=`
+del `<testsuite>` dan cifras mas bajas: las clases anidadas y las parametrizadas no se cuentan
+igual en cada sitio. Correrlo sin `-q` es mas barato que reconstruirlo.
 
 Las de integracion levantan su propio PostgreSQL y su propio RabbitMQ con Testcontainers: hace
 falta el demonio de Docker encendido. El desglose completo esta en
@@ -560,6 +641,30 @@ metodo `elCambioInesperadoCabeDentroDelReloj` de `RelojDeLaEtapaTecnicaQaTest` �
 esta saltada entera, sus otros dos casos pasan y son la red de los dos defectos hermanos que si
 se arreglaron. Cuando se decida que hacer se le quita el `@Disabled` y tiene que pasar. Ver
 [Defectos conocidos](docs/DEFECTOS-CONOCIDOS.md).
+
+### Un backend propio para una rama, y sus cuatro trampas (02/09/2026)
+
+Los tests levantan lo suyo con Testcontainers, pero **comprobar una rama a mano —el panel contra
+esta API— escribe en la base**, y la del 5433 es la que comparte todo el mundo. Levantar un
+backend solo para la rama cuesta cuatro tropiezos que no estaban escritos en ningun sitio:
+
+- ⚠️ **La imagen es `pgvector/pgvector:pg16`, no `postgres:16`.** `vector_store` no la crea Flyway
+  a proposito: la escribe Spring AI al arrancar (`initialize-schema: true`) con la extension
+  `vector`, y sin ella la aplicacion no llega a levantar.
+- ⚠️ **Un worktree no tiene `application-secrets.yaml`.** Se importa por ruta **relativa**
+  (`spring.config.import: optional:file:./application-secrets.yaml`) y no se versiona, asi que
+  desde un worktree el archivo no existe: `api-key: ${google.gemini.api-key}` se queda sin
+  resolver, la aplicacion no arranca y la base se queda sin migrar. Se apunta al del repositorio
+  principal **por ruta absoluta**.
+- ⚠️ **El vhost de RabbitMQ se fija en la linea de comandos**, que es lo unico que gana sobre el
+  perfil. `application-local.yaml` clava `virtual-host: /`, y **dos backends de dos ramas en el
+  mismo vhost se roban los mensajes**: el trabajo de IA de uno se lo come el otro proceso y la
+  calificacion no vuelve nunca. La base tambien va por argumento, no editando el perfil.
+- ⚠️ **El `dev-login` solo crea al PRIMER usuario del equipo.** `arrancarPrimerUsuario` mira si ya
+  hay alguien de equipo en la organizacion plataforma; si lo hay, cualquier otro id recibe «Ese id
+  de RENASER OS no esta registrado en el sistema». En una base recien migrada **el primero que
+  entre se queda el cupo**, y el guion de siembra entra el primero: despues hay que usar su mismo
+  id, no inventar otro.
 
 ## El perfil del candidato (25/08/2026)
 Cada persona tiene **un perfil, unico y transversal a organizaciones**: cuelga de `persona`,
@@ -929,7 +1034,7 @@ Todo vive en `docs/`. Empezar por [docs/README.md](docs/README.md).
   ultimas etapas y sus tres reglas automaticas de disponibilidad.
 - [CI/CD](docs/CI-CD.md) — que se comprueba solo en cada cambio, como se despliega a AWS y que
   variables de entorno pide el servidor. **Leerlo antes de tocar `.github/workflows/`.**
-- [Comprobaciones automaticas](docs/COMPROBACIONES-AUTOMATICAS.md) — las 1072 pruebas y las nueve
+- [Comprobaciones automaticas](docs/COMPROBACIONES-AUTOMATICAS.md) — las 1150 pruebas y las nueve
   reglas de arquitectura, una por una. Que se mira solo y que no.
 - [Defectos conocidos](docs/DEFECTOS-CONOCIDOS.md) — **lo que esta roto, se sabe y sigue
   abierto.** Que le pasa a una persona de verdad, por que pasa y que haria falta para

@@ -31,6 +31,29 @@ public final class DtosCalificacionPrueba {
             Long preguntaId, String codigo, Integer orden, String tipo,
             String enunciado, String respuesta, Instant respondidaEn) {}
 
+    /**
+     * Una de las cosas que la prueba pedía entregar, y cómo llegó.
+     *
+     * <p><b>Salen todas las pedidas, también las que no entregó.</b> Que faltara la tercera
+     * es justo lo que hay que poder ver, y un hueco en la lista no se lee: se lee una lista
+     * más corta, que parece completa.
+     *
+     * <p><b>{@code enlace} y {@code archivoId} viajan solo con {@code descargar_entregables}.</b>
+     * Quien abre la ficha ve QUÉ entregó y cuándo; para llegar al contenido hace falta el
+     * mismo permiso en los dos casos. El archivo ya lo pedía —la descarga y el enlace firmado
+     * lo exigen—, y el enlace tenía que pedir lo mismo: en la prueba de marketing el vídeo de
+     * sustentación se entrega como enlace, así que dejarlo pasar con el permiso flojo abriría
+     * por la puerta de al lado justo lo que la otra cierra.
+     *
+     * <p>{@code porQueNoSeVe} lo dice con palabras cuando no hay contenido que enseñar —no lo
+     * entregó, el archivo ya no está guardado, o falta el permiso—, porque un hueco callado y
+     * un «no entregó» se leen igual y no son lo mismo.
+     */
+    public record EntregaDeLaPrueba(
+            Long entregableRequeridoId, String nombre, String detalle, String formato,
+            boolean esObligatorio, boolean loEntrego, String enlace, Long archivoId,
+            String archivoNombre, Integer version, Instant subidoEn, String porQueNoSeVe) {}
+
     /** Lo que se contesta al pedirle al agente que califique. */
     public record CalificacionIaEncolada(String estado, String mensaje) {}
 

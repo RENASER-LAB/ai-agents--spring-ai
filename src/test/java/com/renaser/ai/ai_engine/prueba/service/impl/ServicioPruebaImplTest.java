@@ -386,4 +386,49 @@ class ServicioPruebaImplTest {
         assertThat(pintada.duracionMinutos()).isEqualTo(90);
         assertThat(pintada.estadoIntento()).isEqualTo("PENDIENTE");
     }
+
+    @Test
+    @DisplayName("el archivo del entregable se guarda con la organización de la VACANTE, no la de quien sube")
+    void elEntregableEsDeLaEmpresaDeLaVacante() throws Exception {
+        /*
+         * ⚠️ **Este test existe por un 404 que solo aparece con la segunda empresa.**
+         * `quien` es el candidato, y su organización es la PLATAFORMA: todas las cuentas del
+         * portal nacen ahí. El panel busca el archivo con `findByIdAndOrganizacionId` usando
+         * la organización de la empresa de la vacante, así que sellarlo con la del candidato
+         * lo deja invisible para cualquier empresa que no sea la plataforma.
+         *
+         * Mientras RENASER fue la plataforma y la única empresa con vacantes, las dos
+         * organizaciones eran la misma y los dos caminos coincidían por casualidad. Por eso
+         * aquí se hacen distintas a propósito: con `ORGANIZACION` en los dos lados, este
+         * test pasaría en verde con el fallo dentro.
+         */
+        Long empresaDeLaVacante = 99L;
+        Postulacion p = Postulacion.builder()
+                .id(POSTULACION).uuid(UUID_POSTULACION).usuarioId(QUIEN.usuarioId())
+                .organizacionId(empresaDeLaVacante).vacanteId(VACANTE)
+                .build();
+        IntentoPrueba intento = IntentoPrueba.builder()
+                .id(INTENTO).postulacionId(POSTULACION).versionPlantillaPruebaId(VERSION)
+                .iniciadoEn(java.time.Instant.now()).build();
+        when(postulaciones.findByUuid(UUID_POSTULACION)).thenReturn(Optional.of(p));
+        when(intentos.findByPostulacionId(POSTULACION)).thenReturn(Optional.of(intento));
+        // `exigirFormato` lo busca por id y comprueba que sea de la versión del intento.
+        when(entregablesRequeridos.findById(5L)).thenReturn(Optional.of(
+                com.renaser.ai.ai_engine.prueba.entity.EntregableRequerido.builder()
+                        .id(5L).nombre("El informe").formato("ARCHIVO")
+                        .versionPlantillaPruebaId(VERSION)
+                        .esObligatorio(true).orden(1).build()));
+        when(almacen.guardar(org.mockito.ArgumentMatchers.anyLong(), any())).thenReturn(
+                com.renaser.ai.ai_engine.archivo.entity.Archivo.builder().id(88L).build());
+
+        servicio.subirEntregableArchivo(QUIEN, UUID_POSTULACION, 5L,
+                new org.springframework.mock.web.MockMultipartFile(
+                        "archivo", "informe.pdf", "application/pdf", "algo".getBytes()));
+
+        // La de la vacante, y NO la del candidato.
+        org.mockito.Mockito.verify(almacen)
+                .guardar(org.mockito.ArgumentMatchers.eq(empresaDeLaVacante), any());
+        org.mockito.Mockito.verify(almacen, org.mockito.Mockito.never())
+                .guardar(org.mockito.ArgumentMatchers.eq(ORGANIZACION), any());
+    }
 }

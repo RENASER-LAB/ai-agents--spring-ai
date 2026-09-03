@@ -82,6 +82,17 @@ class ServicioCalificacionPruebaImplTest {
     private static final ContextoUsuario QUIEN = new ContextoUsuario(
             USUARIO, 3L, ORGANIZACION, "EQUIPO", List.of(2L), Map.of());
 
+    /**
+     * El mismo, pero con el permiso que abre el contenido de un entregable.
+     *
+     * ⚠️ `QUIEN` lleva `Map.of()`: no tiene ninguno. Esa es justo la mitad que
+     * hay que poder probar —que sin el permiso el enlace y el archivo no viajan—
+     * y por eso hacen falta los dos contextos y no uno.
+     */
+    private static final ContextoUsuario QUIEN_PUEDE_VER_EL_CONTENIDO = new ContextoUsuario(
+            USUARIO, 3L, ORGANIZACION, "EQUIPO", List.of(2L),
+            Map.of("descargar_entregables", "TODO"));
+
     @Mock private PostulacionRepository postulaciones;
     @Mock private com.renaser.ai.ai_engine.vacante.service.AlcanceSobreLaVacante alcanceVacante;
     @Mock private IntentoPruebaRepository intentos;
@@ -99,13 +110,18 @@ class ServicioCalificacionPruebaImplTest {
             .CalificacionCuestionarioTecnico cuestionarioTecnico;
     @Mock private com.renaser.ai.ai_engine.perfilintegral.repository.NotaEtapaRepository notasEtapa;
 
+    @Mock private com.renaser.ai.ai_engine.prueba.repository.EntregableRepository entregables;
+    @Mock private com.renaser.ai.ai_engine.prueba.repository.EntregableRequeridoRepository entregablesRequeridos;
+    @Mock private com.renaser.ai.ai_engine.archivo.repository.ArchivoRepository archivos;
+
     private ServicioCalificacionPruebaImpl servicio;
 
     @BeforeEach
     void crearElServicio() {
         servicio = new ServicioCalificacionPruebaImpl(postulaciones, alcanceVacante, intentos, criterios,
                 preguntasElegidas, preguntasCatalogo, respuestas, notasCriterio, versionesPesos,
-                cola, auditoria, vacantes, cuestionarioTecnico, notasEtapa, calificacion);
+                cola, auditoria, vacantes, cuestionarioTecnico, notasEtapa, calificacion,
+                entregables, entregablesRequeridos, archivos);
     }
 
     // ============ Quién puede pedirlo ============
@@ -240,7 +256,130 @@ class ServicioCalificacionPruebaImplTest {
                 .isEqualTo("SIN_CAMBIOS");
     }
 
+    // ============ Lo que entregó ============
+
+    @Test
+    @DisplayName("salen todos los pedidos, entregados o no, en el orden de la versión")
+    void salenTodosLosPedidos() {
+        conPostulacionVisible("abrir_ficha_candidato");
+        hayIntento(Instant.now());
+        hayRequeridos();
+        when(entregables.findByIntentoPruebaId(4L)).thenReturn(List.of(
+                unEntregable(10L, 1L, null, "https://ejemplo.pe/campana", 1)));
+
+        var salida = servicio.verEntregables(QUIEN_PUEDE_VER_EL_CONTENIDO, POSTULACION);
+
+        // El segundo NO se entregó, y tiene que salir igual: un hueco se leería
+        // como una lista más corta, que parece completa.
+        assertThat(salida).hasSize(2);
+        assertThat(salida.get(0).loEntrego()).isTrue();
+        assertThat(salida.get(0).enlace()).isEqualTo("https://ejemplo.pe/campana");
+        assertThat(salida.get(1).loEntrego()).isFalse();
+        assertThat(salida.get(1).porQueNoSeVe()).contains("obligatorio");
+    }
+
+    @Test
+    @DisplayName("de un entregable con varias entregas gana la última")
+    void ganaLaUltimaVersion() {
+        conPostulacionVisible("abrir_ficha_candidato");
+        hayIntento(Instant.now());
+        hayRequeridos();
+        when(entregables.findByIntentoPruebaId(4L)).thenReturn(List.of(
+                unEntregable(10L, 1L, null, "https://ejemplo.pe/vieja", 1),
+                unEntregable(11L, 1L, null, "https://ejemplo.pe/nueva", 3),
+                unEntregable(12L, 1L, null, "https://ejemplo.pe/media", 2)));
+
+        var salida = servicio.verEntregables(QUIEN_PUEDE_VER_EL_CONTENIDO, POSTULACION);
+
+        assertThat(salida.get(0).enlace()).isEqualTo("https://ejemplo.pe/nueva");
+        assertThat(salida.get(0).version()).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("sin «descargar_entregables» se dice qué entregó, pero no se reparte el contenido")
+    void sinPermisoNoViajaElContenido() {
+        conPostulacionVisible("abrir_ficha_candidato");
+        hayIntento(Instant.now());
+        hayRequeridos();
+        when(entregables.findByIntentoPruebaId(4L)).thenReturn(List.of(
+                unEntregable(10L, 1L, 55L, null, 1)));
+
+        var salida = servicio.verEntregables(QUIEN, POSTULACION);
+
+        assertThat(salida.get(0).loEntrego()).isTrue();
+        assertThat(salida.get(0).subidoEn()).isNotNull();
+        // Ni el enlace ni el id del archivo: llegar al contenido pide el mismo
+        // permiso que las dos rutas de archivo.
+        assertThat(salida.get(0).enlace()).isNull();
+        assertThat(salida.get(0).archivoId()).isNull();
+        assertThat(salida.get(0).porQueNoSeVe()).contains("descargar_entregables");
+        // Y ni siquiera se pregunta por el archivo.
+        verifyNoInteractions(archivos);
+    }
+
+    @Test
+    @DisplayName("un archivo borrado, sin ruta o inexistente se dice, no se ofrece")
+    void elArchivoQueYaNoEsta() {
+        conPostulacionVisible("abrir_ficha_candidato");
+        hayIntento(Instant.now());
+        hayRequeridos();
+        when(entregables.findByIntentoPruebaId(4L)).thenReturn(List.of(
+                unEntregable(10L, 1L, 55L, null, 1)));
+        when(archivos.findById(55L)).thenReturn(Optional.of(
+                com.renaser.ai.ai_engine.archivo.entity.Archivo.builder().id(55L).ruta("x").borradoEn(Instant.now()).build()));
+
+        var salida = servicio.verEntregables(QUIEN_PUEDE_VER_EL_CONTENIDO, POSTULACION);
+
+        assertThat(salida.get(0).archivoId()).isNull();
+        assertThat(salida.get(0).porQueNoSeVe()).isEqualTo("El archivo ya no está guardado");
+    }
+
+    @Test
+    @DisplayName("con cuestionario técnico la lista es vacía, y no se busca ningún intento")
+    void elCuestionarioNoEntregaNada() {
+        conPostulacionVisible("abrir_ficha_candidato");
+        when(vacantes.findById(VACANTE)).thenReturn(Optional.of(
+                Vacante.builder().id(VACANTE).instrumentoEtapaTecnica("CUESTIONARIO_TECNICO").build()));
+
+        assertThat(servicio.verEntregables(QUIEN, POSTULACION)).isEmpty();
+
+        // Vacío y no un 404: esa modalidad se contesta escribiendo.
+        verifyNoInteractions(intentos);
+    }
+
+    @Test
+    @DisplayName("una postulación fuera de alcance no existe para quien pregunta")
+    void fueraDeAlcanceNoEnseñaEntregables() {
+        fueraDeAlcance("abrir_ficha_candidato");
+
+        assertThatThrownBy(() -> servicio.verEntregables(QUIEN, POSTULACION))
+                .isInstanceOf(ResourceNotFoundException.class);
+
+        verifyNoInteractions(entregables);
+    }
+
     // ============ Apoyo ============
+
+    /** Dos pedidos: el primero se entrega en las pruebas, el segundo nunca. */
+    private void hayRequeridos() {
+        when(entregablesRequeridos.findByVersionPlantillaPruebaIdOrderByOrden(VERSION_PLANTILLA))
+                .thenReturn(List.of(
+                        com.renaser.ai.ai_engine.prueba.entity.EntregableRequerido.builder().id(1L).nombre("La campaña")
+                                .detalle("Con su segmentación").formato("CUALQUIERA")
+                                .esObligatorio(true).orden(1).build(),
+                        com.renaser.ai.ai_engine.prueba.entity.EntregableRequerido.builder().id(2L).nombre("El vídeo")
+                                .detalle("Cuatro minutos").formato("ENLACE")
+                                .esObligatorio(true).orden(2).build()));
+    }
+
+    private com.renaser.ai.ai_engine.prueba.entity.Entregable unEntregable(
+            Long id, Long requeridoId, Long archivoId, String enlace, Integer version) {
+        return com.renaser.ai.ai_engine.prueba.entity.Entregable.builder()
+                .id(id).intentoPruebaId(4L).entregableRequeridoId(requeridoId)
+                .archivoId(archivoId).enlace(enlace).version(version)
+                .subidoEn(Instant.now()).build();
+    }
+
 
     /** Lo que el guardián devuelve cuando la postulación es de esta empresa y se alcanza. */
     private void hayPostulacion() {
