@@ -414,6 +414,38 @@ class ServicioCalificacionPruebaImplTest {
                         .build()));
     }
 
+    // ============ Quién puede LEER el desglose ============
+
+    /**
+     * ⚠️ <b>Leer el desglose ya no pide el permiso de CORREGIRLO.</b>
+     *
+     * <p>Pedía {@code ajustar_nota}, que solo tienen Talento y Dirección. Responsable de Área
+     * abría el embudo de su vacante con {@code ver_embudo}, veía la nota de cada candidato —y
+     * ahora también las columnas de la rúbrica en la tabla— y al pulsar la fila se topaba con
+     * un 403 sobre el desglose de esa misma nota.
+     *
+     * <p>Ahora pide {@code abrir_ficha_candidato}, que es exactamente esto —abrir la ficha de
+     * alguien— y que ese rol ya tiene con alcance {@code SUS_VACANTES}. Es el mismo permiso
+     * con el que {@code verEntregables} deja ver lo que el candidato entregó.
+     *
+     * <p><b>Escribir no se toca</b>: lo comprueba el test de abajo.
+     */
+    @Test
+    @DisplayName("leer el desglose pide el permiso de la ficha, no el de corregir la nota")
+    void verLasNotasPideElPermisoDeLaFicha() {
+        conPostulacionVisible("abrir_ficha_candidato");
+        hayIntento(Instant.now());
+        hayRubricaCon("AGENTE");
+        when(notasCriterio.findByPostulacionId(POSTULACION)).thenReturn(List.of());
+
+        assertThat(servicio.verNotas(QUIEN, POSTULACION)).hasSize(1);
+
+        verify(alcanceVacante).laPostulacionVisible(any(), eq(POSTULACION),
+                eq("abrir_ficha_candidato"));
+        verify(alcanceVacante, never()).laPostulacionVisible(any(), eq(POSTULACION),
+                eq("ajustar_nota"));
+    }
+
     // ============ Ver lo que contestó ============
 
     @Test

@@ -75,8 +75,15 @@ public class ServicioExcelRankingImpl implements ServicioExcelRanking {
      */
     private static final String SIN_NOTA = "rúbrica incompleta";
 
-    /** El permiso que pide leer la rúbrica de la prueba, criterio a criterio. */
-    private static final String PERMISO_DETALLE = "ajustar_nota";
+    /**
+     * El permiso que pide leer la rúbrica de la prueba, criterio a criterio.
+     *
+     * <p>⚠️ <b>Tiene que ser el MISMO que pide {@code ServicioCalificacionPrueba.verNotas}</b>,
+     * que es a quien llama la hoja de abajo. Cuando eran distintos —aquel pedía
+     * {@code ajustar_nota}— este Excel le decía a Responsable de Área que no podía ver un
+     * detalle que la pantalla sí le enseñaba.
+     */
+    private static final String PERMISO_DETALLE = "abrir_ficha_candidato";
 
     /** El permiso bajo el que viaja la pretensión salarial (V36). */
     private static final String PERMISO_PRETENSION = "ver_pretension";
@@ -316,8 +323,9 @@ public class ServicioExcelRankingImpl implements ServicioExcelRanking {
                 List.of("Candidato", "Criterio", "Puntaje", "Máximo", "Explicación"),
                 new int[]{34, 42, 9, 9, 110});
 
-        // La rúbrica pide «ajustar_nota» y este volcado se abre con «ver_embudo»: hay roles
-        // que tienen el segundo y no el primero. Se pregunta una vez y se dice en una línea,
+        // La rúbrica pide su propio permiso y este volcado se abre con «ver_embudo»: hay
+        // roles que tienen el segundo y no el primero. Se pregunta una vez y se dice en una
+        // línea,
         // en vez de dejar que la primera llamada tumbe el archivo entero con un 403 —o, peor,
         // tragarse ochenta excepciones iguales y devolver una hoja muda.
         if (!quien.tiene(PERMISO_DETALLE)) {
