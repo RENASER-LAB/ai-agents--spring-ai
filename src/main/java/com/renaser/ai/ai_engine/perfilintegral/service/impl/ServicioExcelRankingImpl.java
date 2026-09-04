@@ -5,6 +5,7 @@ import com.renaser.ai.ai_engine.perfilintegral.dto.DtosExcelRanking.ExcelDeRanki
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosExcelRanking.PedidoExcelRanking;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.DatosCandidato;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.FilaRanking;
+import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.Ponderado;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.NotaCriterioResponse;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.RankingVacante;
 import com.renaser.ai.ai_engine.perfilintegral.service.ServicioExcelRanking;
@@ -210,8 +211,15 @@ public class ServicioExcelRankingImpl implements ServicioExcelRanking {
                         cabeceraDePretension(vePretension), "Nota del perfil", "Pasada",
                         "Adecuación", "Potencial", "Confianza de evidencia",
                         "Grupo de prioridad", "Alto rendimiento", "Riesgos", "Alertas",
-                        "Resumen", "Fortalezas"),
-                new int[]{5, 34, 38, 15, 26, 24, 15, 10, 13, 12, 21, 19, 17, 9, 9, 90, 12});
+                        "Resumen", "Fortalezas",
+                        // Lo ya rendido, al final y no junto a la nota del perfil: las cuatro
+                        // se leen juntas, y añadirlas en medio habría corrido de sitio todas
+                        // las columnas que ya existían.
+                        // Sin repetir el perfil integral: en esta hoja «Nota del perfil»
+                        // ya es esa misma cifra.
+                        "Currículum /100", "Prueba /100", "Ponderado /100"),
+                new int[]{5, 34, 38, 15, 26, 24, 15, 10, 13, 12, 21, 19, 17, 9, 9, 90, 12,
+                        16, 13, 16});
 
         int numero = 1;
         for (FilaRanking fila : filas) {
@@ -247,7 +255,8 @@ public class ServicioExcelRankingImpl implements ServicioExcelRanking {
             numero(f, c++, hayRetrato ? fila.riesgosCriticos() : null, pinceles);
             numero(f, c++, hayRetrato ? fila.alertas() : null, pinceles);
             largo(f, c++, fila.resumen(), pinceles);
-            numero(f, c, hayRetrato ? fila.fortalezas() : null, pinceles);
+            numero(f, c++, hayRetrato ? fila.fortalezas() : null, pinceles);
+            ponderado(f, c, fila, pinceles, false, true);
             numero++;
         }
     }
@@ -297,8 +306,12 @@ public class ServicioExcelRankingImpl implements ServicioExcelRanking {
                                    boolean vePretension) {
         encabezar(hoja, pinceles,
                 List.of("#", "Candidato", "Correo", "Teléfono", "Ciudad",
-                        cabeceraDePretension(vePretension), "Nota /100"),
-                new int[]{5, 34, 38, 15, 26, 24, 11});
+                        cabeceraDePretension(vePretension), "Nota /100",
+                        // Sin repetir la prueba: en esta hoja «Nota /100» ya ES esa cifra, y
+                        // dos columnas con el mismo número y distinto nombre harían dudar de
+                        // cuál es cuál.
+                        "Currículum /100", "Perfil integral /100", "Ponderado /100"),
+                new int[]{5, 34, 38, 15, 26, 24, 11, 16, 21, 16});
 
         int numero = 1;
         for (FilaRanking fila : filas) {
@@ -312,7 +325,8 @@ public class ServicioExcelRankingImpl implements ServicioExcelRanking {
             texto(f, c++, telefonoDelCv(fila), pinceles);
             texto(f, c++, fila.ciudad(), pinceles);
             texto(f, c++, pretension(fila), pinceles);
-            nota(f, c, fila.notaEtapa(), pinceles);
+            nota(f, c++, fila.notaEtapa(), pinceles);
+            ponderado(f, c, fila, pinceles, true, false);
             numero++;
         }
     }
@@ -532,6 +546,40 @@ public class ServicioExcelRankingImpl implements ServicioExcelRanking {
             celda.setCellValue(valor);
         }
         celda.setCellStyle(pinceles.normal);
+    }
+
+    /**
+     * Lo ya rendido: currículum, perfil integral, prueba, y el ponderado de los tres.
+     *
+     * <p>Se escriben juntas y en este orden en las dos hojas de Resumen, con una diferencia:
+     * cada hoja se salta la cifra que su propia columna «Nota» ya enseña, para no poner dos
+     * veces el mismo número con dos nombres distintos.
+     *
+     * <p><b>No hay columna del banco de preguntas</b>, y no es un olvido: esa nota no se
+     * guarda suelta en ninguna parte —lo guardado es su mezcla con el currículum— y
+     * despejarla restando da un número falso en dos casos reales. El Perfil Integral, que sí
+     * es exacto, ya la contiene; con estas tres cifras el ponderado se rehace a mano.
+     *
+     * <p>Las cuatro pasan por {@link #nota}, así que una que falte dice por qué falta en vez
+     * de quedarse en blanco — igual que cualquier otra nota de estas hojas.
+     */
+    private void ponderado(Row fila, int columna, FilaRanking datos, Pinceles pinceles,
+                           boolean conElPerfil, boolean conLaPrueba) {
+        Ponderado suyo = datos.ponderado();
+        BigDecimal cv = suyo == null ? null : suyo.cv();
+        BigDecimal perfil = suyo == null ? null : suyo.perfil();
+        BigDecimal prueba = suyo == null ? null : suyo.prueba();
+        BigDecimal sobre100 = suyo == null ? null : suyo.sobre100();
+
+        int c = columna;
+        nota(fila, c++, cv, pinceles);
+        if (conElPerfil) {
+            nota(fila, c++, perfil, pinceles);
+        }
+        if (conLaPrueba) {
+            nota(fila, c++, prueba, pinceles);
+        }
+        nota(fila, c, sobre100, pinceles);
     }
 
     // ========================================================================

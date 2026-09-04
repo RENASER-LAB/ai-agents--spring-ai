@@ -12,6 +12,7 @@ import com.renaser.ai.ai_engine.perfil.repository.PerfilCandidatoRepository;
 import com.renaser.ai.ai_engine.perfil.repository.UbigeoRepository;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.AlertaResponse;
 import com.renaser.ai.ai_engine.pesos.entity.Etapa;
+import com.renaser.ai.ai_engine.pesos.entity.PesoEtapa;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.CalificacionEncoladaResponse;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.FilaRanking;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.HallazgoResponse;
@@ -19,6 +20,7 @@ import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.DatosCandi
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.NotaCriterioResponse;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.PasadaEncolada;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.PerfilIntegralResponse;
+import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.Ponderado;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.RankingVacante;
 import com.renaser.ai.ai_engine.perfilintegral.entity.Alerta;
 import com.renaser.ai.ai_engine.perfilintegral.entity.Criterio;
@@ -126,6 +128,7 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
     private final UbigeoRepository ubigeos;
     private final PerfilCandidatoRepository perfilesCandidato;
     private final com.renaser.ai.ai_engine.prueba.repository.IntentoPruebaRepository intentos;
+    private final com.renaser.ai.ai_engine.pesos.repository.PesoEtapaRepository pesosEtapa;
 
     // El orden de la tanda. Manda el grupo, no la nota: quien llega a la nota arrastrando un
     // riesgo crítico no va por delante de quien llega sin ninguno, y ordenar por número
@@ -517,6 +520,31 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
         Map<Long, NotaEtapa> etapaPorPostulacion = porPostulacion(
                 notasEtapa.findByPostulacionIdInAndEtapaCodigo(ids, etapa),
                 NotaEtapa::getPostulacionId);
+        /*
+          Las dos notas que entran en el ponderado, y los pesos con que se mezclan.
+
+          La de la pestaña que se está mirando ya está arriba, así que solo se pide la otra:
+          en «Prueba del puesto» falta la del perfil, en «Perfil integral» falta la de la
+          prueba, y en las otras tres pestañas faltan las dos. Son una o dos consultas para
+          la tanda entera —la misma regla que todo lo de este bloque—, nunca una por fila.
+        */
+        Map<Long, NotaEtapa> perfilPorPostulacionParaPonderar = ETAPA.equals(etapa)
+                ? etapaPorPostulacion
+                : porPostulacion(notasEtapa.findByPostulacionIdInAndEtapaCodigo(ids, ETAPA),
+                        NotaEtapa::getPostulacionId);
+        Map<Long, NotaEtapa> pruebaPorPostulacion = ETAPA_TECNICA.equals(etapa)
+                ? etapaPorPostulacion
+                : porPostulacion(notasEtapa.findByPostulacionIdInAndEtapaCodigo(ids, ETAPA_TECNICA),
+                        NotaEtapa::getPostulacionId);
+        /*
+          Los pesos, de la versión de LA VACANTE y no de la última publicada, por la misma
+          razón que los de criterio de más arriba. Hardcodear 40 y 30 daría un número
+          equivocado en las vacantes que siguen en la v3, donde el reparto es 57.14/42.86.
+        */
+        Map<String, BigDecimal> pesoDeLaEtapa = pesosEtapa
+                .findByVersionPesosId(vacante.getVersionPesosId()).stream()
+                .collect(Collectors.toMap(PesoEtapa::getEtapaCodigo, PesoEtapa::getPeso, (a, b) -> a));
+
         Map<Long, Long> alertasPorPostulacion = alertas.findByPostulacionIdIn(ids).stream()
                 .collect(Collectors.groupingBy(Alerta::getPostulacionId, Collectors.counting()));
         Map<Long, Cv> cvPorPostulacion = porPostulacion(cvs.findByPostulacionIdIn(ids),
@@ -606,6 +634,8 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
             PerfilCandidato suPerfil = persona == null ? null
                     : perfilPorPersona.get(persona.getId());
 
+            BigDecimal notaDelCurriculum = notaCurriculum(notaPorCriterio.values(), pesos, idsDelCurriculum);
+
             filas.add(new FilaRanking(
                     0,
                     p.getId(),
@@ -620,7 +650,7 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
                     pintarDatos(fichas.get(p.getId())),
                     p.getGrupoPrioridad(),
                     etapa(etapaPorPostulacion.get(p.getId())),
-                    notaCurriculum(notaPorCriterio.values(), pesos, idsDelCurriculum),
+                    notaDelCurriculum,
                     perfil == null ? null : perfil.getAdecuacion(),
                     perfil == null ? null : perfil.getPotencial(),
                     perfil == null ? null : perfil.getAltoRendimiento(),
@@ -639,7 +669,10 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
                     ciudadCodigo,
                     suPerfil == null ? null : suPerfil.getPretensionMin(),
                     suPerfil == null ? null : suPerfil.getPretensionMax(),
-                    suPerfil == null ? null : suPerfil.getPretensionMoneda()));
+                    suPerfil == null ? null : suPerfil.getPretensionMoneda(),
+                    ponderadoDeLoRendido(perfilPorPostulacionParaPonderar.get(p.getId()),
+                            pruebaPorPostulacion.get(p.getId()), notaDelCurriculum,
+                            pesoDeLaEtapa)));
         }
 
         filas.sort(Comparator
@@ -667,7 +700,8 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
                     f.riesgosCriticos(), f.fortalezas(), f.alertas(), f.actualizadoEn(),
                     f.notasCriterio(),
                     f.ciudad(), f.ciudadCodigo(),
-                    f.pretensionMin(), f.pretensionMax(), f.pretensionMoneda()));
+                    f.pretensionMin(), f.pretensionMax(), f.pretensionMoneda(),
+                    f.ponderado()));
         }
 
         return new RankingVacante(vacanteId, vacante.getTitulo(),
@@ -754,6 +788,53 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
         return pesoTotal.compareTo(BigDecimal.ZERO) == 0
                 ? null
                 : suma.divide(pesoTotal, 2, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * Lo que el candidato lleva rendido, sobre 100.
+     *
+     * <p>El embudo pesa cuatro etapas y a estas alturas solo han ocurrido dos. Sumar sus dos
+     * notas y dividir entre 100 —como hace el cálculo de la decisión, que es correcto
+     * <b>ahí</b> porque cuenta con las cuatro— daría 70 puntos disfrazados de 100 y un
+     * candidato excelente parecería mediocre. Así que se divide entre la suma de ESOS dos
+     * pesos. Es el mismo patrón de {@link #notaCurriculum}: denominador variable, nunca 100
+     * fijo, y los pesos leídos de la versión de la vacante — en las que siguen en la v3 el
+     * reparto es 57.14/42.86 y un 70 escrito a mano daría el número equivocado.
+     *
+     * <p>La cifra se queda vacía si falta cualquiera de las dos notas. Reescalar sobre una
+     * sola etapa daría un número con la misma pinta que el de quien sí rindió las dos, y la
+     * tabla existe para compararlos entre sí.
+     *
+     * <p>No se guarda en ninguna parte y no toca la nota global de la decisión: es una vista
+     * de lo que ya está calculado, no una nota nueva (RF-139).
+     */
+    private Ponderado ponderadoDeLoRendido(NotaEtapa delPerfil, NotaEtapa deLaPrueba,
+                                           BigDecimal notaCv,
+                                           Map<String, BigDecimal> pesoDeLaEtapa) {
+        BigDecimal notaPerfil = delPerfil == null ? null : delPerfil.getPuntaje();
+        BigDecimal notaPrueba = deLaPrueba == null ? null : deLaPrueba.getPuntaje();
+        BigDecimal pesoPerfil = pesoDeLaEtapa.get(ETAPA);
+        BigDecimal pesoPrueba = pesoDeLaEtapa.get(ETAPA_TECNICA);
+
+        BigDecimal sobre100 = null;
+        /*
+          Una versión de pesos sin alguna de las dos etapas no es imposible: las hubo antes de
+          que la prueba existiera. Sin peso no hay con qué mezclar, y dividir entre cero sería
+          una excepción en mitad del ranking entero por una columna de adorno.
+
+          ⚠️ Los pesos se BUSCAN por su código, no se suman todos: `findByVersionPesosId` trae
+          las cuatro etapas y sumarlas daría 100, con lo que esto devolvería la nota global de
+          dos cuartas partes —la misma trampa del «675 sobre 100» de la nota por criterio—.
+        */
+        if (notaPerfil != null && notaPrueba != null && pesoPerfil != null && pesoPrueba != null) {
+            BigDecimal pesoTotal = pesoPerfil.add(pesoPrueba);
+            if (pesoTotal.compareTo(BigDecimal.ZERO) > 0) {
+                sobre100 = notaPerfil.multiply(pesoPerfil)
+                        .add(notaPrueba.multiply(pesoPrueba))
+                        .divide(pesoTotal, 2, RoundingMode.HALF_UP);
+            }
+        }
+        return new Ponderado(sobre100, notaCv, notaPerfil, notaPrueba);
     }
 
     /**
