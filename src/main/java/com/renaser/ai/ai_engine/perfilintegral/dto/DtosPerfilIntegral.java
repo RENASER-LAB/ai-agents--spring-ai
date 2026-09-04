@@ -146,6 +146,41 @@ public final class DtosPerfilIntegral {
             List<FilaRanking> filas) {}
 
     /**
+     * Lo que el candidato lleva rendido, sobre 100.
+     *
+     * <p>El embudo son cuatro etapas y solo dos han ocurrido a estas alturas: el Perfil
+     * Integral —que por dentro es el currículum y el banco de preguntas— y la prueba del
+     * puesto. Juntas no llegan a 100 —en la v4 son 70—, así que la cifra se reescala entre
+     * la suma de ESOS dos pesos y no entre 100. Sirve para comparar candidatos entre sí
+     * antes de que exista la nota global; no la sustituye ni se guarda en ninguna parte.
+     *
+     * <p>{@code sobre100} viene vacío mientras falte cualquiera de las dos notas: media
+     * cifra reescalada parece comparable con la de otro candidato y no lo es. Las partes
+     * del desglose se pueden quedar vacías por su cuenta sin que eso anule el total.
+     *
+     * <p><b>El desglose no trae la nota del banco de preguntas suelta, y no es un olvido.</b>
+     * No se guarda en ninguna parte: lo que se guarda es la mezcla ya hecha con el
+     * currículum. Despejarla restando parece fácil y da un número falso en dos casos
+     * reales —quien no tiene evaluación asignada, cuyo Perfil Integral ES su nota de
+     * currículum, y las vacantes que califica {@code CalificacionCriterios}, que escriben
+     * ahí un índice de pilares que no es CV + banco—. Así que se enseña el Perfil Integral
+     * entero, que es exacto.
+     *
+     * <p>El desglose enseña de dónde sale la cifra, no permite recalcularla: los pesos con
+     * que se mezclan no viajan aquí y cambian por vacante.
+     *
+     * @param sobre100 la cifra reescalada; vacía si falta alguna de las dos notas de etapa
+     * @param cv       la nota del currículum, tal como se calcula para el ranking
+     * @param perfil   la nota del Perfil Integral, que ya incluye la del banco
+     * @param prueba   la nota de la prueba del puesto
+     */
+    public record Ponderado(
+            BigDecimal sobre100,
+            BigDecimal cv,
+            BigDecimal perfil,
+            BigDecimal prueba) {}
+
+    /**
      * Un candidato en la tanda. Los números pueden venir vacíos y eso es información: la
      * IA todavía no llegó a esa fila, o falló y no se le inventó una nota.
      */
@@ -187,7 +222,11 @@ public final class DtosPerfilIntegral {
             // todo el mundo, pesaría en la decisión, que es justo lo que se evita.
             BigDecimal pretensionMin,
             BigDecimal pretensionMax,
-            String pretensionMoneda) {}
+            String pretensionMoneda,
+            // Lo ya rendido sobre 100. Es un objeto y no cuatro cifras sueltas a propósito:
+            // este record se copia campo a campo al numerar las filas, y cuatro BigDecimal
+            // vecinos son cuatro ocasiones de intercambiar dos sin que el compilador chiste.
+            Ponderado ponderado) {}
 
     // ============ El desglose de la evaluación del banco ============
 

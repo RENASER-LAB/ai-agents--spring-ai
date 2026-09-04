@@ -5,6 +5,7 @@ import com.renaser.ai.ai_engine.perfilintegral.dto.DtosExcelRanking.ExcelDeRanki
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosExcelRanking.PedidoExcelRanking;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.DatosCandidato;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.FilaRanking;
+import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.Ponderado;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.NotaCriterioResponse;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.RankingVacante;
 import com.renaser.ai.ai_engine.perfilintegral.service.ServicioPerfilIntegralPanel;
@@ -205,6 +206,70 @@ class ServicioExcelRankingImplTest {
     // ========================================================================
     // El cuestionario técnico y el permiso de la rúbrica
     // ========================================================================
+
+    @Test
+    @DisplayName("el Resumen de la prueba cierra con el ponderado y su desglose")
+    void elResumenDeLaPruebaTraeElPonderado() {
+        when(tandas.ranking(any(), eq(13L), eq("PRUEBA_PUESTO"))).thenReturn(tanda(
+                deLaPrueba(427L, "Ana Quispe", nota("90"))));
+        when(notasDeLaPrueba.verNotas(any(), eq(427L)))
+                .thenReturn(List.of(deRubrica("Comprensión", 9.0, 10.0)));
+
+        byte[] libro = servicio.generar(quien("ver_embudo", "abrir_ficha_candidato"), 13L,
+                new PedidoExcelRanking("PRUEBA_PUESTO", List.of(427L), null)).contenido();
+
+        // Las tres van DESPUÉS de las columnas de siempre —la última era «Nota /100», la 6—,
+        // y no intercaladas: así ninguna columna vieja se mueve de sitio.
+        assertThat(celda(libro, "Resumen", 0, 7)).isEqualTo("Currículum /100");
+        assertThat(celda(libro, "Resumen", 0, 8)).isEqualTo("Perfil integral /100");
+        assertThat(celda(libro, "Resumen", 0, 9)).isEqualTo("Ponderado /100");
+        assertThat(celda(libro, "Resumen", 1, 7)).isEqualTo("76.5");
+        assertThat(celda(libro, "Resumen", 1, 8)).isEqualTo("82");
+        assertThat(celda(libro, "Resumen", 1, 9)).isEqualTo("78.14");
+    }
+
+    /**
+     * La hoja del perfil integral NO lleva el ponderado.
+     *
+     * <p>Es la misma decisión que en pantalla, donde la columna tampoco sale en esa pestaña:
+     * ahí la prueba todavía no puede existir para casi nadie. Esconderlo en la mesa y
+     * exportarlo en el archivo serían dos decisiones opuestas sobre la misma cifra.
+     */
+    @Test
+    @DisplayName("el Resumen del perfil integral no lleva el ponderado")
+    void elResumenDelPerfilNoLlevaElPonderado() {
+        when(tandas.ranking(any(), eq(13L), eq("PERFIL_INTEGRAL"))).thenReturn(tanda(
+                delPerfil(427L, "Ana Quispe", nota("90"))));
+
+        byte[] libro = servicio.generar(quien("ver_embudo", "abrir_ficha_candidato"), 13L,
+                new PedidoExcelRanking("PERFIL_INTEGRAL", List.of(427L), null)).contenido();
+
+        // La última sigue siendo Fortalezas, la 16: ninguna columna nueva detrás.
+        assertThat(celda(libro, "Resumen", 0, 16)).isEqualTo("Fortalezas");
+        assertThat(celda(libro, "Resumen", 0, 17)).isEmpty();
+    }
+
+    /**
+     * Sin ponderado la celda dice por qué, como cualquier otra nota de estas hojas.
+     *
+     * <p>En blanco se leería como un cero, y un cero es un juicio que aquí nadie ha emitido:
+     * lo que pasa es que a esa persona le falta una de las dos etapas.
+     */
+    @Test
+    @DisplayName("sin ponderado la celda no se queda en blanco")
+    void sinPonderadoLaCeldaLoDice() {
+        when(tandas.ranking(any(), eq(13L), eq("PRUEBA_PUESTO"))).thenReturn(tanda(
+                sinPonderado(deLaPrueba(427L, "Ana Quispe", nota("90")))));
+        when(notasDeLaPrueba.verNotas(any(), eq(427L)))
+                .thenReturn(List.of(deRubrica("Comprensión", 9.0, 10.0)));
+
+        byte[] libro = servicio.generar(quien("ver_embudo", "abrir_ficha_candidato"), 13L,
+                new PedidoExcelRanking("PRUEBA_PUESTO", List.of(427L), null)).contenido();
+
+        // Y NO «rúbrica incompleta»: la rúbrica puede estar entera y aun así faltar la
+        // nota de una etapa, que es lo que de verdad falta aquí.
+        assertThat(celda(libro, "Resumen", 1, 9)).isEqualTo("falta una nota de etapa");
+    }
 
     @Test
     @DisplayName("sin rúbrica —el cuestionario técnico— el Detalle lo dice en una fila")
@@ -454,7 +519,11 @@ class ServicioExcelRankingImplTest {
                 "A", notaEtapa, notaEtapa, new BigDecimal("70"), new BigDecimal("65"),
                 new BigDecimal("60"), new BigDecimal("75"), "Un resumen corto", 0, 2, 1,
                 Instant.parse("2026-08-30T10:00:00Z"), notas,
-                "Lima — Lima", "1501", null, null, null);
+                "Lima — Lima", "1501", null, null, null,
+                // Con valores distintos entre sí a propósito: cuatro cifras iguales dejarían
+                // pasar que la hoja las escribiera en el orden equivocado.
+                new Ponderado(new BigDecimal("78.14"), new BigDecimal("76.50"),
+                        new BigDecimal("82.00"), new BigDecimal("73.00")));
     }
 
     /**
@@ -480,7 +549,8 @@ class ServicioExcelRankingImplTest {
                 f.datos(), f.grupoPrioridad(), f.notaEtapa(), f.notaCurriculum(), f.adecuacion(),
                 f.potencial(), f.altoRendimiento(), f.confianzaEvidencia(), f.resumen(),
                 f.riesgosCriticos(), f.fortalezas(), f.alertas(), f.actualizadoEn(),
-                f.notasCriterio(), f.ciudad(), f.ciudadCodigo(), min, max, moneda);
+                f.notasCriterio(), f.ciudad(), f.ciudadCodigo(), min, max, moneda,
+                f.ponderado());
     }
 
     // ---- Leer el libro que se acaba de escribir ----
@@ -567,6 +637,17 @@ class ServicioExcelRankingImplTest {
         assertThat(celda(libro, "Resumen", 1, 16)).isEqualTo("2");
     }
 
+    /** La misma fila para quien todavía no tiene las dos notas que se mezclan. */
+    private static FilaRanking sinPonderado(FilaRanking f) {
+        return new FilaRanking(f.puesto(), f.postulacionId(), f.uuid(), f.candidato(), f.correo(),
+                f.estado(), f.estadoNombre(), f.estadoCalificacion(), f.pasada(), f.archivoNombre(),
+                f.datos(), f.grupoPrioridad(), f.notaEtapa(), f.notaCurriculum(), f.adecuacion(),
+                f.potencial(), f.altoRendimiento(), f.confianzaEvidencia(), f.resumen(),
+                f.riesgosCriticos(), f.fortalezas(), f.alertas(), f.actualizadoEn(),
+                f.notasCriterio(), f.ciudad(), f.ciudadCodigo(), f.pretensionMin(),
+                f.pretensionMax(), f.pretensionMoneda(), null);
+    }
+
     /** La misma fila, pero como la deja el ranking cuando la IA aún no la ha mirado. */
     private static FilaRanking sinRetrato(FilaRanking f) {
         return new FilaRanking(f.puesto(), f.postulacionId(), f.uuid(), f.candidato(), f.correo(),
@@ -575,6 +656,8 @@ class ServicioExcelRankingImplTest {
                 null, f.altoRendimiento(), f.confianzaEvidencia(), null,
                 0, 0, 0, f.actualizadoEn(),
                 f.notasCriterio(), f.ciudad(), f.ciudadCodigo(), f.pretensionMin(),
-                f.pretensionMax(), f.pretensionMoneda());
+                // El ponderado NO es parte del retrato: sale de las notas de etapa, no de lo
+                // que la IA dibuja del currículum, y sigue estando cuando el retrato falta.
+                f.pretensionMax(), f.pretensionMoneda(), f.ponderado());
     }
 }

@@ -1097,6 +1097,14 @@ puede tener sus propias plantillas y criterios **sin modificar el original**.
 **RF-154** El aislamiento de datos por organización es una **regla de seguridad desde la primera
 versión**, no una función que se añade después.
 
+**RF-155** El ranking de la prueba del puesto enseña, en una columna, el **ponderado de lo que el
+candidato lleva rendido**: el Perfil Integral —currículum y banco de preguntas— y la prueba,
+reescalados **sobre la suma de sus pesos**. Existe porque hasta que las cuatro etapas terminan no
+hay ninguna cifra que compare la tanda, y el equipo decide a quién seguir mucho antes de eso. **No
+es la Puntuación Global**: no se guarda, no se compara con los umbrales del semáforo y no mueve a
+nadie de estado. Si falta cualquiera de las dos notas, no hay cifra —media cuenta no es una
+cuenta—. Va también al Excel del ranking, con su desglose.
+
 ---
 
 # Qué cambia sin programar

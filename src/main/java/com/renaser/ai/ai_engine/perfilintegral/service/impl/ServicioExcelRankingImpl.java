@@ -5,6 +5,7 @@ import com.renaser.ai.ai_engine.perfilintegral.dto.DtosExcelRanking.ExcelDeRanki
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosExcelRanking.PedidoExcelRanking;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.DatosCandidato;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.FilaRanking;
+import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.Ponderado;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.NotaCriterioResponse;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.RankingVacante;
 import com.renaser.ai.ai_engine.perfilintegral.service.ServicioExcelRanking;
@@ -74,6 +75,9 @@ public class ServicioExcelRankingImpl implements ServicioExcelRanking {
      * juicio que nadie ha hecho, y un blanco en una columna de números se lee como un cero.
      */
     private static final String SIN_NOTA = "rúbrica incompleta";
+
+    /** Lo que falta aquí es una nota de etapa, no una rúbrica. */
+    private static final String SIN_ETAPA = "falta una nota de etapa";
 
     /**
      * El permiso que pide leer la rúbrica de la prueba, criterio a criterio.
@@ -247,6 +251,14 @@ public class ServicioExcelRankingImpl implements ServicioExcelRanking {
             numero(f, c++, hayRetrato ? fila.riesgosCriticos() : null, pinceles);
             numero(f, c++, hayRetrato ? fila.alertas() : null, pinceles);
             largo(f, c++, fila.resumen(), pinceles);
+            /*
+              ⚠️ **El ponderado NO sale en esta hoja, y es la misma razón por la que la
+              columna no sale en la pestaña del perfil**: ahí la mitad de la cuenta —la
+              prueba— todavía no puede existir para nadie, y en la hoja se llenaría de
+              huecos para la mayoría de la etapa más temprana del embudo. Esconderlo en
+              pantalla por no significar nada y exportarlo igual en el archivo serían dos
+              decisiones opuestas sobre la misma cifra.
+            */
             numero(f, c, hayRetrato ? fila.fortalezas() : null, pinceles);
             numero++;
         }
@@ -297,8 +309,12 @@ public class ServicioExcelRankingImpl implements ServicioExcelRanking {
                                    boolean vePretension) {
         encabezar(hoja, pinceles,
                 List.of("#", "Candidato", "Correo", "Teléfono", "Ciudad",
-                        cabeceraDePretension(vePretension), "Nota /100"),
-                new int[]{5, 34, 38, 15, 26, 24, 11});
+                        cabeceraDePretension(vePretension), "Nota /100",
+                        // Sin repetir la prueba: en esta hoja «Nota /100» ya ES esa cifra, y
+                        // dos columnas con el mismo número y distinto nombre harían dudar de
+                        // cuál es cuál.
+                        "Currículum /100", "Perfil integral /100", "Ponderado /100"),
+                new int[]{5, 34, 38, 15, 26, 24, 11, 16, 21, 16});
 
         int numero = 1;
         for (FilaRanking fila : filas) {
@@ -312,7 +328,8 @@ public class ServicioExcelRankingImpl implements ServicioExcelRanking {
             texto(f, c++, telefonoDelCv(fila), pinceles);
             texto(f, c++, fila.ciudad(), pinceles);
             texto(f, c++, pretension(fila), pinceles);
-            nota(f, c, fila.notaEtapa(), pinceles);
+            nota(f, c++, fila.notaEtapa(), pinceles);
+            ponderado(f, c, fila, pinceles);
             numero++;
         }
     }
@@ -530,6 +547,47 @@ public class ServicioExcelRankingImpl implements ServicioExcelRanking {
             celda.setCellValue(SIN_NOTA);
         } else {
             celda.setCellValue(valor);
+        }
+        celda.setCellStyle(pinceles.normal);
+    }
+
+    /**
+     * Lo ya rendido: currículum, perfil integral, prueba, y el ponderado de los tres.
+     *
+     * <p>Se escriben juntas y en este orden en las dos hojas de Resumen, con una diferencia:
+     * cada hoja se salta la cifra que su propia columna «Nota» ya enseña, para no poner dos
+     * veces el mismo número con dos nombres distintos.
+     *
+     * <p><b>No hay columna del banco de preguntas</b>, y no es un olvido: esa nota no se
+     * guarda suelta en ninguna parte —lo guardado es su mezcla con el currículum— y
+     * despejarla restando da un número falso en dos casos reales. El Perfil Integral, que sí
+     * es exacto, ya la contiene.
+     *
+     * <p>Las cuatro pasan por {@link #nota}, así que una que falte dice por qué falta en vez
+     * de quedarse en blanco — igual que cualquier otra nota de estas hojas.
+     */
+    private void ponderado(Row fila, int columna, FilaRanking datos, Pinceles pinceles) {
+        Ponderado suyo = datos.ponderado();
+        int c = columna;
+        cifraOMotivo(fila, c++, suyo == null ? null : suyo.cv(), pinceles);
+        cifraOMotivo(fila, c++, suyo == null ? null : suyo.perfil(), pinceles);
+        cifraOMotivo(fila, c, suyo == null ? null : suyo.sobre100(), pinceles);
+    }
+
+    /**
+     * Una de estas tres cifras, o por qué no está — que <b>no</b> es «rúbrica incompleta».
+     *
+     * <p>Ese es el motivo de las notas de criterio y aquí sería mentira: la rúbrica puede
+     * estar entera y aun así no haber cifra, porque lo que falta es una nota de <b>etapa</b>.
+     * La pantalla, en la misma situación, se toma el trabajo de decir cuál de las dos falta;
+     * la hoja al menos no puede decir algo que no es.
+     */
+    private void cifraOMotivo(Row fila, int columna, BigDecimal valor, Pinceles pinceles) {
+        Cell celda = fila.createCell(columna);
+        if (valor == null) {
+            celda.setCellValue(SIN_ETAPA);
+        } else {
+            celda.setCellValue(valor.doubleValue());
         }
         celda.setCellStyle(pinceles.normal);
     }

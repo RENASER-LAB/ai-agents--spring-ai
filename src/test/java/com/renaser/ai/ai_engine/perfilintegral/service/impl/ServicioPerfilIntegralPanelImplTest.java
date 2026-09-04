@@ -133,6 +133,7 @@ class ServicioPerfilIntegralPanelImplTest {
     @Mock private com.renaser.ai.ai_engine.perfil.repository.UbigeoRepository ubigeos;
     @Mock private com.renaser.ai.ai_engine.perfil.repository.PerfilCandidatoRepository perfilesCandidato;
     @Mock private com.renaser.ai.ai_engine.prueba.repository.IntentoPruebaRepository intentos;
+    @Mock private com.renaser.ai.ai_engine.pesos.repository.PesoEtapaRepository pesosEtapa;
 
     @InjectMocks
     private ServicioPerfilIntegralPanelImpl servicio;
@@ -185,6 +186,180 @@ class ServicioPerfilIntegralPanelImplTest {
         assertThat(filas.get(0).notaEtapa()).isEqualByComparingTo("95");
         // Quien no rindio la prueba no hereda su nota de la preseleccion: va sin nota.
         assertThat(filas.get(1).notaEtapa()).isNull();
+    }
+
+    // ============ El ponderado de lo ya rendido ============
+
+    /**
+     * El ponderado de lo ya rendido: las dos etapas que existen, reescaladas sobre 100.
+     *
+     * <p>Estas pruebas existen porque la cifra es facil de calcular mal de tres formas
+     * distintas, y las tres dan un numero con pinta de correcto: dividir entre 100 —que
+     * devuelve 70 puntos disfrazados—, dividir entre un 70 escrito a mano —que falla en las
+     * vacantes de la v3— y sumar los pesos de las cuatro etapas en vez de buscar los dos que
+     * hacen falta.
+     */
+    @Test
+    void elPonderadoMezclaLasDosEtapasSobreLaSumaDeSusPesos() {
+        candidatos(candidato(1L, "ALTA", "82"));
+        pesosDeEtapa("PERFIL_INTEGRAL", "40", "PRUEBA_PUESTO", "30");
+        notaDeLaPrueba(1L, "73");
+
+        List<FilaRanking> filas = servicio.ranking(quien, VACANTE, "PRUEBA_PUESTO").filas();
+
+        // (82 x 40 + 73 x 30) / 70 = 78.14, no (82 x 40 + 73 x 30) / 100 = 54.70.
+        assertThat(filas.get(0).ponderado().sobre100()).isEqualByComparingTo("78.14");
+    }
+
+    /**
+     * El divisor sale de los pesos de la vacante, no de un 70 escrito a mano.
+     *
+     * <p>Con las mismas dos notas y otro reparto tiene que dar otro numero. Si diera el mismo
+     * seria que el 70 esta en el codigo, y las vacantes que siguen en versiones viejas
+     * saldrian con una cifra que no es la suya.
+     */
+    @Test
+    void elPonderadoCambiaSiLaVacanteReparteLosPesosDeOtraForma() {
+        candidatos(candidato(1L, "ALTA", "82"));
+        pesosDeEtapa("PERFIL_INTEGRAL", "40", "PRUEBA_PUESTO", "20");
+        notaDeLaPrueba(1L, "73");
+
+        List<FilaRanking> filas = servicio.ranking(quien, VACANTE, "PRUEBA_PUESTO").filas();
+
+        // (82 x 40 + 73 x 20) / 60 = 79.00, distinto del 78.14 del reparto 40/30.
+        assertThat(filas.get(0).ponderado().sobre100()).isEqualByComparingTo("79.00");
+    }
+
+    /** El desglose trae las tres notas que hay detras de la cifra. */
+    @Test
+    void elDesgloseTraeElCurriculumYLasDosEtapas() {
+        candidatos(candidato(1L, "ALTA", "82"));
+        pesosDeEtapa("PERFIL_INTEGRAL", "40", "PRUEBA_PUESTO", "30");
+        notaDeLaPrueba(1L, "73");
+        pesos(peso(11L, "100"));
+        notasDeLaTanda.add(nota(1L, 11L, "76.50"));
+
+        FilaRanking fila = servicio.ranking(quien, VACANTE, "PRUEBA_PUESTO").filas().get(0);
+
+        assertThat(fila.ponderado().cv()).isEqualByComparingTo("76.50");
+        assertThat(fila.ponderado().perfil()).isEqualByComparingTo("82");
+        assertThat(fila.ponderado().prueba()).isEqualByComparingTo("73");
+    }
+
+    /**
+     * Con una sola de las dos notas no hay ponderado, y eso es la respuesta correcta.
+     *
+     * <p>Reescalar sobre una etapa devuelve esa misma nota, y en la tabla se leeria como «ya
+     * tiene su ponderado» junto al de quien si rindio las dos. Media cuenta no es una cuenta.
+     */
+    @Test
+    void sinLaNotaDeLaPruebaNoHayPonderado() {
+        candidatos(candidato(1L, "ALTA", "82"));
+        pesosDeEtapa("PERFIL_INTEGRAL", "40", "PRUEBA_PUESTO", "30");
+
+        FilaRanking fila = servicio.ranking(quien, VACANTE, "PRUEBA_PUESTO").filas().get(0);
+
+        assertThat(fila.ponderado().sobre100()).isNull();
+        // El desglose si trae lo que hay: lo que falta es la mezcla, no la mitad que existe.
+        assertThat(fila.ponderado().perfil()).isEqualByComparingTo("82");
+        assertThat(fila.ponderado().prueba()).isNull();
+    }
+
+    /**
+     * Una version de pesos sin la prueba no revienta el ranking entero.
+     *
+     * <p>Las hubo antes de que la prueba existiera, y siguen atadas a las notas de entonces.
+     * Sin su peso no hay con que mezclar: la cifra falta, pero la pantalla se pinta.
+     */
+    @Test
+    void sinPesoDeLaPruebaNoHayPonderadoYTampocoExcepcion() {
+        candidatos(candidato(1L, "ALTA", "82"));
+        pesosDeEtapa("PERFIL_INTEGRAL", "100");
+        notaDeLaPrueba(1L, "73");
+
+        FilaRanking fila = servicio.ranking(quien, VACANTE, "PRUEBA_PUESTO").filas().get(0);
+
+        assertThat(fila.ponderado().sobre100()).isNull();
+    }
+
+    /**
+     * Con una de las dos etapas a peso 0 tampoco hay cifra.
+     *
+     * <p>Un reparto 70/0/15/15 suma 100 y se publicaría sin que nadie lo impidiera, y la
+     * cuenta daría la nota del perfil tal cual bajo una cabecera que promete mezclar dos
+     * cosas. Comprobar solo que la SUMA de los pesos no es cero no basta.
+     */
+    @Test
+    void conUnaEtapaAPesoCeroNoHayPonderado() {
+        candidatos(candidato(1L, "ALTA", "82"));
+        pesosDeEtapa("PERFIL_INTEGRAL", "70", "PRUEBA_PUESTO", "0");
+        notaDeLaPrueba(1L, "73");
+
+        FilaRanking fila = servicio.ranking(quien, VACANTE, "PRUEBA_PUESTO").filas().get(0);
+
+        assertThat(fila.ponderado().sobre100()).isNull();
+    }
+
+    /**
+     * Fuera de la pestaña de la prueba no se consulta nada para el ponderado.
+     *
+     * <p>La cifra solo se pinta ahí y solo esa hoja de Excel la lleva: pedir sus notas y sus
+     * pesos en las otras cuatro pestañas era trabajo tirado en cada apertura del ranking.
+     */
+    @Test
+    void fueraDeLaPruebaElPonderadoNiSeConsulta() {
+        candidatos(candidato(1L, "ALTA", "82"));
+
+        FilaRanking fila = servicio.ranking(quien, VACANTE).filas().get(0);
+
+        assertThat(fila.ponderado().sobre100()).isNull();
+        verifyNoInteractions(pesosEtapa);
+        verify(notasEtapa, times(1))
+                .findByPostulacionIdInAndEtapaCodigo(anyList(), org.mockito.ArgumentMatchers.anyString());
+    }
+
+    /**
+     * El ponderado sobrevive al numerado de las filas.
+     *
+     * <p>Es la unica prueba que caza el fallo mas facil de este cambio: el ranking construye
+     * cada fila, la ordena y despues la RECONSTRUYE campo a campo para ponerle su puesto.
+     * Olvidar el campo en esa segunda copia compila, no rompe ninguna otra prueba, y deja el
+     * cien por cien de las filas sin cifra mientras la primera construccion se ve perfecta.
+     */
+    @Test
+    void elPonderadoSobreviveAlNumeradoDeLasFilas() {
+        candidatos(candidato(1L, "ALTA", "82"), candidato(2L, "ALTA", "60"));
+        pesosDeEtapa("PERFIL_INTEGRAL", "40", "PRUEBA_PUESTO", "30");
+        notaDeLaPrueba(1L, "73");
+        notaDeLaPrueba(2L, "95");
+
+        List<FilaRanking> filas = servicio.ranking(quien, VACANTE, "PRUEBA_PUESTO").filas();
+
+        // Quien bordo la prueba va primero, y su cifra viaja con el.
+        assertThat(filas.get(0).puesto()).isEqualTo(1);
+        assertThat(filas.get(0).ponderado().sobre100()).isEqualByComparingTo("75.00");
+        assertThat(filas.get(1).ponderado().sobre100()).isEqualByComparingTo("78.14");
+    }
+
+    /**
+     * Los pesos se piden UNA vez para la tanda, no una vez por candidato.
+     *
+     * <p>Con cien postulantes, una consulta por fila son cien consultas para pintar la
+     * pantalla que existe justamente para mirar la tanda de una vez. Todo este bloque del
+     * servicio se escribio para eso y esta prueba es la que impide deshacerlo sin querer.
+     */
+    @Test
+    void elPonderadoNoPideNadaPorFila() {
+        candidatos(candidato(1L, "ALTA", "82"), candidato(2L, "ALTA", "60"),
+                candidato(3L, "MEDIA", "44"));
+        pesosDeEtapa("PERFIL_INTEGRAL", "40", "PRUEBA_PUESTO", "30");
+
+        servicio.ranking(quien, VACANTE, "PRUEBA_PUESTO");
+
+        verify(pesosEtapa, times(1)).findByVersionPesosId(2L);
+        // Dos: la de la etapa que se mira y la de la otra. Nunca dos por candidato.
+        verify(notasEtapa, times(2))
+                .findByPostulacionIdInAndEtapaCodigo(anyList(), org.mockito.ArgumentMatchers.anyString());
     }
 
     /**
@@ -801,6 +976,35 @@ class ServicioPerfilIntegralPanelImplTest {
     }
 
     /** Deja la vacante con estos candidatos y sus notas ya preparadas. */
+    /**
+     * Los pesos de etapa de la version de la vacante, en pares codigo/peso.
+     *
+     * <p>Abre ademas la pestaña de la prueba en el catalogo: el ranking valida que la etapa
+     * pedida exista antes de mirar nada, y sin eso los siete tests del ponderado mueren en
+     * la primera linea con un mensaje que no habla de pesos.
+     */
+    private void pesosDeEtapa(String... codigoYPeso) {
+        lenient().when(etapasCatalogo.existsById("PRUEBA_PUESTO")).thenReturn(true);
+        List<com.renaser.ai.ai_engine.pesos.entity.PesoEtapa> lista = new ArrayList<>();
+        for (int i = 0; i < codigoYPeso.length; i += 2) {
+            lista.add(com.renaser.ai.ai_engine.pesos.entity.PesoEtapa.builder()
+                    .versionPesosId(2L).etapaCodigo(codigoYPeso[i])
+                    .peso(new BigDecimal(codigoYPeso[i + 1])).build());
+        }
+        when(pesosEtapa.findByVersionPesosId(2L)).thenReturn(lista);
+    }
+
+    /** Le pone nota de la prueba del puesto, que es la otra mitad del ponderado. */
+    private void notaDeLaPrueba(Long postulacionId, String puntaje) {
+        notasDeLaPrueba.add(NotaEtapa.builder()
+                .postulacionId(postulacionId).etapaCodigo("PRUEBA_PUESTO")
+                .puntaje(new BigDecimal(puntaje)).build());
+        lenient().when(notasEtapa.findByPostulacionIdInAndEtapaCodigo(anyList(), eq("PRUEBA_PUESTO")))
+                .thenReturn(notasDeLaPrueba);
+    }
+
+    private final List<NotaEtapa> notasDeLaPrueba = new ArrayList<>();
+
     private void candidatos(Postulacion... losSuyos) {
         List<Postulacion> lista = new ArrayList<>(List.of(losSuyos));
         when(postulaciones.findByVacanteIdOrderByCreadoEnDesc(VACANTE)).thenReturn(lista);

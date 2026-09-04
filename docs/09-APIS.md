@@ -189,8 +189,8 @@ del área— se ven solo las propias, y una ajena responde 404.
 |---|---|---|
 | GET `/bandeja?espera_a=` | La bandeja: todo lo que espera a `CANDIDATO`, `SISTEMA`, `TALENTO` o `AREA` | `ver_candidatos` |
 | GET `/vacantes/{id}/embudo` | Cuántas postulaciones hay en cada estado | `ver_embudo` |
-| GET `/vacantes/{id}/ranking?etapa=` | La tanda ordenada de más apto a menos, con las ocho notas del currículum de cada uno. **Incluye a quien todavía no tiene nota**. Sin `etapa` ordena por la del Perfil Integral; con ella, por la nota de esa etapa. Cada fila trae además **dónde vive** (`ciudad`, ya escrito «Departamento — Provincia», y `ciudadCodigo`) y **su pretensión salarial**, que solo viaja con `ver_pretension` | `ver_embudo` |
-| POST `/vacantes/{id}/ranking/excel` | La tanda seleccionada, en un `.xlsx` de dos hojas —Resumen y Detalle— que se descarga como adjunto. Se le pasan `etapa`, los `postulacionIds` **ya ordenados por quien llama** y `filtroDescrito`, la frase que se pintó encima de la tabla. Solo hay columnas para `PERFIL_INTEGRAL` y `PRUEBA_PUESTO`; otra etapa es un 400 | `ver_embudo` |
+| GET `/vacantes/{id}/ranking?etapa=` | La tanda ordenada de más apto a menos, con las ocho notas del currículum de cada uno. **Incluye a quien todavía no tiene nota**. Sin `etapa` ordena por la del Perfil Integral; con ella, por la nota de esa etapa. Cada fila trae además **dónde vive** (`ciudad`, ya escrito «Departamento — Provincia», y `ciudadCodigo`), **su pretensión salarial**, que solo viaja con `ver_pretension`, y el **`ponderado`** de lo ya rendido (ver la nota de abajo) | `ver_embudo` |
+| POST `/vacantes/{id}/ranking/excel` | La tanda seleccionada, en un `.xlsx` de dos hojas —Resumen y Detalle— que se descarga como adjunto. Se le pasan `etapa`, los `postulacionIds` **ya ordenados por quien llama** y `filtroDescrito`, la frase que se pintó encima de la tabla. Solo hay columnas para `PERFIL_INTEGRAL` y `PRUEBA_PUESTO`; otra etapa es un 400. Las dos hojas de Resumen cierran con el **ponderado** y su desglose, cada una sin repetir la cifra que su propia columna «Nota» ya enseña | `ver_embudo` |
 | GET `/postulaciones/{id}` · `/historial` | La ficha completa y el recorrido | `abrir_ficha_candidato` |
 | POST `/postulaciones/{id}/transiciones` | Mover a cualquier estado. **El motivo es obligatorio, sin excepción** | `mover_postulacion` |
 | POST `/postulaciones/{id}/confirmacion-avance` | Confirmar que avanza: el sistema calcula el estado siguiente | `confirmar_avance` |
@@ -213,6 +213,29 @@ del área— se ven solo las propias, y una ajena responde 404.
 > Puntuación Global está calculada —sale en `/postulaciones/{id}/semaforo`—, pero nunca como lista
 > ordenada. Está apuntado como decisión 6 en [Alcance del MVP](08-ALCANCE-DEL-MVP.md), con lo que
 > habría que decidir antes de montarlo.
+>
+> **Lo que sí mezcla dos etapas es `ponderado`**, que cada fila trae desde el RF-155. Son el
+> Perfil Integral y la prueba del puesto —lo único que ha ocurrido a esas alturas del embudo—
+> reescalados sobre la suma de SUS pesos, no sobre 100: con el reparto de la v4 son 70 puntos
+> que se estiran a 100, y en una vacante que siga en la v3 el divisor es otro. Los pesos salen
+> de la versión de **la vacante**, nunca de un 70 escrito en el código.
+>
+> El objeto trae cuatro cifras: `sobre100` y el desglose `cv`, `perfil` y `prueba`, que son las
+> tres que hay detrás de la cifra —enseñan de dónde sale, no permiten recalcularla: los pesos no
+> viajan en la respuesta—. `sobre100` viene **vacío mientras falte cualquiera
+> de las dos notas de etapa** —reescalar sobre una sola devuelve esa misma nota, con pinta de ser
+> comparable con la de quien sí rindió las dos—, y también si la versión de pesos no trae alguna
+> de las dos etapas.
+>
+> **No hay nota del banco de preguntas suelta, y no es un olvido.** Esa nota no se guarda en
+> ninguna parte: lo guardado es su mezcla con el currículum, en `nota_etapa`. Despejarla restando
+> da un número falso en dos casos reales —quien no tiene evaluación asignada, cuyo Perfil Integral
+> **es** su nota de currículum, y las vacantes que califica `CalificacionCriterios`, que escriben
+> ahí un índice de pilares que no es CV + banco—. Por eso el desglose enseña el Perfil Integral
+> entero, que sí es exacto.
+>
+> ⚠️ **No es la Puntuación Global y no la sustituye.** No se persiste, no se compara con los
+> umbrales del semáforo y no mueve a nadie de estado: es una vista de lo que ya está calculado.
 
 > **Quién ordena y quién filtra el Excel: el cliente.** El volcado no filtra ni reordena nada. Le
 > llegan los `postulacionIds` en el orden en que se quieren las filas y los escribe en ese orden,
