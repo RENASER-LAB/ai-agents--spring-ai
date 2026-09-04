@@ -26,6 +26,7 @@ import com.renaser.ai.ai_engine.vacante.repository.VacanteRepository;
 import com.renaser.ai.ai_engine.vacante.service.AlcanceSobreLaVacante;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -56,6 +57,7 @@ import java.util.Map;
  * cinco opciones al decidir.
  */
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class ServicioDecisionImpl implements ServicioDecision {
 
@@ -200,6 +202,33 @@ public class ServicioDecisionImpl implements ServicioDecision {
         Map<String, NotaEtapa> notasPorEtapa = notasEtapa.findByPostulacionId(postulacion.getId()).stream()
                 .collect(java.util.stream.Collectors.toMap(NotaEtapa::getEtapaCodigo, java.util.function.Function.identity()));
 
+        /*
+          ⚠️ **Sin pesos de etapa no hay nota que calcular, y hay que decirlo aquí.**
+
+          El bucle de abajo suma etapa por etapa recorriendo los PESOS. Con la lista vacía no
+          itera ni una vez: la nota se queda en el cero con que empieza y `faltan` también se
+          queda vacío, o sea que el método concluye que no falta nada. Con nada pendiente
+          compara ese cero contra los umbrales y propone ROJO. Un candidato con todas sus
+          notas quedaba descartado con un cero que nadie calculó, y el motivo no aparecía por
+          ninguna parte: no es una excepción que alguien vea, es un descarte con pinta de
+          decisión fundada.
+
+          No es hipotético. Las dos versiones que sembró la V41 —«CAZATALENTOS · MICRO» y
+          «CAZATALENTOS · MEDIA/GRANDE»— solo trajeron `peso_dimension`; ninguna migración les
+          dio `peso_etapa`. Cualquier vacante apuntada a una de ellas caía aquí.
+
+          Sin pesos la respuesta correcta es la misma que cuando falta una nota: no se puede
+          calcular todavía. Y queda un error en el log, porque esto no lo arregla el candidato
+          rindiendo nada: lo arregla quien configure los pesos de esa vacante.
+        */
+        boolean sinPesos = pesos.isEmpty();
+        if (sinPesos) {
+            log.error("La vacante {} apunta a la versión de pesos {}, que no tiene ningún "
+                    + "peso_etapa: no se puede proponer semáforo para la postulación {}. "
+                    + "Hay que darle su reparto de etapas a esa versión.",
+                    vacante.getId(), vacante.getVersionPesosId(), postulacion.getId());
+        }
+
         List<String> faltan = new ArrayList<>();
         BigDecimal notaGlobal = BigDecimal.ZERO;
         for (PesoEtapa pe : pesos) {
@@ -222,7 +251,7 @@ public class ServicioDecisionImpl implements ServicioDecision {
                 .toList();
 
         String propuesta = null;
-        if (faltan.isEmpty()) {
+        if (faltan.isEmpty() && !sinPesos) {
             if (!confirmadas.isEmpty()) {
                 propuesta = "ROJO";
             } else {
@@ -239,7 +268,8 @@ public class ServicioDecisionImpl implements ServicioDecision {
         }
 
         Decision existente = decisiones.findByPostulacionId(postulacion.getId()).orElse(null);
-        return new SemaforoResponse(propuesta, faltan.isEmpty() ? notaGlobal.setScale(2, RoundingMode.HALF_UP) : null,
+        return new SemaforoResponse(propuesta,
+                faltan.isEmpty() && !sinPesos ? notaGlobal.setScale(2, RoundingMode.HALF_UP) : null,
                 faltan, barrerasResp,
                 existente == null ? null : existente.getDecididaPorUsuarioId(),
                 existente == null ? null : existente.getMotivo(),
