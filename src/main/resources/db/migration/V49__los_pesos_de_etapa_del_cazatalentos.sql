@@ -70,14 +70,26 @@ SELECT vp.id, c.componente, c.peso::numeric
       WHERE ya.version_pesos_id = vp.id AND ya.componente = c.componente);
 
 -- ============================================================================
--- Y se publican
+-- Se quedan en BORRADOR, y hace falta decir por qué
 -- ============================================================================
--- Nacieron en BORRADOR «hasta que el banco se publique» (V41). El banco ya está, y en
--- borrador no se les puede asignar una vacante: la ficha exige una versión publicada. Con
--- sus pesos completos ya son utilizables, y publicada además queda inmutable, que es la
--- garantía que permite reconstruir una decisión vieja (RF-139).
-UPDATE version_pesos
-   SET estado = 'PUBLICADA',
-       publicada_en = now()
- WHERE etiqueta IN ('CAZATALENTOS · MICRO', 'CAZATALENTOS · MEDIA/GRANDE')
-   AND estado = 'BORRADOR';
+-- La intención era publicarlas: nacieron en BORRADOR «hasta que el banco se publique», el
+-- banco ya está, y en borrador no se les puede asignar una vacante. Pero publicarlas aquí
+-- rompe el sistema entero, y los tests de integración lo cazaron:
+--
+--   `VersionPesosRepository.findFirstByOrganizacionIdAndEstadoOrderByPublicadaEnDesc` es «la
+--   versión publicada más reciente: la que rige una vacante nueva si nadie elige otra», y es
+--   también la que el copiador replica a cada empresa que se da de alta.
+--
+-- Publicadas hoy, estas dos pasan a ser las más recientes, y **cualquier vacante nueva
+-- heredaría 45/55 sin simulación ni validación** — un instrumento concreto convertido en el
+-- reparto por defecto de todo el mundo, en silencio. `FlujoPruebaIT` lo detectó: su vacante
+-- dejó de pesar las cuatro etapas y el semáforo dejó de avisar de las que faltaban.
+--
+-- El criterio «la última publicada» da por supuesto que todas las versiones publicadas son
+-- intercambiables, y con el cazatalentos deja de ser cierto: hay versiones que solo sirven
+-- para un instrumento. Eso es lo que hay que arreglar antes de publicar estas dos, y es un
+-- cambio de otro tamaño —toca cómo se elige la versión de una vacante nueva y de una empresa
+-- nueva—, así que no se cuela aquí.
+--
+-- Mientras tanto los pesos ya están, que era el hueco que dejaba a estas vacantes sin
+-- ponderado y sin semáforo. Publicarlas es el paso siguiente, con su propio cambio.

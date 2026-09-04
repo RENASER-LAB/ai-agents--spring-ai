@@ -260,6 +260,10 @@ enseñárselo.*
 > solo que faltara el combinado — la Puntuación Global de la Decisión, que suma recorriendo esos
 > pesos, devolvía **cero** y proponía descartar a todo el mundo.
 >
+> ⚠️ **Siguen en BORRADOR.** Publicarlas las convertiría en «la última versión publicada», que
+> es la que hereda toda vacante nueva y la que se copia a cada empresa nueva: el reparto de un
+> instrumento concreto pasaría a regir a todo el mundo. Antes hay que arreglar ese criterio.
+>
 > ⚠️ **No se reescaló el 40/30 del embudo genérico.** Habría dado 57.14/42.86, que invierte el
 > criterio: ahí el perfil pesa más que la prueba, y aquí el cliente pidió lo contrario y escribió
 > el porqué, que es la frase de arriba.

@@ -118,7 +118,7 @@ Confirmado con un test antes de tocar nada.
 | | Qué |
 |---|---|
 | **PR #64** | Sin `peso_etapa` no hay semáforo ni nota, igual que cuando falta una nota, y queda un `log.error` con la vacante y la versión. |
-| **V49** | Les da su reparto: **45 / 55**, y las publica. |
+| **V49** | Les da su reparto: **45 / 55**. |
 
 ## De dónde salen el 45 y el 55
 
@@ -151,3 +151,27 @@ Migración aplicada sobre una base limpia, datos sembrados por la API y una vaca
 | Semáforo de la Decisión | ROJO · nota 0 | **AMBAR · nota 70.89** |
 
 `./mvnw test`: 1033 en verde.
+
+## Lo que NO se hizo, y por qué
+
+**Las dos versiones se quedan en BORRADOR.** La intención era publicarlas —en borrador no se les
+puede asignar una vacante— y los tests de integración lo impidieron con razón.
+
+`findFirstByOrganizacionIdAndEstadoOrderByPublicadaEnDesc` es «la versión publicada más reciente:
+la que rige una vacante nueva si nadie elige otra», y también la que el copiador replica a cada
+empresa nueva. Publicadas hoy, estas dos pasan a ser las más recientes: **cualquier vacante nueva
+heredaría 45/55 sin simulación ni validación**, en silencio. `FlujoPruebaIT` lo detectó al
+instante — su vacante dejó de pesar las cuatro etapas y el semáforo dejó de avisar de las que
+faltaban.
+
+El criterio «la última publicada» da por supuesto que todas las versiones publicadas son
+intercambiables, y con el cazatalentos deja de serlo: hay versiones que solo sirven para un
+instrumento. Arreglarlo toca cómo se elige la versión de una vacante nueva **y** de una empresa
+nueva, así que va en su propio cambio. Los pesos ya están, que era el hueco que dejaba a estas
+vacantes sin ponderado y sin semáforo; publicarlas es el paso siguiente.
+
+## Nota de proceso
+
+`./mvnw test` no basta en este repositorio: el CI corre `verify`, que añade los 143 tests de
+integración, y son justo los que ven un efecto a distancia como este. El PR salió en rojo por
+haberlo comprobado solo con los unitarios.
