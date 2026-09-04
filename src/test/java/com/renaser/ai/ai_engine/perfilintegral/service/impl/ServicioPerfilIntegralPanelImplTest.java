@@ -230,7 +230,7 @@ class ServicioPerfilIntegralPanelImplTest {
         assertThat(filas.get(0).ponderado().sobre100()).isEqualByComparingTo("79.00");
     }
 
-    /** El desglose trae las tres cifras con que se rehace la cuenta a mano. */
+    /** El desglose trae las tres notas que hay detras de la cifra. */
     @Test
     void elDesgloseTraeElCurriculumYLasDosEtapas() {
         candidatos(candidato(1L, "ALTA", "82"));
@@ -280,6 +280,42 @@ class ServicioPerfilIntegralPanelImplTest {
         FilaRanking fila = servicio.ranking(quien, VACANTE, "PRUEBA_PUESTO").filas().get(0);
 
         assertThat(fila.ponderado().sobre100()).isNull();
+    }
+
+    /**
+     * Con una de las dos etapas a peso 0 tampoco hay cifra.
+     *
+     * <p>Un reparto 70/0/15/15 suma 100 y se publicaría sin que nadie lo impidiera, y la
+     * cuenta daría la nota del perfil tal cual bajo una cabecera que promete mezclar dos
+     * cosas. Comprobar solo que la SUMA de los pesos no es cero no basta.
+     */
+    @Test
+    void conUnaEtapaAPesoCeroNoHayPonderado() {
+        candidatos(candidato(1L, "ALTA", "82"));
+        pesosDeEtapa("PERFIL_INTEGRAL", "70", "PRUEBA_PUESTO", "0");
+        notaDeLaPrueba(1L, "73");
+
+        FilaRanking fila = servicio.ranking(quien, VACANTE, "PRUEBA_PUESTO").filas().get(0);
+
+        assertThat(fila.ponderado().sobre100()).isNull();
+    }
+
+    /**
+     * Fuera de la pestaña de la prueba no se consulta nada para el ponderado.
+     *
+     * <p>La cifra solo se pinta ahí y solo esa hoja de Excel la lleva: pedir sus notas y sus
+     * pesos en las otras cuatro pestañas era trabajo tirado en cada apertura del ranking.
+     */
+    @Test
+    void fueraDeLaPruebaElPonderadoNiSeConsulta() {
+        candidatos(candidato(1L, "ALTA", "82"));
+
+        FilaRanking fila = servicio.ranking(quien, VACANTE).filas().get(0);
+
+        assertThat(fila.ponderado().sobre100()).isNull();
+        verifyNoInteractions(pesosEtapa);
+        verify(notasEtapa, times(1))
+                .findByPostulacionIdInAndEtapaCodigo(anyList(), org.mockito.ArgumentMatchers.anyString());
     }
 
     /**

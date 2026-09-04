@@ -229,6 +229,27 @@ class ServicioExcelRankingImplTest {
     }
 
     /**
+     * La hoja del perfil integral NO lleva el ponderado.
+     *
+     * <p>Es la misma decisión que en pantalla, donde la columna tampoco sale en esa pestaña:
+     * ahí la prueba todavía no puede existir para casi nadie. Esconderlo en la mesa y
+     * exportarlo en el archivo serían dos decisiones opuestas sobre la misma cifra.
+     */
+    @Test
+    @DisplayName("el Resumen del perfil integral no lleva el ponderado")
+    void elResumenDelPerfilNoLlevaElPonderado() {
+        when(tandas.ranking(any(), eq(13L), eq("PERFIL_INTEGRAL"))).thenReturn(tanda(
+                delPerfil(427L, "Ana Quispe", nota("90"))));
+
+        byte[] libro = servicio.generar(quien("ver_embudo", "abrir_ficha_candidato"), 13L,
+                new PedidoExcelRanking("PERFIL_INTEGRAL", List.of(427L), null)).contenido();
+
+        // La última sigue siendo Fortalezas, la 16: ninguna columna nueva detrás.
+        assertThat(celda(libro, "Resumen", 0, 16)).isEqualTo("Fortalezas");
+        assertThat(celda(libro, "Resumen", 0, 17)).isEmpty();
+    }
+
+    /**
      * Sin ponderado la celda dice por qué, como cualquier otra nota de estas hojas.
      *
      * <p>En blanco se leería como un cero, y un cero es un juicio que aquí nadie ha emitido:
@@ -245,7 +266,9 @@ class ServicioExcelRankingImplTest {
         byte[] libro = servicio.generar(quien("ver_embudo", "abrir_ficha_candidato"), 13L,
                 new PedidoExcelRanking("PRUEBA_PUESTO", List.of(427L), null)).contenido();
 
-        assertThat(celda(libro, "Resumen", 1, 9)).isEqualTo("rúbrica incompleta");
+        // Y NO «rúbrica incompleta»: la rúbrica puede estar entera y aun así faltar la
+        // nota de una etapa, que es lo que de verdad falta aquí.
+        assertThat(celda(libro, "Resumen", 1, 9)).isEqualTo("falta una nota de etapa");
     }
 
     @Test

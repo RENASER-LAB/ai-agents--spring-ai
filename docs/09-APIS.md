@@ -221,7 +221,8 @@ del área— se ven solo las propias, y una ajena responde 404.
 > de la versión de **la vacante**, nunca de un 70 escrito en el código.
 >
 > El objeto trae cuatro cifras: `sobre100` y el desglose `cv`, `perfil` y `prueba`, que son las
-> tres con las que la cuenta se rehace a mano. `sobre100` viene **vacío mientras falte cualquiera
+> tres que hay detrás de la cifra —enseñan de dónde sale, no permiten recalcularla: los pesos no
+> viajan en la respuesta—. `sobre100` viene **vacío mientras falte cualquiera
 > de las dos notas de etapa** —reescalar sobre una sola devuelve esa misma nota, con pinta de ser
 > comparable con la de quien sí rindió las dos—, y también si la versión de pesos no trae alguna
 > de las dos etapas.

@@ -27,7 +27,7 @@ código.
 - Solo en esa pestaña. En la del perfil, la mitad de la cuenta todavía no puede existir para nadie;
   en simulación y validación ya hay notas posteriores que la cifra ignoraría.
 - Ocupa una columna de cifra, ordenable y apagable. **El desglose vive en el título**: las tres
-  notas con las que se rehace la cuenta a mano.
+  notas que hay detrás de la cifra.
 - Sin alguna de las dos notas no hay cifra, sino un guion que dice **cuál falta**.
 - Va también al Excel del ranking, en las dos hojas de Resumen.
 

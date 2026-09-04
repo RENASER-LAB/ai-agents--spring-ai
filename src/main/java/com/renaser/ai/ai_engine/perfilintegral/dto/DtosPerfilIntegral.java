@@ -164,7 +164,10 @@ public final class DtosPerfilIntegral {
      * reales —quien no tiene evaluación asignada, cuyo Perfil Integral ES su nota de
      * currículum, y las vacantes que califica {@code CalificacionCriterios}, que escriben
      * ahí un índice de pilares que no es CV + banco—. Así que se enseña el Perfil Integral
-     * entero, que es exacto, y con estas tres cifras el ponderado se puede rehacer a mano.
+     * entero, que es exacto.
+     *
+     * <p>El desglose enseña de dónde sale la cifra, no permite recalcularla: los pesos con
+     * que se mezclan no viajan aquí y cambian por vacante.
      *
      * @param sobre100 la cifra reescalada; vacía si falta alguna de las dos notas de etapa
      * @param cv       la nota del currículum, tal como se calcula para el ranking

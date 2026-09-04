@@ -523,25 +523,23 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
         /*
           Las dos notas que entran en el ponderado, y los pesos con que se mezclan.
 
-          La de la pestaña que se está mirando ya está arriba, así que solo se pide la otra:
-          en «Prueba del puesto» falta la del perfil, en «Perfil integral» falta la de la
-          prueba, y en las otras tres pestañas faltan las dos. Son una o dos consultas para
-          la tanda entera —la misma regla que todo lo de este bloque—, nunca una por fila.
+          ⚠️ **Solo en la pestaña de la prueba**, que es la única donde la cifra se pinta.
+          Fuera de ahí no se consulta nada: eran tres consultas por petición para un dato que
+          nadie iba a leer.
+
+          La de la prueba ya está arriba —es la etapa que se está mirando—, así que se pide
+          UNA: la del perfil. Para la tanda entera, nunca una por fila; misma regla que todo
+          lo de este bloque.
+
+          Los pesos salen de la versión de LA VACANTE y no de la última publicada, por la
+          misma razón que los de criterio de más arriba: escribir 40 y 30 en el código daría
+          el número equivocado en las vacantes que siguen en la v3, con 57.14/42.86.
         */
-        Map<Long, NotaEtapa> perfilPorPostulacionParaPonderar = ETAPA.equals(etapa)
-                ? etapaPorPostulacion
+        Map<Long, NotaEtapa> perfilPorPostulacionParaPonderar = !laTecnica ? Map.of()
                 : porPostulacion(notasEtapa.findByPostulacionIdInAndEtapaCodigo(ids, ETAPA),
                         NotaEtapa::getPostulacionId);
-        Map<Long, NotaEtapa> pruebaPorPostulacion = ETAPA_TECNICA.equals(etapa)
-                ? etapaPorPostulacion
-                : porPostulacion(notasEtapa.findByPostulacionIdInAndEtapaCodigo(ids, ETAPA_TECNICA),
-                        NotaEtapa::getPostulacionId);
-        /*
-          Los pesos, de la versión de LA VACANTE y no de la última publicada, por la misma
-          razón que los de criterio de más arriba. Hardcodear 40 y 30 daría un número
-          equivocado en las vacantes que siguen en la v3, donde el reparto es 57.14/42.86.
-        */
-        Map<String, BigDecimal> pesoDeLaEtapa = pesosEtapa
+        Map<Long, NotaEtapa> pruebaPorPostulacion = laTecnica ? etapaPorPostulacion : Map.of();
+        Map<String, BigDecimal> pesoDeLaEtapa = !laTecnica ? Map.of() : pesosEtapa
                 .findByVersionPesosId(vacante.getVersionPesosId()).stream()
                 .collect(Collectors.toMap(PesoEtapa::getEtapaCodigo, PesoEtapa::getPeso, (a, b) -> a));
 
@@ -807,6 +805,9 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
      *
      * <p>No se guarda en ninguna parte y no toca la nota global de la decisión: es una vista
      * de lo que ya está calculado, no una nota nueva (RF-139).
+     *
+     * <p>Solo se calcula en la pestaña de la prueba del puesto, que es donde se pinta y la
+     * única hoja de Excel que lo lleva. En las otras cuatro viene vacío y no se consulta.
      */
     private Ponderado ponderadoDeLoRendido(NotaEtapa delPerfil, NotaEtapa deLaPrueba,
                                            BigDecimal notaCv,
@@ -818,21 +819,23 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
 
         BigDecimal sobre100 = null;
         /*
-          Una versión de pesos sin alguna de las dos etapas no es imposible: las hubo antes de
-          que la prueba existiera. Sin peso no hay con qué mezclar, y dividir entre cero sería
-          una excepción en mitad del ranking entero por una columna de adorno.
+          ⚠️ **Los DOS pesos tienen que ser mayores que cero, no solo su suma.** Una versión
+          con la prueba a 0 —70/0/15/15 suma 100 y se publicaría sin problema— dejaría la
+          cuenta en la nota del perfil tal cual, que es exactamente lo que esta cifra promete
+          no ser. Y una versión sin alguna de las dos etapas tampoco es imposible: las hubo
+          antes de que la prueba existiera.
 
           ⚠️ Los pesos se BUSCAN por su código, no se suman todos: `findByVersionPesosId` trae
           las cuatro etapas y sumarlas daría 100, con lo que esto devolvería la nota global de
           dos cuartas partes —la misma trampa del «675 sobre 100» de la nota por criterio—.
         */
-        if (notaPerfil != null && notaPrueba != null && pesoPerfil != null && pesoPrueba != null) {
-            BigDecimal pesoTotal = pesoPerfil.add(pesoPrueba);
-            if (pesoTotal.compareTo(BigDecimal.ZERO) > 0) {
-                sobre100 = notaPerfil.multiply(pesoPerfil)
-                        .add(notaPrueba.multiply(pesoPrueba))
-                        .divide(pesoTotal, 2, RoundingMode.HALF_UP);
-            }
+        boolean pesanLasDos = pesoPerfil != null && pesoPrueba != null
+                && pesoPerfil.compareTo(BigDecimal.ZERO) > 0
+                && pesoPrueba.compareTo(BigDecimal.ZERO) > 0;
+        if (notaPerfil != null && notaPrueba != null && pesanLasDos) {
+            sobre100 = notaPerfil.multiply(pesoPerfil)
+                    .add(notaPrueba.multiply(pesoPrueba))
+                    .divide(pesoPerfil.add(pesoPrueba), 2, RoundingMode.HALF_UP);
         }
         return new Ponderado(sobre100, notaCv, notaPerfil, notaPrueba);
     }
