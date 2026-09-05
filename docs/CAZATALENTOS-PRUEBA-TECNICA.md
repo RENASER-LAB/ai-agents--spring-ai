@@ -250,6 +250,24 @@ Aquí se juntan las dos etapas. Este cálculo no puede hacerse antes: necesita l
 *La técnica pesa más porque mide si sabe hacer el trabajo. La RENASER decide si vale la pena
 enseñárselo.*
 
+> **Dónde vive ese 45/55 en el sistema, desde la V49.** Es el `peso_etapa` de las dos versiones
+> del cazatalentos: **Perfil Integral 45** —donde se guarda la prueba RENASER— y **Prueba del
+> puesto 55** —donde se guarda la técnica—. Suman 100 sobre esas dos únicas etapas, porque este
+> instrumento no contempla simulación ni validación.
+>
+> Hasta la V49 esas dos versiones no tenían ningún `peso_etapa`: la V41 les sembró los pesos de
+> pilar y nada más. Sin ese reparto no había con qué combinar las dos notas, y el daño no era
+> solo que faltara el combinado — la Puntuación Global de la Decisión, que suma recorriendo esos
+> pesos, devolvía **cero** y proponía descartar a todo el mundo.
+>
+> ⚠️ **Siguen en BORRADOR.** Publicarlas las convertiría en «la última versión publicada», que
+> es la que hereda toda vacante nueva y la que se copia a cada empresa nueva: el reparto de un
+> instrumento concreto pasaría a regir a todo el mundo. Antes hay que arreglar ese criterio.
+>
+> ⚠️ **No se reescaló el 40/30 del embudo genérico.** Habría dado 57.14/42.86, que invierte el
+> criterio: ahí el perfil pesa más que la prueba, y aquí el cliente pidió lo contrario y escribió
+> el porqué, que es la frase de arriba.
+
 | Paso | Criterio |
 |---|---|
 | **A entrevista** | Los **5 mejores** del combinado |

@@ -87,3 +87,91 @@ cuatro casos del texto del desglose.
 - `docs/09-APIS.md` — el campo en la respuesta del ranking y en el Excel, y la corrección de la nota
   que afirmaba que ninguna cifra mezclaba etapas.
 - `docs/06-FLUJO-COMPLETO.md` (frontend) — la columna en «El ranking, etapa por etapa».
+
+---
+
+# Segunda entrega del día · el hueco que destapó el ponderado
+
+La columna nueva no funcionaba en la vacante de Administración: enseñaba las dos notas y el
+ponderado vacío. Investigándolo apareció algo bastante peor.
+
+## La causa
+
+La `V41` creó las dos versiones de pesos del cazatalentos —«CAZATALENTOS · MICRO» y
+«CAZATALENTOS · MEDIA/GRANDE»— con sus pesos de pilar, pero **sin una sola fila de
+`peso_etapa`**, y ninguna migración se la dio después. Una vacante apuntada a cualquiera de las
+dos no tiene con qué mezclar la nota del Perfil Integral con la de la prueba.
+
+## Lo que no se veía
+
+La Puntuación Global de la Decisión suma las etapas **recorriendo esos mismos pesos**. Con la
+tabla vacía el bucle no itera: la nota se queda en cero y la lista de etapas que faltan también,
+o sea que el código concluye que no falta nada. Con nada pendiente compara ese cero contra los
+umbrales y propone **ROJO**.
+
+Un candidato con 81.75 en el perfil y 62 en la prueba salía descartado con un cero que nadie
+calculó. No es una excepción que alguien vea: es un descarte con pinta de decisión fundada.
+Confirmado con un test antes de tocar nada.
+
+## Los dos arreglos
+
+| | Qué |
+|---|---|
+| **PR #64** | Sin `peso_etapa` no hay semáforo ni nota, igual que cuando falta una nota, y queda un `log.error` con la vacante y la versión. |
+| **V49** | Les da su reparto: **45 / 55**. |
+
+## De dónde salen el 45 y el 55
+
+Del cliente, textualmente y repetido cuatro veces —en `CAZATALENTOS-sistema-de-filtro.md` y en
+la hoja «Cálculo» de los libros de DIR, SUP y OPE—:
+
+> `Índice combinado = (Índice RENASER × 0.45) + (Índice técnico × 0.55)`
+> «La técnica pesa más porque mide si sabe hacer el trabajo.»
+
+Su prueba RENASER se guarda como `PERFIL_INTEGRAL` y la técnica como `PRUEBA_PUESTO`, así que
+el reparto se traduce directo. Solo esas dos etapas: su material describe un embudo de dos fases
+y no menciona simulación ni validación en ningún punto.
+
+**No se reescaló el 40/30 del embudo genérico**, que habría dado 57.14/42.86 como hizo la V15
+para la v3. Apunta al revés —ahí el perfil pesa más que la prueba— y el cliente pidió lo
+contrario para su instrumento, con su justificación escrita.
+
+El `peso_componente_perfil` va entero a `EVALUACION`: en el cazatalentos el Perfil Integral **es**
+la prueba RENASER, no hay currículum que ponderar. Sin esas filas la versión no pasaría su propia
+validación al publicarse.
+
+## Validación
+
+Migración aplicada sobre una base limpia, datos sembrados por la API y una vacante apuntada a
+«CAZATALENTOS · MICRO»:
+
+| | Antes | Después |
+|---|---|---|
+| Ponderado del ranking | — | **70.89** |
+| Semáforo de la Decisión | ROJO · nota 0 | **AMBAR · nota 70.89** |
+
+`./mvnw test`: 1033 en verde.
+
+## Lo que NO se hizo, y por qué
+
+**Las dos versiones se quedan en BORRADOR.** La intención era publicarlas —en borrador no se les
+puede asignar una vacante— y los tests de integración lo impidieron con razón.
+
+`findFirstByOrganizacionIdAndEstadoOrderByPublicadaEnDesc` es «la versión publicada más reciente:
+la que rige una vacante nueva si nadie elige otra», y también la que el copiador replica a cada
+empresa nueva. Publicadas hoy, estas dos pasan a ser las más recientes: **cualquier vacante nueva
+heredaría 45/55 sin simulación ni validación**, en silencio. `FlujoPruebaIT` lo detectó al
+instante — su vacante dejó de pesar las cuatro etapas y el semáforo dejó de avisar de las que
+faltaban.
+
+El criterio «la última publicada» da por supuesto que todas las versiones publicadas son
+intercambiables, y con el cazatalentos deja de serlo: hay versiones que solo sirven para un
+instrumento. Arreglarlo toca cómo se elige la versión de una vacante nueva **y** de una empresa
+nueva, así que va en su propio cambio. Los pesos ya están, que era el hueco que dejaba a estas
+vacantes sin ponderado y sin semáforo; publicarlas es el paso siguiente.
+
+## Nota de proceso
+
+`./mvnw test` no basta en este repositorio: el CI corre `verify`, que añade los 143 tests de
+integración, y son justo los que ven un efecto a distancia como este. El PR salió en rojo por
+haberlo comprobado solo con los unitarios.

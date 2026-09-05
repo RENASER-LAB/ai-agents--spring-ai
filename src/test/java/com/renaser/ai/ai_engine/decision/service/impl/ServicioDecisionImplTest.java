@@ -9,6 +9,7 @@ import com.renaser.ai.ai_engine.decision.repository.BarreraDetectadaRepository;
 import com.renaser.ai.ai_engine.decision.repository.DecisionRepository;
 import com.renaser.ai.ai_engine.decision.repository.EvidenciaAdicionalRepository;
 import com.renaser.ai.ai_engine.parametro.service.ServicioParametros;
+import com.renaser.ai.ai_engine.perfilintegral.entity.NotaEtapa;
 import com.renaser.ai.ai_engine.perfilintegral.repository.NotaEtapaRepository;
 import com.renaser.ai.ai_engine.pesos.repository.PesoEtapaRepository;
 import com.renaser.ai.ai_engine.postulacion.entity.Postulacion;
@@ -16,6 +17,7 @@ import com.renaser.ai.ai_engine.postulacion.service.MaquinaEstados;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
 import com.renaser.ai.ai_engine.seguridad.dto.FiltroAlcance;
 import com.renaser.ai.ai_engine.seguridad.service.Permisos;
+import com.renaser.ai.ai_engine.vacante.entity.Vacante;
 import com.renaser.ai.ai_engine.vacante.repository.VacanteRepository;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -25,12 +27,15 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -118,6 +123,55 @@ class ServicioDecisionImplTest {
                 new RegistrarBarrera(7L, "Se detectó en la entrevista"));
 
         verify(barrerasDetectadas).save(any());
+    }
+
+    // ============ El semáforo cuando la vacante no tiene pesos de etapa ============
+
+    /**
+     * Una vacante sin {@code peso_etapa} recibe un ROJO con cero, y nadie avisa.
+     *
+     * <p><b>No es hipotético.</b> Las dos versiones de pesos que sembró la V41 —«CAZATALENTOS ·
+     * MICRO» y «CAZATALENTOS · MEDIA/GRANDE»— solo trajeron {@code peso_dimension}: ninguna
+     * migración les dio {@code peso_etapa}. Cualquier vacante apuntada a una de ellas cae aquí.
+     *
+     * <p>El cálculo recorre los pesos para sumar las etapas. Con la lista vacía el bucle no
+     * itera: la nota global se queda en el cero con que empieza y la lista de etapas que faltan
+     * también se queda vacía, o sea que el código concluye que <b>no falta nada</b>. Y con nada
+     * pendiente, compara ese cero contra los umbrales y propone ROJO.
+     *
+     * <p>Era la peor forma de fallar: no una excepción que alguien viera, sino un descarte con
+     * pinta de decisión fundada. Ahora la respuesta es la misma que cuando falta una nota —no
+     * se puede calcular todavía— y el motivo real queda en el log, porque esto no lo arregla
+     * el candidato rindiendo nada: lo arregla quien configure los pesos de esa vacante.
+     */
+    @Test
+    @DisplayName("Sin pesos de etapa no hay semáforo, en vez de un ROJO con cero")
+    void sinPesosDeEtapaNoHaySemaforo() {
+        when(alcanceVacante.laPostulacionVisible(any(), eq(POSTULACION), eq("ver_semaforo_decision")))
+                .thenReturn(Postulacion.builder()
+                        .id(POSTULACION).organizacionId(ORGANIZACION).vacanteId(VACANTE).build());
+        when(vacantes.findById(VACANTE)).thenReturn(Optional.of(
+                Vacante.builder().id(VACANTE).organizacionId(ORGANIZACION).versionPesosId(9L).build()));
+        // Lo que de verdad devuelve la base para una versión de cazatalentos: nada.
+        when(pesosEtapa.findByVersionPesosId(9L)).thenReturn(List.of());
+        // Y el candidato SÍ tiene sus notas: no es que no haya rendido nada.
+        when(notasEtapa.findByPostulacionId(POSTULACION)).thenReturn(List.of(
+                NotaEtapa.builder().postulacionId(POSTULACION).etapaCodigo("PERFIL_INTEGRAL")
+                        .puntaje(new BigDecimal("81.75")).build(),
+                NotaEtapa.builder().postulacionId(POSTULACION).etapaCodigo("PRUEBA_PUESTO")
+                        .puntaje(new BigDecimal("62")).build()));
+        when(barrerasDetectadas
+                .findByPostulacionIdAndConfirmadaPorUsuarioIdIsNotNullAndDescartadaEnIsNull(POSTULACION))
+                .thenReturn(List.of());
+        when(decisiones.findByPostulacionId(POSTULACION)).thenReturn(Optional.empty());
+
+        var semaforo = servicio.verSemaforo(QUIEN, POSTULACION);
+
+        // Ni semáforo ni nota: no hay con qué proponer nada sobre este candidato.
+        assertThat(semaforo.semaforo()).isNull();
+        assertThat(semaforo.notaGlobal()).isNull();
+        // Y sobre todo: NO un cero, que descartaría a alguien de 81.75 y 62.
+        assertThat(semaforo.notaGlobal()).isNotEqualTo(BigDecimal.ZERO);
     }
 
     // ============ El alcance: qué postulaciones y qué vacantes alcanza quien mira ============
