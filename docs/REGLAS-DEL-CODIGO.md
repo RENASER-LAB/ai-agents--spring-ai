@@ -171,3 +171,8 @@ detrás de una caja ni texto desbordado.
 | Se añadió un permiso | [Roles y permisos](04-ROLES-Y-PERMISOS.md) |
 | Un pendiente dejó de serlo, o apareció uno nuevo | «Lo que falta» en Estado del proyecto, o [Defectos conocidos](DEFECTOS-CONOCIDOS.md) |
 | Un placeholder se reemplazó por el valor definitivo | Donde se nombre ese placeholder |
+
+Hay un recordatorio automático: al terminar cada turno, si hay código o migraciones sin commit y
+`docs/ESTADO-DEL-PROYECTO.md` no se tocó, el hook `.claude/hooks/recordar-estado-del-proyecto.sh`
+avisa (una vez cada media hora, sin bloquear nada). Hasta el 06/09/2026 miraba `CLAUDE.MD`, que
+ya no guarda estado.
