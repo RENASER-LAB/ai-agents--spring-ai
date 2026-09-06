@@ -61,6 +61,7 @@ import static org.mockito.Mockito.when;
 class ColaCalificacionIaImplTest {
 
     private static final long POSTULACION = 55L;
+    private static final long LECTURA = 77L;
 
     @Mock private TrabajoIaRepository trabajos;
     @Mock private RegistroTrabajosIa registro;
@@ -68,6 +69,7 @@ class ColaCalificacionIaImplTest {
     @Mock private PuenteCalificacionIa puente;
     // Sin tope por defecto (sinCupo devuelve false en el mock): las pruebas del tope lo
     // encienden una a una.
+    @Mock private com.renaser.ai.ai_engine.perfil.service.PuenteLecturaCvPerfil puenteDelPerfil;
     @Mock private TopeMensualIa tope;
     // Sin organización por defecto (findById vacío = activa): las pruebas de la
     // suspensión la apagan una a una.
@@ -852,8 +854,131 @@ class ColaCalificacionIaImplTest {
         assertThat(cola.comoVa(POSTULACION)).isEqualTo("TERMINADA");
     }
 
+    // ============ Leer el currículum subido al perfil ============
+
+    @Test
+    @DisplayName("Encolar la lectura del perfil crea el trabajo y lo publica")
+    void laLecturaDelPerfilSeEncola() {
+        // La organización viene dada, no se deduce de una vacante: aquí no hay vacante.
+        when(registro.crearParaLecturaDePerfil(7L, AgenteDatosCv.CODIGO_AGENTE, LECTURA, "FINA"))
+                .thenReturn(Optional.of(trabajoDelPerfil("PENDIENTE")));
+
+        assertThat(cola.encolarDatosCvDelPerfil(7L, LECTURA)).isTrue();
+
+        verify(publicador).publicar(70L);
+        verifyNoInteractions(puente);
+    }
+
+    @Test
+    @DisplayName("Con la calificación apagada no se encola nada")
+    void conLaCalificacionApagadaLaLecturaNoSeEncola() {
+        assertThat(conLaCalificacion(false).encolarDatosCvDelPerfil(7L, LECTURA)).isFalse();
+
+        verifyNoInteractions(registro);
+        verifyNoInteractions(publicador);
+    }
+
+    @Test
+    @DisplayName("Si ya hay uno vivo no se encola otro: el currículum no se lee dos veces")
+    void siYaHayUnoVivoNoSeEncolaOtro() {
+        when(registro.crearParaLecturaDePerfil(7L, AgenteDatosCv.CODIGO_AGENTE, LECTURA, "FINA"))
+                .thenReturn(Optional.empty());
+
+        assertThat(cola.encolarDatosCvDelPerfil(7L, LECTURA)).isFalse();
+
+        verifyNoInteractions(publicador);
+    }
+
+    @Test
+    @DisplayName("Dos peticiones a la vez: el índice de la base gana y aquí no revienta")
+    void elChoqueDeLaBaseNoRevienta() {
+        // El índice «una lectura viva por persona» es quien decide de verdad. Dos pestañas
+        // subiendo a la vez llegan aquí las dos, y la que pierde tiene que contestar «no se
+        // encoló», no un 500.
+        when(registro.crearParaLecturaDePerfil(7L, AgenteDatosCv.CODIGO_AGENTE, LECTURA, "FINA"))
+                .thenThrow(new org.springframework.dao.DataIntegrityViolationException("lectura_cv_perfil_una_viva"));
+
+        assertThat(cola.encolarDatosCvDelPerfil(7L, LECTURA)).isFalse();
+
+        verifyNoInteractions(publicador);
+    }
+
+    @Test
+    @DisplayName("Sin cupo la lectura del perfil espera, igual que todo lo demás")
+    void sinCupoLaLecturaEspera() {
+        when(registro.crearParaLecturaDePerfil(7L, AgenteDatosCv.CODIGO_AGENTE, LECTURA, "FINA"))
+                .thenReturn(Optional.of(trabajoDelPerfil("PENDIENTE")));
+        when(tope.sinCupo(7L)).thenReturn(true);
+        when(registro.dejarEnEspera(70L)).thenReturn(true);
+
+        assertThat(cola.encolarDatosCvDelPerfil(7L, LECTURA)).isTrue();
+
+        verifyNoInteractions(publicador);
+    }
+
+    @Test
+    @DisplayName("Si se agotan los intentos, la lectura del perfil se cierra como NO_LEGIBLE")
+    void alAgotarseLosIntentosLaLecturaSeCierra() {
+        // Sin esto la pantalla se queda diciendo «estamos leyendo tu currículum» para
+        // siempre: sondea ese estado cada cinco segundos y nadie más lo iba a mover.
+        TrabajoIa suyo = trabajoDelPerfil("EN_CURSO");
+        when(registro.tomar(70L)).thenReturn(Optional.of(suyo));
+        doThrowEn(datosCv);
+        when(registro.fallar(eq(70L), anyInt(), anyString())).thenReturn(false);
+
+        cola.ejecutar(70L);
+
+        verify(puenteDelPerfil).marcarNoLegible(eq(LECTURA), anyString());
+    }
+
+    @Test
+    @DisplayName("Mientras queden intentos la lectura NO se cierra: todavía puede salir bien")
+    void conIntentosDeSobraLaLecturaSigueViva() {
+        TrabajoIa suyo = trabajoDelPerfil("EN_CURSO");
+        when(registro.tomar(70L)).thenReturn(Optional.of(suyo));
+        doThrowEn(datosCv);
+        when(registro.fallar(eq(70L), anyInt(), anyString())).thenReturn(true);
+
+        cola.ejecutar(70L);
+
+        verify(publicador).publicar(70L);
+        verify(puenteDelPerfil, never()).marcarNoLegible(anyLong(), anyString());
+    }
+
+    @Test
+    @DisplayName("La lectura del perfil no arma ningún retrato: no tiene postulación ni hermanos")
+    void laLecturaDelPerfilNoArmaRetrato() {
+        // ⚠️ Sin la guarda, el bloque del retrato preguntaría por los trabajos de la
+        // postulación `null` y se traería los de cualquier otra lectura de perfil que
+        // anduviera por ahí.
+        when(registro.tomar(70L)).thenReturn(Optional.of(trabajoDelPerfil("EN_CURSO")));
+
+        cola.ejecutar(70L);
+
+        verify(registro).terminar(70L);
+        // organizacionDe() es la primera puerta del retrato: si se llamara, sería con la
+        // postulación vacía.
+        verifyNoInteractions(puente);
+    }
+
+    /** Un trabajo de leer el currículum del perfil: sin postulación, con su lectura detrás. */
+    private TrabajoIa trabajoDelPerfil(String estado) {
+        return TrabajoIa.builder()
+                .id(70L)
+                .organizacionId(7L)
+                .agenteCodigo(AgenteDatosCv.CODIGO_AGENTE)
+                .referenciaTabla(AgenteDatosCv.DEL_PERFIL)
+                .referenciaId(LECTURA)
+                .estado(estado)
+                .modo("FINA")
+                .intentos(1)
+                .creadoEn(Instant.now())
+                .build();
+    }
+
     private ColaCalificacionIaImpl conLaCalificacion(boolean habilitada) {
-        return new ColaCalificacionIaImpl(trabajos, registro, publicador, puente, tope, organizaciones,
+        return new ColaCalificacionIaImpl(trabajos, registro, publicador, puente, puenteDelPerfil,
+                tope, organizaciones,
                 List.of(datosCv, evidenciaCv, evaluador, potencialRiesgo, pruebaPuesto, simulacion),
                 habilitada, 3, 15);
     }

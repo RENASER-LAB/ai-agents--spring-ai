@@ -96,21 +96,34 @@ public class PortalController {
     @Operation(summary = "Entrar con el enlace que llegó por correo, sin contraseña")
     public Sesion accesoPorEnlace(@Valid @RequestBody AccesoPorEnlace datos) {
         var sesion = enlaces.canjear(datos.token());
-        // El portal tiene su propio record, idéntico: así el contrato público no queda atado
-        // a un DTO del paquete de seguridad, que es interno.
-        return new Sesion(sesion.token(), sesion.usuarioId());
+        // El portal tiene su propio record: así el contrato público no queda atado a un DTO
+        // del paquete de seguridad, que es interno. Y aquí se le añade el nombre, que es
+        // justo lo que esta puerta no tenía: quien entra por el enlace del correo nunca se
+        // registró, así que el portal no lo sabía por ningún otro sitio.
+        return cuentas.sesionDe(sesion.token(), sesion.usuarioId());
     }
 
     // ---------- con token de candidato ----------
+
+    @GetMapping("/auth/sesion")
+    @Operation(summary = "Como se llama quien tiene este token")
+    public com.renaser.ai.ai_engine.portal.dto.DtosPortal.QuienSoy quienSoy() {
+        return cuentas.quienSoy(permisos.actual());
+    }
 
     @PostMapping(value = "/postulaciones", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("@permisos.tiene('postular_vacante')")
     @Operation(summary = "Postular: CV (PDF o Word, máx. 10 MB), enlaces, el resultado del que "
             + "te sientes orgulloso, la confirmación de los requisitos indispensables y la "
-            + "aceptación del tratamiento de datos de la empresa (obligatoria)")
+            + "aceptación del tratamiento de datos de la empresa (obligatoria). Sin adjuntar "
+            + "CV se usa el del perfil; adjuntando uno vale solo para esta vacante y el "
+            + "perfil no cambia. Sin ninguno de los dos, 400")
     public ResponseEntity<Map<String, String>> postular(
             @RequestParam Long vacanteId,
-            @RequestParam("cv") MultipartFile cv,
+            // Opcional desde que el currículum puede vivir en el perfil. Quien no adjunte
+            // nada usa el suyo; quien adjunte uno lo usa SOLO para esta vacante. Lo decide
+            // el servicio, que es quien puede contestar un 400 explicando qué falta.
+            @RequestParam(value = "cv", required = false) MultipartFile cv,
             @RequestParam String resultadoOrgulloso,
             @RequestParam(required = false) String portafolio,
             @RequestParam(required = false) String linkedin,

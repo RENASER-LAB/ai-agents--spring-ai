@@ -50,7 +50,27 @@ public final class DtosPortal {
     // los datos. El de la plataforma (crear la cuenta) sale por textosDeConsentimiento.
     public record ConsentimientoDeVacante(String nombreEmpresa, String version, String texto) {}
 
-    public record Sesion(String token, Long usuarioId) {}
+    /**
+     * Con quien entra, y como se llama.
+     *
+     * <p>⚠️ <b>El nombre viaja aqui a proposito.</b> Antes el backend devolvia solo el
+     * identificador y el portal guardaba el nombre en `localStorage` al registrarse: quien
+     * entraba desde otro navegador —o por el enlace del correo, sin haberse registrado
+     * nunca— veia el portal sin su nombre. Los dos pueden venir vacios: `persona` los admite.
+     */
+    public record Sesion(String token, Long usuarioId, String nombre, String apellidos) {}
+
+    /**
+     * Como se llama quien esta usando el token que acaba de llegar.
+     *
+     * <p>⚠️ <b>Es el mismo nombre que devuelve entrar, y hace falta igual.</b> Al entrar el
+     * portal se entera una vez; despues vive de un token guardado, y en la siguiente visita
+     * —o en otro navegador, o tras vaciar el almacenamiento— ya no habia a quien preguntarle
+     * como se llama, asi que la cabecera de su perfil decia «Tu perfil» sobre un disco de
+     * iniciales vacio. No lleva token: quien pregunta ya tiene el suyo, y devolverlo solo lo
+     * pondria en un cuerpo de respuesta mas.
+     */
+    public record QuienSoy(Long usuarioId, String nombre, String apellidos) {}
 
     /**
      * Lo unico que se manda para entrar con el enlace del correo: el token.

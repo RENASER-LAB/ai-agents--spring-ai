@@ -1,6 +1,7 @@
 package com.renaser.ai.ai_engine.perfil.service.impl;
 
 import com.renaser.ai.ai_engine.ai.service.ColaCalificacionIa;
+import com.renaser.ai.ai_engine.perfil.dto.DtosPerfil;
 import com.renaser.ai.ai_engine.perfil.dto.DtosPerfil.PerfilCompleto;
 import com.renaser.ai.ai_engine.perfil.entity.PerfilCandidato;
 import com.renaser.ai.ai_engine.perfil.repository.CertificacionPerfilRepository;
@@ -58,13 +59,15 @@ class PintorDePerfilTest {
     @Mock private CvRepository cvs;
     @Mock private DatoCvRepository datosCv;
     @Mock private ColaCalificacionIa cola;
+    @Mock private com.renaser.ai.ai_engine.perfil.repository.LecturaCvPerfilRepository lecturas;
+    @Mock private com.renaser.ai.ai_engine.archivo.repository.ArchivoRepository archivos;
 
     private PintorDePerfil pintor;
 
     @BeforeEach
     void crearElPintor() {
         pintor = new PintorDePerfil(perfiles, experiencias, educaciones, idiomas,
-                certificaciones, enlaces, postulaciones, cvs, datosCv, cola);
+                certificaciones, enlaces, postulaciones, cvs, datosCv, cola, lecturas, archivos);
         lenient().when(perfiles.findByPersonaId(PERSONA)).thenReturn(Optional.of(
                 PerfilCandidato.builder().id(PERFIL).personaId(PERSONA)
                         .creadoEn(Instant.now()).actualizadoEn(Instant.now()).build()));
@@ -77,6 +80,15 @@ class PintorDePerfilTest {
         lenient().when(certificaciones.findByPerfilCandidatoIdOrderByNombre(PERFIL))
                 .thenReturn(List.of());
         lenient().when(enlaces.findByPerfilCandidatoIdOrderByTipo(PERFIL)).thenReturn(List.of());
+    }
+
+    /** Sustituye el perfil vacío del arranque por uno con foto, portada o currículum. */
+    private void conElPerfil(java.util.function.UnaryOperator<PerfilCandidato.PerfilCandidatoBuilder> como) {
+        PerfilCandidato.PerfilCandidatoBuilder base = PerfilCandidato.builder()
+                .id(PERFIL).personaId(PERSONA)
+                .creadoEn(Instant.now()).actualizadoEn(Instant.now());
+        lenient().when(perfiles.findByPersonaId(PERSONA))
+                .thenReturn(Optional.of(como.apply(base).build()));
     }
 
     private void hayUnaPostulacionConCv() {
@@ -169,7 +181,8 @@ class PintorDePerfilTest {
                 new com.renaser.ai.ai_engine.perfil.dto.DtosPerfil.Pretension(
                         new BigDecimal("3500"), new BigDecimal("4200"), "PEN"),
                 List.of(), List.of(), List.of(), List.of(), List.of(),
-                new com.renaser.ai.ai_engine.perfil.dto.DtosPerfil.LecturaCv("LISTA", null));
+                new com.renaser.ai.ai_engine.perfil.dto.DtosPerfil.LecturaCv("LISTA", null),
+                false, com.renaser.ai.ai_engine.perfil.dto.DtosPerfil.Portada.NINGUNA, null);
 
         PerfilCompleto sin = pintor.sinPretension(con);
 
@@ -191,5 +204,156 @@ class PintorDePerfilTest {
 
         assertThat(pintor.pintar(PERSONA).habilidades())
                 .containsExactly("Excel", "SQL", "Power BI");
+    }
+
+    @Test
+    @DisplayName("Al panel no le llega la foto, ni la portada, ni el CV, ni los diplomas")
+    void sinLoDelCandidato() {
+        // ⚠️ Es la decisión de la clienta del 05/09/2026 y el flanco del RF-41: si la foto
+        // se cuela al panel, la persona que decide vuelve a ver la cara que el anonimizador
+        // le esconde a la IA. Sin este test, añadirla de vuelta no rompería nada.
+        PerfilCompleto suyo = new PerfilCompleto("Analista", "Mi resumen", List.of("Excel"),
+                48, "Lima", "INMEDIATA", null, List.of(), List.of(), List.of(),
+                List.of(new com.renaser.ai.ai_engine.perfil.dto.DtosPerfil.CertificacionItem(7L, "SST", "Sencico", null, null,
+                        "PERSONA", true, true)),
+                List.of(), new com.renaser.ai.ai_engine.perfil.dto.DtosPerfil.LecturaCv("LISTA", null),
+                true, new com.renaser.ai.ai_engine.perfil.dto.DtosPerfil.Portada("GALERIA", "CANTO_AQUA"),
+                new com.renaser.ai.ai_engine.perfil.dto.DtosPerfil.CurriculumDelPerfil("cv.pdf", 1024L, null));
+
+        PerfilCompleto visto = pintor.sinLoDelCandidato(suyo);
+
+        assertThat(visto.tieneFoto()).isFalse();
+        assertThat(visto.portada()).isEqualTo(com.renaser.ai.ai_engine.perfil.dto.DtosPerfil.Portada.NINGUNA);
+        assertThat(visto.cv()).isNull();
+        assertThat(visto.certificaciones()).singleElement()
+                .extracting(com.renaser.ai.ai_engine.perfil.dto.DtosPerfil.CertificacionItem::tieneArchivo).isEqualTo(false);
+        // Y lo demás sigue entero: quitar de más también es un fallo.
+        assertThat(visto.titular()).isEqualTo("Analista");
+        assertThat(visto.resumen()).isEqualTo("Mi resumen");
+        assertThat(visto.habilidades()).containsExactly("Excel");
+        assertThat(visto.certificaciones()).singleElement()
+                .extracting(com.renaser.ai.ai_engine.perfil.dto.DtosPerfil.CertificacionItem::nombre).isEqualTo("SST");
+        assertThat(visto.lecturaCv().estado()).isEqualTo("LISTA");
+    }
+
+    // ============ La foto, la portada y el currículum del perfil ============
+
+    @Test
+    @DisplayName("Un perfil recién nacido no tiene foto, ni portada, ni currículum")
+    void perfilPelado() {
+        var perfil = pintor.pintar(PERSONA);
+
+        assertThat(perfil.tieneFoto()).isFalse();
+        assertThat(perfil.portada()).isEqualTo(DtosPerfil.Portada.NINGUNA);
+        assertThat(perfil.cv()).isNull();
+    }
+
+    @Test
+    @DisplayName("Quien nunca abrió su perfil también responde 200 con todo vacío, no 404")
+    void sinFilaDePerfil() {
+        // La pantalla siempre tiene algo que pintar: la fila de perfil_candidato se crea
+        // perezosamente y quien acaba de registrarse todavía no la tiene.
+        when(perfiles.findByPersonaId(PERSONA)).thenReturn(Optional.empty());
+        when(postulaciones.deLaPersona(PERSONA)).thenReturn(List.of());
+
+        var perfil = pintor.pintar(PERSONA);
+
+        assertThat(perfil.tieneFoto()).isFalse();
+        assertThat(perfil.portada().tipo()).isEqualTo("NINGUNA");
+        assertThat(perfil.cv()).isNull();
+        assertThat(perfil.lecturaCv().estado()).isEqualTo("SIN_CV");
+    }
+
+    @Test
+    @DisplayName("Con foto se dice que la hay, nunca cuál es: el id del archivo no viaja")
+    void conFoto() {
+        conElPerfil(b -> b.fotoArchivoId(300L));
+        when(postulaciones.deLaPersona(PERSONA)).thenReturn(List.of());
+
+        assertThat(pintor.pintar(PERSONA).tieneFoto()).isTrue();
+    }
+
+    @Test
+    @DisplayName("La portada de la galería viaja con su código; la propia, sin él")
+    void lasDosPortadas() {
+        conElPerfil(b -> b.portadaGaleria("CANTO_MENTA"));
+        when(postulaciones.deLaPersona(PERSONA)).thenReturn(List.of());
+        assertThat(pintor.pintar(PERSONA).portada())
+                .isEqualTo(new DtosPerfil.Portada("GALERIA", "CANTO_MENTA"));
+    }
+
+    @Test
+    @DisplayName("La portada propia manda sobre la de galería si por lo que sea quedaran las dos")
+    void laPropiaManda() {
+        // La base lo impide con un CHECK, pero si una fila vieja trajera las dos, se pinta la
+        // que el candidato subió: es la suya.
+        conElPerfil(b -> b.portadaArchivoId(400L).portadaGaleria("CANTO_MENTA"));
+        when(postulaciones.deLaPersona(PERSONA)).thenReturn(List.of());
+
+        assertThat(pintor.pintar(PERSONA).portada())
+                .isEqualTo(new DtosPerfil.Portada("PROPIA", null));
+    }
+
+    @Test
+    @DisplayName("El currículum se pinta con su nombre y su peso, leídos del archivo")
+    void conCurriculum() {
+        Instant subido = Instant.parse("2026-09-01T10:00:00Z");
+        conElPerfil(b -> b.cvArchivoId(500L).cvActualizadoEn(subido));
+        when(archivos.findById(500L)).thenReturn(Optional.of(
+                com.renaser.ai.ai_engine.archivo.entity.Archivo.builder()
+                        .id(500L).nombreOriginal("camila-torres.pdf").tamano(240_000L).build()));
+        when(lecturas.findFirstByPersonaIdAndArchivoIdOrderByIdDesc(PERSONA, 500L))
+                .thenReturn(Optional.empty());
+
+        var cv = pintor.pintar(PERSONA).cv();
+
+        assertThat(cv).isNotNull();
+        assertThat(cv.nombre()).isEqualTo("camila-torres.pdf");
+        assertThat(cv.tamano()).isEqualTo(240_000L);
+        assertThat(cv.subidoEn()).isEqualTo(subido);
+    }
+
+    @Test
+    @DisplayName("Un currículum apuntado a un archivo que ya no está no revienta: se pinta sin él")
+    void curriculumHuerfano() {
+        conElPerfil(b -> b.cvArchivoId(500L));
+        when(archivos.findById(500L)).thenReturn(Optional.empty());
+        when(lecturas.findFirstByPersonaIdAndArchivoIdOrderByIdDesc(PERSONA, 500L))
+                .thenReturn(Optional.empty());
+
+        assertThat(pintor.pintar(PERSONA).cv()).isNull();
+    }
+
+    // ============ Lo que NO llega al panel ============
+
+    @Test
+    @DisplayName("El panel recibe el perfil sin foto, sin portada, sin currículum y sin diplomas")
+    void loDelCandidatoSeQuedaEnElPortal() {
+        // ⚠️ No es cosmética: el RF-41 esconde la cara a la IA para no sesgar por aspecto, y
+        // enseñársela a quien decide desharía la regla por la puerta de al lado.
+        conElPerfil(b -> b.titular("Analista de datos").fotoArchivoId(300L)
+                .portadaGaleria("CANTO_MENTA").cvArchivoId(500L));
+        when(archivos.findById(500L)).thenReturn(Optional.of(
+                com.renaser.ai.ai_engine.archivo.entity.Archivo.builder()
+                        .id(500L).nombreOriginal("cv.pdf").tamano(1L).build()));
+        when(lecturas.findFirstByPersonaIdAndArchivoIdOrderByIdDesc(PERSONA, 500L))
+                .thenReturn(Optional.empty());
+        when(certificaciones.findByPerfilCandidatoIdOrderByNombre(PERFIL)).thenReturn(List.of(
+                com.renaser.ai.ai_engine.perfil.entity.CertificacionPerfil.builder()
+                        .id(9L).perfilCandidatoId(PERFIL).nombre("Scrum Master")
+                        .origen("PERSONA").archivoId(600L).build()));
+
+        var paraElPanel = pintor.sinLoDelCandidato(pintor.pintar(PERSONA));
+
+        assertThat(paraElPanel.tieneFoto()).isFalse();
+        assertThat(paraElPanel.portada()).isEqualTo(DtosPerfil.Portada.NINGUNA);
+        assertThat(paraElPanel.cv()).isNull();
+        assertThat(paraElPanel.certificaciones()).singleElement()
+                .satisfies(c -> {
+                    assertThat(c.nombre()).isEqualTo("Scrum Master");
+                    assertThat(c.tieneArchivo()).isFalse();
+                });
+        // Lo demás sí pasa: quitar el diploma no puede llevarse el certificado por delante.
+        assertThat(paraElPanel.titular()).isEqualTo("Analista de datos");
     }
 }

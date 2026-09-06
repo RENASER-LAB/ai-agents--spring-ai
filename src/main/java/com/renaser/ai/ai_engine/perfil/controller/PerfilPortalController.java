@@ -1,6 +1,7 @@
 package com.renaser.ai.ai_engine.perfil.controller;
 
 import com.renaser.ai.ai_engine.perfil.dto.DtosPerfil.EditarCabecera;
+import com.renaser.ai.ai_engine.perfil.dto.DtosPerfil.ElegirPortada;
 import com.renaser.ai.ai_engine.perfil.dto.DtosPerfil.EditarCertificacion;
 import com.renaser.ai.ai_engine.perfil.dto.DtosPerfil.EditarEducacion;
 import com.renaser.ai.ai_engine.perfil.dto.DtosPerfil.EditarEnlace;
@@ -8,6 +9,7 @@ import com.renaser.ai.ai_engine.perfil.dto.DtosPerfil.EditarExperiencia;
 import com.renaser.ai.ai_engine.perfil.dto.DtosPerfil.EditarIdioma;
 import com.renaser.ai.ai_engine.perfil.dto.DtosPerfil.PerfilCompleto;
 import com.renaser.ai.ai_engine.perfil.dto.DtosPerfil.Reordenar;
+import com.renaser.ai.ai_engine.perfil.service.ServicioArchivosDelPerfil;
 import com.renaser.ai.ai_engine.perfil.service.ServicioPerfilPortal;
 import com.renaser.ai.ai_engine.seguridad.service.Permisos;
 import io.swagger.v3.oas.annotations.Operation;
@@ -24,7 +26,11 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 
 import java.util.Map;
 
@@ -43,6 +49,7 @@ import java.util.Map;
 public class PerfilPortalController {
 
     private final ServicioPerfilPortal servicio;
+    private final ServicioArchivosDelPerfil archivos;
     private final Permisos permisos;
 
     @GetMapping
@@ -206,5 +213,127 @@ public class PerfilPortalController {
     @Operation(summary = "Borrar un enlace")
     public void borrarEnlace(@PathVariable Long id) {
         servicio.borrarEnlace(permisos.actual(), id);
+    }
+    // ---------- foto, portada, currículum y diplomas ----------
+
+    /*
+     * ⚠️ Los cuatro se SIRVEN, no se firman.
+     *
+     * Un `<img src>` no manda cabecera Authorization, así que un enlace firmado no vale para
+     * pintar una foto; y en local el almacén es el de memoria, cuya url `memoria://` no la
+     * abre ningún navegador. Sirviendo los bytes por una ruta con token, la pantalla se
+     * comporta igual en local y en producción, y el navegador los pinta desde un blob.
+     *
+     * ⚠️ Y NINGUNO llega al panel del equipo. La foto no la ve quien decide (RF-41): ver
+     * `PintorDePerfil.sinLoDelCandidato`.
+     */
+
+    @PostMapping(value = "/foto", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @ResponseStatus(HttpStatus.CREATED)
+    @Operation(summary = "Subir mi foto de perfil. JPG, PNG o WebP, hasta 2 MB. Sustituye a "
+            + "la anterior. SOLO la veo yo: no viaja al panel ni a la IA")
+    public void subirFoto(@RequestParam("archivo") MultipartFile archivo) {
+        archivos.guardarFoto(permisos.actual(), archivo);
+    }
+
+    @DeleteMapping("/foto")
+    @Operation(summary = "Quitar mi foto")
+    public void quitarFoto() {
+        archivos.quitarFoto(permisos.actual());
+    }
+
+    @GetMapping("/foto")
+    @Operation(summary = "Mi foto, en bytes. 404 si no tengo")
+    public ResponseEntity<byte[]> foto() {
+        return servir(archivos.foto(permisos.actual()));
+    }
+
+    @PostMapping(value = "/portada", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @ResponseStatus(HttpStatus.CREATED)
+    @Operation(summary = "Subir mi propia portada. Deja de valer la del catálogo si la tenía: "
+            + "son excluyentes")
+    public void subirPortada(@RequestParam("archivo") MultipartFile archivo) {
+        archivos.guardarPortada(permisos.actual(), archivo);
+    }
+
+    @PutMapping("/portada/galeria")
+    @Operation(summary = "Elegir una portada del catálogo del portal (CANTO_MENTA, "
+            + "CANTO_AQUA, CANTO_ROSA, CANTO_VIOLETA o BRUMA). Suelta la propia si la había")
+    public void elegirPortada(@Valid @RequestBody ElegirPortada datos) {
+        archivos.elegirPortadaDeGaleria(permisos.actual(), datos.codigo());
+    }
+
+    @DeleteMapping("/portada")
+    @Operation(summary = "Quedarme sin portada")
+    public void quitarPortada() {
+        archivos.quitarPortada(permisos.actual());
+    }
+
+    @GetMapping("/portada")
+    @Operation(summary = "Mi portada propia, en bytes. 404 si tengo una del catálogo o ninguna")
+    public ResponseEntity<byte[]> portada() {
+        return servir(archivos.portada(permisos.actual()));
+    }
+
+    @PostMapping(value = "/cv", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @ResponseStatus(HttpStatus.CREATED)
+    @Operation(summary = "Subir mi currículum al perfil y arrancar su lectura. PDF o Word, "
+            + "hasta 10 MB. Sustituye al anterior (RF-162) y se reutiliza al postular; si es "
+            + "un archivo que ya se leyó, no se vuelve a pagar la lectura (RF-161)")
+    public void subirCurriculum(@RequestParam("archivo") MultipartFile archivo) {
+        archivos.guardarCurriculum(permisos.actual(), archivo);
+    }
+
+    @DeleteMapping("/cv")
+    @Operation(summary = "Quitar mi currículum del perfil. Lo que ya se propuso al perfil se "
+            + "queda: es mío y ya lo revisé")
+    public void quitarCurriculum() {
+        archivos.quitarCurriculum(permisos.actual());
+    }
+
+    @GetMapping("/cv")
+    @Operation(summary = "Descargar mi currículum")
+    public ResponseEntity<byte[]> curriculum() {
+        return descargar(archivos.curriculum(permisos.actual()));
+    }
+
+    @PostMapping(value = "/certificaciones/{id}/archivo",
+            consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @ResponseStatus(HttpStatus.CREATED)
+    @Operation(summary = "Adjuntar el diploma de una certificación. PDF o imagen")
+    public void subirDiploma(@PathVariable Long id,
+                             @RequestParam("archivo") MultipartFile archivo) {
+        archivos.guardarDiploma(permisos.actual(), id, archivo);
+    }
+
+    @DeleteMapping("/certificaciones/{id}/archivo")
+    @Operation(summary = "Quitar el diploma")
+    public void quitarDiploma(@PathVariable Long id) {
+        archivos.quitarDiploma(permisos.actual(), id);
+    }
+
+    @GetMapping("/certificaciones/{id}/archivo")
+    @Operation(summary = "Ver el diploma de una certificación mía")
+    public ResponseEntity<byte[]> diploma(@PathVariable Long id) {
+        return servir(archivos.diploma(permisos.actual(), id));
+    }
+
+    /** Para pintar en la pantalla: se enseña, no se descarga. */
+    private static ResponseEntity<byte[]> servir(ServicioArchivosDelPerfil.Contenido c) {
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(
+                        c.tipo() == null ? MediaType.APPLICATION_OCTET_STREAM_VALUE : c.tipo()))
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "inline; filename=\"" + c.nombre() + "\"")
+                .body(c.bytes());
+    }
+
+    /** Para guardarlo en el disco de quien lo pide. */
+    private static ResponseEntity<byte[]> descargar(ServicioArchivosDelPerfil.Contenido c) {
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"" + c.nombre() + "\"")
+                .body(c.bytes());
     }
 }

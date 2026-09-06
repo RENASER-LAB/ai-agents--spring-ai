@@ -17,6 +17,15 @@ public final class TiposDeArchivo {
 
     private static final Set<String> EXTENSIONES = Set.of("pdf", "doc", "docx");
 
+    /** Lo que se acepta como foto o portada. Ni GIF ni SVG: ver {@link #exigirImagen}. */
+    private static final Set<String> EXTENSIONES_IMAGEN = Set.of("jpg", "jpeg", "png", "webp");
+
+    private static final Set<String> TIPOS_IMAGEN = Set.of(
+            "image/jpeg", "image/png", "image/webp");
+
+    /** Dos megas para una foto de perfil. El curriculum sigue con sus diez. */
+    public static final long MAXIMO_IMAGEN = 2L * 1024 * 1024;
+
     private static final Set<String> TIPOS = Set.of(
             "application/pdf",
             "application/msword",
@@ -30,6 +39,34 @@ public final class TiposDeArchivo {
         if (!EXTENSIONES.contains(extensionDe(nombreOriginal)) || !TIPOS.contains(tipo)) {
             throw new IllegalArgumentException(
                     "El archivo debe ser PDF o Word (.pdf, .doc, .docx)");
+        }
+    }
+
+    /**
+     * Lo que vale como foto de perfil o como portada.
+     *
+     * <p>Está aparte del currículum a propósito: son dos promesas distintas y mezclarlas
+     * acabaría aceptando un PDF como foto o una imagen como currículum.
+     *
+     * <p><b>Ni SVG ni GIF.</b> Un SVG es un documento que puede llevar scripts dentro y se
+     * sirve desde el mismo origen que el portal; un GIF animado convierte una ficha de
+     * candidato en una pantalla que se mueve. Ninguno de los dos aporta nada aquí.
+     *
+     * @throws IllegalArgumentException si no es una imagen de las que se aceptan, o si pesa
+     *                                  más de {@link #MAXIMO_IMAGEN}
+     */
+    public static void exigirImagen(String nombreOriginal, String tipo, long tamano) {
+        if (!EXTENSIONES_IMAGEN.contains(extensionDe(nombreOriginal)) || !TIPOS_IMAGEN.contains(tipo)) {
+            throw new IllegalArgumentException(
+                    "La imagen debe ser JPG, PNG o WebP (.jpg, .jpeg, .png, .webp)");
+        }
+        // ⚠️ Este límite solo llega a correr por debajo de los 10 MB del multipart de Spring:
+        // por encima, la petición la corta el servidor antes y contesta
+        // ManejadorErrorArchivoGrande con su propio texto. Son dos mensajes distintos y los
+        // dos existen a propósito.
+        if (tamano > MAXIMO_IMAGEN) {
+            throw new IllegalArgumentException(
+                    "La imagen no puede pesar más de 2 MB. Prueba a guardarla más pequeña.");
         }
     }
 

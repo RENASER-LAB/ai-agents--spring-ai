@@ -42,6 +42,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -84,6 +85,8 @@ class ServicioPostulacionPortalImplTest {
     @Mock private com.renaser.ai.ai_engine.perfil.service.ServicioPropuestaPerfil propuestaPerfil;
     @Mock private com.renaser.ai.ai_engine.perfil.service.ServicioLecturaCv lecturaCv;
     @Mock private AlmacenArchivos almacen;
+    @Mock private com.renaser.ai.ai_engine.archivo.repository.ArchivoRepository archivos;
+    @Mock private com.renaser.ai.ai_engine.perfil.repository.PerfilCandidatoRepository perfiles;
     @Mock private ServicioCorreo correo;
     @Mock private MultipartFile cv;
 
@@ -101,7 +104,7 @@ class ServicioPostulacionPortalImplTest {
         servicio = new ServicioPostulacionPortalImpl(organizaciones, personas, usuarios,
                 consentimientos, vacantes, puestos, requisitos, evaluaciones, postulaciones,
                 transiciones, estados, cvs, enlaces, maquina, propuestaPerfil, lecturaCv,
-                almacen, correo, textoProceso);
+                almacen, archivos, perfiles, correo, textoProceso);
         tablon = new ServicioTablonPortalImpl(vacantes, organizaciones, requisitos, textoProceso);
     }
 
@@ -277,5 +280,113 @@ class ServicioPostulacionPortalImplTest {
         org.assertj.core.api.Assertions.assertThat(mias).hasSize(1);
         org.assertj.core.api.Assertions.assertThat(mias.get(0).vacante()).isEqualTo("Analista");
         org.assertj.core.api.Assertions.assertThat(mias.get(0).empresa()).isEqualTo("Acme S.A.C.");
+    }
+
+    // ============ El currículum: el suyo, o el del perfil ============
+
+    @Test
+    @DisplayName("Sin adjuntar nada se copia el del perfil, sellado con la organización de la vacante")
+    void sinAdjuntarSeCopiaElDelPerfil() {
+        // ⚠️ Se COPIA, no se comparte la fila. El archivo lleva sellada la organización de
+        // quien lo subió y el panel lo busca con la de la vacante: compartir la fila haría
+        // que la empresa recibiera un 404 al abrir el currículum. Es el fallo que arregló la
+        // V48, visto desde el otro lado.
+        Long empresa = 9L;
+        armarVacantePublicada(empresa);
+        when(perfiles.findByPersonaId(PERSONA)).thenReturn(Optional.of(
+                com.renaser.ai.ai_engine.perfil.entity.PerfilCandidato.builder()
+                        .id(1L).personaId(PERSONA).cvArchivoId(500L).build()));
+        Archivo suyo = Archivo.builder().id(500L).organizacionId(ORGANIZACION)
+                .ruta("perfil/500.pdf").build();
+        when(archivos.findByIdAndOrganizacionId(500L, ORGANIZACION)).thenReturn(Optional.of(suyo));
+        when(almacen.copiarA(empresa, suyo)).thenReturn(Archivo.builder().id(501L)
+                .organizacionId(empresa).ruta("postulacion/501.pdf").build());
+
+        servicio.postular(QUIEN, VACANTE, null, "Ordené la caja de tres sedes", null, null, null, null, true,
+                "10.0.0.1", "Navegador");
+
+        verify(almacen).copiarA(empresa, suyo);
+        verify(almacen, never()).guardar(any(), any(MultipartFile.class));
+    }
+
+    @Test
+    @DisplayName("Con un archivo adjunto se usa ese, y no se mira el perfil siquiera")
+    void conArchivoNoSeTocaElPerfil() {
+        // El CV puntual de esta vacante no toca el perfil: es la decisión de producto, y sin
+        // esta comprobación un «subir otro» acabaría reemplazando el suyo.
+        armarVacantePublicada(ORGANIZACION);
+        when(cv.isEmpty()).thenReturn(false);
+
+        servicio.postular(QUIEN, VACANTE, cv, "Ordené la caja de tres sedes", null, null, null, null, true,
+                "10.0.0.1", "Navegador");
+
+        verify(almacen).guardar(ORGANIZACION, cv);
+        verifyNoInteractions(perfiles);
+        verify(almacen, never()).copiarA(any(), any());
+    }
+
+    @Test
+    @DisplayName("Un adjunto vacío cuenta como no adjuntar: el navegador manda la parte igual")
+    void elAdjuntoVacioNoCuenta() {
+        armarVacantePublicada(ORGANIZACION);
+        when(cv.isEmpty()).thenReturn(true);
+        when(perfiles.findByPersonaId(PERSONA)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> servicio.postular(QUIEN, VACANTE, cv, "Ordené la caja de tres sedes", null, null, null,
+                null, true, "10.0.0.1", "Navegador"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("Necesitamos tu currículum");
+    }
+
+    @Test
+    @DisplayName("Sin adjunto y sin currículum en el perfil se explica qué hacer, no se revienta")
+    void sinAdjuntoYSinPerfilSeExplica() {
+        armarVacantePublicada(ORGANIZACION);
+        when(perfiles.findByPersonaId(PERSONA)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> servicio.postular(QUIEN, VACANTE, null, "Ordené la caja de tres sedes", null, null, null,
+                null, true, "10.0.0.1", "Navegador"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("guárdalo en tu perfil");
+    }
+
+    @Test
+    @DisplayName("Un perfil que apunta a un currículum ya borrado avisa de que lo vuelva a subir")
+    void elCurriculumBorradoAvisa() {
+        // La anonimización borra el contenido y deja la fila con la ruta en vacío (RF-41).
+        // Copiar eso daría una postulación con un archivo sin bytes que nadie puede abrir.
+        armarVacantePublicada(ORGANIZACION);
+        when(perfiles.findByPersonaId(PERSONA)).thenReturn(Optional.of(
+                com.renaser.ai.ai_engine.perfil.entity.PerfilCandidato.builder()
+                        .id(1L).personaId(PERSONA).cvArchivoId(500L).build()));
+        when(archivos.findByIdAndOrganizacionId(500L, ORGANIZACION)).thenReturn(Optional.of(
+                Archivo.builder().id(500L).organizacionId(ORGANIZACION)
+                        .borradoEn(java.time.Instant.now()).build()));
+
+        assertThatThrownBy(() -> servicio.postular(QUIEN, VACANTE, null, "Ordené la caja de tres sedes", null, null, null,
+                null, true, "10.0.0.1", "Navegador"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("vuelve a subirlo");
+
+        verify(almacen, never()).copiarA(any(), any());
+    }
+
+    @Test
+    @DisplayName("El currículum del perfil se busca con SU organización, no con la de la vacante")
+    void seBuscaConSuOrganizacion() {
+        // Es el cerrojo que pide la regla de arquitectura, y además lo correcto: buscarlo con
+        // la de la vacante dejaría a cualquier empresa pedir el archivo de otra.
+        armarVacantePublicada(9L);
+        when(perfiles.findByPersonaId(PERSONA)).thenReturn(Optional.of(
+                com.renaser.ai.ai_engine.perfil.entity.PerfilCandidato.builder()
+                        .id(1L).personaId(PERSONA).cvArchivoId(500L).build()));
+        when(archivos.findByIdAndOrganizacionId(500L, ORGANIZACION)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> servicio.postular(QUIEN, VACANTE, null, "Ordené la caja de tres sedes", null, null, null,
+                null, true, "10.0.0.1", "Navegador"))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        verify(archivos).findByIdAndOrganizacionId(500L, ORGANIZACION);
+        verify(archivos, never()).findByIdAndOrganizacionId(500L, 9L);
     }
 }

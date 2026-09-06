@@ -45,7 +45,34 @@ public final class DtosPerfil {
             List<IdiomaItem> idiomas,
             List<CertificacionItem> certificaciones,
             List<EnlaceItem> enlaces,
-            LecturaCv lecturaCv) {
+            LecturaCv lecturaCv,
+            // ⚠️ Los tres de abajo son SOLO del portal. El DTO del panel los recibe vacios
+            // —ver ServicioPerfilPanelImpl— porque la foto y los diplomas son del candidato
+            // y no de quien decide (RF-41, decision del 05/09/2026).
+            boolean tieneFoto,
+            Portada portada,
+            CurriculumDelPerfil cv) {
+    }
+
+    /**
+     * La banda de arriba: o una del catalogo de la casa, o una suya, o ninguna.
+     *
+     * <p>{@code tipo} es {@code GALERIA}, {@code PROPIA} o {@code NINGUNA}. Con
+     * {@code GALERIA} viene el {@code codigo}; con {@code PROPIA} se pide a
+     * {@code GET /perfil/portada}.
+     */
+    public record Portada(String tipo, String codigo) {
+
+        public static final Portada NINGUNA = new Portada("NINGUNA", null);
+    }
+
+    /**
+     * Su curriculum, el que se reutiliza al postular.
+     *
+     * <p>Va {@code null} si no ha subido ninguno todavia — que es lo normal, y no bloquea
+     * nada: se puede postular subiendo uno en el momento, como hasta hoy.
+     */
+    public record CurriculumDelPerfil(String nombre, Long tamano, Instant subidoEn) {
     }
 
     public record Pretension(BigDecimal min, BigDecimal max, String moneda) {
@@ -66,7 +93,10 @@ public final class DtosPerfil {
     }
 
     public record CertificacionItem(Long id, String nombre, String entidad, LocalDate emitidaEn,
-                                    LocalDate venceEn, String origen, boolean confirmado) {
+                                    LocalDate venceEn, String origen, boolean confirmado,
+                                    // El diploma escaneado. Solo lo ve el candidato: en el
+                                    // panel este campo va siempre en false.
+                                    boolean tieneArchivo) {
     }
 
     public record EnlaceItem(Long id, String tipo, String url) {
@@ -148,5 +178,9 @@ public final class DtosPerfil {
     }
 
     public record Reordenar(@NotNull List<Long> ids) {
+    }
+
+    /** Elegir una portada del catalogo de la casa. */
+    public record ElegirPortada(@NotBlank String codigo) {
     }
 }

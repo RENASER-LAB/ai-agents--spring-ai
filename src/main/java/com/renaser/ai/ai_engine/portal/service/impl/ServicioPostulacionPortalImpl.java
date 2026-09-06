@@ -79,6 +79,8 @@ public class ServicioPostulacionPortalImpl implements ServicioPostulacionPortal 
     private final com.renaser.ai.ai_engine.perfil.service.ServicioPropuestaPerfil propuestaPerfil;
     private final com.renaser.ai.ai_engine.perfil.service.ServicioLecturaCv lecturaCv;
     private final AlmacenArchivos almacen;
+    private final com.renaser.ai.ai_engine.archivo.repository.ArchivoRepository archivos;
+    private final com.renaser.ai.ai_engine.perfil.repository.PerfilCandidatoRepository perfiles;
     private final ServicioCorreo correo;
     private final TextoProcesoPublicado textoProceso;
 
@@ -155,7 +157,7 @@ public class ServicioPostulacionPortalImpl implements ServicioPostulacionPortal 
                 .creadoEn(Instant.now())
                 .build());
 
-        Archivo archivo = almacen.guardar(organizacionDeLaVacante, cv);
+        Archivo archivo = elCurriculumDeEstaPostulacion(quien, organizacionDeLaVacante, cv);
         Cv curriculum = cvs.save(Cv.builder()
                 .postulacionId(postulacion.getId())
                 .archivoOriginalId(archivo.getId())
@@ -220,6 +222,47 @@ public class ServicioPostulacionPortalImpl implements ServicioPostulacionPortal 
             maquina.transicionar(postulacion, "PERFIL_TURNO_CANDIDATO", null, null, true, false, null);
         }
         return postulacion.getUuid();
+    }
+
+    /**
+     * El currículum de esta postulación: el que suba ahora, o el que ya tiene en su perfil.
+     *
+     * <p><b>Subir uno aquí no le cambia el perfil.</b> Es la decisión de producto: mandar un
+     * currículum a medida para una convocatoria no debe reescribir en silencio el que la
+     * persona eligió dejar en su perfil.
+     *
+     * <p>⚠️ <b>Y por eso el del perfil se COPIA, no se comparte.</b> Un {@code archivo} lleva
+     * sellada la organización de quien lo subió, y el panel lo busca con la de la vacante: el
+     * currículum del perfil está sellado con la plataforma, así que compartir la fila haría
+     * que la empresa de la vacante recibiera un 404 al abrirlo. Es exactamente el fallo que
+     * arregló la V48, visto desde el otro lado.
+     *
+     * <p>La copia no cuesta una lectura de más: el contenido es el mismo, así que
+     * {@code contenido_hash} coincide y {@code ServicioLecturaCv} reutiliza la ficha ya
+     * pagada (RF-161).
+     */
+    private Archivo elCurriculumDeEstaPostulacion(ContextoUsuario quien,
+                                                  Long organizacionDeLaVacante,
+                                                  MultipartFile cv) {
+        if (cv != null && !cv.isEmpty()) {
+            return almacen.guardar(organizacionDeLaVacante, cv);
+        }
+
+        Long delPerfil = perfiles.findByPersonaId(quien.personaId())
+                .map(com.renaser.ai.ai_engine.perfil.entity.PerfilCandidato::getCvArchivoId)
+                .orElse(null);
+        if (delPerfil == null) {
+            throw new IllegalArgumentException("Necesitamos tu currículum: súbelo aquí, o "
+                    + "guárdalo en tu perfil para no tener que subirlo cada vez");
+        }
+        // Con SU organización, no con la de la vacante: el currículum del perfil se selló con
+        // la de quien lo subió, y es además el cerrojo que pide la regla de arquitectura.
+        Archivo suyo = archivos.findByIdAndOrganizacionId(delPerfil, quien.organizacionId())
+                .filter(a -> a.getBorradoEn() == null && a.getRuta() != null)
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "El currículum de tu perfil ya no está guardado: vuelve a subirlo"));
+
+        return almacen.copiarA(organizacionDeLaVacante, suyo);
     }
 
     private void guardarEnlace(Long cvId, String url, String tipo) {

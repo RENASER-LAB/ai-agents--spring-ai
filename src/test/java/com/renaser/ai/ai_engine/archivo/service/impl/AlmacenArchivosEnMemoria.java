@@ -48,7 +48,19 @@ public class AlmacenArchivosEnMemoria implements AlmacenArchivos {
         String nombreOriginal = archivo.getOriginalFilename() == null
                 ? "" : archivo.getOriginalFilename();
         TiposDeArchivo.exigirValido(nombreOriginal, archivo.getContentType());
+        return meter(organizacionId, archivo, nombreOriginal);
+    }
 
+    @Override
+    public Archivo guardarImagen(Long organizacionId, MultipartFile archivo) {
+        String nombreOriginal = archivo.getOriginalFilename() == null
+                ? "" : archivo.getOriginalFilename();
+        TiposDeArchivo.exigirImagen(nombreOriginal, archivo.getContentType(), archivo.getSize());
+        return meter(organizacionId, archivo, nombreOriginal);
+    }
+
+    /** Igual que el almacen de verdad: la validacion decide, el resto es comun. */
+    private Archivo meter(Long organizacionId, MultipartFile archivo, String nombreOriginal) {
         String ruta = organizacionId + "/" + UUID.randomUUID() + "."
                 + TiposDeArchivo.extensionDe(nombreOriginal);
         byte[] contenido;
@@ -67,6 +79,24 @@ public class AlmacenArchivosEnMemoria implements AlmacenArchivos {
                 .tipo(archivo.getContentType())
                 // Igual que el almacen de verdad: la huella permite no releer el mismo CV.
                 .contenidoHash(HashContenido.sha256(contenido))
+                .subidoEn(Instant.now())
+                .creadoEn(Instant.now())
+                .build());
+    }
+
+    @Override
+    public Archivo copiarA(Long organizacionId, Archivo original) {
+        byte[] contenido = leer(original);
+        String ruta = organizacionId + "/" + UUID.randomUUID() + "."
+                + TiposDeArchivo.extensionDe(original.getNombreOriginal());
+        contenidos.put(ruta, contenido);
+        return archivos.save(Archivo.builder()
+                .organizacionId(organizacionId)
+                .ruta(ruta)
+                .nombreOriginal(original.getNombreOriginal())
+                .tamano(original.getTamano())
+                .tipo(original.getTipo())
+                .contenidoHash(original.getContenidoHash())
                 .subidoEn(Instant.now())
                 .creadoEn(Instant.now())
                 .build());

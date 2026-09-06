@@ -1,6 +1,10 @@
 package com.renaser.ai.ai_engine.perfil.service.impl;
 
+import com.renaser.ai.ai_engine.archivo.entity.Archivo;
+import com.renaser.ai.ai_engine.archivo.repository.ArchivoRepository;
 import com.renaser.ai.ai_engine.perfil.dto.DtosPerfil.CertificacionItem;
+import com.renaser.ai.ai_engine.perfil.dto.DtosPerfil.CurriculumDelPerfil;
+import com.renaser.ai.ai_engine.perfil.dto.DtosPerfil.Portada;
 import com.renaser.ai.ai_engine.perfil.dto.DtosPerfil.EducacionItem;
 import com.renaser.ai.ai_engine.perfil.dto.DtosPerfil.EnlaceItem;
 import com.renaser.ai.ai_engine.perfil.dto.DtosPerfil.ExperienciaItem;
@@ -8,12 +12,14 @@ import com.renaser.ai.ai_engine.perfil.dto.DtosPerfil.IdiomaItem;
 import com.renaser.ai.ai_engine.perfil.dto.DtosPerfil.LecturaCv;
 import com.renaser.ai.ai_engine.perfil.dto.DtosPerfil.PerfilCompleto;
 import com.renaser.ai.ai_engine.perfil.dto.DtosPerfil.Pretension;
+import com.renaser.ai.ai_engine.perfil.entity.LecturaCvPerfil;
 import com.renaser.ai.ai_engine.perfil.entity.PerfilCandidato;
 import com.renaser.ai.ai_engine.perfil.repository.CertificacionPerfilRepository;
 import com.renaser.ai.ai_engine.perfil.repository.EducacionPerfilRepository;
 import com.renaser.ai.ai_engine.perfil.repository.EnlacePerfilRepository;
 import com.renaser.ai.ai_engine.perfil.repository.ExperienciaPerfilRepository;
 import com.renaser.ai.ai_engine.perfil.repository.IdiomaPerfilRepository;
+import com.renaser.ai.ai_engine.perfil.repository.LecturaCvPerfilRepository;
 import com.renaser.ai.ai_engine.perfil.repository.PerfilCandidatoRepository;
 import com.renaser.ai.ai_engine.postulacion.entity.Postulacion;
 import com.renaser.ai.ai_engine.postulacion.repository.CvRepository;
@@ -47,6 +53,8 @@ public class PintorDePerfil {
     private final CvRepository cvs;
     private final DatoCvRepository datosCv;
     private final com.renaser.ai.ai_engine.ai.service.ColaCalificacionIa cola;
+    private final LecturaCvPerfilRepository lecturas;
+    private final ArchivoRepository archivos;
 
     public PerfilCompleto pintar(Long personaId) {
         Optional<PerfilCandidato> perfil = perfiles.findByPersonaId(personaId);
@@ -55,7 +63,7 @@ public class PintorDePerfil {
             // siempre tiene algo que pintar.
             return new PerfilCompleto(null, null, List.of(), null, null, null, null,
                     List.of(), List.of(), List.of(), List.of(), List.of(),
-                    lecturaDe(personaId, null));
+                    lecturaDe(personaId, null, null), false, Portada.NINGUNA, null);
         }
         PerfilCandidato p = perfil.get();
         Long id = p.getId();
@@ -79,12 +87,13 @@ public class PintorDePerfil {
                 certificaciones.findByPerfilCandidatoIdOrderByNombre(id).stream()
                         .map(c -> new CertificacionItem(c.getId(), c.getNombre(), c.getEntidad(),
                                 c.getEmitidaEn(), c.getVenceEn(), c.getOrigen(),
-                                c.getConfirmadoEn() != null))
+                                c.getConfirmadoEn() != null, c.getArchivoId() != null))
                         .toList(),
                 enlaces.findByPerfilCandidatoIdOrderByTipo(id).stream()
                         .map(e -> new EnlaceItem(e.getId(), e.getTipo(), e.getUrl()))
                         .toList(),
-                lecturaDe(personaId, p.getActualizadoEn()));
+                lecturaDe(personaId, p.getCvArchivoId(), p.getActualizadoEn()),
+                p.getFotoArchivoId() != null, portadaDe(p), curriculumDe(p));
     }
 
     /** El mismo perfil sin la pretensión: para quien no tiene el permiso de verla. */
@@ -93,7 +102,52 @@ public class PintorDePerfil {
                 completo.habilidades(), completo.experienciaMeses(), completo.ubicacion(),
                 completo.disponibilidad(), null, completo.experiencia(), completo.educacion(),
                 completo.idiomas(), completo.certificaciones(), completo.enlaces(),
-                completo.lecturaCv());
+                completo.lecturaCv(), completo.tieneFoto(), completo.portada(), completo.cv());
+    }
+
+    /**
+     * El mismo perfil sin lo que es del candidato y de nadie más: la foto, la portada, su
+     * currículum y los diplomas.
+     *
+     * <p>⚠️ <b>No es cosmética, es la regla que sostiene el producto.</b> El RF-41 esconde
+     * foto, edad, sexo y estado civil antes de que la IA lea el currículum, para no sesgar
+     * por aspecto. Enseñarle la foto a la persona que decide desharía eso por la puerta de
+     * al lado. Decidido el 05/09/2026: si algún día se quiere, hace falta un RF nuevo y
+     * otro texto de consentimiento.
+     *
+     * <p>El currículum se quita por otro motivo: el panel ya lo abre por su propia ruta, con
+     * el permiso que le corresponde y sellado con la organización de la vacante.
+     */
+    public PerfilCompleto sinLoDelCandidato(PerfilCompleto completo) {
+        return new PerfilCompleto(completo.titular(), completo.resumen(),
+                completo.habilidades(), completo.experienciaMeses(), completo.ubicacion(),
+                completo.disponibilidad(), completo.pretension(), completo.experiencia(),
+                completo.educacion(), completo.idiomas(),
+                completo.certificaciones().stream()
+                        .map(c -> new CertificacionItem(c.id(), c.nombre(), c.entidad(),
+                                c.emitidaEn(), c.venceEn(), c.origen(), c.confirmado(), false))
+                        .toList(),
+                completo.enlaces(), completo.lecturaCv(), false, Portada.NINGUNA, null);
+    }
+
+    private Portada portadaDe(PerfilCandidato p) {
+        if (p.getPortadaArchivoId() != null) {
+            return new Portada("PROPIA", null);
+        }
+        if (p.getPortadaGaleria() != null) {
+            return new Portada("GALERIA", p.getPortadaGaleria());
+        }
+        return Portada.NINGUNA;
+    }
+
+    private CurriculumDelPerfil curriculumDe(PerfilCandidato p) {
+        if (p.getCvArchivoId() == null) {
+            return null;
+        }
+        return archivos.findById(p.getCvArchivoId())
+                .map(a -> new CurriculumDelPerfil(a.getNombreOriginal(), a.getTamano(),
+                        p.getCvActualizadoEn()))
+                .orElse(null);
     }
 
     /**
@@ -101,7 +155,29 @@ public class PintorDePerfil {
      * estado real vive en los trabajos de la cola y en dato_cv, y duplicarlo seria
      * inventarse una segunda fuente de verdad.
      */
-    private LecturaCv lecturaDe(Long personaId, Instant actualizadoEn) {
+    private LecturaCv lecturaDe(Long personaId, Long cvArchivoId, Instant actualizadoEn) {
+        // ⚠️ La del perfil manda, y no es un empate arbitrario: si subió su currículum a su
+        // perfil, ESE es el archivo que describe lo que la pantalla está enseñando. Lo que
+        // pasara con el de una postulación vieja ya no es la respuesta a «¿en qué punto está
+        // mi currículum?».
+        //
+        // Y se busca por el archivo que hay AHORA, no por la lectura más reciente: las
+        // lecturas se guardan para siempre como recibo de lo ya pagado (RF-161), así que
+        // quien quitó su currículum conserva filas «LISTA» de uno que ya no existe.
+        Optional<LecturaCvPerfil> delPerfil = cvArchivoId == null
+                ? Optional.empty()
+                : lecturas.findFirstByPersonaIdAndArchivoIdOrderByIdDesc(personaId, cvArchivoId);
+        if (delPerfil.isPresent()) {
+            LecturaCvPerfil l = delPerfil.get();
+            return new LecturaCv(l.getEstado(),
+                    l.getTerminadoEn() != null ? l.getTerminadoEn() : l.getCreadoEn());
+        }
+        if (cvArchivoId != null) {
+            // Hay currículum en el perfil pero ninguna lectura suya: es el de una migración
+            // o el de alguien que lo subió antes de que esto existiera. No hay nada corriendo.
+            return new LecturaCv("NO_LEGIBLE", actualizadoEn);
+        }
+
         List<Postulacion> suyas = postulaciones.deLaPersona(personaId);
         Postulacion ultima = suyas.stream()
                 .filter(p -> cvs.findByPostulacionId(p.getId()).isPresent())

@@ -85,7 +85,20 @@ public class AlmacenArchivosSupabase implements AlmacenArchivos {
         String nombreOriginal = archivo.getOriginalFilename() == null
                 ? "" : archivo.getOriginalFilename();
         TiposDeArchivo.exigirValido(nombreOriginal, archivo.getContentType());
+        return subirYRegistrar(organizacionId, archivo, nombreOriginal);
+    }
 
+    @Override
+    public Archivo guardarImagen(Long organizacionId, MultipartFile archivo) {
+        String nombreOriginal = archivo.getOriginalFilename() == null
+                ? "" : archivo.getOriginalFilename();
+        TiposDeArchivo.exigirImagen(nombreOriginal, archivo.getContentType(), archivo.getSize());
+        return subirYRegistrar(organizacionId, archivo, nombreOriginal);
+    }
+
+    /** Lo que hacen los dos una vez decidido que el archivo vale. */
+    private Archivo subirYRegistrar(Long organizacionId, MultipartFile archivo,
+                                    String nombreOriginal) {
         String ruta = rutaNueva(organizacionId, nombreOriginal);
         byte[] contenido;
         try {
@@ -104,6 +117,25 @@ public class AlmacenArchivosSupabase implements AlmacenArchivos {
                 // La huella es lo que permite no pagar dos lecturas del mismo curriculum.
                 // Se calcula aqui porque este es el unico embudo por el que pasan los bytes.
                 .contenidoHash(HashContenido.sha256(contenido))
+                .subidoEn(Instant.now())
+                .creadoEn(Instant.now())
+                .build());
+    }
+
+    @Override
+    public Archivo copiarA(Long organizacionId, Archivo original) {
+        byte[] contenido = leer(original);
+        String ruta = rutaNueva(organizacionId, original.getNombreOriginal());
+        subir(ruta, contenido, original.getTipo());
+        return archivos.save(Archivo.builder()
+                .organizacionId(organizacionId)
+                .ruta(ruta)
+                .nombreOriginal(original.getNombreOriginal())
+                .tamano(original.getTamano())
+                .tipo(original.getTipo())
+                // La misma huella: es el mismo contenido, y eso es justo lo que evita
+                // volver a pagar su lectura.
+                .contenidoHash(original.getContenidoHash())
                 .subidoEn(Instant.now())
                 .creadoEn(Instant.now())
                 .build());

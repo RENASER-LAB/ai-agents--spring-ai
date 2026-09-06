@@ -90,7 +90,37 @@ public class ServicioPropuestaPerfilImpl implements ServicioPropuestaPerfil {
         if (personaId == null) {
             return;
         }
+        volcar(personaId, resultado);
+    }
 
+    /**
+     * El currículum que subió a su perfil, sin postulación de por medio.
+     *
+     * <p>Se comprueba igual que arriba que la persona no esté anonimizada: el borrado de la
+     * 29733 se pidió sobre la persona, no sobre una convocatoria.
+     */
+    @Override
+    @Transactional
+    public boolean proponerAlPerfil(Long personaId, ResultadoDatos resultado) {
+        if (resultado == null || personaId == null) {
+            return false;
+        }
+        boolean viva = personas.findById(personaId)
+                .filter(persona -> persona.getAnonimizadoEn() == null)
+                .isPresent();
+        if (!viva) {
+            return false;
+        }
+        return volcar(personaId, resultado);
+    }
+
+    /**
+     * Lo que hacen las dos: crear el perfil si no había y proponerle lo leído.
+     *
+     * @return si algo llegó a entrar. Un currículum del que no salió ni una fecha ni una
+     *         frase deja el perfil igual que estaba, y quien llama tiene que poder decirlo.
+     */
+    private boolean volcar(Long personaId, ResultadoDatos resultado) {
         PerfilCandidato perfil = perfiles.findByPersonaId(personaId)
                 .orElseGet(() -> perfiles.save(PerfilCandidato.builder()
                         .personaId(personaId)
@@ -106,6 +136,17 @@ public class ServicioPropuestaPerfilImpl implements ServicioPropuestaPerfil {
 
         perfil.setActualizadoEn(Instant.now());
         perfiles.save(perfil);
+
+        // «Algo entró» se mide contra lo que hay ahora, no contra lo que dijo el modelo: si
+        // propuso tres empleos que la persona ya tenía escritos, no se añadió nada nuevo
+        // pero su perfil SÍ describe su currículum. Lo que no vale es un perfil que sigue
+        // vacío después de leer.
+        return perfil.getTitular() != null || perfil.getResumen() != null
+                || perfil.getHabilidades() != null
+                || !experiencias.findByPerfilCandidatoIdOrderByOrden(perfil.getId()).isEmpty()
+                || !educaciones.findByPerfilCandidatoIdOrderByOrden(perfil.getId()).isEmpty()
+                || !idiomas.findByPerfilCandidatoIdOrderByIdioma(perfil.getId()).isEmpty()
+                || !certificaciones.findByPerfilCandidatoIdOrderByNombre(perfil.getId()).isEmpty();
     }
 
     /** La persona dueña, o null si no se puede (o no se debe: anonimizada por el borrado). */

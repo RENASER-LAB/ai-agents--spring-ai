@@ -145,6 +145,18 @@ public interface ColaCalificacionIa {
      */
     boolean encolarDatosCv(Long postulacionId);
 
+    /**
+     * Leer el currículum que el candidato subió a <b>su perfil</b>, sin postulación de por
+     * medio.
+     *
+     * <p>Mismo agente y misma instrucción que {@link #encolarDatosCv}: es el mismo trabajo
+     * sobre el mismo tipo de documento. La organización se pasa a mano porque no hay vacante
+     * de la que deducirla.
+     *
+     * @param lecturaId la fila de {@code lectura_cv_perfil} que se va a atender
+     */
+    boolean encolarDatosCvDelPerfil(Long organizacionId, Long lecturaId);
+
     boolean encolarPruebaPuesto(Long postulacionId);
 
     /**

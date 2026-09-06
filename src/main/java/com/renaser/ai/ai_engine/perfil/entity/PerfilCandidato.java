@@ -34,6 +34,20 @@ public class PerfilCandidato {
     private BigDecimal pretensionMin;
     private BigDecimal pretensionMax;
     private String pretensionMoneda;
+
+    // La foto. ⚠️ SOLO la ve el candidato en su portal: no entra en el DTO del panel ni en
+    // el texto que lee la IA (RF-41). Decidido el 05/09/2026; ensenarsela a quien decide
+    // necesita un RF nuevo y otro texto de consentimiento, no un campo mas en un mapper.
+    private Long fotoArchivoId;
+    // O la suya o una del catalogo de la casa, nunca las dos: lo impone un CHECK.
+    private Long portadaArchivoId;
+    private String portadaGaleria;
+    // Su curriculum, el ultimo (RF-162). Al postular se COPIA a la organizacion de la
+    // vacante en vez de compartirse: un archivo sellado con otra organizacion no se abre
+    // desde el panel de esa empresa, que es lo que arreglo la V48.
+    private Long cvArchivoId;
+    private Instant cvActualizadoEn;
+
     private Instant actualizadoEn;
     private Instant creadoEn;
 }

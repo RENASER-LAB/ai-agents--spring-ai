@@ -111,6 +111,39 @@ public class RegistroTrabajosIa {
     }
 
     /**
+     * Crea el trabajo de una LECTURA DE PERFIL: un currículum sin postulación detrás.
+     *
+     * <p>Mismo molde que {@link #crearParaVacante}, con {@code referencia_tabla} apuntando a
+     * {@code lectura_cv_perfil}. La lectura ya nace con su índice de «una viva por persona»,
+     * así que aquí basta con no duplicar el trabajo de una misma lectura.
+     */
+    @Transactional
+    public Optional<TrabajoIa> crearParaLecturaDePerfil(Long organizacionId, String agenteCodigo,
+                                                        Long lecturaId, String modo) {
+        boolean vivo = trabajos
+                .findFirstByReferenciaTablaAndReferenciaIdAndAgenteCodigoOrderByIdDesc(
+                        "lectura_cv_perfil", lecturaId, agenteCodigo)
+                .map(t -> "PENDIENTE".equals(t.getEstado()) || "EN_CURSO".equals(t.getEstado())
+                        || "EN_ESPERA".equals(t.getEstado()))
+                .orElse(false);
+        if (vivo) {
+            return Optional.empty();
+        }
+        return Optional.of(trabajos.saveAndFlush(TrabajoIa.builder()
+                .organizacionId(organizacionId)
+                .agenteCodigo(agenteCodigo)
+                .modo(modo)
+                // Sin postulacion: la columna admite vacio desde la V11 y el REDACTOR ya
+                // usaba esta misma puerta para colgar de una vacante.
+                .referenciaTabla("lectura_cv_perfil")
+                .referenciaId(lecturaId)
+                .estado("PENDIENTE")
+                .intentos(0)
+                .creadoEn(Instant.now())
+                .build()));
+    }
+
+    /**
      * <b>La barrera.</b> Crea el trabajo que cierra la etapa, pero solo si los que corren a
      * la vez ya acabaron todos.
      *

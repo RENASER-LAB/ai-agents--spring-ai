@@ -159,4 +159,39 @@ class ServicioCuentaPortalImplTest {
         return new CrearCuenta("Camila", "Reyes", "camila@correo.pe", "unaClaveLarga123",
                 ciudadUbigeo, true, false);
     }
+
+    // ============ Quién soy ============
+
+    @Test
+    @DisplayName("La sesión trae el nombre de quien entra, leído de persona")
+    void quienSoyTraeElNombre() {
+        // El portal saludaba por lo que hubiera en localStorage: quien entraba desde otro
+        // navegador —o desde el enlace del correo— se quedaba sin nombre.
+        when(usuarios.findById(60L)).thenReturn(Optional.of(
+                Usuario.builder().id(60L).personaId(33L).build()));
+        when(personas.findById(33L)).thenReturn(Optional.of(
+                Persona.builder().id(33L).nombre("Camila").apellidos("Torres").build()));
+
+        var soy = servicio.quienSoy(new com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario(
+                60L, 33L, ORGANIZACION, "CANDIDATO", java.util.List.of(), java.util.Map.of()));
+
+        assertThat(soy.usuarioId()).isEqualTo(60L);
+        assertThat(soy.nombre()).isEqualTo("Camila");
+        assertThat(soy.apellidos()).isEqualTo("Torres");
+    }
+
+    @Test
+    @DisplayName("Sin persona detrás se saluda sin nombre, no se cierra la puerta")
+    void sinPersonaSeSaludaSinNombre() {
+        // No debería pasar, pero quedarse fuera del portal por no saber cómo te llamas sería
+        // peor que saludar sin nombre, que es algo que la pantalla ya sabe hacer.
+        when(usuarios.findById(60L)).thenReturn(Optional.empty());
+
+        var soy = servicio.quienSoy(new com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario(
+                60L, 33L, ORGANIZACION, "CANDIDATO", java.util.List.of(), java.util.Map.of()));
+
+        assertThat(soy.usuarioId()).isEqualTo(60L);
+        assertThat(soy.nombre()).isNull();
+        assertThat(soy.apellidos()).isNull();
+    }
 }
