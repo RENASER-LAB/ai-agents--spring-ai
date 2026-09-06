@@ -20,8 +20,38 @@ import org.springframework.web.multipart.MultipartFile;
  */
 public interface ServicioArchivosDelPerfil {
 
-    /** Lo que se devuelve para pintar o descargar: el contenido y con qué nombre y tipo. */
+    /**
+     * Lo que se devuelve para pintar o descargar: el contenido y con qué nombre y tipo.
+     *
+     * <p>⚠️ <b>Los tres métodos se escriben a mano porque el componente es un array.</b> Un
+     * {@code record} con {@code byte[]} hereda el {@code equals} y el {@code hashCode} de la
+     * referencia, así que dos contenidos idénticos salen distintos y meter uno en un
+     * {@code Set} no hace lo que parece.
+     *
+     * <p>Y el {@code toString} <b>no imprime los bytes, dice cuántos son</b>: esto lleva
+     * dentro el currículum de una persona, y el volcado por defecto de un array es basura en
+     * el registro; el volcado de su contenido sería un dato personal en el registro.
+     */
     record Contenido(byte[] bytes, String nombre, String tipo) {
+
+        @Override
+        public boolean equals(Object otro) {
+            return otro instanceof Contenido c
+                    && java.util.Arrays.equals(bytes, c.bytes)
+                    && java.util.Objects.equals(nombre, c.nombre)
+                    && java.util.Objects.equals(tipo, c.tipo);
+        }
+
+        @Override
+        public int hashCode() {
+            return java.util.Objects.hash(java.util.Arrays.hashCode(bytes), nombre, tipo);
+        }
+
+        @Override
+        public String toString() {
+            return "Contenido[nombre=" + nombre + ", tipo=" + tipo
+                    + ", bytes=" + (bytes == null ? 0 : bytes.length) + "]";
+        }
     }
 
     void guardarFoto(ContextoUsuario quien, MultipartFile archivo);
