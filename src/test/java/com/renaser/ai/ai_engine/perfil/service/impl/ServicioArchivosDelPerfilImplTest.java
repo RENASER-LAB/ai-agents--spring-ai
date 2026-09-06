@@ -5,6 +5,7 @@ import com.renaser.ai.ai_engine.ai.service.ColaCalificacionIa;
 import com.renaser.ai.ai_engine.archivo.entity.Archivo;
 import com.renaser.ai.ai_engine.archivo.repository.ArchivoRepository;
 import com.renaser.ai.ai_engine.archivo.service.AlmacenArchivos;
+import com.renaser.ai.ai_engine.perfil.entity.CertificacionPerfil;
 import com.renaser.ai.ai_engine.perfil.entity.LecturaCvPerfil;
 import com.renaser.ai.ai_engine.perfil.entity.PerfilCandidato;
 import com.renaser.ai.ai_engine.perfil.repository.CertificacionPerfilRepository;
@@ -277,5 +278,128 @@ class ServicioArchivosDelPerfilImplTest {
         Contenido c = new Contenido(new byte[] {1, 2, 3}, "cv.pdf", "application/pdf");
         assertThat(c.toString()).contains("bytes=3").doesNotContain("[1, 2, 3]");
         assertThat(c).isEqualTo(new Contenido(new byte[] {1, 2, 3}, "cv.pdf", "application/pdf"));
+    }
+
+    // ==================== Los diplomas ====================
+
+    @Test
+    @DisplayName("Un diploma en PDF va por la ruta de documento")
+    void elDiplomaEnPdf() {
+        cuandoLaCertificacionEsMia(20L, null);
+        when(almacen.guardar(eq(ORG), any())).thenReturn(archivo(95L, "h"));
+
+        servicio.guardarDiploma(QUIEN, 20L, unPdf());
+
+        verify(almacen).guardar(eq(ORG), any());
+        verify(almacen, never()).guardarImagen(anyLong(), any());
+    }
+
+    @Test
+    @DisplayName("Y una foto del papel también vale: va por la de imagen")
+    void elDiplomaEnFoto() {
+        // Mucha gente tiene el diploma en papel y le hace una foto con el móvil.
+        cuandoLaCertificacionEsMia(20L, null);
+        when(almacen.guardarImagen(eq(ORG), any())).thenReturn(archivo(96L, "h"));
+
+        servicio.guardarDiploma(QUIEN, 20L,
+                new MockMultipartFile("a", "diploma.jpg", "image/jpeg", new byte[] {1}));
+
+        verify(almacen).guardarImagen(eq(ORG), any());
+        verify(almacen, never()).guardar(anyLong(), any());
+    }
+
+    @Test
+    @DisplayName("La certificación de otra persona responde 404, no 403")
+    void laCertificacionAjenaEs404() {
+        // Decir «prohibido» ya confirmaría que existe.
+        CertificacionPerfil deOtro = CertificacionPerfil.builder()
+                .id(21L).perfilCandidatoId(999L).nombre("BLS").build();
+        when(certificaciones.findById(21L)).thenReturn(Optional.of(deOtro));
+
+        assertThatThrownBy(() -> servicio.diploma(QUIEN, 21L))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("Quitar el diploma suelta su archivo y deja la certificación")
+    void quitarElDiplomaDejaLaCertificacion() {
+        CertificacionPerfil fila = cuandoLaCertificacionEsMia(22L, 97L);
+        when(archivos.findByIdAndOrganizacionId(97L, ORG)).thenReturn(Optional.of(archivo(97L, "h")));
+
+        servicio.quitarDiploma(QUIEN, 22L);
+
+        assertThat(fila.getArchivoId()).isNull();
+        verify(certificaciones).save(fila);
+    }
+
+    // ==================== Quitar lo demás ====================
+
+    @Test
+    @DisplayName("Quitar la foto la suelta y deja el perfil sin ella")
+    void quitarLaFoto() {
+        perfil.setFotoArchivoId(98L);
+        when(archivos.findByIdAndOrganizacionId(98L, ORG)).thenReturn(Optional.of(archivo(98L, "h")));
+
+        servicio.quitarFoto(QUIEN);
+
+        assertThat(perfil.getFotoArchivoId()).isNull();
+    }
+
+    @Test
+    @DisplayName("Quitar la portada borra las dos formas: la propia y el código")
+    void quitarLaPortadaBorraLasDos() {
+        perfil.setPortadaArchivoId(99L);
+        perfil.setPortadaGaleria("CANTO_AQUA");
+        when(archivos.findByIdAndOrganizacionId(99L, ORG)).thenReturn(Optional.of(archivo(99L, "h")));
+
+        servicio.quitarPortada(QUIEN);
+
+        assertThat(perfil.getPortadaArchivoId()).isNull();
+        assertThat(perfil.getPortadaGaleria()).isNull();
+    }
+
+    @Test
+    @DisplayName("Subir una portada propia borra el código de galería: son excluyentes")
+    void laPropiaBorraElCodigo() {
+        perfil.setPortadaGaleria("CANTO_ROSA");
+        when(almacen.guardarImagen(eq(ORG), any())).thenReturn(archivo(100L, "h"));
+
+        servicio.guardarPortada(QUIEN,
+                new MockMultipartFile("a", "fondo.png", "image/png", new byte[] {1}));
+
+        assertThat(perfil.getPortadaArchivoId()).isEqualTo(100L);
+        assertThat(perfil.getPortadaGaleria()).isNull();
+    }
+
+    @Test
+    @DisplayName("Sin perfil todavía, pedir la portada es 404 y no revienta")
+    void sinPerfilTodaviaEs404() {
+        // `perfil_candidato` se crea perezosamente: quien acaba de registrarse
+        // no tiene fila, y pedir su portada no puede ser un 500.
+        when(perfiles.findByPersonaId(PERSONA)).thenReturn(Optional.empty());
+        when(perfiles.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        assertThatThrownBy(() -> servicio.portada(QUIEN))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("El currículum se sirve con nombre y tipo, para que la descarga tenga sentido")
+    void elCurriculumSeSirveConSuNombre() {
+        perfil.setCvArchivoId(101L);
+        when(archivos.findByIdAndOrganizacionId(101L, ORG)).thenReturn(Optional.of(archivo(101L, "h")));
+        when(almacen.leer(any())).thenReturn(new byte[] {9});
+
+        Contenido c = servicio.curriculum(QUIEN);
+
+        assertThat(c.nombre()).isEqualTo("cv.pdf");
+        assertThat(c.tipo()).isEqualTo("application/pdf");
+    }
+
+    private CertificacionPerfil cuandoLaCertificacionEsMia(long id, Long archivoId) {
+        CertificacionPerfil fila = CertificacionPerfil.builder()
+                .id(id).perfilCandidatoId(perfil.getId()).nombre("BLS").archivoId(archivoId).build();
+        when(certificaciones.findById(id)).thenReturn(Optional.of(fila));
+        return fila;
     }
 }

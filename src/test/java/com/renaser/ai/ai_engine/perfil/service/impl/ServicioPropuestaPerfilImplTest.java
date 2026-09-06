@@ -274,4 +274,51 @@ class ServicioPropuestaPerfilImplTest {
         assertThat(ServicioPropuestaPerfilImpl.mes("hace dos años")).isNull();
         assertThat(ServicioPropuestaPerfilImpl.mes(null)).isNull();
     }
+
+    // ==================== Sin postulación detrás ====================
+
+    @Test
+    @DisplayName("Al perfil directo: el currículum subido al perfil no tiene postulación")
+    void propuestaSinPostulacion() {
+        // ⚠️ Es el camino nuevo del 05/09/2026. `trasPostular` sale de una
+        // postulación; aquí solo hay una persona que subió su currículum, y lo
+        // que se vuelca es exactamente lo mismo.
+        // «Entró algo» se mide contra lo que hay DESPUÉS, no contra lo que dijo
+        // el modelo: por eso el repositorio tiene que devolver la fila guardada.
+        when(experiencias.findByPerfilCandidatoIdOrderByOrden(PERFIL))
+                // Mutable: el volcado ordena la lista que le devuelve el repositorio.
+                .thenReturn(new java.util.ArrayList<>(
+                        List.of(ExperienciaPerfil.builder().id(1L).orden(0).build())));
+
+        boolean entro = servicio.proponerAlPerfil(PERSONA_ID,
+                conExperiencia(new ExperienciaLeida(
+                        "Analista", "Clínica San Juan", "2022-03", null, null)));
+
+        assertThat(entro).isTrue();
+        verify(experiencias).save(any());
+    }
+
+    @Test
+    @DisplayName("A una persona anonimizada no se le propone nada")
+    void aLaAnonimizadaNoSeLePropone() {
+        // El borrado del 29733 ya pasó por ahí: volver a escribirle el perfil
+        // desharía lo que la ley obliga a hacer.
+        when(personas.findById(PERSONA_ID)).thenReturn(Optional.of(
+                Persona.builder().id(PERSONA_ID).anonimizadoEn(Instant.now()).build()));
+
+        boolean entro = servicio.proponerAlPerfil(PERSONA_ID,
+                conExperiencia(new ExperienciaLeida("Analista", "Clínica", "2022-03", null, null)));
+
+        assertThat(entro).isFalse();
+        verify(experiencias, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Sin persona o sin resultado devuelve false en vez de reventar")
+    void loVacioNoRevienta() {
+        // Lo llama la cola: una excepción aquí tumba el trabajo entero por un
+        // caso que no es un error, solo un vacío.
+        assertThat(servicio.proponerAlPerfil(null, conExperiencia())).isFalse();
+        assertThat(servicio.proponerAlPerfil(PERSONA_ID, null)).isFalse();
+    }
 }
