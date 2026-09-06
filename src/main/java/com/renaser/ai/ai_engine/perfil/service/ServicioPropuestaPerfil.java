@@ -20,6 +20,19 @@ public interface ServicioPropuestaPerfil {
     void proponer(Long postulacionId, ResultadoDatos resultado);
 
     /**
+     * Lo mismo, pero a partir de la persona: para el currículum que subió a <b>su perfil</b>,
+     * que no tiene postulación detrás y puede que nunca la tenga.
+     *
+     * <p>Las reglas son exactamente las mismas —propone, no pisa, y no resucita a quien pidió
+     * el borrado—; lo único que cambia es de dónde sale la persona.
+     *
+     * @return true si de verdad entró algo al perfil. Un {@code false} es lo que convierte la
+     *         lectura en {@code NO_LEGIBLE}: decir {@code LISTA} sobre una ficha vacía haría
+     *         que la pantalla prometiera datos que no están.
+     */
+    boolean proponerAlPerfil(Long personaId, ResultadoDatos resultado);
+
+    /**
      * Propone al perfil los enlaces que el candidato escribió en el formulario de postular.
      * Un enlace que no valida (RF-166) se omite sin romper la postulación: el formulario de
      * postular no es el sitio para pelear por una URL.

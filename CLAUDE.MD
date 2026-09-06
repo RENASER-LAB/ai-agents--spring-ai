@@ -696,6 +696,69 @@ y el diseño en [docs/PROPUESTA-PERFIL-DEL-CANDIDATO.md](docs/PROPUESTA-PERFIL-D
 ⚠️ **No encender con candidatos reales sin el texto de consentimiento nuevo**: el vigente
 cubre una postulacion concreta, no un perfil que se conserva entre convocatorias (RF-169).
 
+## El perfil guarda sus archivos, y su curriculum se lee al subirlo (05/09/2026 · V51)
+
+El perfil paso de ser texto a guardar **foto, portada, curriculum y diplomas**. Todo en
+`archivo`, con el patron de siempre. Migracion **V51** (`perfil_candidato` gana cuatro
+columnas y `certificacion_perfil` una; tabla nueva `lectura_cv_perfil`).
+
+**Lo del candidato NO llega al panel, y no es cosmetica.** La foto, la portada, el curriculum
+del perfil y los diplomas se recortan en `PintorDePerfil.sinLoDelCandidato`. El RF-41 esconde
+la cara a la IA para no sesgar por aspecto; enseñarsela a quien decide desharia la regla por
+la puerta de al lado. Decidido con la clienta el 05/09/2026: si algun dia se quiere, hace
+falta RF nuevo y otro texto de consentimiento.
+
+⚠️ **Los bytes se sirven, no se firma un enlace.** Un `<img src>` no manda cabecera
+`Authorization`, y en local `urlDeDescarga` devuelve una url `memoria://` que ningun navegador
+abre. `GET /perfil/foto`, `/perfil/portada`, `/perfil/cv` y el diploma devuelven contenido.
+
+### La lectura del CV del perfil no cuelga de ninguna postulacion
+
+⚠️ **Y no hizo falta agente nuevo ni tocar el esquema de la cola.** `trabajo_ia.postulacion_id`
+es nullable desde la V11 y la tabla ya trae `referencia_tabla`/`referencia_id` —
+`AgenteRedactor` lo usa desde entonces. Se encola `DATOS_CV` con
+`referencia_tabla = 'lectura_cv_perfil'` y `AgenteDatosCv.ejecutar` se bifurca en
+`AgenteDatosCv.DEL_PERFIL`. El estado vive en `lectura_cv_perfil` con los mismos cuatro
+valores que ya conocia la pantalla; sin fila, `SIN_CV`.
+
+Lo unico que hubo que revisar fue cada `getPostulacionId()` de `ai/` para el caso nulo: solo
+`intentarElRetrato` necesita guarda, porque un retrato sin postulacion no significa nada.
+
+⚠️ **Las lecturas NO se borran nunca: son el recibo de lo ya pagado** (RF-161). Borrarlas al
+quitar el curriculum hacia que volver a subir el mismo PDF llamara otra vez al modelo para
+proponer exactamente los mismos datos. La pantalla no se confunde porque el estado se busca
+por el archivo que hay AHORA
+(`findFirstByPersonaIdAndArchivoIdOrderByIdDesc`), no por la lectura mas reciente.
+
+⚠️ **Una lectura cerrada no se vuelve a abrir.** El trabajo sigue en la cola despues de que la
+lectura se cierre —quitar el curriculum la cancela, subir otro la deja atras—, y sin la guarda
+de `yaEstaCerrada` volcaba al perfil las propuestas de un curriculum que la persona acababa de
+borrar.
+
+### Postular reutiliza el curriculum del perfil, y lo COPIA
+
+Sin adjuntar nada se usa el del perfil; adjuntando uno, ese vale **solo para esa vacante** y el
+del perfil no cambia. Sin ninguno de los dos, 400 con el motivo en lenguaje normal.
+
+⚠️ **El archivo se copia, no se comparte la fila.** Un `archivo` lleva sellada la organizacion
+de quien lo subio y el panel lo busca con la de la vacante: compartir la fila daria 404 a la
+empresa. Es el fallo que arreglo la V48 visto desde el otro lado. `almacen.copiarA` conserva
+el `contenido_hash`, asi que la lectura no se paga otra vez.
+
+### Y dos cosas que la regla de arquitectura obliga a hacer bien
+
+Los `findById` sobre `ArchivoRepository` de este paquete van por
+`findByIdAndOrganizacionId(id, quien.organizacionId())`. El id ya sale de la fila de perfil de
+quien llama, asi que la persona es segura por construccion; la organizacion es el segundo
+cerrojo que pide `ArquitecturaTest`, y encaja de verdad porque estos archivos se sellaron con
+esa misma organizacion al subirlos. **Se cumple la regla en vez de apuntarse en la lista de
+excepciones acordadas.**
+
+`GET /portal/auth/sesion` devuelve como se llama quien tiene el token. Hace falta porque el
+portal solo entra una vez: a partir de la segunda visita arranca de un token guardado y nadie
+le ha dicho el nombre. No lleva `@PreAuthorize` porque la cadena del portal termina en
+`.anyRequest().hasAuthority("TIPO_CANDIDATO")` — comprobado: 401 sin token y 401 con uno falso.
+
 ## Multiempresa (26/08/2026 · completo, piezas A-F)
 El sistema paso de «Renaser contrata para Renaser» a plataforma tipo Indeed: cada empresa
 se registra por invitacion de Renaser, publica sus vacantes y ve solo a sus candidatos.

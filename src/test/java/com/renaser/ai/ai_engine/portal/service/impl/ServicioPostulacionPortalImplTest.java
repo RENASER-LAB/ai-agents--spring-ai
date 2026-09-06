@@ -84,6 +84,8 @@ class ServicioPostulacionPortalImplTest {
     @Mock private com.renaser.ai.ai_engine.perfil.service.ServicioPropuestaPerfil propuestaPerfil;
     @Mock private com.renaser.ai.ai_engine.perfil.service.ServicioLecturaCv lecturaCv;
     @Mock private AlmacenArchivos almacen;
+    @Mock private com.renaser.ai.ai_engine.archivo.repository.ArchivoRepository archivos;
+    @Mock private com.renaser.ai.ai_engine.perfil.repository.PerfilCandidatoRepository perfiles;
     @Mock private ServicioCorreo correo;
     @Mock private MultipartFile cv;
 
@@ -101,7 +103,7 @@ class ServicioPostulacionPortalImplTest {
         servicio = new ServicioPostulacionPortalImpl(organizaciones, personas, usuarios,
                 consentimientos, vacantes, puestos, requisitos, evaluaciones, postulaciones,
                 transiciones, estados, cvs, enlaces, maquina, propuestaPerfil, lecturaCv,
-                almacen, correo, textoProceso);
+                almacen, archivos, perfiles, correo, textoProceso);
         tablon = new ServicioTablonPortalImpl(vacantes, organizaciones, requisitos, textoProceso);
     }
 

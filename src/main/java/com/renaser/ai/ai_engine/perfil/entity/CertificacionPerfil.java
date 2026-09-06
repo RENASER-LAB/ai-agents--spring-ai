@@ -22,6 +22,8 @@ public class CertificacionPerfil {
     private String entidad;
     private LocalDate emitidaEn;
     private LocalDate venceEn;
+    // El diploma escaneado, si lo subio. Como la foto: del candidato y para el candidato.
+    private Long archivoId;
     private String origen;
     private Instant confirmadoEn;
     private Instant creadoEn;

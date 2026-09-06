@@ -68,6 +68,7 @@ class ColaCalificacionIaImplTest {
     @Mock private PuenteCalificacionIa puente;
     // Sin tope por defecto (sinCupo devuelve false en el mock): las pruebas del tope lo
     // encienden una a una.
+    @Mock private com.renaser.ai.ai_engine.perfil.service.PuenteLecturaCvPerfil puenteDelPerfil;
     @Mock private TopeMensualIa tope;
     // Sin organización por defecto (findById vacío = activa): las pruebas de la
     // suspensión la apagan una a una.
@@ -853,7 +854,8 @@ class ColaCalificacionIaImplTest {
     }
 
     private ColaCalificacionIaImpl conLaCalificacion(boolean habilitada) {
-        return new ColaCalificacionIaImpl(trabajos, registro, publicador, puente, tope, organizaciones,
+        return new ColaCalificacionIaImpl(trabajos, registro, publicador, puente, puenteDelPerfil,
+                tope, organizaciones,
                 List.of(datosCv, evidenciaCv, evaluador, potencialRiesgo, pruebaPuesto, simulacion),
                 habilitada, 3, 15);
     }

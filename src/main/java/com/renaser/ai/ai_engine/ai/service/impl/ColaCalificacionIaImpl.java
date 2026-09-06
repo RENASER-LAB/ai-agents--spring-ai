@@ -93,6 +93,8 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
     private final RegistroTrabajosIa registro;
     private final TrabajoIaPublisher publicador;
     private final PuenteCalificacionIa puente;
+    /** Para poder cerrar la lectura del currículum del perfil cuando el agente se agota. */
+    private final com.renaser.ai.ai_engine.perfil.service.PuenteLecturaCvPerfil puenteDelPerfil;
     private final TopeMensualIa tope;
     private final OrganizacionRepository organizaciones;
     private final Map<String, AgenteSeleccion> agentes;
@@ -104,6 +106,7 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
                                   RegistroTrabajosIa registro,
                                   TrabajoIaPublisher publicador,
                                   PuenteCalificacionIa puente,
+                                  com.renaser.ai.ai_engine.perfil.service.PuenteLecturaCvPerfil puenteDelPerfil,
                                   TopeMensualIa tope,
                                   OrganizacionRepository organizaciones,
                                   List<AgenteSeleccion> agentes,
@@ -114,6 +117,7 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
         this.registro = registro;
         this.publicador = publicador;
         this.puente = puente;
+        this.puenteDelPerfil = puenteDelPerfil;
         this.tope = tope;
         this.organizaciones = organizaciones;
         this.agentes = agentes.stream()
@@ -277,6 +281,13 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
             // calificado y sin nadie que armara el retrato— porque su currículum era un PDF
             // escaneado del que no sale texto. Pasa en cuatro de cada ciento dieciséis. El
             // retrato tiene que salir igual, con lo que sí se pudo leer.
+            //
+            // Y si lo que se agotó era la lectura de un currículum SUBIDO AL PERFIL, hay que
+            // cerrarla: sin esto se quedaría diciendo «estamos leyendo tu currículum» para
+            // siempre, y la pantalla sondea ese estado cada cinco segundos.
+            if (AgenteDatosCv.DEL_PERFIL.equals(trabajo.getReferenciaTabla())) {
+                puenteDelPerfil.marcarNoLegible(trabajo.getReferenciaId(), mensaje(e));
+            }
             intentarElRetrato(trabajo);
         }
     }
@@ -510,6 +521,35 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
         return encolarSuelto(postulacionId, AgenteDatosCv.CODIGO_AGENTE);
     }
 
+    /**
+     * Leer el currículum que el candidato acaba de subir a SU PERFIL.
+     *
+     * <p>El mismo agente y la misma instrucción que {@link #encolarDatosCv}; lo que cambia
+     * es que aquí no hay postulación, así que la organización viene dada —la de la
+     * plataforma, que es de quien es el candidato— en vez de deducirse de una vacante.
+     */
+    @Override
+    public boolean encolarDatosCvDelPerfil(Long organizacionId, Long lecturaId) {
+        if (!habilitada) {
+            log.warn("La calificación con IA está apagada por configuración: la lectura de "
+                    + "perfil {} no se encola", lecturaId);
+            return false;
+        }
+        Optional<TrabajoIa> creado;
+        try {
+            creado = registro.crearParaLecturaDePerfil(
+                    organizacionId, AgenteDatosCv.CODIGO_AGENTE, lecturaId, FINA);
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            log.info("Lectura de perfil {} duplicada: ya hay un trabajo vivo", lecturaId);
+            return false;
+        }
+        if (creado.isEmpty()) {
+            return false;
+        }
+        frenarOPublicar(creado.get(), organizacionId);
+        return true;
+    }
+
     private boolean encolarSuelto(Long postulacionId, String agente) {
         if (situacionDe(postulacionId, agente, FINA, null) != Situacion.HAY_QUE_ENCOLARLO) {
             return false;
@@ -532,6 +572,13 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
     private void intentarElRetrato(TrabajoIa acabado) {
         if (!aLaVezDe(acabado.getModo()).contains(acabado.getAgenteCodigo())) {
             // El que cierra la etapa y los dos sueltos no tienen a nadie detrás.
+            return;
+        }
+        // ⚠️ La lectura del currículum SUBIDO AL PERFIL no tiene postulación: ni retrato que
+        // armar ni hermanos con los que compararse. Sin esta guarda, el bloque de abajo
+        // preguntaría por los trabajos de la postulación `null` y traería los de cualquier
+        // otra lectura de perfil que anduviera por ahí.
+        if (AgenteDatosCv.DEL_PERFIL.equals(acabado.getReferenciaTabla())) {
             return;
         }
         // La lectura de datos que dispara postular (el perfil del candidato) va SOLA: si al

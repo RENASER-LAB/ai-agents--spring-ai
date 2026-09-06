@@ -176,7 +176,30 @@ public class ServicioCuentaPortalImpl implements ServicioCuentaPortal {
         intentos.registrarExito(datos.correo());
         usuario.setUltimoAccesoEn(Instant.now());
         usuarios.save(usuario);
-        return new Sesion(tokens.emitir(usuario.getId(), org.getId(), "CANDIDATO"), usuario.getId());
+        return sesionDe(tokens.emitir(usuario.getId(), org.getId(), "CANDIDATO"), usuario.getId());
+    }
+
+    /**
+     * La sesion con el nombre de quien entra.
+     *
+     * <p>Un usuario sin persona —que no deberia pasar— devuelve la sesion sin nombre en vez
+     * de reventar: quedarse fuera del portal por no saber como te llamas seria peor que
+     * saludar sin nombre, que es exactamente lo que el portal ya sabe hacer.
+     */
+    @Override
+    public com.renaser.ai.ai_engine.portal.dto.DtosPortal.QuienSoy quienSoy(ContextoUsuario quien) {
+        Sesion sesion = sesionDe(null, quien.usuarioId());
+        return new com.renaser.ai.ai_engine.portal.dto.DtosPortal.QuienSoy(
+                sesion.usuarioId(), sesion.nombre(), sesion.apellidos());
+    }
+
+    @Override
+    public Sesion sesionDe(String token, Long usuarioId) {
+        return usuarios.findById(usuarioId)
+                .flatMap(u -> personas.findById(u.getPersonaId()))
+                .map(persona -> new Sesion(token, usuarioId, persona.getNombre(),
+                        persona.getApellidos()))
+                .orElseGet(() -> new Sesion(token, usuarioId, null, null));
     }
 
     @Override

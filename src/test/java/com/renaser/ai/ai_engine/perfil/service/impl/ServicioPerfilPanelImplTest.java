@@ -70,13 +70,15 @@ class ServicioPerfilPanelImplTest {
         return new PerfilCompleto("Analista", null, List.of(), null, null, null,
                 new Pretension(new BigDecimal("3500"), new BigDecimal("4200"), "PEN"),
                 List.of(), List.of(), List.of(), List.of(), List.of(),
-                new LecturaCv("LISTA", null));
+                new LecturaCv("LISTA", null), false,
+                com.renaser.ai.ai_engine.perfil.dto.DtosPerfil.Portada.NINGUNA, null);
     }
 
     @Test
     @DisplayName("Sin ver_pretension, la pretensión no viaja — el resto del perfil sí")
     void sinPermisoNoViajaLaPretension() {
         when(pintor.pintar(PERSONA)).thenReturn(conPretension());
+        when(pintor.sinLoDelCandidato(conPretension())).thenReturn(conPretension());
         when(pintor.sinPretension(conPretension()))
                 .thenAnswer(i -> new PintorDePerfilPuro().sinPretension(conPretension()));
 
@@ -91,12 +93,27 @@ class ServicioPerfilPanelImplTest {
     @DisplayName("Con ver_pretension sí viaja: la ve quien negocia, cuando toca")
     void conPermisoViaja() {
         when(pintor.pintar(PERSONA)).thenReturn(conPretension());
+        when(pintor.sinLoDelCandidato(conPretension())).thenReturn(conPretension());
 
         PerfilCompleto visto = servicio.verDePostulacion(
                 equipoCon("ver_perfil_candidato", "ver_pretension"), POSTULACION);
 
         assertThat(visto.pretension()).isNotNull();
         assertThat(visto.pretension().moneda()).isEqualTo("PEN");
+    }
+
+    @Test
+    @DisplayName("Lo del candidato se quita SIEMPRE, tenga el permiso que tenga")
+    void loDelCandidatoNoViajaNunca() {
+        // Aquí solo se comprueba que el panel pide la versión recortada; lo que recorta se
+        // prueba sobre el pintor de verdad, en PintorDePerfilTest#sinLoDelCandidato.
+        when(pintor.pintar(PERSONA)).thenReturn(conPretension());
+        when(pintor.sinLoDelCandidato(conPretension())).thenReturn(conPretension());
+
+        servicio.verDePostulacion(equipoCon("ver_perfil_candidato", "ver_pretension"),
+                POSTULACION);
+
+        verify(pintor).sinLoDelCandidato(conPretension());
     }
 
     @Test
@@ -125,6 +142,7 @@ class ServicioPerfilPanelImplTest {
         // El error caro al migrar es pedir el alcance del permiso de al lado: nada falla, y
         // un rol con este acotado y otro libre acabaría leyendo perfiles ajenos.
         when(pintor.pintar(PERSONA)).thenReturn(conPretension());
+        when(pintor.sinLoDelCandidato(conPretension())).thenReturn(conPretension());
         when(pintor.sinPretension(conPretension()))
                 .thenAnswer(i -> new PintorDePerfilPuro().sinPretension(conPretension()));
 
@@ -146,7 +164,7 @@ class ServicioPerfilPanelImplTest {
             return new PerfilCompleto(c.titular(), c.resumen(), c.habilidades(),
                     c.experienciaMeses(), c.ubicacion(), c.disponibilidad(), null,
                     c.experiencia(), c.educacion(), c.idiomas(), c.certificaciones(),
-                    c.enlaces(), c.lecturaCv());
+                    c.enlaces(), c.lecturaCv(), c.tieneFoto(), c.portada(), c.cv());
         }
     }
 }

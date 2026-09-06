@@ -35,7 +35,9 @@ public class ServicioPerfilPanelImpl implements ServicioPerfilPanel {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Postulación", "id", postulacionId));
 
-        PerfilCompleto completo = pintor.pintar(personaId);
+        // ⚠️ Lo primero que se quita: la foto, la portada, el curriculum del perfil y los
+        // diplomas. Son del candidato y aqui mira quien decide. Ver `sinLoDelCandidato`.
+        PerfilCompleto completo = pintor.sinLoDelCandidato(pintor.pintar(personaId));
         // La pretension solo viaja con su propio permiso — y sin el, no viaja ni el
         // nombre del campo (JsonInclude NON_NULL en el DTO).
         return quien.tiene("ver_pretension") ? completo : pintor.sinPretension(completo);

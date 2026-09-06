@@ -28,6 +28,18 @@ public interface AlmacenArchivos {
     Archivo guardar(Long organizacionId, MultipartFile archivo);
 
     /**
+     * Lo mismo, pero para una imagen: la foto o la portada del perfil.
+     *
+     * <p>Está aparte de {@link #guardar} porque lo que se acepta es distinto —JPG, PNG o
+     * WebP, hasta 2 MB, frente a PDF o Word hasta 10— y son dos promesas que no se deben
+     * mezclar: con un solo método acabaría colándose un PDF como foto o al revés.
+     *
+     * @throws IllegalArgumentException si no es una de las imágenes que se aceptan, o si pesa
+     *                                  de más
+     */
+    Archivo guardarImagen(Long organizacionId, MultipartFile archivo);
+
+    /**
      * El contenido, en memoria.
      *
      * <p>Lo necesita quien tiene que <b>mirar dentro</b> del archivo: el extractor que saca
@@ -35,6 +47,20 @@ public interface AlmacenArchivos {
      * usa esto, se usa {@link #urlDeDescarga}.
      */
     byte[] leer(Archivo archivo);
+
+    /**
+     * El mismo contenido, guardado otra vez a nombre de otra organización.
+     *
+     * <p><b>Por qué copiar y no compartir la fila.</b> Un {@code archivo} lleva sellada la
+     * organización de quien lo subió, y cada panel busca los suyos con la de la vacante. El
+     * currículum que el candidato guarda en su perfil está sellado con la plataforma; si una
+     * postulación reutilizara esa misma fila, la empresa de la vacante recibiría un 404 al
+     * abrirlo — que es exactamente lo que arregló la V48, visto desde el otro lado.
+     *
+     * <p>No cuesta una lectura de IA de más: el contenido es idéntico, así que
+     * {@code contenido_hash} coincide y la ficha ya pagada se reutiliza (RF-161).
+     */
+    Archivo copiarA(Long organizacionId, Archivo original);
 
     /** Borra el contenido y anula la ruta; la fila se conserva (anonimización). */
     void borrarContenido(Archivo archivo);

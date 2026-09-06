@@ -20,11 +20,24 @@ import java.util.List;
  */
 public interface ServicioCuentaPortal {
 
+    /**
+     * La sesion del portal a partir de un token ya emitido, con el nombre de quien entra.
+     *
+     * <p>La usa la entrada por enlace del correo, que emite su token en otro sitio —el
+     * paquete de seguridad, que es interno— y necesita devolver el contrato publico del
+     * portal.
+     */
+    com.renaser.ai.ai_engine.portal.dto.DtosPortal.Sesion sesionDe(String token, Long usuarioId);
+
     List<TextoConsentimientoPublico> textosDeConsentimiento();
 
     void crearCuenta(CrearCuenta datos, String ip, String userAgent);
 
     Sesion entrar(Login datos);
+
+    /** Como se llama quien llama, para el portal que ya tiene token pero no nombre. */
+    com.renaser.ai.ai_engine.portal.dto.DtosPortal.QuienSoy quienSoy(
+            com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario quien);
 
     void retirarConsentimientoFuturos(ContextoUsuario quien);
 

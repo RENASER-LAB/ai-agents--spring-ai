@@ -58,13 +58,15 @@ class PintorDePerfilTest {
     @Mock private CvRepository cvs;
     @Mock private DatoCvRepository datosCv;
     @Mock private ColaCalificacionIa cola;
+    @Mock private com.renaser.ai.ai_engine.perfil.repository.LecturaCvPerfilRepository lecturas;
+    @Mock private com.renaser.ai.ai_engine.archivo.repository.ArchivoRepository archivos;
 
     private PintorDePerfil pintor;
 
     @BeforeEach
     void crearElPintor() {
         pintor = new PintorDePerfil(perfiles, experiencias, educaciones, idiomas,
-                certificaciones, enlaces, postulaciones, cvs, datosCv, cola);
+                certificaciones, enlaces, postulaciones, cvs, datosCv, cola, lecturas, archivos);
         lenient().when(perfiles.findByPersonaId(PERSONA)).thenReturn(Optional.of(
                 PerfilCandidato.builder().id(PERFIL).personaId(PERSONA)
                         .creadoEn(Instant.now()).actualizadoEn(Instant.now()).build()));
@@ -169,7 +171,8 @@ class PintorDePerfilTest {
                 new com.renaser.ai.ai_engine.perfil.dto.DtosPerfil.Pretension(
                         new BigDecimal("3500"), new BigDecimal("4200"), "PEN"),
                 List.of(), List.of(), List.of(), List.of(), List.of(),
-                new com.renaser.ai.ai_engine.perfil.dto.DtosPerfil.LecturaCv("LISTA", null));
+                new com.renaser.ai.ai_engine.perfil.dto.DtosPerfil.LecturaCv("LISTA", null),
+                false, com.renaser.ai.ai_engine.perfil.dto.DtosPerfil.Portada.NINGUNA, null);
 
         PerfilCompleto sin = pintor.sinPretension(con);
 
@@ -191,5 +194,35 @@ class PintorDePerfilTest {
 
         assertThat(pintor.pintar(PERSONA).habilidades())
                 .containsExactly("Excel", "SQL", "Power BI");
+    }
+
+    @Test
+    @DisplayName("Al panel no le llega la foto, ni la portada, ni el CV, ni los diplomas")
+    void sinLoDelCandidato() {
+        // ⚠️ Es la decisión de la clienta del 05/09/2026 y el flanco del RF-41: si la foto
+        // se cuela al panel, la persona que decide vuelve a ver la cara que el anonimizador
+        // le esconde a la IA. Sin este test, añadirla de vuelta no rompería nada.
+        PerfilCompleto suyo = new PerfilCompleto("Analista", "Mi resumen", List.of("Excel"),
+                48, "Lima", "INMEDIATA", null, List.of(), List.of(), List.of(),
+                List.of(new com.renaser.ai.ai_engine.perfil.dto.DtosPerfil.CertificacionItem(7L, "SST", "Sencico", null, null,
+                        "PERSONA", true, true)),
+                List.of(), new com.renaser.ai.ai_engine.perfil.dto.DtosPerfil.LecturaCv("LISTA", null),
+                true, new com.renaser.ai.ai_engine.perfil.dto.DtosPerfil.Portada("GALERIA", "CANTO_AQUA"),
+                new com.renaser.ai.ai_engine.perfil.dto.DtosPerfil.CurriculumDelPerfil("cv.pdf", 1024L, null));
+
+        PerfilCompleto visto = pintor.sinLoDelCandidato(suyo);
+
+        assertThat(visto.tieneFoto()).isFalse();
+        assertThat(visto.portada()).isEqualTo(com.renaser.ai.ai_engine.perfil.dto.DtosPerfil.Portada.NINGUNA);
+        assertThat(visto.cv()).isNull();
+        assertThat(visto.certificaciones()).singleElement()
+                .extracting(com.renaser.ai.ai_engine.perfil.dto.DtosPerfil.CertificacionItem::tieneArchivo).isEqualTo(false);
+        // Y lo demás sigue entero: quitar de más también es un fallo.
+        assertThat(visto.titular()).isEqualTo("Analista");
+        assertThat(visto.resumen()).isEqualTo("Mi resumen");
+        assertThat(visto.habilidades()).containsExactly("Excel");
+        assertThat(visto.certificaciones()).singleElement()
+                .extracting(com.renaser.ai.ai_engine.perfil.dto.DtosPerfil.CertificacionItem::nombre).isEqualTo("SST");
+        assertThat(visto.lecturaCv().estado()).isEqualTo("LISTA");
     }
 }

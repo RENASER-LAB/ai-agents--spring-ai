@@ -4,8 +4,58 @@
     {
       "name": "backend-prueba-local",
       "runtimeExecutable": "./mvnw",
-      "runtimeArgs": ["spring-boot:test-run", "-Dspring-boot.run.profiles=local", "-Dspring-boot.run.jvmArguments=-Dserver.port=8082"],
+      "runtimeArgs": [
+        "spring-boot:test-run",
+        "-Dspring-boot.run.profiles=local",
+        "-Dspring-boot.run.jvmArguments=-Dserver.port=8082"
+      ],
       "port": 8082
+    },
+    {
+      "comment": [
+        "TEMPORAL, de la rama feat/perfil-del-candidato. Se borra al fusionar.",
+        "",
+        "⚠️ BASE PROPIA Y DESECHABLE: `renaser-pg-perfil` en el 5442, con la imagen pgvector",
+        "—la aplicacion hace CREATE EXTENSION vector al arrancar—. La del 5433 la comparten",
+        "los otros worktrees y Flyway reserva ahi el numero de migracion PARA TODOS, y esta",
+        "rama trae la V51.",
+        "",
+        "⚠️ VHOST PROPIO `perfil`: compartir el broker con otro backend le roba los mensajes.",
+        "",
+        "⚠️ EL SECRETS POR RUTA ABSOLUTA: un worktree no lo tiene, no se versiona."
+      ],
+      "name": "backend-perfil",
+      "runtimeExecutable": "./mvnw",
+      "runtimeArgs": [
+        "-f",
+        "/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/.claude/worktrees/perfil/pom.xml",
+        "spring-boot:test-run",
+        "-Dspring-boot.run.profiles=local",
+        "-Dspring-boot.run.arguments=--server.port=8088 --spring.config.import=optional:file:/home/n4nd0/Documentos/RENASER-RECLUTAMIENTO/application-secrets.yaml --spring.datasource.url=jdbc:postgresql://localhost:5442/renaser_db --spring.rabbitmq.host=localhost --spring.rabbitmq.port=5672 --spring.rabbitmq.username=guest --spring.rabbitmq.password=guest --spring.rabbitmq.ssl.enabled=false --spring.rabbitmq.virtual-host=perfil"
+      ],
+      "port": 8088,
+      "autoPort": false
+    },
+    {
+      "comment": [
+        "TEMPORAL, de la rama feat/perfil-del-candidato. Se borra al fusionar.",
+        "El portal de esta rama, contra el backend de arriba (.env.local del worktree lo apunta).",
+        "`--prefix` porque el worktree del frontend es otro arbol distinto del de este archivo."
+      ],
+      "name": "portal-perfil",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "--prefix",
+        "/home/n4nd0/Documentos/RenaserOsPostulantes/.claude/worktrees/perfil",
+        "run",
+        "dev",
+        "--",
+        "--port",
+        "5212",
+        "--strictPort"
+      ],
+      "port": 5212,
+      "autoPort": false
     }
   ]
 }

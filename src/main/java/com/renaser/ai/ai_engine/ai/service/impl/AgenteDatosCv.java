@@ -69,7 +69,16 @@ public class AgenteDatosCv implements AgenteSeleccion {
             ni comentarios.
             """;
 
+    /**
+     * De dónde viene el currículum cuando no viene de una postulación.
+     *
+     * <p>Es el valor de {@code trabajo_ia.referencia_tabla} para la otra mitad de este
+     * agente. Ver {@link #ejecutar}.
+     */
+    public static final String DEL_PERFIL = "lectura_cv_perfil";
+
     private final PuenteCalificacionIa puente;
+    private final com.renaser.ai.ai_engine.perfil.service.PuenteLecturaCvPerfil puenteDelPerfil;
     private final EjecutorAgenteIa ejecutor;
 
     @Override
@@ -77,8 +86,27 @@ public class AgenteDatosCv implements AgenteSeleccion {
         return CODIGO_AGENTE;
     }
 
+    /**
+     * El mismo trabajo sobre dos orígenes distintos.
+     *
+     * <p><b>Un currículum llega por dos puertas</b>: pegado a una postulación, como siempre,
+     * o subido por el candidato a su propio perfil, que no tiene postulación detrás y puede
+     * que nunca la tenga. Lo que se le pide al modelo es <b>idéntico</b> —el mismo objetivo,
+     * el mismo formato, la misma instrucción activa—, así que son dos puentes y no dos
+     * agentes: un agente nuevo obligaría a sembrar su fila en {@code agente} y su
+     * {@code instruccion_ia}, para acabar mandando exactamente el mismo prompt.
+     *
+     * <p>Se distingue por {@code referencia_tabla}, igual que hace el REDACTOR con
+     * {@code "vacante"}. La columna {@code postulacion_id} de {@code trabajo_ia} ya admite
+     * vacío desde la V11: esto no es un hueco que se abre, es uno que ya estaba.
+     */
     @Override
     public void ejecutar(TrabajoIa trabajo) {
+        if (DEL_PERFIL.equals(trabajo.getReferenciaTabla())) {
+            ejecutarDelPerfil(trabajo);
+            return;
+        }
+
         InsumoDatos insumo = puente.insumoDatos(trabajo.getPostulacionId());
         log.info("DATOS_CV lee el currículum de la postulación {} ({} caracteres)",
                 trabajo.getPostulacionId(), insumo.curriculum().length());
@@ -87,5 +115,17 @@ public class AgenteDatosCv implements AgenteSeleccion {
         EjecutorAgenteIa.Ejecutado<ResultadoDatos> salida =
                 ejecutor.ejecutar(trabajo, OBJETIVO, FORMATO, insumo, ResultadoDatos.class, false);
         puente.guardarDatos(trabajo.getPostulacionId(), salida.ejecucionIaId(), salida.resultado());
+    }
+
+    /** El currículum que el candidato subió a su perfil. Ver {@link #ejecutar}. */
+    private void ejecutarDelPerfil(TrabajoIa trabajo) {
+        Long lecturaId = trabajo.getReferenciaId();
+        InsumoDatos insumo = puenteDelPerfil.insumo(lecturaId);
+        log.info("DATOS_CV lee el currículum del perfil (lectura {}, {} caracteres)",
+                lecturaId, insumo.curriculum().length());
+
+        EjecutorAgenteIa.Ejecutado<ResultadoDatos> salida =
+                ejecutor.ejecutar(trabajo, OBJETIVO, FORMATO, insumo, ResultadoDatos.class, false);
+        puenteDelPerfil.guardar(lecturaId, salida.ejecucionIaId(), salida.resultado());
     }
 }
