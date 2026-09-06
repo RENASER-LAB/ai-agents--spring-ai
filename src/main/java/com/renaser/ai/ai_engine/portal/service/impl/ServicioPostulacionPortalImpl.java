@@ -237,9 +237,14 @@ public class ServicioPostulacionPortalImpl implements ServicioPostulacionPortal 
      * que la empresa de la vacante recibiera un 404 al abrirlo. Es exactamente el fallo que
      * arregló la V48, visto desde el otro lado.
      *
-     * <p>La copia no cuesta una lectura de más: el contenido es el mismo, así que
-     * {@code contenido_hash} coincide y {@code ServicioLecturaCv} reutiliza la ficha ya
-     * pagada (RF-161).
+     * <p>⚠️ <b>Y esta copia sí cuesta una lectura de más, aunque el contenido sea el mismo.</b>
+     * {@code ServicioLecturaCv} busca la ficha ya pagada en {@code dato_cv}, que son las
+     * lecturas de las postulaciones; la del currículum del perfil no está ahí, vive en
+     * {@code lectura_cv_perfil} — que guarda el estado, no lo que el modelo devolvió. Así que
+     * quien leyó su currículum en su perfil y después postula con él lo paga dos veces. En la
+     * otra dirección no: subir al perfil un currículum ya leído al postular no vuelve a pagar
+     * (ver {@code yaSeLeyo} en {@code ServicioArchivosDelPerfilImpl}). Cerrar esta dirección
+     * pide guardar el resultado crudo de la lectura del perfil, y eso es una migración.
      */
     private Archivo elCurriculumDeEstaPostulacion(ContextoUsuario quien,
                                                   Long organizacionDeLaVacante,

@@ -48,7 +48,7 @@ ETIQUETA_PESOS = "La prueba vale todo · Administrador sin banco"
 
 # ---------------------------------------------------------------- el correo
 #
-# El aviso de la prueba lo escribió Ricardo: la plantilla `PRUEBA_DISPONIBLE`, que la máquina
+# El aviso de la prueba ya existía: la plantilla `PRUEBA_DISPONIBLE`, que la máquina
 # de estados manda al entrar en PRUEBA_TURNO_CANDIDATO, con el enunciado en PDF, el plazo
 # según la modalidad y el WhatsApp del parámetro `whatsapp_evidencia`. Esa **no se toca**:
 # es la que siguen usando Arquitecto e Ingeniero Civil, donde la entrega por WhatsApp es

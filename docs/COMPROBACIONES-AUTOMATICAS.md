@@ -47,9 +47,15 @@ demás de la calificación se prueba con un doble del modelo y no gasta nada.
 
 ---
 
-## 1072 pruebas
+## 1150 pruebas
 
-Contadas de correr `./mvnw verify` el **01/09/2026**: **930 unitarias y 142 de integración**.
+Contadas de correr `./mvnw verify` el **02/09/2026**: **1007 unitarias y 143 de integración**
+(de esas 143, 6 se saltan: las que gastan saldo o mandan correo de verdad). El día anterior eran
+1072 (930 y 142): la rama del panel que ve los entregables (V48) trajo el resto. El 03/09 el
+commit #62 (el ranking de la prueba) añadió 5 unitarios más; la próxima corrida completa tiene
+que dar 1155, y con los 13 unitarios que trajeron el 04/09 los commits #63-#65 (el ponderado, el
+semáforo sin pesos y los pesos de Administración), 1168; y con los 80 del #66 (los archivos del
+perfil, 06/09), 1248.
 
 ⚠️ **El total está al día; la tabla de abajo no.** Su reparto por filas es el del recuento del
 28/08/2026 (877 = 770 + 107), antes del módulo de vacantes —los tiempos de la etapa técnica, la

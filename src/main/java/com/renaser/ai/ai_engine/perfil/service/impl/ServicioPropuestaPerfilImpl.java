@@ -117,8 +117,10 @@ public class ServicioPropuestaPerfilImpl implements ServicioPropuestaPerfil {
     /**
      * Lo que hacen las dos: crear el perfil si no había y proponerle lo leído.
      *
-     * @return si algo llegó a entrar. Un currículum del que no salió ni una fecha ni una
-     *         frase deja el perfil igual que estaba, y quien llama tiene que poder decirlo.
+     * @return si la LECTURA aportó algo, que no es lo mismo que si el perfil tiene algo.
+     *         Quien ya había escrito su titular a mano y sube un PDF escaneado tiene el
+     *         perfil lleno y una lectura de la que no salió nada: medirlo contra el perfil
+     *         le decía «revisa lo que encontramos» sobre algo que no existe.
      */
     private boolean volcar(Long personaId, ResultadoDatos resultado) {
         PerfilCandidato perfil = perfiles.findByPersonaId(personaId)
@@ -128,25 +130,36 @@ public class ServicioPropuestaPerfilImpl implements ServicioPropuestaPerfil {
                         .actualizadoEn(Instant.now())
                         .build()));
 
-        rellenarHuecosDeCabecera(perfil, resultado);
-        proponerExperiencia(perfil.getId(), resultado.experiencia());
-        proponerEducacion(perfil.getId(), resultado.educacion());
-        proponerIdiomas(perfil.getId(), resultado.idiomas());
-        proponerCertificaciones(perfil.getId(), resultado.certificaciones());
+        // Se cuenta lo que salió del currículum en ESTA pasada. Cuenta también lo que el
+        // modelo leyó y la persona ya tenía escrito —no se añadió una fila, pero el
+        // currículum sí quedó descrito en su perfil—; lo que no cuenta es lo que se descartó
+        // por venir inservible, que para el candidato es lo mismo que no haber leído nada.
+        int aportes = rellenarHuecosDeCabecera(perfil, resultado)
+                + proponerExperiencia(perfil.getId(), resultado.experiencia())
+                + proponerEducacion(perfil.getId(), resultado.educacion())
+                + proponerIdiomas(perfil.getId(), resultado.idiomas())
+                + proponerCertificaciones(perfil.getId(), resultado.certificaciones());
 
         perfil.setActualizadoEn(Instant.now());
         perfiles.save(perfil);
 
-        // «Algo entró» se mide contra lo que hay ahora, no contra lo que dijo el modelo: si
-        // propuso tres empleos que la persona ya tenía escritos, no se añadió nada nuevo
-        // pero su perfil SÍ describe su currículum. Lo que no vale es un perfil que sigue
-        // vacío después de leer.
-        return perfil.getTitular() != null || perfil.getResumen() != null
-                || perfil.getHabilidades() != null
-                || !experiencias.findByPerfilCandidatoIdOrderByOrden(perfil.getId()).isEmpty()
-                || !educaciones.findByPerfilCandidatoIdOrderByOrden(perfil.getId()).isEmpty()
-                || !idiomas.findByPerfilCandidatoIdOrderByIdioma(perfil.getId()).isEmpty()
-                || !certificaciones.findByPerfilCandidatoIdOrderByNombre(perfil.getId()).isEmpty();
+        return aportes > 0;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean conservaLoPropuestoDeUnCurriculum(Long personaId) {
+        return perfiles.findByPersonaId(personaId)
+                .map(PerfilCandidato::getId)
+                .filter(id -> experiencias.findByPerfilCandidatoIdOrderByOrden(id).stream()
+                                .anyMatch(e -> CURRICULUM.equals(e.getOrigen()))
+                        || educaciones.findByPerfilCandidatoIdOrderByOrden(id).stream()
+                                .anyMatch(e -> CURRICULUM.equals(e.getOrigen()))
+                        || idiomas.findByPerfilCandidatoIdOrderByIdioma(id).stream()
+                                .anyMatch(i -> CURRICULUM.equals(i.getOrigen()))
+                        || certificaciones.findByPerfilCandidatoIdOrderByNombre(id).stream()
+                                .anyMatch(c -> CURRICULUM.equals(c.getOrigen())))
+                .isPresent();
     }
 
     /** La persona dueña, o null si no se puede (o no se debe: anonimizada por el borrado). */
@@ -200,28 +213,48 @@ public class ServicioPropuestaPerfilImpl implements ServicioPropuestaPerfil {
 
     // ==================== La cabecera: solo huecos ====================
 
-    private void rellenarHuecosDeCabecera(PerfilCandidato perfil, ResultadoDatos r) {
-        if (enBlanco(perfil.getTitular()) && !enBlanco(r.ultimoPuesto())) {
-            perfil.setTitular(r.ultimoPuesto().trim());
+    /**
+     * @return cuántos campos de cabecera trajo el currículum, se hayan escrito o no. El que
+     *         la persona ya tenía puesto se cuenta igual: salió del archivo, así que la
+     *         lectura sirvió aunque no hubiera hueco donde ponerlo.
+     */
+    private int rellenarHuecosDeCabecera(PerfilCandidato perfil, ResultadoDatos r) {
+        int aportes = 0;
+        if (!enBlanco(r.ultimoPuesto())) {
+            aportes++;
+            if (enBlanco(perfil.getTitular())) {
+                perfil.setTitular(r.ultimoPuesto().trim());
+            }
         }
-        if (enBlanco(perfil.getResumen()) && !enBlanco(r.perfilResumen())) {
-            perfil.setResumen(r.perfilResumen().trim());
+        if (!enBlanco(r.perfilResumen())) {
+            aportes++;
+            if (enBlanco(perfil.getResumen())) {
+                perfil.setResumen(r.perfilResumen().trim());
+            }
         }
-        if (enBlanco(perfil.getHabilidades()) && r.habilidades() != null
-                && !r.habilidades().isEmpty()) {
-            perfil.setHabilidades(String.join(" | ", r.habilidades()));
+        if (r.habilidades() != null && !r.habilidades().isEmpty()) {
+            aportes++;
+            if (enBlanco(perfil.getHabilidades())) {
+                perfil.setHabilidades(String.join(" | ", r.habilidades()));
+            }
         }
-        if (perfil.getExperienciaMeses() == null && mesesValidos(r.experienciaMesesTotal())) {
-            perfil.setExperienciaMeses(r.experienciaMesesTotal());
+        if (mesesValidos(r.experienciaMesesTotal())) {
+            aportes++;
+            if (perfil.getExperienciaMeses() == null) {
+                perfil.setExperienciaMeses(r.experienciaMesesTotal());
+            }
         }
+        return aportes;
     }
 
     // ==================== Las listas ====================
 
-    private void proponerExperiencia(Long perfilId, List<ExperienciaLeida> leidas) {
+    /** @return cuántos empleos leídos quedaron reflejados en el perfil (ver {@code volcar}). */
+    private int proponerExperiencia(Long perfilId, List<ExperienciaLeida> leidas) {
         if (leidas == null) {
-            return;
+            return 0;
         }
+        int aportes = 0;
         List<ExperienciaPerfil> actuales = experiencias.findByPerfilCandidatoIdOrderByOrden(perfilId);
         int siguienteOrden = actuales.stream().map(ExperienciaPerfil::getOrden)
                 .filter(Objects::nonNull).max(Integer::compare).orElse(0) + 1;
@@ -242,6 +275,7 @@ public class ServicioPropuestaPerfilImpl implements ServicioPropuestaPerfil {
                 hasta = null;   // el CHECK la rechazaria; sin fin es «sigue aqui», que es neutro
             }
 
+            aportes++;
             Optional<ExperienciaPerfil> existente = buscar(actuales,
                     e -> clave(e.getPuesto()) + "|" + clave(e.getEmpresa()),
                     clave(leida.puesto()) + "|" + clave(leida.empresa()));
@@ -266,12 +300,15 @@ public class ServicioPropuestaPerfilImpl implements ServicioPropuestaPerfil {
                 experiencias.save(e);
             }
         }
+        return aportes;
     }
 
-    private void proponerEducacion(Long perfilId, List<EducacionLeida> leidas) {
+    /** @return cuántos estudios leídos quedaron reflejados en el perfil. */
+    private int proponerEducacion(Long perfilId, List<EducacionLeida> leidas) {
         if (leidas == null) {
-            return;
+            return 0;
         }
+        int aportes = 0;
         List<EducacionPerfil> actuales = educaciones.findByPerfilCandidatoIdOrderByOrden(perfilId);
         int siguienteOrden = actuales.stream().map(EducacionPerfil::getOrden)
                 .filter(Objects::nonNull).max(Integer::compare).orElse(0) + 1;
@@ -285,6 +322,7 @@ public class ServicioPropuestaPerfilImpl implements ServicioPropuestaPerfil {
             String nivel = leida.nivel() != null
                     && nivelesEducativos.existsById(leida.nivel()) ? leida.nivel() : null;
 
+            aportes++;
             Optional<EducacionPerfil> existente = buscar(actuales,
                     e -> clave(e.getTitulo()) + "|" + clave(e.getInstitucion()),
                     clave(leida.titulo()) + "|" + clave(leida.institucion()));
@@ -310,12 +348,15 @@ public class ServicioPropuestaPerfilImpl implements ServicioPropuestaPerfil {
                 educaciones.save(e);
             }
         }
+        return aportes;
     }
 
-    private void proponerIdiomas(Long perfilId, List<IdiomaLeido> leidos) {
+    /** @return cuántos idiomas leídos quedaron reflejados en el perfil. */
+    private int proponerIdiomas(Long perfilId, List<IdiomaLeido> leidos) {
         if (leidos == null) {
-            return;
+            return 0;
         }
+        int aportes = 0;
         List<IdiomaPerfil> actuales = idiomas.findByPerfilCandidatoIdOrderByIdioma(perfilId);
 
         for (IdiomaLeido leido : leidos) {
@@ -329,6 +370,7 @@ public class ServicioPropuestaPerfilImpl implements ServicioPropuestaPerfil {
                 continue;
             }
 
+            aportes++;
             Optional<IdiomaPerfil> existente = buscar(actuales,
                     i -> clave(i.getIdioma()), clave(leido.idioma()));
 
@@ -347,12 +389,15 @@ public class ServicioPropuestaPerfilImpl implements ServicioPropuestaPerfil {
                 idiomas.save(i);
             }
         }
+        return aportes;
     }
 
-    private void proponerCertificaciones(Long perfilId, List<CertificacionLeida> leidas) {
+    /** @return cuántas certificaciones leídas quedaron reflejadas en el perfil. */
+    private int proponerCertificaciones(Long perfilId, List<CertificacionLeida> leidas) {
         if (leidas == null) {
-            return;
+            return 0;
         }
+        int aportes = 0;
         List<CertificacionPerfil> actuales =
                 certificaciones.findByPerfilCandidatoIdOrderByNombre(perfilId);
 
@@ -366,6 +411,7 @@ public class ServicioPropuestaPerfilImpl implements ServicioPropuestaPerfil {
                 vence = null;   // el CHECK la rechazaria; sin vencimiento es «no caduca»
             }
 
+            aportes++;
             Optional<CertificacionPerfil> existente = buscar(actuales,
                     c -> clave(c.getNombre()), clave(leida.nombre()));
 
@@ -387,6 +433,7 @@ public class ServicioPropuestaPerfilImpl implements ServicioPropuestaPerfil {
                 certificaciones.save(c);
             }
         }
+        return aportes;
     }
 
     // ==================== Las reglas, en un solo sitio ====================

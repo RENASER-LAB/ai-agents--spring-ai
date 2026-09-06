@@ -75,7 +75,8 @@ Renaser pueda usar cada peldaño en una vacante real antes de subir al siguiente
 | **2 · Que la máquina ordene** | La IA lee, puntúa y ordena en grupos | 62 | 13 |
 | **3 · Que se vea lo que hacen** | La prueba del puesto, y comparar dicho con hecho | 73 | 15 |
 
-Las tablas son acumuladas. El sistema completo son 93 tablas y 21 pantallas base.
+Las tablas son acumuladas. El sistema completo eran 93 tablas y 21 pantallas base cuando se
+escribió esto; con las migraciones hasta la V48 son 105 (ver [Modelo de datos](05-MODELO-DE-DATOS.md)).
 
 ---
 
@@ -217,12 +218,11 @@ Ponerle reloj a estas pruebas no es cronometrarlas: es **rehacer el encargo much
 Alguien de Renaser tiene que reescribir al menos una, y decidir qué se conserva de la original.
 Sin eso el hito 3 no tiene contenido que ejecutar.
 
-**5 · Cómo se puntúa cuando solo existen 70 de los 100 puntos.** En el hito 3 hay Perfil Integral
-(40) y prueba (30); faltan simulación y validación (15 y 15). Hay dos formas: mostrar 70 sobre
-100 y decir que faltan, o repartir esos 30 entre lo que sí existe. Nuestra recomendación:
-**repartir**, porque lo que se está midiendo es si el orden que sale coincide con el que pondría
-una persona, y para eso hace falta una escala completa. Queda apuntado en la versión de pesos, así
-que cuando entren las dos etapas que faltan es un cambio de datos, no de código.
+**5 · Cómo se puntúa cuando solo existen 70 de los 100 puntos.** **RESUELTA.** Simulación y
+validación se construyeron el 18/08/2026, así que las cuatro etapas existen y la versión de
+pesos vigente reparte los 100 completos: 40/30/15/15. Mientras faltaron, la recomendación era
+repartir esos 30 entre lo que sí existía, y eso fue un cambio de datos en la versión de pesos, no
+de código.
 
 **6 · ¿Hace falta un ranking general por vacante?** Apuntado el 21/08, y desde el 25/08 medio
 respondido. Los **rankings por etapa ya existen**: `GET /panel/vacantes/{id}/ranking?etapa=`
@@ -230,7 +230,11 @@ cambia la nota con la que se ordena, sin tocar las ocho notas del currículum de
 que sigue sin existir es el ranking **general**, el que ordena por la Puntuación Global con las
 cuatro etapas dentro. Es lo primero que pregunta cualquiera que ve la pantalla: ¿y el orden con
 todo lo demás dentro?
-primero que pregunta cualquiera que ve la pantalla: *¿y el orden con todo lo demás dentro?*
+
+> Lo que sí existe desde el 04/09/2026 es el **`ponderado`** de la pestaña «Prueba del puesto»
+> (RF-155): mezcla solo el Perfil Integral y la prueba, reescalados sobre la suma de sus dos
+> pesos, y sirve para decidir a quién seguir a mitad del embudo. **No es este ranking general**
+> ni la Puntuación Global: no se guarda ni mueve a nadie de estado.
 
 La Puntuación Global de RF-113 **ya está calculada**: la nota ponderada de las etapas que pese la
 versión de la vacante —cuatro en la v1, dos en la v3— sale en
@@ -348,6 +352,6 @@ Lo que hay que hacer fuera del código, en orden:
 | [Qué hace el sistema](00-QUE-HACE-EL-SISTEMA.md) | El sistema entero, sin nada técnico |
 | [Requisitos funcionales](01-REQUISITOS-FUNCIONALES.md) | Qué hace el sistema, etapa por etapa |
 | [Estados de la postulación](03-ESTADOS-POSTULACION.md) | Los 18 estados y cómo se pasa de uno a otro |
-| [Modelo de datos](05-MODELO-DE-DATOS.md) | Las 93 tablas por área y por qué existe cada una |
+| [Modelo de datos](05-MODELO-DE-DATOS.md) | Las 106 tablas por área y por qué existe cada una |
 | [Inventario de pantallas](06-INVENTARIO-DE-PANTALLAS-MOCKUPS.md) | Las 21 pantallas base |
 | [La comprobación](insumos/COMPROBACION-SIN-TECNICA.md) | De dónde salen los conteos de tablas de este documento |

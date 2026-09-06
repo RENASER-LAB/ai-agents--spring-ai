@@ -11,13 +11,21 @@ public interface LecturaCvPerfilRepository extends JpaRepository<LecturaCvPerfil
     /**
      * La lectura de ESE archivo, que es la única que describe lo que hay ahora en el perfil.
      *
-     * <p>⚠️ <b>Por el archivo y no por «la última».</b> Las lecturas no se borran nunca —son
-     * el recibo de lo ya pagado (RF-161)—, así que quien quitó su currículum sigue teniendo
-     * filas {@code LISTA} de uno que ya no está. Preguntar por la más reciente diría «listo»
-     * sobre un currículum ausente.
+     * <p>⚠️ <b>Por el archivo y no por «la última».</b> Mientras el perfil exista las
+     * lecturas no se borran —son el recibo de lo ya pagado (RF-161)—, así que quien quitó su
+     * currículum sigue teniendo filas {@code LISTA} de uno que ya no está. Preguntar por la
+     * más reciente diría «listo» sobre un currículum ausente.
      */
     Optional<LecturaCvPerfil> findFirstByPersonaIdAndArchivoIdOrderByIdDesc(
             Long personaId, Long archivoId);
+
+    /**
+     * Se van con el perfil, y solo con él (supresión 29733 y barrido de retención).
+     *
+     * <p>Es la única excepción a que el recibo se conserve: sin perfil detrás, decir «este
+     * archivo ya se leyó» cerraría {@code LISTA} una lectura que no propondría nada.
+     */
+    void deleteByPersonaId(Long personaId);
 
     /** La que esté corriendo, para cerrarla antes de arrancar otra. */
     Optional<LecturaCvPerfil> findByPersonaIdAndEstado(Long personaId, String estado);

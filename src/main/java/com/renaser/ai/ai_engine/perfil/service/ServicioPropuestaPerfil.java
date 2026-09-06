@@ -33,6 +33,20 @@ public interface ServicioPropuestaPerfil {
     boolean proponerAlPerfil(Long personaId, ResultadoDatos resultado);
 
     /**
+     * Si el perfil de esta persona todavía conserva algo que le propuso un currículum.
+     *
+     * <p>Lo pregunta quien decide si una lectura ya pagada sirve de recibo. La ficha de una
+     * postulación ({@code dato_cv}) dice que ese archivo se leyó, pero no guarda lo que se
+     * propuso: si el perfil se borró entre medias —el barrido de retención se lleva los
+     * perfiles dormidos—, aquellas propuestas ya no están y el recibo no vale para nada.
+     *
+     * @return true si queda al menos una fila con origen CURRICULUM. Se mira eso y no si el
+     *         perfil tiene algo: lo que la persona escribió a mano no lo puso ningún
+     *         currículum, así que no prueba que aquella lectura siga sirviendo.
+     */
+    boolean conservaLoPropuestoDeUnCurriculum(Long personaId);
+
+    /**
      * Propone al perfil los enlaces que el candidato escribió en el formulario de postular.
      * Un enlace que no valida (RF-166) se omite sin romper la postulación: el formulario de
      * postular no es el sitio para pelear por una URL.

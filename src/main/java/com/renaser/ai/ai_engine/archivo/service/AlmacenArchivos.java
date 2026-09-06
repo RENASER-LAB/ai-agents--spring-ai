@@ -57,8 +57,11 @@ public interface AlmacenArchivos {
      * postulación reutilizara esa misma fila, la empresa de la vacante recibiría un 404 al
      * abrirlo — que es exactamente lo que arregló la V48, visto desde el otro lado.
      *
-     * <p>No cuesta una lectura de IA de más: el contenido es idéntico, así que
-     * {@code contenido_hash} coincide y la ficha ya pagada se reutiliza (RF-161).
+     * <p>⚠️ <b>Copiar no es gratis en lecturas de IA.</b> La huella coincide, pero la ficha
+     * ya pagada solo se reutiliza si la lectura anterior fue de una POSTULACIÓN
+     * ({@code dato_cv}): la del currículum del perfil no guarda lo que el modelo devolvió, así
+     * que copiar de perfil a postulación paga una segunda lectura. Al revés sí se reutiliza
+     * (RF-161).
      */
     Archivo copiarA(Long organizacionId, Archivo original);
 

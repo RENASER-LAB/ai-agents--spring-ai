@@ -1,3 +1,5 @@
+> ⚠️ **Documento histórico (14/08/2026).** Describe un estado que ya no existe: hoy hay login propio, permisos por rol en cada endpoint y multiempresa. El estado de seguridad vigente está en [04-ROLES-Y-PERMISOS](04-ROLES-Y-PERMISOS.md) y [REGLAS-DEL-CODIGO](REGLAS-DEL-CODIGO.md).
+
 # Auditoría técnica — AI Engine (RENASER OS)
 
 **Fecha:** 14 de agosto de 2026

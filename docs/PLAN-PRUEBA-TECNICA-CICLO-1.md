@@ -1,3 +1,5 @@
+> ⚠️ **Plan ya ejecutado.** La V42 y las siguientes hasta la V48 están aplicadas; queda como registro de cómo se hizo el ciclo 1. Lo vigente está en [DISENO-PRUEBA-TECNICA-FICHA-Y-REDACTOR](DISENO-PRUEBA-TECNICA-FICHA-Y-REDACTOR.md) y [PRUEBA-DEL-PUESTO](PRUEBA-DEL-PUESTO.md).
+
 # Plan de desarrollo · Prueba técnica, ciclo 1
 
 Ejecuta el [diseño aprobado](DISENO-PRUEBA-TECNICA-FICHA-Y-REDACTOR.md). Todo el trabajo

@@ -1,14 +1,14 @@
 {
-  "description": "Recordatorio de mantener CLAUDE.MD al dia cuando cambia el codigo o el esquema.",
+  "description": "Recordatorio de mantener docs/ESTADO-DEL-PROYECTO.md al dia cuando cambia el codigo o el esquema.",
   "hooks": {
     "Stop": [
       {
         "hooks": [
           {
             "type": "command",
-            "command": "\"$CLAUDE_PROJECT_DIR/.claude/hooks/recordar-claude-md.sh\" 2>/dev/null || true",
+            "command": "\"$CLAUDE_PROJECT_DIR/.claude/hooks/recordar-estado-del-proyecto.sh\" 2>/dev/null || true",
             "timeout": 10,
-            "statusMessage": "Revisando CLAUDE.MD"
+            "statusMessage": "Revisando el estado del proyecto"
           }
         ]
       }

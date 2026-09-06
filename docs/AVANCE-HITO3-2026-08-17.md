@@ -1,7 +1,9 @@
+> ⚠️ **Documento histórico (17/08/2026).** Cuenta lo que se construyó ese día; el estado presente está en [ESTADO-DEL-PROYECTO](ESTADO-DEL-PROYECTO.md). El rango 60-120 minutos que menciona se retiró el 31/08/2026.
+
 # Avance del hito 3 — 17/08/2026
 
 Resumen de lo que se construyó del hito 3 («Que se vea lo que hacen»). Los hitos 1 y 2
-—salvo la calificación con IA, que construirá Ricardo— ya estaban hechos antes de
+—salvo la calificación con IA, que entonces iba a construir otro desarrollador— ya estaban hechos antes de
 empezar. El detalle completo del modelo de datos sigue viviendo en
 [07-DICCIONARIO-DE-DATOS.md](07-DICCIONARIO-DE-DATOS.md) y el alcance en
 [08-ALCANCE-DEL-MVP.md](08-ALCANCE-DEL-MVP.md).

@@ -13,6 +13,8 @@ import com.renaser.ai.ai_engine.perfil.repository.LecturaCvPerfilRepository;
 import com.renaser.ai.ai_engine.perfil.repository.PerfilCandidatoRepository;
 import com.renaser.ai.ai_engine.perfil.service.PortadasDeLaCasa;
 import com.renaser.ai.ai_engine.perfil.service.ServicioArchivosDelPerfil;
+import com.renaser.ai.ai_engine.perfil.service.ServicioPropuestaPerfil;
+import com.renaser.ai.ai_engine.postulacion.repository.DatoCvRepository;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -36,6 +38,10 @@ public class ServicioArchivosDelPerfilImpl implements ServicioArchivosDelPerfil 
     private final ArchivoRepository archivos;
     private final AlmacenArchivos almacen;
     private final ColaCalificacionIa cola;
+    // El otro recibo de «este archivo ya se leyó»: el de las postulaciones. Ver yaSeLeyo.
+    private final DatoCvRepository datosCv;
+    // Y quien sabe si lo que aquel recibo propuso sigue en el perfil.
+    private final ServicioPropuestaPerfil propuesta;
 
     // ==================== La foto ====================
 
@@ -170,11 +176,13 @@ public class ServicioArchivosDelPerfilImpl implements ServicioArchivosDelPerfil 
     /**
      * Quita su currículum del perfil.
      *
-     * <p>⚠️ <b>Las lecturas NO se borran, y eso es lo que evita cobrar dos veces.</b> Cada
-     * fila {@code LISTA} es el recibo de un archivo ya leído; borrarlas dejaba que quitar y
-     * volver a subir el mismo PDF llamara otra vez al modelo para proponer exactamente los
-     * mismos datos, que es justo lo que prohíbe el RF-161. La pantalla no se confunde porque
-     * el estado se busca por el archivo que hay ahora, no por la lectura más reciente.
+     * <p>⚠️ <b>Las lecturas NO se borran aquí, y eso es lo que evita cobrar dos veces.</b>
+     * Cada fila {@code LISTA} es el recibo de un archivo ya leído; borrarlas dejaba que
+     * quitar y volver a subir el mismo PDF llamara otra vez al modelo para proponer
+     * exactamente los mismos datos, que es justo lo que prohíbe el RF-161. La pantalla no se
+     * confunde porque el estado se busca por el archivo que hay ahora, no por la lectura más
+     * reciente. Solo desaparecen cuando desaparece el perfil entero, en
+     * {@code ServicioCicloVidaPerfil}.
      *
      * <p>Lo que la persona ya llevó a su perfil se queda: es suyo y ya lo revisó.
      */
@@ -289,7 +297,22 @@ public class ServicioArchivosDelPerfilImpl implements ServicioArchivosDelPerfil 
                 .ifPresent(almacen::borrarContenido);
     }
 
-    /** Si esta persona ya pagó la lectura de un archivo con este mismo contenido. */
+    /**
+     * Si esta persona ya pagó la lectura de un archivo con este mismo contenido.
+     *
+     * <p>⚠️ <b>Se miran los DOS recibos, no solo el del perfil.</b> Un currículum se lee
+     * desde aquí o al postular, y el de postular escribe {@code dato_cv} — pero propone lo
+     * mismo a este perfil en la misma transacción ({@code PuenteCalificacionIa.guardarDatos}).
+     * Quien postuló con su PDF y luego lo guarda en su perfil ya tiene ahí lo que ese PDF
+     * decía: volver a leerlo era pagar dos veces por el mismo resultado (RF-161).
+     *
+     * <p>⚠️ <b>Pero el recibo de la postulación solo vale mientras aquellas propuestas sigan
+     * en el perfil.</b> {@code dato_cv} guarda la ficha de la postulación, no lo que se
+     * propuso aquí, y el barrido de retención se lleva el perfil entero: sin esa condición,
+     * quien volviera después de que le barrieran el perfil vería un «ya está: revisa lo que
+     * encontramos» sobre un perfil vacío. Sin propuestas vivas se vuelve a leer — se paga
+     * una vez, y entonces sí hay algo que revisar.
+     */
     private boolean yaSeLeyo(Long personaId, Archivo nuevo) {
         if (nuevo.getContenidoHash() == null) {
             return false;
@@ -297,8 +320,12 @@ public class ServicioArchivosDelPerfilImpl implements ServicioArchivosDelPerfil 
         List<Long> mismos = archivos.findByContenidoHash(nuevo.getContenidoHash()).stream()
                 .map(Archivo::getId)
                 .toList();
-        return !lecturas.findByPersonaIdAndArchivoIdInAndEstado(
-                personaId, mismos, LecturaCvPerfil.LISTA).isEmpty();
+        if (!lecturas.findByPersonaIdAndArchivoIdInAndEstado(
+                personaId, mismos, LecturaCvPerfil.LISTA).isEmpty()) {
+            return true;
+        }
+        return !datosCv.fichasDeLaPersonaConHash(personaId, nuevo.getContenidoHash()).isEmpty()
+                && propuesta.conservaLoPropuestoDeUnCurriculum(personaId);
     }
 
     private static boolean esImagen(MultipartFile archivo) {

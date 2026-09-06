@@ -165,3 +165,30 @@ postulaciones que se calificaron con ella conservan su nota tal como se calculó
 - La migración nueva es `V18`. Nació como `V16`, pero ese número ya lo ocupaban dos
   migraciones de la rama de agentes (`V16` del CV anonimizado y `V17` de los pesos), y
   Flyway no arranca con dos del mismo número.
+
+---
+
+## Los inscritos de una sesión (27/08/2026, V40)
+
+Quien conduce una simulación no sabía a quién esperaba: el nombre estaba en la base pero no
+salía por ningún endpoint, y sin él no había forma de llegar a las `inscripcionId` que piden
+`/inscripciones/{id}/marcas` y `/asistencia`. La V40 **no añade ninguna tabla**: solo dos
+permisos y su reparto inicial.
+
+- **`GET /panel/sesiones-simulacion/{id}/inscritos`** (permiso `ver_inscritos_simulacion`)
+  devuelve `inscripcionId`, `postulacionId`, `candidato`, `vacante`, `inscritaEn` y `asistio`,
+  recortado por el alcance. **Los dos GET de sesiones aceptan los dos permisos**
+  (`crear_sesiones_simulacion` **o** `ver_inscritos_simulacion`).
+- **`contarInscritos` es el ÚNICO sitio que decide cómo se cuentan los inscritos**
+  (`ServicioSimulacionImpl`). Sus cuatro casos: alcance nulo cuenta la sesión entera, `TODO`
+  cuenta todo, `SUS_VACANTES` cuenta con un `WHERE` en la base y `PROPIO` cuenta cero sin
+  preguntar. **Con qué alcance se cuenta lo decide siempre `ver_inscritos_simulacion`**.
+- **Las marcas y la asistencia aplican el alcance** (`verMarcas`, `marcarEvento`,
+  `marcarAsistencia`): antes pedían su permiso y lo tiraban. `laInscripcion` comprueba la empresa
+  **por sus dos lados** (la sesión y la postulación), porque la inscripción no guarda
+  organización. Ajena responde 404, igual que una que no existe.
+- **`NombresDeUsuarios`** resuelve el nombre respetando la anonimización: sin usuario, sin
+  persona o con la persona borrada devuelve `(anonimizado)`, y una tanda entera cuesta dos
+  consultas.
+- El reparto de permisos se edita por API desde esa misma migración: ver
+  [Roles y permisos](04-ROLES-Y-PERMISOS.md).

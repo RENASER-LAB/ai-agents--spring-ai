@@ -45,21 +45,25 @@ desarrollar o encajar mejor en otro puesto, en vez de limitarse a un sí o un no
 
 ## Qué es este sistema
 
-Un módulo de RENASER OS que acompaña a un candidato desde que ve una vacante hasta que es
-contratado, y que después comprueba si la persona rindió como el sistema predijo.
+Un sistema que acompaña a un candidato desde que ve una vacante hasta que es contratado, y que
+después comprueba si la persona rindió como el sistema predijo.
 
-Tiene **dos caras**:
+Tiene **dos caras**, las dos en el frontend `RenaserOsPostulantes`:
 
 | Cara | Quién la usa | Dónde vive |
 |---|---|---|
-| Portal de Talento | Candidatos y prospectos invitados | Portal público de Renaser |
-| Panel de Talento | Equipo de Talento, responsables de área y Dirección | Dentro de RENASER OS |
+| Portal de Talento | Candidatos y prospectos invitados | Portal público |
+| Panel de Talento | Equipo de Talento, responsables de área, Dirección y las empresas cliente | Panel de la empresa |
 
-Renaser publica **solo sus propias vacantes**. No es una bolsa de trabajo para terceros.
+Desde el 26/08/2026 es una **plataforma**: Renaser es la dueña, cada empresa se registra por
+invitación de Renaser, publica sus vacantes y ve solo a sus candidatos (ver «Multiempresa» en
+[Las APIs](APIS-MULTIEMPRESA.md)). El único sitio donde se mezclan empresas es el tablón
+público de vacantes.
 
-**Va dentro de RENASER OS.** El frontend ya existe y llama a este backend por su API. El equipo
-de Renaser entra con la cuenta que ya tiene; los candidatos, que no son usuarios de RENASER OS,
-tienen cuenta en este sistema.
+**El equipo entra con correo y contraseña propios**, con cuentas que nacen solo por invitación;
+los candidatos tienen su cuenta aparte, y también pueden entrar con un enlace de un solo uso que
+les llega por correo. RENASER OS, el otro sistema de Renaser, quedó como **integración futura
+dormida**: no emite tokens ni alimenta ningún dato hoy.
 
 ---
 
@@ -90,7 +94,7 @@ tienen cuenta en este sistema.
 | Vigilancia por cámara durante las pruebas | No se pide y es invasivo |
 | Nómina, contratos, vacaciones | Es otro módulo de RENASER OS |
 | Un modelo de IA entrenado desde cero | El valor está en las reglas, los bancos y la evidencia, no en el modelo |
-| Interfaz multiempresa | El modelo de datos sí la soporta; la pantalla se queda en Renaser |
+| Una pantalla para que Renaser administre la plataforma | El backend del multiempresa está entero (alta de empresas, aislamiento, tope de IA, suspensión); la pantalla de esa administración no se ha construido y hoy se opera por la API |
 
 ### Lo que el sistema nunca hace
 
@@ -1027,9 +1031,12 @@ datos, no algo fijo en el código.
 Quién puede hacer qué está definido acción por acción en
 [Roles y permisos](04-ROLES-Y-PERMISOS.md).
 
-**RF-141** **La identidad viene de RENASER OS; los permisos de este módulo son de este módulo.**
-RENASER OS dice quién eres; este sistema decide qué puedes hacer aquí, porque su sistema no
-conoce acciones como «publicar una versión del banco».
+**RF-141** **La identidad del equipo y los permisos son de este sistema.** El equipo entra con
+correo y contraseña propios; las cuentas nacen solo por invitación y un candidato con su
+contraseña correcta recibe el mismo rechazo que un correo inexistente. Los permisos se definen
+aquí porque son acciones que solo existen aquí («publicar una versión del banco»). RENASER OS
+quedó como integración futura: su identificador se conserva como columna suelta y ningún flujo
+lo usa hoy.
 
 **RF-142** Hay cosas que **nunca** son configurables, porque si aparecen como casilla alguien las
 marcará algún día: que un candidato vea a otros candidatos, que las claves lleguen al portal,

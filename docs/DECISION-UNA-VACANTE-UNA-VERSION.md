@@ -134,3 +134,25 @@ Toda la maquinaria de versionado está, y las guardas también: `exigirVaraQuiet
 asignadores, la recalificación en lote (`scripts/recalificar-banco.py`, que además se niega a
 tocar una vacante donde ya se contrató) y el reencolado forzoso del evaluador
 (`ColaCalificacionIa.reencolarEvaluador`).
+
+---
+
+## La excepción del 04/09: la V50 editó una versión publicada en sitio
+
+La versión de pesos de Administrador y Asistente Administrativo daba el 100 a la prueba y nada al
+Perfil Integral. La V50 la corrigió a 45/55 **sin crear otra versión**, y esta regla dice lo
+contrario. Las dos razones, dichas en la propia migración:
+
+1. **Crear una versión nueva rompe algo más grande.** El sistema toma «la última publicada» como
+   la que hereda toda vacante nueva y la que el copiador replica a cada empresa que se da de
+   alta. Publicar cualquier versión hoy convertiría ese 45/55 en el reparto por defecto de todo
+   el mundo; es el mismo motivo por el que la V49 dejó las dos versiones del cazatalentos en
+   BORRADOR.
+2. **La inmutabilidad protege el pasado, y ahí no había pasado que proteger.** Nadie había sido
+   contratado ni descartado en esas dos vacantes con el reparto anterior (comprobado con el
+   equipo). Las notas ya calculadas conservan su versión (RF-139); lo que cambia es cómo se
+   combinan de aquí en adelante.
+
+No es un precedente: con alguien ya contratado o descartado, el reparto nuevo se estrenaría en la
+siguiente convocatoria. Y el criterio de «la última publicada» hay que cambiarlo antes de publicar
+ninguna versión más; está en [Estado del proyecto](ESTADO-DEL-PROYECTO.md).

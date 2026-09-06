@@ -85,8 +85,13 @@ public class FlujoPerfilIT {
     static long experienciaPropuestaId;
     static long educacionPropuestaId;
     static long versionPruebaId;
+    static long personaId;
+    static long fotoArchivoId;
+    static long cvDelPerfilArchivoId;
+    static long diplomaArchivoId;
 
     private static final byte[] PDF = "el mismo curriculum de siempre".getBytes();
+    private static final byte[] PNG = "una foto diminuta que nadie mira".getBytes();
 
     @DisplayName("Antes de llenar nada, el perfil responde vacío: nunca un 404")
     @Test
@@ -452,9 +457,68 @@ public class FlujoPerfilIT {
                  where r.codigo in ('TALENTO', 'DIRECCION')""");
     }
 
-    @DisplayName("El borrado de la ley 29733 se lleva el perfil entero; dato_cv se queda")
+    @DisplayName("El perfil guarda su foto, su currículum y el diploma de una certificación")
     @Test
     @Order(10)
+    void elPerfilGuardaSusArchivos() throws Exception {
+        // Hasta aquí el perfil no tenía ni un archivo, así que el borrado del paso siguiente
+        // nunca llegaba a soltar ninguno: decía «0 archivos soltados» y daba verde igual.
+        mvc.perform(multipart("/api/v1/portal/perfil/foto")
+                        .file(new MockMultipartFile("archivo", "foto.png", "image/png", PNG))
+                        .header("Authorization", "Bearer " + tokenCandidato))
+                .andExpect(status().isCreated());
+
+        // El MISMO archivo con el que postuló: su ficha ya está pagada en dato_cv y sigue
+        // propuesta en el perfil, así que se cierra LISTA sin llamar a ningún modelo.
+        mvc.perform(multipart("/api/v1/portal/perfil/cv")
+                        .file(new MockMultipartFile("archivo", "cv.pdf", "application/pdf", PDF))
+                        .header("Authorization", "Bearer " + tokenCandidato))
+                .andExpect(status().isCreated());
+
+        long certificacion = idDe(conToken(post("/api/v1/portal/perfil/certificaciones"),
+                tokenCandidato, """
+                {"nombre":"Auditor líder ISO 9001","entidad":"Bureau Veritas",
+                 "emitidaEn":"2025-01-01"}""").andExpect(status().isCreated()));
+        mvc.perform(multipart("/api/v1/portal/perfil/certificaciones/" + certificacion
+                        + "/archivo")
+                        .file(new MockMultipartFile("archivo", "diploma.pdf",
+                                "application/pdf", "el papel escaneado".getBytes()))
+                        .header("Authorization", "Bearer " + tokenCandidato))
+                .andExpect(status().isCreated());
+
+        personaId = jdbc.queryForObject(
+                "select persona_id from perfil_candidato where id = ?", Long.class, perfilId);
+        fotoArchivoId = jdbc.queryForObject(
+                "select foto_archivo_id from perfil_candidato where id = ?", Long.class, perfilId);
+        cvDelPerfilArchivoId = jdbc.queryForObject(
+                "select cv_archivo_id from perfil_candidato where id = ?", Long.class, perfilId);
+        diplomaArchivoId = jdbc.queryForObject(
+                "select archivo_id from certificacion_perfil where id = ?", Long.class,
+                certificacion);
+
+        // Los tres están guardados de verdad: con ruta y sin borrar
+        assertThat(jdbc.queryForObject("""
+                select count(*) from archivo
+                 where id in (?, ?, ?) and ruta is not null and borrado_en is null""",
+                Integer.class, fotoArchivoId, cvDelPerfilArchivoId, diplomaArchivoId))
+                .isEqualTo(3);
+
+        // Y el recibo de la lectura existe, reutilizando el de la postulación (RF-161):
+        // sigue sin haber ni un trabajo DATOS_CV en toda la tanda.
+        assertThat(jdbc.queryForObject(
+                "select estado from lectura_cv_perfil where persona_id = ?", String.class,
+                personaId)).isEqualTo("LISTA");
+        assertThat(jdbc.queryForObject(
+                "select count(*) from trabajo_ia where agente_codigo = 'DATOS_CV'",
+                Integer.class)).isZero();
+        conTokenGet("/api/v1/portal/perfil", tokenCandidato)
+                .andExpect(jsonPath("$.lecturaCv.estado").value("LISTA"))
+                .andExpect(jsonPath("$.tieneFoto").value(true));
+    }
+
+    @DisplayName("El borrado de la ley 29733 se lleva el perfil entero; dato_cv se queda")
+    @Test
+    @Order(11)
     void elBorradoSeLlevaElPerfil() throws Exception {
         conToken(post("/api/v1/portal/solicitudes-borrado"), tokenCandidato,
                 "{\"motivo\":\"Ya no quiero participar\"}").andExpect(status().isCreated());
@@ -477,9 +541,28 @@ public class FlujoPerfilIT {
                 "select count(*) from perfil_candidato where id = ?", Integer.class, perfilId))
                 .isZero();
 
+        // Sus archivos se soltaron del almacen: sin ruta y con la fecha de borrado. Antes se
+        // quedaban en el bucket sin ninguna fila por la que volver a encontrarlos.
+        assertThat(jdbc.queryForObject("""
+                select count(*) from archivo
+                 where id in (?, ?, ?) and ruta is null and borrado_en is not null""",
+                Integer.class, fotoArchivoId, cvDelPerfilArchivoId, diplomaArchivoId))
+                .as("foto, currículum y diploma del perfil").isEqualTo(3);
+
+        // Y el recibo de la lectura se va con el perfil: sobre un perfil que ya no existe
+        // diria «lista» sobre unos datos que nadie va a proponer.
+        assertThat(jdbc.queryForObject(
+                "select count(*) from lectura_cv_perfil where persona_id = ?", Integer.class,
+                personaId)).isZero();
+
         // dato_cv NO se toca aqui: sostiene la criba y el ranking de lo ya evaluado
         assertThat(jdbc.queryForObject(
                 "select count(*) from dato_cv where postulacion_id = ?", Integer.class,
+                postulacionId)).isEqualTo(1);
+        // El CV de la POSTULACION sigue con su fila; su archivo lo suelta el 29733 desde
+        // siempre, y eso no lo cambia nada de esto.
+        assertThat(jdbc.queryForObject(
+                "select count(*) from cv where postulacion_id = ?", Integer.class,
                 postulacionId)).isEqualTo(1);
     }
 
