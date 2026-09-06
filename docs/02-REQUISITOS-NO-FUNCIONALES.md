@@ -12,26 +12,28 @@ El **qué hace** está en [Requisitos funcionales](01-REQUISITOS-FUNCIONALES.md)
 
 ## El sistema en una página
 
-Un portal público donde la gente postula, y un panel dentro de RENASER OS donde el equipo de
-Renaser trabaja. Entre los dos, cinco etapas de evaluación que van de leer un currículum a
+Un portal público donde la gente postula, y un panel donde trabajan el equipo de Renaser y las
+empresas cliente. Entre los dos, cinco etapas de evaluación que van de leer un currículum a
 verla sostener un periodo de trabajo real.
 
-Este backend **es un módulo de RENASER OS**, no un sistema aparte. El frontend ya existe y lo
-llama por su API. Son dos servicios separados: **no comparten base de datos**.
+El frontend es un repositorio propio, `RenaserOsPostulantes`, con las dos caras, y llama a este
+backend por su API. RENASER OS, el otro sistema de Renaser, **quedó como integración futura
+dormida**: no emite tokens ni alimenta ningún dato hoy, y si algún día se conecta será por HTTP,
+sin compartir base de datos.
 
 ```
-   CANDIDATO                      EQUIPO RENASER
-   portal público                 panel en RENASER OS
+   CANDIDATO                      EQUIPO Y EMPRESAS
+   portal público                 panel de la empresa
         |                                |
         +----------------+---------------+
                          |
-                 React + Vite
+            React + Vite (RenaserOsPostulantes)
                          |
                    API REST / JSON
                          |
-                   Spring Boot  <----> API de RENASER OS
-                         |             identidad del equipo
+                   Spring Boot  - - -> API de RENASER OS (futura, dormida)
                          |             tareas y tiempos
+                         |             desempeño 30/90/180
                          |             desempeño 30/90/180
         +----------------+----------------+
         |                |                |
@@ -93,8 +95,8 @@ rehacerlo.
 
 **RNF-01** El backend se construye en **Java con Spring Boot**.
 
-**RNF-02** El frontend es el proyecto de RENASER OS que ya existe, hecho en **React con Vite**.
-Sus pantallas de selección de personal se están construyendo desde el 18/08/2026.
+**RNF-02** El frontend es el repositorio `RenaserOsPostulantes`, hecho en **React con Vite**,
+con el portal del candidato y el panel de la empresa dentro del mismo proyecto.
 
 **RNF-03** Los dos se comunican por **API REST con JSON**. Son proyectos separados: cada uno
 se despliega por su cuenta y el contrato entre ellos es la API.
@@ -108,16 +110,17 @@ Para desarrollar se levanta en un contenedor; en producción, en el servidor de 
 
 Cinco reglas que evitan problemas conocidos:
 
-**RNF-06** **La identidad del equipo viene de RENASER OS; los permisos de este módulo son de
-este módulo.** RENASER OS emite el token y este backend solo valida su firma: no guardamos la
-contraseña de nadie del equipo. Los candidatos sí tienen cuenta y contraseña aquí, porque no son
-usuarios de RENASER OS.
-*Por qué:* dos contraseñas para la misma persona es justo lo que RENASER OS quiere evitar. Pero
-su sistema no conoce acciones como «publicar una versión del banco», así que los permisos finos
-tienen que vivir donde existen esas acciones.
+**RNF-06** **La identidad del equipo y los permisos viven en este sistema.** El equipo entra
+con correo y contraseña propios (`POST /panel/auth/login`), las cuentas nacen solo por
+invitación con un token de un solo uso, y los candidatos tienen su cuenta aparte por otra
+puerta. Un candidato con su contraseña correcta recibe en el panel el mismo 401 que un correo
+que no existe.
+*Por qué:* RENASER OS iba a emitir el token, pero esa integración quedó dormida (25/08/2026) y
+las empresas cliente nunca fueron usuarias de RENASER OS. Los permisos finos viven aquí porque
+solo aquí existen acciones como «publicar una versión del banco».
 
-**RNF-06b** El identificador que un usuario tiene en RENASER OS se guarda como **columna suelta,
-sin clave foránea**, porque son dos servicios separados.
+**RNF-06b** El identificador que un usuario tenga en RENASER OS se guarda como **columna suelta,
+sin clave foránea**, porque son dos servicios separados. Hoy ningún flujo real la llena.
 *Por qué:* una clave foránea contra una tabla que vive en otra base de datos no existe. Fingir
 que sí lleva a un sistema que se cae cuando el otro cambia algo.
 
@@ -293,9 +296,11 @@ tener que contarlo; uno de fuera obliga.
 ni estado civil**. Son dos archivos, no uno, y lo que sale es siempre la versión recortada,
 nunca el original que subió la persona.
 
-⚠️ **Nada de esto está probado en código todavía, porque la IA aún no califica a nadie.** Los
-tres agentes del hito 2 son los que lo vuelven real. Mientras no existan, ningún dato de
-candidato sale de Renaser.
+⚠️ **Desde el 18/08/2026 esto ya pasa de verdad**: seis de los diez agentes del catálogo corren
+contra DeepSeek y el currículum sale anonimizado. Lo que falta no es código sino el texto de
+consentimiento que nombre a DeepSeek y a Google, aprobado por Renaser, antes del primer
+candidato real. Ver [Calificación con IA](CALIFICACION-CON-IA.md) y
+[Estado del proyecto](ESTADO-DEL-PROYECTO.md).
 
 **RNF-34** Los textos de instrucción que se envían a la IA se administran como configuración,
 con versiones, y se pueden cambiar sin volver a desplegar el sistema.
@@ -421,9 +426,9 @@ ajuste automático que nunca tendría suficiente información para funcionar.
 
 | De qué depende | Estado | Qué pasa si no está |
 |---|---|---|
-| API de RENASER OS: identidad del equipo | **Existe** | Nadie del equipo puede entrar. Es la única dependencia dura |
-| API de RENASER OS: tareas, tiempos y bloqueos | **Existe** | Las métricas de la validación se completan a mano |
-| API de RENASER OS: desempeño 30/90/180 | **Existe** | El seguimiento posterior queda vacío |
+| API de RENASER OS: identidad del equipo | **Dormida, no construida** | Nada: el equipo entra con correo y contraseña propios desde el 25/08/2026 |
+| API de RENASER OS: tareas, tiempos y bloqueos | **No construida** | Las métricas de la validación se completan a mano |
+| API de RENASER OS: desempeño 30/90/180 | **No construida** | El seguimiento posterior lo llena una persona |
 | Módulo psicométrico propio | **No construido** | Su 5% se reparte entre las otras dos partes |
 | DeepSeek, que califica | **En uso desde el 18/08/2026** | Nadie se queda sin nota: el trabajo se reintenta y la postulación espera. Pero **cada consulta se paga**, y sin saldo o sin clave válida no avanza |
 | Google Gemini, que busca por significado | **En uso** | La búsqueda por parecido queda vacía. También se paga por consulta |

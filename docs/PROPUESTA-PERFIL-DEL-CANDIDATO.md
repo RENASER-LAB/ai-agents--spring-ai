@@ -429,7 +429,8 @@ RF-164 dice justo lo contrario.
   vocabulario; es otro trabajo.
 - **Que el perfil valga como postulación** sin currículum. Hoy el currículum es lo que se
   califica, y quitarlo cambia el embudo entero.
-- **Foto y referencias laborales.** La foto va contra la anonimización del currículum, que
-  existe para no sesgar por edad, sexo o aspecto. Las referencias son datos personales de
-  terceros que no han consentido nada.
+- **Referencias laborales.** Son datos personales de terceros que no han consentido nada.
+- **La foto en el panel.** La foto sí existe desde la V51 (05/09/2026), pero **solo la ve el
+  candidato**: no viaja al panel ni a la IA, porque la anonimización del currículum existe para
+  no sesgar por edad, sexo o aspecto. Enseñarla al equipo pide un RF nuevo y otro consentimiento.
 - **Las pantallas.** Van aparte, con su propio documento de APIs para quien las construya.

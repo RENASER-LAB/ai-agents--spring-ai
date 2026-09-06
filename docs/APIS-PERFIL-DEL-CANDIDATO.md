@@ -192,10 +192,30 @@ descarga de archivo.
 
 ---
 
+### Foto, portada, currículum y diplomas (V51 · 05/09/2026)
+
+| Qué | Rutas | Reglas |
+|---|---|---|
+| La foto | `POST` / `GET` / `DELETE /api/v1/portal/perfil/foto` | JPG, PNG o WebP, hasta 2 MB. Sustituye a la anterior. **Solo la ve el candidato** |
+| La portada | `POST` / `GET` / `DELETE /api/v1/portal/perfil/portada` · `PUT /api/v1/portal/perfil/portada/galeria` | O una propia o una del catálogo del portal (`CANTO_MENTA`, `CANTO_AQUA`, `CANTO_ROSA`, `CANTO_VIOLETA`…), **nunca las dos**: elegir una quita la otra |
+| El currículum del perfil | `POST` / `GET` / `DELETE /api/v1/portal/perfil/cv` | PDF o Word, hasta 10 MB. Uno por persona, el último (RF-162). **Se lee al subirlo**, sin postulación detrás. Quitarlo cancela la lectura en curso; lo que ya se propuso al perfil se queda |
+| El diploma | `POST` / `GET` / `DELETE /api/v1/portal/perfil/certificaciones/{id}/archivo` | PDF (hasta 10 MB) o foto del papel (JPG, PNG o WebP, hasta 2 MB). El de una certificación ajena responde 404 |
+
+**Los `GET` devuelven los bytes, no un enlace firmado.** Un `<img src>` no manda cabecera
+`Authorization`, así que la pantalla pide el archivo con el token y lo pinta desde memoria.
+
+**Nada de esto llega al panel ni a la IA.** El RF-41 esconde la cara a la IA para no sesgar por
+aspecto; enseñársela a quien decide desharía la regla. Decidido con Renaser el 05/09/2026:
+cambiarlo pide un RF nuevo y otro texto de consentimiento.
+
+---
+
 ## La lectura del currículum · lo que más afecta a la pantalla
 
-El CV **se sube al postular**, como hoy (`POST /api/v1/portal/postulaciones`). No hay endpoint
-aparte para subirlo al perfil.
+El CV se sube **al perfil** (`POST /api/v1/portal/perfil/cv`, desde el 05/09/2026) o **al postular**
+(`POST /api/v1/portal/postulaciones`). Al postular, **sin adjuntar nada se usa el del perfil**,
+copiado a la empresa de la vacante; adjuntando otro, ese vale solo para esa vacante y el del
+perfil no cambia. Sin ninguno de los dos, 400 con el motivo en palabras.
 
 **La lectura es asíncrona.** Postular responde al momento; la lectura tarda decenas de segundos
 y va por una cola. Así que la pantalla **no puede esperarla**: postular tiene que terminar y
@@ -265,6 +285,10 @@ que el resto del panel, `AlcanceSobreLaVacante`.
 **Un candidato sin perfil devuelve 200 con todo vacío**, no 404: la ficha no puede romperse por
 eso.
 
+**Y nada de lo que el candidato subió llega aquí**: ni la foto, ni la portada, ni el currículum del
+perfil, ni los diplomas (se recortan en `PintorDePerfil.sinLoDelCandidato`, con test). Ver arriba
+por qué.
+
 ---
 
 ## Los catálogos
@@ -309,3 +333,30 @@ Para que no se diseñe encima:
 - **Referencias laborales.** Son datos personales de terceros que no han consentido nada.
 - **Varios currículums.** Solo se conserva el último.
 - **Que el perfil sustituya al currículum al postular.** El archivo sigue siendo obligatorio.
+
+---
+
+## Reglas que no se negocian (para quien toca el código)
+
+Cada persona tiene **un perfil, único y transversal a organizaciones**: cuelga de `persona`, no
+de `usuario` (el usuario existe una vez por organización). Paquete `perfil/` (V36: 6 tablas + 2
+catálogos). `perfil_candidato` **no existe al registrarse**: se crea perezosamente, y lo que se
+pide en el alta va en `persona`.
+
+- **La IA propone, nunca pisa**: lo leído entra `origen=CURRICULUM` sin confirmar; lo escrito o
+  confirmado por la persona no se toca. El merge vive en `ServicioPropuestaPerfilImpl` y sus
+  tests son la especificación.
+- **Una lectura por archivo**: `archivo.contenido_hash` (SHA-256). Postular con el mismo PDF
+  copia la ficha `dato_cv` en vez de pagar otra llamada. El disparo al postular se apaga con
+  `renaser.perfil.lectura-al-postular=false` (las pruebas de calificación lo usan).
+- **El perfil NO puntúa**: no entra en notas ni rankings.
+- **La pretensión salarial** va detrás del permiso `ver_pretension` y sin él **no viaja ni el
+  nombre del campo** en el JSON del panel. Nunca en listas ni rankings. El vacío no significa
+  que nadie pidiera sueldo.
+- **El borrado 29733 se lleva el perfil entero**; `dato_cv` se queda porque sostiene lo ya
+  evaluado. Retención: parámetro `meses_conservar_perfil` (24) y el barrido diario
+  `BarridoRetencionPerfil`.
+- Una lectura de `DATOS_CV` **sin hermanos en la tanda no arma el retrato**: la barrera de la
+  cola lo ignora hasta que una criba o una entrega encolen a los demás.
+- ⚠️ **No encender con candidatos reales sin el texto de consentimiento nuevo**: el vigente cubre
+  una postulación concreta, no un perfil que se conserva entre convocatorias.

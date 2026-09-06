@@ -12,6 +12,9 @@ import com.renaser.ai.ai_engine.perfil.repository.CertificacionPerfilRepository;
 import com.renaser.ai.ai_engine.perfil.repository.LecturaCvPerfilRepository;
 import com.renaser.ai.ai_engine.perfil.repository.PerfilCandidatoRepository;
 import com.renaser.ai.ai_engine.perfil.service.ServicioArchivosDelPerfil.Contenido;
+import com.renaser.ai.ai_engine.perfil.service.ServicioPropuestaPerfil;
+import com.renaser.ai.ai_engine.postulacion.entity.DatoCv;
+import com.renaser.ai.ai_engine.postulacion.repository.DatoCvRepository;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -58,6 +61,8 @@ class ServicioArchivosDelPerfilImplTest {
     @Mock private ArchivoRepository archivos;
     @Mock private AlmacenArchivos almacen;
     @Mock private ColaCalificacionIa cola;
+    @Mock private DatoCvRepository datosCv;
+    @Mock private ServicioPropuestaPerfil propuesta;
 
     private ServicioArchivosDelPerfilImpl servicio;
     private PerfilCandidato perfil;
@@ -87,7 +92,8 @@ class ServicioArchivosDelPerfilImplTest {
             return l;
         });
         servicio = new ServicioArchivosDelPerfilImpl(
-                perfiles, certificaciones, lecturas, archivos, almacen, cola);
+                perfiles, certificaciones, lecturas, archivos, almacen, cola, datosCv,
+                propuesta);
     }
 
     // ==================== El currículum ====================
@@ -144,6 +150,57 @@ class ServicioArchivosDelPerfilImplTest {
         verify(lecturas).save(nueva.capture());
         assertThat(nueva.getValue().getEstado()).isEqualTo(LecturaCvPerfil.LISTA);
         assertThat(nueva.getValue().getMotivo()).contains("no se vuelve a pagar");
+    }
+
+    @Test
+    @DisplayName("RF-161: tampoco se paga si ese archivo ya se leyó AL POSTULAR")
+    void elLeidoAlPostularTampocoSeVuelveAPagar() {
+        // Los dos recibos son tablas distintas —`lectura_cv_perfil` y `dato_cv`— y no se
+        // miraban entre ellos: quien postulaba con su PDF y luego lo guardaba en su perfil
+        // pagaba la misma lectura dos veces. Lo que se leyó al postular ya se propuso a
+        // este mismo perfil en aquella transacción.
+        when(almacen.guardar(eq(ORG), any())).thenReturn(archivo(60L, "hash-de-postular"));
+        when(archivos.findByContenidoHash("hash-de-postular"))
+                .thenReturn(List.of(archivo(60L, "hash-de-postular")));
+        when(lecturas.findByPersonaIdAndArchivoIdInAndEstado(
+                eq(PERSONA), any(), eq(LecturaCvPerfil.LISTA)))
+                .thenReturn(List.of());
+        when(datosCv.fichasDeLaPersonaConHash(PERSONA, "hash-de-postular"))
+                .thenReturn(List.of(DatoCv.builder().id(3L).postulacionId(8L).build()));
+        when(propuesta.conservaLoPropuestoDeUnCurriculum(PERSONA)).thenReturn(true);
+
+        servicio.guardarCurriculum(QUIEN, unPdf());
+
+        verify(cola, never()).encolarDatosCvDelPerfil(anyLong(), anyLong());
+        ArgumentCaptor<LecturaCvPerfil> nueva = ArgumentCaptor.forClass(LecturaCvPerfil.class);
+        verify(lecturas).save(nueva.capture());
+        assertThat(nueva.getValue().getEstado()).isEqualTo(LecturaCvPerfil.LISTA);
+        assertThat(nueva.getValue().getMotivo()).contains("no se vuelve a pagar");
+    }
+
+    @Test
+    @DisplayName("Barrido por inactividad y vuelve con el mismo CV: no se queda LISTA sobre un perfil vacío")
+    void trasElBarridoElReciboDeLaPostulacionNoVale() {
+        // `dato_cv` dice que ese archivo se leyó, pero no guarda lo que se propuso, y el
+        // barrido de retención se llevó el perfil entero: sin propuestas vivas, darla por
+        // buena sería «revisa lo que encontramos» sobre un perfil vacío. Se vuelve a leer.
+        when(almacen.guardar(eq(ORG), any())).thenReturn(archivo(61L, "hash-barrido"));
+        when(archivos.findByContenidoHash("hash-barrido"))
+                .thenReturn(List.of(archivo(61L, "hash-barrido")));
+        when(lecturas.findByPersonaIdAndArchivoIdInAndEstado(
+                eq(PERSONA), any(), eq(LecturaCvPerfil.LISTA)))
+                .thenReturn(List.of());
+        when(datosCv.fichasDeLaPersonaConHash(PERSONA, "hash-barrido"))
+                .thenReturn(List.of(DatoCv.builder().id(3L).postulacionId(8L).build()));
+        when(propuesta.conservaLoPropuestoDeUnCurriculum(PERSONA)).thenReturn(false);
+        when(cola.encolarDatosCvDelPerfil(ORG, 99L)).thenReturn(true);
+
+        servicio.guardarCurriculum(QUIEN, unPdf());
+
+        verify(cola).encolarDatosCvDelPerfil(ORG, 99L);
+        ArgumentCaptor<LecturaCvPerfil> nueva = ArgumentCaptor.forClass(LecturaCvPerfil.class);
+        verify(lecturas).save(nueva.capture());
+        assertThat(nueva.getValue().getEstado()).isEqualTo(LecturaCvPerfil.EN_CURSO);
     }
 
     @Test

@@ -198,6 +198,49 @@ Tres cosas están puestas con un criterio que Renaser tiene que confirmar:
 
 ---
 
+## El ranking por etapa y el desglose de la evaluación (25/08/2026)
+
+Dos endpoints más en `PostulacionesPanelController`:
+
+| Para qué | Llamada |
+|---|---|
+| Ordenar la tanda por la nota de otra etapa | `GET /panel/vacantes/{id}/ranking?etapa=PRUEBA_PUESTO` |
+| Abrir la evaluación del banco por dentro | `GET /panel/postulaciones/{id}/evaluacion` |
+| Bajar la tanda a Excel | `GET /panel/vacantes/{id}/ranking/excel` |
+
+- **`?etapa=` cambia con qué nota se ordena, y en una sola etapa también las columnas.** Con
+  `PRUEBA_PUESTO` (desde el 03/09/2026) cada fila trae **los criterios de la rúbrica con la que
+  se midió a ese candidato** (caja 20, divisas 15, sedes 15…), con el peso sacado de los
+  `puntos` de la rúbrica; la cabecera de la tabla se arma de lo que llega en las filas, nunca de
+  una lista escrita a mano. Tres casos salen sin criterios y ninguno es un error: el cuestionario
+  técnico (no tiene rúbrica), quien aún no abrió su prueba, y una plantilla a medio escribir.
+  **En esa pestaña nunca se cae a los ocho criterios del currículum.** En las demás pestañas las
+  ocho notas del currículum siguen siendo las del Perfil Integral. Los códigos salen del catálogo
+  `etapa`; uno que no esté da 400. Quien no tenga nota en esa etapa sale al final, sin heredar la
+  de otra. Son dos consultas para la tanda entera (los intentos y las rúbricas de las versiones
+  que aparezcan), nunca una por fila.
+- **Con `PRUEBA_PUESTO` cada fila trae además el `ponderado`** (desde el 04/09/2026, RF-155): lo
+  ya rendido —Perfil Integral y prueba— reescalado sobre la suma de sus dos pesos, con su
+  desglose. Vacío si falta cualquiera de las dos notas. **No es la Puntuación Global.** Está
+  contado en [Prueba del puesto](PRUEBA-DEL-PUESTO.md) y en [Las APIs](09-APIS.md).
+- **Es una sobrecarga, no un cambio de firma, a propósito**: `cribaFina()` decide a quién
+  recalificar por la nota de preselección y tenía que seguir haciéndolo. Sin el parámetro el
+  camino es el de antes, sin una consulta de más.
+- **El desglose es de solo lectura y nunca da 404.** Sin evaluación asignada devuelve vacíos:
+  una vacante publicada con el banco apagado es un caso normal. Lo guarda
+  `ver_respuestas_evaluacion`, que estaba en el catálogo desde V12 y no lo comprobaba nadie;
+  este es el primer endpoint que lo usa.
+- ⚠️ **`alineacion` sale vacía siempre**: la tabla `resultado_alineacion` existe, el panel ya la
+  lee y **ningún agente la escribe todavía**. Vacía significa «no calculado», no «todo en verde».
+- **La cuenta de la nota de la evaluación vive en un solo sitio**,
+  `ServicioCalificacion.notaCombinada`. Mezclar lo cerrado con lo abierto es una interpretación
+  sin confirmar con el cliente: el día que cambie tiene que cambiar a la vez para la nota de la
+  etapa y para lo que ve el panel. No volver a copiarla.
+- Para mirar el panel con datos y no con tablas vacías hay dos guiones que escriben en la base
+  local: `scripts/sembrar-evaluacion-local.py` y `scripts/escenario-etapas-local.py`.
+
+---
+
 ## Enlaces
 
 - [La calificación con IA](CALIFICACION-CON-IA.md) — los tres agentes, qué se guarda de cada

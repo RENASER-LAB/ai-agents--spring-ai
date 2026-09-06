@@ -26,7 +26,7 @@ una tabla, `ficha_vacante`, así que el 102 de aquel día se quedó a un paso—
 integración.
 El desglose al día está en [Comprobaciones automáticas](COMPROBACIONES-AUTOMATICAS.md).
 
-⚠️ Los documentos de `docs/` describen el sistema completo (93 tablas, 77 permisos). El código
+⚠️ Los documentos de `docs/` describen el sistema completo (106 tablas, 77 permisos). El código
 va por detrás y por otro camino en algunos puntos —de esos 77 permisos hay **71 sembrados** en
 la base, y al revés también: hay cuatro sembrados que la matriz del doc 04 no enumera—.
 **Cuando se contradigan, manda el código.**

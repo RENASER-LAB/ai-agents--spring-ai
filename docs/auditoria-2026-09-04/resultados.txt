@@ -1,0 +1,17 @@
+Comprobaciones focalizadas de la auditoría del 2026-09-04
+
+REPRODUCIDO: routing AG-05 del contrato publica 0 mensajes
+REPRODUCIDO: dependsOn pendiente no impide publicar al agente dependiente
+REPRODUCIDO: un flujo permite 31 corridas con MAX_AGENT_RUNS=6
+REPRODUCIDO: se publica fan-out aunque humanGate.required=true y approved=false (no prueba escrituras externas)
+REPRODUCIDO: redelivery de un run terminado vuelve a invocar al modelo dos veces
+REPRODUCIDO: anonimización elimina años de experiencia y conserva 'Con 2 hijos': Tengo [DATO NO UTILIZABLE] de experiencia en Java. Con 2 hijos.
+REPRODUCIDO: reencolarEvaluador devuelve false para EVALUADOR terminado
+
+Unitarias
+[INFO] Tests run: 1032, Failures: 0, Errors: 0, Skipped: 1
+BUILD SUCCESS
+
+Integración
+[INFO] Tests run: 19, Failures: 0, Errors: 0, Skipped: 0
+BUILD SUCCESS

@@ -23,8 +23,8 @@ Sirve para tres cosas:
 - **Entender el sistema.** Un modelo de datos bien contado explica el negocio mejor que
   cualquier otro documento.
 
-**La base ya está construida.** Las migraciones `V1` a `V40` viven en
-`src/main/resources/db/migration` —**102 tablas de este módulo**, 105 en la base contando la de
+**La base ya está construida.** Las migraciones `V1` a `V51` viven en
+`src/main/resources/db/migration` —**103 tablas de este módulo**, 106 en la base contando la de
 Flyway y las dos del motor de agentes— y Flyway es el dueño del esquema. Cambiar algo de aquí
 ya cuesta una migración nueva, y **una migración aplicada no se edita nunca**: se escribe otra
 encima.
@@ -36,6 +36,11 @@ La `V36` trae **el perfil del candidato**: seis tablas que cuelgan de `persona` 
 la columna `archivo.contenido_hash` (la huella que evita pagar dos lecturas del mismo
 currículum) y los permisos `ver_perfil_candidato` y `ver_pretension`. Ver
 [PROPUESTA-PERFIL-DEL-CANDIDATO.md](PROPUESTA-PERFIL-DEL-CANDIDATO.md).
+
+La `V51` (05/09/2026) le da al perfil **foto, portada, currículum propio y diplomas**: cinco
+columnas en `perfil_candidato`, una en `certificacion_perfil` y la tabla `lectura_cv_perfil`,
+que sigue la lectura del currículum subido al perfil sin colgar de ninguna postulación. **Nada de
+eso llega al panel ni a la IA**: la foto la ve solo el candidato (RF-41, decidido el 05/09/2026).
 
 La `V37` convierte el esquema en **multiempresa**: `organizacion.es_plataforma` marca a la
 dueña de la plataforma (solo una puede serlo) y reemplaza al código `'RENASER'` que estaba
@@ -203,8 +208,8 @@ Pero hay una diferencia nueva entre los dos tipos de usuario:
 
 | | Contraseña | Identificador externo |
 |---|---|---|
-| Equipo de Renaser | **Vacía.** RENASER OS emite su token y aquí solo se valida | El que tiene en RENASER OS |
-| Candidato | La suya, cifrada | Vacío. No es usuario de RENASER OS |
+| Equipo de Renaser o de una empresa cliente | La suya, cifrada (desde el 25/08/2026: login propio, cuentas por invitación) | Vacío salvo que algún día se conecte RENASER OS |
+| Candidato | La suya, cifrada; o entra con un enlace de un solo uso | Vacío. No es usuario de RENASER OS |
 
 Ese identificador externo es una **columna suelta, sin clave foránea**, porque RENASER OS es
 otro servicio que habla por HTTP y no comparte base de datos con este. Fingir una clave foránea
@@ -376,15 +381,15 @@ error del modelo de un cambio en las instrucciones que le dimos nosotros.
            apunta a su ejecucion
 
 
-  RENASER OS  <---- HTTP ----  identidad del equipo
-  (otro servicio)              tareas y tiempos
-                               desempeno 30/90/180
+  RENASER OS  < - - HTTP - -   tareas y tiempos        (integracion futura,
+  (otro servicio)              desempeno 30/90/180      hoy dormida)
 ```
 
 Tres cosas que el mapa deja ver y conviene subrayar: **la evaluación cuelga del usuario**, no de
 la postulación, por lo dicho en la tercera decisión; **todo lo que califica una máquina apunta a
 la ejecución concreta** que produjo esa nota; y **RENASER OS es un servicio aparte**, no una
-tabla más.
+tabla más, y hoy no está conectado: la identidad del equipo es propia y las métricas de la
+validación las pone una persona.
 
 Hay una versión dibujada de este mismo mapa en
 [diagramas/modelo-de-datos.html](diagramas/modelo-de-datos.html), que se abre en el navegador.
@@ -430,7 +435,8 @@ código. El Administrador puede crear roles nuevos y repartir permisos sin que n
 | `rol_permiso` | Qué permisos tiene un rol y **con qué alcance** | rol_id, permiso_id, alcance |
 
 `contrasena_hash` y `usuario_renaser_os_id` son **excluyentes**: quien tiene uno no tiene el
-otro. El equipo entra con el token de RENASER OS; los candidatos, con su contraseña.
+otro. Desde el 25/08/2026 el equipo entra también con contraseña (cuentas por invitación) y
+`usuario_renaser_os_id` queda reservado para una integración futura que hoy está dormida.
 
 El `area_id` queda vacío en los candidatos, que no pertenecen a ningún departamento.
 
@@ -939,9 +945,10 @@ diseños, archivos de hasta 200 MB— no inflan la base de datos. **El almacén 
 sistema**, no el de RENASER OS, y es privado siempre: para abrir un archivo, el backend genera
 un enlace firmado que dura poco.
 
-El seguimiento de desempeño **ya no está bloqueado**: RENASER OS existe y expone por su API los
-objetivos, tareas, plazos, retrabajo y resultados. `metrica_desempeno.origen` dice si el valor
-llegó solo o lo puso una persona.
+El seguimiento de desempeño **sigue sin alimentarse solo**: la integración con RENASER OS que
+traería objetivos, tareas, plazos, retrabajo y resultados no está construida. Hoy los valores los
+pone una persona, y `metrica_desempeno.origen` deja dicho si llegó solo o lo puso alguien, para
+que el día que se conecte no haga falta cambiar el modelo.
 
 ---
 
@@ -1085,8 +1092,9 @@ dimensión entran por nivel y familia. Se puede arrancar con una receta razonabl
 **La figura contractual de la validación productiva.** Bloquea esa modalidad, no el modelo: la
 otra modalidad funciona desde el primer día.
 
-**Cómo responde el sistema cuando la API de RENASER OS no está.** Está decidido qué hacer en cada
-caso, pero falta el detalle de reintentos y tiempos de espera.
+**La integración con RENASER OS.** No está construida ni la usa ningún flujo; la identidad del
+equipo es propia desde el 25/08/2026. Si algún día se conecta, falta decidir reintentos y
+tiempos de espera.
 
 **La ciudad sobrevive al anonimizado.** El borrado vacía nombre, apellidos, teléfono, documento y
 fecha de nacimiento, y deja puesto `persona.ciudad_ubigeo`. Nadie ha decidido todavía si una

@@ -1,7 +1,7 @@
 # Diccionario de datos
 
 Sistema de selección de personal — Renaser Consulting
-Versión 2.2 · 2026-08-27 · Puesto al día con las migraciones hasta la `V40`
+Versión 2.5 · 2026-09-06 · Puesto al día con las migraciones hasta la `V51` (la V49 y la V50 solo siembran pesos; la V51 trae la tabla `lectura_cv_perfil` y los archivos del perfil)
 
 Cada tabla con todas sus columnas, tipos y claves. **Este documento se consulta**, no se lee de
 corrido: es la base para escribir las migraciones de Flyway.
@@ -155,7 +155,8 @@ Cómo entra al sistema. Apunta a una persona.
 **Restricción:** no puede tener `contrasena_hash` y `usuario_renaser_os_id` a la vez
 
 `usuario_renaser_os_id` es **texto y no una clave foránea**: RENASER OS es otro servicio que
-habla por HTTP y no comparte base de datos con este.
+habla por HTTP y no comparte base de datos con este. Hoy ningún flujo real la llena: el equipo
+entra con correo y contraseña propios desde el 25/08/2026.
 
 El correo es único **dentro de una organización**, no en toda la base. La misma persona puede ser
 candidata en dos empresas distintas.
@@ -2436,8 +2437,8 @@ El corte de los 30, 90 o 180 días, con su diagnóstico.
 El diagnóstico va en columnas y no en tabla aparte porque es **uno por corte** y solo aparece
 cuando hay desviación relevante.
 
-**Ya no está bloqueado:** RENASER OS existe y expone por su API los objetivos, tareas, plazos,
-retrabajo y resultados.
+**Sigue sin alimentarse solo:** la integración con RENASER OS que traería objetivos, tareas,
+plazos, retrabajo y resultados no está construida; hoy los valores los pone una persona.
 
 ## `metrica_desempeno`
 
@@ -2522,12 +2523,17 @@ La ficha de la persona. Una por persona, para siempre.
 | `pretension_min` | numeric(12,2) | no | |
 | `pretension_max` | numeric(12,2) | no | |
 | `pretension_moneda` | text | no | `PEN` o `USD` |
+| `foto_archivo_id` | bigint | no | Su foto (`V51`). **Solo la ve el candidato**: no viaja al panel ni al texto que lee la IA (RF-41). Decisión del 05/09/2026; cambiarla pide un RF nuevo |
+| `portada_archivo_id` | bigint | no | Su portada propia (`V51`). Excluyente con `portada_galeria` |
+| `portada_galeria` | text | no | Código de una portada del catálogo del portal (`V51`) |
+| `cv_archivo_id` | bigint | no | Su currículum, el último (RF-162, `V51`). Al postular se reutiliza **copiándolo** a la organización de la vacante: un archivo sellado con otra organización no se abre desde el panel de esa empresa (lo que arregló la V48) |
+| `cv_actualizado_en` | timestamptz | no | Cuándo subió el último currículum (`V51`) |
 | `actualizado_en` | timestamptz | sí | |
 | `creado_en` | timestamptz | sí | |
 
 **Clave primaria:** `id` · **Único:** `persona_id` · **Apunta a:** `persona`
-**Restricciones:** `pretension_max` ≥ `pretension_min`; y de los tres campos de pretensión, **o
-los tres o ninguno**
+**Restricciones:** `pretension_max` ≥ `pretension_min`; de los tres campos de pretensión, **o
+los tres o ninguno**; y **una sola portada**: `portada_archivo_id` o `portada_galeria`, nunca las dos (`V51`)
 
 La pretensión solo la ve quien tenga el permiso `ver_pretension`, y **nunca viaja en listas ni
 en rankings**.
@@ -2599,9 +2605,10 @@ y sin espacios de más—, que es lo que impide que «Inglés» e «ingles» ent
 | `vence_en` | date | no | **Vacío = no caduca.** Muchas sí lo hacen —colegiatura, primeros auxilios, seguridad— y en salud eso decide si alguien puede trabajar o no |
 | `origen` | text | sí | `PERSONA` o `CURRICULUM` |
 | `confirmado_en` | timestamptz | no | |
+| `archivo_id` | bigint | no | El diploma escaneado, si lo subió: PDF o foto del papel (`V51`). Como la foto: del candidato y para el candidato |
 | `creado_en` | timestamptz | sí | |
 
-**Clave primaria:** `id` · **Apunta a:** `perfil_candidato`
+**Clave primaria:** `id` · **Apunta a:** `perfil_candidato`, `archivo`
 **Restricción:** `vence_en` ≥ `emitida_en`
 
 ## `enlace_perfil`
@@ -2618,6 +2625,30 @@ y sin espacios de más—, que es lo que impide que «Inglés» e «ingles» ent
 **Apunta a:** `perfil_candidato`
 
 No lleva `origen` ni `confirmado_en`: los enlaces los pone siempre la persona.
+
+## `lectura_cv_perfil` (`V51`)
+
+En qué punto está la lectura del currículum que el candidato subió **a su perfil**. No
+confundir con `cv` y `dato_cv`, que son de una postulación. Sin fila = `SIN_CV`.
+
+| Columna | Tipo | Oblig. | Qué guarda |
+|---|---|---|---|
+| `id` | bigint | sí | Clave |
+| `persona_id` | bigint | sí | |
+| `archivo_id` | bigint | sí | El currículum que se leyó |
+| `estado` | text | sí | `EN_CURSO`, `LISTA` o `NO_LEGIBLE` |
+| `intentos` | integer | sí | |
+| `motivo` | text | no | Por qué no salió nada, para contarlo sin que parezca culpa del candidato |
+| `creado_en` | timestamptz | sí | |
+| `terminado_en` | timestamptz | no | |
+
+**Clave primaria:** `id` · **Apunta a:** `persona`, `archivo` · **Índice parcial:** una sola lectura
+`EN_CURSO` por persona
+
+**Las lecturas no se borran nunca**: son el recibo de lo ya pagado (RF-161). El estado que ve la
+pantalla se busca por el archivo que hay ahora, no por la lectura más reciente. ⚠️ El índice parcial
+obliga a hacer `flush` entre cerrar la anterior y crear la nueva: Hibernate ordena los INSERT antes
+que los UPDATE dentro de la misma transacción.
 
 ---
 

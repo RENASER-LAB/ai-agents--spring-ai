@@ -1,11 +1,11 @@
 # Las APIs del sistema
 
 Sistema de selección de personal — Renaser Consulting
-Versión 1.6 · 2026-08-26 · Cubre **las cinco etapas del embudo**: postulación, Perfil Integral,
+Versión 1.9 · 2026-09-06 · Cubre **las cinco etapas del embudo**: postulación, Perfil Integral,
 prueba del puesto, simulación de trabajo, validación práctica y decisión final
 
-Este documento explica las APIs para quien las va a consumir: el frontend de RENASER OS y el
-portal del candidato. **La referencia viva es Swagger**, en `http://localhost:8081/swagger-ui.html`
+Este documento explica las APIs para quien las va a consumir: el panel de la empresa y el
+portal del candidato, las dos caras del frontend `RenaserOsPostulantes`. **La referencia viva es Swagger**, en `http://localhost:8081/swagger-ui.html`
 cuando la aplicación corre en local: ahí están los cuerpos exactos, se prueban las llamadas y
 siempre está al día porque se genera del código. **Es el 8081, no el 8080** — el perfil `local`
 mueve la aplicación de puerto porque el 8080 suele estar ocupado por Adminer, que responde 200 a
@@ -56,6 +56,11 @@ regalaría a un atacante la lista de correos registrados. Tras varios intentos f
 en 5), la entrada se bloquea unos minutos y responde **429** con la cabecera `Retry-After` y el
 campo `segundosDeEspera`, para que la pantalla pueda decir cuánto falta en vez de adivinarlo.
 
+**El candidato que llega por correo:** `POST /portal/auth/acceso` canjea el **enlace de acceso**
+que va en el aviso de que su postulación avanza (V26), sin contraseña. Es de un solo uso y es la
+única puerta para quien fue cargado desde una carpeta de currículums y nunca creó una cuenta. El
+equipo puede generar uno nuevo con `POST /panel/postulaciones/{id}/enlace-acceso`.
+
 **El equipo:** `POST /panel/auth/login` con correo y contraseña. Solo entran cuentas de
 equipo: un candidato con su contraseña correcta recibe el mismo 401 que un correo que no
 existe — la contraseña del portal no abre el panel. El bloqueo por intentos es el mismo que
@@ -101,7 +106,8 @@ en lenguaje normal.
 | GET `/catalogos/ubigeo` | Dónde se puede decir que uno vive: las **196 provincias** del Perú y «Fuera del Perú», cada una con su departamento, ordenadas por departamento y nombre. Es `{codigo, nombre, departamento}`, y el departamento viene vacío solo en `EXT` | Cualquiera, sin token |
 | POST `/cuentas` | Crear la cuenta y registrar los consentimientos. Desde el 31/08 pide además **la ciudad** (`ciudadUbigeo`), obligatoria: un código que el catálogo no ofrezca es un 400 | Cualquiera |
 | POST `/auth/login` | Entrar; devuelve el token | Cualquiera |
-| POST `/postulaciones` | Postular: CV (PDF o Word, máx. 10 MB), enlaces, el resultado del que se siente orgulloso, la confirmación de los requisitos y `aceptaTratamiento` (obligatorio): la aceptación del texto de la empresa queda firmada con IP y navegador, a nombre de esa postulación | Candidato |
+| GET `/auth/sesion` | Cómo se llama quien tiene el token. El portal entra una vez y guarda el token; en la segunda visita nadie le había dicho el nombre (06/09) | Candidato |
+| POST `/postulaciones` | Postular: CV (PDF o Word, máx. 10 MB; **desde el 06/09 opcional si el perfil ya tiene uno**: sin adjuntar se usa el del perfil, copiado a la empresa de la vacante, y adjuntando otro ese vale solo para esa vacante y el del perfil no cambia), enlaces, el resultado del que se siente orgulloso, la confirmación de los requisitos y `aceptaTratamiento` (obligatorio): la aceptación del texto de la empresa queda firmada con IP y navegador, a nombre de esa postulación | Candidato |
 | GET `/postulaciones` | Sus postulaciones, con la empresa de cada una, estado, días sin cambio y **qué rendirá en la etapa técnica** (`instrumentoEtapaTecnica`: la prueba del puesto o el cuestionario) | Candidato |
 | GET `/postulaciones/{uuid}` | El detalle de una suya, con el historial completo | Candidato |
 | POST `/postulaciones/{uuid}/retiro` | Retirarla. **No borra sus datos**: eso se pide aparte | Candidato |
@@ -187,6 +193,9 @@ del área— se ven solo las propias, y una ajena responde 404.
 
 | Método y ruta | Qué hace | Permiso |
 |---|---|---|
+| PATCH `/postulaciones/{id}/contacto` | Corregir el correo o el teléfono de una ficha cuando el currículum los traía mal escritos (V27). Queda auditado | `corregir_contacto_candidato` |
+| POST `/postulaciones/{id}/reapertura-evaluacion` | Volver a abrir la evaluación de quien no llegó a entregarla en plazo, para darle otra oportunidad | `mover_postulacion` |
+| POST `/postulaciones/{id}/enlace-acceso` | Generar un enlace de acceso nuevo para ese candidato (entra sin contraseña; ver «Cómo entrar») | `mover_postulacion` |
 | GET `/bandeja?espera_a=` | La bandeja: todo lo que espera a `CANDIDATO`, `SISTEMA`, `TALENTO` o `AREA` | `ver_candidatos` |
 | GET `/vacantes/{id}/embudo` | Cuántas postulaciones hay en cada estado | `ver_embudo` |
 | GET `/vacantes/{id}/ranking?etapa=` | La tanda ordenada de más apto a menos, con las ocho notas del currículum de cada uno. **Incluye a quien todavía no tiene nota**. Sin `etapa` ordena por la del Perfil Integral; con ella, por la nota de esa etapa. Cada fila trae además **dónde vive** (`ciudad`, ya escrito «Departamento — Provincia», y `ciudadCodigo`), **su pretensión salarial**, que solo viaja con `ver_pretension`, y el **`ponderado`** de lo ya rendido (ver la nota de abajo) | `ver_embudo` |
@@ -255,7 +264,8 @@ del área— se ven solo las propias, y una ajena responde 404.
 > declaró, o que el rol de quien descarga no puede verla— y solo una es verdad cada vez, así que
 > el pie lo dice. Por eso mismo el ranking devuelve `puedeVerPretension` en su cabecera: sin ese
 > booleano, la pantalla tendría que nombrar las dos posibilidades sin afirmar ninguna. Sin
-> `ver_pretension` el dato ni se consulta. Y quien tiene `ver_embudo` pero no `ajustar_nota` se
+> `ver_pretension` el dato ni se consulta. Y quien tiene `ver_embudo` pero no
+> `abrir_ficha_candidato` (el mismo permiso que pide `GET /prueba/notas`, desde el 03/09/2026) se
 > lleva el Detalle de la prueba resumido en una línea que explica qué permiso le falta, en vez de
 > un archivo a medio escribir.
 
@@ -325,7 +335,7 @@ del área— se ven solo las propias, y una ajena responde 404.
 | POST `/postulaciones/{id}/prueba/plazo` | Fijarle a ESE candidato su fecha de cierre, normalmente para darle más horas. **Queda marcada como suya**: mover después la fecha de la vacante no se la toca. Antes de empezar, la fecha puesta manda sobre el cálculo por días | `mover_postulacion` |
 | GET `/postulaciones/{id}/prueba/respuestas` | Lo que contestó, pregunta a pregunta. Las preguntas son **las de la versión que él vio**, en su orden, no las del catálogo de hoy: una versión publicada después puede llevar otras | `abrir_ficha_candidato` |
 | GET `/postulaciones/{id}/prueba/entregables` | **Lo que subió**: los archivos y los enlaces que la prueba pedía, entregados o no —que falte un obligatorio es lo que hay que ver antes de poner una nota—. De cada uno, **la última versión**: pudo entregarlo tres veces. ⚠️ El `enlace` y el `archivoId` **viajan solo con `descargar_entregables`**; sin él se dice qué entregó y cuándo, y `porQueNoSeVe` explica el hueco. Con cuestionario técnico devuelve **lista vacía, no 404** | `abrir_ficha_candidato` |
-| GET `/postulaciones/{id}/prueba/notas` | La rúbrica entera con lo que lleva puesto cada criterio: puntaje, explicación y **de quién viene la nota**, si de la IA o de una persona. Lo que aún no tiene nota sale en nulo | `ajustar_nota` |
+| GET `/postulaciones/{id}/prueba/notas` | La rúbrica entera, **en su orden**, con lo que lleva puesto cada criterio: puntaje, explicación y **de quién viene la nota**, si de la IA o de una persona. Lo que aún no tiene nota sale en nulo. Desde el 03/09/2026 **leer pide el permiso de abrir la ficha, no el de corregir**: Responsable de Área veía la nota en el embudo y recibía 403 al abrir su desglose | `abrir_ficha_candidato` |
 | POST `/postulaciones/{id}/prueba/criterios/{criterioId}/nota` | Poner la nota de un criterio, con explicación obligatoria | `ajustar_nota` |
 | POST `/postulaciones/{id}/prueba/calificacion-ia` | Pedirle al agente `PRUEBA_PUESTO` los criterios que la rúbrica le reserva. Tarda decenas de segundos y **no pisa ningún ajuste hecho a mano**. Al acabar, si la rúbrica quedó entera **deja también la nota de la etapa** | `ajustar_nota` |
 | POST `/postulaciones/{id}/prueba/calificacion` | Ponderar las notas ya puestas. Exige que estén todos los criterios. **Escribe**: deja la nota guardada, no es una consulta. Desde el 28/08 **ya no es el único camino**: si el agente deja la rúbrica entera, la nota sale sola y esta llamada solo la reescribe con lo mismo. Sigue haciendo falta cuando los últimos criterios los pone una persona | `ajustar_nota` |
@@ -349,6 +359,8 @@ lo interno viaja, y una prueba ajena responde 404.
 | POST `/postulaciones/{id}/ausencia-simulacion` | Qué hacer con quien faltó: otra fecha o cerrar | `decidir_sobre_ausente` |
 | POST `/postulaciones/{id}/simulacion/...` | Poner notas y ponderarlas, como en la prueba | `calificar_simulacion` |
 | GET/POST `/postulaciones/{id}/conversacion-final` | Las 3-5 preguntas y lo que se respondió | `hacer_conversacion_final` |
+| POST `/postulaciones/{id}/conversacion-final/generar` | Pedirle al agente `SIMULACION` que escriba las preguntas, sacadas de las contradicciones entre lo que dijo y lo que se le vio hacer. **No puntúa nada**, y una pregunta ya contestada no se rehace | `hacer_conversacion_final` |
+| POST `/conversacion-final/{preguntaId}/respuesta` | Anotar lo que el candidato respondió a una pregunta concreta | `hacer_conversacion_final` |
 
 **El portal del candidato es `/portal/simulacion/{codigo}`**: ver las fechas de su vacante que
 tengan cupo, elegir una, y consultar la que eligió.
@@ -436,9 +448,10 @@ el primer día.
 
 | Método y ruta | Qué hace | Permiso |
 |---|---|---|
-| GET `/postulaciones/{id}/semaforo` | La Puntuación Global y una propuesta de semáforo | `ver_semaforo_decision` |
+| GET `/postulaciones/{id}/semaforo` | La Puntuación Global y una propuesta de semáforo. Si la versión de pesos de la vacante no tiene ningún peso de etapa responde «no se puede calcular todavía», nunca un cero en rojo (04/09) | `ver_semaforo_decision` |
 | POST `/postulaciones/{id}/decision` | Decidir. El motivo es siempre obligatorio (RF-119) | `decidir_contratacion` la primera vez, `cambiar_decision` para corregir |
 | POST `/postulaciones/{id}/evidencia-adicional` | Pedir evidencia adicional cuando sale ámbar. Tope configurable | `pedir_evidencia_adicional` |
+| POST `/postulaciones/{id}/barreras-detectadas` | Marcar qué barrera crítica de la vacante disparó este candidato, con su evidencia, antes de decidir. Es distinto de `/vacantes/{id}/barreras-criticas`, que las DEFINE | `decidir_contratacion` |
 
 ⚠️ **La decisión de contratar no es de Talento.** Es del responsable del área o de
 Dirección (RF-119) — la primera vez en el sistema que Talento no tiene el permiso de
@@ -480,11 +493,47 @@ el banco v4 que venga no necesitará una migración. El ciclo es
 | PATCH `/banco-preguntas/opciones/{id}/textos`, `/campos-caso/{id}/textos`, `/rangos/{id}/textos`, `/pares-consistencia/{id}/textos` | Igual para el texto de cada pieza publicada; su clave nunca viaja en el cuerpo | `publicar_version_banco` |
 | PATCH `/banco-preguntas/versiones/{id}/etiqueta` | Renombrar una versión publicada | `publicar_version_banco` |
 
+### Las plantillas de evaluación (`/api/v1/panel/plantillas-evaluacion`)
+
+La plantilla es lo que una vacante elige en `POST /vacantes/{id}/plantilla-evaluacion`: qué
+versión del banco se responde y cuántos ítems de cada dimensión entran (las cuotas). Desde la
+V20 el banco v3 se aplica **entero por nivel**, así que las cuotas solo tienen sentido para bancos
+que se muestrean.
+
+| Método y ruta | Qué hace | Permiso |
+|---|---|---|
+| GET `/plantillas-evaluacion` | Las plantillas de la organización (o las de la plataforma, si la bandera de personalización está apagada) | `elegir_plantilla_evaluacion` |
+| POST `/plantillas-evaluacion` | Crear una en borrador sobre una versión del banco | `editar_plantillas_evaluacion` |
+| GET/POST `/plantillas-evaluacion/{id}/cuotas` | Cuántos ítems de cada dimensión entran | `elegir_plantilla_evaluacion` / `editar_plantillas_evaluacion` |
+| POST `/plantillas-evaluacion/{id}/publicacion` | Publicar: desde ahí la eligen las vacantes y ya no se edita | `editar_plantillas_evaluacion` |
+
+### Los pesos del embudo (`/api/v1/panel/pesos`)
+
+Una versión de pesos dice cuánto vale cada etapa (40/30/15/15 en la sembrada), cada dimensión,
+cada criterio y cada componente. **Se publica y ya no se edita**: cada nota queda atada a la
+versión con la que se calculó y nada se recalcula hacia atrás. Una vacante elige la suya con
+`POST /vacantes/{id}/version-pesos`; sin elegir, rige la publicada más reciente de la
+organización (o la de la plataforma).
+
+| Método y ruta | Qué hace | Permiso |
+|---|---|---|
+| GET/POST `/pesos/versiones` | Las versiones y crear una en borrador | `publicar_version_pesos` |
+| GET/POST `/pesos/versiones/{id}/etapas` | El reparto entre las cuatro etapas; tiene que sumar 100 | `publicar_version_pesos` |
+| GET/POST `/pesos/versiones/{id}/dimensiones` · `/criterios` · `/componentes` | El reparto dentro de cada etapa: dimensiones del banco, criterios del currículum, y componentes del Perfil Integral | `publicar_version_pesos` |
+| POST `/pesos/versiones/{id}/publicacion` | Publicar. La aduana exige que todos los repartos estén completos y cuadren | `publicar_version_pesos` |
+
+El guion `scripts/completar-y-publicar-pesos-cazatalentos.py` recorre exactamente estas llamadas.
+
 ### Administración
 
 | Método y ruta | Qué hace | Permiso |
 |---|---|---|
-| GET `/areas` · POST `/areas` | Las áreas de la organización: hace falta una para registrar una solicitud | `ver_solicitudes` / `crear_usuarios_y_asignar_roles` |
+| GET `/catalogos` | Los catálogos que llenan los desplegables del panel (puestos, niveles, familias, etapas, estados) | cualquier cuenta del equipo |
+| GET `/areas` | Las áreas **activas** de la organización: es la lista que llena el desplegable de la solicitud, y hace falta una para registrarla. **No cambia ni debe cambiar**: una área retirada ahí sería una solicitud nueva colgada de algo que la empresa dio por cerrado | `ver_solicitudes` |
+| GET `/areas/todas` | Las áreas con las retiradas. Es una ruta aparte y no un parámetro de la anterior, para que ese contrato no se afloje por descuido | `crear_usuarios_y_asignar_roles` |
+| POST `/areas` · PUT `/areas/{id}` | Crear y renombrar. El nombre repetido se rechaza antes de llegar al `UNIQUE`, sensible a mayúsculas igual que la restricción | `crear_usuarios_y_asignar_roles` |
+| POST `/areas/{id}/desactivacion` · `/reactivacion` | Retirar y volver a activar. **La última área activa no se puede retirar**: sin ninguna, la empresa no puede volver a registrar una solicitud | `crear_usuarios_y_asignar_roles` |
+| GET `/areas/{id}/impacto` · POST `/areas/{id}/borrado` | Cuántas solicitudes y usuarios cuelgan del área, y borrarla. **Borrar exige reasignar**: las claves ajenas no declaran `ON DELETE`, así que se mueven primero las solicitudes y los usuarios al área de destino y se borra después, en una transacción. Sin destino solo se admite si está vacía; si no, **409 con los dos recuentos**. La auditoría del borrado lleva el nombre y los recuentos porque es lo único que sobrevive | `crear_usuarios_y_asignar_roles` |
 | GET/PUT `/parametros` | Los valores que Renaser cambia sin programar. `tope_mensual_ia` se ve pero no se edita desde aquí: lo administra la plataforma | `editar_parametros` |
 | GET/POST `/plantillas-correo` | Los textos de correo. Editar = crear versión nueva | `editar_textos_correo` |
 | GET/POST `/textos-consentimiento` | Los textos legales de la organización, con su historia. El POST crea la versión nueva **y la publica**: es lo que abre la puerta de publicar vacantes — sin texto PROCESO publicado no se reciben candidatos | `editar_textos_correo` |
@@ -507,6 +556,20 @@ conserva `administrar_permisos` no se puede quedar sin él**: revocarlo dejaría
 nadie que pudiera volver a tocarlo, y de ahí solo se sale entrando a la base a mano. El
 candado cuenta por organización y no en total, para que dos organizaciones no se tapen la una
 a la otra.
+
+### Las instrucciones de la IA (`/api/v1/panel/agentes-ia`)
+
+| Método y ruta | Qué hace | Permiso |
+|---|---|---|
+| GET `/agentes-ia` | El catálogo de agentes: cuáles existen y cuáles tienen clase (hoy seis de diez) | `editar_instrucciones_ia` |
+| GET `/agentes-ia/instrucciones` | Las instrucciones de cada agente con su historia de versiones | `editar_instrucciones_ia` |
+| POST `/agentes-ia/instrucciones` · POST `…/{id}/publicacion` | Escribir una versión nueva de la instrucción de un agente, y publicarla. Publicada, es la que usa la siguiente calificación | `editar_instrucciones_ia` |
+
+⚠️ **La instrucción es una para todo el mundo**: `instruccion_ia` no tiene `organizacion_id`.
+Por eso la del agente `PRUEBA_PUESTO` solo puede hablar del oficio de calificar; lo propio de
+cada prueba va en la **guía de calificación** de su versión (`guiaCalificacion`, hasta 2000
+caracteres, se congela al publicar). Y la IA de la prueba nota **por criterio**, nunca sobre
+100: ver [Prueba del puesto](PRUEBA-DEL-PUESTO.md).
 
 ### La plataforma y las empresas
 
@@ -551,6 +614,7 @@ con las reglas que Swagger no cuenta, está en
 | GET/PUT `/portal/perfil` · GET `/portal/perfil/descarga` | El dueño ve su perfil entero y lo descarga (ley 29733). Vacío responde 200, nunca 404. El PUT **reemplaza** la cabecera, no la fusiona | El propio token; lo ajeno es 404 |
 | POST/PUT/DELETE + POST `/{id}/confirmacion` en `/portal/perfil/experiencia`, `/educacion`, `/idiomas`, `/certificaciones` · PUT `/orden` solo en las dos primeras | Añadir, corregir, borrar y dar por bueno lo que se sacó del currículum | El propio token |
 | POST y DELETE `/portal/perfil/enlaces` | **Solo esas dos**: un enlace no lleva origen ni confirmación, así que no se edita — se borra y se crea | El propio token |
+| POST/GET/DELETE `/portal/perfil/foto`, `/portada` (y PUT `/portada/galeria`), `/cv`; POST/GET/DELETE `/portal/perfil/certificaciones/{id}/archivo` | Desde el 05/09 (V51): la foto (JPG, PNG o WebP, hasta 2 MB), la portada propia o una del catálogo (nunca las dos), el currículum del perfil (PDF o Word, hasta 10 MB; **se lee al subirlo**, sin esperar a que postule) y el diploma de una certificación (PDF hasta 10 MB, o imagen hasta 2 MB). **Los GET devuelven los bytes**, no un enlace firmado: un `<img src>` no manda cabecera. **Nada de esto llega al panel ni a la IA** | El propio token |
 | GET `/portal/catalogos/niveles-educativos` · `/niveles-idioma` | Los desplegables, para no escribirlos a mano. Devuelven `codigo` y `nombre` ya ordenados: no hay campo `orden`. El tercero del grupo, `/catalogos/ubigeo`, **es el único que responde sin token**, porque su desplegable sale en el registro | Token de candidato |
 | GET `/panel/postulaciones/{id}/perfil` | La trayectoria del candidato sin abrir su archivo. **No puntúa** | `ver_perfil_candidato`; la pretensión solo con `ver_pretension` |
 

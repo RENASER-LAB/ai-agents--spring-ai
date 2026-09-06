@@ -1,3 +1,5 @@
+> ⚠️ **Documento histórico (17/08/2026).** Cuenta lo que se construyó ese día; el estado presente está en [ESTADO-DEL-PROYECTO](ESTADO-DEL-PROYECTO.md).
+
 # Avance del hito 2 — 17/08/2026
 
 Resumen de lo que se construyó del hito 2 («Que la máquina ordene»). El hito 1 ya estaba

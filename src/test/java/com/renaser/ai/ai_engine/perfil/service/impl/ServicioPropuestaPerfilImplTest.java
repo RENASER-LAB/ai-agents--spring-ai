@@ -91,6 +91,12 @@ class ServicioPropuestaPerfilImplTest {
                 .creadoEn(Instant.now()).actualizadoEn(Instant.now()).build();
     }
 
+    /** Lo que devuelve el modelo cuando del archivo no salió nada aprovechable. */
+    private ResultadoDatos vacio() {
+        return new ResultadoDatos(null, null, null, null, null, null, null, null, null, null,
+                null, null, null, null);
+    }
+
     private ResultadoDatos conExperiencia(ExperienciaLeida... leidas) {
         return new ResultadoDatos(null, null, null, null, null, null, null, null, null, null,
                 List.of(leidas), null, null, null);
@@ -283,8 +289,8 @@ class ServicioPropuestaPerfilImplTest {
         // ⚠️ Es el camino nuevo del 05/09/2026. `trasPostular` sale de una
         // postulación; aquí solo hay una persona que subió su currículum, y lo
         // que se vuelca es exactamente lo mismo.
-        // «Entró algo» se mide contra lo que hay DESPUÉS, no contra lo que dijo
-        // el modelo: por eso el repositorio tiene que devolver la fila guardada.
+        // «Entró algo» se mide contra lo que aportó ESTA lectura, no contra lo
+        // que hay en el perfil: aquí el currículum trajo un empleo, y por eso sí.
         when(experiencias.findByPerfilCandidatoIdOrderByOrden(PERFIL))
                 // Mutable: el volcado ordena la lista que le devuelve el repositorio.
                 .thenReturn(new java.util.ArrayList<>(
@@ -296,6 +302,60 @@ class ServicioPropuestaPerfilImplTest {
 
         assertThat(entro).isTrue();
         verify(experiencias).save(any());
+    }
+
+    @Test
+    @DisplayName("Un currículum del que no salió nada NO es «lista», aunque el perfil esté lleno")
+    void loQueNoAportoNadaNoEsLista() {
+        // El fallo que arregla esta prueba: se medía el perfil entero, así que quien
+        // había escrito su titular a mano y subía un PDF escaneado recibía «revisa lo
+        // que encontramos» sin nada que revisar. La regla del puente —una ficha de la
+        // que no salió nada se cierra NO_LEGIBLE— solo se cumplía con el perfil vacío.
+        PerfilCandidato conTitularATeclado = PerfilCandidato.builder()
+                .id(PERFIL).personaId(PERSONA_ID).titular("Analista de datos")
+                .creadoEn(Instant.now()).actualizadoEn(Instant.now()).build();
+        when(perfiles.findByPersonaId(PERSONA_ID))
+                .thenReturn(Optional.of(conTitularATeclado));
+
+        boolean entro = servicio.proponerAlPerfil(PERSONA_ID, vacio());
+
+        assertThat(entro).isFalse();
+        // Y lo que la persona escribió sigue ahí: no aportar nada no es borrar nada.
+        assertThat(conTitularATeclado.getTitular()).isEqualTo("Analista de datos");
+    }
+
+    @Test
+    @DisplayName("Lo que el modelo leyó y la persona ya tenía escrito SÍ cuenta como leído")
+    void loQueYaEstabaEscritoCuenta() {
+        // La otra mitad de la regla: el currículum describe su perfil aunque no haya
+        // hueco donde poner nada. Decirle «no se pudo leer» sería igual de falso.
+        PerfilCandidato conTitularATeclado = PerfilCandidato.builder()
+                .id(PERFIL).personaId(PERSONA_ID).titular("Analista de datos")
+                .creadoEn(Instant.now()).actualizadoEn(Instant.now()).build();
+        when(perfiles.findByPersonaId(PERSONA_ID))
+                .thenReturn(Optional.of(conTitularATeclado));
+
+        boolean entro = servicio.proponerAlPerfil(PERSONA_ID, new ResultadoDatos(
+                null, null, null, null, null, null, "Analista senior de datos",
+                null, null, null, null, null, null, null));
+
+        assertThat(entro).isTrue();
+        assertThat(conTitularATeclado.getTitular()).isEqualTo("Analista de datos");
+    }
+
+    @Test
+    @DisplayName("Lo que se descarta por venir inservible no cuenta como aporte")
+    void loDescartadoNoCuenta() {
+        // Una experiencia sin fecha de inicio parseable se descarta, y un currículum
+        // del que solo salió eso no dio nada aprovechable.
+        when(experiencias.findByPerfilCandidatoIdOrderByOrden(PERFIL))
+                .thenReturn(new java.util.ArrayList<>());
+
+        boolean entro = servicio.proponerAlPerfil(PERSONA_ID, conExperiencia(
+                new ExperienciaLeida("Analista", "Clínica", "hace dos años", null, null)));
+
+        assertThat(entro).isFalse();
+        verify(experiencias, never()).save(any());
     }
 
     @Test
@@ -311,6 +371,33 @@ class ServicioPropuestaPerfilImplTest {
 
         assertThat(entro).isFalse();
         verify(experiencias, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Lo que propuso un currículum se distingue de lo que la persona escribió")
+    void conservaLoPropuestoSoloCuentaLoDelCurriculum() {
+        // Es lo que decide si el recibo de una postulación todavía vale: sin filas
+        // CURRICULUM, aquella lectura ya no está en ningún sitio.
+        when(experiencias.findByPerfilCandidatoIdOrderByOrden(PERFIL)).thenReturn(List.of(
+                ExperienciaPerfil.builder().id(1L).origen("PERSONA").build()));
+        when(educaciones.findByPerfilCandidatoIdOrderByOrden(PERFIL)).thenReturn(List.of());
+        when(idiomas.findByPerfilCandidatoIdOrderByIdioma(PERFIL)).thenReturn(List.of());
+        when(certificaciones.findByPerfilCandidatoIdOrderByNombre(PERFIL)).thenReturn(List.of());
+
+        assertThat(servicio.conservaLoPropuestoDeUnCurriculum(PERSONA_ID)).isFalse();
+
+        when(idiomas.findByPerfilCandidatoIdOrderByIdioma(PERFIL)).thenReturn(List.of(
+                IdiomaPerfil.builder().id(2L).origen("CURRICULUM").build()));
+
+        assertThat(servicio.conservaLoPropuestoDeUnCurriculum(PERSONA_ID)).isTrue();
+    }
+
+    @Test
+    @DisplayName("Sin perfil (lo barrió la retención) no queda nada que aquella lectura propusiera")
+    void sinPerfilNoConservaNada() {
+        when(perfiles.findByPersonaId(PERSONA_ID)).thenReturn(Optional.empty());
+
+        assertThat(servicio.conservaLoPropuestoDeUnCurriculum(PERSONA_ID)).isFalse();
     }
 
     @Test

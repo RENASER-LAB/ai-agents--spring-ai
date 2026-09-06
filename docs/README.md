@@ -1,8 +1,12 @@
 # Documentación · Sistema de selección Renaser
 
 Backend en Java + Spring Boot para el módulo de selección de personal de Renaser Consulting.
-**Va dentro de RENASER OS**: su frontend ya existe —React con Vite— y llama a este backend por
-su API. Sus pantallas de selección se están construyendo ahora.
+El frontend es un repositorio aparte, `RenaserOsPostulantes` (React con Vite), con dos caras:
+el portal del candidato y el panel de la empresa. Ambas llaman a este backend por su API.
+
+**Si vas a tocar código, tres documentos antes que nada**: [Estado del proyecto](ESTADO-DEL-PROYECTO.md)
+(qué está hecho y qué falta), [Reglas del código](REGLAS-DEL-CODIGO.md) (cómo está organizado y
+qué no se negocia) y [Trabajar en local](TRABAJAR-EN-LOCAL.md) (levantarlo, perfiles, tests).
 
 ---
 
@@ -26,32 +30,60 @@ requisitos nuevos el 14 de agosto y cambian bastante.
 | Documento | Qué contiene |
 |---|---|
 | [00 · Qué hace el sistema](00-QUE-HACE-EL-SISTEMA.md) | El sistema entero sin nada técnico. Cinco minutos |
-| [01 · Requisitos funcionales](01-REQUISITOS-FUNCIONALES.md) | RF-01 a RF-154. Qué hace el sistema |
+| [01 · Requisitos funcionales](01-REQUISITOS-FUNCIONALES.md) | RF-01 a RF-155. Qué hace el sistema |
 | [02 · Requisitos no funcionales](02-REQUISITOS-NO-FUNCIONALES.md) | RNF-01 a RNF-66. Tecnología, seguridad, rendimiento |
 | [03 · Estados de la postulación](03-ESTADOS-POSTULACION.md) | Los 18 estados de una postulación y sus transiciones |
 | [04 · Roles y permisos](04-ROLES-Y-PERMISOS.md) | Los 77 permisos, acción por acción. En la base hay 71 sembrados |
-| [05 · Modelo de datos](05-MODELO-DE-DATOS.md) | Las 93 tablas por área y por qué el modelo es así. Se lee |
+| [05 · Modelo de datos](05-MODELO-DE-DATOS.md) | Las 106 tablas (V1-V51) por área y por qué el modelo es así. Se lee |
 | [06 · Inventario de pantallas](06-INVENTARIO-DE-PANTALLAS-MOCKUPS.md) | Las 21 pantallas base, estados, ventanas, campos y datos de los mockups |
 | [07 · Diccionario de datos](07-DICCIONARIO-DE-DATOS.md) | Cada tabla con todas sus columnas, tipos y claves. Se consulta |
 | [08 · Alcance del MVP](08-ALCANCE-DEL-MVP.md) | Qué se construye primero, en tres hitos, y qué queda fuera |
 | [09 · Las APIs](09-APIS.md) | Las dos puertas, cómo entrar y qué hace cada endpoint. La referencia viva es Swagger |
+| [Estado del proyecto](ESTADO-DEL-PROYECTO.md) | **El presente**: hitos, tests, agentes, lo que falta de código y lo que decide Renaser. Se corrige, no se acumula |
+| [Reglas del código](REGLAS-DEL-CODIGO.md) | Los dos módulos, los paquetes de dominio, la frontera con el motor de agentes, y las reglas que no se negocian (estados, alcance, migraciones, Jackson 3). Qué documento se actualiza con cada cambio |
+| [Trabajar en local](TRABAJAR-EN-LOCAL.md) | Perfiles de configuración, arrancar el backend, correr los tests, un backend propio por rama, dónde están las pantallas, los guiones de `scripts/` |
 | [Curso del backend](CURSO-BACKEND.md) | Ruta para entender el código que existe, en orden. Para quien entra al proyecto |
 | [Calificación con IA](CALIFICACION-CON-IA.md) | Cómo la IA lee el currículum, califica lo abierto y arma el Perfil de Talento. Y qué pasa si falla |
 | [La rúbrica de la prueba](RUBRICA-DE-LA-PRUEBA.md) | Cómo se reparten los 100 puntos de una prueba y **quién pone cada nota**: el sistema, un agente o una persona |
+| [La prueba del puesto, por dentro](PRUEBA-DEL-PUESTO.md) | Los dos instrumentos de la etapa técnica; componer una versión antes de publicarla; la guía de calificación; los minutos de la vacante; el cierre en dos niveles; la vacante sin banco; la nota de la etapa; lo que el panel ve de los entregables |
+| [Diseño de la prueba técnica](DISENO-PRUEBA-TECNICA-FICHA-Y-REDACTOR.md) · [Una vacante, una versión](DECISION-UNA-VACANTE-UNA-VERSION.md) | La ficha del puesto (las 10 preguntas al dueño) y el redactor que arma el cuestionario; y por qué una vacante rinde una sola versión |
+| [CAZATALENTOS · banco](CAZATALENTOS-BANCO-RENASER.md) · [prueba técnica](CAZATALENTOS-PRUEBA-TECNICA.md) | Los bancos por nivel del método CAZATALENTOS (V41) y su prueba técnica |
 | [Criba de currículums](CRIBA-DE-CURRICULUMS.md) | Cargar una convocatoria con una carpeta de currículums, pedir que la IA los lea y ver quién es el más apto |
 | [Fallos corregidos de la criba](FALLOS-CORREGIDOS-CRIBA.md) | Los cinco fallos que salieron al pasar 190 currículums reales. Cuatro no daban error |
 | [Los siete fallos de la auditoría](FALLOS-CORREGIDOS-AUDITORIA.md) | Lo que encontró la revisión del 18/08: cuatro que tocaban dinero o decisiones de contratación, y ninguno daba error |
-| [Comprobaciones automáticas](COMPROBACIONES-AUTOMATICAS.md) | Qué se comprueba solo: 1072 pruebas, 9 reglas de arquitectura y Semgrep |
+| [Comprobaciones automáticas](COMPROBACIONES-AUTOMATICAS.md) | Qué se comprueba solo: las pruebas (1150 el 02/09/2026; 1248 esperadas tras los commits del 03 al 06/09), las reglas de arquitectura y Semgrep |
 | [Defectos conocidos](DEFECTOS-CONOCIDOS.md) | Lo que está roto, se sabe y sigue abierto: qué le pasa a una persona de verdad y qué haría falta para arreglarlo |
+| `AUDITORIA-CODIGO-2026-09-03.xlsx` | La auditoría de código muerto, sin usar y sin conectar, backend y frontend: una fila por pieza, qué pasa en palabras del cliente, y la columna DECISIÓN para elegir qué se borra, qué se conecta y qué se queda. Puesta al día el 05/09 con los commits del 04/09 |
+| [Auditoría de RNF y agentes](AUDITORIA-RNF-Y-AGENTES-2026-09-04.md) | La revisión del 04/09 de seguridad, concurrencia, disponibilidad, escalabilidad, resiliencia y mantenibilidad, con sus hallazgos P1/P2 y la evidencia reproducible en `auditoria-2026-09-04/` |
 | [Banco de preguntas v3](AVANCE-BANCO-V3-2026-08-19.md) | El banco nuevo del cliente: 190 ítems, ocho formatos y su motor de puntuación. Qué está hecho y qué falta |
 | [El perfil del candidato](PROPUESTA-PERFIL-DEL-CANDIDATO.md) | El perfil único de la persona: requisitos, historias y tablas. Implementado; los RF esperan la validación de Renaser |
-| [APIs del perfil](APIS-PERFIL-DEL-CANDIDATO.md) | El contrato para quien construya las pantallas del perfil, con las reglas que Swagger no cuenta |
+| [APIs del perfil](APIS-PERFIL-DEL-CANDIDATO.md) | El contrato para quien construya las pantallas del perfil, con las reglas que Swagger no cuenta; desde el 05/09 también foto, portada, currículum propio y diplomas |
 | [APIs del multiempresa](APIS-MULTIEMPRESA.md) | Qué cambia para el frontend con las empresas: lo que rompe (postular exige aceptar el tratamiento), los dos logins y la plataforma |
-| Multiempresa · [qué es de cada empresa](superpowers/specs/2026-08-25-instrumental-por-empresa-design.md) · [el aislamiento](superpowers/specs/2026-08-25-aislamiento-entre-empresas-design.md) · [la identidad y el alta](superpowers/specs/2026-08-25-identidad-y-alta-de-empresas-design.md) | Las tres piezas del cambio a plataforma (25/08): banderas de personalización con su resolutor, lo ajeno responde «no existe», y el panel entra con correo y contraseña por invitación |
+| Multiempresa · [Renaser dueña de la plataforma](superpowers/specs/2026-08-25-renaser-duena-de-la-plataforma-design.md) · [qué es de cada empresa](superpowers/specs/2026-08-25-instrumental-por-empresa-design.md) · [el aislamiento](superpowers/specs/2026-08-25-aislamiento-entre-empresas-design.md) · [la identidad y el alta](superpowers/specs/2026-08-25-identidad-y-alta-de-empresas-design.md) · [el candidato ante varias empresas](superpowers/specs/2026-08-25-el-candidato-ante-varias-empresas-design.md) · [el coste de la IA por empresa](superpowers/specs/2026-08-25-el-coste-de-la-ia-por-empresa-design.md) | Las seis piezas del cambio a plataforma (25/08): la plataforma como dato, banderas de personalización con su resolutor, lo ajeno responde «no existe», el panel entra con correo y contraseña por invitación, el consentimiento por empresa, y el tope de gasto de IA |
 | [El perfil, para Renaser](PARA-RENASER-EL-PERFIL-DEL-CANDIDATO.md) | La explicación sin tecnicismos, para decidir si merece la pena |
 | [CI/CD](CI-CD.md) | Qué corre en cada cambio, cómo se despliega a Pruebas en AWS y qué variables de entorno hacen falta |
 | [Conectar la base a Supabase](CONEXION-SUPABASE.md) | **Retirado.** El perfil `supabase` se borró el 21/08: apuntaba tu máquina a la única base que hay, la de producción. Queda la explicación de por qué |
 | [Los currículums dejan de vivir en el backend](ARCHIVOS-EN-BUCKET.md) | El bucket, los dos enlaces firmados, y por qué un PDF en el disco del backend se pierde en el primer despliegue |
+
+### Lo que se hizo cada día
+
+Documentos de avance y reportes, del más nuevo al más viejo. Cuentan lo que pasó ese día; el
+estado presente está en [Estado del proyecto](ESTADO-DEL-PROYECTO.md).
+
+| Fecha | Documento |
+|---|---|
+| 04/09 | [REPORTE-CAMBIOS-2026-09-04](REPORTE-CAMBIOS-2026-09-04.md), [REPORTE-COMPLETO-CAMBIOS-2026-09-04](REPORTE-COMPLETO-CAMBIOS-2026-09-04.md), [AUDITORIA-RNF-Y-AGENTES-2026-09-04](AUDITORIA-RNF-Y-AGENTES-2026-09-04.md) |
+| 03/09 | [REPORTE-CAMBIOS-2026-09-03](REPORTE-CAMBIOS-2026-09-03.md), `AUDITORIA-CODIGO-2026-09-03.xlsx` |
+| 01/09 | [REPORTE-CAMBIOS-2026-09-01](REPORTE-CAMBIOS-2026-09-01.md) |
+| 31/08 | [REPORTE-WORKTREES-2026-08-31](REPORTE-WORKTREES-2026-08-31.md) |
+| 28/08 | [REPORTE-CAMBIOS-2026-08-28](REPORTE-CAMBIOS-2026-08-28.md) |
+| 27/08 | [REPORTE-TRABAJO-2026-08-27](REPORTE-TRABAJO-2026-08-27.md) |
+| 26/08 | [AVANCE-2026-08-26](AVANCE-2026-08-26.md) |
+| 23/08 | [AVANCE-IMPORTADOR-BANCO](AVANCE-IMPORTADOR-BANCO-2026-08-23.md) |
+| 19/08 | [AVANCE-BANCO-V3](AVANCE-BANCO-V3-2026-08-19.md) |
+| 18/08 | [AVANCE-SIMULACION-VALIDACION](AVANCE-SIMULACION-VALIDACION-2026-08-18.md), [FALLOS-CORREGIDOS-AUDITORIA](FALLOS-CORREGIDOS-AUDITORIA.md), [FALLOS-CORREGIDOS-CRIBA](FALLOS-CORREGIDOS-CRIBA.md) |
+| 17/08 | [AVANCE-HITO2](AVANCE-HITO2-2026-08-17.md), [AVANCE-HITO3](AVANCE-HITO3-2026-08-17.md), [PLAN-PRUEBA-TECNICA-CICLO-1](PLAN-PRUEBA-TECNICA-CICLO-1.md) |
+| 14/08 | [AUDITORIA_2026-08-14](AUDITORIA_2026-08-14.md) |
 
 ### Diagramas
 
@@ -82,7 +114,8 @@ Material de origen. Solo se consulta:
 | `Sistema_RENASER_Talent_Intelligence...docx` | Versión anterior del vigente. Descartada |
 | `CAMBIOS-DEL-DOCUMENTO-NUEVO.md` | Qué cambió con el documento nuevo y qué se decidió |
 | `ANALISIS-DOCUMENTOS.md` | Qué documento manda sobre cuál y por qué |
-| [`COMPROBACION-SIN-TECNICA.md`](insumos/COMPROBACION-SIN-TECNICA.md) | El sistema en dos páginas sin nada técnico, y las 93 tablas rastreadas contra él. **Su primera parte se lee sola** |
+| [`COMPROBACION-SIN-TECNICA.md`](insumos/COMPROBACION-SIN-TECNICA.md) | El sistema en dos páginas sin nada técnico, y las 93 tablas de entonces rastreadas contra él (hoy son 105). **Su primera parte se lee sola** |
+| [`CAZATALENTOS-sistema-de-filtro.md`](insumos/CAZATALENTOS-sistema-de-filtro.md) | El método CAZATALENTOS tal como lo describió la clienta: los bancos por nivel y su filtro |
 | `NOTAS-TEMPORALES.md` | Lo que sigue pendiente |
 | `entrevista-cliente-2026-08-08.md` | Transcripción de la reunión |
 | `pruebas-tecnicas/` | **Las cinco pruebas del puesto reales** (ARQ, BIO, CIVIL, CX, SIS), tal como se enviaron a candidatos |
@@ -116,7 +149,7 @@ pasa), **sin datos** (falta evidencia) o **reserva** (no para esta vacante, pero
 | Trabajo en segundo plano | RabbitMQ |
 | Inteligencia artificial · conversación y calificación | DeepSeek, que es un servicio externo |
 | Inteligencia artificial · búsqueda por significado | Google Gemini, que es un servicio externo |
-| Frontend | React con Vite, el de RENASER OS |
+| Frontend | React con Vite, en el repositorio `RenaserOsPostulantes` (portal del candidato y panel de la empresa) |
 | Identidad del equipo | Correo y contraseña, cuentas por invitación (25/08); RENASER OS quedó dormido como integración futura |
 
 **Qué sale de Renaser y qué no.** La base de datos y los archivos viven en servidores de

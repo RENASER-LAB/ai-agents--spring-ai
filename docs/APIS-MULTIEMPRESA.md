@@ -100,3 +100,44 @@ la organización plataforma:
    normal.
 4. Un mismo correo puede existir como candidato y como equipo sin chocar: **son cuentas y
    puertas distintas**. No unifiques sesiones entre portal y panel.
+
+## Para quien toca el código (26/08/2026)
+
+Los seis specs con el porqué de cada decisión están en `superpowers/specs/2026-08-25-*.md`. Lo
+que hay que saber antes de escribir una línea:
+
+- **La plataforma es un dato, no un literal**: `organizacion.es_plataforma` (solo una puede
+  serlo). El `findByCodigo("RENASER")` quemado ya no existe: se resuelve con
+  `findByEsPlataformaTrue`.
+- **Cuatro banderas de personalización** por organización (banco, pesos, plantillas de
+  evaluación, pruebas), apagadas por defecto = leer el instrumento de la plataforma; encender =
+  copiarlo. El ÚNICO punto que las interpreta es `organizacion/service/DuenoDelInstrumento`.
+  **Leer resuelve, editar no**: con la bandera apagada se VE el método de la plataforma en solo
+  lectura; mutar algo ajeno responde 404. Apagar archiva el banco propio, nunca lo borra (RF-138).
+- **Dos logins separados**: el portal del candidato y el panel de empresas
+  (`POST /panel/auth/login`), que solo autentica cuentas con `usuario.es_equipo`. Las cuentas
+  del panel nacen SOLO por invitación (tabla `invitacion`, token de un solo uso, se guarda el
+  hash). El candidato es de la plataforma: una cuenta, postula a cualquier empresa, y **su
+  postulación nace en la organización de la vacante**.
+- **El aislamiento tiene dos vigilantes**: la regla de ArchUnit que prohíbe `findById` suelto
+  sobre repositorios de agregados con dueño (lista `LLAMADAS_SIN_DUENO_ACORDADAS` en
+  `ArquitecturaTest`) y `FlujoDosEmpresasIT`. La única pantalla que mezcla empresas es el tablón
+  público de vacantes, a propósito.
+- **El borrado 29733 es de la plataforma**: los candidatos son cuentas de plataforma y la
+  anonimización cruza empresas. Desde una empresa responde 403.
+- **El consentimiento se firma con cada empresa** (V38): al crear la cuenta se consiente con la
+  plataforma; al postular se acepta el texto PROCESO de LA EMPRESA de la vacante, y la fila queda
+  con `postulacion_id`, IP y navegador. **Publicar una vacante exige el texto PROCESO publicado
+  de la organización** (`POST /panel/textos-consentimiento` crea la versión Y la publica).
+- **Cada llamada al modelo tiene precio** (V38-V39): `ejecucion_ia.costo` se escribe al cerrar
+  con la tarifa vigente de `tarifa_modelo`. La bitácora guarda el modelo QUE EL PROVEEDOR
+  REPORTA, y por eso **todo modelo de `application.yaml` necesita su tarifa**: un IT recorre los
+  modelos configurados y exige tarifa vigente para cada uno. Al 80% del tope un correo
+  `TOPE_IA_AVISO` una vez por mes (en su PROPIA transacción; su fallo se traga); al 100% los
+  trabajos nuevos nacen **EN_ESPERA** y el sondeo de atascados los despierta cuando vuelve el
+  cupo. El retrato que cierra una tanda no pasa por el tope: sus insumos ya se pagaron.
+- **Suspender una empresa la congela también para el gasto**: `organizacion.es_activa` lo leen
+  el login del panel, `FiltroIdentidad` (corta los tokens vivos, solo tipo EQUIPO), el tablón
+  público y la cola de IA. Los candidatos que ya estaban dentro NO se tocan.
+- Los ITs son dos: `FlujoDosEmpresasIT` (alta, aislamiento, viaje del candidato, consentimiento,
+  borrado, suspensión) y `FlujoPlataformaIT` (la vida entera del tope).

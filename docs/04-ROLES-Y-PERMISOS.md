@@ -23,17 +23,14 @@ Esto es lo primero que hay que entender, porque son dos sistemas distintos.
 
 | | Quién manda |
 |---|---|
-| **Quién eres**, si trabajas en Renaser | **RENASER OS.** Emite el token; este sistema solo lo valida. No guardamos tu contraseña |
-| **Quién eres**, si eres candidato | **Este sistema.** Los candidatos no son usuarios de RENASER OS |
+| **Quién eres**, si trabajas en Renaser o en una empresa cliente | **Este sistema.** Correo y contraseña propios; la cuenta nace solo por invitación (`POST /panel/auth/login`) |
+| **Quién eres**, si eres candidato | **Este sistema**, por otra puerta: cuenta propia o enlace de acceso de un solo uso |
 | **Qué puedes hacer** dentro del módulo de selección | **Este sistema**, siempre |
 
-La razón de que los permisos sean nuestros es simple: RENASER OS no sabe qué es «publicar una
-versión del banco de preguntas» ni «confirmar una barrera crítica». Son acciones que solo
-existen aquí.
-
-Cada usuario del equipo guarda el identificador que tiene en RENASER OS, como un dato suelto y
-**sin clave foránea**, porque son dos servicios separados que hablan por HTTP y no comparten
-base de datos.
+Hasta el 25/08/2026 la identidad del equipo iba a venir de RENASER OS; esa integración quedó
+**dormida** y hoy no emite ningún token. Cada usuario del equipo conserva el identificador que
+tenga en RENASER OS como un dato suelto y **sin clave foránea**, por si algún día se conecta;
+ningún flujo real lo llena.
 
 ---
 
@@ -42,10 +39,10 @@ base de datos.
 | Rol | Quién es | Dónde trabaja |
 |---|---|---|
 | **Candidato** | Alguien que postula | Portal de Talento |
-| **Equipo de Talento** | Quien lleva el proceso día a día | Panel dentro de RENASER OS |
-| **Responsable del área** | El jefe del puesto que se busca | Panel dentro de RENASER OS |
-| **Dirección** | La autoridad de negocio | Panel dentro de RENASER OS |
-| **Administrador** | Quien administra el sistema | Panel dentro de RENASER OS |
+| **Equipo de Talento** | Quien lleva el proceso día a día | Panel de la empresa |
+| **Responsable del área** | El jefe del puesto que se busca | Panel de la empresa |
+| **Dirección** | La autoridad de negocio | Panel de la empresa |
+| **Administrador** | Quien administra el sistema | Panel de la empresa |
 
 **Dirección decide qué valora Renaser al contratar**: los pesos, el banco de preguntas, las
 instrucciones de la IA, las reglas de decisión. **Administrador maneja el sistema**: usuarios,

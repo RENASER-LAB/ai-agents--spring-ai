@@ -21,6 +21,11 @@ import java.util.List;
  * se copia a la postulación nueva y no se encola nada — la criba y el retrato la encuentran
  * gratis, y la barrera de la cola («esta postulación ya tiene ficha») pasa a ser verdad sin
  * tocarla. Solo un archivo distinto dispara una lectura nueva.
+ *
+ * <p>⚠️ <b>Solo mira las lecturas de POSTULACIONES.</b> Un currículum leído desde el perfil
+ * no deja ficha en {@code dato_cv} —{@code lectura_cv_perfil} guarda el estado, no lo que el
+ * modelo devolvió—, así que postular con él paga una lectura nueva. La decisión al revés
+ * vive en {@code ServicioArchivosDelPerfilImpl.yaSeLeyo}, que sí mira los dos recibos.
  */
 @Service
 @Slf4j
