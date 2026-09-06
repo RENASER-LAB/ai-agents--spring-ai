@@ -1,0 +1,28 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "comment": [
+        "PLANTILLA. Copiala a .claude/launch.json, que no se versiona porque es de cada",
+        "maquina: ahi van tambien tus entradas de otros worktrees (rutas absolutas, puertos",
+        "propios), que no deben llegar a main.",
+        "",
+        "El backend contra tu Postgres local (localhost:5433/renaser_db).",
+        "",
+        "El puerto es 8081 y no puede ser otro: lo pone el perfil `local`",
+        "(application-local.yaml) y es al que apunta el proxy del panel",
+        "(RenaserOsPostulantes/.env.local y .env.emulador). Por eso NO se repite aqui con",
+        "-Dserver.port: lo dice el perfil y un solo sitio. El 8080 es Adminer y contesta 200",
+        "a todo: equivocarse de puerto no da un error, da una pantalla que parece funcionar.",
+        "",
+        "Es `test-run` y no `run`: el almacen de archivos en memoria vive en src/test.",
+        "",
+        "Para verlo con el panel: este, y `portal` desde RenaserOsPostulantes."
+      ],
+      "name": "backend-prueba-local",
+      "runtimeExecutable": "./mvnw",
+      "runtimeArgs": ["spring-boot:test-run", "-Dspring-boot.run.profiles=local"],
+      "port": 8081
+    }
+  ]
+}

@@ -91,3 +91,11 @@ despliegue/.env
 # llevan tokens de las pruebas dentro, que hacen saltar al detector de secretos.
 verify*.log
 *.log
+
+### El lanzador de la app de escritorio (de cada maquina, nunca commitear) ###
+# Cada sesion que arranca un worktree le añade una entrada con rutas absolutas de
+# esa maquina y puertos propios, y eso se colo dos veces a main por squash (#56 el
+# puerto 8082, #66 las entradas de la rama perfil). Ademas, tenerlo versionado y
+# tocado a la vez hace fallar cada `git pull` que lo traiga cambiado. La plantilla
+# portable es .claude/launch.example.json: se copia a launch.json y ya.
+.claude/launch.json
