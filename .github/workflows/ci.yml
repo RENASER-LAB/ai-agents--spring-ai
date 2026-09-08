@@ -106,10 +106,10 @@ jobs:
 
     env:
       REGION: us-east-1
-      REGISTRO: 526338061654.dkr.ecr.us-east-1.amazonaws.com
+      REGISTRO: 302277511407.dkr.ecr.us-east-1.amazonaws.com
       REPOSITORIO: ai-engine
-      INSTANCIA: i-05fc037e853d07264
-      URL: https://18-204-177-210.nip.io
+      INSTANCIA: i-0451d14fb7bcc16f5
+      URL: https://34-196-100-108.nip.io
 
     steps:
       - uses: actions/checkout@v4
@@ -125,7 +125,7 @@ jobs:
       - name: Pedirle permiso a AWS
         uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
         with:
-          role-to-assume: arn:aws:iam::526338061654:role/github-despliegue
+          role-to-assume: arn:aws:iam::302277511407:role/github-despliegue
           aws-region: us-east-1
 
       - name: Entrar al registro
