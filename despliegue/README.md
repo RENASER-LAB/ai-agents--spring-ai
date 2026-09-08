@@ -8,13 +8,19 @@ pero no guarda nada que importe: los trabajos se apuntan en la tabla `trabajo_ia
 publicarse y un sondeo los reencola si se pierden. Esta máquina se puede tirar y volver a
 crear sin perder nada más que los certificados, que Caddy saca otra vez solo.
 
-**Lo que ya está creado** (cuenta 526338061654, `us-east-1`):
+**Lo que ya está creado** (cuenta 302277511407, `us-east-1`):
+
+⚠️ **Esta cuenta es compartida.** Ahí vive también `Renaser-90-dias-backend`, con su propia
+instancia, su IP y un repositorio ECR llamado —para más confusión— `renaser-backend`. Lo
+nuestro es lo de la tabla de abajo, y en ECR es **`ai-engine`**. Antes de tocar o borrar
+nada, mira de qué proyecto es.
+
 
 | | |
 |---|---|
-| Instancia | `i-05fc037e853d07264` · `t3.medium` · Elastic IP `18.204.177.210` |
-| Imagen | `526338061654.dkr.ecr.us-east-1.amazonaws.com/ai-engine:latest` |
-| Grupo de seguridad | `sg-0fe61167414449546` — solo 80 y 443 |
+| Instancia | `i-0451d14fb7bcc16f5` · `t3.medium` · Elastic IP `34.196.100.108` |
+| Imagen | `302277511407.dkr.ecr.us-east-1.amazonaws.com/ai-engine:latest` |
+| Grupo de seguridad | `sg-0ce9e1ea9768e1467` — solo 80 y 443 |
 | Rol | `renaser-ec2` — ECR de lectura y SSM |
 | Rol que asume GitHub | `github-despliegue` — ECR de escritura y `SendCommand`; su política de confianza solo acepta `main`, y el `sub` va con identificadores numéricos (ver [CI-CD.md](../docs/CI-CD.md)) |
 
@@ -96,10 +102,10 @@ Ya creado: `ai-engine`.
 ### 3. Construir y subir
 
 ```bash
-aws ecr get-login-password --region us-east-1 --profile renaser   | docker login --username AWS --password-stdin 526338061654.dkr.ecr.us-east-1.amazonaws.com
+aws ecr get-login-password --region us-east-1 --profile nando-nuevo   | docker login --username AWS --password-stdin 302277511407.dkr.ecr.us-east-1.amazonaws.com
 
-docker build -t 526338061654.dkr.ecr.us-east-1.amazonaws.com/ai-engine:latest .
-docker push 526338061654.dkr.ecr.us-east-1.amazonaws.com/ai-engine:latest
+docker build -t 302277511407.dkr.ecr.us-east-1.amazonaws.com/ai-engine:latest .
+docker push 302277511407.dkr.ecr.us-east-1.amazonaws.com/ai-engine:latest
 ```
 
 La máquina es Intel (`t3.medium`), así que se construye para la arquitectura de siempre. Si
@@ -122,7 +128,7 @@ Los archivos **ya están** en `/opt/renaser`. Falta el `.env`. Como el 22 está 
 sin llave:
 
 ```bash
-aws ssm start-session --target i-05fc037e853d07264 --region us-east-1 --profile renaser
+aws ssm start-session --target i-0451d14fb7bcc16f5 --region us-east-1 --profile nando-nuevo
 sudo -u ec2-user -i
 cd /opt/renaser && cp .env.example .env && nano .env
 ```
@@ -183,17 +189,22 @@ enseña los registros en vez de dejar el servicio caído sin que nadie se entere
 
 ## El dominio y el HTTPS
 
-Va por **`https://18-204-177-210.nip.io`**, con certificado de Let's Encrypt válido y gratis.
+Va por **`https://34-196-100-108.nip.io`**, con certificado de Let's Encrypt válido y gratis.
 
 `nip.io` resuelve cualquier `IP.nip.io` a esa IP, así que Let's Encrypt puede verificar el
 dominio sin que haya que registrar ni pagar nada. El certificado lo saca y lo renueva Caddy
 solo, y HTTP redirige a HTTPS con un 308.
 
-La IP es **fija** (Elastic IP `18.204.177.210`), así que no cambia si la instancia se reinicia.
+La IP es **fija** (Elastic IP `34.196.100.108`), así que no cambia si la instancia se reinicia.
 
 ⚠️ **Es provisional a propósito.** `nip.io` es un servicio de terceros: si se cae, el dominio
 se cae con él. Cuando Renaser tenga uno propio, se apunta un registro A a esa misma IP, se
 cambia `DOMINIO` en el `.env` y se reinicia Caddy. Nada más.
+
+Y hay una segunda razón, ya vivida: **`nip.io` lleva la IP dentro del nombre**, así que
+cambiar de servidor cambia la dirección, y el `vercel.json` del frontend hay que tocarlo y
+volver a desplegarlo. La migración del 08/09/2026 costó ese paso extra. Con un dominio
+propio la próxima mudanza no toca el frontend: solo se mueve el registro DNS.
 
 ## Lo que hay que saber antes de tocar esto
 

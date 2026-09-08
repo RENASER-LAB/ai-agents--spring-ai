@@ -60,7 +60,7 @@ Lo que lo hace posible, ya creado en la cuenta:
 | Proveedor OIDC | `token.actions.githubusercontent.com` |
 | Rol que asume GitHub | `github-despliegue` |
 | Quién puede asumirlo | **Solo la rama `main`** de este repositorio, por la condición `sub` del token |
-| Qué puede hacer | Subir a `ai-engine` en ECR, y `SendCommand` **solo** sobre `i-05fc037e853d07264` |
+| Qué puede hacer | Subir a `ai-engine` en ECR, y `SendCommand` **solo** sobre `i-0451d14fb7bcc16f5` |
 
 Ese `sub` **no** tiene la forma que dice la documentación de GitHub. Esta organización emite
 *immutable subject claims*, con los identificadores numéricos pegados al nombre:
