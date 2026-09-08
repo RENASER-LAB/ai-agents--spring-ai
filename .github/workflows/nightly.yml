@@ -88,7 +88,7 @@ jobs:
       # El registro de la aplicación es lo único que explica un 500: se guarda siempre
       - name: Guardar el registro de la aplicación
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: registro-aplicacion
           path: app.log
@@ -112,7 +112,7 @@ jobs:
 
       - name: Guardar el reporte
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: reporte-pit
           path: target/pit-reports/
