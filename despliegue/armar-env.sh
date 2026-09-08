@@ -19,7 +19,7 @@ set -euo pipefail
 
 RAIZ="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SECRETOS="$RAIZ/application-secrets.yaml"
-INSTANCIA="${INSTANCIA:-i-05fc037e853d07264}"
+INSTANCIA="${INSTANCIA:-i-0451d14fb7bcc16f5}"
 REGION="${REGION:-us-east-1}"
 PERFIL="${PERFIL:-renaser}"
 
@@ -54,7 +54,7 @@ def exigir(valor, nombre):
 jwt = base64.b64encode(secrets.token_bytes(48)).decode()
 
 valores = {
-  "IMAGEN": "526338061654.dkr.ecr.us-east-1.amazonaws.com/ai-engine:latest",
+  "IMAGEN": "302277511407.dkr.ecr.us-east-1.amazonaws.com/ai-engine:latest",
 
   "SPRING_DATASOURCE_URL":      exigir(leer("spring","datasource","url"), "spring.datasource.url"),
   "SPRING_DATASOURCE_USERNAME": exigir(leer("spring","datasource","username"), "spring.datasource.username"),

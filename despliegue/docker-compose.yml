@@ -27,6 +27,13 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: pruebas
 
+      # Apaga la calificacion con IA sin reconstruir la imagen. Existe por la migracion de
+      # cuenta del 08/09/2026: mientras la maquina vieja y la nueva convivieron, las dos
+      # miraban la MISMA base y su sondeo de trabajos atascados reencolaba los mismos
+      # candidatos, pagando dos veces cada inferencia. Se queda porque el mismo freno sirve
+      # para cualquier otro solape, y para parar en seco si el proveedor se descontrola.
+      RENASER_AI_CALIFICACION_HABILITADA: ${IA_HABILITADA:-true}
+
       # Base de datos: Supabase. Puerto 5432 (la conexion directa), NO el 6543 del pooler
       # de transacciones, que no soporta las consultas preparadas que Flyway necesita para
       # migrar y hace fallar el arranque con un error que no dice por que.
