@@ -134,17 +134,60 @@ un fichero, no por el intérprete de órdenes.
 llevándose scripts y volcados. Se recuperó porque la contraseña del proyecto nuevo estaba
 guardada en Parameter Store. **Nada que haga falta para terminar puede vivir solo en `/tmp`.**
 
-## Vuelta atrás, si hiciera falta
+## La vuelta atrás que hubo, y por qué ya no existe
 
-Parameter Store conserva el historial: la **versión 1** de `SPRING_DATASOURCE_URL`,
-`SPRING_DATASOURCE_USERNAME`, `SPRING_DATASOURCE_PASSWORD` y `APP_ARCHIVOS_SUPABASE_CLAVE`
-son los valores de Oregon. Restaurarlos y redesplegar devuelve el sistema al proyecto viejo,
-que **sigue encendido e intacto**.
+Durante el cambio, la red era el historial de Parameter Store: la **versión 1** de los cuatro
+parámetros eran los valores de Oregon, y restaurarlos más un redespliegue devolvía el sistema
+al proyecto viejo.
+
+Esa red duró poco, y a propósito. **Dejó de servir en cuanto entraron datos nuevos**: unas
+horas después ya había 3 personas, 3 postulaciones y 4 currículums que solo existían en
+Virginia, así que volver habría significado perderlos. Por eso se borró Oregon el mismo día
+en vez de guardarlo «por si acaso»: había dejado de ser una vuelta atrás y era solo un
+proyecto pagando compute.
+
+La red de ahora es otra: **el proyecto nuevo tiene copias diarias propias** (plan Pro).
+
+## Lo que vino después, el mismo 09/09/2026
+
+**Oregon se borró.** Antes se comprobó que nada vivo lo referenciaba: ni un parámetro de
+SSM, ni el contenedor, ni el repositorio salvo comentarios históricos. Las dos reservas de
+`SUPABASE_URL` se repuntaron a us-east-1 en el PR #73 — dejarlas apuntando al proyecto
+borrado habría convertido el valor por defecto en un 404 garantizado el día que alguien
+levantase un entorno sin ese parámetro.
+
+**Se rotaron las dos credenciales**, porque la aplicación las publicaba:
+
+| | Estaba | Ahora |
+|---|---|---|
+| Contraseña de la base | dentro de `SPRING_DATASOURCE_URL`, y Hibernate imprime esa URL entera al arrancar | la URL es `?sslmode=require` a secas; usuario y contraseña van en sus propios parámetros, que Spring sí enmascara |
+| Clave del bucket | la `service_role` heredada (un JWT) | una `sb_secret_…`, que no es un JWT |
+
+Comprobado tras el cambio: **0 líneas con «password» en el registro** del contenedor.
+
+**Y se fue el módulo ajeno.** `/api/v1/supabase` servía cobranzas, prospectos y KPIs de otro
+negocio; entró en el commit inicial y nunca lo llamó nadie (0 peticiones frente a 647 al
+portal). Fuera en el PR #74, con sus 7 proveedores de contexto y `SUPABASE_SERVICE_ROLE_KEY`.
+
+### La trampa de revocar claves en Supabase
+
+Desactivar las claves *legacy* desde **Settings → API Keys** **no basta**. Deja la base
+devolviendo 401 pero **el almacenamiento las sigue aceptando**: se comprobó descargando un
+currículum con la clave ya «desactivada», cinco veces en dos minutos y medio.
+
+Lo que las mata de verdad está en otro sitio: **Settings → JWT Keys → JWT Signing Keys**,
+revocar la *previous key*. Esas claves antiguas siguen **verificando** tokens ya emitidos —
+lo dice la propia pantalla— y el almacenamiento se apoya en esa verificación.
+
+Después de revocar, la clave vieja da 400 al listar, al firmar y al descargar, y 401 contra
+la base. Esas cuatro puertas son la comprobación; con menos, no está cerrado.
 
 ## Lo que queda pendiente
 
-- **Cambiar la contraseña del proyecto viejo.** Se filtró en un registro
-  de sesión, y ese proyecto sigue vivo como vuelta atrás. La cambias tú desde el panel.
-- **Apagar o borrar el proyecto de Oregon** cuando haya confianza suficiente. Hasta entonces
-  paga compute en la cuenta Pro.
-- El nombre del proyecto nuevo es `renaser-reclutamiento`, que sí dice lo que es.
+- **Los currículums escaneados se quedan sin evaluar, y en silencio.** El 09/09 dos
+  postulaciones (553 y 580) perdieron su Perfil de Talento porque su PDF no tiene capa de
+  texto: `pdftotext` saca 0 caracteres de los dos. El fichero se descarga bien; sencillamente
+  no hay nada que leer. El candidato no se entera y el sistema lo deja sin nota. Se arregla
+  avisando al subirlo —se detecta en el momento— o pasando OCR.
+- **Hay nueve proyectos de Supabase en la cuenta Pro**, varios con pinta de abandonados.
+- El nombre del proyecto es `renaser-reclutamiento`, que sí dice lo que es.
