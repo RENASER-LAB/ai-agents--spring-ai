@@ -81,6 +81,19 @@ services:
       APP_ARCHIVOS_TIPO: supabase
       APP_ARCHIVOS_SUPABASE_CLAVE: ${APP_ARCHIVOS_SUPABASE_CLAVE}
 
+      # En QUE proyecto de Supabase esta ese bucket. Iba fijo en application.yaml, y eso
+      # convierte una mudanza de proyecto en una migracion a medias: cambiar la base en
+      # Parameter Store movia la base y dejaba los curriculums en el proyecto viejo. La
+      # aplicacion arranca bien, el panel funciona, y el fallo aparece dias despues al
+      # abrir un CV.
+      #
+      # El valor por defecto es el proyecto de hoy, a proposito: mientras SUPABASE_URL no
+      # exista en Parameter Store esto no cambia nada. Y tiene que llevar `:-` con un valor
+      # real, no quedarse en ${SUPABASE_URL}: sin la variable, Docker la pasaria vacia, y
+      # para Spring vacio no es ausente — no aplicaria el valor por defecto de
+      # application.yaml y la aplicacion se quedaria sin bucket.
+      SUPABASE_URL: ${SUPABASE_URL:-https://jcmjaiwwnbbhflguydnq.supabase.co}
+
       # Correo. Sin CORREO_TRANSPORTE=smtp la aplicacion arranca igual y solo anota los
       # avisos en correo_enviado, que es el comportamiento por defecto y no rompe nada.
       CORREO_TRANSPORTE: ${CORREO_TRANSPORTE:-log}
