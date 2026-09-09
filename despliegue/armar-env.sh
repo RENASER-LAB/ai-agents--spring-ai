@@ -72,7 +72,6 @@ valores = {
   "GOOGLE_GEMINI_API_KEY": exigir(leer("google","gemini","api-key"), "google.gemini.api-key"),
 
   "JWT_SECRETO": jwt,
-  "SUPABASE_SERVICE_ROLE_KEY":   exigir(leer("supabase","service-role-key"), "supabase.service-role-key"),
   "APP_ARCHIVOS_SUPABASE_CLAVE": exigir(leer("app","archivos","supabase","clave"), "app.archivos.supabase.clave"),
 
   "CORREO_TRANSPORTE":   leer("renaser","correo","transporte") or "log",
