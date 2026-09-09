@@ -96,7 +96,7 @@ public class ConfiguracionSeguridad {
             .addFilterBefore(filtroIdentidad, UsernamePasswordAuthenticationFilter.class)
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/v1/rag/**", "/api/v1/agent-runs/**",
-                        "/api/v1/flows/**", "/api/v1/supabase/**")
+                        "/api/v1/flows/**")
                     .hasAuthority("TIPO_EQUIPO")
                 .anyRequest().permitAll())
             .exceptionHandling(e -> e.authenticationEntryPoint(entradaSinIdentidad()));

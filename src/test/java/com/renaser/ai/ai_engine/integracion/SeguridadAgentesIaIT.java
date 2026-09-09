@@ -117,11 +117,9 @@ public class SeguridadAgentesIaIT {
     }
 
     @Test
-    @DisplayName("las otras tres rutas del módulo también piden identidad")
+    @DisplayName("las otras dos rutas del módulo también piden identidad")
     void lasOtrasRutasTambienPidenIdentidad() throws Exception {
         mvc.perform(get("/api/v1/agent-runs/last").param("agentType", "KNOWLEDGE"))
-                .andExpect(status().isUnauthorized());
-        mvc.perform(get("/api/v1/supabase/motores"))
                 .andExpect(status().isUnauthorized());
         mvc.perform(post("/api/v1/flows/execute")
                         .contentType(MediaType.APPLICATION_JSON)

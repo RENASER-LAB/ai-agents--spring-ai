@@ -245,19 +245,6 @@ renaser:
     remitente: ${CORREO_REMITENTE:}
     nombre-remitente: ${CORREO_NOMBRE_REMITENTE:Renaser}
 
-# El proyecto que leen los agentes de IA por su API REST (/api/v1/supabase: cobros,
-# prospectos, motores...). NO es la base del reclutamiento, que esta mas abajo en
-# app.archivos.supabase.
-#
-# OJO: hoy esto no funciona. La clave que hay en Parameter Store pertenece a otro proyecto
-# (el viejo del reclutamiento, jcmjaiwwnbbhflguydnq), asi que pedirle datos a la url de
-# arriba devuelve «401 Invalid API key». Ya era asi antes de la mudanza del 09/09/2026 —
-# comprobado ese dia—, o sea que no lo rompio la migracion. Se deja anotado y no se toca:
-# arreglarlo pide decidir si ese modulo sigue haciendo falta.
-supabase:
-  url: https://ikyjurujfxpazygwloja.supabase.co
-  service-role-key: ${SUPABASE_SERVICE_ROLE_KEY:}
-
 # Configuración propia del módulo de reclutamiento
 app:
   archivos:
