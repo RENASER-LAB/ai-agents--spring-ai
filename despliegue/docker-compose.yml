@@ -87,12 +87,14 @@ services:
       # aplicacion arranca bien, el panel funciona, y el fallo aparece dias despues al
       # abrir un CV.
       #
-      # El valor por defecto es el proyecto de hoy, a proposito: mientras SUPABASE_URL no
-      # exista en Parameter Store esto no cambia nada. Y tiene que llevar `:-` con un valor
-      # real, no quedarse en ${SUPABASE_URL}: sin la variable, Docker la pasaria vacia, y
-      # para Spring vacio no es ausente — no aplicaria el valor por defecto de
-      # application.yaml y la aplicacion se quedaria sin bucket.
-      SUPABASE_URL: ${SUPABASE_URL:-https://jcmjaiwwnbbhflguydnq.supabase.co}
+      # Tiene que llevar `:-` con un valor real, no quedarse en ${SUPABASE_URL}: sin la
+      # variable, Docker la pasaria vacia, y para Spring vacio no es ausente — no aplicaria
+      # el valor por defecto de application.yaml y la aplicacion se quedaria sin bucket.
+      #
+      # Y esa reserva tiene que apuntar a un proyecto VIVO. Apuntaba a jcmjaiwwnbbhflguydnq
+      # (us-west-2) hasta el 09/09/2026; la base se mudo a us-east-1 y ese proyecto se borra,
+      # asi que dejarlo ahi convertia la reserva en un 404 garantizado.
+      SUPABASE_URL: ${SUPABASE_URL:-https://sjmyhkhivvippngilwiu.supabase.co}
 
       # Correo. Sin CORREO_TRANSPORTE=smtp la aplicacion arranca igual y solo anota los
       # avisos en correo_enviado, que es el comportamiento por defecto y no rompe nada.

@@ -245,6 +245,15 @@ renaser:
     remitente: ${CORREO_REMITENTE:}
     nombre-remitente: ${CORREO_NOMBRE_REMITENTE:Renaser}
 
+# El proyecto que leen los agentes de IA por su API REST (/api/v1/supabase: cobros,
+# prospectos, motores...). NO es la base del reclutamiento, que esta mas abajo en
+# app.archivos.supabase.
+#
+# OJO: hoy esto no funciona. La clave que hay en Parameter Store pertenece a otro proyecto
+# (el viejo del reclutamiento, jcmjaiwwnbbhflguydnq), asi que pedirle datos a la url de
+# arriba devuelve «401 Invalid API key». Ya era asi antes de la mudanza del 09/09/2026 —
+# comprobado ese dia—, o sea que no lo rompio la migracion. Se deja anotado y no se toca:
+# arreglarlo pide decidir si ese modulo sigue haciendo falta.
 supabase:
   url: https://ikyjurujfxpazygwloja.supabase.co
   service-role-key: ${SUPABASE_SERVICE_ROLE_KEY:}
@@ -271,7 +280,15 @@ app:
     # en application-secrets.yaml, que no se versiona.
     supabase:
       # El proyecto de la base de datos del backend, NO el de los agentes de IA.
-      url: ${SUPABASE_URL:https://jcmjaiwwnbbhflguydnq.supabase.co}
+      #
+      # Este valor es la RESERVA, no la verdad: en el servidor manda SUPABASE_URL, que sale
+      # de Parameter Store. Pero tiene que apuntar a un proyecto que exista, porque si el
+      # parametro falta la aplicacion arranca igual y se pone a buscar curriculums aqui —
+      # sin error de arranque, con 404 al abrir el primer CV.
+      #
+      # Apuntaba a jcmjaiwwnbbhflguydnq (us-west-2) hasta el 09/09/2026. La base se mudo a
+      # us-east-1 y ese proyecto se borra; ver despliegue/MIGRACION-SUPABASE.md.
+      url: ${SUPABASE_URL:https://sjmyhkhivvippngilwiu.supabase.co}
       bucket: ${ARCHIVOS_BUCKET:Documentos-cv}
       # Lo que dura un enlace de descarga. Corto a propósito: el enlace no vuelve a
       # preguntar quién eres, así que es tan secreto como el currículum que abre.
