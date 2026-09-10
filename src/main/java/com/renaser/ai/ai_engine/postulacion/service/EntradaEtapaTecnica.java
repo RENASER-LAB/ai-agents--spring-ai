@@ -38,6 +38,8 @@ public class EntradaEtapaTecnica {
     private final PostulacionRepository postulaciones;
     private final ServicioPrueba prueba;
     private final ServicioEvaluacion evaluaciones;
+    private final com.renaser.ai.ai_engine.perfilintegral.repository.VersionBancoRepository
+            versionesBanco;
 
     /**
      * Si esta vacante tiene hoy con qué llenar su etapa técnica.
@@ -50,13 +52,21 @@ public class EntradaEtapaTecnica {
      * hacer es no avanzar y dejar la postulación esperando a alguien, que es exactamente
      * lo que pasaba antes de que existiera el automático.
      *
-     * <p>Solo se mira lo que esta clase necesita para crear. Que el cuestionario esté
-     * publicado lo comprueba quien lo crea, y por eso el pase automático se protege además
-     * con el {@code try/catch} de su listener.
+     * <p>Se comprueba lo mismo que exige crear: la plantilla asignada, o el cuestionario
+     * <b>publicado</b> —uno en borrador no sirve, y preguntar solo por el instrumento
+     * elegido dejaba pasar ese caso—. Aun así el pase automático se protege además con el
+     * {@code try/catch} de su listener: entre esta pregunta y la creación puede cambiar
+     * cualquier cosa.
      */
     public boolean hayInstrumento(Vacante vacante) {
         if (CUESTIONARIO_TECNICO.equals(vacante.getInstrumentoEtapaTecnica())) {
-            return true;
+            // El cuestionario preparado y todavía en borrador NO cuenta. Sin esto, una
+            // vacante a medio montar en automático escribía un error por CADA candidato que
+            // terminaba su retrato: el pase se intentaba, el creador se plantaba dentro, y
+            // lo que en realidad pasaba —«falta publicar el cuestionario»— quedaba enterrado
+            // bajo un montón de excepciones que parecen una avería.
+            return versionesBanco.findFirstByVacanteIdAndEstado(vacante.getId(), "PUBLICADA")
+                    .isPresent();
         }
         return vacante.getVersionPlantillaPruebaId() != null;
     }
@@ -67,12 +77,17 @@ public class EntradaEtapaTecnica {
      * <p>La versión queda fijada aquí y no cambia aunque después se publique otra (RF-90):
      * es el mismo patrón que la evaluación del banco, que se ata al postular.
      *
-     * <p><b>Es idempotente por los dos lados, y hay que mantenerlo así.</b> El intento de la
-     * prueba no puede duplicarse porque su tabla lo impide con una clave única. El
-     * cuestionario técnico <b>no tiene esa red</b>: la columna admite cualquier id, así que
-     * la regla la pone el {@code if} de aquí dentro. Estaba antes en el llamador, y ahí ya
-     * no vale: con dos caminos, uno de ellos se olvidaría y crearía un segundo examen
-     * dejando el primero —con sus respuestas y sus notas— sin dueño.
+     * <p><b>Es idempotente por los dos lados, y hay dos redes debajo.</b> El {@code if} de
+     * aquí dentro atrapa el caso normal —volver a entrar en la etapa tras retroceder a
+     * alguien—, y estaba antes en el llamador, donde ya no vale: con dos caminos, uno se
+     * olvidaría y crearía un segundo examen dejando el primero, con sus respuestas y sus
+     * notas, sin dueño.
+     *
+     * <p>Debajo está la base, y hace falta: dos caminos pueden leer «todavía no tiene»
+     * <b>a la vez</b> —el pase automático justo cuando alguien pulsa «confirmar»— y el
+     * {@code if} no ve al otro. {@code intento_prueba} lo impide con su clave única desde la
+     * V15; el cuestionario técnico, con el índice único parcial de la V53. El perdedor de la
+     * carrera se lleva un error y no escribe nada, que es exactamente lo que se busca.
      */
     public void crearAlEntrar(Postulacion postulacion, Vacante vacante) {
         Long organizacionId = postulacion.getOrganizacionId();

@@ -20,3 +20,21 @@ COMMENT ON COLUMN vacante.calificacion_automatica IS
     'Encendido: al postular se califica el currículum (si la vacante no lleva banco), al '
     'terminar la calificación la postulación pasa sola a la etapa técnica, y la prueba del '
     'puesto se califica sola al entregarse. Apagado: cada paso lo pide una persona.';
+
+-- Y una red que hasta ahora no hacía falta.
+--
+-- Entrar a la etapa técnica crea lo que el candidato va a rendir. Con la prueba del
+-- puesto eso no se puede duplicar: `intento_prueba` lo impide con una clave única desde
+-- la V15. Con el cuestionario técnico la regla la ponía un `if` en el código, y hasta
+-- ahora bastaba porque solo había un camino de entrada: una persona pulsando «confirmar».
+--
+-- Desde esta migración hay dos, y pueden coincidir en el mismo segundo: el retrato
+-- termina y publica su aviso justo cuando quien tenía la ficha abierta pulsa el botón.
+-- Los dos leen que todavía no hay examen, los dos lo crean, y el segundo en escribir se
+-- queda la columna dejando el primero —con sus respuestas y sus notas— sin dueño.
+--
+-- Es un índice PARCIAL: la inmensa mayoría de las postulaciones no han llegado a la etapa
+-- técnica y tienen la columna vacía, y en Postgres los nulos no se estorban entre sí.
+CREATE UNIQUE INDEX IF NOT EXISTS postulacion_evaluacion_tecnica_unica
+    ON postulacion (evaluacion_tecnica_id)
+    WHERE evaluacion_tecnica_id IS NOT NULL;

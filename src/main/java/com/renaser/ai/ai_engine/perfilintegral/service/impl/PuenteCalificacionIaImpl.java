@@ -736,31 +736,42 @@ public class PuenteCalificacionIaImpl implements PuenteCalificacionIa {
                         .etapaCodigo(ETAPA)
                         .creadoEn(Instant.now())
                         .build());
-        BigDecimal nota = pesoTotal.compareTo(BigDecimal.ZERO) == 0
-                ? fila.getPuntaje()
-                : suma.divide(pesoTotal, 2, RoundingMode.HALF_UP);
-
         /*
-         * ⚠️ **Sin ningún componente con peso NO hay nota, y eso no es un cero.**
+         * ⚠️ **Sin ningún componente con peso NO hay nota que calcular, y aquí no se toca
+         * nada de nada.**
          *
-         * Aquí se guardaba `BigDecimal.ZERO` cuando la cuenta no salía. Un cero se lee como
+         * Antes se guardaba `BigDecimal.ZERO` cuando la cuenta no salía. Un cero se lee como
          * «lo hizo malísimo» y ordena como tal; lo que de verdad pasa es que no hay con qué
          * calcular —una vacante con el banco apagado y todo el peso en la evaluación, por
          * ejemplo—. El 08/09/2026 eso mandó al fondo del ranking a once candidatos con
          * currículums de entre 50 y 86: el ranking ordena primero por grupo de prioridad, y
          * el cero los dejaba a todos en NO_PRIORIZADO, por debajo de gente con notas de 16.
          *
-         * La fila no se escribe en absoluto, y no se escribe un nulo, porque `puntaje` es
-         * NOT NULL desde la V12. Es la misma forma que ya usa la ruta hermana
-         * (`CalificacionPorCriterio`: sin pilar no se escribe) y la que el resto del sistema
-         * ya sabe leer — el ranking y el Excel pintan la nota ausente como un hueco.
+         * <p>Se sale ANTES de escribir, y eso cubre los dos casos de golpe:
+         *
+         * <ul>
+         *   <li><b>Sin nota previa</b>, la fila no se crea. No se escribe un nulo porque
+         *       {@code puntaje} es NOT NULL desde la V12; la ausencia de fila es la forma que
+         *       el resto del sistema ya sabe leer —el ranking y el Excel pintan un hueco— y
+         *       la misma que usa la ruta hermana ({@code CalificacionPorCriterio}: sin pilar
+         *       no se escribe).
+         *   <li><b>Con nota previa</b>, se conserva intacta y sin volver a firmarla. Esto es
+         *       lo que se escapaba: la nota vieja se guardaba otra vez con la versión de
+         *       pesos NUEVA y la fecha de hoy, o sea que quedaba escrito que se calculó con
+         *       una versión que no le da peso a nada. Dos candidatos idénticos ordenaban al
+         *       revés —el recién llegado sin nota al final, el antiguo con su 72 intacto— y
+         *       la versión de pesos dejaba de servir para reconstruir la decisión.
+         * </ul>
          */
-        if (nota == null) {
-            log.info("La postulación {} se queda SIN nota de perfil integral: la versión de "
-                    + "pesos {} no le da peso a ningún componente que se pueda llenar",
-                    postulacionId, vacante.getVersionPesosId());
-            return null;
+        if (pesoTotal.compareTo(BigDecimal.ZERO) == 0) {
+            log.info("La postulación {} se queda con la nota de perfil integral que tuviera "
+                    + "({}): la versión de pesos {} no le da peso a ningún componente que se "
+                    + "pueda llenar, así que no hay nada que recalcular",
+                    postulacionId, fila.getPuntaje(), vacante.getVersionPesosId());
+            return fila.getPuntaje();
         }
+
+        BigDecimal nota = suma.divide(pesoTotal, 2, RoundingMode.HALF_UP);
         fila.setPuntaje(nota);
         fila.setVersionPesosId(vacante.getVersionPesosId());
         fila.setCalculadaEn(Instant.now());
