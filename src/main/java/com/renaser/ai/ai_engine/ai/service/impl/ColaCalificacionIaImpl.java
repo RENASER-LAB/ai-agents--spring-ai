@@ -160,14 +160,6 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
     }
 
     @Override
-    public boolean encolarCribaRapida(Long postulacionId) {
-        if (apagada(postulacionId)) {
-            return false;
-        }
-        return encolarElRetrato(postulacionId, RAPIDA);
-    }
-
-    @Override
     public boolean encolarCribaFina(Long postulacionId) {
         if (apagada(postulacionId)) {
             return false;

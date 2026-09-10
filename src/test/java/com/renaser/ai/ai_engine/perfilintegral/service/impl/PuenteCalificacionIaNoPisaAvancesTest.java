@@ -90,6 +90,10 @@ class PuenteCalificacionIaNoPisaAvancesTest {
     @Mock private ServicioCalificacion calificacion;
     @Mock private ServicioParametros parametros;
     @Mock private MaquinaEstados maquina;
+    // Desde la V53, al cerrar el retrato se avisa de que terminó para que las vacantes
+    // automáticas puedan avanzar solas. Aquí no se comprueba a quién llega ese aviso: lo que
+    // se prueba es a quién se mueve y a quién no.
+    @Mock private org.springframework.context.ApplicationEventPublisher avisos;
 
     @InjectMocks
     private PuenteCalificacionIaImpl puente;

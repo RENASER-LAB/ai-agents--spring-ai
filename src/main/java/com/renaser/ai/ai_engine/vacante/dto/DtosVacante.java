@@ -39,7 +39,7 @@ public final class DtosVacante {
                                Instant publicadaEn, Instant cerradaEn, boolean aplicaEvaluacion,
                                Long plantillaEvaluacionId, Long versionPlantillaPruebaId,
                                Long versionPesosId, String instrumentoEtapaTecnica,
-                               Integer minutosEtapaTecnica) {}
+                               Integer minutosEtapaTecnica, boolean calificacionAutomatica) {}
 
     public record GuardarRequisito(@NotBlank String descripcion, @NotBlank String regla) {}
 
@@ -84,6 +84,15 @@ public final class DtosVacante {
     // Encender o apagar la evaluación del banco para esta vacante. Apagada, quien postula
     // no recibe cuestionario del banco: la prueba del puesto es su única evaluación.
     public record AplicarEvaluacion(@NotNull Boolean aplica) {}
+
+    /**
+     * Encender o apagar el recorrido automático de esta vacante.
+     *
+     * <p>Encendido, la postulación viaja sola hasta que termina la prueba del puesto y solo
+     * entonces espera a una persona. Apagado, cada paso lo pide alguien, que es como
+     * funcionaron todas las vacantes hasta la V53.
+     */
+    public record ActivarCalificacionAutomatica(@NotNull Boolean activa) {}
 
     // Qué versión de pesos rige la decisión de esta vacante. Existe para las vacantes que
     // reparten distinto —una sin banco pone todo en la prueba— sin tocar el reparto general.

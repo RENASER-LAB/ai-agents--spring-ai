@@ -55,6 +55,19 @@ public interface ServicioVacantesPanel {
     void definirAplicacionEvaluacion(ContextoUsuario quien, Long id, boolean aplica);
 
     /**
+     * Encender o apagar el recorrido automático de esta vacante.
+     *
+     * <p>Encendido, la postulación viaja sola: se le califica el currículum al postular —si
+     * la vacante no lleva banco—, pasa sola a la etapa técnica cuando la calificación
+     * termina, y su prueba se califica sola al entregarse. La primera persona que hace falta
+     * es la que decide quién va a la simulación.
+     *
+     * <p>Solo cambia lo que pase de aquí en adelante: a quien ya está parado en una bandeja
+     * no lo mueve, y para eso está el botón de calificar la tanda.
+     */
+    void activarCalificacionAutomatica(ContextoUsuario quien, Long id, boolean activa);
+
+    /**
      * Qué versión de pesos rige la decisión de esta vacante.
      *
      * <p>Al crearse, la vacante toma la última publicada; esto permite apuntarla a otra

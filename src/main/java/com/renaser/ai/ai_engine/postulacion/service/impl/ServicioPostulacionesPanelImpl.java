@@ -17,10 +17,7 @@ import com.renaser.ai.ai_engine.usuario.entity.Usuario;
 import com.renaser.ai.ai_engine.usuario.repository.UsuarioRepository;
 import com.renaser.ai.ai_engine.usuario.service.NombresDeUsuarios;
 import com.renaser.ai.ai_engine.postulacion.service.ServicioPostulacionesPanel;
-import com.renaser.ai.ai_engine.prueba.service.ServicioPrueba;
-import com.renaser.ai.ai_engine.perfilintegral.service.ServicioEvaluacion;
 
-import static com.renaser.ai.ai_engine.perfilintegral.service.impl.ServicioEvaluacionImpl.CUESTIONARIO_TECNICO;
 import com.renaser.ai.ai_engine.simulacion.service.ServicioDisponibilidadSimulacion;
 import com.renaser.ai.ai_engine.validacion.service.ServicioValidacion;
 import com.renaser.ai.ai_engine.postulacion.dto.DtosPostulacion.*;
@@ -65,8 +62,7 @@ public class ServicioPostulacionesPanelImpl implements ServicioPostulacionesPane
     private final AlmacenArchivos almacen;
     private final MaquinaEstados maquina;
     private final Permisos permisos;
-    private final ServicioPrueba prueba;
-    private final ServicioEvaluacion evaluaciones;
+    private final EntradaEtapaTecnica entradaTecnica;
     private final ServicioValidacion validacion;
     private final ServicioDisponibilidadSimulacion disponibilidad;
     private final DatoCvRepository datosCv;
@@ -184,29 +180,9 @@ public class ServicioPostulacionesPanelImpl implements ServicioPostulacionesPane
         if ("PRUEBA_TURNO_CANDIDATO".equals(siguiente.getCodigo())) {
             Vacante vacante = vacantes.findById(p.getVacanteId())
                     .orElseThrow(() -> new IllegalStateException("La vacante de esta postulación ya no existe"));
-            if (CUESTIONARIO_TECNICO.equals(vacante.getInstrumentoEtapaTecnica())) {
-                // ⚠️ Solo si no tiene ya el suyo. Volver a entrar en la etapa —pasa cuando se
-                // retrocede una postulación y se la vuelve a avanzar— crearía un segundo
-                // examen y dejaría el primero, con sus respuestas y sus notas, sin dueño. El
-                // intento de la prueba del puesto no puede duplicarse porque su tabla lo
-                // impide con una clave única; aquí la columna admite cualquier id, así que la
-                // regla la pone este `if`.
-                if (p.getEvaluacionTecnicaId() == null) {
-                    // Sin los minutos: los pregunta el examen a su vacante cuando el
-                    // candidato lo abre, no ahora. Así, corregirlos entre este avance y esa
-                    // apertura sigue alcanzándole.
-                    p.setEvaluacionTecnicaId(evaluaciones.crearTecnicaAlEntrar(
-                            quien.organizacionId(), p.getUsuarioId(), vacante.getId()));
-                    postulaciones.save(p);
-                }
-            } else {
-                if (vacante.getVersionPlantillaPruebaId() == null) {
-                    throw new IllegalStateException(
-                            "Esta vacante no tiene plantilla de prueba asignada: no se puede avanzar");
-                }
-                prueba.crearAlEntrar(quien.organizacionId(), p.getId(),
-                        vacante.getVersionPlantillaPruebaId(), vacante.getPruebaCierraEn());
-            }
+            // Lo comparte con el pase automático, que llega aquí sin usuario del que sacar la
+            // organización. Ver EntradaEtapaTecnica.
+            entradaTecnica.crearAlEntrar(p, vacante);
         }
 
         // Al entrar a validación se crea su periodo, en POR_HABILITAR: alguien tiene que

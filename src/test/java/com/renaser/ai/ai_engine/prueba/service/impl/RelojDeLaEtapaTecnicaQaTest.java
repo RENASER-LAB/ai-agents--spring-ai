@@ -88,6 +88,9 @@ class RelojDeLaEtapaTecnicaQaTest {
     @Mock private PostulacionRepository postulaciones;
     @Mock private AlmacenArchivos almacen;
     @Mock private MaquinaEstados maquina;
+    // Desde la V53 la entrega pide la nota si la vacante califica sola. Aquí no se mira: los
+    // dobles de vacante no la encienden, así que el camino no se toma.
+    @Mock private com.renaser.ai.ai_engine.ai.service.ColaCalificacionIa cola;
 
     private ServicioPruebaImpl servicio;
 
@@ -95,7 +98,7 @@ class RelojDeLaEtapaTecnicaQaTest {
     void crearElServicio() {
         servicio = new ServicioPruebaImpl(intentos, versiones, vacantes, variantes,
                 preguntasElegidas, preguntasCatalogo, entregablesRequeridos, entregables,
-                respuestas, postulaciones, almacen, maquina);
+                respuestas, postulaciones, almacen, maquina, cola);
         lenient().when(preguntasElegidas.findByVersionPlantillaPruebaIdOrderByOrden(VERSION))
                 .thenReturn(List.of());
         lenient().when(preguntasCatalogo.findByIdIn(anyList())).thenReturn(List.of());

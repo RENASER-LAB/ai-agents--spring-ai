@@ -87,6 +87,9 @@ class ServicioPruebaImplTest {
     @Mock private PostulacionRepository postulaciones;
     @Mock private AlmacenArchivos almacen;
     @Mock private MaquinaEstados maquina;
+    // Desde la V53 la entrega pide la nota si la vacante califica sola. Aquí no se mira: los
+    // dobles de vacante no la encienden, así que el camino no se toma.
+    @Mock private com.renaser.ai.ai_engine.ai.service.ColaCalificacionIa cola;
 
     private ServicioPruebaImpl servicio;
 
@@ -94,7 +97,7 @@ class ServicioPruebaImplTest {
     void crearElServicio() {
         servicio = new ServicioPruebaImpl(intentos, versiones, vacantes, variantes,
                 preguntasElegidas, preguntasCatalogo, entregablesRequeridos, entregables,
-                respuestas, postulaciones, almacen, maquina);
+                respuestas, postulaciones, almacen, maquina, cola);
         // Lo que `pintar` consulta para armar la pantalla. Aquí no se mira nada de eso: lo
         // que se prueba es el reloj, y sin estos dobles ni se llega a la aserción.
         lenient().when(preguntasElegidas.findByVersionPlantillaPruebaIdOrderByOrden(VERSION))

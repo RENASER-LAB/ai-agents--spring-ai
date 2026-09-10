@@ -320,6 +320,19 @@ class ArquitecturaTest {
             // vacante tiene asignada (y que se validó contra el dueño al asignarla).
             "ServicioPostulacionesPanelImpl#confirmarAvance",
             "ServicioPostulacionesPanelImpl#ficha",
+            // El pase automático de la V53. No hay usuario del que sacar la organización —lo
+            // dispara el final de la calificación, no una persona— y por eso no puede pasar
+            // por el guardián: no hay a quién preguntarle qué alcanza. La postulación se lee
+            // por id porque el evento trae su id y nada más, y la vacante se deriva de ella,
+            // que es el mismo patrón que los de arriba. Lo que sustituye al guardián es que
+            // todo lo que se escribe sale de la propia postulación: su organización, su
+            // vacante y su estado. Ver PaseAutomatico.
+            "PaseAutomatico#avanzarSiToca",
+            // Cerrar el intento de la prueba, también de la V53: mira la vacante para saber
+            // si califica sola. Aquí tampoco hay usuario —lo dispara el candidato al
+            // entregar, o el barrido del reloj— y la vacante se deriva de la postulación
+            // cuyo intento se está cerrando, que ya se resolvió por su propio camino.
+            "ServicioPruebaImpl#cerrarIntento",
             "ServicioPerfilIntegralPanelImpl#pesosDe",
             "ServicioPerfilIntegralPanelImpl#ranking",
             "ServicioDecisionImpl#calcular",

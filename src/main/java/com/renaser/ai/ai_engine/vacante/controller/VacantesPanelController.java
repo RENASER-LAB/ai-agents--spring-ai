@@ -111,6 +111,17 @@ public class VacantesPanelController {
         servicio.definirAplicacionEvaluacion(permisos.actual(), id, datos.aplica());
     }
 
+    @PostMapping("/vacantes/{id}/calificacion-automatica")
+    @PreAuthorize("@permisos.tiene('elegir_plantilla_evaluacion')")
+    @Operation(summary = "Encender o apagar el recorrido automático. Encendido, la "
+            + "postulación se califica y avanza sola hasta que termina la prueba del puesto, "
+            + "y solo entonces espera a una persona")
+    public void activarCalificacionAutomatica(
+            @PathVariable Long id,
+            @Valid @RequestBody ActivarCalificacionAutomatica datos) {
+        servicio.activarCalificacionAutomatica(permisos.actual(), id, datos.activa());
+    }
+
     @PostMapping("/vacantes/{id}/version-pesos")
     @PreAuthorize("@permisos.tiene('publicar_version_pesos')")
     @Operation(summary = "Elegir qué versión de pesos rige la decisión de esta vacante. "

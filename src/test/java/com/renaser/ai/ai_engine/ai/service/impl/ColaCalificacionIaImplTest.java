@@ -120,15 +120,6 @@ class ColaCalificacionIaImplTest {
     }
 
     @Test
-    void laPasadaRapidaEmpiezaSacandoLosDatosDelCandidato() {
-        // Los datos cuestan casi nada y son lo que hace legible la tabla del ranking: sin
-        // ellos la primera pasada deja una lista de nombres de archivo.
-        cola.encolarCribaRapida(POSTULACION);
-
-        verify(registro).crearSiHaceFalta(1L, POSTULACION, AgenteDatosCv.CODIGO_AGENTE, "RAPIDA", null);
-    }
-
-    @Test
     void laCribaDeCurriculumRecorreLaMismaFilaQueLaCalificacionCompleta() {
         // No la decide quien llama: la decide el candidato. Si no entregó evaluación, la
         // fila se salta sola al evaluador más adelante.
@@ -166,7 +157,6 @@ class ColaCalificacionIaImplTest {
         ColaCalificacionIaImpl apagada = conLaCalificacion(false);
 
         assertThat(apagada.encolarPerfilIntegral(POSTULACION)).isFalse();
-        assertThat(apagada.encolarCribaRapida(POSTULACION)).isFalse();
         assertThat(apagada.encolarCribaFina(POSTULACION)).isFalse();
         apagada.reintentarAtascados();
 
@@ -482,26 +472,6 @@ class ColaCalificacionIaImplTest {
         // Y los otros dos sí, que son los que sí tienen algo que leer.
         verify(registro).crearSiHaceFalta(1L, POSTULACION, AgenteDatosCv.CODIGO_AGENTE, "FINA", null);
         verify(registro).crearSiHaceFalta(1L, POSTULACION, AgenteEvidenciaCv.CODIGO_AGENTE, "FINA", null);
-    }
-
-    @Test
-    void laPasadaRapidaNiSiquieraPreguntaPorElEvaluador() {
-        // Su tanda no lo incluye. Preguntar por la evaluación sería una consulta a la base
-        // por cada candidato de la tanda para una respuesta que da igual.
-        cola.encolarCribaRapida(POSTULACION);
-        verify(registro).crearSiHaceFalta(
-                1L, POSTULACION, AgenteDatosCv.CODIGO_AGENTE, "RAPIDA", null);
-        verify(registro).crearSiHaceFalta(
-                1L, POSTULACION, AgenteEvidenciaCv.CODIGO_AGENTE, "RAPIDA", null);
-
-        // Y su barrera espera a dos, no a tres: si esperara al evaluador, una criba de
-        // currículums no terminaría nunca.
-        ejecutar(trabajo(2L, AgenteEvidenciaCv.CODIGO_AGENTE, "PENDIENTE", "RAPIDA"), evidenciaCv);
-        verify(registro).crearElRetratoSiLosDemasAcabaron(1L, POSTULACION,
-                List.of(AgenteDatosCv.CODIGO_AGENTE, AgenteEvidenciaCv.CODIGO_AGENTE),
-                AgentePotencialRiesgo.CODIGO_AGENTE, "RAPIDA", 2L);
-
-        verify(puente, never()).tieneEvaluacionEntregada(anyLong());
     }
 
     @Test

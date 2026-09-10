@@ -78,6 +78,7 @@ public class ServicioPostulacionPortalImpl implements ServicioPostulacionPortal 
     private final MaquinaEstados maquina;
     private final com.renaser.ai.ai_engine.perfil.service.ServicioPropuestaPerfil propuestaPerfil;
     private final com.renaser.ai.ai_engine.perfil.service.ServicioLecturaCv lecturaCv;
+    private final com.renaser.ai.ai_engine.ai.service.ColaCalificacionIa colaIa;
     private final AlmacenArchivos almacen;
     private final com.renaser.ai.ai_engine.archivo.repository.ArchivoRepository archivos;
     private final com.renaser.ai.ai_engine.perfil.repository.PerfilCandidatoRepository perfiles;
@@ -207,6 +208,25 @@ public class ServicioPostulacionPortalImpl implements ServicioPostulacionPortal 
             // responder en el Perfil Integral. Va directo a la bandeja del equipo, que
             // decide a quién invitar a la prueba del puesto — su única evaluación.
             maquina.transicionar(postulacion, "PERFIL_POR_CONFIRMAR", null, null, true, false, null);
+
+            /*
+             * Y si además la vacante califica sola, se le pide la nota del currículum ya.
+             *
+             * ⚠️ **Solo aquí, en la rama sin banco, y hay dos razones.**
+             *
+             * La primera es que aquí no hay nada que esperar: el candidato ya hizo todo lo
+             * que tenía que hacer. En una vacante CON banco le toca responderlo, y calificar
+             * ahora le armaría el retrato con el currículum a solas y lo mandaría a «por
+             * confirmar» antes de que contestara una sola pregunta.
+             *
+             * La segunda es el sitio exacto dentro del método: va DESPUÉS de comprobar los
+             * requisitos indispensables. A quien no los cumple se le acaba de cerrar la
+             * postulación unas líneas más arriba, y calificarle el currículum sería pagar el
+             * modelo por alguien que ya está fuera.
+             */
+            if (vacante.isCalificacionAutomatica()) {
+                colaIa.encolarCribaCv(postulacion.getId());
+            }
         } else {
             // Su evaluación se crea aquí, no cuando entre a responderla: así queda atada a la
             // versión del banco que estaba publicada el día que postuló. Sin esto la

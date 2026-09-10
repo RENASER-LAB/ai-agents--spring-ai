@@ -94,28 +94,16 @@ public interface ColaCalificacionIa {
     boolean encolarCribaCv(Long postulacionId);
 
     /**
-     * Primera pasada: rápida, sobre todos.
+     * La pasada que califica de verdad: cuidadosa, sobre quien haga falta.
      *
-     * <p>Saca los datos del candidato y lo puntúa con el modelo que <b>no razona</b>. Una
-     * tanda de diez tarda medio minuto en vez de veinte, y sirve para lo que hace falta
-     * aquí: ordenar y separar la mitad de abajo, donde la decisión es fácil.
+     * <p>Puntúa con el modelo que razona y arma el Perfil de Talento. En la misma corrida
+     * saca los datos del candidato, así que no hace falta pedirlos antes.
      *
-     * <p>No sirve para decidir a quién se contrata. Medido sobre los mismos diez
-     * currículums, solo tres quedan en la misma posición que con el modelo que razona, y
-     * este ve menos riesgos críticos. Para eso está la segunda.
-     *
-     * @return true si quedó algo en la cola
-     */
-    boolean encolarCribaRapida(Long postulacionId);
-
-    /**
-     * Segunda pasada: cuidadosa, solo sobre los de arriba.
-     *
-     * <p>Vuelve a puntuar con el modelo que razona y rehace el Perfil de Talento. Es la que
-     * manda: pisa las notas de la primera, que eran provisionales.
-     *
-     * <p>Se pide por separado y no se encadena a la primera a propósito. Cuál es «arriba»
-     * depende de cómo salió la tanda entera, y eso no se sabe hasta que la primera termina.
+     * <p><b>Hubo una pasada barata, y se retiró en la V53.</b> Contestaba sin razonar y
+     * dejaba notas provisionales para ordenar la tanda antes de gastar en la buena. Nadie
+     * las miraba, y obligaba a lanzar dos botones para llegar a la única nota que se usa.
+     * De ella queda el modo {@code RAPIDA} en los trabajos ya escritos: {@link #pasadaDe}
+     * lo sigue devolviendo, y una nota suya <b>no</b> cuenta como definitiva.
      *
      * @return true si quedó algo en la cola
      */

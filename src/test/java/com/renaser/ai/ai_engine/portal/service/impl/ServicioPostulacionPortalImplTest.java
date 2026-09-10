@@ -88,6 +88,9 @@ class ServicioPostulacionPortalImplTest {
     @Mock private com.renaser.ai.ai_engine.archivo.repository.ArchivoRepository archivos;
     @Mock private com.renaser.ai.ai_engine.perfil.repository.PerfilCandidatoRepository perfiles;
     @Mock private ServicioCorreo correo;
+    // Desde la V53, postular a una vacante que califica sola pide la nota del currículum al
+    // momento. Aquí ninguna la enciende, así que ese camino no se toma.
+    @Mock private com.renaser.ai.ai_engine.ai.service.ColaCalificacionIa colaIa;
     @Mock private MultipartFile cv;
 
     private ServicioPostulacionPortalImpl servicio;
@@ -104,7 +107,7 @@ class ServicioPostulacionPortalImplTest {
         servicio = new ServicioPostulacionPortalImpl(organizaciones, personas, usuarios,
                 consentimientos, vacantes, puestos, requisitos, evaluaciones, postulaciones,
                 transiciones, estados, cvs, enlaces, maquina, propuestaPerfil, lecturaCv,
-                almacen, archivos, perfiles, correo, textoProceso);
+                colaIa, almacen, archivos, perfiles, correo, textoProceso);
         tablon = new ServicioTablonPortalImpl(vacantes, organizaciones, requisitos, textoProceso);
     }
 

@@ -44,6 +44,7 @@ import com.renaser.ai.ai_engine.perfilintegral.repository.RespuestaRepository;
 import com.renaser.ai.ai_engine.perfilintegral.service.FormulasCazatalentos;
 import com.renaser.ai.ai_engine.perfilintegral.service.LectorBancoCazatalentos;
 import com.renaser.ai.ai_engine.perfilintegral.service.PuenteCalificacionIa;
+import com.renaser.ai.ai_engine.perfilintegral.service.RetratoTerminado;
 import com.renaser.ai.ai_engine.perfilintegral.service.ServicioCalificacion;
 import com.renaser.ai.ai_engine.pesos.entity.PesoComponentePerfil;
 import com.renaser.ai.ai_engine.pesos.repository.PesoComponentePerfilRepository;
@@ -118,6 +119,8 @@ public class PuenteCalificacionIaImpl implements PuenteCalificacionIa {
     private final HallazgoPerfilRepository hallazgos;
     private final ServicioTextoCv textoCv;
     private final ServicioCalificacion calificacion;
+    /** Para avisar de que el retrato terminó, sin llamar a quien avanza. Ver RetratoTerminado. */
+    private final org.springframework.context.ApplicationEventPublisher avisos;
     private final ServicioParametros parametros;
     private final MaquinaEstados maquina;
     private final CalificacionCriterios calificacionCriterios;
@@ -596,6 +599,11 @@ public class PuenteCalificacionIaImpl implements PuenteCalificacionIa {
         // calificado se guarda igual: lo que no se hace es mandarla donde ya no está.
         if (maquina.sigueEnLaEtapa(postulacion, "PERFIL_INTEGRAL")) {
             maquina.transicionar(postulacion, "PERFIL_POR_CONFIRMAR", null, null, true, false, null);
+            // Y si la vacante califica y avanza sola, alguien tiene que enterarse de que esto
+            // ya terminó. Se avisa y no se llama: avanzar pasa por crear lo que el candidato
+            // va a rendir, y ese camino vuelve hasta aquí cerrando un círculo con el que
+            // Spring no arranca. Ver RetratoTerminado.
+            avisos.publishEvent(new RetratoTerminado(postulacionId));
         } else {
             log.info("POTENCIAL_RIESGO: la postulación {} ya salió del Perfil Integral (está en "
                     + "{}): se guarda su perfil y su nota, pero no se la mueve",
@@ -731,8 +739,27 @@ public class PuenteCalificacionIaImpl implements PuenteCalificacionIa {
         BigDecimal nota = pesoTotal.compareTo(BigDecimal.ZERO) == 0
                 ? fila.getPuntaje()
                 : suma.divide(pesoTotal, 2, RoundingMode.HALF_UP);
+
+        /*
+         * ⚠️ **Sin ningún componente con peso NO hay nota, y eso no es un cero.**
+         *
+         * Aquí se guardaba `BigDecimal.ZERO` cuando la cuenta no salía. Un cero se lee como
+         * «lo hizo malísimo» y ordena como tal; lo que de verdad pasa es que no hay con qué
+         * calcular —una vacante con el banco apagado y todo el peso en la evaluación, por
+         * ejemplo—. El 08/09/2026 eso mandó al fondo del ranking a once candidatos con
+         * currículums de entre 50 y 86: el ranking ordena primero por grupo de prioridad, y
+         * el cero los dejaba a todos en NO_PRIORIZADO, por debajo de gente con notas de 16.
+         *
+         * La fila no se escribe en absoluto, y no se escribe un nulo, porque `puntaje` es
+         * NOT NULL desde la V12. Es la misma forma que ya usa la ruta hermana
+         * (`CalificacionPorCriterio`: sin pilar no se escribe) y la que el resto del sistema
+         * ya sabe leer — el ranking y el Excel pintan la nota ausente como un hueco.
+         */
         if (nota == null) {
-            nota = BigDecimal.ZERO;
+            log.info("La postulación {} se queda SIN nota de perfil integral: la versión de "
+                    + "pesos {} no le da peso a ningún componente que se pueda llenar",
+                    postulacionId, vacante.getVersionPesosId());
+            return null;
         }
         fila.setPuntaje(nota);
         fila.setVersionPesosId(vacante.getVersionPesosId());
@@ -782,6 +809,17 @@ public class PuenteCalificacionIaImpl implements PuenteCalificacionIa {
      */
     private String grupoDe(Long organizacionId, BigDecimal nota, PerfilTalento perfil,
                            ResultadoPerfil resultado) {
+        /*
+         * ⚠️ **Sin nota no hay grupo**, y el hueco se deja a la vista.
+         *
+         * Los tres grupos son cortes sobre la nota: sin ella, cualquiera de los tres sería
+         * inventado — y el peor sería NO_PRIORIZADO, que es justo donde caería un candidato
+         * al que no se ha podido puntuar. El ranking ya sabe pintar a quien no tiene grupo:
+         * lo manda al final con su estado escrito, en vez de mezclarlo con los descartados.
+         */
+        if (nota == null) {
+            return null;
+        }
         int alta = parametros.entero(organizacionId, "umbral_grupo_alta", 80);
         int priorizado = parametros.entero(organizacionId, "umbral_grupo_priorizado", 65);
 

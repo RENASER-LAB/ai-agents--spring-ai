@@ -101,6 +101,17 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
      */
     private static final String ETAPA_TECNICA = "PRUEBA_PUESTO";
 
+    /**
+     * Con qué pasada está calificado alguien de verdad.
+     *
+     * <p>Se escribe aquí y no se importa de la cola: la frontera con el motor de agentes
+     * solo deja cruzar las clases acordadas, y el valor es parte del contrato de
+     * {@code ColaCalificacionIa.pasadaDe}. La otra pasada que existió —la barata, retirada
+     * en la V53— sigue apareciendo en trabajos viejos de la base, y por eso hay que
+     * distinguirla en vez de dar por buena cualquier nota.
+     */
+    private static final String PASADA_DEFINITIVA = "FINA";
+
     private final PostulacionRepository postulaciones;
     private final VacanteRepository vacantes;
     private final AlcanceSobreLaVacante alcanceVacante;
@@ -243,7 +254,7 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
 
     @Override
     @Transactional
-    public PasadaEncolada cribaRapida(ContextoUsuario quien, Long vacanteId) {
+    public PasadaEncolada calificarTanda(ContextoUsuario quien, Long vacanteId) {
         Vacante vacante = vacanteVisible(quien, vacanteId, "ajustar_nota");
         Set<String> cerrados = cerrados();
         List<Postulacion> suyas = postulaciones.findByVacanteIdOrderByCreadoEnDesc(vacanteId);
@@ -265,98 +276,48 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
             if (cerrados.contains(p.getEstadoCodigo())) {
                 continue;
             }
-            // Quien ya tiene retrato no se vuelve a calificar: repetirlo cuesta lo mismo y
-            // no cambia nada. Para rehacer uno concreto está el botón de su ficha.
+            /*
+             * ⚠️ **A quien ya salió del Perfil Integral se le califica, pero NO se le mueve.**
+             *
+             * `moverACalificando` empuja a «calificando» a cualquiera que no esté ya ahí o
+             * en «por confirmar» — y eso incluye a quien está rindiendo la prueba con el
+             * reloj corriendo. Antes no se notaba porque este bucle se saltaba a todo el que
+             * tuviera cualquier nota; ahora alcanza a quien tiene una nota vieja de la
+             * pasada barata o a quien falló, y esa gente puede haber avanzado ya. Arrastrarla
+             * hacia atrás le quita al candidato un turno que ya le habían dado.
+             *
+             * Se sale del todo y no solo se omite el movimiento: recalificar el Perfil
+             * Integral de quien ya está en otra etapa es rehacer una nota que la vacante ya
+             * dio por buena. Para eso está el botón de su ficha, que es una decisión de
+             * alguien, con nombre y apellido.
+             */
+            if (!maquina.sigueEnLaEtapa(p, "PERFIL_INTEGRAL")) {
+                continue;
+            }
+            // Quien ya tiene la nota definitiva no se vuelve a calificar: repetirlo cuesta lo
+            // mismo y no cambia nada. Quien solo tiene la de la pasada barata que se retiró en
+            // la V53 SÍ entra: aquella era provisional y aquí cuenta como no tener nota.
             ColaCalificacionIa.Estado estado = enCola.get(p.getId());
             String pasada = estado == null ? null : estado.pasada();
-            if (pasada != null || !cvPorPostulacion.containsKey(p.getId())) {
+            if (PASADA_DEFINITIVA.equals(pasada) || !cvPorPostulacion.containsKey(p.getId())) {
                 continue;
             }
             // Se cuenta lo que de verdad quedó en la cola, no lo que se intentó. Antes se
             // sumaba siempre, así que un segundo clic respondía «43 en cola» sin haber
             // encolado a nadie, y eso mismo quedaba escrito en la auditoría.
-            if (!cola.encolarCribaRapida(p.getId())) {
+            if (!cola.encolarCribaFina(p.getId())) {
                 continue;
             }
             moverACalificando(p);
             encolados++;
         }
-        auditoria.registrar(quien.organizacionId(), quien, "criba_rapida",
+        auditoria.registrar(quien.organizacionId(), quien, "calificar_tanda",
                 "vacante", vacanteId, null, Map.of("candidatos", String.valueOf(encolados)), null);
         return new PasadaEncolada("ENCOLADA", encolados,
                 encolados == 0
                         ? "No había nadie sin calificar en «" + vacante.getTitulo() + "»."
-                        : encolados + " currículums en cola. Con el modelo rápido, una tanda "
-                          + "de diez tarda alrededor de medio minuto.");
-    }
-
-    @Override
-    @Transactional
-    public PasadaEncolada cribaFina(ContextoUsuario quien, Long vacanteId) {
-        vacanteVisible(quien, vacanteId, "ajustar_nota");
-        Set<String> cerrados = cerrados();
-        List<FilaRanking> filas = ranking(quien, vacanteId).filas().stream()
-                .filter(f -> !cerrados.contains(f.estado()))
-                .toList();
-
-        // Sin una primera pasada que haya ordenado, «los de arriba» no existen: la lista
-        // sale por orden alfabético y la segunda pasada se gastaría en la gente que tocó
-        // por la letra de su apellido. Es un error fácil de cometer —basta pulsar el botón
-        // mientras la tanda todavía se está cargando— y caro de descubrir.
-        long conNota = filas.stream().filter(f -> f.notaEtapa() != null).count();
-        if (conNota == 0) {
-            throw new IllegalStateException(
-                    "Todavía no hay ninguna nota en esta convocatoria: la segunda pasada no "
-                            + "sabría a quién mirar y elegiría por orden alfabético. Lanza "
-                            + "primero la pasada rápida y espera a que termine.");
-        }
-        if (conNota < filas.size()) {
-            log.warn("La segunda pasada de la vacante {} se pide con {} de {} candidatos "
-                    + "todavía sin nota: los que faltan no entran en el corte",
-                    vacanteId, filas.size() - conNota, filas.size());
-        }
-
-        int porcentaje = parametros.entero(quien.organizacionId(), "porcentaje_criba_fina", 50);
-        // Al menos uno: con tres candidatos y un corte del 20 % la cuenta da cero, y una
-        // segunda pasada que no mira a nadie no es una segunda pasada.
-        int cuantos = Math.max(1, (int) Math.ceil(conNota * porcentaje / 100.0));
-
-        List<FilaRanking> corte = filas.stream()
-                .filter(f -> f.notaEtapa() != null)
-                .limit(cuantos).toList();
-
-        // El corte es la mitad de la tanda por defecto, así que crece con los candidatos.
-        // Traerlas de una vez y no con un findById por fila: la postulación solo hace falta
-        // para moverla de estado, y quién entra en el corte ya se sabe aquí.
-        Map<Long, Postulacion> porId = porId(
-                postulaciones.findAllById(corte.stream().map(FilaRanking::postulacionId).toList()),
-                Postulacion::getId);
-
-        int encolados = 0;
-        for (FilaRanking f : corte) {
-            // Quien ya pasó por la fina no repite: es la definitiva.
-            if ("FINA".equals(f.pasada())) {
-                continue;
-            }
-            if (!cola.encolarCribaFina(f.postulacionId())) {
-                continue;
-            }
-            Postulacion p = porId.get(f.postulacionId());
-            if (p != null) {
-                moverACalificando(p);
-            }
-            encolados++;
-        }
-        auditoria.registrar(quien.organizacionId(), quien, "criba_fina",
-                "vacante", vacanteId, null,
-                Map.of("candidatos", String.valueOf(encolados),
-                       "porcentaje", String.valueOf(porcentaje)), null);
-        return new PasadaEncolada("ENCOLADA", encolados,
-                encolados == 0
-                        ? "Los de arriba ya están calificados con el modelo que razona."
-                        : "Se vuelven a calificar los " + encolados + " primeros (el "
-                          + porcentaje + "% de la tanda) con el modelo que razona. "
-                          + "Tarda alrededor de un minuto y medio.");
+                        : encolados + " currículums en cola. Tarda alrededor de un minuto y "
+                          + "medio por cada diez: vuelve a mirar el ranking en un rato.");
     }
 
     /**
