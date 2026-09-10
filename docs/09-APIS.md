@@ -214,8 +214,8 @@ del área— se ven solo las propias, y una ajena responde 404.
 > **Hay un ranking por etapa, y es el mismo endpoint.** `?etapa=PERFIL_INTEGRAL` —que equivale
 > a no pasarlo—, `PRUEBA_PUESTO`, `SIMULACION`, `VALIDACION` o `DECISION` cambia **solo la nota con la que se ordena**: las ocho notas del
 > currículum de cada fila siguen siendo las del Perfil Integral, porque son de esa etapa siempre.
-> Sin el parámetro se comporta exactamente como antes —así lo llama la criba fina, que decide a
-> quién recalificar por la nota de preselección—, y una etapa que no esté en el catálogo es un 400.
+> Sin el parámetro se comporta exactamente como antes: ordena por la nota de la preselección.
+> Una etapa que no esté en el catálogo es un 400.
 > Quien no tiene nota en la etapa pedida sale al final, sin heredar la de otra.
 >
 > Sigue sin haber un ranking **general** que mezcle las cuatro etapas en una sola nota. La

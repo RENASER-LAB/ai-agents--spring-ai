@@ -581,6 +581,7 @@ Una convocatoria concreta.
 | `version_plantilla_prueba_id` | bigint | no | |
 | `plantilla_evaluacion_id` | bigint | no | |
 | `aplica_evaluacion` | boolean | sí | Apagado, quien postula no recibe la evaluación del banco: va directo a la bandeja del equipo y su única evaluación es la prueba del puesto. Por defecto encendido |
+| `calificacion_automatica` | boolean | sí | Encendido, la postulación se califica y avanza sola hasta que termina la prueba del puesto, y solo entonces espera a una persona. Por defecto **apagado**: en automático cada postulante cuesta una llamada al modelo desde el momento en que postula |
 | `prueba_cierra_en` | timestamptz | no | Cuándo cierra la prueba de esta vacante, para todos. Vacío: se cuentan los días de la versión de la plantilla desde que cada uno empieza |
 | `responsable_usuario_id` | bigint | sí | Quién se hace cargo de contratar |
 | `publicada_en` | timestamptz | no | |

@@ -101,6 +101,29 @@ un cero: son cosas distintas.
 
 ---
 
+## Un solo botón para calificar (10/09/2026)
+
+**Antes había dos y había que pulsarlos en orden.** Una «criba rápida» puntuaba a toda la
+tanda con un modelo barato para ordenarla, y una «criba fina» volvía sobre la parte de
+arriba con el modelo bueno y pisaba aquellas notas. En la práctica nadie miraba las notas de
+la primera, así que era un paso de más — y encima obligaba a hablarle al reclutador de
+«modelos que razonan» y de «notas provisionales», que no son cosa suya.
+
+Ahora es **«Revisar y calificar pendientes»**, y hace lo que dice: recorre la vacante,
+se salta a quien ya tiene su nota y a quien está cerrado —retirado, no continúa o
+contratado—, y califica al resto.
+
+Dos detalles que importan:
+
+- **Quien solo tenga una nota de aquella pasada barata entra igual.** Esa nota era
+  provisional y aquí cuenta como no tenerla.
+- **A quien ya salió del perfil integral se le deja en paz.** Podría estar rindiendo la
+  prueba con el reloj corriendo, y calificarlo lo devolvería a la bandeja anterior.
+
+Lo que se pierde: ya no se puede ordenar una tanda enorme barato antes de gastar en la
+buena. Es a propósito; si algún día aparece una convocatoria de cientos, esto habrá que
+mirarlo otra vez.
+
 ## Flujo de implementación
 
 1. **Descarga la carpeta de Drive** a `cv-convocatoria/` en la raíz del proyecto. Está en el
@@ -163,7 +186,7 @@ node servidor.js
 ```
 
 Queda en `http://localhost:3000` y hace el camino completo desde el navegador: elegir el
-puesto, **arrastrar los currículums**, lanzar las dos pasadas y ver la tabla. Los sube por las
+puesto, **arrastrar los currículums**, pedir la calificación y ver la tabla. Los sube por las
 mismas llamadas del portal que usa el script, así que no hay un segundo camino de entrada que
 mantener.
 
