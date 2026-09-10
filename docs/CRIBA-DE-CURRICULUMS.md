@@ -246,9 +246,9 @@ Dos endpoints más en `PostulacionesPanelController`:
   ya rendido —Perfil Integral y prueba— reescalado sobre la suma de sus dos pesos, con su
   desglose. Vacío si falta cualquiera de las dos notas. **No es la Puntuación Global.** Está
   contado en [Prueba del puesto](PRUEBA-DEL-PUESTO.md) y en [Las APIs](09-APIS.md).
-- **Es una sobrecarga, no un cambio de firma, a propósito**: `cribaFina()` decide a quién
-  recalificar por la nota de preselección y tenía que seguir haciéndolo. Sin el parámetro el
-  camino es el de antes, sin una consulta de más.
+- **Es una sobrecarga, no un cambio de firma, a propósito**: sin pedir etapa, el ranking
+  ordena por la nota de la preselección, que es lo que hacía antes de que existieran las
+  pestañas. Sin el parámetro el camino es el de antes, sin una consulta de más.
 - **El desglose es de solo lectura y nunca da 404.** Sin evaluación asignada devuelve vacíos:
   una vacante publicada con el banco apagado es un caso normal. Lo guarda
   `ver_respuestas_evaluacion`, que estaba en el catálogo desde V12 y no lo comprobaba nadie;
