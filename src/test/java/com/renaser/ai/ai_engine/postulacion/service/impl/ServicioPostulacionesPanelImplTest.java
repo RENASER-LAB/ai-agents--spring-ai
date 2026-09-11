@@ -320,6 +320,40 @@ class ServicioPostulacionesPanelImplTest {
     }
 
     @Test
+    @DisplayName("La ficha dice si quien la abre puede mover la postulación")
+    void laFichaDiceSiSePuedeMover() {
+        // El panel no tiene ninguna otra forma de saberlo: el login solo devuelve el token y
+        // el id, así que sin este booleano la única manera de averiguar si se puede descartar
+        // a alguien sería intentarlo y leer el 403. Es una pista para pintar el botón, no la
+        // defensa —esa sigue siendo el @PreAuthorize de la transición.
+        prepararLaFichaDe(1L);
+
+        assertThat(servicio.ficha(quien, 1L).puedeMoverPostulacion())
+                .as("este contexto solo trae descargar_entregables")
+                .isFalse();
+
+        // El tipo es EQUIPO o CANDIDATO, no el nombre del rol: los roles van en rolIds.
+        ContextoUsuario talento = new ContextoUsuario(10L, 20L, ORGANIZACION, "EQUIPO",
+                List.of(1L), Map.of("mover_postulacion", "TODO"));
+        assertThat(servicio.ficha(talento, 1L).puedeMoverPostulacion()).isTrue();
+    }
+
+    /** El montaje mínimo para que la ficha de esa postulación se pueda armar. */
+    private void prepararLaFichaDe(long postulacionId) {
+        Postulacion p = postulacion(postulacionId, 901L, VACANTE);
+        when(alcanceVacante.laPostulacionVisible(any(), eq(postulacionId), eq("abrir_ficha_candidato")))
+                .thenReturn(p);
+        when(usuarios.findById(901L)).thenReturn(Optional.of(
+                com.renaser.ai.ai_engine.usuario.entity.Usuario.builder()
+                        .id(901L).organizacionId(ORGANIZACION)
+                        .correo("ana@correo.pe").build()));
+        when(nombres.de(901L)).thenReturn("Ana Ruiz");
+        when(vacantes.findById(VACANTE)).thenReturn(Optional.of(vacante()));
+        when(estados.findById("EVALUACION_POR_REVISAR")).thenReturn(Optional.of(estadoTalento()));
+        when(cvs.findByPostulacionId(postulacionId)).thenReturn(Optional.empty());
+    }
+
+    @Test
     @DisplayName("La ficha de una postulación que no es suya responde 404, no 403")
     void laFichaAjenaNoSeAbre() {
         // Que una postulación de vacante ajena no se alcance lo decide y lo prueba

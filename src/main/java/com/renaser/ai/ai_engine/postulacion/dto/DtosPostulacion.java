@@ -17,11 +17,26 @@ public final class DtosPostulacion {
                               String estado, String estadoNombre, String esperaA,
                               String grupoPrioridad, long diasSinCambio) {}
 
+    /**
+     * La ficha de una postulación, con lo que quien la abre puede hacer con ella.
+     *
+     * <p>{@code puedeMoverPostulacion} dice si esta petición tiene {@code mover_postulacion}.
+     * No es un dato de la postulación: es una facultad de quien pregunta, y viaja aquí por
+     * la misma razón que {@code puedeVerPretension} viaja en el ranking —el panel no tiene
+     * ninguna otra forma de saber qué permisos trae la sesión, porque el login solo devuelve
+     * el token y el id—. Sin él, la única manera de averiguar si se puede descartar a alguien
+     * sería intentarlo y leer el 403: enseñar el botón a todo el mundo y que la mitad choque.
+     *
+     * <p>Es una pista para pintar, NUNCA la defensa: quien decide sigue siendo el
+     * {@code @PreAuthorize} de la transición. Un navegador que se invente el {@code true} no
+     * gana nada.
+     */
     public record FichaPostulacion(Long id, String uuid, String candidato, String correo,
                                    String vacante, String estado, String estadoNombre,
                                    String grupoPrioridad, String motivoCierre,
                                    String resultadoOrgulloso, List<String> enlaces,
-                                   Long archivoCvId, Instant creadoEn, Instant movidoEn) {}
+                                   Long archivoCvId, Instant creadoEn, Instant movidoEn,
+                                   boolean puedeMoverPostulacion) {}
 
     public record PasoHistorial(String estadoAnterior, String estadoNuevo, Long usuarioId,
                                 boolean fueElSistema, boolean fuePorLote, String motivo,
@@ -50,9 +65,18 @@ public final class DtosPostulacion {
             @NotBlank(message = "Corregir un dato del curriculum exige un motivo escrito")
             String motivo) {}
 
+    /**
+     * Mover una postulación a mano.
+     *
+     * <p>{@code avisar} nulo significa avisar: es el comportamiento de siempre y el que tiene
+     * que salir cuando quien llama no dijo nada. Solo un {@code false} explícito calla el
+     * correo, y entonces queda escrito que no se avisó —en el motivo y en la auditoría—, porque
+     * si no, un descarte silencioso y uno normal se leen igual seis meses después.
+     */
     public record Transicionar(@NotBlank String estadoDestino,
                                @NotBlank String motivo,
-                               String motivoCierre) {}
+                               String motivoCierre,
+                               Boolean avisar) {}
 
     public record ConfirmarAvance(@NotBlank String motivo) {}
 

@@ -131,6 +131,18 @@ public final class DtosPerfilIntegral {
      * que pide cada candidato. Viaja porque sin él una columna vacía tiene dos lecturas que
      * no se distinguen desde el navegador —nadie lo declaró, o tu rol no puede verlo— y la
      * pantalla se ve obligada a nombrar las dos sin afirmar ninguna.
+     *
+     * <p>{@code puedeMoverPostulacion} dice si quien pregunta puede mover postulaciones, y
+     * está aquí por lo mismo que está en la ficha: <b>el login solo devuelve token e id</b>,
+     * así que el panel no tiene ninguna otra forma de saber qué permisos trae la sesión. Lo
+     * usa la mesa de la tabla para decidir si ofrece descartar a la tanda marcada; sin él,
+     * ese botón saldría para todo el mundo y la mitad del equipo descubriría su rol chocando
+     * contra un 403 con seis personas seleccionadas.
+     *
+     * <p>⚠️ Dice si el permiso <b>está</b>, no hasta dónde llega su alcance: el alcance se
+     * guarda por permiso, así que quien pueda ver esta tanda entera y mover solo las de sus
+     * vacantes verá el botón y recibirá un 404 en las que no le tocan. Es una pista para
+     * pintar, nunca la defensa.
      */
     public record RankingVacante(
             Long vacanteId,
@@ -143,6 +155,7 @@ public final class DtosPerfilIntegral {
             int enCurso,
             int fallidos,
             boolean puedeVerPretension,
+            boolean puedeMoverPostulacion,
             List<FilaRanking> filas) {}
 
     /**
