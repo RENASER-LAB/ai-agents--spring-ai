@@ -166,6 +166,11 @@ class ServicioPerfilIntegralPanelImplTest {
                         .findByIdAndOrganizacionId(i.getArgument(1), ORGANIZACION)
                         .orElseThrow(() -> new ResourceNotFoundException(
                                 "Postulación", "id", i.getArgument(1))));
+        // Por defecto todo el mundo sigue en el Perfil Integral: es donde está quien espera
+        // una nota. Los tests que quieren a alguien que ya avanzó lo dicen ellos.
+        lenient().when(maquina.sigueEnLaEtapa(
+                        org.mockito.ArgumentMatchers.any(), eq("PERFIL_INTEGRAL")))
+                .thenReturn(true);
     }
 
     // ============ El ranking de otra etapa ============
@@ -736,70 +741,79 @@ class ServicioPerfilIntegralPanelImplTest {
         assertThat(filas.get(0).notaCurriculum()).isNull();
     }
 
-    // ============ La segunda pasada ============
+    // ============ A quién alcanza el botón de calificar la tanda ============
 
     @Test
-    void laSegundaPasadaSeNiegaSiTodaviaNadieTieneNota() {
-        // El fallo que se arregló. Es un error fácil de cometer —basta pulsar el botón
-        // mientras la tanda se está cargando— y caro de descubrir, porque encolar no falla:
-        // se gasta el modelo que razona en la mitad de la lista elegida por el apellido.
-        candidatos(candidato(1L, null, null), candidato(2L, null, null));
-
-        assertThatThrownBy(() -> servicio.cribaFina(quien, VACANTE))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("orden alfabético");
-
-        verify(cola, never()).encolarCribaFina(anyLong());
-    }
-
-    @Test
-    void elCorteSeCalculaSobreLosQueTienenNotaNoSobreLaListaEntera() {
-        // Seis candidatos y solo tres calificados: la mitad son dos, no tres. Contar los
-        // seis metería en el corte a alguien de quien no se sabe nada.
-        candidatos(candidato(1L, "ALTA", "90"), candidato(2L, "ALTA", "80"),
-                   candidato(3L, "ALTA", "70"), candidato(4L, null, null),
-                   candidato(5L, null, null), candidato(6L, null, null));
-        when(parametros.entero(ORGANIZACION, "porcentaje_criba_fina", 50)).thenReturn(50);
-        lenient().when(cola.encolarCribaFina(anyLong())).thenReturn(true);
-
-        servicio.cribaFina(quien, VACANTE);
-
-        verify(cola).encolarCribaFina(1L);
-        verify(cola).encolarCribaFina(2L);
-        verify(cola, never()).encolarCribaFina(3L);
-    }
-
-    @Test
-    void elCorteEsAlMenosUno() {
-        // Con tres candidatos y un corte del 20 % la cuenta da cero, y una segunda pasada
-        // que no mira a nadie no es una segunda pasada: es un botón que no hace nada.
-        candidatos(candidato(1L, "ALTA", "90"), candidato(2L, "ALTA", "80"),
-                   candidato(3L, "ALTA", "70"));
-        when(parametros.entero(ORGANIZACION, "porcentaje_criba_fina", 50)).thenReturn(20);
-
-        servicio.cribaFina(quien, VACANTE);
-
-        verify(cola).encolarCribaFina(1L);
-        verify(cola, never()).encolarCribaFina(2L);
-    }
-
-    @Test
-    void quienYaPasoPorLaFinaNoRepite() {
-        // La fina es la definitiva: volver a pedirla cuesta lo mismo y no cambia nada.
+    void quienYaTieneLaNotaDefinitivaNoRepite() {
+        // Repetirlo cuesta lo mismo y no cambia nada. Para rehacer uno concreto está el
+        // botón de su ficha, que es una decisión de alguien con nombre y apellido.
+        Postulacion ya = candidato(1L, "ALTA", "90");
+        Postulacion falta = candidato(2L, null, null);
+        conCurriculum(ya, falta);
         yaPasoPorLaFina(1L);
-        candidatos(candidato(1L, "ALTA", "90"), candidato(2L, "ALTA", "80"));
-        when(parametros.entero(ORGANIZACION, "porcentaje_criba_fina", 50)).thenReturn(100);
+        sinRetrato(2L);
+        candidatos(ya, falta);
+        when(cola.encolarCribaFina(2L)).thenReturn(true);
 
-        servicio.cribaFina(quien, VACANTE);
+        assertThat(servicio.calificarTanda(quien, VACANTE).candidatos()).isEqualTo(1);
+
+        verify(cola).encolarCribaFina(2L);
+        verify(cola, never()).encolarCribaFina(1L);
+    }
+
+    @Test
+    @DisplayName("Una nota de la pasada barata que se retiró no cuenta como nota")
+    void laNotaProvisionalSeVuelveACalificar() {
+        // Hasta la V53 había dos pasadas: una barata que dejaba notas provisionales y otra
+        // que las pisaba. La barata se retiró, pero sus notas siguen en la base. Tratarlas
+        // como definitivas dejaría a esa gente con una nota que nadie quiso dar por buena.
+        Postulacion provisional = candidato(1L, "ALTA", "88");
+        conCurriculum(provisional);
+        estadosDeLaTanda.put(1L, new ColaCalificacionIa.Estado("TERMINADA", "RAPIDA"));
+        candidatos(provisional);
+        when(cola.encolarCribaFina(1L)).thenReturn(true);
+
+        assertThat(servicio.calificarTanda(quien, VACANTE).candidatos()).isEqualTo(1);
+
+        verify(cola).encolarCribaFina(1L);
+    }
+
+    @Test
+    void aQuienYaAvanzoNoSeLeArrastraHaciaAtras() {
+        // El fallo que este botón podía introducir. Alcanza a quien no tiene nota definitiva,
+        // y ahí entra alguien cuya calificación falló y que ya está rindiendo la prueba con
+        // el reloj corriendo. Moverlo a «calificando» le quita un turno que ya le dieron.
+        Postulacion enLaPrueba = candidato(1L, null, null);
+        Postulacion enSuSitio = candidato(2L, null, null);
+        conCurriculum(enLaPrueba, enSuSitio);
+        sinRetrato(1L, 2L);
+        candidatos(enLaPrueba, enSuSitio);
+        when(maquina.sigueEnLaEtapa(enLaPrueba, "PERFIL_INTEGRAL")).thenReturn(false);
+        when(cola.encolarCribaFina(2L)).thenReturn(true);
+
+        assertThat(servicio.calificarTanda(quien, VACANTE).candidatos()).isEqualTo(1);
 
         verify(cola, never()).encolarCribaFina(1L);
-        verify(cola).encolarCribaFina(2L);
+        verify(maquina, never()).transicionar(eq(enLaPrueba), anyString(), any(), any(),
+                anyBoolean(), anyBoolean(), any());
+    }
+
+    @Test
+    void sinCurriculumNoHayNadaQueCalificar() {
+        // El agente lee el currículum: sin archivo no tiene insumo, y encolarlo sería gastar
+        // una vuelta de cola para que se plante.
+        Postulacion sinArchivo = candidato(1L, null, null);
+        sinRetrato(1L);
+        candidatos(sinArchivo);
+
+        assertThat(servicio.calificarTanda(quien, VACANTE).candidatos()).isZero();
+        verify(cola, never()).encolarCribaFina(anyLong());
     }
 
     // ============ A quién no toca ninguna criba ============
 
     @Test
-    void laCribaRapidaNoResucitaAQuienYaTermino() {
+    void calificarLaTandaNoResucitaAQuienYaTermino() {
         // El fallo que se arregló. Un retirado, un contratado y un descartado siguen en la
         // vacante con su currículum puesto: barrerla sin mirar el estado los devolvía a «por
         // confirmar», a la bandeja de alguien, y pagaba el modelo por cada uno.
@@ -810,13 +824,13 @@ class ServicioPerfilIntegralPanelImplTest {
         conCurriculum(viva, contratado, retirado);
         sinRetrato(1L, 2L, 3L);
         candidatos(viva, contratado, retirado);
-        when(cola.encolarCribaRapida(1L)).thenReturn(true);
+        when(cola.encolarCribaFina(1L)).thenReturn(true);
 
-        servicio.cribaRapida(quien, VACANTE);
+        servicio.calificarTanda(quien, VACANTE);
 
-        verify(cola).encolarCribaRapida(1L);
-        verify(cola, never()).encolarCribaRapida(2L);
-        verify(cola, never()).encolarCribaRapida(3L);
+        verify(cola).encolarCribaFina(1L);
+        verify(cola, never()).encolarCribaFina(2L);
+        verify(cola, never()).encolarCribaFina(3L);
     }
 
     @Test
@@ -837,9 +851,9 @@ class ServicioPerfilIntegralPanelImplTest {
     // ============ Los botones cuentan lo que de verdad encolaron ============
 
     @Test
-    @DisplayName("La criba rápida mira la tanda en bloque, no candidato a candidato")
-    void laCribaRapidaNoPreguntaUnaVezPorCandidato() {
-        // La tanda de una criba es la misma que pinta el ranking: crece con los candidatos
+    @DisplayName("Calificar la tanda la mira en bloque, no candidato a candidato")
+    void calificarLaTandaNoPreguntaUnaVezPorCandidato() {
+        // La tanda es la misma que pinta el ranking: crece con los candidatos
         // que se apunten. Preguntar por fila con qué pasada está cada uno y si tiene
         // currículum eran dos consultas por persona antes siquiera de decidir si se encola.
         Postulacion[] tanda = new Postulacion[60];
@@ -851,9 +865,9 @@ class ServicioPerfilIntegralPanelImplTest {
         conCurriculum(tanda);
         sinRetrato(ids);
         candidatos(tanda);
-        lenient().when(cola.encolarCribaRapida(anyLong())).thenReturn(true);
+        lenient().when(cola.encolarCribaFina(anyLong())).thenReturn(true);
 
-        assertThat(servicio.cribaRapida(quien, VACANTE).candidatos()).isEqualTo(60);
+        assertThat(servicio.calificarTanda(quien, VACANTE).candidatos()).isEqualTo(60);
 
         verify(cvs, times(1)).findByPostulacionIdIn(anyList());
         verify(cola, times(1)).estadoDe(anyList());
@@ -864,7 +878,7 @@ class ServicioPerfilIntegralPanelImplTest {
     }
 
     @Test
-    void laCribaRapidaSoloCuentaAQuienDeVerdadQuedoEnLaCola() {
+    void calificarLaTandaSoloCuentaAQuienDeVerdadQuedoEnLaCola() {
         // Antes se sumaba siempre. Un segundo clic respondía «2 en cola» sin haber encolado
         // a nadie, y ese número falso quedaba escrito también en la auditoría, que es donde
         // alguien va a mirar dentro de tres meses.
@@ -873,10 +887,10 @@ class ServicioPerfilIntegralPanelImplTest {
         conCurriculum(uno, dos);
         sinRetrato(1L, 2L);
         candidatos(uno, dos);
-        when(cola.encolarCribaRapida(1L)).thenReturn(true);
-        when(cola.encolarCribaRapida(2L)).thenReturn(false);
+        when(cola.encolarCribaFina(1L)).thenReturn(true);
+        when(cola.encolarCribaFina(2L)).thenReturn(false);
 
-        assertThat(servicio.cribaRapida(quien, VACANTE).candidatos()).isEqualTo(1);
+        assertThat(servicio.calificarTanda(quien, VACANTE).candidatos()).isEqualTo(1);
         // Y a quien no se encoló tampoco se le mueve el estado: seguiría diciendo que se le
         // está calificando cuando no hay nada calificándose.
         verify(maquina, never()).transicionar(eq(dos), anyString(), any(), any(),
@@ -908,10 +922,10 @@ class ServicioPerfilIntegralPanelImplTest {
         when(alcanceVacante.laVacanteVisible(any(), eq(VACANTE), eq("ajustar_nota")))
                 .thenThrow(new ResourceNotFoundException("Vacante", "id", VACANTE));
 
-        assertThatThrownBy(() -> servicio.cribaRapida(quien, VACANTE))
+        assertThatThrownBy(() -> servicio.calificarTanda(quien, VACANTE))
                 .isInstanceOf(ResourceNotFoundException.class);
 
-        verify(cola, never()).encolarCribaRapida(anyLong());
+        verify(cola, never()).encolarCribaFina(anyLong());
         // Y lo que fija esta prueba: se pregunta por el permiso del endpoint, no por el otro.
         verify(alcanceVacante, never()).laVacanteVisible(any(), eq(VACANTE), eq("ver_embudo"));
     }
@@ -953,7 +967,7 @@ class ServicioPerfilIntegralPanelImplTest {
         }
     }
 
-    /** Nadie le ha hecho todavía el retrato: es a quien la criba rápida tiene que mirar. */
+    /** Nadie le ha hecho todavía el retrato: es a quien el botón de la tanda tiene que mirar. */
     private void sinRetrato(Long... postulacionIds) {
         for (Long id : postulacionIds) {
             estadosDeLaTanda.put(id, new ColaCalificacionIa.Estado("SIN_EMPEZAR", null));

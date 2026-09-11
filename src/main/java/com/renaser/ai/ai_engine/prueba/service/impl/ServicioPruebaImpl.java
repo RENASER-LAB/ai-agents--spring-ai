@@ -72,6 +72,7 @@ public class ServicioPruebaImpl implements ServicioPrueba {
     private final PostulacionRepository postulaciones;
     private final AlmacenArchivos almacen;
     private final MaquinaEstados maquina;
+    private final com.renaser.ai.ai_engine.ai.service.ColaCalificacionIa cola;
 
     private final SecureRandom azar = new SecureRandom();
 
@@ -344,6 +345,27 @@ public class ServicioPruebaImpl implements ServicioPrueba {
         // Del sistema si es automática; si no, sigue siendo el candidato quien la
         // disparó, pero la transición en sí la hace el sistema: no hay motivo que pedir.
         maquina.transicionar(postulacion, "PRUEBA_CALIFICANDO", null, null, true, false, null);
+
+        /*
+         * Y si la vacante califica sola, se pide la nota aquí mismo.
+         *
+         * <p>Hasta la V53 esto acababa en la línea de arriba: la prueba quedaba «calificando»
+         * y ahí se estaba hasta que alguien abriera el panel y pulsara el botón. El
+         * cuestionario técnico —el otro instrumento de esta misma etapa— sí se calificaba
+         * solo desde el ciclo 2, así que el mismo estado significaba dos cosas distintas
+         * según lo que rindiera la vacante. Aquí se igualan.
+         *
+         * <p><b>No se comprueba la rúbrica antes.</b> Sería tentador saltarse la cola cuando
+         * no hay ni un criterio para el agente, pero el agente ya se planta solo en ese caso
+         * y sin llamar al modelo — así que no se paga nada— y a cambio hace algo que hace
+         * falta: mueve la postulación a «por confirmar». Sin encolar, una prueba que califica
+         * una persona entera se quedaría en «calificando» para siempre, esperando a un agente
+         * que nadie iba a llamar.
+         */
+        Vacante vacante = vacantes.findById(postulacion.getVacanteId()).orElse(null);
+        if (vacante != null && vacante.isCalificacionAutomatica()) {
+            cola.encolarPruebaPuesto(postulacion.getId());
+        }
     }
 
     private void sortearCambio(IntentoPrueba intento, VersionPlantillaPrueba version) {

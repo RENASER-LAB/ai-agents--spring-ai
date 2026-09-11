@@ -90,6 +90,10 @@ class PuenteCalificacionIaNoPisaAvancesTest {
     @Mock private ServicioCalificacion calificacion;
     @Mock private ServicioParametros parametros;
     @Mock private MaquinaEstados maquina;
+    // Desde la V53, al cerrar el retrato se avisa de que terminó para que las vacantes
+    // automáticas puedan avanzar solas. Aquí no se comprueba a quién llega ese aviso: lo que
+    // se prueba es a quién se mueve y a quién no.
+    @Mock private org.springframework.context.ApplicationEventPublisher avisos;
 
     @InjectMocks
     private PuenteCalificacionIaImpl puente;
@@ -113,7 +117,22 @@ class PuenteCalificacionIaNoPisaAvancesTest {
             p.setId(11L);
             return p;
         });
-        lenient().when(pesosComponente.findByVersionPesosId(2L)).thenReturn(List.of());
+        /*
+          Con peso de verdad, y no una lista vacía.
+
+          Sin ningún componente con peso NO hay nota que calcular —y desde la V53 tampoco se
+          escribe ninguna—, así que la lista vacía dejaba estas pruebas afirmando que la nota
+          «se guarda igual» sobre un caso en el que no hay nota que guardar. Lo que aquí se
+          prueba es a quién se mueve y a quién no, con un candidato normal.
+
+          El peso va en la EVALUACIÓN y no en el currículum porque la nota de la evaluación es
+          la que estos dobles saben dar (`resumenDeLoCerrado`, ahí abajo); la del currículum
+          sale de los criterios, que aquí están vacíos a propósito.
+        */
+        lenient().when(pesosComponente.findByVersionPesosId(2L)).thenReturn(List.of(
+                com.renaser.ai.ai_engine.pesos.entity.PesoComponentePerfil.builder()
+                        .versionPesosId(2L).componente("EVALUACION")
+                        .peso(java.math.BigDecimal.valueOf(100)).build()));
         lenient().when(calificacion.resumenDeLoCerrado(POSTULACION))
                 .thenReturn(new ServicioCalificacion.ResumenCerrado(new BigDecimal("70"), 20));
         lenient().when(notasEtapa.findByPostulacionIdAndEtapaCodigo(POSTULACION, "PERFIL_INTEGRAL"))
@@ -155,6 +174,31 @@ class PuenteCalificacionIaNoPisaAvancesTest {
         verify(perfiles).save(any(PerfilTalento.class));
         verify(notasEtapa).save(any(NotaEtapa.class));
         assertThat(postulacion.getGrupoPrioridad()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("sin ningún componente con peso, la nota que hubiera se queda como estaba")
+    void sinPesosLaNotaViejaNoSeVuelveAFirmar() {
+        /*
+          El caso de Administración, y la mitad que se escapaba del arreglo del cero falso.
+
+          Cuando ningún componente tiene peso no hay nada que calcular. Al recién llegado se
+          le deja sin nota —eso ya estaba—, pero al que YA tenía una se le volvía a guardar
+          la vieja firmada con la versión de pesos NUEVA y con la fecha de hoy: quedaba
+          escrito que su 70 se calculó con una versión que no le da peso a nada.
+
+          Dos candidatos idénticos ordenaban al revés —el nuevo al final sin nota, el antiguo
+          con su 70 intacto— y la versión de pesos dejaba de servir para reconstruir la
+          decisión, que es justo para lo que se guarda.
+        */
+        when(pesosComponente.findByVersionPesosId(2L)).thenReturn(List.of());
+
+        puente.cerrarPerfilIntegral(POSTULACION, EJECUCION_IA, resultado());
+
+        // Ni se pisa ni se re-firma: no se escribe nada en absoluto.
+        verify(notasEtapa, never()).save(any(NotaEtapa.class));
+        // Y el retrato sí se guarda: lo que no se puede calcular es la nota de la etapa.
+        verify(perfiles).save(any(PerfilTalento.class));
     }
 
     private static boolean anyBoolean() {

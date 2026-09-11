@@ -96,26 +96,27 @@ public interface ServicioPerfilIntegralPanel {
     RankingVacante ranking(ContextoUsuario quien, Long vacanteId, String etapaCodigo);
 
     /**
-     * Primera pasada sobre la tanda entera: rápida, para ordenar.
+     * Calificar a todos los de la tanda a los que todavía les falta su nota.
      *
-     * <p>Encola a todos los que aún no tienen retrato. Diez currículums tardan medio minuto
-     * porque el modelo contesta sin razonar y porque van en paralelo.
+     * <p>Recorre la vacante entera y encola a quien no tiene nota definitiva, con el
+     * modelo cuidadoso —el único que se usa ya— que en la misma corrida saca los datos del
+     * candidato y lo puntúa. Se salta a quien ya la tiene y a quien está cerrado: retirado,
+     * no continúa o contratado.
      *
-     * <p>Lo que sale es un orden, no un veredicto. Sirve para separar la mitad de abajo,
-     * donde la decisión es fácil y los dos modelos coinciden.
+     * <p><b>Hasta la V53 esto eran dos botones.</b> Había una primera pasada barata para
+     * ordenar y una segunda, cara, solo sobre la parte alta. En la práctica nadie miraba
+     * las notas de la primera, y obligar a lanzarla antes era un paso de más que además
+     * enseñaba conceptos internos —«provisional», «el modelo que razona»— a quien solo
+     * quiere ver quién es el más apto. Se perdió la posibilidad de ordenar barato una tanda
+     * enorme; se ganó un botón que hace lo que dice.
+     *
+     * <p><b>Quien solo tenga una nota vieja de aquella primera pasada entra igual</b>: esa
+     * nota era provisional, y aquí cuenta como no tenerla.
+     *
+     * <p>No devuelve ninguna nota: encola. Lo único cierto al volver de aquí es qué se
+     * pidió y para cuánta gente.
      */
-    PasadaEncolada cribaRapida(ContextoUsuario quien, Long vacanteId);
-
-    /**
-     * Segunda pasada, solo sobre los de arriba: cuidadosa, para decidir.
-     *
-     * <p>Vuelve a calificar con el modelo que razona a la parte alta de la tanda —cuánta,
-     * lo dice el parámetro {@code porcentaje_criba_fina}— y pisa las notas provisionales.
-     *
-     * <p>Se pide después de la primera y no a la vez, porque cuál es «arriba» no se sabe
-     * hasta que la primera termina de ordenar a todos.
-     */
-    PasadaEncolada cribaFina(ContextoUsuario quien, Long vacanteId);
+    PasadaEncolada calificarTanda(ContextoUsuario quien, Long vacanteId);
 
     /**
      * Reemplaza el currículum de una postulación que ya existe, desde el panel.

@@ -64,22 +64,13 @@ public class PostulacionesPanelController {
                 : perfilIntegral.ranking(permisos.actual(), id, etapa);
     }
 
-    @PostMapping("/vacantes/{id}/criba-rapida")
+    @PostMapping("/vacantes/{id}/calificar-tanda")
     @PreAuthorize("@permisos.tiene('ajustar_nota')")
-    @Operation(summary = "Primera pasada sobre la tanda entera: el modelo contesta sin razonar "
-            + "y en paralelo. Diez currículums tardan alrededor de medio minuto. Sirve para "
-            + "ordenar, no para decidir")
-    public PasadaEncolada cribaRapida(@PathVariable Long id) {
-        return perfilIntegral.cribaRapida(permisos.actual(), id);
-    }
-
-    @PostMapping("/vacantes/{id}/criba-fina")
-    @PreAuthorize("@permisos.tiene('ajustar_nota')")
-    @Operation(summary = "Segunda pasada, solo sobre la parte alta de la tanda: el modelo que "
-            + "razona vuelve a calificarlos y pisa las notas provisionales. Cuánta parte, lo "
-            + "dice el parámetro «porcentaje_criba_fina»")
-    public PasadaEncolada cribaFina(@PathVariable Long id) {
-        return perfilIntegral.cribaFina(permisos.actual(), id);
+    @Operation(summary = "Califica a todos los de la tanda a los que les falta la nota. Se "
+            + "salta a quien ya la tiene y a quien está cerrado. No devuelve notas: encola, y "
+            + "tarda alrededor de un minuto y medio por cada diez currículums")
+    public PasadaEncolada calificarTanda(@PathVariable Long id) {
+        return perfilIntegral.calificarTanda(permisos.actual(), id);
     }
 
     @GetMapping("/postulaciones/{id}")

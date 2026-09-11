@@ -483,7 +483,7 @@ public class FlujoCalificacionIaIT {
     @DisplayName("La criba rápida lee la tanda sin razonar y salta al evaluador")
     @Test
     @Order(3)
-    void laCribaRapidaLeeLaTandaSinRazonarYSaltaAlEvaluador() throws Exception {
+    void calificarLaTandaAlcanzaAQuienLeFaltaLaNota() throws Exception {
         ModeloDePrueba.falla = false;
         ModeloDePrueba.razonoPorAgente.clear();
 
@@ -492,43 +492,45 @@ public class FlujoCalificacionIaIT {
         String reciénLlegadoA = postularConCurriculumReal("ana@correo.pe");
         String reciénLlegadoB = postularConCurriculumReal("beto@correo.pe");
 
-        String respuesta = conToken(post("/api/v1/panel/vacantes/" + vacanteId + "/criba-rapida"),
+        String respuesta = conToken(post("/api/v1/panel/vacantes/" + vacanteId + "/calificar-tanda"),
                 tokenEquipo, null)
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.estado").value("ENCOLADA"))
                 .andReturn().getResponse().getContentAsString();
 
-        // Tres y no cuatro. Camila ya tiene su retrato de la pasada fina y se salta sola;
-        // Luis no lo tiene —su intento falló y no se le inventó ninguna nota— así que
-        // vuelve a entrar. Eso es la regla de «no calificar dos veces», por los dos lados.
+        // Tres y no cuatro. Camila ya tiene su nota definitiva y se salta sola; Luis no la
+        // tiene —su intento falló y no se le inventó ninguna— así que vuelve a entrar. Eso
+        // es la regla de «no calificar dos veces», por los dos lados.
         assertThat(json.readTree(respuesta).get("candidatos").asInt()).isEqualTo(3);
 
         long idA = idDe(reciénLlegadoA);
         long idB = idDe(reciénLlegadoB);
 
-        esperarA(() -> contar("""
-                select count(*) from trabajo_ia
-                where modo = 'RAPIDA' and estado = 'TERMINADO'""") == 9,
-                "los tres agentes de la pasada rápida terminen con los tres candidatos");
+        esperarA(() -> "PERFIL_POR_CONFIRMAR".equals(jdbc.queryForObject(
+                        "select estado_codigo from postulacion where id = ?", String.class, idA))
+                && "PERFIL_POR_CONFIRMAR".equals(jdbc.queryForObject(
+                        "select estado_codigo from postulacion where id = ?", String.class, idB)),
+                "los dos recién llegados terminen su retrato");
 
-        // 1 · Ni una sola llamada razonó. Si esto se rompe, la pasada rápida tarda lo mismo
-        // que la cuidadosa y las dos dejan de tener sentido por separado.
+        // 1 · Los agentes que JUZGAN razonaron todos. Es la única pasada que queda: hasta la
+        // V53 había otra barata que no razonaba y dejaba notas provisionales que nadie
+        // miraba, y que obligaba a pulsar dos botones para llegar a la nota que sí se usa.
+        //
+        // El que saca la ficha de datos no entra en la cuenta y no es un olvido: no juzga
+        // nada, copia del currículum lo que ya está escrito. Hacerle razonar sería pagar
+        // más por el mismo dato.
         assertThat(ModeloDePrueba.razonoPorAgente)
                 .isNotEmpty()
-                .allSatisfy(llamada -> assertThat(llamada).endsWith(":false"));
+                .filteredOn(llamada -> !llamada.startsWith("DATOS_CV"))
+                .isNotEmpty()
+                .allSatisfy(llamada -> assertThat(llamada).endsWith(":true"));
 
-        // 2 · El evaluador no se llamó: sin respuestas entregadas no tenía nada que puntuar
-        assertThat(ModeloDePrueba.razonoPorAgente)
-                .noneMatch(llamada -> llamada.startsWith("EVALUADOR"));
+        // 2 · A los dos recién llegados no se les llamó al evaluador: no han entregado nada,
+        // así que no había respuestas que puntuar
         assertThat(contar("""
                 select count(*) from trabajo_ia
-                where modo = 'RAPIDA' and agente_codigo = 'EVALUADOR'""")).isZero();
-
-        // Y sí corrieron los tres que sí tocaban, en su orden
-        assertThat(jdbc.queryForList("""
-                select distinct agente_codigo from trabajo_ia where modo = 'RAPIDA'
-                order by agente_codigo""", String.class))
-                .containsExactly("DATOS_CV", "EVIDENCIA_CV", "POTENCIAL_RIESGO");
+                where agente_codigo = 'EVALUADOR' and postulacion_id in (%s, %s)"""
+                .formatted(idA, idB))).isZero();
 
         // 3 · La ficha de datos, que es lo que hace legible la tabla sin abrir un PDF
         Map<String, Object> ficha = jdbc.queryForMap(
@@ -561,7 +563,7 @@ public class FlujoCalificacionIaIT {
         }
 
         // 6 · Pedirla otra vez no cuesta nada: ya no queda nadie sin calificar
-        String segunda = conToken(post("/api/v1/panel/vacantes/" + vacanteId + "/criba-rapida"),
+        String segunda = conToken(post("/api/v1/panel/vacantes/" + vacanteId + "/calificar-tanda"),
                 tokenEquipo, null)
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
@@ -649,8 +651,10 @@ public class FlujoCalificacionIaIT {
             }
         }
         assertThat(calificada).isNotNull();
-        // De qué pasada viene su nota: una de la rápida es provisional y hay que saberlo
-        assertThat(calificada.get("pasada").asText()).isIn("RAPIDA", "FINA");
+        // De qué pasada viene su nota. Desde la V53 solo hay una, pero la columna sigue:
+        // en la base quedan notas de la pasada barata que se retiró, y una nota provisional
+        // y una definitiva se ven igual —un número— sin que valgan lo mismo.
+        assertThat(calificada.get("pasada").asText()).isEqualTo("FINA");
         // Con qué archivo se le puede encontrar en la carpeta del equipo
         assertThat(calificada.get("archivoNombre").asText()).isEqualTo("cv.pdf");
         // Y quién es, sin abrir el PDF
@@ -676,111 +680,6 @@ public class FlujoCalificacionIaIT {
             sumaPesos = sumaPesos.add(nota.get("peso").decimalValue());
         }
         assertThat(sumaPesos).isPositive();
-    }
-
-    /**
-     * La segunda pasada, solo sobre la parte alta de la tanda.
-     *
-     * <p>Aquí el modelo sí razona, y sus notas pisan las provisionales. Lo que importa es
-     * que no se gaste en la tanda entera: si volviera a mirar a todos, la primera pasada no
-     * habría ahorrado nada.
-     */
-    @DisplayName("La criba fina vuelve solo sobre los de arriba, y esa sí razona")
-    @Test
-    @Order(5)
-    void laCribaFinaVuelveSoloSobreLosDeArribaYEsaSiRazona() throws Exception {
-        ModeloDePrueba.razonoPorAgente.clear();
-
-        // Todos los candidatos reciben la misma respuesta del doble, así que sus notas
-        // empatan y el orden entre ellos no se puede predecir desde aquí. Lo que sí se
-        // puede es leer la lista y calcular el corte con la misma cuenta que hace el
-        // sistema: se busca al primero que todavía viene de la pasada rápida y se pone el
-        // porcentaje justo para que el corte llegue hasta él y no más allá.
-        JsonNode antes = json.readTree(conToken(
-                get("/api/v1/panel/vacantes/" + vacanteId + "/ranking"), tokenEquipo, null)
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString());
-
-        List<String> pasadas = new ArrayList<>();
-        for (JsonNode fila : antes.get("filas")) {
-            if (!fila.get("notaEtapa").isNull()) {
-                pasadas.add(fila.get("pasada").asText());
-            }
-        }
-        int conNota = pasadas.size();
-        int hastaDonde = pasadas.indexOf("RAPIDA") + 1;
-        assertThat(hastaDonde)
-                .withFailMessage("Para esta prueba tiene que quedar alguien con nota "
-                        + "provisional de la pasada rápida")
-                .isPositive();
-        int porcentaje = (int) Math.ceil(hastaDonde * 100.0 / conNota);
-
-        // Un corte de verdad: mira a los de arriba y deja fuera al resto. Si esto dejara de
-        // ser cierto, la primera pasada no habría ahorrado nada.
-        assertThat(hastaDonde).isLessThan(conNota);
-
-        jdbc.update("update parametro set valor = ? where codigo = 'porcentaje_criba_fina'",
-                String.valueOf(porcentaje));
-
-        int conNotaAntes = contar(
-                "select count(*) from nota_etapa where etapa_codigo = 'PERFIL_INTEGRAL'");
-        int finasAntes = contar("""
-                select count(*) from trabajo_ia
-                where modo = 'FINA' and agente_codigo = 'POTENCIAL_RIESGO'
-                  and estado = 'TERMINADO'""");
-
-        String respuesta = conToken(post("/api/v1/panel/vacantes/" + vacanteId + "/criba-fina"),
-                tokenEquipo, null)
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.estado").value("ENCOLADA"))
-                .andReturn().getResponse().getContentAsString();
-
-        // Solo los que entraron en el corte y todavía no habían pasado por la fina: quien
-        // ya la tiene no repite, porque la suya es la definitiva.
-        long esperados = pasadas.subList(0, hastaDonde).stream()
-                .filter(p -> !"FINA".equals(p)).count();
-        int encolados = json.readTree(respuesta).get("candidatos").asInt();
-        assertThat(encolados)
-                .withFailMessage("La segunda pasada tiene que mirar a los de arriba y solo a "
-                        + "ellos, saltándose a quien ya pasó por ella")
-                .isEqualTo((int) esperados);
-
-        esperarA(() -> contar("""
-                select count(*) from trabajo_ia
-                where modo = 'FINA' and agente_codigo = 'POTENCIAL_RIESGO'
-                  and estado = 'TERMINADO'""") == finasAntes + encolados,
-                "la segunda pasada termine con los de arriba");
-
-        // 1 · Esta sí razona: es lo que la hace lenta y lo que la hace fiable
-        assertThat(ModeloDePrueba.razonoPorAgente)
-                .isNotEmpty()
-                .allSatisfy(llamada -> assertThat(llamada).endsWith(":true"));
-
-        // 2 · Y a nadie se le sacó la ficha de datos dos veces. Ese paso está en las dos
-        // filas, pero se salta solo cuando la ficha ya existe: son datos copiados del
-        // currículum, no notas, y no cambian salvo que cambie el archivo.
-        assertThat(contar("""
-                select count(*) from (
-                    select postulacion_id from trabajo_ia
-                    where agente_codigo = 'DATOS_CV' and estado = 'TERMINADO'
-                    group by postulacion_id having count(*) > 1) repetidos"""))
-                .withFailMessage("Alguien pagó su ficha de datos dos veces: la segunda pasada "
-                        + "tiene que saltarse ese paso cuando la ficha ya está sacada")
-                .isZero();
-
-        // 3 · Nadie perdió su nota por volver a pasar: se pisan, no se borran
-        assertThat(contar("select count(*) from nota_etapa where etapa_codigo = 'PERFIL_INTEGRAL'"))
-                .isEqualTo(conNotaAntes);
-
-        // 4 · Y su nota deja de ser provisional: el ranking ya los cuenta como pasada fina
-        JsonNode despues = json.readTree(conToken(
-                get("/api/v1/panel/vacantes/" + vacanteId + "/ranking"), tokenEquipo, null)
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString());
-        assertThat(despues.get("conPasadaFina").asInt())
-                .isEqualTo(antes.get("conPasadaFina").asInt() + encolados);
-
-        jdbc.update("update parametro set valor = '50' where codigo = 'porcentaje_criba_fina'");
     }
 
     /**
@@ -833,25 +732,102 @@ public class FlujoCalificacionIaIT {
     }
 
     /**
-     * Pedir la segunda pasada antes de que exista una primera.
+     * Con banco de preguntas, el pase automático espera a que el candidato lo entregue.
      *
-     * <p>Sin ninguna nota, «los de arriba» no existen y la lista sale por orden alfabético:
-     * la pasada cuidadosa se gastaría en quien tocó por la letra de su apellido. Es un error
-     * fácil de cometer —basta pulsar el botón mientras la tanda se está cargando— y caro de
-     * descubrir, porque no falla: califica, y califica a quien no era.
+     * <p>Es la guarda que evita el peor fallo posible de todo esto. Sin ella, pulsar
+     * «calificar la tanda» alcanza a quien está en su turno y todavía no ha respondido
+     * nada: se le arma el retrato con el currículum a solas —el evaluador se salta porque
+     * no hay respuestas que puntuar— y se le empuja a la prueba del puesto sin haber
+     * contestado nunca su evaluación.
      */
-    @DisplayName("La segunda pasada se niega si todavía no hay ninguna nota")
+    @DisplayName("Con banco, el pase automático espera a que lo entregue")
     @Test
     @Order(7)
-    void laSegundaPasadaSeNiegaSiTodaviaNoHayNingunaNota() throws Exception {
-        long vacanteVacia = crearVacanteSinCandidatos();
-        int trabajosAntes = contar("select count(*) from trabajo_ia");
+    void conBancoNoSeAvanzaAQuienTodaviaNoHaRespondido() throws Exception {
+        ModeloDePrueba.falla = false;
+        // La vacante sigue con su banco encendido; lo único que cambia es el interruptor.
+        conToken(post("/api/v1/panel/vacantes/" + vacanteId + "/calificacion-automatica"),
+                tokenEquipo, "{\"activa\": true}").andExpect(status().isOk());
 
-        conToken(post("/api/v1/panel/vacantes/" + vacanteVacia + "/criba-fina"), tokenEquipo, null)
-                .andExpect(status().isConflict());
+        String codigo = postularConCurriculumReal("elsa@correo.pe");
+        long id = idDe(codigo);
+        assertThat(jdbc.queryForObject(
+                "select estado_codigo from postulacion where id = ?", String.class, id))
+                .isEqualTo("PERFIL_TURNO_CANDIDATO");
 
-        // Y no encoló nada: negarse tiene que ser gratis
-        assertThat(contar("select count(*) from trabajo_ia")).isEqualTo(trabajosAntes);
+        // Alguien pulsa el botón de calificar la tanda mientras esta persona todavía no ha
+        // abierto su evaluación. Se le califica el currículum: eso está bien y es lo que se
+        // pidió.
+        conToken(post("/api/v1/panel/vacantes/" + vacanteId + "/calificar-tanda"),
+                tokenEquipo, null).andExpect(status().isOk());
+
+        esperarA(() -> "PERFIL_POR_CONFIRMAR".equals(jdbc.queryForObject(
+                        "select estado_codigo from postulacion where id = ?", String.class, id)),
+                "termine el retrato de quien no ha respondido");
+
+        // Y aquí se para. No avanza a la prueba, porque su evaluación sigue sin entregar.
+        assertThat(jdbc.queryForObject(
+                "select estado_codigo from postulacion where id = ?", String.class, id))
+                .isEqualTo("PERFIL_POR_CONFIRMAR");
+        assertThat(contar("select count(*) from intento_prueba where postulacion_id = %d"
+                .formatted(id))).isZero();
+
+        // Se apaga para que el resto de la cadena siga como estaba.
+        conToken(post("/api/v1/panel/vacantes/" + vacanteId + "/calificacion-automatica"),
+                tokenEquipo, "{\"activa\": false}").andExpect(status().isOk());
+    }
+
+    /**
+     * El recorrido automático, de punta a punta y sin que nadie toque el panel.
+     *
+     * <p>Es lo que separa una vacante automática de una normal: quien postula se califica
+     * solo y aparece rindiendo la prueba del puesto, sin que nadie confirme nada por el
+     * camino. La primera persona que hace falta es la que decide quién va a la simulación.
+     *
+     * <p>Va el último de la cadena a propósito: apaga el banco de la vacante compartida, y
+     * cualquier prueba posterior encontraría una convocatoria distinta de la que montó el
+     * primer test.
+     */
+    @DisplayName("Con el interruptor puesto, la postulación llega sola hasta la prueba")
+    @Test
+    @Order(8)
+    void laVacanteAutomaticaLlevaAlCandidatoHastaLaPruebaElSolo() throws Exception {
+        ModeloDePrueba.falla = false;
+
+        // Sin banco de preguntas: el candidato no tiene nada que responder antes, así que
+        // todo lo que falta para decidir sale de su currículum.
+        conToken(post("/api/v1/panel/vacantes/" + vacanteId + "/aplicacion-evaluacion"),
+                tokenEquipo, "{\"aplica\": false}").andExpect(status().isOk());
+        conToken(post("/api/v1/panel/vacantes/" + vacanteId + "/calificacion-automatica"),
+                tokenEquipo, "{\"activa\": true}").andExpect(status().isOk());
+
+        String codigo = postularConCurriculumReal("diego@correo.pe");
+        long id = idDe(codigo);
+
+        // Y esto es todo lo que hace falta. Nadie pulsa nada: se le califica el currículum
+        // al postular y, cuando termina, se le pasa solo a rendir su prueba.
+        esperarA(() -> "PRUEBA_TURNO_CANDIDATO".equals(jdbc.queryForObject(
+                        "select estado_codigo from postulacion where id = ?", String.class, id)),
+                "la postulación llegue sola hasta la prueba del puesto");
+
+        // Con su nota puesta, que es lo que hace que el pase signifique algo
+        assertThat(jdbc.queryForObject(
+                "select grupo_prioridad from postulacion where id = ?", String.class, id))
+                .isNotNull();
+
+        // Y con su prueba ya creada: sin esto llegaría a la etapa sin nada que rendir
+        assertThat(contar("select count(*) from intento_prueba where postulacion_id = %d"
+                .formatted(id))).isEqualTo(1);
+
+        // El pase queda escrito como del sistema y CON motivo. Sin el motivo, el historial
+        // enseña un salto sin autor y sin explicación, y quien lo abra dentro de seis meses
+        // no puede saber si lo movió una persona o la propia vacante.
+        Map<String, Object> pase = jdbc.queryForMap("""
+                select es_sistema, usuario_id, motivo from transicion_estado
+                where postulacion_id = ? and estado_nuevo_codigo = 'PRUEBA_TURNO_CANDIDATO'""", id);
+        assertThat(pase.get("es_sistema")).isEqualTo(true);
+        assertThat(pase.get("usuario_id")).isNull();
+        assertThat((String) pase.get("motivo")).contains("automático");
     }
 
     /**

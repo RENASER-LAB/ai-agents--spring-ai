@@ -55,6 +55,12 @@ public class Vacante {
     private String instrumentoEtapaTecnica = "PLANTILLA";
     // Minutos del candidato en la etapa técnica. Vacío: los del instrumento elegido (V43)
     private Integer minutosEtapaTecnica;
+    // Encendido, la postulación viaja sola hasta que termina la prueba del puesto: se
+    // califica el currículum al postular (si la vacante no lleva banco), se pasa sola a la
+    // etapa técnica al terminar la calificación, y la prueba se califica sola al
+    // entregarse. La primera persona que hace falta decide quién va a la simulación (V53)
+    @Builder.Default
+    private boolean calificacionAutomatica = false;
     private Long responsableUsuarioId;
     private Instant publicadaEn;
     private Instant cerradaEn;

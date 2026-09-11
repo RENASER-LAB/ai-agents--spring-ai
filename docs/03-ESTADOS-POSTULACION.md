@@ -326,6 +326,39 @@ Por eso:
 
 ---
 
+## La vacante que avanza sola (10/09/2026)
+
+Cada vacante tiene un interruptor: **«calificar y avanzar sola»**. Nace apagado, y apagada la
+vacante se comporta exactamente como cuenta el resto de este documento.
+
+**Encendido**, tres paradas donde nadie tenía nada que decidir dejan de existir:
+
+| Cuándo | Qué pasa sin que nadie toque nada |
+|---|---|
+| Al postular, si la vacante no lleva banco de preguntas | Se le califica el currículum |
+| Al terminar esa calificación | Pasa sola de `PERFIL_POR_CONFIRMAR` a `PRUEBA_TURNO_CANDIDATO`, se le crea lo que va a rendir y le llega su correo con el enlace |
+| Al entregar la prueba del puesto | Se califica sola, y queda en `PRUEBA_POR_CONFIRMAR` |
+
+Así, **la primera vez que hace falta una persona es para decidir quién va a la simulación**,
+con las notas de la prueba ya delante.
+
+**Con banco de preguntas, el pase espera a que el candidato lo entregue.** Es la salvedad que
+más importa: si no esperara, a quien todavía no ha respondido se le armaría el retrato con el
+currículum a solas y se le mandaría a la prueba sin haber contestado nunca su evaluación.
+
+Y hay cuatro sitios donde el pase **no** se da, aunque el interruptor esté puesto. En los
+cuatro la postulación se queda esperando a una persona, que es donde estaba antes:
+
+- La vacante todavía no tiene con qué llenar la etapa técnica.
+- La postulación ya salió del perfil integral: alguien la movió mientras la IA trabajaba.
+- La postulación está cerrada: retirada, no continúa o contratada.
+- Algo falló al dar el pase. Lo calificado se guarda igual y no se vuelve a pagar el modelo.
+
+El pase queda escrito en el historial como una transición del sistema, con su motivo: «pase
+automático». Quien abra esa postulación dentro de seis meses puede saber que no lo movió nadie.
+
+---
+
 ## Casos especiales
 
 ### El cronómetro se agota

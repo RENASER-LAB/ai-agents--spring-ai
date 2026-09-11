@@ -260,7 +260,8 @@ trabajo de código es pequeño; lo que falta son tres decisiones que no son nues
   versiones no son comparables: la v1 reparte 40/30/15/15 sobre cuatro etapas y la v3 reparte
   57.14/42.86 sobre dos, porque una etapa no aplicaba (RF-114). Las dos suman 100. Ordenar en una
   misma lista a alguien medido con la v1 y a alguien medido con la v3 es medir con dos varas
-  distintas, el mismo fallo que ya nos pasó al mezclar notas de la criba rápida con las finas.
+  distintas, el mismo fallo que ya nos pasó cuando había dos pasadas de criba y se mezclaban
+  sus notas en una sola lista (aquello se arregló retirando la pasada barata, en la V53).
 - **Los rankings de la prueba, la simulación y la validación ordenarían notas escritas a mano.**
   Esas tres las califica una persona, criterio por criterio. Un ranking de esas
   etapas no es «lo que dijo la IA»: es lo que teclearon los evaluadores, y estará casi vacío

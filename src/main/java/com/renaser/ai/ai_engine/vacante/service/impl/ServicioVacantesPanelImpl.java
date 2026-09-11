@@ -421,6 +421,31 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
 
     @Override
     @Transactional
+    public void activarCalificacionAutomatica(ContextoUsuario quien, Long id, boolean activa) {
+        Vacante vacante = laDeLaOrganizacion(quien, id);
+        if ("CERRADA".equals(vacante.getEstado())) {
+            throw new IllegalStateException("Una vacante cerrada no se edita");
+        }
+        /*
+         * ⚠️ **No se exige tener la prueba lista para encenderlo, y es deliberado.**
+         *
+         * Sería tentador plantarse aquí como hace la evaluación del banco. Pero el orden
+         * natural de montar una vacante es encender lo que se quiere y luego elegir el
+         * instrumento, y bloquear el interruptor obligaría a hacerlo al revés. Lo que sí
+         * está protegido es el efecto: el pase automático comprueba que haya con qué llenar
+         * la etapa técnica y, si no lo hay, deja la postulación esperando a una persona en
+         * vez de reventar. Publicar la vacante sigue exigiendo el instrumento, como siempre.
+         */
+        boolean anterior = vacante.isCalificacionAutomatica();
+        vacante.setCalificacionAutomatica(activa);
+        vacantes.save(vacante);
+        auditoria.registrar(quien.organizacionId(), quien, "activar_calificacion_automatica",
+                "vacante", id, Map.of("calificacionAutomatica", anterior),
+                Map.of("calificacionAutomatica", activa), null);
+    }
+
+    @Override
+    @Transactional
     public void asignarVersionPesos(ContextoUsuario quien, Long id, Long versionPesosId) {
         Vacante vacante = laDeLaOrganizacion(quien, id);
         VersionPesos version = versionesPesos
@@ -815,6 +840,6 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                 v.getPublicadaEn(), v.getCerradaEn(), v.isAplicaEvaluacion(),
                 v.getPlantillaEvaluacionId(), v.getVersionPlantillaPruebaId(),
                 v.getVersionPesosId(), v.getInstrumentoEtapaTecnica(),
-                v.getMinutosEtapaTecnica());
+                v.getMinutosEtapaTecnica(), v.isCalificacionAutomatica());
     }
 }

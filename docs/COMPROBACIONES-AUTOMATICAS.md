@@ -47,15 +47,16 @@ demás de la calificación se prueba con un doble del modelo y no gasta nada.
 
 ---
 
-## 1150 pruebas
+## 1276 pruebas
 
-Contadas de correr `./mvnw verify` el **02/09/2026**: **1007 unitarias y 143 de integración**
-(de esas 143, 6 se saltan: las que gastan saldo o mandan correo de verdad). El día anterior eran
-1072 (930 y 142): la rama del panel que ve los entregables (V48) trajo el resto. El 03/09 el
-commit #62 (el ranking de la prueba) añadió 5 unitarios más; la próxima corrida completa tiene
-que dar 1155, y con los 13 unitarios que trajeron el 04/09 los commits #63-#65 (el ponderado, el
-semáforo sin pesos y los pesos de Administración), 1168; y con los 80 del #66 (los archivos del
-perfil, 06/09), 1248.
+Contadas de correr `./mvnw verify` el **10/09/2026**: **1132 unitarias y 144 de integración**
+(7 se saltan: las que gastan saldo o mandan correo de verdad). Es un recuento de verdad, de una
+corrida completa, y no una suma de lo que fue añadiendo cada rama — la cuenta anterior llevaba
+cuatro ramas arrastradas desde el 02/09 sin volver a correrlo entero.
+
+⚠️ **`./mvnw test` no vale para dar este número**: corre solo las 1132 unitarias. Las 144 de
+integración levantan la aplicación entera contra una base con todas las migraciones aplicadas, y
+son las únicas que ven los efectos a distancia de un cambio de datos. Es lo que corre el CI.
 
 ⚠️ **El total está al día; la tabla de abajo no.** Su reparto por filas es el del recuento del
 28/08/2026 (877 = 770 + 107), antes del módulo de vacantes —los tiempos de la etapa técnica, la

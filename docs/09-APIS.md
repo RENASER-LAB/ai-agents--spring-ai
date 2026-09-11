@@ -181,6 +181,7 @@ del área— se ven solo las propias, y una ajena responde 404.
 | POST `/vacantes/{id}/cuestionario-tecnico/generacion` | Pedir al agente REDACTOR el borrador (202). Exige la ficha COMPLETA; con una generación viva o la IA apagada responde `encolada=false`. Cuenta contra el tope mensual de IA | `editar_vacante` |
 | PUT `/vacantes/{id}/cuestionario-tecnico/preguntas/{preguntaId}` | Corregir una pregunta del borrador con las palabras del dueño (enunciado y guía C3/C4/señal) | `editar_vacante` |
 | GET `/vacantes/{id}` | La vacante con su configuración: qué evaluación y qué prueba tiene, sus pesos, y **qué instrumento y cuántos minutos** rigen su etapa técnica | `ver_vacantes` |
+| POST `/vacantes/{id}/calificacion-automatica` | Encender o apagar el recorrido automático. Encendido, quien postule se califica solo y llega hasta la prueba del puesto sin que nadie confirme nada; la primera persona que hace falta decide quién va a la simulación. **Apagado de fábrica**: en automático cada postulante gasta una llamada al modelo desde que postula | `elegir_plantilla_evaluacion` |
 | POST `/vacantes/{id}/instrumento-tecnico` | Qué se rinde en la etapa técnica de esta vacante —`PLANTILLA` (la prueba del puesto) o `CUESTIONARIO_TECNICO` (el cuestionario CAZATALENTOS)— y en cuántos minutos. **Uno de los dos, nunca los dos**: publicar exige tener listo el que se eligió. **Se frena en cuanto alguien EMPEZÓ su etapa técnica**, no al recibir la primera postulación: postular no es rendir, y quien no ha abierto nada no tiene nada que moverle debajo. Minutos vacíos = los del instrumento; si se ponen, **al menos 5**, rigen los DOS instrumentos y se leen al empezar el examen, así que corregirlos alcanza a todo el que aún no lo haya abierto | `elegir_plantilla_prueba` |
 | POST `/vacantes/{id}/cuestionario-tecnico/publicacion` | Publicar el borrador: el acto humano que vuelve real el cuestionario. Re-pasa la aduana entera (cantidades del nivel, presencial donde toca, guía completa, temas prohibidos) y archiva la publicada anterior **de esta vacante** — los bancos por nivel ni se miran | `editar_vacante` |
 | GET `/vacantes/{id}/plantillas-correo` | Qué avisos manda esta vacante con texto propio. Vacío = los de siempre | `ver_vacantes` |
@@ -205,6 +206,7 @@ del área— se ven solo las propias, y una ajena responde 404.
 | POST `/postulaciones/{id}/confirmacion-avance` | Confirmar que avanza: el sistema calcula el estado siguiente | `confirmar_avance` |
 | GET `/postulaciones/{id}/perfil-integral` | El retrato de la IA: notas del currículum, hallazgos y avisos. Cada nota lleva su explicación, **su confianza —de 0 a 100, la misma escala del puntaje, no de 0 a 1—** y el **motivo del ajuste**, que solo tiene valor cuando esa nota la corrigió una persona | `ver_perfil_integral` |
 | GET `/postulaciones/{id}/evaluacion` | El desglose del banco: cada respuesta abierta con su nota, la explicación y la evidencia que citó la IA, el promedio de lo cerrado y los semáforos de alineación. En un banco CAZATALENTOS cada respuesta trae además **qué pilar alimenta** (`pilar`, `pilarCodigo`) y **las cuatro señales** que el agente marcó (`senales`), y el desglose entero trae los `patrones` del cuestionario. **Sin evaluación asignada devuelve vacíos, no 404**. ⚠️ `senales` en nulo significa que **ese banco no las medía**, no que ninguna se cumpliera. ⚠️ `alineacion` sale vacía siempre: nadie escribe esa tabla todavía | `ver_respuestas_evaluacion` |
+| POST `/vacantes/{id}/calificar-tanda` | Calificar de una vez a todos los de la tanda a los que les falta la nota. Se salta a quien ya la tiene y a quien está cerrado —retirado, no continúa o contratado—, y a quien ya salió del Perfil Integral, que podría estar rindiendo la prueba con el reloj corriendo. **No devuelve notas: encola**, y tarda alrededor de minuto y medio por cada diez currículums. Sustituye a `criba-rapida` y `criba-fina` desde la V53 | `ajustar_nota` |
 | POST `/postulaciones/{id}/criba-cv` | Que la IA lea **solo el currículum** y arme el retrato con eso. Es lo que se pide con una tanda recién llegada | `ajustar_nota` |
 | POST `/postulaciones/{id}/calificacion-perfil-integral` | Calificar con todo: currículum y evaluación. Exige evaluación entregada | `ajustar_nota` |
 | POST `/postulaciones/{id}/cv` | Reemplazar el currículum desde el panel | `ajustar_nota` |
@@ -214,8 +216,8 @@ del área— se ven solo las propias, y una ajena responde 404.
 > **Hay un ranking por etapa, y es el mismo endpoint.** `?etapa=PERFIL_INTEGRAL` —que equivale
 > a no pasarlo—, `PRUEBA_PUESTO`, `SIMULACION`, `VALIDACION` o `DECISION` cambia **solo la nota con la que se ordena**: las ocho notas del
 > currículum de cada fila siguen siendo las del Perfil Integral, porque son de esa etapa siempre.
-> Sin el parámetro se comporta exactamente como antes —así lo llama la criba fina, que decide a
-> quién recalificar por la nota de preselección—, y una etapa que no esté en el catálogo es un 400.
+> Sin el parámetro se comporta exactamente como antes: ordena por la nota de la preselección.
+> Una etapa que no esté en el catálogo es un 400.
 > Quien no tiene nota en la etapa pedida sale al final, sin heredar la de otra.
 >
 > Sigue sin haber un ranking **general** que mezcle las cuatro etapas en una sola nota. La

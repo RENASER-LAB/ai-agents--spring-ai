@@ -32,6 +32,13 @@ queda esperando a que una persona decida.**
    evaluación con los pesos de la vacante, le asigna un **grupo de prioridad** y mueve la
    postulación a **«por confirmar»**, que es donde una persona mira y decide.
 
+⚠️ **Si ningún componente tiene peso, no hay nota: se deja el hueco.** Pasa cuando una vacante
+apaga el banco de preguntas y su versión de pesos le daba a la evaluación todo el peso del
+Perfil Integral. Antes se guardaba un **cero**, y un cero se lee como «lo hizo malísimo» y
+ordena como tal: el 08/09/2026 mandó al fondo del ranking a once candidatos con currículums de
+entre 50 y 86. Quien ya tenía nota de antes la conserva **tal cual**, sin volver a firmarla con
+una versión de pesos que no la calculó.
+
 **Van en fila y no a la vez** porque el tercero necesita lo que dejaron los dos primeros. Y
 así hay un solo trabajo vivo por candidato, que es lo que hace fácil reintentar.
 
@@ -275,6 +282,29 @@ el borrador no cuadra, se le devuelve UNA vez con los errores delante; si persis
 trabajo queda FALLIDO y visible — un borrador a medias jamás se guarda como si estuviera
 bien. El detalle del flujo completo está en
 [el diseño del ciclo 1](DISENO-PRUEBA-TECNICA-FICHA-Y-REDACTOR.md).
+
+## Cuándo arranca sola, y cuándo la pide una persona
+
+Cada vacante lleva un interruptor —**«calificar y avanzar sola»**, apagado de fábrica— que
+decide quién dispara cada calificación:
+
+| Momento | Con el interruptor apagado | Con el interruptor encendido |
+|---|---|---|
+| Al postular | Se **lee** el currículum para autocompletar el perfil, pero no se califica | Si la vacante no lleva banco, se **califica** el currículum |
+| Al entregar el banco de preguntas | Se califica sola | Igual |
+| Al entregar el **cuestionario técnico** | Se califica solo | Igual |
+| Al entregar la **prueba del puesto** | Espera a que alguien pulse «calificar» | Se califica sola |
+| Al terminar el retrato | La postulación espera a una persona | Pasa sola a la etapa técnica |
+
+**El interruptor nace apagado porque cuesta dinero.** En automático, cada persona que postule
+gasta una llamada al modelo desde el momento en que postula, y esa decisión es de quien lleva
+la vacante — no del sistema.
+
+**Y la calificación de la tanda se pide con un solo botón.** Hasta la V53 había dos —una pasada
+barata para ordenar y otra cuidadosa solo sobre la parte alta— y había que pulsarlas en orden.
+Está contado en [La criba de currículums](CRIBA-DE-CURRICULUMS.md).
+
+---
 
 ## Cómo apagarlo
 
