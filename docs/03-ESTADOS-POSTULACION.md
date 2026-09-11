@@ -359,6 +359,68 @@ automático». Quien abra esa postulación dentro de seis meses puede saber que 
 
 ---
 
+## Descartar a alguien desde el panel (11/09/2026)
+
+La Regla 2 dice que una persona con permiso puede mover una postulación a donde quiera. Hasta
+hoy eso era cierto por dentro y no por fuera: **el panel podía calificar, mover fechas y
+confirmar avances, pero no tenía forma de decir «esta persona no sigue»**. Para descartar a
+alguien había que pedírselo a quien supiera llamar al sistema por debajo.
+
+Ahora la ficha del candidato —la que se abre debajo de su fila en el ranking— trae un botón
+**«Descartar»**. Lo que pasa al pulsarlo:
+
+| Paso | Qué ocurre |
+|---|---|
+| El botón se ve | Solo si quien mira puede mover postulaciones: Talento y Dirección. Quien no, no ve nada |
+| Sobre alguien ya cerrado | El botón no sale, y en su lugar una línea dice que esa postulación ya terminó su recorrido. De un estado final no se vuelve |
+| Al pulsar | Se abre una ventana que pide **una sola cosa: por qué no continúa**, escrito a mano y obligatorio |
+| Al confirmar | La postulación pasa a **«no continúa»**, el motivo queda en su historial, y **al candidato le llega el correo de rechazo** |
+
+Tres cosas que conviene tener claras antes de pulsarlo:
+
+- **Sale un correo, y sale al momento.** No es un cambio de estado interno que alguien vaya a
+  revisar después: es la carta que le dice a una persona que no sigue. La ventana lo avisa con
+  su nombre delante, antes de pedir el motivo, precisamente porque no se puede recoger.
+- **El motivo no se lo mandamos al candidato.** El texto que le llega es siempre el mismo. Lo
+  que se escribe aquí lo lee el equipo en el historial, y es lo que responde dentro de seis
+  meses a «¿por qué se cerró esto?».
+- **«No continúa» no es lo mismo que «cerrada».** Descartar dice que la empresa decidió que no
+  sigue; cerrar es administrativo —el candidato se retiró, se cerró la convocatoria—. Mezclarlos
+  hace mentir al embudo, que es lo que ya advierte este documento más arriba.
+
+### Descartar a varios de una vez
+
+Hacerlo de uno en uno son tantas fichas abiertas como personas. La mesa de la tabla —la que ya
+tiene las casillas y el motivo con que se hace avanzar a una tanda— trae ahora también
+**«Descartar a N personas»**. Se marca a quien sea, se escribe **un motivo que vale para todas**
+y se elige qué hacer con ellas: avanzar o descartar.
+
+**Ese botón no actúa al pulsarlo.** Abre una ventana con **los nombres escritos**, uno por uno y
+sin recortar. No es ceremonia: el error que de verdad ocurre no es equivocarse de botón, es
+llegar ahí con alguien marcado de una pestaña anterior, y una cifra —«descartar a 6»— parece
+correcta hasta que se leen los seis nombres.
+
+Va una a una, no todas de golpe. Quien no se pueda descartar —ya cerrado, o fuera de lo que ese
+rol alcanza— **no frena a las demás**: sale nombrado al final, con su motivo. Por eso la ventana
+promete «hasta N correos» y no «N».
+
+### Descartar sin avisar
+
+En los dos sitios —la ficha y la tanda— hay una casilla **«avisar por correo»**, encendida de
+salida. Quitarla descarta **sin que al candidato le llegue nada**.
+
+Existe para un caso concreto: el equipo ya habló con esa persona por teléfono o en la entrevista,
+y una carta automática que llega después de esa conversación dice lo mismo pero peor. Callar el
+correo es lo amable ahí, y hasta ahora no se podía.
+
+⚠️ **Callar el correo no es callarlo todo.** El estado cambia igual, la transición se guarda
+igual y la auditoría se escribe igual. Y **que no se avisó queda escrito**: el historial de esa
+postulación lo dice al final del motivo, y la auditoría lo registra aparte. Sin eso, quien abra
+esa ficha dentro de seis meses vería «no continúa» con su motivo y daría por hecho que al
+candidato se le dijo —y si llama preguntando, nadie en el equipo sabría que nunca se le avisó.
+
+---
+
 ## Casos especiales
 
 ### El cronómetro se agota

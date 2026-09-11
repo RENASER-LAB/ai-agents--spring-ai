@@ -667,7 +667,7 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
                 puesto == null ? null : puesto.getNombre(),
                 puesto == null ? null : puesto.getNivelPuestoCodigo(),
                 numeradas.size(), conFina, calificados, enCurso, fallidos,
-                puedeVerPretension, numeradas);
+                puedeVerPretension, quien.tiene("mover_postulacion"), numeradas);
     }
 
     /**

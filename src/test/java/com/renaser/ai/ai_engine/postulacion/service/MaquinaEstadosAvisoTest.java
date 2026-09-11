@@ -41,6 +41,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -284,5 +285,92 @@ class MaquinaEstadosAvisoTest {
 
         assertThat(plantillaAlMover(p, "PERFIL_TURNO_CANDIDATO", "CANDIDATO"))
                 .isEqualTo("POSTULACION_AVANZA");
+    }
+
+    // ---------- Descartar sin avisar ----------
+
+    /**
+     * Lo que compila perfectamente estando mal al callar el correo:
+     *
+     *   0. **Callar de más.** `avisar = false` solo tiene que silenciar el correo. Si de paso
+     *      se saltara la transición o la auditoría, la postulación se movería sin que quede
+     *      escrito quién la movió ni por qué.
+     *   1. **Callar en silencio.** Que no se avisara tiene que poder leerse después: sin
+     *      rastro, quien abra esa postulación dentro de seis meses ve «no continúa» con su
+     *      motivo y da por hecho que al candidato se le dijo. Si llama preguntando, nadie en
+     *      el equipo sabrá que nunca se le avisó.
+     *   2. **Callar por defecto.** La firma de siempre —la de siete parámetros, que usan los
+     *      veintitantos sitios que mueven una postulación— tiene que seguir avisando. Un
+     *      parámetro nuevo que naciera en `false` apagaría los avisos de todo el sistema sin
+     *      que ningún test lo dijera.
+     */
+    @Test
+    @DisplayName("Sin avisar: no sale el correo, pero la transición y la auditoría sí")
+    void sinAvisarNoSaleElCorreo() {
+        Postulacion p = vacanteCon(1L, 10L, PDF_ARQ, 3);
+        when(estados.findById("NO_CONTINUA")).thenReturn(Optional.of(
+                EstadoPostulacion.builder().codigo("NO_CONTINUA").nombre("No continúa")
+                        .esperaA("NADIE").esFinal(true).build()));
+        when(estados.findById("PERFIL_POR_CONFIRMAR"))
+                .thenReturn(Optional.of(estado("PERFIL_POR_CONFIRMAR", "TALENTO")));
+
+        maquina.transicionar(p, "NO_CONTINUA", null, "Ya se lo dijimos en la entrevista.",
+                false, false, "DECISION_PERSONA", false);
+
+        verifyNoInteractions(correo);
+        // Y todo lo demás ocurre igual: sin esto, «sin avisar» sería «sin hacer nada».
+        verify(transiciones).save(any());
+        verify(postulaciones).save(any());
+    }
+
+    @Test
+    @DisplayName("Que no se avisó queda escrito en el motivo y en la auditoría")
+    void sinAvisarQuedaEscrito() {
+        Postulacion p = vacanteCon(1L, 10L, PDF_ARQ, 3);
+        when(estados.findById("NO_CONTINUA")).thenReturn(Optional.of(
+                EstadoPostulacion.builder().codigo("NO_CONTINUA").nombre("No continúa")
+                        .esperaA("NADIE").esFinal(true).build()));
+        when(estados.findById("PERFIL_POR_CONFIRMAR"))
+                .thenReturn(Optional.of(estado("PERFIL_POR_CONFIRMAR", "TALENTO")));
+
+        maquina.transicionar(p, "NO_CONTINUA", null, "Ya se lo dijimos en la entrevista.",
+                false, false, "DECISION_PERSONA", false);
+
+        // En el motivo, porque es lo único de la transición que pinta el historial de la ficha.
+        ArgumentCaptor<com.renaser.ai.ai_engine.postulacion.entity.TransicionEstado> guardada =
+                ArgumentCaptor.forClass(com.renaser.ai.ai_engine.postulacion.entity.TransicionEstado.class);
+        verify(transiciones).save(guardada.capture());
+        assertThat(guardada.getValue().getMotivo())
+                .as("el historial de la ficha es donde alguien lo va a leer")
+                .isEqualTo("Ya se lo dijimos en la entrevista. · sin avisar al candidato");
+
+        // Y en la auditoría, que es el registro que nadie puede reescribir.
+        ArgumentCaptor<Object> valorNuevo = ArgumentCaptor.forClass(Object.class);
+        verify(auditoria).registrar(anyLong(), any(), eq("transicion_estado"), eq("postulacion"),
+                anyLong(), any(), valorNuevo.capture(), anyString());
+        assertThat(valorNuevo.getValue().toString()).contains("NO_ENVIADO");
+    }
+
+    @Test
+    @DisplayName("La firma de siempre sigue avisando: callar es una decisión explícita")
+    void porDefectoSeAvisa() {
+        // ⚠️ Los veintitantos sitios que mueven una postulación usan la firma de siete
+        // parámetros. Si el aviso dejara de ser el valor por defecto, se apagarían todos los
+        // correos del sistema y ningún otro test lo diría.
+        Postulacion p = vacanteCon(1L, 10L, PDF_ARQ, 3);
+        when(estados.findById("NO_CONTINUA")).thenReturn(Optional.of(
+                EstadoPostulacion.builder().codigo("NO_CONTINUA").nombre("No continúa")
+                        .esperaA("NADIE").esFinal(true).build()));
+        when(estados.findById("PERFIL_POR_CONFIRMAR"))
+                .thenReturn(Optional.of(estado("PERFIL_POR_CONFIRMAR", "TALENTO")));
+
+        maquina.transicionar(p, "NO_CONTINUA", null, "No encaja.", false, false, "DECISION_PERSONA");
+
+        verify(correo, atLeastOnce()).enviar(anyLong(), anyLong(), anyString(), anyString(), any());
+        // Y el motivo sale limpio: la marca es solo de cuando se calla.
+        ArgumentCaptor<com.renaser.ai.ai_engine.postulacion.entity.TransicionEstado> guardada =
+                ArgumentCaptor.forClass(com.renaser.ai.ai_engine.postulacion.entity.TransicionEstado.class);
+        verify(transiciones).save(guardada.capture());
+        assertThat(guardada.getValue().getMotivo()).isEqualTo("No encaja.");
     }
 }

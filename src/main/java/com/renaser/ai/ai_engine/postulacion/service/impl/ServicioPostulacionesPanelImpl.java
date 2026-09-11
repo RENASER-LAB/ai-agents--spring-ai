@@ -133,7 +133,8 @@ public class ServicioPostulacionesPanelImpl implements ServicioPostulacionesPane
         return new FichaPostulacion(p.getId(), p.getUuid().toString(), candidato, usuario.getCorreo(),
                 vacante, p.getEstadoCodigo(), nombreEstado, p.getGrupoPrioridad(), p.getMotivoCierre(),
                 cv == null ? null : cv.getResultadoOrgulloso(), urls,
-                cv == null ? null : cv.getArchivoOriginalId(), p.getCreadoEn(), p.getMovidoEn());
+                cv == null ? null : cv.getArchivoOriginalId(), p.getCreadoEn(), p.getMovidoEn(),
+                quien.tiene("mover_postulacion"));
     }
 
     @Override
@@ -157,7 +158,10 @@ public class ServicioPostulacionesPanelImpl implements ServicioPostulacionesPane
         if ("NO_CONTINUA".equals(datos.estadoDestino()) && motivoCierre == null) {
             motivoCierre = "DECISION_PERSONA";
         }
-        maquina.transicionar(p, datos.estadoDestino(), quien, datos.motivo(), false, false, motivoCierre);
+        // Nulo es avisar: quien no dijo nada quiere lo de siempre.
+        boolean avisar = datos.avisar() == null || datos.avisar();
+        maquina.transicionar(p, datos.estadoDestino(), quien, datos.motivo(), false, false,
+                motivoCierre, avisar);
     }
 
     @Override

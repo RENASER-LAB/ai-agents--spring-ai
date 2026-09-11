@@ -161,9 +161,39 @@ public class MaquinaEstados {
     // Toda transición pasa por aquí: valida, escribe el registro inmutable, actualiza la
     // postulación, audita, y avisa al candidato si el estado nuevo lo amerita.
     @Transactional
+    /**
+     * Mover una postulación avisando al candidato, que es lo que toca casi siempre.
+     *
+     * <p>Es la firma de toda la vida y la que usan los veintitantos sitios que mueven una
+     * postulación. Delega en la de abajo con {@code avisar = true}: el aviso es el
+     * comportamiento por defecto y callarse tiene que ser una decisión explícita de quien
+     * llama, nunca un descuido de quien añadió un parámetro.
+     */
     public void transicionar(Postulacion postulacion, String estadoNuevoCodigo,
                              ContextoUsuario quien, String motivo,
                              boolean esSistema, boolean esPorLote, String motivoCierre) {
+        transicionar(postulacion, estadoNuevoCodigo, quien, motivo, esSistema, esPorLote,
+                motivoCierre, true);
+    }
+
+    /**
+     * Mover una postulación, con la opción de NO avisar al candidato.
+     *
+     * <p>⚠️ <b>{@code avisar = false} solo silencia el correo.</b> Todo lo demás ocurre igual:
+     * el estado cambia, la transición se guarda y la auditoría se escribe. Es para los casos en
+     * que el equipo ya habló con esa persona por otro lado y una carta automática de rechazo
+     * llegaría después de la conversación, diciendo lo mismo peor.
+     *
+     * <p>⚠️ <b>Que no se avisara tiene que poder leerse después.</b> Sin dejar rastro, quien
+     * abra esa postulación dentro de seis meses ve «no continúa» con su motivo y da por hecho
+     * que al candidato se le dijo — y si llama preguntando, nadie en el equipo sabrá que nunca
+     * se le avisó. Por eso queda en dos sitios: marcado en el motivo que se guarda —que es lo
+     * que pinta el historial de la ficha— y en el registro de auditoría.
+     */
+    public void transicionar(Postulacion postulacion, String estadoNuevoCodigo,
+                             ContextoUsuario quien, String motivo,
+                             boolean esSistema, boolean esPorLote, String motivoCierre,
+                             boolean avisar) {
         EstadoPostulacion nuevo = estados.findById(estadoNuevoCodigo)
                 .orElseThrow(() -> new IllegalArgumentException("No existe el estado " + estadoNuevoCodigo));
 
@@ -189,6 +219,14 @@ public class MaquinaEstados {
 
         String estadoAnterior = postulacion.getEstadoCodigo();
 
+        // La marca va en el motivo porque es lo único de la transición que el historial de la
+        // ficha pinta: `transicion_estado` no tiene columna para esto y una columna nueva es
+        // una migración. Separada con « · » y al final, para que se lea como lo que es —un
+        // hecho añadido— y no como parte de lo que escribió la persona.
+        String motivoGuardado = avisar || motivo == null || motivo.isBlank()
+                ? motivo
+                : motivo + " · sin avisar al candidato";
+
         transiciones.save(TransicionEstado.builder()
                 .postulacionId(postulacion.getId())
                 .estadoAnteriorCodigo(estadoAnterior)
@@ -197,7 +235,7 @@ public class MaquinaEstados {
                 .rolId(quien == null || quien.rolIds().isEmpty() ? null : quien.rolIds().get(0))
                 .esSistema(esSistema)
                 .esPorLote(esPorLote)
-                .motivo(motivo)
+                .motivo(motivoGuardado)
                 .ocurridaEn(Instant.now())
                 .creadoEn(Instant.now())
                 .build());
@@ -212,9 +250,17 @@ public class MaquinaEstados {
         auditoria.registrar(postulacion.getOrganizacionId(), quien,
                 "transicion_estado", "postulacion", postulacion.getId(),
                 Map.of("estado", estadoAnterior == null ? "" : estadoAnterior),
-                Map.of("estado", estadoNuevoCodigo), motivo);
+                // El valor nuevo se serializa entero a JSON, así que el «no se avisó» cabe sin
+                // tocar el esquema. Solo se escribe cuando es cierto: un `avisado: true` en las
+                // decenas de miles de transiciones normales sería ruido en cada fila.
+                avisar
+                        ? Map.of("estado", estadoNuevoCodigo)
+                        : Map.of("estado", estadoNuevoCodigo, "avisoAlCandidato", "NO_ENVIADO"),
+                motivoGuardado);
 
-        avisarAlCandidato(postulacion, nuevo, motivoCierre);
+        if (avisar) {
+            avisarAlCandidato(postulacion, nuevo, motivoCierre);
+        }
     }
 
     /**

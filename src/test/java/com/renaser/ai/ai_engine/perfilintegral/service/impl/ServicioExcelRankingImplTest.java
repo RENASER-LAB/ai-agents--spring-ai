@@ -481,7 +481,7 @@ class ServicioExcelRankingImplTest {
 
     private static RankingVacante tanda(FilaRanking... filas) {
         return new RankingVacante(13L, "Analista de datos", "Analista", "JUNIOR",
-                filas.length, filas.length, filas.length, 0, 0, true, List.of(filas));
+                filas.length, filas.length, filas.length, 0, 0, true, true, List.of(filas));
     }
 
     private static NotaCriterioResponse nota(String puntaje) {

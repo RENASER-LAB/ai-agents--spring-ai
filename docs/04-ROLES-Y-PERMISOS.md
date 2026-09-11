@@ -241,6 +241,15 @@ resultado de esa persona es quien la va a tener en su equipo.
 | Pedir borrado de sus datos | ● | ○ | ○ | ○ | ○ |
 | Ejecutar el borrado de datos | ○ | ○ | ○ | ● | ● |
 
+**«Cerrar una postulación a mano» ya tiene pantalla (11/09/2026).** Es el botón «Descartar» de
+la ficha del panel, y solo lo ve quien puede mover postulaciones —Talento y Dirección, tal como
+dice esta tabla—. Pide el motivo escrito y manda a «no continúa».
+
+⚠️ **Tener el permiso no es tenerlo sobre todos.** El alcance se guarda por permiso, así que un
+rol puede abrir la ficha de cualquiera y poder mover solo las de sus vacantes. En esa franja el
+botón se ve y la acción se rechaza: quien reparte los permisos tiene que mirar los dos alcances
+—el de abrir la ficha y el de moverla— y no solo quién tiene cada punto.
+
 ### Radar de Talento
 
 | Acción | Candidato | Talento | Resp. área | Dirección | Admin |
