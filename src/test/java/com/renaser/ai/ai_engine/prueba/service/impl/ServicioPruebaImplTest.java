@@ -37,7 +37,10 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -145,6 +148,45 @@ class ServicioPruebaImplTest {
     /** Minutos entre dos instantes, redondeando: los tests no compiten con el reloj. */
     private long minutosEntre(Instant desde, Instant hasta) {
         return Math.round(ChronoUnit.SECONDS.between(desde, hasta) / 60.0);
+    }
+
+    // ============ Entregar: quién pide la nota ============
+
+    @Test
+    @DisplayName("en una vacante automática, entregar pide la nota sin que nadie pulse nada")
+    void enAutomaticoLaEntregaPideLaNota() {
+        /*
+          Hasta la V53 esto acababa en «calificando» y ahí se estaba hasta que alguien abriera
+          el panel. El cuestionario técnico —el otro instrumento de la MISMA etapa— sí se
+          calificaba solo, así que el mismo estado significaba dos cosas distintas según lo
+          que rindiera la vacante.
+        */
+        IntentoPrueba intento = intentoSinEmpezar();
+        intento.setIniciadoEn(Instant.now().minus(10, ChronoUnit.MINUTES));
+        laVacanteEnAutomatico(true);
+
+        servicio.entregar(QUIEN, UUID_POSTULACION);
+
+        verify(cola).encolarPruebaPuesto(POSTULACION);
+    }
+
+    @Test
+    @DisplayName("en una vacante normal, entregar no pide nada: sigue esperando al botón")
+    void enManualLaEntregaNoPideNada() {
+        IntentoPrueba intento = intentoSinEmpezar();
+        intento.setIniciadoEn(Instant.now().minus(10, ChronoUnit.MINUTES));
+        laVacanteEnAutomatico(false);
+
+        servicio.entregar(QUIEN, UUID_POSTULACION);
+
+        verify(cola, never()).encolarPruebaPuesto(anyLong());
+    }
+
+    /** La vacante que `cerrarIntento` mira para saber si la nota se pide sola. */
+    private void laVacanteEnAutomatico(boolean automatica) {
+        lenient().when(vacantes.findById(VACANTE)).thenReturn(Optional.of(Vacante.builder()
+                .id(VACANTE).organizacionId(ORGANIZACION)
+                .calificacionAutomatica(automatica).build()));
     }
 
     // ============ Los minutos de la vacante rigen ============

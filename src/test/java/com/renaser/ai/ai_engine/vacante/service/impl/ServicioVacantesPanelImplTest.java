@@ -42,6 +42,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -355,6 +356,32 @@ class ServicioVacantesPanelImplTest {
         verify(auditoria).registrar(ORGANIZACION, QUIEN, "definir_aplicacion_evaluacion",
                 "vacante", VACANTE, Map.of("aplicaEvaluacion", true),
                 Map.of("aplicaEvaluacion", false), null);
+    }
+
+    @Test
+    @DisplayName("poner la vacante en automático queda guardado y auditado")
+    void encenderElAutomaticoSeGuarda() {
+        Vacante v = vacante("PUBLICADA", true, 7L);
+
+        servicio.activarCalificacionAutomatica(QUIEN, VACANTE, true);
+
+        assertThat(v.isCalificacionAutomatica()).isTrue();
+        verify(vacantes).save(v);
+        verify(auditoria).registrar(ORGANIZACION, QUIEN, "activar_calificacion_automatica",
+                "vacante", VACANTE, Map.of("calificacionAutomatica", false),
+                Map.of("calificacionAutomatica", true), null);
+    }
+
+    @Test
+    @DisplayName("el automático no se toca en una vacante cerrada")
+    void elAutomaticoDeUnaCerradaNoSeToca() {
+        vacante("CERRADA", true, 7L);
+
+        assertThatThrownBy(() -> servicio.activarCalificacionAutomatica(QUIEN, VACANTE, true))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("cerrada");
+
+        verify(vacantes, never()).save(any(Vacante.class));
     }
 
     @Test
