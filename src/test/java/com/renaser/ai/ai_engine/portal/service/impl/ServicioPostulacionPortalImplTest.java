@@ -38,6 +38,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -93,6 +94,11 @@ class ServicioPostulacionPortalImplTest {
     @Mock private com.renaser.ai.ai_engine.ai.service.ColaCalificacionIa colaIa;
     @Mock private MultipartFile cv;
 
+    // La campana del portal (V56). Es un doble y no el real: estas pruebas miran postular,
+    // y publicar avisos tiene las suyas propias.
+    @Mock
+    private com.renaser.ai.ai_engine.notificacion.service.ServicioAvisosPortal avisos;
+
     private ServicioPostulacionPortalImpl servicio;
     // El tablón, armado sobre los mismos dobles: la prueba de la suspendida vigila una
     // sola invariante —lo que el tablón esconde, postular tampoco lo acepta— y esa
@@ -107,7 +113,7 @@ class ServicioPostulacionPortalImplTest {
         servicio = new ServicioPostulacionPortalImpl(organizaciones, personas, usuarios,
                 consentimientos, vacantes, puestos, requisitos, evaluaciones, postulaciones,
                 transiciones, estados, cvs, enlaces, maquina, propuestaPerfil, lecturaCv,
-                colaIa, almacen, archivos, perfiles, correo, textoProceso);
+                colaIa, almacen, archivos, perfiles, correo, textoProceso, avisos);
         tablon = new ServicioTablonPortalImpl(vacantes, organizaciones, requisitos, textoProceso);
     }
 
@@ -119,6 +125,17 @@ class ServicioPostulacionPortalImplTest {
      * estricto de Mockito las tumbaría por stubs sin usar.
      */
     private void armarVacantePublicada(Long organizacionDeLaVacante) {
+        armarVacantePublicada(organizacionDeLaVacante, "OCULTA");
+    }
+
+    /**
+     * La misma vacante, diciendo o callando lo que paga.
+     *
+     * <p>El caso por defecto es {@code OCULTA} porque es como estaban todas las vacantes antes
+     * de la V54: así las pruebas de siempre siguen contando exactamente lo que contaban, sin
+     * que un requisito nuevo se les cuele por debajo.
+     */
+    private void armarVacantePublicada(Long organizacionDeLaVacante, String tipoRemuneracion) {
         // La vacante se busca en el tablón entero (findById): el candidato es de la
         // plataforma y postula a la vacante de cualquier empresa.
         org.mockito.Mockito.lenient().when(vacantes.findById(VACANTE))
@@ -126,6 +143,12 @@ class ServicioPostulacionPortalImplTest {
                         .id(VACANTE).organizacionId(organizacionDeLaVacante).estado("PUBLICADA")
                         .titulo("Administrador").puestoId(5L)
                         .aplicaEvaluacion(false)
+                        .remuneracionTipo(tipoRemuneracion)
+                        .remuneracionMin("OCULTA".equals(tipoRemuneracion)
+                                ? null : new java.math.BigDecimal("3000"))
+                        .remuneracionMax("RANGO".equals(tipoRemuneracion)
+                                ? new java.math.BigDecimal("4000") : null)
+                        .remuneracionMoneda("OCULTA".equals(tipoRemuneracion) ? null : "PEN")
                         .build()));
         org.mockito.Mockito.lenient()
                 .when(postulaciones.existsByUsuarioIdAndVacanteId(USUARIO, VACANTE)).thenReturn(false);
@@ -170,13 +193,105 @@ class ServicioPostulacionPortalImplTest {
                         .build()));
     }
 
+    // ============ El trato del sueldo (V54) ============
+
+    /**
+     * Las dos mitades del trato de la V54, que es simétrico:
+     *
+     * <ul>
+     *   <li>La vacante <b>enseña</b> lo que paga → quien postula tiene que decir lo suyo.
+     *   <li>La vacante lo <b>calla</b> → no se le exige nada, y se ignora lo que mande.
+     * </ul>
+     *
+     * <p>Aceptarle un número mientras la empresa esconde el suyo es exactamente el
+     * desequilibrio que esto vino a romper, y por eso la segunda mitad también se comprueba.
+     */
+    @Test
+    @DisplayName("si la vacante publica lo que paga, sin decir cuánto quieres ganar no hay postulación")
+    void elSueldoALaVistaExigeElPropio() {
+        armarVacantePublicada(ORGANIZACION, "RANGO");
+
+        assertThatThrownBy(() -> servicio.postular(QUIEN, VACANTE, cv, "Ordené la caja",
+                null, null, null, null, true, null, null, "10.0.0.1", "Navegador"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("cuánto quieres ganar")
+                // Y le dice lo que la vacante ofrece, para que el número que escriba lo escriba
+                // sabiendo contra qué: el trato solo es un trato si los dos ven lo del otro.
+                .hasMessageContaining("S/ 3 000 a 4 000");
+
+        verify(postulaciones, never()).save(any(Postulacion.class));
+    }
+
+    @Test
+    @DisplayName("con el sueldo a la vista, la pretensión declarada se guarda con su moneda y su fecha")
+    void laPretensionSeGuardaConLaPostulacion() {
+        armarVacantePublicada(ORGANIZACION, "FIJA");
+
+        servicio.postular(QUIEN, VACANTE, cv, "Ordené la caja", null, null, null, null, true,
+                new java.math.BigDecimal("3800"), "pen", "10.0.0.1", "Navegador");
+
+        var captor = org.mockito.ArgumentCaptor.forClass(Postulacion.class);
+        verify(postulaciones).save(captor.capture());
+        Postulacion guardada = captor.getValue();
+        assertThat(guardada.getPretensionMonto()).isEqualByComparingTo("3800");
+        // Normalizada: «pen» y «PEN» son el mismo dinero, y guardar las dos grafías haría que
+        // comparar dos pretensiones dependiera de cómo escribió cada uno.
+        assertThat(guardada.getPretensionMoneda()).isEqualTo("PEN");
+        assertThat(guardada.getPretensionDeclaradaEn()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("con el sueldo oculto no se exige nada, y lo que llegue se ignora")
+    void elSueldoOcultoLibera() {
+        armarVacantePublicada(ORGANIZACION, "OCULTA");
+
+        servicio.postular(QUIEN, VACANTE, cv, "Ordené la caja", null, null, null, null, true,
+                new java.math.BigDecimal("3800"), "PEN", "10.0.0.1", "Navegador");
+
+        var captor = org.mockito.ArgumentCaptor.forClass(Postulacion.class);
+        verify(postulaciones).save(captor.capture());
+        // Se ignora a propósito: quedarse el número mientras la empresa calla el suyo sería
+        // cobrarle al candidato una información por la que no recibió nada.
+        assertThat(captor.getValue().getPretensionMonto()).isNull();
+        assertThat(captor.getValue().getPretensionMoneda()).isNull();
+        assertThat(captor.getValue().getPretensionDeclaradaEn()).isNull();
+    }
+
+    @Test
+    @DisplayName("una pretensión absurda se para antes de crear nada")
+    void laCifraAbsurdaNoPasa() {
+        armarVacantePublicada(ORGANIZACION, "FIJA");
+
+        assertThatThrownBy(() -> servicio.postular(QUIEN, VACANTE, cv, "Ordené la caja",
+                null, null, null, null, true, new java.math.BigDecimal("0"), "PEN",
+                "10.0.0.1", "Navegador"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("mayor que cero");
+
+        verify(postulaciones, never()).save(any(Postulacion.class));
+    }
+
+    @Test
+    @DisplayName("lo declarado se le propone al perfil como banda base")
+    void loDeclaradoLlegaAlPerfil() {
+        // La otra mitad del modelo híbrido: el perfil prellena el formulario, y el formulario
+        // rellena el perfil de quien llegó sin banda. Quien ya tenía una no la pierde — eso lo
+        // decide el propio servicio de propuestas, y tiene su prueba allí.
+        armarVacantePublicada(ORGANIZACION, "FIJA");
+
+        servicio.postular(QUIEN, VACANTE, cv, "Ordené la caja", null, null, null, null, true,
+                new java.math.BigDecimal("3800"), "PEN", "10.0.0.1", "Navegador");
+
+        verify(propuestaPerfil).proponerPretension(PERSONA, new java.math.BigDecimal("3800"), "PEN");
+    }
+
     @Test
     @DisplayName("sin banco no se crea evaluación y la postulación va directa a la bandeja del equipo")
     void sinBancoVaDirectaALaBandeja() {
         armarVacantePublicada(ORGANIZACION);
 
         servicio.postular(QUIEN, VACANTE, cv, "Ordené la caja de tres sedes",
-                null, null, null, null, true, "10.0.0.1", "Navegador");
+                null, null, null, null, true, null, null, "10.0.0.1", "Navegador");
 
         // El salto: directo a la bandeja del equipo, sin turno de candidato en el perfil
         verify(maquina).transicionar(any(Postulacion.class), eq("PERFIL_POR_CONFIRMAR"),
@@ -195,7 +310,7 @@ class ServicioPostulacionPortalImplTest {
         armarVacantePublicada(empresa);
 
         servicio.postular(QUIEN, VACANTE, cv, "Ordené la caja de tres sedes",
-                null, null, null, null, true, "10.0.0.1", "Navegador");
+                null, null, null, null, true, null, null, "10.0.0.1", "Navegador");
 
         var captor = org.mockito.ArgumentCaptor.forClass(
                 com.renaser.ai.ai_engine.consentimiento.entity.Consentimiento.class);
@@ -212,7 +327,7 @@ class ServicioPostulacionPortalImplTest {
     @DisplayName("sin aceptar el tratamiento de datos no hay postulación, y no queda nada a medias")
     void sinAceptarElTratamientoNoHayPostulacion() {
         assertThatThrownBy(() -> servicio.postular(QUIEN, VACANTE, cv, "Un resultado",
-                null, null, null, null, null, "10.0.0.1", "Navegador"))
+                null, null, null, null, null, null, null, "10.0.0.1", "Navegador"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("aceptar el tratamiento");
         // Se corta ANTES de tocar nada: ni postulación, ni CV, ni consentimiento
@@ -231,7 +346,7 @@ class ServicioPostulacionPortalImplTest {
                 .thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> servicio.postular(QUIEN, VACANTE, cv, "Un resultado",
-                null, null, null, null, true, "10.0.0.1", "Navegador"))
+                null, null, null, null, true, null, null, "10.0.0.1", "Navegador"))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("texto de consentimiento");
         verifyNoInteractions(consentimientos);
@@ -253,7 +368,7 @@ class ServicioPostulacionPortalImplTest {
         assertThatThrownBy(() -> tablon.consentimientoDeVacante(VACANTE))
                 .isInstanceOf(com.renaser.ai.ai_engine.ai.exception.ResourceNotFoundException.class);
         assertThatThrownBy(() -> servicio.postular(QUIEN, VACANTE, cv, "Un resultado",
-                null, null, null, null, true, "10.0.0.1", "Navegador"))
+                null, null, null, null, true, null, null, "10.0.0.1", "Navegador"))
                 .isInstanceOf(com.renaser.ai.ai_engine.ai.exception.ResourceNotFoundException.class);
         verifyNoInteractions(consentimientos);
     }
@@ -305,7 +420,7 @@ class ServicioPostulacionPortalImplTest {
         when(almacen.copiarA(empresa, suyo)).thenReturn(Archivo.builder().id(501L)
                 .organizacionId(empresa).ruta("postulacion/501.pdf").build());
 
-        servicio.postular(QUIEN, VACANTE, null, "Ordené la caja de tres sedes", null, null, null, null, true,
+        servicio.postular(QUIEN, VACANTE, null, "Ordené la caja de tres sedes", null, null, null, null, true, null, null,
                 "10.0.0.1", "Navegador");
 
         verify(almacen).copiarA(empresa, suyo);
@@ -320,7 +435,7 @@ class ServicioPostulacionPortalImplTest {
         armarVacantePublicada(ORGANIZACION);
         when(cv.isEmpty()).thenReturn(false);
 
-        servicio.postular(QUIEN, VACANTE, cv, "Ordené la caja de tres sedes", null, null, null, null, true,
+        servicio.postular(QUIEN, VACANTE, cv, "Ordené la caja de tres sedes", null, null, null, null, true, null, null,
                 "10.0.0.1", "Navegador");
 
         verify(almacen).guardar(ORGANIZACION, cv);
@@ -336,7 +451,7 @@ class ServicioPostulacionPortalImplTest {
         when(perfiles.findByPersonaId(PERSONA)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> servicio.postular(QUIEN, VACANTE, cv, "Ordené la caja de tres sedes", null, null, null,
-                null, true, "10.0.0.1", "Navegador"))
+                null, true, null, null, "10.0.0.1", "Navegador"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Necesitamos tu currículum");
     }
@@ -348,7 +463,7 @@ class ServicioPostulacionPortalImplTest {
         when(perfiles.findByPersonaId(PERSONA)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> servicio.postular(QUIEN, VACANTE, null, "Ordené la caja de tres sedes", null, null, null,
-                null, true, "10.0.0.1", "Navegador"))
+                null, true, null, null, "10.0.0.1", "Navegador"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("guárdalo en tu perfil");
     }
@@ -367,7 +482,7 @@ class ServicioPostulacionPortalImplTest {
                         .borradoEn(java.time.Instant.now()).build()));
 
         assertThatThrownBy(() -> servicio.postular(QUIEN, VACANTE, null, "Ordené la caja de tres sedes", null, null, null,
-                null, true, "10.0.0.1", "Navegador"))
+                null, true, null, null, "10.0.0.1", "Navegador"))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("vuelve a subirlo");
 
@@ -386,7 +501,7 @@ class ServicioPostulacionPortalImplTest {
         when(archivos.findByIdAndOrganizacionId(500L, ORGANIZACION)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> servicio.postular(QUIEN, VACANTE, null, "Ordené la caja de tres sedes", null, null, null,
-                null, true, "10.0.0.1", "Navegador"))
+                null, true, null, null, "10.0.0.1", "Navegador"))
                 .isInstanceOf(IllegalArgumentException.class);
 
         verify(archivos).findByIdAndOrganizacionId(500L, ORGANIZACION);

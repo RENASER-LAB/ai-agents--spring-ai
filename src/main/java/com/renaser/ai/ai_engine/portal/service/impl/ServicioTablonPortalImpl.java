@@ -123,6 +123,6 @@ public class ServicioTablonPortalImpl implements ServicioTablonPortal {
                 .toList();
         return new VacantePublica(v.getId(), v.getTitulo(), nombreEmpresa, v.getDescripcion(),
                 v.getProposito(), v.getResponsabilidades(), v.getRequisitos(), v.getModalidad(),
-                v.getHorario(), v.getUbicacion(), v.getCompensacionPublica(), reqs);
+                v.getHorario(), v.getUbicacion(), RemuneracionQueVeElCandidato.de(v), reqs);
     }
 }

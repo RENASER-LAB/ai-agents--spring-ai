@@ -95,6 +95,15 @@ class ServicioVacantesPanelImplTest {
     @Mock private com.renaser.ai.ai_engine.postulacion.repository.PostulacionRepository postulaciones;
     @Mock private com.renaser.ai.ai_engine.perfilintegral.repository.VersionBancoRepository versionesBanco;
 
+    // Las seis de contarle a la gente que el sueldo cambió (V55). Son dobles: lo que hacen
+    // de verdad lo comprueban sus propias pruebas; aquí se vigila A QUIÉN se llama.
+    @Mock private com.renaser.ai.ai_engine.notificacion.service.ServicioAvisosPortal avisos;
+    @Mock private com.renaser.ai.ai_engine.notificacion.service.ServicioCorreo correo;
+    @Mock private com.renaser.ai.ai_engine.notificacion.service.DireccionDelCandidato direcciones;
+    @Mock private com.renaser.ai.ai_engine.postulacion.service.ServicioEnlaceAcceso enlacesDeAcceso;
+    @Mock private com.renaser.ai.ai_engine.usuario.repository.UsuarioRepository usuarios;
+    @Mock private com.renaser.ai.ai_engine.usuario.repository.PersonaRepository personas;
+
     private ServicioVacantesPanelImpl servicio;
 
     @BeforeEach
@@ -102,7 +111,8 @@ class ServicioVacantesPanelImplTest {
         servicio = new ServicioVacantesPanelImpl(vacantes, puestos, requisitos, solicitudes,
                 versionesPesos, plantillas, versionesPrueba, plantillasPrueba, plantillasCorreo,
                 plantillasPorVacante, textosConsentimiento, intentos, evaluaciones, versionesBanco,
-                auditoria, dueno, postulaciones);
+                auditoria, dueno, postulaciones, avisos, correo, direcciones, enlacesDeAcceso,
+                usuarios, personas);
         // En estas pruebas la organizacion no personaliza nada: el resolutor contesta
         // que el dueño de todo instrumento es ella misma (aqui hace de plataforma).
         org.mockito.Mockito.lenient()

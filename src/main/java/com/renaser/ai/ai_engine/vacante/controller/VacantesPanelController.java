@@ -187,6 +187,27 @@ public class VacantesPanelController {
         servicio.quitarPlantillaCorreo(permisos.actual(), id, avisoCodigo);
     }
 
+    /**
+     * Cambiar lo que la vacante dice que paga.
+     *
+     * <p>Verbo propio y no un campo del PUT general: este cambio le manda un correo y un aviso
+     * a cada candidato vivo, y eso no puede dispararse al corregir una falta de ortografía en
+     * la descripción.
+     *
+     * <p>Va con {@code editar_vacante}: quien puede cambiar el puesto puede cambiar el sueldo.
+     * Partirlo en un permiso aparte le daría a alguien la mitad del formulario, y la empresa
+     * que decide el presupuesto es la misma que redacta la convocatoria.
+     */
+    @PostMapping("/vacantes/{id}/remuneracion")
+    @PreAuthorize("@permisos.tiene('editar_vacante')")
+    @Operation(summary = "Definir o cambiar la remuneración (OCULTA, FIJA o RANGO). Si la "
+            + "vacante está publicada, avisa por correo y por la campana del portal a cada "
+            + "candidato que sigue en carrera. El motivo es obligatorio")
+    public RemuneracionActualizadaResponse actualizarRemuneracion(
+            @PathVariable Long id, @Valid @RequestBody ActualizarRemuneracion datos) {
+        return servicio.actualizarRemuneracion(permisos.actual(), id, datos);
+    }
+
     @PostMapping("/vacantes/{id}/publicacion")
     @PreAuthorize("@permisos.tiene('publicar_vacante')")
     @Operation(summary = "Publicar: la vacante aparece en el portal")

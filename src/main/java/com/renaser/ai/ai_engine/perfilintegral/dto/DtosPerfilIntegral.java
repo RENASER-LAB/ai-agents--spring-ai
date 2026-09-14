@@ -156,6 +156,14 @@ public final class DtosPerfilIntegral {
             int fallidos,
             boolean puedeVerPretension,
             boolean puedeMoverPostulacion,
+            /**
+             * Si ESTA vacante publica lo que paga (V54).
+             *
+             * <p>Es lo que le da sentido a la columna de la pretensión declarada: con el
+             * sueldo oculto nadie estaba obligado a decir el suyo, y una columna entera vacía
+             * significa que el trato funcionó — no que la tanda sea de gente reservada.
+             */
+            boolean vacanteMuestraSueldo,
             List<FilaRanking> filas) {}
 
     /**
@@ -236,6 +244,23 @@ public final class DtosPerfilIntegral {
             BigDecimal pretensionMin,
             BigDecimal pretensionMax,
             String pretensionMoneda,
+            /**
+             * Lo que pidió AL POSTULAR A ESTA VACANTE (V54), con la misma protección que la
+             * del perfil: sin {@code ver_pretension} viene vacío.
+             *
+             * <p>⚠️ <b>No es lo mismo que la del perfil, y por eso son dos campos y no uno.</b>
+             * La del perfil es su expectativa general —la que escribió una vez y quizá hace
+             * meses—; esta la confirmó mirando lo que ESTA vacante ofrece. Cuando difieren, la
+             * diferencia es información: alguien que pide menos de su banda habitual en una
+             * vacante concreta está diciendo algo.
+             *
+             * <p>⚠️ <b>Vacío no significa que no quisiera decirlo.</b> Con
+             * {@code vacanteMuestraSueldo} en false, la vacante tenía el sueldo oculto y no se
+             * le exigió: es el trato cumpliéndose, no un candidato esquivo. Quien pinte esta
+             * columna tiene que decirlo con esas palabras.
+             */
+            BigDecimal pretensionDeclarada,
+            String pretensionDeclaradaMoneda,
             // Lo ya rendido sobre 100. Es un objeto y no cuatro cifras sueltas a propósito:
             // este record se copia campo a campo al numerar las filas, y cuatro BigDecimal
             // vecinos son cuatro ocasiones de intercambiar dos sin que el compilador chiste.

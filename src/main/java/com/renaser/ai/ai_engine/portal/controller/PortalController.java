@@ -117,7 +117,9 @@ public class PortalController {
             + "te sientes orgulloso, la confirmación de los requisitos indispensables y la "
             + "aceptación del tratamiento de datos de la empresa (obligatoria). Sin adjuntar "
             + "CV se usa el del perfil; adjuntando uno vale solo para esta vacante y el "
-            + "perfil no cambia. Sin ninguno de los dos, 400")
+            + "perfil no cambia. Sin ninguno de los dos, 400. Si la vacante publica su "
+            + "remuneración, pretensionMonto y pretensionMoneda son obligatorios; si no, se "
+            + "ignoran")
     public ResponseEntity<Map<String, String>> postular(
             @RequestParam Long vacanteId,
             // Opcional desde que el currículum puede vivir en el perfil. Quien no adjunte
@@ -134,9 +136,16 @@ public class PortalController {
             // que dice qué falta. El IP y el navegador van al registro firmado, como en
             // crearCuenta.
             @RequestParam(required = false) Boolean aceptaTratamiento,
+            // Obligatorios cuando la vacante publica lo que paga, ignorados cuando no (V54).
+            // No los exige Spring por lo mismo que `aceptaTratamiento`: quien decide si hacen
+            // falta es la vacante, y solo el servicio puede mirarla y contestar un 400 que
+            // explique por qué se piden.
+            @RequestParam(required = false) java.math.BigDecimal pretensionMonto,
+            @RequestParam(required = false) String pretensionMoneda,
             HttpServletRequest request) {
         UUID uuid = postulaciones.postular(permisos.actual(), vacanteId, cv, resultadoOrgulloso,
                 portafolio, linkedin, github, requisitosConfirmados, aceptaTratamiento,
+                pretensionMonto, pretensionMoneda,
                 request.getRemoteAddr(), request.getHeader("User-Agent"));
         return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("codigo", uuid.toString()));
     }
@@ -158,6 +167,36 @@ public class PortalController {
     @Operation(summary = "Retirar mi postulación. No borra mis datos: eso se pide aparte")
     public void retirar(@PathVariable UUID uuid) {
         postulaciones.retirar(permisos.actual(), uuid);
+    }
+
+    /**
+     * La campana: lo que pasó mientras no estaba (V55).
+     *
+     * <p>No pide permiso propio. Todo candidato con sesión tiene campana, y son SUS avisos: el
+     * servicio filtra por el usuario del token y no hay forma de pedir los de otro.
+     */
+    @GetMapping("/avisos")
+    @Operation(summary = "Mis avisos, los nuevos arriba, y cuántos me quedan sin ver")
+    public MisAvisos misAvisos() {
+        return postulaciones.misAvisos(permisos.actual());
+    }
+
+    /**
+     * Apaga el punto.
+     *
+     * <p>Se marca al ABRIR LA CAMPANA y no al abrir cada postulación: enterarse de que hay
+     * algo es lo que lo apaga. El aviso sigue ahí para releerlo, solo deja de contar.
+     */
+    @PostMapping("/avisos/lectura")
+    @Operation(summary = "Marcar leídos todos mis avisos")
+    public Map<String, Integer> marcarAvisosLeidos() {
+        return Map.of("marcados", postulaciones.marcarAvisosLeidos(permisos.actual()));
+    }
+
+    @PostMapping("/avisos/{id}/lectura")
+    @Operation(summary = "Marcar leído un aviso mío")
+    public void marcarAvisoLeido(@PathVariable Long id) {
+        postulaciones.marcarAvisoLeido(permisos.actual(), id);
     }
 
     @PostMapping("/consentimientos/futuros/retiro")

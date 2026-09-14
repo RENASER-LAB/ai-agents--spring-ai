@@ -629,6 +629,11 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
                     suPerfil == null ? null : suPerfil.getPretensionMin(),
                     suPerfil == null ? null : suPerfil.getPretensionMax(),
                     suPerfil == null ? null : suPerfil.getPretensionMoneda(),
+                    // La declarada al postular aquí. Bajo el MISMO permiso que la del perfil:
+                    // es el mismo dato sensible, y dejarla pasar sin permiso porque viaja en
+                    // otra columna abriría por la puerta de atrás lo que la V36 cerró.
+                    puedeVerPretension ? p.getPretensionMonto() : null,
+                    puedeVerPretension ? p.getPretensionMoneda() : null,
                     ponderadoDeLoRendido(perfilPorPostulacionParaPonderar.get(p.getId()),
                             pruebaPorPostulacion.get(p.getId()), notaDelCurriculum,
                             pesoDeLaEtapa)));
@@ -660,6 +665,7 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
                     f.notasCriterio(),
                     f.ciudad(), f.ciudadCodigo(),
                     f.pretensionMin(), f.pretensionMax(), f.pretensionMoneda(),
+                    f.pretensionDeclarada(), f.pretensionDeclaradaMoneda(),
                     f.ponderado()));
         }
 
@@ -667,7 +673,9 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
                 puesto == null ? null : puesto.getNombre(),
                 puesto == null ? null : puesto.getNivelPuestoCodigo(),
                 numeradas.size(), conFina, calificados, enCurso, fallidos,
-                puedeVerPretension, quien.tiene("mover_postulacion"), numeradas);
+                puedeVerPretension, quien.tiene("mover_postulacion"),
+                com.renaser.ai.ai_engine.vacante.service.Remuneracion.laEnsena(vacante),
+                numeradas);
     }
 
     /**
