@@ -161,7 +161,8 @@ public class ServicioExcelRankingImpl implements ServicioExcelRanking {
                             + vacanteId + ": no hay nada que volcar.");
         }
 
-        byte[] contenido = escribir(quien, etapa, enElOrdenPedido, ajenas, pedido.filtroDescrito());
+        byte[] contenido = escribir(quien, etapa, enElOrdenPedido, ajenas,
+                pedido.filtroDescrito(), tanda.vacanteMuestraSueldo());
         return new ExcelDeRanking(nombreDelArchivo(etapa, vacanteId), contenido);
     }
 
@@ -176,7 +177,8 @@ public class ServicioExcelRankingImpl implements ServicioExcelRanking {
     // ========================================================================
 
     private byte[] escribir(ContextoUsuario quien, String etapa, List<FilaRanking> filas,
-                            List<Long> ajenas, String filtroDescrito) {
+                            List<Long> ajenas, String filtroDescrito,
+                            boolean vacanteMuestraSueldo) {
         try (XSSFWorkbook libro = new XSSFWorkbook();
              ByteArrayOutputStream salida = new ByteArrayOutputStream()) {
             Pinceles pinceles = new Pinceles(libro);
@@ -192,7 +194,8 @@ public class ServicioExcelRankingImpl implements ServicioExcelRanking {
                 resumenDeLaPrueba(resumen, pinceles, filas, vePretension);
                 detalleDeLaPrueba(detalle, pinceles, quien, filas);
             }
-            pie(resumen, pinceles, filas, ajenas, filtroDescrito, vePretension);
+            pie(resumen, pinceles, filas, ajenas, filtroDescrito, vePretension,
+                    vacanteMuestraSueldo);
 
             libro.write(salida);
             return salida.toByteArray();
@@ -425,7 +428,7 @@ public class ServicioExcelRankingImpl implements ServicioExcelRanking {
     // ========================================================================
 
     private void pie(Sheet hoja, Pinceles pinceles, List<FilaRanking> filas, List<Long> ajenas,
-                     String filtroDescrito, boolean vePretension) {
+                     String filtroDescrito, boolean vePretension, boolean vacanteMuestraSueldo) {
         int linea = hoja.getLastRowNum() + 2;
 
         String filtro = filtroDescrito == null || filtroDescrito.isBlank()
@@ -443,9 +446,16 @@ public class ServicioExcelRankingImpl implements ServicioExcelRanking {
                             + PERMISO_PRETENSION + "»: el dato no se consultó. NO significa "
                             + "que estos candidatos no declararan sueldo.");
         } else if (filas.stream().allMatch(f -> pretension(f).isEmpty())) {
-            linea = anotar(hoja, pinceles, linea,
-                    "Ninguno de los " + filas.size() + " candidatos volcados declaró "
-                            + "pretensión salarial.");
+            // Tres motivos y no dos desde la V54, y el tercero es el único que NO es del
+            // candidato: esta vacante no publica lo que paga, así que a nadie se le exigió
+            // decir lo suyo. Escribir «ninguno declaró» ahí es exactamente la frase que la
+            // V54 prohíbe — acusa de reservado a quien cumplió el trato.
+            linea = anotar(hoja, pinceles, linea, vacanteMuestraSueldo
+                    ? "Ninguno de los " + filas.size() + " candidatos volcados declaró "
+                            + "pretensión salarial."
+                    : "Esta vacante no publica su remuneración, así que a nadie se le pidió "
+                            + "la suya: quien no enseña lo que paga tampoco pregunta lo que "
+                            + "piden. NO significa que estos candidatos fueran reservados.");
         }
 
         if (!ajenas.isEmpty()) {
@@ -619,14 +629,26 @@ public class ServicioExcelRankingImpl implements ServicioExcelRanking {
     }
 
     /**
-     * «S/ 3,000 – 4,500», «desde S/ 3,000», o vacío. Vacío lo explica el pie, no la celda.
+     * «S/ 3,800», «S/ 3,000 – 4,500», «desde S/ 3,000», o vacío. Vacío lo explica el pie.
      *
      * <p>Se escribe igual que en el panel —mismo símbolo, mismo separador de millares— porque
      * es la MISMA cifra: la hoja sale del panel y se reenvía, y era la menos legible de las
      * dos. Y el símbolo no se supone: sin moneda declarada van las cifras solas, que un
      * candidato pidiendo 3.000 dólares y leído como «S/ 3,000» es una llamada perdida.
+     *
+     * <p>⚠️ <b>Y «la misma cifra» significa la que el panel pinta, que desde la V54 es la
+     * DECLARADA AL POSTULAR AQUÍ.</b> La del perfil es su expectativa general, escrita quizá
+     * hace meses y sin mirar esta vacante; la declarada la confirmó delante del sueldo de este
+     * puesto, y es con la que se va a negociar. Escribir aquí la del perfil teniendo la otra
+     * hacía que la hoja y la pantalla dieran dos números distintos de la misma persona — y la
+     * hoja es el artefacto con el que se decide fuera de la aplicación.
      */
     private String pretension(FilaRanking fila) {
+        if (fila.pretensionDeclarada() != null) {
+            String suSimbolo = simboloDe(fila.pretensionDeclaradaMoneda());
+            return (suSimbolo.isEmpty() ? "" : suSimbolo + " ")
+                    + cantidad(fila.pretensionDeclarada());
+        }
         BigDecimal min = fila.pretensionMin();
         BigDecimal max = fila.pretensionMax();
         if (min == null && max == null) {

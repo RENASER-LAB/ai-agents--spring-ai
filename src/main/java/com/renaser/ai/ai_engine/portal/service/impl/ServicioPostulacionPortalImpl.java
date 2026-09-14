@@ -419,11 +419,26 @@ public class ServicioPostulacionPortalImpl implements ServicioPostulacionPortal 
                 .collect(Collectors.toMap(Vacante::getId, Function.identity()));
         Map<String, String> unEstado = estados.findById(p.getEstadoCodigo()).stream()
                 .collect(Collectors.toMap(EstadoPostulacion::getCodigo, EstadoPostulacion::getNombre));
+        /*
+         * El detalle lleva la MISMA cuenta que la lista, y no un cero.
+         *
+         * No es para pintar un punto —abrir la postulación ya es verla—: es lo que decide si
+         * el sueldo sale resaltado con su «actualizado el …». Quien llega aquí desde el aviso
+         * viene justamente a ver qué cambió, y con un cero fijo el resaltado no se encendía
+         * nunca: el recorrido entero para el que se construyó terminaba en una pantalla sin
+         * ninguna marca.
+         *
+         * La fecha del cambio por sí sola no sirve para eso: una vacante que se movió hace un
+         * año y a la que esta persona postuló ayer no tiene ninguna novedad que contarle.
+         */
+        // Del dueño de la postulación, que es quien pregunta: `laMia` ya comprobó que el
+        // token y la postulación son de la misma persona antes de llegar aquí.
+        long sinLeer = avisos
+                .sinLeerPorPostulacion(p.getUsuarioId(), List.of(p.getId()))
+                .getOrDefault(p.getId(), 0L);
         return comoResumen(p, unaVacante, unEstado,
                 nombresDeOrganizacion(unaVacante.values().stream().toList()),
-                // El detalle no pinta punto: abrir la postulación ya ES verla. El punto vive
-                // en la lista, que es donde sirve para decidir qué abrir.
-                0L);
+                sinLeer);
     }
 
     // ============ La campana (V55) ============

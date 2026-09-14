@@ -35,4 +35,15 @@ public interface AvisoPortalRepository extends JpaRepository<AvisoPortal, Long> 
     @Query("update AvisoPortal a set a.leidoEn = :cuando "
             + "where a.usuarioId = :usuarioId and a.leidoEn is null")
     int marcarTodosLeidos(@Param("usuarioId") Long usuarioId, @Param("cuando") Instant cuando);
+
+    /**
+     * Se lleva todos los de una persona: lo usa el borrado de datos de la ley 29733.
+     *
+     * <p>Borra de verdad, no vacía. A diferencia de {@code correo_enviado} —que conserva su
+     * fila porque demuestra que se avisó— un aviso del portal no es prueba de nada frente a
+     * nadie, y su {@code cuerpo} lleva el texto ya armado con el nombre de la vacante.
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("delete from AvisoPortal a where a.usuarioId = :usuarioId")
+    int deleteByUsuarioId(@Param("usuarioId") Long usuarioId);
 }

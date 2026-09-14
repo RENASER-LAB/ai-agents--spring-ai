@@ -61,6 +61,20 @@ public final class Remuneracion {
     private static final BigDecimal MAXIMO = new BigDecimal("1000000");
 
     /**
+     * Y el suelo, que hasta ahora no existía: bastaba con ser mayor que cero.
+     *
+     * <p>Un sueldo mensual de S/ 3.50 no es una oferta baja, es un error. Llegaba de dos
+     * sitios: de un formulario que leía «3,500» como tres soles con cincuenta —ver
+     * {@code dominio/dinero} en el portal—, y de cualquier cliente de la API que mandara la
+     * cifra sin pasar por una pantalla. El suelo lo para en los dos casos.
+     *
+     * <p>Cien y no el sueldo mínimo legal: la cifra también viaja en dólares, y un umbral
+     * pegado a la ley peruana rechazaría una práctica pagada en USD que es perfectamente
+     * real. Lo que se para aquí es el error de magnitud, no la oferta modesta.
+     */
+    private static final BigDecimal MINIMO = new BigDecimal("100");
+
+    /**
      * ¿Esta vacante enseña lo que paga?
      *
      * <p>Y por tanto —el trato de la V54— ¿le exige a quien postula que diga lo suyo?
@@ -125,10 +139,33 @@ public final class Remuneracion {
             throw new IllegalArgumentException(
                     "Los montos de la remuneración tienen que ser mayores que cero");
         }
+        exigirEntero(monto);
+        if (monto.compareTo(MINIMO) < 0) {
+            throw new IllegalArgumentException(
+                    "Ese monto es demasiado bajo para ser un sueldo mensual: el mínimo "
+                            + "admitido es " + escribirMonto(MINIMO)
+                            + ". Escríbelo en cifras enteras, sin céntimos");
+        }
         if (monto.compareTo(MAXIMO) > 0) {
             throw new IllegalArgumentException(
                     "Ese monto parece un error de tecleo: el máximo admitido es "
                             + escribirMonto(MAXIMO));
+        }
+    }
+
+    /**
+     * Los sueldos van en cifras enteras, y eso es una regla y no una comodidad.
+     *
+     * <p>Nadie negocia los céntimos de un sueldo mensual. Admitirlos es admitir la
+     * ambigüedad entera: con decimales sobre la mesa no hay forma de saber si un 3.50 que
+     * llega por la API son tres soles y medio o un 3500 que alguien escribió como «3,50»
+     * en un formulario que lo leyó mal. Sin decimales, esa duda no existe.
+     */
+    private static void exigirEntero(BigDecimal monto) {
+        if (monto.stripTrailingZeros().scale() > 0) {
+            throw new IllegalArgumentException(
+                    "Los sueldos se escriben en cifras enteras, sin céntimos: llegó "
+                            + monto.toPlainString() + ". Por ejemplo: 3500");
         }
     }
 
@@ -150,6 +187,18 @@ public final class Remuneracion {
         }
         if (monto.signum() <= 0) {
             throw new IllegalArgumentException("Tu pretensión tiene que ser mayor que cero");
+        }
+        // Las mismas reglas que la vacante, y no por simetría estética: si el candidato
+        // pudiera declarar céntimos y la empresa no, comparar las dos cifras —que es todo lo
+        // que este trato existe para permitir— dejaría de ser una resta limpia.
+        //
+        // Los mensajes SÍ son distintos: este lo lee alguien que está postulando, no quien
+        // configura una vacante, y «los montos de la remuneración» no es su idioma.
+        exigirEntero(monto);
+        if (monto.compareTo(MINIMO) < 0) {
+            throw new IllegalArgumentException(
+                    "Esa cifra es demasiado baja para un sueldo mensual. Escríbela en cifras "
+                            + "enteras, sin céntimos: por ejemplo 3500");
         }
         if (monto.compareTo(MAXIMO) > 0) {
             throw new IllegalArgumentException(

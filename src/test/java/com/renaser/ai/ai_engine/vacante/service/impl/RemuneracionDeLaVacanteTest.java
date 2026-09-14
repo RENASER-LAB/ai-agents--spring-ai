@@ -161,6 +161,13 @@ class RemuneracionDeLaVacanteTest {
                         Instant.now().plusSeconds(3600)));
         lenient().when(plantillasPorVacante.findByVacanteIdAndAvisoCodigo(eq(VACANTE), anyString()))
                 .thenReturn(Optional.empty());
+        // El aviso se publica de verdad. Hace falta decirlo porque el contador de
+        // «a cuánta gente le llegó» sube por el AVISO y no por el correo: `publicar`
+        // devuelve null cuando falla, y un doble que devuelve null por defecto haría que
+        // el servicio contara cero con toda la razón.
+        lenient().when(avisos.publicar(anyLong(), anyLong(), anyString(), anyString(),
+                        anyString(), anyLong(), anyLong()))
+                .thenAnswer(invocacion -> AvisoPortal.builder().id(1L).build());
     }
 
     private static ActualizarRemuneracion cambiarA(String tipo, String min, String max) {

@@ -1020,11 +1020,21 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
         int avisados = 0;
         for (var postulacion : vivas) {
             try {
-                avisos.publicar(vacante.getOrganizacionId(), postulacion.getUsuarioId(),
-                        AvisoPortal.REMUNERACION_ACTUALIZADA,
+                // El contador sube por el AVISO DEL PORTAL, que es el único de los dos
+                // canales que puede decir si llegó: `publicar` devuelve null cuando falla.
+                //
+                // El correo no cuenta a propósito, y no es descuido: `ServicioCorreo.enviar`
+                // es void y sale por la puerta de atrás tanto si falta la plantilla como si
+                // el SMTP está caído —lo anota y sigue—, así que sumarlo daría un número que
+                // afirma entregas que nadie puede confirmar. Lo que el panel promete con esta
+                // cifra es lo que de verdad quedó esperando a alguien dentro del portal.
+                AvisoPortal publicado = avisos.publicar(vacante.getOrganizacionId(),
+                        postulacion.getUsuarioId(), AvisoPortal.REMUNERACION_ACTUALIZADA,
                         titulo, cuerpo, postulacion.getId(), vacante.getId());
                 correoDelCambio(vacante, postulacion, antes, ahora);
-                avisados++;
+                if (publicado != null) {
+                    avisados++;
+                }
             } catch (RuntimeException e) {
                 log.error("No se pudo avisar del cambio de sueldo a la postulación {}: {}",
                         postulacion.getId(), e.getMessage());

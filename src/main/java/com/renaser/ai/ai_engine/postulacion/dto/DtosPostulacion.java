@@ -36,7 +36,31 @@ public final class DtosPostulacion {
                                    String grupoPrioridad, String motivoCierre,
                                    String resultadoOrgulloso, List<String> enlaces,
                                    Long archivoCvId, Instant creadoEn, Instant movidoEn,
-                                   boolean puedeMoverPostulacion) {}
+                                   boolean puedeMoverPostulacion,
+                                   /**
+                                    * Lo que pidió al postular AQUÍ, ya escrito («S/ 3 800»).
+                                    *
+                                    * <p>⚠️ <b>Solo con el permiso {@code ver_pretension}; sin
+                                    * él viaja vacío.</b> El mismo trato que en el ranking y
+                                    * que en el perfil: la V36 lo dejó escrito — si apareciera
+                                    * junto a la nota para todo el mundo, pesaría en la
+                                    * decisión, que es justo lo que se evita.
+                                    *
+                                    * <p>Está aquí porque esta es la pantalla donde se decide
+                                    * sobre UNA persona, y decidir sin saber si su cifra entra
+                                    * en el presupuesto es descubrirlo en la llamada.
+                                    */
+                                   String pretensionDeclarada,
+                                   /**
+                                    * Por qué no hay pretensión, cuando no la hay.
+                                    *
+                                    * <p>Tres motivos y solo uno es verdad cada vez: no tienes
+                                    * permiso, esta vacante no publicaba su sueldo —y entonces
+                                    * a nadie se le exigió—, o de verdad no la declaró. Un
+                                    * hueco a secas se lee siempre como el tercero, que es el
+                                    * único que acusa al candidato.
+                                    */
+                                   String porQueSinPretension) {}
 
     public record PasoHistorial(String estadoAnterior, String estadoNuevo, Long usuarioId,
                                 boolean fueElSistema, boolean fuePorLote, String motivo,

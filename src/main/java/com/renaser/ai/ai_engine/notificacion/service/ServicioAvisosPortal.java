@@ -6,6 +6,8 @@ import com.renaser.ai.ai_engine.notificacion.repository.AvisoPortalRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
@@ -35,8 +37,21 @@ public class ServicioAvisosPortal {
     /**
      * Deja un aviso esperando a alguien.
      *
+     * <p>⚠️ <b>En transacción propia, y el {@code REQUIRES_NEW} es la mitad de la garantía.</b>
+     * Sin él, el {@code catch} de abajo no protege nada: un INSERT que falla dentro de la
+     * transacción del llamador la deja marcada {@code rollback-only} antes de lanzar, así que
+     * atrapar la excepción no la rescata y el commit revienta después con un
+     * {@code UnexpectedRollbackException} — llevándose por delante el cambio de sueldo y su
+     * fila de auditoría, que es exactamente lo que este método promete no hacer.
+     *
+     * <p>El precio es el de siempre con {@code REQUIRES_NEW}: el aviso se compromete antes
+     * que lo que lo provocó, así que si el cambio de sueldo se deshace después, el aviso se
+     * queda. Es el lado correcto del que equivocarse — un aviso de más se explica; un sueldo
+     * revertido en silencio, no.
+     *
      * @return el aviso guardado, o {@code null} si no se pudo — nunca lanza.
      */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public AvisoPortal publicar(Long organizacionId, Long usuarioId, String tipo,
                                 String titulo, String cuerpo,
                                 Long postulacionId, Long vacanteId) {

@@ -93,6 +93,53 @@ class RemuneracionTest {
                     .hasMessageContaining("error de tecleo");
         }
 
+        /**
+         * El suelo y la regla del entero, que llegaron juntos y por el mismo motivo.
+         *
+         * <p>El formulario del portal leía «3,500» como <b>3.5</b> —`Number('3,500')` en
+         * JavaScript— y las validaciones de aquí lo dejaban pasar: era mayor que cero y menor
+         * que el techo. El resultado era una vacante publicada prometiendo tres soles con
+         * cincuenta, y cuarenta correos diciéndolo. El formulario ya está arreglado, pero la
+         * API no es solo el formulario: esto es lo que la cierra por debajo.
+         */
+        @Test
+        @DisplayName("un sueldo con céntimos no es un sueldo: se rechaza en los dos lados")
+        void losSueldosVanEnCifrasEnteras() {
+            assertThatThrownBy(() -> Remuneracion.validar("FIJA", soles("3.50"), null, "PEN"))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("cifras enteras");
+            assertThatThrownBy(() ->
+                    Remuneracion.validar("RANGO", soles("3000"), soles("4000.75"), "PEN"))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("cifras enteras");
+            assertThatThrownBy(() -> Remuneracion.validarPretension(soles("3.50"), "PEN"))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("cifras enteras");
+
+            // Pero «3500.00» sí: son ceros, no céntimos — y es exactamente como vuelve una
+            // cifra guardada en una columna `numeric(12,2)`. Rechazarla haría que abrir la
+            // pantalla y pulsar guardar sin tocar nada fuera un error.
+            assertThat(Remuneracion.validar("FIJA", soles("3500.00"), null, "PEN"))
+                    .isEqualTo("PEN");
+            assertThat(Remuneracion.validarPretension(soles("3800.00"), "PEN"))
+                    .isEqualTo("PEN");
+        }
+
+        @Test
+        @DisplayName("y hay suelo: S/ 50 al mes no es una oferta baja, es un error")
+        void haySuelo() {
+            assertThatThrownBy(() -> Remuneracion.validar("FIJA", soles("50"), null, "PEN"))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("demasiado bajo");
+            assertThatThrownBy(() -> Remuneracion.validarPretension(soles("50"), "PEN"))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("demasiado baja");
+            // Cien justo entra: el suelo para el error de magnitud, no la oferta modesta, y
+            // la cifra también viaja en dólares.
+            assertThat(Remuneracion.validar("FIJA", soles("100"), null, "USD"))
+                    .isEqualTo("USD");
+        }
+
         @Test
         @DisplayName("un tipo inventado no pasa")
         void soloTresTipos() {
