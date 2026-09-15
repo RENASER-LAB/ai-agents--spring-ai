@@ -156,9 +156,7 @@ class ServicioPerfilIntegralPanelImplTest {
         lenient().when(alcanceVacante.laVacanteVisible(
                         org.mockito.ArgumentMatchers.any(),
                         org.mockito.ArgumentMatchers.eq(VACANTE), anyString()))
-                .thenReturn(Vacante.builder()
-                        .id(VACANTE).organizacionId(ORGANIZACION).puestoId(3L).versionPesosId(2L)
-                        .titulo("Analista de procesos").responsableUsuarioId(10L).build());
+                .thenReturn(vacanteQuePublicaSuSueldo());
         lenient().when(alcanceVacante.laPostulacionVisible(
                         org.mockito.ArgumentMatchers.any(),
                         org.mockito.ArgumentMatchers.anyLong(), anyString()))
@@ -659,6 +657,24 @@ class ServicioPerfilIntegralPanelImplTest {
         verifyNoInteractions(perfilesCandidato);
     }
 
+    /**
+     * La vacante del escenario, publicando lo que paga.
+     *
+     * <p>Y eso importa: desde la V54 la pretensión pide DOS llaves —el permiso, y que la
+     * vacante enseñe su sueldo—. Con una vacante OCULTA por defecto, las pruebas del permiso
+     * pasarían por el motivo equivocado y dejarían de proteger lo que dicen proteger.
+     */
+    private static Vacante vacanteQuePublicaSuSueldo() {
+        return Vacante.builder()
+                .id(VACANTE).organizacionId(ORGANIZACION).puestoId(3L).versionPesosId(2L)
+                .titulo("Analista de procesos").responsableUsuarioId(10L)
+                .remuneracionTipo("RANGO")
+                .remuneracionMin(new java.math.BigDecimal("3000"))
+                .remuneracionMax(new java.math.BigDecimal("4500"))
+                .remuneracionMoneda("PEN")
+                .build();
+    }
+
     @Test
     @DisplayName("Con ver_pretension sí viaja: la ve quien negocia, cuando toca")
     void conElPermisoLaPretensionViaja() {
@@ -669,6 +685,45 @@ class ServicioPerfilIntegralPanelImplTest {
         assertThat(fila.pretensionMin()).isEqualByComparingTo("2500");
         assertThat(fila.pretensionMax()).isEqualByComparingTo("3500");
         assertThat(fila.pretensionMoneda()).isEqualTo("PEN");
+    }
+
+    /**
+     * La otra mitad del trato, aplicada al panel (V54).
+     *
+     * <p>Una vacante que esconde su sueldo no le exige la cifra a quien postula — pero el
+     * ranking seguía leyendo la banda del perfil, que es de la plataforma y no de ninguna
+     * empresa. Así, la empresa que no enseña lo suyo veía lo que esa persona escribió en su
+     * perfil, o lo que se le guardó cuando declaró su cifra a OTRA empresa que sí lo enseñó.
+     *
+     * <p>Cobrar por un lado lo que no se paga por el otro, dando un rodeo.
+     */
+    @Test
+    @DisplayName("Una vacante que no publica su sueldo no ve ninguna pretensión, ni con permiso")
+    void sinEnsenarElSueldoNoSeVeLaPretension() {
+        when(alcanceVacante.laVacanteVisible(
+                        org.mockito.ArgumentMatchers.any(),
+                        org.mockito.ArgumentMatchers.eq(VACANTE), anyString()))
+                .thenReturn(Vacante.builder()
+                        .id(VACANTE).organizacionId(ORGANIZACION).puestoId(3L).versionPesosId(2L)
+                        .titulo("Analista de procesos").responsableUsuarioId(10L)
+                        .remuneracionTipo("OCULTA").build());
+        candidatos(conPretension(candidato(1L, "ALTA", "90"), "2500", "3500", "PEN"));
+
+        var tanda = servicio.ranking(quienTambienVeLaPretension(), VACANTE);
+        FilaRanking fila = tanda.filas().get(0);
+
+        assertThat(fila.pretensionMin()).isNull();
+        assertThat(fila.pretensionMax()).isNull();
+        assertThat(fila.pretensionMoneda()).isNull();
+        // Y como sin permiso: el dato no llega ni a la memoria de esta petición.
+        verifyNoInteractions(perfilesCandidato);
+
+        // ⚠️ Pero `puedeVerPretension` sigue diciendo la verdad sobre el PERMISO. El panel
+        // tiene que poder distinguir los dos motivos: con un solo booleano para los dos, a
+        // Dirección le diría «tu rol no puede verla», que es falso y además la manda a pedir
+        // un permiso que ya tiene.
+        assertThat(tanda.puedeVerPretension()).isTrue();
+        assertThat(tanda.vacanteMuestraSueldo()).isFalse();
     }
 
     @Test

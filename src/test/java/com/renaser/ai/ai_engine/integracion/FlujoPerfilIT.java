@@ -413,6 +413,18 @@ public class FlujoPerfilIT {
         // El primer usuario del equipo entra con todos los roles, asi que para probar el
         // caso SIN permiso se le quita a todos los roles y se restaura despues: los permisos
         // se leen de la base en cada peticion, no viven en el token.
+        /*
+         * La vacante de este flujo nace sin publicar su sueldo, y desde la V54 eso es la
+         * OTRA llave de la pretensión: quien no enseña lo que paga no ve lo que piden, tenga
+         * el permiso o no. Esta prueba mira el PERMISO, así que se enciende el sueldo aquí
+         * —por SQL, para no arrastrar al resto del flujo, que postula sin declarar cifra— y
+         * se apaga al terminar.
+         */
+        jdbc.update("""
+                update vacante set remuneracion_tipo = 'RANGO', remuneracion_min = 3000,
+                       remuneracion_max = 4500, remuneracion_moneda = 'PEN'
+                 where id = ?""", vacanteId);
+
         jdbc.update("""
                 delete from rol_permiso where permiso_id =
                     (select id from permiso where codigo = 'ver_pretension')""");
@@ -437,6 +449,26 @@ public class FlujoPerfilIT {
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
         assertThat(conPermiso).contains("pretension", "3500", "4200");
+
+        /*
+         * Y la segunda llave, sobre la misma petición y el mismo permiso: se apaga el sueldo
+         * de la vacante y la pretensión deja de viajar.
+         *
+         * Es el agujero que cerró la reciprocidad. La banda vive en `perfil_candidato`, que
+         * es de la plataforma y no de ninguna empresa: sin esta regla, la empresa que esconde
+         * lo que paga —y que por eso no le pidió nada al candidato— leía aquí lo que esa
+         * persona escribió en su perfil, o lo que se le guardó al declarar su cifra a OTRA
+         * empresa que sí la enseñó.
+         */
+        jdbc.update("update vacante set remuneracion_tipo = 'OCULTA', remuneracion_min = null, "
+                + "remuneracion_max = null, remuneracion_moneda = null where id = ?", vacanteId);
+
+        String vacanteSinSueldo = conTokenGet("/api/v1/panel/postulaciones/" + postulacionId
+                + "/perfil", tokenEquipo)
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        assertThat(vacanteSinSueldo).doesNotContain("pretension", "3500", "4200");
+        assertThat(vacanteSinSueldo).contains("Analista de procesos");   // el resto sí viaja
     }
 
     @DisplayName("Sin ver_perfil_candidato, la sección entera es un 403")

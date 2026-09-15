@@ -54,6 +54,7 @@ import com.renaser.ai.ai_engine.usuario.repository.PersonaRepository;
 import com.renaser.ai.ai_engine.usuario.repository.UsuarioRepository;
 import com.renaser.ai.ai_engine.vacante.entity.Puesto;
 import com.renaser.ai.ai_engine.vacante.entity.Vacante;
+import com.renaser.ai.ai_engine.vacante.service.Remuneracion;
 import com.renaser.ai.ai_engine.vacante.repository.PuestoRepository;
 import com.renaser.ai.ai_engine.vacante.repository.VacanteRepository;
 import com.renaser.ai.ai_engine.vacante.service.AlcanceSobreLaVacante;
@@ -526,10 +527,31 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
         // de esas provincias— en vez de dos por fila.
         Map<String, String> ciudades = ciudadesDe(personasPorId.values());
 
-        // La pretensión solo se pide si quien mira puede verla. No es solo no pintarla:
-        // sin permiso, la consulta ni se lanza, y así el dato no llega a existir en la
-        // memoria de esta petición.
-        boolean puedeVerPretension = quien.tiene("ver_pretension");
+        /*
+         * La pretensión pide DOS llaves, y las dos por el mismo motivo: que el dato no llegue
+         * a existir en la memoria de esta petición.
+         *
+         * La primera es el permiso, de siempre: solo Dirección la ve, para que el sueldo no
+         * pese al calificar (V36).
+         *
+         * ⚠️ **La segunda es que ESTA vacante publique lo que paga**, y cierra un hueco que
+         * era anterior a la V54 y que la V54 ensanchó.
+         *
+         * El trato dice que quien no enseña su sueldo no le exige al candidato el suyo — pero
+         * el ranking seguía leyendo la banda del perfil, que es de la plataforma y no de
+         * ninguna empresa. Así, una vacante con el sueldo oculto veía lo que esa persona
+         * había escrito en su perfil; y desde la V54, lo que el perfil guarda puede ser
+         * exactamente la cifra que declaró a OTRA empresa, la que sí enseñó lo suyo. Cobrar
+         * por un lado lo que no se paga por el otro es el desequilibrio entero, dando un
+         * rodeo.
+         *
+         * Con esta línea la reciprocidad deja de ser una regla del formulario de postular y
+         * pasa a ser una regla del sistema: si no enseñas lo que pagas, no ves lo que piden.
+         * Y hace verdad el aviso que el panel ya pinta en esas vacantes —«a nadie se le pidió
+         * la suya»—, que hasta ahora convivía con una columna que sí traía cifras.
+         */
+        boolean laVacanteEnsenaSuSueldo = Remuneracion.laEnsena(vacante);
+        boolean puedeVerPretension = quien.tiene("ver_pretension") && laVacanteEnsenaSuSueldo;
         Map<Long, PerfilCandidato> perfilPorPersona = puedeVerPretension
                 ? perfilesCandidato.findByPersonaIdIn(personasPorId.keySet().stream().toList())
                         .stream().collect(Collectors.toMap(PerfilCandidato::getPersonaId,
@@ -673,8 +695,11 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
                 puesto == null ? null : puesto.getNombre(),
                 puesto == null ? null : puesto.getNivelPuestoCodigo(),
                 numeradas.size(), conFina, calificados, enCurso, fallidos,
-                puedeVerPretension, quien.tiene("mover_postulacion"),
-                com.renaser.ai.ai_engine.vacante.service.Remuneracion.laEnsena(vacante),
+                // ⚠️ Viaja el PERMISO, no la conjunción de arriba: el panel tiene que poder
+                // decir cuál de los dos motivos deja la columna vacía, y con un solo booleano
+                // para los dos casos diría «tu rol no puede verla» a quien sí puede.
+                quien.tiene("ver_pretension"), quien.tiene("mover_postulacion"),
+                laVacanteEnsenaSuSueldo,
                 numeradas);
     }
 

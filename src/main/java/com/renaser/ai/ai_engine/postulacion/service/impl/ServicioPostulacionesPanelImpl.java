@@ -135,7 +135,12 @@ public class ServicioPostulacionesPanelImpl implements ServicioPostulacionesPane
         // La pretensión, bajo el mismo permiso de siempre. Se resuelve en dos pasos —la cifra
         // y, si no la hay, por qué— porque un hueco a secas se lee como «no la declaró», que
         // es el único de los tres motivos que acusa al candidato.
-        boolean vePretension = quien.tiene("ver_pretension");
+        // Las dos llaves: el permiso, y que la vacante publique lo que paga. La segunda es
+        // la misma regla del ranking y del perfil — si no enseñas lo que pagas, no ves lo que
+        // piden. Aquí hoy sería redundante (una vacante oculta nunca guarda pretensión), pero
+        // escribirla explícita es lo que impide que la regla se quede a medias mañana.
+        boolean vePretension = quien.tiene("ver_pretension")
+                && laVacante != null && Remuneracion.laEnsena(laVacante);
         String suPretension = vePretension
                 ? Remuneracion.escribirPretension(p.getPretensionMonto(), p.getPretensionMoneda())
                 : null;

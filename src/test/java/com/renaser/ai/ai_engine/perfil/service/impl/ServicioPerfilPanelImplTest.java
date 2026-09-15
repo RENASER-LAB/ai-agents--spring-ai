@@ -39,12 +39,23 @@ class ServicioPerfilPanelImplTest {
     @Mock private com.renaser.ai.ai_engine.vacante.service.AlcanceSobreLaVacante alcance;
     @Mock private UsuarioRepository usuarios;
     @Mock private PintorDePerfil pintor;
+    // La segunda llave de la pretensión: que la vacante de esta postulación publique lo que
+    // paga. Sin ella, la empresa que esconde su sueldo leía aquí la banda del perfil.
+    @Mock private com.renaser.ai.ai_engine.vacante.repository.VacanteRepository vacantes;
 
     private ServicioPerfilPanelImpl servicio;
 
     @BeforeEach
     void crearElServicio() {
-        servicio = new ServicioPerfilPanelImpl(alcance, usuarios, pintor);
+        servicio = new ServicioPerfilPanelImpl(alcance, usuarios, pintor, vacantes);
+        // Su vacante publica el sueldo: es lo que deja pasar la pretensión en las pruebas que
+        // miran el permiso. La que comprueba la otra llave la reemplaza por una OCULTA.
+        lenient().when(vacantes.findByIdAndOrganizacionId(7L, ORGANIZACION)).thenReturn(Optional.of(
+                com.renaser.ai.ai_engine.vacante.entity.Vacante.builder()
+                        .id(7L).remuneracionTipo("RANGO")
+                        .remuneracionMin(new java.math.BigDecimal("3000"))
+                        .remuneracionMax(new java.math.BigDecimal("4000"))
+                        .remuneracionMoneda("PEN").build()));
         // Quién alcanza qué ya no se decide aquí: lo decide AlcanceSobreLaVacante, y allí
         // tiene sus propias pruebas. Lo que se comprueba en esta clase es que se le pregunta
         // por el permiso correcto y que lo que conteste llega intacto al llamador.
