@@ -74,6 +74,35 @@ mensual de IA; y se siembra la plantilla de correo del aviso del 80% (`TOPE_IA_A
 todas las organizaciones. La `V39` es de una línea: siembra la tarifa del modelo rápido, que
 a la `V38` se le quedó fuera y dejaba invisible el gasto de leer currículums.
 
+La `V54` (14/09/2026) **no añade ninguna tabla y cambia quién firma qué**. Hasta ella había dos
+tipos de texto —`PROCESO` y `FUTUROS_CONTACTOS`— y el de la cuenta usaba el primero, que habla de
+«esta vacante» cuando al registrarse todavía no hay ninguna: quien luego postulaba a una vacante
+de Renaser firmaba dos veces el mismo texto. La migración suma el tipo **`PLATAFORMA`** al CHECK
+de `texto_consentimiento.tipo` y publica ese texto para la organización plataforma, junto con una
+`1.1` del opcional. Además renombra la organización plataforma a su razón social, «RENASER
+CONSULTING S.A.C.», porque ese nombre viaja dentro del texto que firma cada candidato.
+
+**Y el texto de `PROCESO` pasó a ser uno solo para todas las empresas.** Antes había una fila por
+empresa y lo único que cambiaba entre ellas eran las tres palabras de su razón social: corregir
+una coma obligaba a republicar empresa por empresa, y una empresa recién dada de alta no podía
+recibir candidatos hasta publicar la suya. La V54 publica **una sola** `1.1`, de la plataforma,
+con un hueco donde va el nombre de quien publica la vacante, y **retira** —les quita la fecha de
+publicación, sin borrar nada— todas las filas que seguían siendo el texto provisional de la v1.0:
+las copias que el alta había repartido y las dos de la propia plataforma, ya relevadas. Nadie las
+lee, pero el panel de textos legales las listaría como vigentes.
+
+De ahí salen tres consecuencias que se ven desde fuera: **ninguna empresa puede publicar textos**
+(el panel responde 400 a los tres tipos), **el alta de una empresa no le copia ninguno**, y
+**publicar una vacante ya no exige tener texto propio** — ese freno se retiró con la migración.
+
+Lo que sí añade la V54 es **una columna**: `consentimiento.texto_firmado`, donde se guarda el
+texto tal como se le pintó a la persona, con el nombre de la empresa ya puesto. Con el hueco,
+apuntar a la fila dejó de bastar para saber qué leyó cada quien.
+
+⚠️ **La V54 no toca las filas ya existentes de `consentimiento`.** Quien ya tenía cuenta sigue
+ligado al texto que firmó, y no hay mecanismo para pedirle el nuevo. Ver
+[BORRADOR-CONSENTIMIENTO-v1.1.md](BORRADOR-CONSENTIMIENTO-v1.1.md).
+
 La `V40` **no añade ninguna tabla**, y eso es lo interesante: lo que hacía falta —saber quién
 eligió cada fecha de una sesión— ya estaba en `inscripcion_sesion`, solo que no salía por
 ningún endpoint. Lo único que trae son dos permisos, `ver_inscritos_simulacion` y
@@ -475,20 +504,47 @@ El alcance tiene tres valores: **propio**, **sus vacantes** y **todo**. Qué alc
 | Tabla | Para qué existe | Columnas que importan |
 |---|---|---|
 | `texto_consentimiento` | El texto que se acepta, versionado y con su huella | organizacion_id, tipo, version, texto, hash, publicado_en |
-| `consentimiento` | Que esta persona aceptó esta versión concreta | persona_id, texto_consentimiento_id, postulacion_id, aceptado_en, ip, id_sesion, user_agent, retirado_en |
+| `consentimiento` | Que esta persona aceptó esta versión concreta | persona_id, texto_consentimiento_id, postulacion_id, texto_firmado, aceptado_en, ip, id_sesion, user_agent, retirado_en |
 | `politica_conservacion` | Cuánto se guardan los datos y qué se hace al vencer | organizacion_id, meses, accion_al_vencer, es_activa |
 | `solicitud_borrado` | Pedir el borrado y ejecutarlo son dos cosas distintas, con días de por medio | persona_id, solicitado_en, ejecutado_en, ejecutado_por_usuario_id |
 
-**Son dos consentimientos, no uno.** El `tipo` distingue el del **proceso** —evaluar esta
-postulación— del de **futuros contactos** —guardar sus datos y avisarle de otras convocatorias—.
-El segundo nunca se da por supuesto, y `retirado_en` permite quitarlo sin tocar el primero.
+**Son tres consentimientos, no uno** (desde la `V54`, 14/09/2026). El `tipo` los distingue, y lo
+que los separa es **con quién se firma cada uno**:
 
-**Y desde el multiempresa, el del proceso se firma con cada empresa.** `postulacion_id` vacío
-es un consentimiento de cuenta con la plataforma (crear la cuenta, futuros contactos); lleno,
-el texto de la empresa de esa vacante, aceptado al postular. Postular a tres empresas son tres
-filas, cada una a nombre de la suya — lo que la ley 29733 espera: cada quien que trata datos,
-nombrado y consentido. Por eso la unicidad por persona y texto rige solo en las filas de
-cuenta: re-postular a la misma empresa con el mismo texto vigente vuelve a firmarse.
+| `tipo` | Con quién se firma | Qué cubre | De quién es la fila |
+|---|---|---|---|
+| `PLATAFORMA` | Renaser | La cuenta, el perfil, la inteligencia artificial, los proveedores, la salida de datos del país, el plazo y los derechos | De la organización plataforma |
+| `PROCESO` | La empresa de la vacante | Que ella decida sobre esa postulación | De la organización plataforma: **es una sola fila para todas las empresas** |
+| `FUTUROS_CONTACTOS` | Renaser | Conservar el perfil y avisarle de otras vacantes | De la organización plataforma |
+
+El de futuros contactos nunca se da por supuesto, y `retirado_en` permite quitarlo sin tocar
+ninguno de los otros dos. **Los tres son de la plataforma, y solo ella los publica**: el panel
+responde 400 a una empresa que intente publicar cualquiera de los tres.
+
+**Con quién se firma y de quién es la fila son dos cosas distintas, desde la V54.** El texto de
+`PROCESO` lleva un hueco donde va el nombre de quien publica la vacante, y ese nombre se pone al
+leerlo: una sola fila sirve a todas las empresas, y cada candidato lee el nombre de la suya. Por
+eso la fila es siempre de la plataforma aunque el permiso se firme con la empresa.
+
+**Y por eso se guarda lo leído, no solo a qué fila apunta.** `texto_firmado` guarda el texto ya
+compuesto, tal como se le pintó a la persona: dos candidatos de dos empresas firman la misma fila
+y han leído cosas distintas. Vacío significa «lo firmado es el texto literal de su fila», que es
+el caso de los dos de la cuenta y de todo lo anterior a la V54. **Saber con qué empresa se firmó
+se responde con la postulación y con ese texto, nunca con el dueño de la fila.**
+
+**Desde el multiempresa, el del proceso se firma con cada empresa.** `postulacion_id` vacío
+es un consentimiento de cuenta con la plataforma (`PLATAFORMA` al registrarse, y
+`FUTUROS_CONTACTOS` si lo marcó); lleno, el de la empresa de esa vacante, aceptado al postular.
+Postular a tres empresas son tres filas, cada una a nombre de la suya — lo que la ley 29733
+espera: cada quien que trata datos, nombrado y consentido. Por eso la unicidad por persona y
+texto rige solo en las filas de cuenta: re-postular a la misma empresa con el mismo texto
+vigente vuelve a firmarse.
+
+**Cuál es el texto vigente lo responde un solo sitio.** Vigente es **el publicado más reciente**
+de esa organización y ese tipo, no «el marcado como activo». Antes lo preguntaban por su cuenta
+los cuatro sitios que lo necesitan —el tablón antes de postular, la postulación al firmar, el
+registro de la cuenta y la política de privacidad pública—, y cuatro copias de la misma búsqueda
+acaban contestando distinto.
 
 Se guarda la versión del texto aceptado, no un simple «sí acepté», y también su **huella**, el
 **identificador de sesión** y el navegador, para poder exportar la evidencia completa.

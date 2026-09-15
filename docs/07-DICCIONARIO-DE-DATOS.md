@@ -340,7 +340,7 @@ El texto que se acepta, versionado y con su huella.
 |---|---|---|---|
 | `id` | bigint | sí | Clave |
 | `organizacion_id` | bigint | sí | |
-| `tipo` | text | sí | `PROCESO` o `FUTUROS_CONTACTOS` |
+| `tipo` | text | sí | `PLATAFORMA`, `PROCESO` o `FUTUROS_CONTACTOS` |
 | `version` | text | sí | `1.0`, `1.1`… |
 | `texto` | text | sí | El texto completo |
 | `hash` | text | sí | Huella SHA-256 del texto |
@@ -349,6 +349,35 @@ El texto que se acepta, versionado y con su huella.
 **Clave primaria:** `id` · **Único:** `organizacion_id` + `tipo` + `version`
 
 **Nunca se modifica una versión publicada.** Editar crea otra.
+
+**Los tres tipos, y con quién se firma cada uno** (desde la `V54`, 14/09/2026):
+
+| `tipo` | Con quién se firma | Cuándo | De quién es la fila |
+|---|---|---|---|
+| `PLATAFORMA` | Renaser | Al crear la cuenta | De la organización plataforma |
+| `PROCESO` | La empresa de la vacante | Al postular | De la organización plataforma: **una sola fila para todas** |
+| `FUTUROS_CONTACTOS` | Renaser | Al crear la cuenta, opcional | De la organización plataforma |
+
+**Vigente es el publicado más reciente** de esa organización y ese tipo, no «el marcado como
+activo»: publicar una versión nueva no despublica la anterior, y `publicado_en` vacío es un
+borrador que no rige.
+
+**Los tres son de la plataforma, y solo ella los publica.** Una empresa que intente publicar
+cualquiera de los tres recibe un **400**. Dar de alta una empresa **no le copia ninguno**: hasta
+la V54 se le dejaba una copia en borrador para que la reescribiera con su nombre, y esas copias
+la V54 las retiró.
+
+**El texto de `PROCESO` lleva un hueco donde va el nombre de la empresa**, y ese nombre se pone
+al leerlo. Dentro de ese texto a la plataforma se la nombra «Renaser» a secas y no por su razón
+social, para que la frase de quién presta la plataforma no se confunda con el nombre sustituido.
+Quién es Renaser con su RUC y su domicilio se dice en el texto de `PLATAFORMA`, que el candidato
+ya aceptó y al que esa misma frase le manda.
+
+⚠️ **El hueco no sale nunca del backend**: quien sirve un texto lo sirve ya compuesto. Con el
+nombre real de la empresa cuando se pide el de una vacante, y con «la empresa que publica la
+vacante» en la lista pública, donde no hay ninguna. Si el marcador viajara hasta el portal, un
+cliente que lo sustituyera por su cuenta enseñaría el hueco en crudo en una página legal el día
+que el marcador cambiara, sin que nada fallara.
 
 ## `consentimiento`
 
@@ -359,6 +388,8 @@ Que esta persona aceptó esta versión concreta.
 | `id` | bigint | sí | Clave |
 | `persona_id` | bigint | sí | |
 | `texto_consentimiento_id` | bigint | sí | |
+| `postulacion_id` | bigint | no | La postulación que lo firmó (`V38`). Vacío = es de la cuenta, con la plataforma |
+| `texto_firmado` | text | no | El texto tal como se le pintó, con el nombre de la empresa ya puesto (`V54`). Vacío = lo firmado es el texto literal de su fila |
 | `nombre_registrado` | text | no | Cómo se llamaba al aceptar |
 | `aceptado_en` | timestamptz | sí | |
 | `ip` | text | no | |
@@ -366,12 +397,36 @@ Que esta persona aceptó esta versión concreta.
 | `user_agent` | text | no | |
 | `retirado_en` | timestamptz | no | Solo aplica al de futuros contactos |
 
-**Clave primaria:** `id` · **Único:** `persona_id` + `texto_consentimiento_id`
+**Clave primaria:** `id` · **Único parcial:** `persona_id` + `texto_consentimiento_id` cuando
+`postulacion_id` está vacío, y `postulacion_id` + `texto_consentimiento_id` cuando está lleno
+
+**Son dos unicidades y no una, desde la `V38`.** La de antes —una persona no acepta dos veces el
+mismo texto— impedía re-postular: quien postula a dos vacantes de la misma empresa firma dos
+veces la misma fila, y con razón. Así que esa regla se conservó **solo para las filas de cuenta**,
+donde sigue siendo verdad, y las de postulación tienen la suya: una postulación firma su texto
+una sola vez.
 
 Se guarda la **versión aceptada**, no un simple «sí acepté». Con eso, la huella, la sesión y el
 navegador, la evidencia se puede exportar entera.
 
-`retirado_en` permite quitar el consentimiento de futuros contactos **sin tocar** el del proceso.
+⚠️ **`texto_firmado` existe porque la fila apuntada dejó de ser lo leído.** Desde la `V54` el
+texto de `PROCESO` es uno solo para todas las empresas y lleva un hueco donde va el nombre: dos
+candidatos de dos empresas apuntan a la misma fila y leyeron cosas distintas. Se guarda el texto
+entero, y no solo el nombre de la empresa, porque el nombre puede cambiar después —
+`organizacion.nombre` ya cambió una vez— y entonces lo leído no se podría reconstruir.
+
+⚠️ **Con qué empresa se firmó lo dicen `postulacion_id` y `texto_firmado`, no el dueño de la fila
+del texto**, que es siempre la plataforma. Preguntárselo a `texto_consentimiento.organizacion_id`
+era cierto cuando cada empresa tenía su texto, y dejó de serlo.
+
+`retirado_en` permite quitar el consentimiento de futuros contactos **sin tocar** ninguno de los
+otros dos.
+
+⚠️ **`ip` es la prueba de que el permiso lo dio esa persona**, y el texto que firma lo dice con
+esas palabras. Con un proxy delante y sin configurarlo, esa columna guarda la dirección interna
+del proxy y todas las aceptaciones salen desde la misma: una columna con el mismo valor repetido
+no prueba nada. Está resuelto en el perfil de despliegue y solo ahí — en local la aplicación se
+expone directa y cualquiera podría mandar esa cabecera a mano.
 
 ## `politica_conservacion`
 
@@ -391,6 +446,13 @@ Cuánto se guardan los datos y qué se hace al vencer.
 El plazo **es un dato, no un número en el código**. La ley obliga a fijarlo y a decirlo en el
 texto de consentimiento; escribirlo en el código significa un despliegue cada vez que el abogado
 cambie de opinión.
+
+⚠️ **Hoy esta tabla no la lee nadie, y el plazo que se aplica sale de otro sitio.** Quien decide
+es el parámetro `meses_conservar_perfil` (arranca en 24), y de las tres acciones que enumera
+`accion_al_vencer` solo ocurre una: **eliminar**, y solo el perfil. La persona, el usuario, las
+postulaciones y lo respondido en ellas se conservan mientras haya cuenta. Además, como el perfil
+es de la persona y es transversal, **el plazo que manda es el más largo de todas las
+organizaciones**, no el de cada una.
 
 ## `solicitud_borrado`
 

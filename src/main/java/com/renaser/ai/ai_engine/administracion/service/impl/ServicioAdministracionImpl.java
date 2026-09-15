@@ -159,9 +159,25 @@ public class ServicioAdministracionImpl implements ServicioAdministracion {
     @Override
     @Transactional
     public Long publicarTextoConsentimiento(ContextoUsuario quien, NuevoTextoConsentimiento datos) {
-        if (!List.of("PROCESO", "FUTUROS_CONTACTOS").contains(datos.tipo())) {
-            throw new IllegalArgumentException(
-                    "El tipo debe ser PROCESO o FUTUROS_CONTACTOS, no «" + datos.tipo() + "»");
+        if (!TipoConsentimiento.existe(datos.tipo())) {
+            throw new IllegalArgumentException("El tipo debe ser PLATAFORMA, PROCESO o "
+                    + "FUTUROS_CONTACTOS, no «" + datos.tipo() + "»");
+        }
+        // ⚠️ **Los tres textos son de la plataforma, y solo ella los publica.**
+        //
+        // Ninguno de los tres lo lee nadie fuera de ella: los dos de la cuenta se buscan
+        // siempre en duenos.plataforma() (ServicioCuentaPortalImpl), y el de PROCESO
+        // también, porque es uno solo para todas y se compone con el nombre de la empresa
+        // al leerlo (TextosDeConsentimiento#procesoDe). Dejar que una empresa publique
+        // cualquiera de los tres sería un formulario que promete algo que no llega a
+        // ninguna pantalla — y en el peor caso, que ella crea haber cambiado lo que firman
+        // sus candidatos cuando no ha cambiado nada.
+        TipoConsentimiento tipo = TipoConsentimiento.valueOf(datos.tipo());
+        if (!organizaciones.findById(quien.organizacionId())
+                .map(Organizacion::isEsPlataforma).orElse(false)) {
+            throw new IllegalArgumentException("Los textos de consentimiento son de la "
+                    + "plataforma: hay uno solo para todas las empresas y lleva el nombre de "
+                    + "la tuya donde corresponde. Si hay que cambiarlo, se pide a Renaser");
         }
         // La versión nueva nace publicada: es la que rige desde ya. Las anteriores no se
         // tocan —ni siquiera una en borrador del alta—, porque los consentimientos ya

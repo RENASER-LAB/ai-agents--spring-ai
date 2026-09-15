@@ -191,10 +191,9 @@ public class FlujoPlataformaIT {
         conToken(post("/api/v1/panel/usuarios/" + anaId + "/roles"), tokenAcme,
                 "{\"roles\":[\"ADMINISTRADOR\",\"DIRECCION\",\"TALENTO\"]}")
                 .andExpect(status().isOk());
-        conToken(post("/api/v1/panel/textos-consentimiento"), tokenAcme, """
-                {"tipo": "PROCESO", "texto": "Acme S.A.C. tratará tus datos para evaluar tu \
-                postulación."}""")
-                .andExpect(status().isCreated());
+        // ACME ya no publica ningún texto legal —desde la V54 hay uno solo, de la
+        // plataforma, con el nombre de la empresa dentro— y tampoco le hace falta para
+        // recibir candidatos: el freno que lo exigía se cayó con el mismo cambio.
 
         conToken(post("/api/v1/panel/areas"), tokenAcme, "{\"nombre\":\"Operaciones\"}")
                 .andExpect(status().isCreated());
@@ -428,7 +427,7 @@ public class FlujoPlataformaIT {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                         {"nombre":"%s","apellidos":"Quispe","correo":"%s",
-                         "contrasena":"unaClaveLarga123","ciudadUbigeo":"1501","aceptaProceso":true,
+                         "contrasena":"unaClaveLarga123","ciudadUbigeo":"1501","aceptaPlataforma":true,
                          "aceptaFuturosContactos":false}""".formatted(nombre, correo)))
                 .andExpect(status().isCreated());
         String token = leer(mvc.perform(post("/api/v1/portal/auth/login")

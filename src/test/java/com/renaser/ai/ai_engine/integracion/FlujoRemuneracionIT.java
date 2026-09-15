@@ -541,7 +541,7 @@ public class FlujoRemuneracionIT {
                         .content("""
                                 {"nombre": "Lucía", "apellidos": "Mendoza",
                                  "correo": "%s", "contrasena": "%s",
-                                 "ciudadUbigeo": "1501", "aceptaProceso": true,
+                                 "ciudadUbigeo": "1501", "aceptaPlataforma": true,
                                  "aceptaFuturosContactos": true}""".formatted(CORREO_CANDIDATO, CLAVE)))
                 .andExpect(status().isCreated());
 

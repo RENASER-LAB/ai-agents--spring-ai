@@ -23,8 +23,10 @@ public final class DtosAdministracion {
                                  String cuerpo, boolean esActiva) {}
 
     // Los textos legales de la organización. La versión es opcional: en blanco, el
-    // sistema numera la siguiente («2.0» tras la «1.0» del alta). El tipo es PROCESO o
-    // FUTUROS_CONTACTOS, los dos de texto_consentimiento desde la V3.
+    // sistema numera la siguiente. El tipo sale de TipoConsentimiento, y los tres son de
+    // la PLATAFORMA: una empresa no publica ninguno. El de PROCESO es uno solo para todas
+    // y lleva el nombre de cada una donde corresponde, así que un texto por empresa sería
+    // un texto que nadie revisa y que ninguna pantalla lee.
     public record NuevoTextoConsentimiento(@NotBlank String tipo, @NotBlank String texto,
                                            String version) {}
 

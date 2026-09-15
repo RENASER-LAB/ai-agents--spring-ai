@@ -54,7 +54,7 @@ public class PortalController {
     }
 
     @GetMapping("/consentimientos/textos")
-    @Operation(summary = "Los textos vigentes de los dos consentimientos de la plataforma")
+    @Operation(summary = "Los tres textos vigentes de la plataforma: el de la cuenta, el de postular (con el nombre de la empresa dicho en palabras) y el opcional")
     public List<TextoConsentimientoPublico> textos() {
         return cuentas.textosDeConsentimiento();
     }

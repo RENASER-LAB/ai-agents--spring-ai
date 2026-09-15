@@ -52,6 +52,29 @@ class BarridoRetencionPerfilTest {
                 .thenReturn(24);
     }
 
+    /**
+     * El texto legal promete un plazo, y el barrido aplica otro: ahí se rompe.
+     *
+     * <p>El consentimiento de la V54 le dice al candidato «si paso 24 meses sin actividad,
+     * mi perfil se elimina». Ese 24 no sale de ninguna parte del texto: es
+     * {@link BarridoRetencionPerfil#MESES_POR_DEFECTO}. Quien lo cambie sin republicar el
+     * texto deja a la plataforma borrando datos en un plazo que nadie consintió —y lo
+     * contrario, conservándolos de más—, que es exactamente lo que la ley 29733 pide
+     * declarar. No hay forma de que git lo avise: son dos archivos que no se citan.
+     */
+    @Test
+    @DisplayName("el plazo que promete el texto legal es el que aplica el barrido")
+    void elPlazoDelTextoLegalEsElQueAplicaElBarrido() throws Exception {
+        String migracion = java.nio.file.Files.readString(java.nio.file.Path.of(
+                "src/main/resources/db/migration/"
+                        + "V54__el_consentimiento_dice_quien_trata_los_datos.sql"));
+
+        assertThat(migracion)
+                .as("el texto PLATAFORMA de la V54 nombra el plazo de conservación")
+                .contains("Si paso " + BarridoRetencionPerfil.MESES_POR_DEFECTO
+                        + " meses sin actividad");
+    }
+
     private PerfilCandidato perfilTocado(Instant cuando) {
         return PerfilCandidato.builder().id(40L).personaId(PERSONA)
                 .creadoEn(cuando).actualizadoEn(cuando).build();

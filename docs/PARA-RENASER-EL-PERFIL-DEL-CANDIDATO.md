@@ -66,15 +66,21 @@ es justo lo que este sistema se propuso dejar de premiar.
 
 ## Lo que hay que decidir antes
 
-**Hace falta cambiar el texto de consentimiento.** El de hoy le dice al candidato que sus datos
-se usan para *esa* convocatoria. Un perfil que se conserva entre convocatorias es otra cosa, y
-la ley 29733 obliga a decírselo claro: qué se guarda, cuánto tiempo y para qué.
+**El texto de consentimiento ya se cambió** (14/09/2026), y ahora dice qué se guarda, cuánto
+tiempo y para qué: el permiso obligatorio de la cuenta enumera lo que entra al perfil, y el
+opcional de futuras vacantes dice con esas palabras que lo que se conserva es el perfil y el
+currículum. Antes el texto hablaba solo de *esa* convocatoria, y un perfil que se conserva entre
+convocatorias es otra cosa.
 
-Es el mismo texto que ya está pendiente de aprobación por otro motivo, así que se puede
-resolver de una vez.
+**Lo que hace falta ahora es que un abogado lo firme.** Ya no falta información; falta la firma.
+Y hay una decisión que sigue sin tomar: **quien creó su cuenta antes de esa fecha nunca firmó el
+texto nuevo**. El sistema no toca los permisos ya firmados —es lo que hace que una aceptación
+valga— y no hay ninguna pantalla para volver a pedirlos. Hay que decidir si se les pide o no.
 
-**Y hay que decidir cuánto se conserva un perfil.** Si alguien postuló hace dos años y no
-volvió, ¿su ficha sigue ahí? Renaser tiene que poner ese número; el sistema lo aplica solo.
+**Y hay que confirmar cuánto se conserva un perfil.** Hoy el sistema tiene puestos **24 meses sin
+actividad** —sin postular y sin tocar el perfil— y eso es lo que el texto le promete al
+candidato: pasado ese plazo, su perfil se elimina. Renaser puede cambiar ese número, pero
+**cambiarlo obliga a republicar el texto**, porque la promesa está escrita dentro.
 
 ---
 

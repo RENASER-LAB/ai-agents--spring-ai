@@ -236,6 +236,39 @@ heredaban lo que cada uno tuviera en su `application-secrets.yaml`, y seis empez
 el día que ese archivo apuntó a un broker con TLS. Una prueba que da distinto según la máquina
 no sirve para nada.
 
+Los tres consentimientos (14/09) dejan **ocho unitarias netas** —siete de un archivo nuevo, dos
+añadidas a otros dos, y una que se fue con el freno que dejó de existir— y aserciones nuevas
+dentro de `FlujoDosEmpresasIT`, sin ningún caso de integración nuevo.
+
+Las siete del buscador del texto vigente: que el nombre del tipo viaje a la base tal cual
+—renombrarlo sin migración rompería contra el CHECK al crear una cuenta y no aquí—; que **una
+empresa sin texto propio reciba igualmente sus candidatos, leyendo el texto general con su nombre
+puesto dentro**; que **aunque una empresa tenga uno suyo publicado mande el general**; que
+rellenar un texto sin hueco no toque nada; que el vigente sea el de esa organización y ese tipo y
+no el de al lado; y que cada corte diga qué falta, el de la vacante hablando de la vacante y el
+de la cuenta hablando de la cuenta.
+
+Las dos de fuera: que al crear la cuenta se firme el texto de la plataforma y **nadie vaya a
+buscar el de una vacante**, y que **el plazo que promete el texto legal sea el que aplica el
+barrido**. Esta última es rara y vale la pena explicarla: lee la migración como un archivo y
+comprueba que los meses escritos dentro del texto son los mismos que usa el código. Son dos
+archivos que no se citan entre sí, así que no hay forma de que git avise si alguien cambia uno y
+no el otro, y lo que está en juego es borrar datos en un plazo que nadie consintió.
+
+La que se fue era la que exigía texto propio para publicar una vacante: ese freno se retiró con
+la V54, y el IT que chocaba contra él ahora comprueba lo contrario — que la vacante se publica a
+la primera.
+
+En el IT: que el alta **no le copie ningún texto** a la empresa nueva; que **el texto que leen
+sus candidatos venga con su nombre dentro** —comprobado antes de que ella publique nada, porque
+con un texto suyo ya publicado la aserción pasaría aunque el hueco no se sustituyera— y sin
+llevarse por delante la frase que dice quién presta la plataforma; que una empresa reciba **400
+al intentar publicar cualquiera de los tres tipos** o uno inventado; y que lo que queda en
+`consentimiento.texto_firmado` sea el texto con el nombre puesto, sin hueco.
+
+⚠️ **El total de arriba no se recontó con estas ocho**; la cifra solo se sostiene recontando los
+`<testcase>`, nunca sumando a ojo.
+
 ---
 
 ## Las nueve reglas de arquitectura

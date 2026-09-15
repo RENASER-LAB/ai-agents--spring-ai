@@ -86,8 +86,6 @@ class ServicioVacantesPanelImplTest {
     @Mock private com.renaser.ai.ai_engine.prueba.repository.PlantillaPruebaRepository plantillasPrueba;
     @Mock private PlantillaCorreoRepository plantillasCorreo;
     @Mock private PlantillaCorreoVacanteRepository plantillasPorVacante;
-    @Mock private com.renaser.ai.ai_engine.consentimiento.repository.TextoConsentimientoRepository
-            textosConsentimiento;
     @Mock private IntentoPruebaRepository intentos;
     @Mock private com.renaser.ai.ai_engine.perfilintegral.repository.EvaluacionRepository evaluaciones;
     @Mock private ServicioAuditoria auditoria;
@@ -110,7 +108,7 @@ class ServicioVacantesPanelImplTest {
     void crearElServicio() {
         servicio = new ServicioVacantesPanelImpl(vacantes, puestos, requisitos, solicitudes,
                 versionesPesos, plantillas, versionesPrueba, plantillasPrueba, plantillasCorreo,
-                plantillasPorVacante, textosConsentimiento, intentos, evaluaciones, versionesBanco,
+                plantillasPorVacante, intentos, evaluaciones, versionesBanco,
                 auditoria, dueno, postulaciones, avisos, correo, direcciones, enlacesDeAcceso,
                 usuarios, personas);
         // En estas pruebas la organizacion no personaliza nada: el resolutor contesta
@@ -119,15 +117,6 @@ class ServicioVacantesPanelImplTest {
                 .when(dueno.duenoDe(org.mockito.ArgumentMatchers.eq(ORGANIZACION),
                         org.mockito.ArgumentMatchers.any()))
                 .thenReturn(ORGANIZACION);
-        // Y tiene su texto legal publicado, como Renaser desde la V9: publicar una vacante
-        // lo exige (pieza D), y la prueba que lo quita es la que comprueba el freno.
-        org.mockito.Mockito.lenient()
-                .when(textosConsentimiento
-                        .findFirstByOrganizacionIdAndTipoAndPublicadoEnIsNotNullOrderByPublicadoEnDesc(
-                                ORGANIZACION, "PROCESO"))
-                .thenReturn(Optional.of(com.renaser.ai.ai_engine.consentimiento.entity
-                        .TextoConsentimiento.builder().id(70L).tipo("PROCESO").build()));
-
         // El puesto de la vacante y el banco publicado de su nivel: sin los dos, publicar
         // con la evaluacion encendida falla, y eso lo comprueba su propia prueba apagando
         // este mock. Lenient porque la mitad de estas pruebas no llegan a mirarlos.
@@ -334,23 +323,11 @@ class ServicioVacantesPanelImplTest {
                 .hasMessageContaining("plantilla de evaluación publicada para el nivel " + NIVEL);
     }
 
-    @Test
-    @DisplayName("sin el texto legal publicado no se publica la vacante, y el error dice qué falta")
-    void sinTextoLegalNoSePublica() {
-        // El requisito del día uno de la pieza A: al postular se firma el texto PROCESO de
-        // la empresa, y no puede firmarse lo que no existe. El error sale aquí, en la cara
-        // de quien publica, no en la del primer candidato.
-        Vacante v = vacante("BORRADOR", false, null);
-        when(textosConsentimiento
-                .findFirstByOrganizacionIdAndTipoAndPublicadoEnIsNotNullOrderByPublicadoEnDesc(
-                        ORGANIZACION, "PROCESO"))
-                .thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> servicio.publicar(QUIEN, VACANTE))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("texto de consentimiento");
-        assertThat(v.getEstado()).isEqualTo("BORRADOR");
-    }
+    // Aquí vivía «sin el texto legal publicado no se publica la vacante». Se cayó con la
+    // V54: el texto de PROCESO es uno solo para todas, con un hueco donde va el nombre de
+    // la empresa, así que ya no hay nada que publicar y el freno no podía saltar nunca.
+    // La comprobación de que sin texto no se firma sigue viva un piso más abajo, en
+    // ServicioPostulacionPortalImplTest#sinTextoPublicadoPostularSeFrena.
 
     // ============ El interruptor ============
 

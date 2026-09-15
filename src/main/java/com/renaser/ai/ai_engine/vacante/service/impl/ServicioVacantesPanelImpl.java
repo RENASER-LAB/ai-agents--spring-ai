@@ -2,7 +2,6 @@ package com.renaser.ai.ai_engine.vacante.service.impl;
 
 import com.renaser.ai.ai_engine.ai.exception.ResourceNotFoundException;
 import com.renaser.ai.ai_engine.auditoria.service.ServicioAuditoria;
-import com.renaser.ai.ai_engine.consentimiento.repository.TextoConsentimientoRepository;
 import com.renaser.ai.ai_engine.notificacion.entity.PlantillaCorreoVacante;
 import com.renaser.ai.ai_engine.notificacion.repository.PlantillaCorreoRepository;
 import com.renaser.ai.ai_engine.notificacion.repository.PlantillaCorreoVacanteRepository;
@@ -89,7 +88,6 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
     private final PlantillaPruebaRepository plantillasPrueba;
     private final PlantillaCorreoRepository plantillasCorreo;
     private final PlantillaCorreoVacanteRepository plantillasPorVacante;
-    private final TextoConsentimientoRepository textosConsentimiento;
     private final IntentoPruebaRepository intentos;
     // Solo para preguntar si alguien ya abrió su cuestionario técnico: es el otro
     // instrumento de la etapa, y la guarda tiene que mirar los dos.
@@ -374,18 +372,12 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
         // sin ninguna de las dos, porque entonces el candidato llega a su etapa técnica y no
         // encuentra nada que rendir.
         exigirInstrumentoTecnico(vacante);
-        // El requisito del día uno de la pieza A: sin texto legal publicado con SU nombre,
-        // la empresa no recibe candidatos — al postular se firma ese texto (ley 29733), y
-        // no puede firmarse lo que no existe. Renaser lo tiene publicado desde la V9; a
-        // las empresas nuevas el alta se lo copia en borrador y les toca publicarlo.
-        if (textosConsentimiento
-                .findFirstByOrganizacionIdAndTipoAndPublicadoEnIsNotNullOrderByPublicadoEnDesc(
-                        quien.organizacionId(), "PROCESO")
-                .isEmpty()) {
-            throw new IllegalStateException("Antes de publicar una vacante, publica el texto de "
-                    + "consentimiento de tu empresa (POST /panel/textos-consentimiento): quien "
-                    + "postule tiene que saber quién tratará sus datos");
-        }
+        // Aquí había un freno más: sin texto legal publicado con SU nombre, la empresa no
+        // recibía candidatos. Se cayó con la V54, que dejó UN SOLO texto de PROCESO para
+        // todas, con un hueco donde va el nombre de la empresa: el texto ya existe siempre
+        // y no hay nada que publicar. El freno solo llegaba a servir cuando el alta repartía
+        // un borrador que nadie publicaba, y entonces el error salía en la cara de quien
+        // abría la vacante en vez de en la de quien podía arreglarlo.
         vacante.setEstado("PUBLICADA");
         vacante.setPublicadaEn(Instant.now());
         vacantes.save(vacante);

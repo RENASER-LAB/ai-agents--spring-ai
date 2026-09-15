@@ -1,7 +1,6 @@
 package com.renaser.ai.ai_engine.vacante.service.impl;
 
 import com.renaser.ai.ai_engine.auditoria.service.ServicioAuditoria;
-import com.renaser.ai.ai_engine.consentimiento.repository.TextoConsentimientoRepository;
 import com.renaser.ai.ai_engine.notificacion.entity.AvisoPortal;
 import com.renaser.ai.ai_engine.notificacion.repository.PlantillaCorreoRepository;
 import com.renaser.ai.ai_engine.notificacion.repository.PlantillaCorreoVacanteRepository;
@@ -87,7 +86,6 @@ class RemuneracionDeLaVacanteTest {
     @Mock private PlantillaPruebaRepository plantillasPrueba;
     @Mock private PlantillaCorreoRepository plantillasCorreo;
     @Mock private PlantillaCorreoVacanteRepository plantillasPorVacante;
-    @Mock private TextoConsentimientoRepository textosConsentimiento;
     @Mock private IntentoPruebaRepository intentos;
     @Mock private EvaluacionRepository evaluaciones;
     @Mock private VersionBancoRepository versionesBanco;
@@ -107,7 +105,7 @@ class RemuneracionDeLaVacanteTest {
     void crearElServicio() {
         servicio = new ServicioVacantesPanelImpl(vacantes, puestos, requisitos, solicitudes,
                 versionesPesos, plantillas, versionesPrueba, plantillasPrueba, plantillasCorreo,
-                plantillasPorVacante, textosConsentimiento, intentos, evaluaciones, versionesBanco,
+                plantillasPorVacante, intentos, evaluaciones, versionesBanco,
                 auditoria, dueno, postulaciones, avisos, correo, direcciones, enlacesDeAcceso,
                 usuarios, personas);
     }

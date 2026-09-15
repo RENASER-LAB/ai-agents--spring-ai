@@ -66,15 +66,39 @@ se puede poner de frente contra el presupuesto y contestar «entra o no entra».
 centro de lo que tenga escrito en su perfil y él confirma o corrige; lo que escriba vuelve a su
 perfil **solo si lo tenía vacío**.
 
-Aceptar que le evalúen para **esta** vacante y aceptar que le llamen para **otras** oportunidades
-son dos permisos distintos. Se piden por separado y se pueden retirar por separado.
+**Son tres permisos distintos, y se piden en dos momentos.** Al crear la cuenta marca dos
+casillas: una por el permiso con Renaser, que es el largo —cuenta qué datos se guardan, que una
+inteligencia artificial participa, qué empresas de fuera intervienen y que sus datos salen del
+país, cuánto se conservan y cómo pide que se borren—, y otra aparte y opcional, para que le
+avisen de otras vacantes aunque no tenga ninguna postulación abierta. Después, **cada vez que
+postula**, da el de la empresa que publica esa vacante: que es ella quien decide sobre su
+candidatura, y que ese permiso no alcanza a las demás empresas del portal.
+
+Ese tercero **no se marca, se da al enviar la candidatura**: encima del botón se le dice qué
+empresa la va a recibir y se le enlaza el texto entero, y enviarla es el acto. Queda guardado
+igual, con el texto que leyó, la fecha y desde dónde lo hizo.
+
+El texto de ese permiso **es el mismo para todas las empresas**, con el nombre de la que publica
+la vacante puesto dentro: ninguna empresa escribe el suyo, así que no hay ninguna que se quede
+con un papel viejo ni una recién llegada que no pueda recibir candidatos.
+
+Se piden por separado y se retiran por separado. Antes el permiso de la cuenta era el de una
+vacante, así que quien se registraba aceptaba un papel que hablaba de «esta vacante» cuando
+todavía no había ninguna.
 
 ### 4 · El sistema comprueba lo indispensable, y nada más
 
-Solo eso puede detener a alguien sin que intervenga una persona, y queda guardada la regla exacta
-que se aplicó.
+Es lo único que puede **descartar** a alguien sin que intervenga una persona, y queda guardada la
+regla exacta que se aplicó.
 
 **El currículum no descarta a nadie.** Se lee y se puntúa, pero no cierra ninguna puerta.
+
+**Hay otras dos cosas que el sistema hace solo**, y conviene decirlas porque el candidato las lee
+en el permiso que acepta: si se le pasa el plazo que tenía para responder una evaluación o una
+prueba, su proceso se cierra; y en las vacantes que se configuraron para avanzar solas, pasa a la
+etapa siguiente sin esperar a que alguien lo apruebe. **Ninguna de las tres depende de una nota**:
+ninguna nota contrata ni descarta por sí sola. En cualquiera de las tres, el candidato puede
+escribir y pedir que una persona lo revise.
 
 ### 5 · Una sola evaluación
 
@@ -99,6 +123,10 @@ destacaron los puede confirmar de golpe, y aun así cada uno conserva su razón 
 
 Quién puede hacer qué depende de su cargo, y algunos solo ven lo suyo: el responsable de un área
 ve a los candidatos de sus vacantes, no a los de las demás.
+
+**Salvo que la vacante se haya configurado para avanzar sola**, y entonces este paso no espera a
+nadie: la candidatura pasa a la etapa siguiente por su cuenta. Es una elección de quien lleva la
+vacante, nace apagada, y el candidato lo lee en el permiso que aceptó.
 
 ### 8 · La prueba del puesto
 
@@ -163,7 +191,8 @@ está acertando.** Todo lo anterior son medios; esto es el resultado.
 
 **Nadie se cae en silencio.** Salvo el requisito indispensable de la entrada, ninguna etapa
 descarta sola. Cada una ordena, y una persona confirma. Cuando alguien no continúa, queda escrito
-por qué.
+por qué. Lo único que además se cierra solo es el proceso de quien dejó pasar su plazo sin
+responder, y eso también queda escrito.
 
 **Cualquiera puede pedir que borren sus datos.** Se borran —lo que pidió ganar incluido, y los
 avisos que tuviera esperándole—. El registro de las decisiones se queda, sin nada que identifique
@@ -173,6 +202,12 @@ a la persona: así se cumple la ley sin perder la trazabilidad de lo que ya se d
 con su marca de visto. El correo se pierde —cae en promociones, llega a una dirección que ya nadie
 mira—, así que la campana no lo sustituye: lo acompaña. Hoy avisa de una sola cosa, que cambió el
 sueldo de un puesto al que postuló, y está hecha para las que vengan.
+
+**Y hay un plazo aunque nadie pida nada.** Si alguien pasa dos años sin postular y sin tocar su
+ficha, esa ficha se elimina. Lo que sostiene una decisión ya tomada —sus postulaciones y lo que
+respondió en ellas— se conserva mientras tenga cuenta. Los dos años son un número que Renaser
+puede cambiar, pero cambiarlo obliga a reescribir el permiso que la gente firma, porque está
+escrito dentro.
 
 **Renaser quiere usar esto también con sus clientes de consultoría.** Los datos de cada empresa
 van separados, y una empresa no ve nada de otra.
