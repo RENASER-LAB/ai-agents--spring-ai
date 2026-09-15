@@ -136,7 +136,7 @@ public class PortalController {
             // que dice qué falta. El IP y el navegador van al registro firmado, como en
             // crearCuenta.
             @RequestParam(required = false) Boolean aceptaTratamiento,
-            // Obligatorios cuando la vacante publica lo que paga, ignorados cuando no (V54).
+            // Obligatorios cuando la vacante publica lo que paga, ignorados cuando no (V55).
             // No los exige Spring por lo mismo que `aceptaTratamiento`: quien decide si hacen
             // falta es la vacante, y solo el servicio puede mirarla y contestar un 400 que
             // explique por qué se piden.
@@ -170,7 +170,7 @@ public class PortalController {
     }
 
     /**
-     * La campana: lo que pasó mientras no estaba (V55).
+     * La campana: lo que pasó mientras no estaba (V56).
      *
      * <p>No pide permiso propio. Todo candidato con sesión tiene campana, y son SUS avisos: el
      * servicio filtra por el usuario del token y no hay forma de pedir los de otro.

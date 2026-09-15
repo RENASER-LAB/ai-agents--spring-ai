@@ -6,7 +6,7 @@ import lombok.*;
 import java.time.Instant;
 
 /**
- * Un aviso esperando al candidato dentro del portal: la otra mitad del correo (V55).
+ * Un aviso esperando al candidato dentro del portal: la otra mitad del correo (V56).
  *
  * <p>El correo sale y no vuelve —cae en promociones, llega a una dirección que el cargador
  * de currículums inventó, se marca leído sin abrir—. Este aviso se queda quieto en la

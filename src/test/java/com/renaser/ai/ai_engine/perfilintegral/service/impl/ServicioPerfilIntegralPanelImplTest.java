@@ -660,7 +660,7 @@ class ServicioPerfilIntegralPanelImplTest {
     /**
      * La vacante del escenario, publicando lo que paga.
      *
-     * <p>Y eso importa: desde la V54 la pretensión pide DOS llaves —el permiso, y que la
+     * <p>Y eso importa: desde la V55 la pretensión pide DOS llaves —el permiso, y que la
      * vacante enseñe su sueldo—. Con una vacante OCULTA por defecto, las pruebas del permiso
      * pasarían por el motivo equivocado y dejarían de proteger lo que dicen proteger.
      */
@@ -688,7 +688,7 @@ class ServicioPerfilIntegralPanelImplTest {
     }
 
     /**
-     * La otra mitad del trato, aplicada al panel (V54).
+     * La otra mitad del trato, aplicada al panel (V55).
      *
      * <p>Una vacante que esconde su sueldo no le exige la cifra a quien postula — pero el
      * ranking seguía leyendo la banda del perfil, que es de la plataforma y no de ninguna

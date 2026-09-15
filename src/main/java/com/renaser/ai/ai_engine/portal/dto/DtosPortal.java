@@ -43,7 +43,7 @@ public final class DtosPortal {
                                  List<RequisitoPublico> requisitosObjetivos) {}
 
     /**
-     * Lo que esta vacante paga, tal como el candidato puede verlo (V54).
+     * Lo que esta vacante paga, tal como el candidato puede verlo (V55).
      *
      * <p>{@code tipo} es {@code OCULTA}, {@code FIJA} o {@code RANGO}. Con {@code OCULTA} los
      * montos van vacíos y {@code texto} dice «No la publica»: el campo viaja igualmente
@@ -65,7 +65,7 @@ public final class DtosPortal {
         public static final RemuneracionPublica OCULTA =
                 new RemuneracionPublica("OCULTA", null, null, null, "No la publica", null);
 
-        /** ¿Obliga a quien postula a declarar la suya? El trato de la V54, en una línea. */
+        /** ¿Obliga a quien postula a declarar la suya? El trato de la V55, en una línea. */
         public boolean exigePretension() {
             return !"OCULTA".equals(tipo);
         }
@@ -127,7 +127,7 @@ public final class DtosPortal {
                                 Instant creadoEn, String instrumentoEtapaTecnica,
                                 /**
                                  * Cuántos avisos suyos de este proceso siguen sin ver: el
-                                 * punto de la fila (V55). Cero = sin punto.
+                                 * punto de la fila (V56). Cero = sin punto.
                                  */
                                 long avisosSinLeer,
                                 /**
@@ -151,7 +151,7 @@ public final class DtosPortal {
     public record Pretension(BigDecimal monto, String moneda, String texto) {}
 
     /**
-     * Un aviso de la campana (V55).
+     * Un aviso de la campana (V56).
      *
      * <p>{@code postulacionUuid} y no el id interno: es el identificador que el portal ya usa
      * para todo lo del candidato, y el que sabe convertir en una dirección.

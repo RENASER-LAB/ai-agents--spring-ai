@@ -1,8 +1,8 @@
 # El sueldo, de los dos lados
 
 Qué dice la vacante sobre el dinero, qué se le pide a quien postula a cambio, y por qué las dos
-cosas son la misma decisión. Reúne lo que se construyó el 14 y el 15/09/2026 (migraciones `V54` y
-`V55`).
+cosas son la misma decisión. Reúne lo que se construyó el 14 y el 15/09/2026 (migraciones `V55` y
+`V56`).
 
 ---
 

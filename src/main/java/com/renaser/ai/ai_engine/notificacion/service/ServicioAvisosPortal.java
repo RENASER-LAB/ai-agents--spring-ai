@@ -16,7 +16,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * La campana del portal: publicar avisos y apagarlos (V55).
+ * La campana del portal: publicar avisos y apagarlos (V56).
  *
  * <p>Vive junto a {@link ServicioCorreo} porque es su pareja: casi todo lo que merece un
  * correo merece también quedarse esperando dentro. Los dos salen del mismo hecho y ninguno

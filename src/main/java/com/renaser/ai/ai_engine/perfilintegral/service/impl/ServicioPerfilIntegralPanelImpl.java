@@ -535,12 +535,12 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
          * pese al calificar (V36).
          *
          * ⚠️ **La segunda es que ESTA vacante publique lo que paga**, y cierra un hueco que
-         * era anterior a la V54 y que la V54 ensanchó.
+         * era anterior a la V55 y que la V55 ensanchó.
          *
          * El trato dice que quien no enseña su sueldo no le exige al candidato el suyo — pero
          * el ranking seguía leyendo la banda del perfil, que es de la plataforma y no de
          * ninguna empresa. Así, una vacante con el sueldo oculto veía lo que esa persona
-         * había escrito en su perfil; y desde la V54, lo que el perfil guarda puede ser
+         * había escrito en su perfil; y desde la V55, lo que el perfil guarda puede ser
          * exactamente la cifra que declaró a OTRA empresa, la que sí enseñó lo suyo. Cobrar
          * por un lado lo que no se paga por el otro es el desequilibrio entero, dando un
          * rodeo.

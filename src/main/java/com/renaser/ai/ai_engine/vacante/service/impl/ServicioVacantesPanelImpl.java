@@ -187,7 +187,7 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
         // un sueldo que todavía no se ha comprobado.
         //
         // Sin `remuneracion` en el cuerpo nace OCULTA, que es como han nacido todas hasta la
-        // V54. Y sin marca de «actualizada»: al crearla no se actualizó nada, se declaró, y
+        // V55. Y sin marca de «actualizada»: al crearla no se actualizó nada, se declaró, y
         // ponerla ya haría que la primera persona que abriera la vacante viera una novedad
         // que no lo es.
         RemuneracionDeLaVacante sueldo = datos.remuneracion() == null
@@ -955,7 +955,7 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
     /**
      * Publicar el sueldo, o no publicarlo, se decide ANTES de publicar la vacante.
      *
-     * <p>El trato de la V54 se cobra por adelantado: la vacante enseña lo que paga y, a
+     * <p>El trato de la V55 se cobra por adelantado: la vacante enseña lo que paga y, a
      * cambio, cada persona que postula está obligada a decir lo suyo. Sin esta guarda, una
      * empresa podía publicar un rango, recoger cuarenta pretensiones obligatorias y volver a
      * {@code OCULTA} al día siguiente — quedándose lo cobrado y retirando lo pagado. Dos
@@ -1018,7 +1018,7 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
         if (Remuneracion.OCULTA.equals(lo.tipo())) {
             // Se limpian los montos en lugar de dejarlos donde estaban. Una vacante OCULTA con
             // cifras guardadas es un sueldo que sigue en la base esperando a que alguien lo
-            // lea por descuido, y la restricción de la V54 tampoco lo admitiría.
+            // lea por descuido, y la restricción de la V55 tampoco lo admitiría.
             vacante.setRemuneracionMin(null);
             vacante.setRemuneracionMax(null);
             vacante.setRemuneracionMoneda(null);

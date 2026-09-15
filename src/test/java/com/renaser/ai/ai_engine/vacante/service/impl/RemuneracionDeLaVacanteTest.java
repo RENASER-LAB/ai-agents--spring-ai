@@ -61,7 +61,7 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
- * Cambiar lo que la vacante dice que paga (V54).
+ * Cambiar lo que la vacante dice que paga (V55).
  *
  * <p>Lo que se protege aquí es <b>a quién llega la noticia</b>. Cambiar un sueldo no es
  * guardar un campo: es escribirle a cada persona que tiene una candidatura abierta, y las
@@ -207,7 +207,7 @@ class RemuneracionDeLaVacanteTest {
     @DisplayName("apagar la remuneración borra los montos, no los deja escondidos en la base")
     void apagarlaLimpiaLosMontos() {
         // Una vacante OCULTA con cifras guardadas es un sueldo esperando a que alguien lo lea
-        // por descuido — y la restricción de la V54 tampoco lo admitiría.
+        // por descuido — y la restricción de la V55 tampoco lo admitiría.
         //
         // En BORRADOR: apagar la remuneración de una PUBLICADA ya no se puede.
         Vacante v = vacantePublicada("RANGO", "3000", "4000");

@@ -51,7 +51,7 @@ public class ServicioPerfilPanelImpl implements ServicioPerfilPanel {
          * ⚠️ **La segunda es que la vacante DE ESTA POSTULACION publique lo que paga.** Esta
          * banda vive en `perfil_candidato`, que es de la plataforma y no de ninguna empresa:
          * sin esta linea, la empresa que esconde su sueldo —y que por eso no le pidio nada al
-         * candidato— leia aqui lo que esa persona escribio en su perfil, o lo que la V54 le
+         * candidato— leia aqui lo que esa persona escribio en su perfil, o lo que la V55 le
          * guardo cuando declaro su cifra a OTRA empresa. Cobrar por un lado lo que no se paga
          * por el otro, dando un rodeo.
          *

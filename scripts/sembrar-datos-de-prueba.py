@@ -353,7 +353,7 @@ def sembrar(api, uid_equipo):
     print("\n4 · Las vacantes")
     vacantes = []
     titulos = ["Desarrollador web", "Líder de operaciones", "Analista de experiencia del cliente"]
-    # Las tres formas del sueldo, una por vacante (V54). Sembrarlas todas OCULTAS —que es
+    # Las tres formas del sueldo, una por vacante (V55). Sembrarlas todas OCULTAS —que es
     # como nacen si no se dice nada— dejaba el trato entero sin ejercitar: nadie declaraba
     # pretensión al postular, y ninguna prueba de extremo a extremo pisaba el camino en que
     # publicar el sueldo la exige. Con esto, una base recién sembrada tiene las dos mitades.
@@ -427,7 +427,7 @@ def sembrar(api, uid_equipo):
         # descarte automático del sistema, y conviene que se vea en los datos.
         if cumple:
             campos["requisitosConfirmados"] = (None, str(vacante["requisito"]))
-        # El trato de la V54: si la vacante publica lo que paga, declarar la pretensión es
+        # El trato de la V55: si la vacante publica lo que paga, declarar la pretensión es
         # obligatorio y sin ella el backend responde 400. Si la esconde, no se manda nada —
         # mandarlo igual escribiría en su registro un número que nadie le pidió.
         if vacante["sueldo"]["tipo"] != "OCULTA":

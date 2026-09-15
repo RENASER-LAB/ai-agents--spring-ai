@@ -88,7 +88,7 @@ public class ServicioPostulacionPortalImpl implements ServicioPostulacionPortal 
     private final ServicioCorreo correo;
     private final TextoProcesoPublicado textoProceso;
     // Para el punto de cada fila de «mis postulaciones»: cuántos avisos de ese proceso
-    // siguen sin ver. Ver ServicioAvisosPortal (V55).
+    // siguen sin ver. Ver ServicioAvisosPortal (V56).
     private final ServicioAvisosPortal avisos;
 
     @Override
@@ -123,7 +123,7 @@ public class ServicioPostulacionPortalImpl implements ServicioPostulacionPortal 
         }
 
         /*
-         * El trato de la V54, y es simétrico en las dos direcciones.
+         * El trato de la V55, y es simétrico en las dos direcciones.
          *
          * Si la vacante enseña lo que paga, quien postula tiene que decir lo que quiere ganar:
          * la empresa ya puso su presupuesto sobre la mesa y pedirle el suyo es el otro lado
@@ -165,7 +165,7 @@ public class ServicioPostulacionPortalImpl implements ServicioPostulacionPortal 
                 .estadoCodigo("POSTULADA")
                 .rondasEvidenciaUsadas(0)
                 // Los tres van juntos o los tres van vacíos: lo exige la restricción de la
-                // V54, y por eso una postulación nunca puede acabar con un monto suelto del
+                // V55, y por eso una postulación nunca puede acabar con un monto suelto del
                 // que no se sepa la moneda ni el día en que se dijo.
                 .pretensionMonto(pretension)
                 .pretensionMoneda(monedaPretension)
@@ -441,7 +441,7 @@ public class ServicioPostulacionPortalImpl implements ServicioPostulacionPortal 
                 sinLeer);
     }
 
-    // ============ La campana (V55) ============
+    // ============ La campana (V56) ============
 
     @Override
     public DtosPortal.MisAvisos misAvisos(ContextoUsuario quien) {

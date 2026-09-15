@@ -54,7 +54,7 @@ public interface ServicioPropuestaPerfil {
     void proponerEnlaces(Long personaId, String linkedin, String github, String portafolio);
 
     /**
-     * Guarda en el perfil, <b>como banda base</b>, lo que acaba de declarar al postular (V54).
+     * Guarda en el perfil, <b>como banda base</b>, lo que acaba de declarar al postular (V55).
      *
      * <p>Es la mitad que faltaba del modelo híbrido: el perfil prellena el formulario de
      * postular, y postular rellena el perfil de quien todavía no tenía nada. Sin esto, quien

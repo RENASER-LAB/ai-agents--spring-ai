@@ -23,7 +23,7 @@ public interface ServicioPostulacionPortal {
     // navegador a nombre de esa empresa y de esta postulación (pieza D).
     /**
      * @param pretensionMonto cuánto quiere ganar en esta vacante. <b>Obligatorio si la vacante
-     *        publica lo que paga</b> y se ignora si no (V54): es el trato simétrico —la
+     *        publica lo que paga</b> y se ignora si no (V55): es el trato simétrico —la
      *        empresa enseña su presupuesto, el candidato enseña su precio— y no tiene sentido
      *        pedírselo a quien no ha recibido nada a cambio.
      */
@@ -39,7 +39,7 @@ public interface ServicioPostulacionPortal {
 
     void retirar(ContextoUsuario quien, UUID uuid);
 
-    // ---------- la campana (V55) ----------
+    // ---------- la campana (V56) ----------
 
     /** Mis avisos, los nuevos arriba, y cuántos me quedan sin ver. */
     MisAvisos misAvisos(ContextoUsuario quien);

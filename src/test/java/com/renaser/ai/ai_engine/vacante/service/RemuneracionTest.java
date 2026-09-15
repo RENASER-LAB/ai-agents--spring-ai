@@ -163,7 +163,7 @@ class RemuneracionTest {
         }
 
         @Test
-        @DisplayName("una vacante anterior a la V54 —con el tipo vacío— cuenta como OCULTA")
+        @DisplayName("una vacante anterior a la V55 —con el tipo vacío— cuenta como OCULTA")
         void laFilaViejaEsOculta() {
             // Es el estado real de todas las vacantes que existían al desplegar: la columna
             // tiene DEFAULT, pero una entidad construida a mano puede traerlo en null y no

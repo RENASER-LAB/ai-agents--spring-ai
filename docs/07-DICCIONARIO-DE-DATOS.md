@@ -1,7 +1,7 @@
 # Diccionario de datos
 
 Sistema de selección de personal — Renaser Consulting
-Versión 2.6 · 2026-09-15 · Puesto al día con las migraciones hasta la `V55` (la V49 y la V50 solo siembran pesos; la V51 trae la tabla `lectura_cv_perfil` y los archivos del perfil; la V52 y la V53 no crean tablas; la V54 pone el sueldo en la vacante y la pretensión en la postulación; la V55 trae la tabla `aviso_portal`)
+Versión 2.6 · 2026-09-15 · Puesto al día con las migraciones hasta la `V56` (la V49 y la V50 solo siembran pesos; la V51 trae la tabla `lectura_cv_perfil` y los archivos del perfil; la V52 y la V53 no crean tablas; la V55 pone el sueldo en la vacante y la pretensión en la postulación; la V56 trae la tabla `aviso_portal`)
 
 Cada tabla con todas sus columnas, tipos y claves. **Este documento se consulta**, no se lee de
 corrido: es la base para escribir las migraciones de Flyway.
@@ -570,12 +570,12 @@ Una convocatoria concreta.
 | `modalidad` | text | no | |
 | `horario` | text | no | |
 | `ubicacion` | text | no | |
-| `compensacion_publica` | text | no | **RETIRADA (`V54`).** Era el sueldo en prosa: «S/ 3500», «a convenir», «según experiencia» o nada. Se conserva por las vacantes creadas antes, pero **ninguna pantalla la lee ni la escribe**, y no viaja en ningún contrato. El sueldo vive en las cuatro columnas de abajo |
-| `remuneracion_tipo` | text | sí | (`V54`) `OCULTA`, `FIJA` o `RANGO`. Por defecto `OCULTA`. **Es lo que decide si declarar pretensión al postular es obligatorio** |
-| `remuneracion_min` | numeric(12,2) | no | (`V54`) Con `FIJA`, el monto; con `RANGO`, el mínimo. Vacío con `OCULTA` |
-| `remuneracion_max` | numeric(12,2) | no | (`V54`) Solo con `RANGO`, y nunca menor que `remuneracion_min` |
-| `remuneracion_moneda` | text | no | (`V54`) `PEN` o `USD`. Vacío con `OCULTA` |
-| `remuneracion_actualizada_en` | timestamptz | no | (`V54`) Cuándo se cambió el sueldo por última vez. Vacío: nunca se tocó desde que se creó. El portal lo usa para pintar «actualizado el …» sobre el monto nuevo |
+| `compensacion_publica` | text | no | **RETIRADA (`V55`).** Era el sueldo en prosa: «S/ 3500», «a convenir», «según experiencia» o nada. Se conserva por las vacantes creadas antes, pero **ninguna pantalla la lee ni la escribe**, y no viaja en ningún contrato. El sueldo vive en las cuatro columnas de abajo |
+| `remuneracion_tipo` | text | sí | (`V55`) `OCULTA`, `FIJA` o `RANGO`. Por defecto `OCULTA`. **Es lo que decide si declarar pretensión al postular es obligatorio** |
+| `remuneracion_min` | numeric(12,2) | no | (`V55`) Con `FIJA`, el monto; con `RANGO`, el mínimo. Vacío con `OCULTA` |
+| `remuneracion_max` | numeric(12,2) | no | (`V55`) Solo con `RANGO`, y nunca menor que `remuneracion_min` |
+| `remuneracion_moneda` | text | no | (`V55`) `PEN` o `USD`. Vacío con `OCULTA` |
+| `remuneracion_actualizada_en` | timestamptz | no | (`V55`) Cuándo se cambió el sueldo por última vez. Vacío: nunca se tocó desde que se creó. El portal lo usa para pintar «actualizado el …» sobre el monto nuevo |
 | `tipo_cierre` | text | sí | `FECHA`, `PLAZAS` o `PERMANENTE` |
 | `plazas` | integer | no | Solo si `tipo_cierre` es `PLAZAS` |
 | `abre_en` | timestamptz | no | |
@@ -596,7 +596,7 @@ Una convocatoria concreta.
 **Apunta a:** `organizacion`, `solicitud_talento`, `puesto`, `version_pesos`,
 `version_plantilla_prueba`, `plantilla_evaluacion`, `usuario`
 
-**Restricción `vacante_remuneracion_coherente` (`V54`).** La base hace cumplir las tres formas, no
+**Restricción `vacante_remuneracion_coherente` (`V55`).** La base hace cumplir las tres formas, no
 solo el código: con `OCULTA` los cuatro campos van vacíos; con `FIJA` hay monto en
 `remuneracion_min`, `remuneracion_max` vacío y moneda; con `RANGO` hay los dos montos, el máximo
 no menor que el mínimo, y moneda. Una vacante `FIJA` sin monto sería una vacante que promete un
@@ -823,9 +823,9 @@ Un usuario en una vacante.
 | `motivo_cierre` | text | no | Solo en los estados finales de cierre |
 | `evaluacion_id` | bigint | no | Cuál evaluación le corresponde |
 | `rondas_evidencia_usadas` | integer | sí | Por defecto 0. Tope configurable |
-| `pretension_monto` | numeric(12,2) | no | (`V54`) Cuánto dijo que quiere ganar **al postular a esta vacante**. Un monto único, no una banda |
-| `pretension_moneda` | text | no | (`V54`) `PEN` o `USD` |
-| `pretension_declarada_en` | timestamptz | no | (`V54`) Cuándo lo declaró |
+| `pretension_monto` | numeric(12,2) | no | (`V55`) Cuánto dijo que quiere ganar **al postular a esta vacante**. Un monto único, no una banda |
+| `pretension_moneda` | text | no | (`V55`) `PEN` o `USD` |
+| `pretension_declarada_en` | timestamptz | no | (`V55`) Cuándo lo declaró |
 | `movido_en` | timestamptz | sí | Cuándo cambió de estado por última vez |
 
 **Clave primaria:** `id` · **Único:** `usuario_id` + `vacante_id` · `uuid`
@@ -854,7 +854,7 @@ solapan», que no sirve para decidir. La restricción `postulacion_pretension_co
 que los tres campos vayan juntos o ninguno.
 
 ⚠️ **Vacío NO significa «no quiso decirlo».** Son tres motivos distintos y el panel tiene que
-poder decir cuál es: la postulación es anterior a la `V54`, la vacante tenía el sueldo oculto y no
+poder decir cuál es: la postulación es anterior a la `V55`, la vacante tenía el sueldo oculto y no
 se le exigió nada, o quien mira no tiene `ver_pretension`. Un guion a secas se lee siempre como el
 único de los tres que acusa al candidato.
 
@@ -2459,7 +2459,7 @@ conserva, así que se sigue sabiendo qué plantilla, qué versión y cuándo.
 
 ## `aviso_portal`
 
-La campana del portal del candidato (`V55`): lo que pasó mientras no estaba, con su estado de
+La campana del portal del candidato (`V56`): lo que pasó mientras no estaba, con su estado de
 leído.
 
 | Columna | Tipo | Oblig. | Qué guarda |

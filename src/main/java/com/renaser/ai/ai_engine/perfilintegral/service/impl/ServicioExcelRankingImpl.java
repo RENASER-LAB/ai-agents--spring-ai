@@ -446,10 +446,10 @@ public class ServicioExcelRankingImpl implements ServicioExcelRanking {
                             + PERMISO_PRETENSION + "»: el dato no se consultó. NO significa "
                             + "que estos candidatos no declararan sueldo.");
         } else if (filas.stream().allMatch(f -> pretension(f).isEmpty())) {
-            // Tres motivos y no dos desde la V54, y el tercero es el único que NO es del
+            // Tres motivos y no dos desde la V55, y el tercero es el único que NO es del
             // candidato: esta vacante no publica lo que paga, así que a nadie se le exigió
             // decir lo suyo. Escribir «ninguno declaró» ahí es exactamente la frase que la
-            // V54 prohíbe — acusa de reservado a quien cumplió el trato.
+            // V55 prohíbe — acusa de reservado a quien cumplió el trato.
             linea = anotar(hoja, pinceles, linea, vacanteMuestraSueldo
                     ? "Ninguno de los " + filas.size() + " candidatos volcados declaró "
                             + "pretensión salarial."
@@ -636,7 +636,7 @@ public class ServicioExcelRankingImpl implements ServicioExcelRanking {
      * dos. Y el símbolo no se supone: sin moneda declarada van las cifras solas, que un
      * candidato pidiendo 3.000 dólares y leído como «S/ 3,000» es una llamada perdida.
      *
-     * <p>⚠️ <b>Y «la misma cifra» significa la que el panel pinta, que desde la V54 es la
+     * <p>⚠️ <b>Y «la misma cifra» significa la que el panel pinta, que desde la V55 es la
      * DECLARADA AL POSTULAR AQUÍ.</b> La del perfil es su expectativa general, escrita quizá
      * hace meses y sin mirar esta vacante; la declarada la confirmó delante del sueldo de este
      * puesto, y es con la que se va a negociar. Escribir aquí la del perfil teniendo la otra

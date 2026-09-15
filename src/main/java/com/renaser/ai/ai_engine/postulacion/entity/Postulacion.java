@@ -32,7 +32,7 @@ public class Postulacion {
     private Long evaluacionTecnicaId;
     private Integer rondasEvidenciaUsadas;
     /**
-     * Cuánto dijo que quiere ganar al postular a ESTA vacante (V54).
+     * Cuánto dijo que quiere ganar al postular a ESTA vacante (V55).
      *
      * <p>Un monto único y no una banda: el perfil guarda su expectativa general como rango,
      * y aquí se concreta en el número que se puede poner de frente contra el presupuesto de

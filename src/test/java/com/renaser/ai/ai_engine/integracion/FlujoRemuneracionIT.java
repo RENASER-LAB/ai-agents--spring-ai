@@ -38,7 +38,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * El trato del sueldo de la V54 y la campana de la V55, de punta a punta y contra la base
+ * El trato del sueldo de la V55 y la campana de la V56, de punta a punta y contra la base
  * de verdad.
  *
  * <p>Existe porque lo que estas dos migraciones prometen no se puede comprobar con dobles.
@@ -47,11 +47,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * repositorios simulados, y eso deja fuera justo la mitad que se rompe sola:
  *
  * <ul>
- *   <li>Las restricciones de la V54. Un mock acepta cualquier fila; la base no. Una
+ *   <li>Las restricciones de la V55. Un mock acepta cualquier fila; la base no. Una
  *       postulación con monto y sin moneda, o una vacante FIJA sin cifra, son estados que el
  *       código no debería poder producir — y esta prueba comprueba que, si algún día los
  *       produce, la base los para.
- *   <li>La tabla de la V55 con sus claves foráneas y sus columnas obligatorias de verdad.
+ *   <li>La tabla de la V56 con sus claves foráneas y sus columnas obligatorias de verdad.
  *   <li>El contrato HTTP completo: que negarse a postular sin declarar el sueldo sea un 400
  *       con la cifra de la vacante dentro, y no un 500 mudo ni un 201 silencioso.
  *   <li>Que el correo, el aviso y la auditoría salgan del MISMO gesto y queden escritos en
@@ -209,7 +209,7 @@ public class FlujoRemuneracionIT {
         assertThat(jdbc.queryForObject(
                 "select pretension_monto from postulacion where id = ?", BigDecimal.class, postulacionConBanda))
                 .isEqualByComparingTo("3800");
-        // Los tres van juntos o los tres van vacíos (restricción de la V54): sin la fecha, la
+        // Los tres van juntos o los tres van vacíos (restricción de la V55): sin la fecha, la
         // cifra sería un número del que no se sabe cuándo se dijo.
         assertThat(jdbc.queryForObject(
                 "select pretension_declarada_en from postulacion where id = ?", Instant.class, postulacionConBanda))
@@ -249,7 +249,7 @@ public class FlujoRemuneracionIT {
 
         // Manda una cifra de todas formas —un cliente viejo, un formulario que no se enteró—
         // y la postulación entra, pero la cifra NO se guarda. Aceptarla mientras la empresa
-        // calla la suya es justo el desequilibrio que la V54 viene a romper.
+        // calla la suya es justo el desequilibrio que la V55 viene a romper.
         mvc.perform(multipart("/api/v1/portal/postulaciones")
                         .file(unCurriculum())
                         .param("vacanteId", String.valueOf(vacanteOculta))
@@ -293,7 +293,7 @@ public class FlujoRemuneracionIT {
                 .andExpect(jsonPath("$.ahora").value(FIJO))
                 .andExpect(jsonPath("$.candidatosAvisados").value(1));
 
-        // 1. El aviso dentro del portal, que es lo que la V55 vino a traer.
+        // 1. El aviso dentro del portal, que es lo que la V56 vino a traer.
         assertThat(contar("""
                 select count(*) from aviso_portal
                 where usuario_id = %d and vacante_id = %d
@@ -428,7 +428,7 @@ public class FlujoRemuneracionIT {
 
     @Test
     @Order(9)
-    @DisplayName("la restricción de la V54 para la remuneración de la vacante no admite estados imposibles")
+    @DisplayName("la restricción de la V55 para la remuneración de la vacante no admite estados imposibles")
     void laBaseParaLasRemuneracionesIncoherentes() {
         // Las cuatro formas de mentir con los mismos cuatro campos. El código las valida antes
         // (Remuneracion.validar), pero un formulario no es la única forma de escribir en una
@@ -461,7 +461,7 @@ public class FlujoRemuneracionIT {
 
     @Test
     @Order(10)
-    @DisplayName("la restricción de la V54 para la pretensión exige los tres campos juntos o los tres vacíos")
+    @DisplayName("la restricción de la V55 para la pretensión exige los tres campos juntos o los tres vacíos")
     void laBaseParaLasPretensionesAMedias() {
         seRechaza("un monto suelto, sin moneda ni fecha",
                 "update postulacion set pretension_monto = 3000, pretension_moneda = null,"
@@ -487,9 +487,9 @@ public class FlujoRemuneracionIT {
 
     @Test
     @Order(11)
-    @DisplayName("la tabla de avisos de la V55 no admite un aviso de nadie, de ninguna empresa ni sin texto")
+    @DisplayName("la tabla de avisos de la V56 no admite un aviso de nadie, de ninguna empresa ni sin texto")
     void laBaseParaLosAvisosHuerfanos() {
-        // La V55 no lleva CHECK: lo que la protege son sus claves foráneas y sus columnas
+        // La V56 no lleva CHECK: lo que la protege son sus claves foráneas y sus columnas
         // obligatorias. Un aviso sin dueño no se lo puede enseñar a nadie, y uno sin texto
         // sería un punto rojo que al pulsarlo no dice nada.
         seRechaza("un aviso de un usuario que no existe",

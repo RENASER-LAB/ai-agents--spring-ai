@@ -95,7 +95,7 @@ class ServicioVacantesPanelImplTest {
     @Mock private com.renaser.ai.ai_engine.postulacion.repository.PostulacionRepository postulaciones;
     @Mock private com.renaser.ai.ai_engine.perfilintegral.repository.VersionBancoRepository versionesBanco;
 
-    // Las seis de contarle a la gente que el sueldo cambió (V55). Son dobles: lo que hacen
+    // Las seis de contarle a la gente que el sueldo cambió (V56). Son dobles: lo que hacen
     // de verdad lo comprueban sus propias pruebas; aquí se vigila A QUIÉN se llama.
     @Mock private com.renaser.ai.ai_engine.notificacion.service.ServicioAvisosPortal avisos;
     @Mock private com.renaser.ai.ai_engine.notificacion.service.ServicioCorreo correo;

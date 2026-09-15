@@ -18,9 +18,9 @@ import java.util.Set;
  *
  * <ol>
  *   <li><b>¿Es válida?</b> Una vacante FIJA sin monto o un RANGO al revés no son estados
- *       que se puedan guardar. La base también lo impide (V54), pero un 500 de constraint
+ *       que se puedan guardar. La base también lo impide (V55), pero un 500 de constraint
  *       no le dice a nadie qué escribió mal.
- *   <li><b>¿Obliga al candidato?</b> El trato de la V54: enseñar el sueldo obliga a quien
+ *   <li><b>¿Obliga al candidato?</b> El trato de la V55: enseñar el sueldo obliga a quien
  *       postula a decir el suyo; esconderlo lo libera.
  *   <li><b>¿Cómo se escribe?</b> El correo del cambio de sueldo dice «antes» y «ahora», y
  *       esa frase la arma este archivo — no la plantilla de cada empresa, que tendría que
@@ -77,13 +77,13 @@ public final class Remuneracion {
     /**
      * ¿Esta vacante enseña lo que paga?
      *
-     * <p>Y por tanto —el trato de la V54— ¿le exige a quien postula que diga lo suyo?
+     * <p>Y por tanto —el trato de la V55— ¿le exige a quien postula que diga lo suyo?
      */
     public static boolean laEnsena(Vacante vacante) {
         return vacante != null && !OCULTA.equals(tipoDe(vacante));
     }
 
-    /** El tipo de una vacante, tolerando el nulo de una fila anterior a la V54. */
+    /** El tipo de una vacante, tolerando el nulo de una fila anterior a la V55. */
     public static String tipoDe(Vacante vacante) {
         String tipo = vacante.getRemuneracionTipo();
         return tipo == null || tipo.isBlank() ? OCULTA : tipo;

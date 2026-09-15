@@ -414,7 +414,7 @@ public class FlujoPerfilIT {
         // caso SIN permiso se le quita a todos los roles y se restaura despues: los permisos
         // se leen de la base en cada peticion, no viven en el token.
         /*
-         * La vacante de este flujo nace sin publicar su sueldo, y desde la V54 eso es la
+         * La vacante de este flujo nace sin publicar su sueldo, y desde la V55 eso es la
          * OTRA llave de la pretensión: quien no enseña lo que paga no ve lo que piden, tenga
          * el permiso o no. Esta prueba mira el PERMISO, así que se enciende el sueldo aquí
          * —por SQL, para no arrastrar al resto del flujo, que postula sin declarar cifra— y

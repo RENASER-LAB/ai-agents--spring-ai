@@ -29,7 +29,7 @@ public class Vacante {
     private String modalidad;
     private String horario;
     private String ubicacion;
-    // RETIRADA (V54): el sueldo vive en los campos de remuneración de abajo. Se mantiene
+    // RETIRADA (V55): el sueldo vive en los campos de remuneración de abajo. Se mantiene
     // mapeada porque la columna sigue existiendo con los datos de las vacantes viejas, pero
     // ninguna pantalla la lee ni la escribe.
     @Deprecated
@@ -45,7 +45,7 @@ public class Vacante {
      */
     @Builder.Default
     private String remuneracionTipo = "OCULTA";
-    // FIJA guarda aquí su único monto y deja max vacío. La base lo hace cumplir (V54).
+    // FIJA guarda aquí su único monto y deja max vacío. La base lo hace cumplir (V55).
     private BigDecimal remuneracionMin;
     private BigDecimal remuneracionMax;
     private String remuneracionMoneda;

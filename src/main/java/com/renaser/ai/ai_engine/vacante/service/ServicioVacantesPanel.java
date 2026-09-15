@@ -114,7 +114,7 @@ public interface ServicioVacantesPanel {
     void cerrar(ContextoUsuario quien, Long id, String motivo);
 
     /**
-     * Cambia lo que esta vacante dice que paga, y avisa a quien ya postuló (V54).
+     * Cambia lo que esta vacante dice que paga, y avisa a quien ya postuló (V55).
      *
      * <p>No es un campo más del formulario de editar, y por eso tiene verbo propio: cambiar
      * el sueldo de una vacante viva le manda un correo y un aviso a cada persona con una

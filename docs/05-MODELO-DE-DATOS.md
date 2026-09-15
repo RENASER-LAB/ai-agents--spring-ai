@@ -23,7 +23,7 @@ Sirve para tres cosas:
 - **Entender el sistema.** Un modelo de datos bien contado explica el negocio mejor que
   cualquier otro documento.
 
-**La base ya está construida.** Las migraciones `V1` a `V55` viven en
+**La base ya está construida.** Las migraciones `V1` a `V56` viven en
 `src/main/resources/db/migration` —**104 tablas de este módulo**, 107 en la base contando la de
 Flyway y las dos del motor de agentes— y Flyway es el dueño del esquema. Cambiar algo de aquí
 ya cuesta una migración nueva, y **una migración aplicada no se edita nunca**: se escribe otra
@@ -42,16 +42,16 @@ columnas en `perfil_candidato`, una en `certificacion_perfil` y la tabla `lectur
 que sigue la lectura del currículum subido al perfil sin colgar de ninguna postulación. **Nada de
 eso llega al panel ni a la IA**: la foto la ve solo el candidato (RF-41, decidido el 05/09/2026).
 
-La `V54` (14/09/2026) convierte el sueldo en **un trato entre los dos lados**: cinco columnas de
+La `V55` (14/09/2026) convierte el sueldo en **un trato entre los dos lados**: cinco columnas de
 remuneración en `vacante` y tres de pretensión en `postulacion`. Hasta entonces la vacante decía
 el dinero en un texto libre (`compensacion_publica`, que queda retirada) y el candidato decía el
 suyo en su perfil, opcional y sin mirar ninguna vacante concreta: las dos mitades del mismo dato
 vivían separadas y ninguna comprometía a nadie. Ver [El sueldo, de los dos
 lados](EL-SUELDO-DE-LOS-DOS-LADOS.md).
 
-La `V55` (14/09/2026) le da al portal **una campana**: la tabla `aviso_portal` guarda lo que pasó
+La `V56` (14/09/2026) le da al portal **una campana**: la tabla `aviso_portal` guarda lo que pasó
 mientras el candidato no estaba, con su estado de leído. Nace con un solo tipo de aviso —el cambio
-de sueldo de la V54— y está hecha para los que vengan.
+de sueldo de la V55— y está hecha para los que vengan.
 
 La `V37` convierte el esquema en **multiempresa**: `organizacion.es_plataforma` marca a la
 dueña de la plataforma (solo una puede serlo) y reemplaza al código `'RENASER'` que estaba
@@ -545,7 +545,7 @@ del nivel se cargan como valores iniciales que se pueden cambiar.
 El Evaluador de Estándar —antes Bar Raiser— tiene `puede_bloquear`, que arranca en falso: emite
 una recomendación registrada. El sistema no deja nombrar a alguien del área que contrata.
 
-**La vacante dice lo que paga de una de tres formas** (`V54`): no publicarlo, un monto fijo, o un
+**La vacante dice lo que paga de una de tres formas** (`V55`): no publicarlo, un monto fijo, o un
 rango. No es un detalle de presentación: **es lo que decide si quien postula está obligado a
 declarar cuánto quiere ganar**. Si la empresa enseña su cifra, se le exige la suya; si la esconde,
 no se le pide nada. El detalle del trato está en [El sueldo, de los dos
@@ -604,14 +604,14 @@ embudo de cada vacante mentiría: alguien que se retiró no es alguien que no di
 `es_por_lote` marca las transiciones hechas en bloque. Aunque se despachen cien de una vez,
 **cada una guarda su propio motivo**.
 
-**La pretensión vive en la postulación y no solo en el perfil** (`V54`). El perfil guarda la banda
+**La pretensión vive en la postulación y no solo en el perfil** (`V55`). El perfil guarda la banda
 general de la persona y es la que prellena el formulario —con el centro, no con el borde bajo—;
 la postulación guarda **el número que confirmó delante del sueldo de este puesto**. Son dos datos
 distintos a propósito: uno se escribió quizá hace meses sin mirar ninguna vacante, el otro se
 escribió sabiendo lo que esta paga. Lo declarado vuelve al perfil solo si el perfil estaba vacío:
 propone, nunca pisa.
 
-⚠️ **Una pretensión vacía tiene tres motivos distintos** —la postulación es anterior a la `V54`, la
+⚠️ **Una pretensión vacía tiene tres motivos distintos** —la postulación es anterior a la `V55`, la
 vacante no publicaba su sueldo, o quien mira no tiene permiso— y el panel tiene que decir cuál es.
 Solo uno de los tres habla del candidato.
 
@@ -973,9 +973,9 @@ para permitirlo. También registra los cambios de permisos.
 Del correo se guarda el cuerpo ya armado, no solo cuál plantilla se usó. Si mañana alguien edita
 la plantilla, lo que se le envió a esa persona sigue siendo lo que dice el registro.
 
-`aviso_portal` (`V55`) es **la otra mitad del correo, no su reemplazo**: los dos salen del mismo
+`aviso_portal` (`V56`) es **la otra mitad del correo, no su reemplazo**: los dos salen del mismo
 hecho. El correo sale y no vuelve —cae en promociones, llega a una dirección que el cargador de
-currículums inventó—, y hasta la V55 lo que pasaba mientras el candidato no estaba no quedaba en
+currículums inventó—, y hasta la V56 lo que pasaba mientras el candidato no estaba no quedaba en
 ninguna parte: su lista de postulaciones se veía igual el día que todo seguía igual y el día que
 le cambiaron el sueldo. Guarda el texto ya armado por la misma razón que el correo. Hoy nace un
 solo tipo de aviso, el cambio de remuneración; la tabla está hecha para los que vengan

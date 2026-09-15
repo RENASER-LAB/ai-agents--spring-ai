@@ -132,7 +132,7 @@ class ServicioPostulacionPortalImplTest {
      * La misma vacante, diciendo o callando lo que paga.
      *
      * <p>El caso por defecto es {@code OCULTA} porque es como estaban todas las vacantes antes
-     * de la V54: así las pruebas de siempre siguen contando exactamente lo que contaban, sin
+     * de la V55: así las pruebas de siempre siguen contando exactamente lo que contaban, sin
      * que un requisito nuevo se les cuele por debajo.
      */
     private void armarVacantePublicada(Long organizacionDeLaVacante, String tipoRemuneracion) {
@@ -193,10 +193,10 @@ class ServicioPostulacionPortalImplTest {
                         .build()));
     }
 
-    // ============ El trato del sueldo (V54) ============
+    // ============ El trato del sueldo (V55) ============
 
     /**
-     * Las dos mitades del trato de la V54, que es simétrico:
+     * Las dos mitades del trato de la V55, que es simétrico:
      *
      * <ul>
      *   <li>La vacante <b>enseña</b> lo que paga → quien postula tiene que decir lo suyo.

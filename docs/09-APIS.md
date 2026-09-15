@@ -111,7 +111,7 @@ en lenguaje normal.
 | GET `/postulaciones` | Sus postulaciones, con la empresa de cada una, estado, días sin cambio, **qué rendirá en la etapa técnica** (`instrumentoEtapaTecnica`: la prueba del puesto o el cuestionario), lo que paga la vacante hoy (`remuneracion`, con su `actualizadaEn`), lo que él pidió aquí (`miPretension`) y cuántos avisos de ese proceso sigue sin ver (`avisosSinLeer`) | Candidato |
 | GET `/postulaciones/{uuid}` | El detalle de una suya, con el historial completo | Candidato |
 | POST `/postulaciones/{uuid}/retiro` | Retirarla. **No borra sus datos**: eso se pide aparte | Candidato |
-| GET `/avisos` | La campana (`V55`): sus avisos con los nuevos arriba, y cuántos le quedan sin ver (`{sinLeer, avisos}`). **Sin permiso propio**: todo candidato con sesión tiene campana, y el servicio filtra por el usuario del token | Candidato |
+| GET `/avisos` | La campana (`V56`): sus avisos con los nuevos arriba, y cuántos le quedan sin ver (`{sinLeer, avisos}`). **Sin permiso propio**: todo candidato con sesión tiene campana, y el servicio filtra por el usuario del token | Candidato |
 | POST `/avisos/lectura` | Marcar leídos todos los suyos. Devuelve `{marcados}` | Candidato |
 | POST `/avisos/{id}/lectura` | Marcar leído uno | Candidato |
 | POST `/consentimientos/futuros/retiro` | Retirar el consentimiento de futuros contactos | Candidato |

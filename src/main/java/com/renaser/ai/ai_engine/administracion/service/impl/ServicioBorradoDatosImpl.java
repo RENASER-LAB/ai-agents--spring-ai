@@ -136,7 +136,7 @@ public class ServicioBorradoDatosImpl implements ServicioBorradoDatos {
         /*
          * 4b · La pretensión declarada en cada postulación, y los avisos de su campana.
          *
-         * Las dos llegaron con la V54 y la V55, y las dos son el mismo dato que ya se
+         * Las dos llegaron con la V55 y la V56, y las dos son el mismo dato que ya se
          * borraba por otro lado contado de otra forma:
          *
          *   - `postulacion.pretension_monto` es la cifra exacta que dijo, y vive en una
@@ -150,7 +150,7 @@ public class ServicioBorradoDatosImpl implements ServicioBorradoDatos {
          *     olvido, no una decisión.
          *
          * ⚠️ Las tres columnas de la pretensión se limpian JUNTAS: el CHECK
-         * `postulacion_pretension_coherente` (V54) rechaza dejar una puesta y las otras no.
+         * `postulacion_pretension_coherente` (V55) rechaza dejar una puesta y las otras no.
          */
         if (usuario != null) {
             for (Postulacion p : postulaciones.findByUsuarioIdOrderByCreadoEnDesc(usuario.getId())) {

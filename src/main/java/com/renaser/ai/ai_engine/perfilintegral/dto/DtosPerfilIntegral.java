@@ -157,7 +157,7 @@ public final class DtosPerfilIntegral {
             boolean puedeVerPretension,
             boolean puedeMoverPostulacion,
             /**
-             * Si ESTA vacante publica lo que paga (V54).
+             * Si ESTA vacante publica lo que paga (V55).
              *
              * <p>Es lo que le da sentido a la columna de la pretensión declarada: con el
              * sueldo oculto nadie estaba obligado a decir el suyo, y una columna entera vacía
@@ -245,7 +245,7 @@ public final class DtosPerfilIntegral {
             BigDecimal pretensionMax,
             String pretensionMoneda,
             /**
-             * Lo que pidió AL POSTULAR A ESTA VACANTE (V54), con la misma protección que la
+             * Lo que pidió AL POSTULAR A ESTA VACANTE (V55), con la misma protección que la
              * del perfil: sin {@code ver_pretension} viene vacío.
              *
              * <p>⚠️ <b>No es lo mismo que la del perfil, y por eso son dos campos y no uno.</b>

@@ -24,7 +24,7 @@ public final class DtosVacante {
             String horario,
             String ubicacion,
             /**
-             * Lo que paga, si lo dice (V54).
+             * Lo que paga, si lo dice (V55).
              *
              * <p>Vacío = {@code OCULTA}, que es como nacen todas las vacantes que no digan lo
              * contrario. No es {@code @NotNull} a propósito: obligar a declarar el sueldo
@@ -61,10 +61,10 @@ public final class DtosVacante {
      * <p>{@code tipo} es {@code OCULTA}, {@code FIJA} o {@code RANGO}. Con {@code FIJA} el
      * monto va en {@code min} y {@code max} se queda vacío; con {@code OCULTA} los tres
      * campos van vacíos. Las reglas las hace cumplir {@code Remuneracion}, y también la base
-     * (V54), porque un formulario no es la única forma de escribir en una tabla.
+     * (V55), porque un formulario no es la única forma de escribir en una tabla.
      *
      * <p>⚠️ <b>Esconder el sueldo no es un detalle de presentación.</b> Decide si quien
-     * postula está obligado a declarar cuánto quiere ganar: es el trato de la V54, y las dos
+     * postula está obligado a declarar cuánto quiere ganar: es el trato de la V55, y las dos
      * mitades se guardan en este mismo campo.
      */
     public record RemuneracionDeLaVacante(@NotBlank String tipo, BigDecimal min,
