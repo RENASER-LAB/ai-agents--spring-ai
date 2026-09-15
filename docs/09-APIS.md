@@ -99,18 +99,21 @@ en lenguaje normal.
 
 | Método y ruta | Qué hace | Quién |
 |---|---|---|
-| GET `/vacantes` | Las vacantes publicadas **de todas las empresas activas**, cada una con el nombre de la suya. Las de una empresa suspendida no salen | Cualquiera, sin token |
-| GET `/vacantes/{id}` | El detalle público, con los requisitos indispensables | Cualquiera |
+| GET `/vacantes` | Las vacantes publicadas **de todas las empresas activas**, cada una con el nombre de la suya. Las de una empresa suspendida no salen. Cada una trae su `remuneracion` | Cualquiera, sin token |
+| GET `/vacantes/{id}` | El detalle público, con los requisitos indispensables y la `remuneracion` | Cualquiera |
 | GET `/vacantes/{id}/consentimiento` | El texto de tratamiento de datos **de la empresa de esa vacante**: lo que se acepta al postular, con el nombre de quien tratará los datos | Cualquiera |
 | GET `/consentimientos/textos` | Los textos vigentes de los dos consentimientos de la plataforma (los de crear la cuenta) | Cualquiera |
 | GET `/catalogos/ubigeo` | Dónde se puede decir que uno vive: las **196 provincias** del Perú y «Fuera del Perú», cada una con su departamento, ordenadas por departamento y nombre. Es `{codigo, nombre, departamento}`, y el departamento viene vacío solo en `EXT` | Cualquiera, sin token |
 | POST `/cuentas` | Crear la cuenta y registrar los consentimientos. Desde el 31/08 pide además **la ciudad** (`ciudadUbigeo`), obligatoria: un código que el catálogo no ofrezca es un 400 | Cualquiera |
 | POST `/auth/login` | Entrar; devuelve el token | Cualquiera |
 | GET `/auth/sesion` | Cómo se llama quien tiene el token. El portal entra una vez y guarda el token; en la segunda visita nadie le había dicho el nombre (06/09) | Candidato |
-| POST `/postulaciones` | Postular: CV (PDF o Word, máx. 10 MB; **desde el 06/09 opcional si el perfil ya tiene uno**: sin adjuntar se usa el del perfil, copiado a la empresa de la vacante, y adjuntando otro ese vale solo para esa vacante y el del perfil no cambia), enlaces, el resultado del que se siente orgulloso, la confirmación de los requisitos y `aceptaTratamiento` (obligatorio): la aceptación del texto de la empresa queda firmada con IP y navegador, a nombre de esa postulación | Candidato |
-| GET `/postulaciones` | Sus postulaciones, con la empresa de cada una, estado, días sin cambio y **qué rendirá en la etapa técnica** (`instrumentoEtapaTecnica`: la prueba del puesto o el cuestionario) | Candidato |
+| POST `/postulaciones` | Postular: CV (PDF o Word, máx. 10 MB; **desde el 06/09 opcional si el perfil ya tiene uno**: sin adjuntar se usa el del perfil, copiado a la empresa de la vacante, y adjuntando otro ese vale solo para esa vacante y el del perfil no cambia), enlaces, el resultado del que se siente orgulloso, la confirmación de los requisitos y `aceptaTratamiento` (obligatorio): la aceptación del texto de la empresa queda firmada con IP y navegador, a nombre de esa postulación. **Desde el 14/09 lleva además `pretensionMonto` y `pretensionMoneda`**: obligatorios si la vacante publica lo que paga —faltando, 400—, e ignorados si no | Candidato |
+| GET `/postulaciones` | Sus postulaciones, con la empresa de cada una, estado, días sin cambio, **qué rendirá en la etapa técnica** (`instrumentoEtapaTecnica`: la prueba del puesto o el cuestionario), lo que paga la vacante hoy (`remuneracion`, con su `actualizadaEn`), lo que él pidió aquí (`miPretension`) y cuántos avisos de ese proceso sigue sin ver (`avisosSinLeer`) | Candidato |
 | GET `/postulaciones/{uuid}` | El detalle de una suya, con el historial completo | Candidato |
 | POST `/postulaciones/{uuid}/retiro` | Retirarla. **No borra sus datos**: eso se pide aparte | Candidato |
+| GET `/avisos` | La campana (`V55`): sus avisos con los nuevos arriba, y cuántos le quedan sin ver (`{sinLeer, avisos}`). **Sin permiso propio**: todo candidato con sesión tiene campana, y el servicio filtra por el usuario del token | Candidato |
+| POST `/avisos/lectura` | Marcar leídos todos los suyos. Devuelve `{marcados}` | Candidato |
+| POST `/avisos/{id}/lectura` | Marcar leído uno | Candidato |
 | POST `/consentimientos/futuros/retiro` | Retirar el consentimiento de futuros contactos | Candidato |
 | POST `/solicitudes-borrado` | Pedir el borrado de sus datos | Candidato |
 | GET `/evaluacion/{uuid}` | Su evaluación: las preguntas en **su** orden y lo que lleva respondido | Candidato |
@@ -144,6 +147,20 @@ ese campo. Si la clave llega al navegador, el banco entero queda inutilizado.
 la vacante y el candidato confirma cuáles cumple. Cualquier requisito activo no confirmado cierra
 la postulación en el acto (`NO_CONTINUA`), con la regla exacta escrita en su historial. Es el
 **único** descarte automático de todo el sistema.
+
+**El sueldo se pide solo si la vacante enseña el suyo.** Es un trato simétrico y va en el mismo
+campo de la vacante: publicar lo que paga obliga a quien postula a declarar cuánto quiere ganar
+—`pretensionMonto` y `pretensionMoneda`, o 400—, y esconderlo lo libera, tanto que lo que mande
+se ignora. La cifra es **entera**, entre 100 y 1 000 000, en `PEN` o `USD`; sin decimales, porque
+con ellos no hay forma de distinguir «3,50» de un 3500 mal tecleado. Una vacante que no lo
+publica devuelve `remuneracion.tipo: "OCULTA"` y **no un hueco**: el portal tiene que poder
+decirlo en voz alta, porque un hueco se lee como un fallo de carga. El detalle está en
+[El sueldo, de los dos lados](EL-SUELDO-DE-LOS-DOS-LADOS.md).
+
+**La campana es del usuario, no de la postulación.** `GET /avisos` no acepta filtros ni ids de
+nadie más: son los del token. El punto se apaga al pulsar cada aviso o todos de una vez, **no al
+abrir la campana**: enterarse de que hay algo no es lo mismo que haberlo leído, y apagarlo al
+abrir apagaba también el punto de cada fila de «Mis procesos» sin que nadie hubiera leído nada.
 
 ## El panel del equipo (`/api/v1/panel`)
 
@@ -187,6 +204,7 @@ del área— se ven solo las propias, y una ajena responde 404.
 | GET `/vacantes/{id}/plantillas-correo` | Qué avisos manda esta vacante con texto propio. Vacío = los de siempre | `ver_vacantes` |
 | POST `/vacantes/{id}/plantillas-correo` · DELETE `/{avisoCodigo}` | Hacer que esta vacante mande otro texto en lugar del aviso que le tocaba, y devolverlo al de siempre. **Una plantilla es una por organización**: sin esto, cambiar el texto de una convocatoria se lo cambia a todas | `editar_textos_correo` |
 | GET/POST `/vacantes/{id}/barreras-criticas` | Las capacidades que ningún promedio alto compensa | `definir_barreras_criticas` |
+| POST `/vacantes/{id}/remuneracion` | Cambiar lo que paga la vacante, con **motivo obligatorio**. Tiene verbo propio y no viaja en el `PUT` general porque **le escribe a cada candidato vivo** —correo y aviso en su portal—: corregir una falta de ortografía en la descripción no puede mandarle una noticia a cuarenta personas. Guardar lo mismo que ya había no cuenta como cambio y no avisa a nadie. Devuelve `{antes, ahora, candidatosAvisados}`. **En una vacante publicada no se puede cambiar la decisión de publicar el sueldo o no** (409); el monto sí, y moverse entre fija y rango también | `editar_vacante` |
 | POST `/vacantes/{id}/publicacion` | Publicar: aparece en el portal | `publicar_vacante` |
 | POST `/vacantes/{id}/cierre` | Cerrar: frena postulaciones nuevas, **no arrastra las que van en marcha** | `cerrar_vacante` |
 
@@ -199,9 +217,9 @@ del área— se ven solo las propias, y una ajena responde 404.
 | POST `/postulaciones/{id}/enlace-acceso` | Generar un enlace de acceso nuevo para ese candidato (entra sin contraseña; ver «Cómo entrar») | `mover_postulacion` |
 | GET `/bandeja?espera_a=` | La bandeja: todo lo que espera a `CANDIDATO`, `SISTEMA`, `TALENTO` o `AREA` | `ver_candidatos` |
 | GET `/vacantes/{id}/embudo` | Cuántas postulaciones hay en cada estado | `ver_embudo` |
-| GET `/vacantes/{id}/ranking?etapa=` | La tanda ordenada de más apto a menos, con las ocho notas del currículum de cada uno. **Incluye a quien todavía no tiene nota**. Sin `etapa` ordena por la del Perfil Integral; con ella, por la nota de esa etapa. Cada fila trae además **dónde vive** (`ciudad`, ya escrito «Departamento — Provincia», y `ciudadCodigo`), **su pretensión salarial**, que solo viaja con `ver_pretension`, y el **`ponderado`** de lo ya rendido (ver la nota de abajo). La respuesta trae además **`puedeMoverPostulacion`**, por lo mismo que la ficha: es el único modo que tiene el panel de saber si ofrecer el descarte en lote, porque no hay endpoint de «mis permisos» | `ver_embudo` |
+| GET `/vacantes/{id}/ranking?etapa=` | La tanda ordenada de más apto a menos, con las ocho notas del currículum de cada uno. **Incluye a quien todavía no tiene nota**. Sin `etapa` ordena por la del Perfil Integral; con ella, por la nota de esa etapa. Cada fila trae además **dónde vive** (`ciudad`, ya escrito «Departamento — Provincia», y `ciudadCodigo`), **su pretensión salarial**, que pide **dos llaves** —`ver_pretension` y que esta vacante publique lo que paga—, y el **`ponderado`** de lo ya rendido (ver la nota de abajo). La respuesta trae además **`puedeMoverPostulacion`**, por lo mismo que la ficha: es el único modo que tiene el panel de saber si ofrecer el descarte en lote, porque no hay endpoint de «mis permisos» | `ver_embudo` |
 | POST `/vacantes/{id}/ranking/excel` | La tanda seleccionada, en un `.xlsx` de dos hojas —Resumen y Detalle— que se descarga como adjunto. Se le pasan `etapa`, los `postulacionIds` **ya ordenados por quien llama** y `filtroDescrito`, la frase que se pintó encima de la tabla. Solo hay columnas para `PERFIL_INTEGRAL` y `PRUEBA_PUESTO`; otra etapa es un 400. Las dos hojas de Resumen cierran con el **ponderado** y su desglose, cada una sin repetir la cifra que su propia columna «Nota» ya enseña | `ver_embudo` |
-| GET `/postulaciones/{id}` · `/historial` | La ficha completa y el recorrido. La ficha trae además **`puedeMoverPostulacion`**: si quien pregunta tiene `mover_postulacion`. No es un dato del candidato sino una facultad de quien mira —igual que `puedeVerPretension` en el ranking— y existe porque el login solo devuelve token e id, así que el panel no tiene otra forma de saber si pintar el botón de descartar. ⚠️ Dice si el permiso **está**, no hasta dónde llega su alcance: quien pueda abrir fichas de todos y mover solo las suyas verá el botón y recibirá un **404** al pulsarlo | `abrir_ficha_candidato` |
+| GET `/postulaciones/{id}` · `/historial` | La ficha completa y el recorrido. La ficha trae además **`puedeMoverPostulacion`**: si quien pregunta tiene `mover_postulacion`. No es un dato del candidato sino una facultad de quien mira —igual que `puedeVerPretension` en el ranking— y existe porque el login solo devuelve token e id, así que el panel no tiene otra forma de saber si pintar el botón de descartar. ⚠️ Dice si el permiso **está**, no hasta dónde llega su alcance: quien pueda abrir fichas de todos y mover solo las suyas verá el botón y recibirá un **404** al pulsarlo. Desde el 14/09 trae también **lo que esa persona pidió ganar al postular aquí**, con las dos llaves de siempre, y cuando no hay nada **dice cuál de los tres motivos es** | `abrir_ficha_candidato` |
 | POST `/postulaciones/{id}/transiciones` | Mover a cualquier estado. **El motivo es obligatorio, sin excepción**. Es también lo que usan **«Descartar»** de la ficha del panel y **«Descartar a N personas»** de la mesa de la tabla: mandan `NO_CONTINUA` y el servicio rellena solo `motivoCierre = DECISION_PERSONA` (para `CERRADA` sería `CIERRE_MANUAL`). ⚠️ Hacia un estado final **esto avisa al candidato por correo** — `NO_CONTINUA` dispara la plantilla `POSTULACION_NO_CONTINUA` en la misma transacción—, y el motivo escrito **no viaja en ese correo**: queda en el historial y la auditoría. **`avisar: false` calla ese correo y solo eso**: el estado cambia, la transición se guarda y la auditoría se escribe igual. Nulo o ausente = avisar, que es lo de siempre. ⚠️ Que no se avisó **queda escrito en los dos sitios donde alguien lo va a buscar**: el motivo guardado termina en « · sin avisar al candidato» —es lo único de la transición que pinta el historial de la ficha— y la auditoría lleva `avisoAlCandidato: NO_ENVIADO`. Sin eso, un descarte silencioso y uno normal se leen igual seis meses después, y si el candidato llama preguntando nadie sabría que nunca se le dijo | `mover_postulacion` |
 | POST `/postulaciones/{id}/confirmacion-avance` | Confirmar que avanza: el sistema calcula el estado siguiente | `confirmar_avance` |
 | GET `/postulaciones/{id}/perfil-integral` | El retrato de la IA: notas del currículum, hallazgos y avisos. Cada nota lleva su explicación, **su confianza —de 0 a 100, la misma escala del puntaje, no de 0 a 1—** y el **motivo del ajuste**, que solo tiene valor cuando esa nota la corrigió una persona | `ver_perfil_integral` |
@@ -262,11 +280,15 @@ del área— se ven solo las propias, y una ajena responde 404.
 > y se llama `ranking-{etapa}-vacante-{id}-{fecha}.xlsx`, con la fecha dentro porque estas hojas
 > se guardan.
 >
-> **La columna de pretensión se explica sola.** Vacía significa dos cosas opuestas —que nadie la
-> declaró, o que el rol de quien descarga no puede verla— y solo una es verdad cada vez, así que
+> **La columna de pretensión se explica sola.** Vacía significa tres cosas distintas —que nadie la
+> declaró, que el rol de quien descarga no puede verla, o que **esta vacante no publica su
+> remuneración y por tanto a nadie se le pidió la suya**— y solo una es verdad cada vez, así que
 > el pie lo dice. Por eso mismo el ranking devuelve `puedeVerPretension` en su cabecera: sin ese
-> booleano, la pantalla tendría que nombrar las dos posibilidades sin afirmar ninguna. Sin
-> `ver_pretension` el dato ni se consulta. Y quien tiene `ver_embudo` pero no
+> booleano, la pantalla tendría que nombrar las posibilidades sin afirmar ninguna. ⚠️ **Ese
+> booleano es el permiso a secas, no la conjunción con lo que publica la vacante**: son motivos
+> distintos para una casilla vacía y la pantalla tiene que poder decir cuál es — con un solo sí/no
+> para los dos, a Dirección le diría «tu rol no puede verla», que es falso. Sin `ver_pretension`, o
+> con una vacante que esconde su sueldo, el dato ni se consulta. Y quien tiene `ver_embudo` pero no
 > `abrir_ficha_candidato` (el mismo permiso que pide `GET /prueba/notas`, desde el 03/09/2026) se
 > lleva el Detalle de la prueba resumido en una línea que explica qué permiso le falta, en vez de
 > un archivo a medio escribir.
@@ -618,7 +640,7 @@ con las reglas que Swagger no cuenta, está en
 | POST y DELETE `/portal/perfil/enlaces` | **Solo esas dos**: un enlace no lleva origen ni confirmación, así que no se edita — se borra y se crea | El propio token |
 | POST/GET/DELETE `/portal/perfil/foto`, `/portada` (y PUT `/portada/galeria`), `/cv`; POST/GET/DELETE `/portal/perfil/certificaciones/{id}/archivo` | Desde el 05/09 (V51): la foto (JPG, PNG o WebP, hasta 2 MB), la portada propia o una del catálogo (nunca las dos), el currículum del perfil (PDF o Word, hasta 10 MB; **se lee al subirlo**, sin esperar a que postule) y el diploma de una certificación (PDF hasta 10 MB, o imagen hasta 2 MB). **Los GET devuelven los bytes**, no un enlace firmado: un `<img src>` no manda cabecera. **Nada de esto llega al panel ni a la IA** | El propio token |
 | GET `/portal/catalogos/niveles-educativos` · `/niveles-idioma` | Los desplegables, para no escribirlos a mano. Devuelven `codigo` y `nombre` ya ordenados: no hay campo `orden`. El tercero del grupo, `/catalogos/ubigeo`, **es el único que responde sin token**, porque su desplegable sale en el registro | Token de candidato |
-| GET `/panel/postulaciones/{id}/perfil` | La trayectoria del candidato sin abrir su archivo. **No puntúa** | `ver_perfil_candidato`; la pretensión solo con `ver_pretension` |
+| GET `/panel/postulaciones/{id}/perfil` | La trayectoria del candidato sin abrir su archivo. **No puntúa** | `ver_perfil_candidato`; la pretensión pide además `ver_pretension` **y** que la vacante publique lo que paga |
 
 ---
 

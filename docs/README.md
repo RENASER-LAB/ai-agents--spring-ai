@@ -30,24 +30,25 @@ requisitos nuevos el 14 de agosto y cambian bastante.
 | Documento | Qué contiene |
 |---|---|
 | [00 · Qué hace el sistema](00-QUE-HACE-EL-SISTEMA.md) | El sistema entero sin nada técnico. Cinco minutos |
-| [01 · Requisitos funcionales](01-REQUISITOS-FUNCIONALES.md) | RF-01 a RF-155. Qué hace el sistema |
+| [01 · Requisitos funcionales](01-REQUISITOS-FUNCIONALES.md) | RF-01 a RF-164. Qué hace el sistema |
 | [02 · Requisitos no funcionales](02-REQUISITOS-NO-FUNCIONALES.md) | RNF-01 a RNF-66. Tecnología, seguridad, rendimiento |
 | [03 · Estados de la postulación](03-ESTADOS-POSTULACION.md) | Los 18 estados de una postulación y sus transiciones |
 | [04 · Roles y permisos](04-ROLES-Y-PERMISOS.md) | Los 77 permisos, acción por acción. En la base hay 71 sembrados |
-| [05 · Modelo de datos](05-MODELO-DE-DATOS.md) | Las 106 tablas (V1-V51) por área y por qué el modelo es así. Se lee |
+| [05 · Modelo de datos](05-MODELO-DE-DATOS.md) | Las 107 tablas (V1-V55) por área y por qué el modelo es así. Se lee |
 | [06 · Inventario de pantallas](06-INVENTARIO-DE-PANTALLAS-MOCKUPS.md) | Las 21 pantallas base, estados, ventanas, campos y datos de los mockups |
 | [07 · Diccionario de datos](07-DICCIONARIO-DE-DATOS.md) | Cada tabla con todas sus columnas, tipos y claves. Se consulta |
 | [08 · Alcance del MVP](08-ALCANCE-DEL-MVP.md) | Qué se construye primero, en tres hitos, y qué queda fuera |
 | [09 · Las APIs](09-APIS.md) | Las dos puertas, cómo entrar y qué hace cada endpoint. La referencia viva es Swagger |
 | [Estado del proyecto](ESTADO-DEL-PROYECTO.md) | **El presente**: hitos, tests, agentes, lo que falta de código y lo que decide Renaser. Se corrige, no se acumula |
 | [Reglas del código](REGLAS-DEL-CODIGO.md) | Los dos módulos, los paquetes de dominio, la frontera con el motor de agentes, y las reglas que no se negocian (estados, alcance, migraciones, Jackson 3). Qué documento se actualiza con cada cambio |
-| [Trabajar en local](TRABAJAR-EN-LOCAL.md) | Perfiles de configuración, arrancar el backend, correr los tests, un backend propio por rama, dónde están las pantallas, los guiones de `scripts/` |
+| [Trabajar en local](TRABAJAR-EN-LOCAL.md) | Perfiles de configuración, arrancar el backend, correr los tests (y por qué siempre con `clean`), las pruebas de extremo a extremo contra un worktree, un backend propio por rama, dónde están las pantallas, los guiones de `scripts/` |
 | [Curso del backend](CURSO-BACKEND.md) | Ruta para entender el código que existe, en orden. Para quien entra al proyecto |
 | [Calificación con IA](CALIFICACION-CON-IA.md) | Cómo la IA lee el currículum, califica lo abierto y arma el Perfil de Talento. Y qué pasa si falla |
 | [La rúbrica de la prueba](RUBRICA-DE-LA-PRUEBA.md) | Cómo se reparten los 100 puntos de una prueba y **quién pone cada nota**: el sistema, un agente o una persona |
 | [La prueba del puesto, por dentro](PRUEBA-DEL-PUESTO.md) | Los dos instrumentos de la etapa técnica; componer una versión antes de publicarla; la guía de calificación; los minutos de la vacante; el cierre en dos niveles; la vacante sin banco; la nota de la etapa; lo que el panel ve de los entregables |
 | [Diseño de la prueba técnica](DISENO-PRUEBA-TECNICA-FICHA-Y-REDACTOR.md) · [Una vacante, una versión](DECISION-UNA-VACANTE-UNA-VERSION.md) | La ficha del puesto (las 10 preguntas al dueño) y el redactor que arma el cuestionario; y por qué una vacante rinde una sola versión |
 | [CAZATALENTOS · banco](CAZATALENTOS-BANCO-RENASER.md) · [prueba técnica](CAZATALENTOS-PRUEBA-TECNICA.md) | Los bancos por nivel del método CAZATALENTOS (V41) y su prueba técnica |
+| [El sueldo, de los dos lados](EL-SUELDO-DE-LOS-DOS-LADOS.md) | El trato de la remuneración (V54): la vacante que enseña lo que paga exige la pretensión, la que la esconde no pide nada y tampoco ve nada. La campana del portal (V55) y lo que se lleva el borrado de datos |
 | [Criba de currículums](CRIBA-DE-CURRICULUMS.md) | Cargar una convocatoria con una carpeta de currículums, pedir que la IA los lea y ver quién es el más apto |
 | [Fallos corregidos de la criba](FALLOS-CORREGIDOS-CRIBA.md) | Los cinco fallos que salieron al pasar 190 currículums reales. Cuatro no daban error |
 | [Los siete fallos de la auditoría](FALLOS-CORREGIDOS-AUDITORIA.md) | Lo que encontró la revisión del 18/08: cuatro que tocaban dinero o decisiones de contratación, y ninguno daba error |

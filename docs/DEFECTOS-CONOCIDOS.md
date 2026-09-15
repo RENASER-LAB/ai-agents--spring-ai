@@ -11,7 +11,7 @@ haría falta para arreglarlo**. Sin lo tercero, una lista así solo sirve para p
 > descubrir cada pocos meses, normalmente con un candidato dentro. Lo que **ya está arreglado**
 > no vive aquí: vive en el documento de su tema, en `CLAUDE.MD` o en el javadoc de su clase.
 
-Última revisión: **01/09/2026**.
+Última revisión: **15/09/2026**.
 
 ---
 
@@ -127,6 +127,54 @@ con un enunciado subido por el panel** sin abrirlo antes uno mismo.
 
 ---
 
+## 5 · Un JSON mal escrito contra la API devuelve 500 en vez de 400
+
+**Qué le pasa a alguien.** Quien consume la API —hoy el frontend, mañana quien integre— manda un
+cuerpo con una coma de más, una llave sin cerrar o un número donde iba un texto, y recibe **un 500
+sin explicación**. El error dice «fallo del servidor» cuando lo que pasa es que el mensaje venía
+mal escrito, así que quien lo recibe busca la avería en el sitio equivocado. Y en el registro del
+servidor esos fallos se mezclan con los que sí son averías de verdad.
+
+**Por qué pasa.** `ManejadorErrores` enumera las excepciones del proyecto para traducirlas a un
+código y un mensaje, pero **no cubre las que lanza Spring MVC antes de llegar a ningún controlador**
+—`HttpMessageNotReadableException` la primera—. Nadie las atrapa, así que salen por el camino por
+defecto, que es el 500.
+
+**Es deuda anterior a esta rama**, y es **la causa conocida de casi todos los fallos del fuzzing**
+de la API: el barrido manda cuerpos deformes a propósito y cuenta 500 donde debería contar 400.
+Comprobado a mano el **15/09/2026**.
+
+**Qué haría falta.** Añadir a `ManejadorErrores` los `@ExceptionHandler` de las excepciones de
+Spring MVC —cuerpo ilegible, parámetro que falta, tipo que no convierte, método no permitido— con
+el mismo formato de error que ya usa el resto. Es un archivo y ningún cambio de contrato: lo que
+cambia es el número que se devuelve, de 500 a 400. Conviene hacerlo antes de volver a medir el
+fuzzing, porque hasta entonces su cifra no dice casi nada.
+
+---
+
+## 6 · La suite de extremo a extremo sale con 19 fallos de fondo
+
+**Qué le pasa a alguien.** Quien corre la suite contra una base recién sembrada la ve terminar en
+rojo, y **no puede saber si rompió algo**. Sin una cifra de referencia, el rojo no dice nada: ni
+«esto estaba así», ni «esto lo rompiste tú».
+
+**La medida, del 15/09/2026: 19 fallan, 153 pasan.** Es un recuento de una corrida completa contra
+base recién sembrada, no una suma de lo que fue arrastrando cada rama.
+
+**Por qué pasa.** No son regresiones. Los specs de `03-orden`, `04-filtros`, `05-excel`,
+`06-sin-ciudad`, `07-movil`, `08-teclado`, `14-vacante`, `18-ranking-contra-api` y
+`20-prueba-y-empresas` **esperan notas y cifras concretas que el sembrador de datos de prueba no
+produce**. Se escribieron contra una base que tenía otros datos, y el sembrador siguió su camino.
+
+**Qué haría falta.** Decidir cuál de las dos, y no a medias: que el sembrador produzca los valores
+que los specs esperan, o que los specs dejen de esperar cifras exactas y comprueben la forma —que
+el orden sea descendente, que la columna exista, que el Excel traiga las hojas— en vez del número.
+Lo segundo es más barato y más duradero; lo primero conserva la capacidad de comprobar que una
+cuenta da lo que tiene que dar. Mientras no se haga, **la cifra de arriba es la referencia**: 19
+es el rojo esperado, y cualquier número mayor sí es una regresión.
+
+---
+
 ## Documentos relacionados
 
 - [Requisitos funcionales](01-REQUISITOS-FUNCIONALES.md) — el rango de duración retirado está en
@@ -134,3 +182,5 @@ con un enunciado subido por el panel** sin abrirlo antes uno mismo.
 - [Modelo de datos](05-MODELO-DE-DATOS.md) — qué impide la base y qué no
 - [Diccionario de datos](07-DICCIONARIO-DE-DATOS.md) — las columnas que salen aquí, una por una
 - [Comprobaciones automáticas](COMPROBACIONES-AUTOMATICAS.md) — qué se comprueba solo
+- [Trabajar en local](TRABAJAR-EN-LOCAL.md) — cómo se corren las pruebas de extremo a extremo, y
+  las dos trampas que hacen que mientan

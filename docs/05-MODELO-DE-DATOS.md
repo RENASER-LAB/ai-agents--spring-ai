@@ -23,8 +23,8 @@ Sirve para tres cosas:
 - **Entender el sistema.** Un modelo de datos bien contado explica el negocio mejor que
   cualquier otro documento.
 
-**La base ya está construida.** Las migraciones `V1` a `V51` viven en
-`src/main/resources/db/migration` —**103 tablas de este módulo**, 106 en la base contando la de
+**La base ya está construida.** Las migraciones `V1` a `V55` viven en
+`src/main/resources/db/migration` —**104 tablas de este módulo**, 107 en la base contando la de
 Flyway y las dos del motor de agentes— y Flyway es el dueño del esquema. Cambiar algo de aquí
 ya cuesta una migración nueva, y **una migración aplicada no se edita nunca**: se escribe otra
 encima.
@@ -41,6 +41,17 @@ La `V51` (05/09/2026) le da al perfil **foto, portada, currículum propio y dipl
 columnas en `perfil_candidato`, una en `certificacion_perfil` y la tabla `lectura_cv_perfil`,
 que sigue la lectura del currículum subido al perfil sin colgar de ninguna postulación. **Nada de
 eso llega al panel ni a la IA**: la foto la ve solo el candidato (RF-41, decidido el 05/09/2026).
+
+La `V54` (14/09/2026) convierte el sueldo en **un trato entre los dos lados**: cinco columnas de
+remuneración en `vacante` y tres de pretensión en `postulacion`. Hasta entonces la vacante decía
+el dinero en un texto libre (`compensacion_publica`, que queda retirada) y el candidato decía el
+suyo en su perfil, opcional y sin mirar ninguna vacante concreta: las dos mitades del mismo dato
+vivían separadas y ninguna comprometía a nadie. Ver [El sueldo, de los dos
+lados](EL-SUELDO-DE-LOS-DOS-LADOS.md).
+
+La `V55` (14/09/2026) le da al portal **una campana**: la tabla `aviso_portal` guarda lo que pasó
+mientras el candidato no estaba, con su estado de leído. Nace con un solo tipo de aviso —el cambio
+de sueldo de la V54— y está hecha para los que vengan.
 
 La `V37` convierte el esquema en **multiempresa**: `organizacion.es_plataforma` marca a la
 dueña de la plataforma (solo una puede serlo) y reemplaza al código `'RENASER'` que estaba
@@ -398,7 +409,7 @@ Hay una versión dibujada de este mismo mapa en
 
 ## Las tablas
 
-Noventa y tres en total, agrupadas por área para poder leerlas de a poco. En cada una se nombran
+Ciento cuatro en total, agrupadas por área para poder leerlas de a poco. En cada una se nombran
 las columnas que importan para entender qué hace, no todas.
 
 **Para verlas todas, con tipo y clave, está el [Diccionario de datos](07-DICCIONARIO-DE-DATOS.md).**
@@ -514,7 +525,7 @@ agente que la produjo.
 | `familia` | Las siete familias de trabajo | codigo, nombre |
 | `familia_afin` | Qué familias se parecen lo bastante para reutilizar evaluaciones | familia_codigo, familia_afin_codigo |
 | `puesto` | El catálogo de puestos, con su nivel y su familia | organizacion_id, codigo, nombre, nivel_puesto_codigo, familia_codigo |
-| `vacante` | Una convocatoria concreta | organizacion_id, solicitud_talento_id, puesto_id, titulo, descripcion, tipo_cierre, plazas, cierra_en, estado, version_pesos_id, version_plantilla_prueba_id, plantilla_evaluacion_id, responsable_usuario_id |
+| `vacante` | Una convocatoria concreta | organizacion_id, solicitud_talento_id, puesto_id, titulo, descripcion, tipo_cierre, plazas, cierra_en, estado, version_pesos_id, version_plantilla_prueba_id, plantilla_evaluacion_id, responsable_usuario_id, remuneracion_tipo, remuneracion_min, remuneracion_max, remuneracion_moneda, remuneracion_actualizada_en |
 | `requisito_objetivo` | Lo único que puede detener una postulación sin que intervenga nadie | vacante_id, descripcion, regla, es_activo |
 | `barrera_critica` | Lo que ningún promedio alto compensa, definido por vacante | vacante_id, descripcion, es_activa |
 | `evaluador_estandar` | Quién revisa que la urgencia no baje el nivel, en esta vacante | vacante_id, usuario_id, puede_bloquear, asignado_por_usuario_id |
@@ -533,6 +544,16 @@ del nivel se cargan como valores iniciales que se pueden cambiar.
 
 El Evaluador de Estándar —antes Bar Raiser— tiene `puede_bloquear`, que arranca en falso: emite
 una recomendación registrada. El sistema no deja nombrar a alguien del área que contrata.
+
+**La vacante dice lo que paga de una de tres formas** (`V54`): no publicarlo, un monto fijo, o un
+rango. No es un detalle de presentación: **es lo que decide si quien postula está obligado a
+declarar cuánto quiere ganar**. Si la empresa enseña su cifra, se le exige la suya; si la esconde,
+no se le pide nada. El detalle del trato está en [El sueldo, de los dos
+lados](EL-SUELDO-DE-LOS-DOS-LADOS.md).
+
+`compensacion_publica` —el sueldo en prosa— **queda retirada**: los datos se conservan por las
+vacantes viejas, pero ninguna pantalla la lee ni la escribe. Dos sitios donde decir el sueldo son
+dos sitios donde contradecirse, y el trato necesita un número comparable, no una frase.
 
 ---
 
@@ -563,7 +584,7 @@ prospectos que podrían encajar, y eso es una búsqueda por parecido, no por igu
 | Tabla | Para qué existe | Columnas que importan |
 |---|---|---|
 | `estado_postulacion` | Catálogo cerrado de los 18 estados | codigo, nombre, etapa_codigo, momento_codigo, espera_a, orden, es_final |
-| `postulacion` | Un usuario en una vacante. Tiene un solo estado a la vez, nunca dos | organizacion_id, uuid, usuario_id, vacante_id, estado_codigo, grupo_prioridad, motivo_cierre, evaluacion_id, rondas_evidencia_usadas, movido_en |
+| `postulacion` | Un usuario en una vacante. Tiene un solo estado a la vez, nunca dos | organizacion_id, uuid, usuario_id, vacante_id, estado_codigo, grupo_prioridad, motivo_cierre, evaluacion_id, rondas_evidencia_usadas, movido_en, pretension_monto, pretension_moneda, pretension_declarada_en |
 | `transicion_estado` | Cada cambio de estado, guardado aparte. **No se modifica ni se borra nunca** | postulacion_id, estado_anterior_codigo, estado_nuevo_codigo, usuario_id, rol_id, es_sistema, es_por_lote, motivo, ocurrida_en |
 
 El estado guarda **etapa** y **momento** aparte, y por eso el siguiente estado se calcula en vez
@@ -582,6 +603,17 @@ embudo de cada vacante mentiría: alguien que se retiró no es alguien que no di
 
 `es_por_lote` marca las transiciones hechas en bloque. Aunque se despachen cien de una vez,
 **cada una guarda su propio motivo**.
+
+**La pretensión vive en la postulación y no solo en el perfil** (`V54`). El perfil guarda la banda
+general de la persona y es la que prellena el formulario —con el centro, no con el borde bajo—;
+la postulación guarda **el número que confirmó delante del sueldo de este puesto**. Son dos datos
+distintos a propósito: uno se escribió quizá hace meses sin mirar ninguna vacante, el otro se
+escribió sabiendo lo que esta paga. Lo declarado vuelve al perfil solo si el perfil estaba vacío:
+propone, nunca pisa.
+
+⚠️ **Una pretensión vacía tiene tres motivos distintos** —la postulación es anterior a la `V54`, la
+vacante no publicaba su sueldo, o quien mira no tiene permiso— y el panel tiene que decir cuál es.
+Solo uno de los tres habla del candidato.
 
 ---
 
@@ -924,13 +956,14 @@ Tres reglas que la máquina no puede romper:
 
 ---
 
-### Auditoría, archivos y desempeño · 5 tablas
+### Auditoría, archivos y desempeño · 6 tablas
 
 | Tabla | Para qué existe | Columnas que importan |
 |---|---|---|
 | `auditoria` | Toda acción que cambia una decisión | organizacion_id, usuario_id, rol_id, accion, entidad, entidad_id, valor_anterior, valor_nuevo, motivo, ocurrida_en |
 | `archivo` | Los archivos viven fuera de la base; aquí solo está su ruta | organizacion_id, ruta, nombre_original, tamano, tipo, subido_en |
 | `correo_enviado` | A quién, cuándo y **qué decía** | usuario_id, plantilla_correo_codigo, version, asunto, cuerpo, canal, estado_entrega, enviado_en |
+| `aviso_portal` | La campana del candidato: lo que pasó mientras no estaba, con leído/no leído | usuario_id, organizacion_id, tipo, titulo, cuerpo, postulacion_id, vacante_id, leido_en, creado_en |
 | `seguimiento_desempeno` | El corte de los 30, 90 o 180 días, con su diagnóstico | organizacion_id, postulacion_id, dias, resultado_esperado, porcentaje_logrado, obstaculo, causa, accion, registrado_en |
 | `metrica_desempeno` | Cada una de las diez medidas de ese corte | seguimiento_desempeno_id, metrica, valor, origen |
 
@@ -939,6 +972,15 @@ para permitirlo. También registra los cambios de permisos.
 
 Del correo se guarda el cuerpo ya armado, no solo cuál plantilla se usó. Si mañana alguien edita
 la plantilla, lo que se le envió a esa persona sigue siendo lo que dice el registro.
+
+`aviso_portal` (`V55`) es **la otra mitad del correo, no su reemplazo**: los dos salen del mismo
+hecho. El correo sale y no vuelve —cae en promociones, llega a una dirección que el cargador de
+currículums inventó—, y hasta la V55 lo que pasaba mientras el candidato no estaba no quedaba en
+ninguna parte: su lista de postulaciones se veía igual el día que todo seguía igual y el día que
+le cambiaron el sueldo. Guarda el texto ya armado por la misma razón que el correo. Hoy nace un
+solo tipo de aviso, el cambio de remuneración; la tabla está hecha para los que vengan
+—«avanzaste de etapa», «tienes una prueba por rendir», «te queda un día»—, que hoy existen solo
+como correos que salen y no vuelven.
 
 La base guarda la ruta del archivo, nunca el archivo. Así los entregables pesados —vídeos,
 diseños, archivos de hasta 200 MB— no inflan la base de datos. **El almacén es propio de este
@@ -969,6 +1011,12 @@ cuáles sí, porque las que no, hay que probarlas en el código.
 - El puntaje de una etapa siempre apunta a una versión de pesos concreta.
 - No se puede inscribir a un candidato en una sesión que no sirve para su vacante.
 - Toda vacante apunta a una solicitud de talento.
+- **Las tres formas de decir el sueldo son coherentes**: sin publicar no hay montos ni moneda;
+  fija tiene monto y moneda y ningún máximo; rango tiene los dos montos, con el máximo no menor
+  que el mínimo. Una vacante que promete un sueldo que nadie escribió no se puede guardar, ni
+  desde el código ni desde una carga masiva.
+- **La pretensión de una postulación va entera o no va**: monto, moneda y fecha de declaración,
+  los tres o ninguno.
 
 ### Tienen que vivir en el código
 
@@ -990,6 +1038,14 @@ cuáles sí, porque las que no, hay que probarlas en el código.
   garantice sola sin seguridad por fila, que aquí no se usa porque el dueño de la seguridad es
   Spring Boot.
 - **Los permisos de cada llamada.** Ocultar un botón no es seguridad.
+- **Que un sueldo sea una cifra creíble.** Entero, mínimo 100, máximo 1 000 000. La base solo
+  exige que sea mayor que cero, y con eso pasaban tanto el S/ 3.50 de un «3,500» mal interpretado
+  como el sueldo con un dedo de más.
+- **Que publicar el sueldo, o no publicarlo, no cambie después de publicar la vacante.** La base
+  ve una columna que pasa de un texto a otro; lo que se está revocando —o concediendo tarde— es un
+  trato con gente que ya postuló.
+- **Que una vacante que esconde su sueldo no vea ninguna pretensión.** Son dos llaves distintas
+  —el permiso y lo que publica esta vacante— y ninguna de las dos cabe en una restricción.
 
 ### Nunca existen, ni siquiera como opción
 
@@ -1017,9 +1073,14 @@ una sola tabla.
 4. Se borran sus archivos del almacén —currículum y entregables— y las filas quedan apuntando a
    nada.
 5. Sus respuestas de texto libre se vacían, porque pueden contener datos personales.
-6. Si era prospecto del Radar, deja de estar activo.
-7. **Se conserva todo lo demás**: puntajes, historial de estados, auditoría, métricas.
-8. Sus postulaciones abiertas pasan a cerradas, con motivo «pidió borrar sus datos».
+6. **Se vacía la pretensión declarada en cada una de sus postulaciones**, y se borra su banda del
+   perfil. Es el mismo dato con el mismo tratamiento declarado: dejar viva la cifra exacta en el
+   ranking de cada empresa mientras desaparece la del perfil no tiene defensa.
+7. **Se borran enteros sus avisos del portal**, no se vacían. A diferencia del correo, que conserva
+   su fila porque demuestra que se avisó, un aviso del portal no es prueba de nada frente a nadie.
+8. Si era prospecto del Radar, deja de estar activo.
+9. **Se conserva todo lo demás**: puntajes, historial de estados, auditoría, métricas.
+10. Sus postulaciones abiertas pasan a cerradas, con motivo «pidió borrar sus datos».
 
 El resultado es que el embudo de esa vacante sigue cuadrando y la auditoría sigue completa, pero
 ya no hay forma de saber de quién se trataba.

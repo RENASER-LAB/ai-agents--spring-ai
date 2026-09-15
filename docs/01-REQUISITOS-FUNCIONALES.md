@@ -343,8 +343,10 @@ evaluación ya cargadas, y puede crear una variante propia de esa vacante **sin 
 plantillas publicadas**.
 
 **RF-12** La vacante pública incluye: puesto, propósito, responsabilidades, capacidades
-esperadas, requisitos indispensables, modalidad, horario, ubicación, cultura de trabajo, y
-compensación solo si Renaser decide publicarla.
+esperadas, requisitos indispensables, modalidad, horario, ubicación, cultura de trabajo, y **la
+remuneración, que se declara de una de tres formas** (ver «El sueldo, y el trato que lo
+acompaña»). Publicarla o no **no es solo una decisión de presentación**: es lo que decide si a
+quien postula se le exige declarar cuánto quiere ganar.
 
 **RF-13** La vacante pública **nunca** expone claves de evaluación, pesos, preguntas,
 indicadores confidenciales ni puntuaciones mínimas internas.
@@ -953,9 +955,11 @@ avanzar.
 **La tanda de una vacante se ordena, se filtra y se descarga.** El panel enseña a los candidatos
 de una etapa ordenados de más apto a menos, y de cada uno dice también **dónde vive**, que es por
 lo que más se recorta una tanda cuando el puesto es presencial. La **pretensión salarial** aparece
-en esa misma lista, pero **solo para quien tenga permiso de verla** —hoy, Dirección—: para el
-resto la casilla va vacía, y la pantalla dice que va vacía por el permiso y no porque el
-candidato no pidiera sueldo. Confundir las dos cosas cambia una decisión de contratación.
+en esa misma lista, pero pide **dos llaves**: el permiso de verla —hoy, Dirección— **y** que esa
+vacante publique lo que paga (ver «El sueldo, y el trato que lo acompaña»). Faltando cualquiera de
+las dos, la casilla va vacía, **y la pantalla dice cuál de los tres motivos es**: el permiso, que
+la vacante no mostraba sueldo, o que esa persona no declaró ninguna. Confundirlos cambia una
+decisión de contratación, y solo el último habla del candidato.
 
 Esa lista, tal como quedó después de ordenarla y filtrarla, **se lleva a una hoja de cálculo**.
 El archivo respeta el orden que se estaba viendo, trae una hoja de resumen —una fila por
@@ -969,7 +973,7 @@ entra al sistema; nunca sale de ahí una pregunta ni una respuesta de ninguna pr
 
 | Sección | Qué muestra |
 |---|---|
-| Identidad y proceso | Puesto, etapa, origen, fechas |
+| Identidad y proceso | Puesto, etapa, origen, fechas, y lo que pidió ganar al postular (con las dos llaves; si no hay nada, dice por qué) |
 | Perfil Integral | El 40%, dimensiones, potencial, adecuación, alineación (⚠️ los semáforos de alineación todavía no los calcula nadie: esa sección sale vacía) |
 | Prueba del puesto | Puntaje, entregables, tiempos, explicación, cambio |
 | Simulación | Eventos, puntaje, preguntas humanas y respuestas |
@@ -1114,6 +1118,80 @@ cuenta—. Va también al Excel del ranking, con su desglose.
 
 ---
 
+# 16. El sueldo, y el trato que lo acompaña
+
+Hasta el 14/09/2026 la vacante decía el dinero en un texto libre donde cabía «S/ 3500», «a
+convenir» o nada, y el candidato decía el suyo en su perfil, opcional y sin mirar ninguna vacante
+concreta. Las dos mitades del mismo dato vivían separadas y ninguna comprometía a nadie. El
+detalle largo está en [El sueldo, de los dos lados](EL-SUELDO-DE-LOS-DOS-LADOS.md).
+
+**RF-156** La vacante declara su remuneración de **una de tres formas**: no publicarla, un **monto
+fijo**, o un **rango** de mínimo a máximo. Con moneda, y solo dos: soles o dólares. Una lista
+abierta admitiría «soles», «S/.», «PEN» y cuatro grafías más del mismo dinero, y comparar dos
+vacantes dejaría de ser posible sin un diccionario de sinónimos. El texto libre de compensación
+queda **retirado**: dos sitios donde decir el sueldo son dos sitios donde contradecirse.
+
+**RF-157** **El trato es simétrico.** Si la vacante publica lo que paga, quien postula está
+**obligado** a declarar cuánto quiere ganar; si no lo publica, no se le exige nada y lo que mande
+se ignora. Pedirle su cifra a alguien mientras la empresa esconde la suya es el desequilibrio que
+esto viene a romper.
+
+Lo que declara es **un monto único, no una banda**: es lo único que se puede poner de frente
+contra el presupuesto de la vacante y contestar «entra o no entra». Rango contra rango contesta
+«se solapan», que no sirve para decidir.
+
+**RF-158** **Publicar el sueldo, o no publicarlo, se decide antes de publicar la vacante**, y una
+vez publicada ya no cambia **en ninguna de las dos direcciones**. Esconderlo después es quedarse
+lo cobrado y retirar lo pagado: cuarenta pretensiones obligatorias recogidas y el sueldo oculto al
+día siguiente, en dos clics. Y encenderlo después parte la tanda en dos —los de antes sin cifra,
+los de después con ella— que ninguna pantalla puede comparar de frente.
+
+Lo que **sí** se cambia en una vacante publicada es el **monto**: subirlo, bajarlo, o cerrar un
+rango en una cifra fija. Moverse entre fijo y rango entra ahí, porque las dos formas publican, y
+cerrar el rango cuando ya se sabe el número es de los cambios más frecuentes. Si de verdad hace
+falta cambiar la decisión, la salida es **cerrar la vacante y abrir otra**, y la pantalla lo dice
+con esas palabras en lugar de dejar una opción gris sin explicación — un control bloqueado y mudo
+se lee como que la pantalla está rota, no como una regla.
+
+**RF-159** **Cambiar el monto de una vacante publicada le avisa a cada candidato que sigue en
+carrera**, por correo y por la campana de su portal. A quien ya no continúa no se le escribe: la
+noticia no le afecta. El cambio **exige motivo escrito** y no viaja con la edición general de la
+vacante: corregir una falta de ortografía en la descripción no puede mandarle una noticia a
+cuarenta personas. **Guardar lo mismo que ya había no cuenta como cambio** y no avisa a nadie.
+
+**RF-160** **Nada de esto va hacia atrás.** Encender o apagar la remuneración no vuelve a pedirle
+la pretensión a quien ya postuló, porque no hay forma de hacerlo: el trato se juzga con las reglas
+que había el día que cada uno envió su candidatura. Donde falte la cifra, la pantalla **dice cuál
+de los motivos es** —la postulación es anterior, la vacante no publicaba su sueldo, o quien mira
+no tiene permiso— y no deja un hueco, que se lee siempre como el único de los tres que acusa al
+candidato.
+
+**RF-161** **El perfil propone y la postulación decide.** El perfil de la persona guarda su banda
+de expectativa; al postular, el formulario se prellena con el **centro** de esa banda —quien puso
+«3000 a 4000» no está diciendo que quiera 3000— y ella confirma o corrige. Lo que declare **vuelve
+a su perfil solo si lo tenía vacío**: propone, nunca pisa.
+
+**RF-162** **La reciprocidad rige también en el panel.** Una vacante que no publica su sueldo **no
+ve ninguna pretensión** —ni la declarada al postular ni la del perfil—, tenga o no tenga el
+permiso quien mire. Son **dos llaves**: el permiso, y que esta vacante publique lo que paga. El
+perfil de la persona es de la plataforma y no de ninguna empresa, así que sin la segunda llave una
+empresa podía leer la cifra que esa persona declaró ante otra, la que sí puso su presupuesto sobre
+la mesa (ver «Candidatos» en los roles y permisos).
+
+**RF-163** **Los sueldos van en cifras enteras**, entre **100** y **1 000 000**. Sin céntimos a
+propósito: nadie negocia los centavos de un sueldo mensual, y admitirlos es no poder distinguir
+tres soles y medio de un 3500 mal tecleado. El suelo no es el sueldo mínimo legal porque la cifra
+también viaja en dólares: lo que se para es el error de magnitud, no la oferta modesta.
+
+**RF-164** **El portal tiene una campana**: lo que pasó mientras el candidato no estaba le espera
+dentro, con su marca de leído. **Complementa al correo, no lo sustituye** — el correo cae en
+promociones, se marca leído sin abrir, o llega a una dirección que el cargador de currículums
+inventó y que nadie mira. Nace con un solo tipo de aviso, el cambio de remuneración, y está hecha
+para los que vengan. El aviso se marca leído **al pulsarlo**, o todos a la vez con el botón de la
+cabecera: abrir la campana no es haber leído nada.
+
+---
+
 # Qué cambia sin programar
 
 Renaser ajusta seguido sus criterios. Todo lo de esta lista se cambia desde una pantalla, sin
@@ -1131,6 +1209,7 @@ tocar código y sin volver a publicar el sistema:
 | El reparto de tiempos de la simulación | Talento |
 | La duración de la validación práctica | Talento |
 | Los textos de los correos | Talento |
+| La remuneración de una vacante: el monto o el rango, con motivo | Talento |
 | Las instrucciones que recibe la inteligencia artificial | Dirección |
 | Los roles y sus permisos | Dirección |
 | El periodo de conservación de datos y qué se hace al vencer | Dirección |

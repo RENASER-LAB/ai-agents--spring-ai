@@ -10,11 +10,18 @@ nadie salvo una persona leyendo el código.
 ## Cómo se lanza todo
 
 ```bash
-./mvnw verify
+./mvnw clean verify
 ```
 
 `test` lanza solo las unitarias y las de arquitectura; `verify` añade las de integración,
 que corren en su propia fase. Es lo mismo que hace la tubería de integración continua.
+
+⚠️ **El `clean` no es adorno.** Maven copia los recursos a `target/` pero **no borra los que
+desaparecieron**, así que si la rama renumeró una migración —o se cambió de rama sin limpiar— en
+`target/classes` quedan las dos con el mismo número, Flyway se niega a arrancar y **las 8 clases
+de integración revientan a la vez** con `FlywayException: Found more than one migration with
+version N`. El código está bien; lo que está sucio es el directorio de salida. La tubería parte de
+un árbol limpio y por eso allí nunca se ve.
 
 En Linux basta con el demonio de Docker encendido: comprobado el 19/08/2026, `verify` corre
 limpio sin tocar nada más.

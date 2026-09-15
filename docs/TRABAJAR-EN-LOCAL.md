@@ -122,7 +122,14 @@ Son dos tandas y el comando decide cuál corre:
 | Comando | Qué corre | Necesita |
 |---|---|---|
 | `./mvnw test` | unitarias con dobles y las de arquitectura | nada |
-| `./mvnw verify` | lo anterior más las de integración | Docker |
+| `./mvnw clean verify` | lo anterior más las de integración | Docker |
+
+⚠️ **`verify` sin `clean` miente si `target/` trae migraciones de una numeración anterior.** Maven
+copia los recursos pero **no borra los que desaparecieron**: si la rama renumeró una migración —o
+se cambió de rama sin limpiar—, en `target/classes` quedan las dos, Flyway ve dos migraciones con
+el mismo número y **las 8 clases de integración revientan a la vez** con `FlywayException: Found
+more than one migration with version N`. El código está bien y el fallo no está en ninguna parte
+del código. **Siempre `./mvnw clean verify`.**
 
 El número vigente está en [Estado del proyecto](ESTADO-DEL-PROYECTO.md) y el desglose en
 [Comprobaciones automáticas](COMPROBACIONES-AUTOMATICAS.md).
@@ -142,6 +149,28 @@ El número vigente está en [Estado del proyecto](ESTADO-DEL-PROYECTO.md) y el d
   hacer se le quita el `@Disabled` y tiene que pasar. Ver [Defectos conocidos](DEFECTOS-CONOCIDOS.md).
 - **Tests con fechas quemadas caducan.** Ya pasó el 24/08/2026; se pasaron a fechas relativas y
   el patrón sigue siendo el riesgo.
+
+---
+
+## Las pruebas de extremo a extremo, contra un worktree
+
+Viven en el frontend (`herramientas/e2e/`, Playwright) y se lanzan con `npm run test:e2e`. Manejan
+un navegador de verdad contra el portal y el panel, así que **escriben en la base** a la que
+apunte el backend, y **limpian lo que crearon** al terminar.
+
+⚠️ **Hacen falta TRES variables, no dos.** `E2E_PORTAL` (dónde está el frontend), `E2E_API` (dónde
+está el backend) y **`E2E_PG`** (cómo se llama el contenedor de la base). Sin la tercera, el
+ayudante de limpieza busca un contenedor llamado `renaser-verifica` —el de la base principal— y
+**la limpieza falla en silencio**, dejando las cuentas de prueba vivas en la base del worktree.
+No sale ningún error: lo único que se ve es que la corrida siguiente arranca con basura de la
+anterior.
+
+⚠️ **Su rojo de fondo son 19 fallos** contra una base recién sembrada, y no son regresiones.
+Medido el 15/09/2026: **19 fallan, 153 pasan**. Sin esa cifra de referencia, el rojo no dice nada.
+Los nueve specs y el porqué están en [Defectos conocidos](DEFECTOS-CONOCIDOS.md).
+
+⚠️ **Recrear la base para «empezar limpio» deja el backend inservible** hasta volver a sembrarla:
+las pruebas no traen consigo los datos que dan por hechos (vacantes publicadas, pesos, plantillas).
 
 ---
 

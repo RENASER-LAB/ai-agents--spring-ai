@@ -1,7 +1,7 @@
 # Diccionario de datos
 
 Sistema de selección de personal — Renaser Consulting
-Versión 2.5 · 2026-09-06 · Puesto al día con las migraciones hasta la `V51` (la V49 y la V50 solo siembran pesos; la V51 trae la tabla `lectura_cv_perfil` y los archivos del perfil)
+Versión 2.6 · 2026-09-15 · Puesto al día con las migraciones hasta la `V55` (la V49 y la V50 solo siembran pesos; la V51 trae la tabla `lectura_cv_perfil` y los archivos del perfil; la V52 y la V53 no crean tablas; la V54 pone el sueldo en la vacante y la pretensión en la postulación; la V55 trae la tabla `aviso_portal`)
 
 Cada tabla con todas sus columnas, tipos y claves. **Este documento se consulta**, no se lee de
 corrido: es la base para escribir las migraciones de Flyway.
@@ -11,8 +11,8 @@ Lo que llegó después de la versión 2.0 va marcado con su migración entre par
 ⚠️ **Tres tablas de la base no tienen ficha aquí.** `agent_run` es del motor de agentes y no de
 selección, así que no la tendrá nunca. `invitacion` (`V37`) y `tarifa_modelo` (`V38`) sí
 deberían tenerla: llegaron con el multiempresa y su ficha está pendiente. Hasta que se
-escriban, para esas dos manda la migración. De las **102 tablas de selección** que existen hoy,
-aquí hay ficha de 100, más otras diez que están solo diseñadas y todavía no existen.
+escriban, para esas dos manda la migración. De las **103 tablas de selección** que existen hoy,
+aquí hay ficha de 101, más otras diez que están solo diseñadas y todavía no existen.
 
 Para entender *por qué* el modelo es así, está el [Modelo de datos](05-MODELO-DE-DATOS.md).
 
@@ -570,7 +570,12 @@ Una convocatoria concreta.
 | `modalidad` | text | no | |
 | `horario` | text | no | |
 | `ubicacion` | text | no | |
-| `compensacion_publica` | text | no | Solo si Renaser decide publicarla |
+| `compensacion_publica` | text | no | **RETIRADA (`V54`).** Era el sueldo en prosa: «S/ 3500», «a convenir», «según experiencia» o nada. Se conserva por las vacantes creadas antes, pero **ninguna pantalla la lee ni la escribe**, y no viaja en ningún contrato. El sueldo vive en las cuatro columnas de abajo |
+| `remuneracion_tipo` | text | sí | (`V54`) `OCULTA`, `FIJA` o `RANGO`. Por defecto `OCULTA`. **Es lo que decide si declarar pretensión al postular es obligatorio** |
+| `remuneracion_min` | numeric(12,2) | no | (`V54`) Con `FIJA`, el monto; con `RANGO`, el mínimo. Vacío con `OCULTA` |
+| `remuneracion_max` | numeric(12,2) | no | (`V54`) Solo con `RANGO`, y nunca menor que `remuneracion_min` |
+| `remuneracion_moneda` | text | no | (`V54`) `PEN` o `USD`. Vacío con `OCULTA` |
+| `remuneracion_actualizada_en` | timestamptz | no | (`V54`) Cuándo se cambió el sueldo por última vez. Vacío: nunca se tocó desde que se creó. El portal lo usa para pintar «actualizado el …» sobre el monto nuevo |
 | `tipo_cierre` | text | sí | `FECHA`, `PLAZAS` o `PERMANENTE` |
 | `plazas` | integer | no | Solo si `tipo_cierre` es `PLAZAS` |
 | `abre_en` | timestamptz | no | |
@@ -590,6 +595,22 @@ Una convocatoria concreta.
 **Clave primaria:** `id`
 **Apunta a:** `organizacion`, `solicitud_talento`, `puesto`, `version_pesos`,
 `version_plantilla_prueba`, `plantilla_evaluacion`, `usuario`
+
+**Restricción `vacante_remuneracion_coherente` (`V54`).** La base hace cumplir las tres formas, no
+solo el código: con `OCULTA` los cuatro campos van vacíos; con `FIJA` hay monto en
+`remuneracion_min`, `remuneracion_max` vacío y moneda; con `RANGO` hay los dos montos, el máximo
+no menor que el mínimo, y moneda. Una vacante `FIJA` sin monto sería una vacante que promete un
+sueldo que nadie escribió, y un formulario no es la única forma de escribir en una tabla.
+
+⚠️ **`FIJA` guarda su monto en `remuneracion_min` y deja `remuneracion_max` vacío**, en vez de
+tener una columna `monto` aparte. Con una columna aparte, «¿cuánto paga esta vacante?» habría que
+mirarlo en dos sitios distintos según el tipo, y toda consulta por rangos llevaría un `COALESCE`.
+
+⚠️ **El suelo y el techo no están en la base, están en el código** (`Remuneracion`): los sueldos
+van en **cifras enteras**, mínimo 100 y máximo 1 000 000. Sin decimales a propósito — con ellos no
+hay forma de distinguir «3,50» de un 3500 mal tecleado, y ese error publicaba vacantes prometiendo
+tres soles y medio. Cien y no el sueldo mínimo legal porque la cifra también viaja en dólares: lo
+que se para es el error de magnitud, no la oferta modesta.
 
 ⚠️ **Hay una referencia circular** entre `vacante` y `version_plantilla_prueba`: la vacante apunta
 a la versión que usa, y una versión puede ser una copia privada de una vacante. Flyway no puede
@@ -802,6 +823,9 @@ Un usuario en una vacante.
 | `motivo_cierre` | text | no | Solo en los estados finales de cierre |
 | `evaluacion_id` | bigint | no | Cuál evaluación le corresponde |
 | `rondas_evidencia_usadas` | integer | sí | Por defecto 0. Tope configurable |
+| `pretension_monto` | numeric(12,2) | no | (`V54`) Cuánto dijo que quiere ganar **al postular a esta vacante**. Un monto único, no una banda |
+| `pretension_moneda` | text | no | (`V54`) `PEN` o `USD` |
+| `pretension_declarada_en` | timestamptz | no | (`V54`) Cuándo lo declaró |
 | `movido_en` | timestamptz | sí | Cuándo cambió de estado por última vez |
 
 **Clave primaria:** `id` · **Único:** `usuario_id` + `vacante_id` · `uuid`
@@ -820,6 +844,25 @@ adivinar cuántas postulaciones hay.
 | `CERRADA` | `INACTIVIDAD`, `CIERRE_MANUAL`, `RETIRO_CANDIDATO`, `PLAZO_VENCIDO`, `BORRADO_DATOS` |
 
 `movido_en` es lo que alimenta «cuántos días lleva sin avanzar» y el cierre por inactividad.
+
+**La pretensión es un monto único y no un rango, y es deliberado.** El perfil de la persona sigue
+guardando su banda (`perfil_candidato.pretension_min`–`max`): esa es su expectativa general y es
+la que prellena el formulario, con el **centro** de la banda. Pero al postular a una vacante
+concreta se le pide **un** número, porque es lo único que se puede poner de frente contra el
+presupuesto de la vacante y contestar «entra o no entra». Rango contra rango contesta «se
+solapan», que no sirve para decidir. La restricción `postulacion_pretension_coherente` obliga a
+que los tres campos vayan juntos o ninguno.
+
+⚠️ **Vacío NO significa «no quiso decirlo».** Son tres motivos distintos y el panel tiene que
+poder decir cuál es: la postulación es anterior a la `V54`, la vacante tenía el sueldo oculto y no
+se le exigió nada, o quien mira no tiene `ver_pretension`. Un guion a secas se lee siempre como el
+único de los tres que acusa al candidato.
+
+**Lo declarado vuelve al perfil solo si el perfil estaba vacío.** Propone, nunca pisa: quien ya
+tenía su banda escrita se la queda tal cual.
+
+**Al ejecutar un borrado de datos de la ley 29733, los tres campos se vacían.** Es el mismo dato
+con el mismo tratamiento declarado que la banda del perfil, que también se borra.
 
 ## `transicion_estado`
 
@@ -2413,6 +2456,56 @@ plantilla, lo que se le envió a esa persona sigue siendo lo que dice el registr
 ⚠️ **Al ejecutar un borrado de datos, `asunto` y `cuerpo` se sobrescriben** con «[eliminado por
 solicitud de borrado]»: el cuerpo armado contiene el nombre y el correo de la persona. La fila se
 conserva, así que se sigue sabiendo qué plantilla, qué versión y cuándo.
+
+## `aviso_portal`
+
+La campana del portal del candidato (`V55`): lo que pasó mientras no estaba, con su estado de
+leído.
+
+| Columna | Tipo | Oblig. | Qué guarda |
+|---|---|---|---|
+| `id` | bigint | sí | Clave |
+| `usuario_id` | bigint | sí | A quién. **Del usuario y no de la persona**: la campana es de quien entra al portal, y es el usuario el que tiene sesión |
+| `organizacion_id` | bigint | sí | De qué empresa viene. La misma regla que la postulación: el aviso nace en la organización **de la vacante**, que es la que hizo algo que contar |
+| `tipo` | text | sí | Qué clase de noticia es. Hoy solo `REMUNERACION_ACTUALIZADA` |
+| `titulo` | text | sí | El texto **ya armado** |
+| `cuerpo` | text | sí | El texto **ya armado** |
+| `postulacion_id` | bigint | no | A dónde lleva al pulsarlo |
+| `vacante_id` | bigint | no | A dónde lleva al pulsarlo |
+| `leido_en` | timestamptz | no | Vacío: sigue contando para el punto de la campana |
+| `creado_en` | timestamptz | sí | |
+
+**Clave primaria:** `id`
+**Apunta a:** `usuario`, `organizacion`, `postulacion`, `vacante`
+**Índices:** `aviso_portal_de_cada_uno` (`usuario_id`, `creado_en DESC`) para la consulta de la
+campana, que corre en cada carga del portal; y `aviso_portal_sin_leer` (`usuario_id`), **parcial
+sobre los no leídos**, para el contador del punto — los leídos son la inmensa mayoría en cuanto la
+tabla lleva un tiempo viva, y contarlos para descartarlos sería pagar por lo que ya no importa.
+
+**Complementa al correo, no lo sustituye.** Los dos salen del mismo hecho. El correo se pierde
+—cae en promociones, se marca leído sin abrir, llega a una dirección que el cargador de currículums
+inventó—; el aviso queda esperando dentro.
+
+**El texto se guarda ya armado, no como plantilla con variables**, igual que en `correo_enviado`.
+Un aviso que se reconstruyera al leerlo diría el sueldo de hoy y no el que cambió aquel día: la
+noticia se volvería un espejo.
+
+`postulacion_id` y `vacante_id` son opcionales porque no todo aviso futuro colgará de una
+postulación: «completa tu perfil» no cuelga de ninguna.
+
+⚠️ **Las cuatro claves foráneas no borran en cascada**, como todas las de este sistema. Un candidato
+de prueba con un aviso hace fallar el borrado de su `postulacion` y de su `usuario`, y los guiones
+de limpieza tienen que quitar sus avisos primero.
+
+⚠️ **El comentario de columna de `leido_en` dice que se marca al abrir la campana; ya no es así.**
+Se marca al pulsar cada aviso, o todos con el botón de la cabecera: enterarse de que hay algo no
+es lo mismo que haberlo leído, y apagar el punto al abrir apagaba también el de cada fila de «Mis
+procesos» sin que nadie hubiera leído nada. El comentario quedó del día de la migración y no se
+puede editar sin otra migración.
+
+**Al ejecutar un borrado de datos, los avisos de esa persona se borran enteros**, no se vacían. A
+diferencia de `correo_enviado`, que conserva su fila porque demuestra que se avisó, un aviso del
+portal no es prueba de nada frente a nadie.
 
 ## `seguimiento_desempeno`
 
