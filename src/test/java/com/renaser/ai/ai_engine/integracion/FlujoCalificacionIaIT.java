@@ -1038,7 +1038,7 @@ public class FlujoCalificacionIaIT {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                         {"nombre":"Camila","apellidos":"Rojas","correo":"%s",
-                         "contrasena":"unaClaveLarga123","ciudadUbigeo":"1501","aceptaProceso":true,
+                         "contrasena":"unaClaveLarga123","ciudadUbigeo":"1501","aceptaPlataforma":true,
                          "aceptaFuturosContactos":false}""".formatted(correo)))
                 .andExpect(status().isCreated());
         return leer(mvc.perform(post("/api/v1/portal/auth/login")

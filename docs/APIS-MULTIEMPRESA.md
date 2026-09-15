@@ -31,16 +31,37 @@ de existir; la pantalla debe tolerarlo sin romperse.
 
 **El flujo de postular gana un paso:**
 
-1. `GET /portal/vacantes/{id}/consentimiento` (público) → el texto legal de la empresa de
-   esa vacante: quién es, qué datos tratará, cuánto tiempo. Se muestra junto a la casilla.
+1. `GET /portal/vacantes/{id}/consentimiento` (público) → el texto legal que se firma al postular
+   a esa vacante, **ya compuesto con el nombre de la empresa** que la publica.
 2. `POST /portal/postulaciones` con `aceptaTratamiento=true` → la aceptación queda firmada
-   (texto, versión, fecha, IP, navegador) a nombre de esa postulación.
+   (texto compuesto, versión, fecha, IP, navegador) a nombre de esa postulación.
 
 **«Mis postulaciones» cruza empresas.** `GET /portal/postulaciones` sigue devolviendo todas
 las del candidato, ahora cada una con su empresa. La cuenta es una sola (de la plataforma);
 los procesos son de cada empresa.
 
-Lo que NO cambia: crear cuenta, login del candidato, la evaluación, el perfil
+**Y ese texto ya no repite lo de la cuenta** (14/09/2026). Dice solo lo que es de esa empresa
+—que ella publica la vacante y ella decide sobre la candidatura, y que el permiso no alcanza a
+las demás del portal—, porque lo técnico ya se aceptó con Renaser al crear la cuenta.
+
+⚠️ **Es un solo texto para todas las empresas**, con un hueco donde va el nombre de quien publica
+la vacante. El hueco se rellena en el backend y no cruza la frontera: lo que llega al portal es
+el texto listo para enseñar y para firmar. Ninguna empresa tiene texto propio ni puede
+publicarlo.
+
+⚠️ **Y desde el 15/09/2026 el portal ya no pinta una casilla ahí.** Encima del botón se dice
+quién recibirá la candidatura y se enlaza el texto entero; enviar es el acto. El backend **sigue
+exigiendo `aceptaTratamiento`** —es lo que corta el paso a quien llame a la API por su cuenta— y
+la firma se sigue guardando igual. Lo que cambió es cómo se da el permiso, no que se dé.
+
+Lo que SÍ cambia al crear cuenta: la casilla obligatoria de `POST /portal/cuentas` pasó a
+llamarse **`aceptaPlataforma`** (era `aceptaProceso`) y `GET /portal/consentimientos/textos`
+devuelve ahora **los tres** textos de la plataforma —`PLATAFORMA`, `PROCESO` y
+`FUTUROS_CONTACTOS`— donde antes devolvía dos. El de `PROCESO` sale compuesto con «la empresa
+que publica la vacante», porque ahí no hay ninguna concreta. Es un cambio de contrato: back y
+front salieron juntos.
+
+Lo que NO cambia: el login del candidato, la evaluación, el perfil
 ([APIS-PERFIL-DEL-CANDIDATO.md](APIS-PERFIL-DEL-CANDIDATO.md)) — todo igual.
 
 ---
@@ -67,8 +88,13 @@ frontend debe depender de él.
 ## El panel de la empresa: lo nuevo para su administrador
 
 - **Textos legales**: `GET/POST /panel/textos-consentimiento`. El POST crea la versión
-  nueva **y la publica**. Importa porque **publicar una vacante sin texto PROCESO publicado
-  da error** con mensaje claro — la pantalla de vacantes debería avisarlo antes, no después.
+  nueva **y la publica**. Desde el 14/09/2026 **solo la plataforma puede usarlo**: los tres
+  textos son suyos, y una empresa que intente publicar cualquiera de los tres recibe un **400**
+  con un mensaje que lo explica. La pantalla de textos legales de una empresa no tiene por qué
+  ofrecer el formulario: no hay nada que publique.
+  Y con esto se cayó un freno que había: **publicar una vacante ya no exige tener texto propio**,
+  porque el texto general ya existe y nombra a la empresa. La pantalla de vacantes puede dejar
+  de avisar de eso.
 - **Personalización de instrumentos**: `POST/DELETE /panel/organizacion/personalizacion/{instrumento}`
   (BANCO, PESOS, PLANTILLA_EVALUACION, PRUEBA). Apagada = usa el método de Renaser (solo
   lectura); encendida = copia propia editable. La pantalla debe distinguir «esto es de
@@ -126,9 +152,20 @@ que hay que saber antes de escribir una línea:
 - **El borrado 29733 es de la plataforma**: los candidatos son cuentas de plataforma y la
   anonimización cruza empresas. Desde una empresa responde 403.
 - **El consentimiento se firma con cada empresa** (V38): al crear la cuenta se consiente con la
-  plataforma; al postular se acepta el texto PROCESO de LA EMPRESA de la vacante, y la fila queda
-  con `postulacion_id`, IP y navegador. **Publicar una vacante exige el texto PROCESO publicado
-  de la organización** (`POST /panel/textos-consentimiento` crea la versión Y la publica).
+  plataforma; al postular se acepta el texto `PROCESO` a nombre de LA EMPRESA de la vacante, y la
+  fila queda con `postulacion_id`, IP, navegador y el texto tal como se leyó.
+- **Y son tres tipos, no dos** (V54): `PLATAFORMA` es lo que se acepta con Renaser al crear la
+  cuenta, `PROCESO` lo que se firma al postular y `FUTUROS_CONTACTOS` el opcional. **Los tres son
+  de la organización plataforma**, incluido el de postular: es **uno solo para todas** las
+  empresas, con un hueco donde va el nombre de quien publica la vacante, que se pone al leerlo.
+  De ahí que **el alta de una empresa no le copie ningún texto**, que **ninguna empresa pueda
+  publicar uno** (400 en los tres tipos) y que **publicar una vacante ya no exija tenerlo**: ese
+  freno se retiró con la V54, y antes solo llegaba a servir cuando el alta repartía un borrador
+  que nadie publicaba.
+- ⚠️ **Con qué empresa se firmó no lo dice el dueño de la fila del texto**, que es siempre la
+  plataforma. Lo dicen la postulación (`consentimiento.postulacion_id` → `postulacion`) y el
+  texto guardado (`consentimiento.texto_firmado`), que lleva el nombre dentro. Cruzar por
+  `texto_consentimiento.organizacion_id` era correcto con un texto por empresa, y dejó de serlo.
 - **Cada llamada al modelo tiene precio** (V38-V39): `ejecucion_ia.costo` se escribe al cerrar
   con la tarifa vigente de `tarifa_modelo`. La bitácora guarda el modelo QUE EL PROVEEDOR
   REPORTA, y por eso **todo modelo de `application.yaml` necesita su tarifa**: un IT recorre los

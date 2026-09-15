@@ -120,7 +120,7 @@ public class FlujoDosEmpresasIT {
 
         // La siembra completa del día uno: sin ella la empresa nace coja y nada avisa.
         // Roles con su matriz (menos administrar_plataforma), parámetros editables,
-        // textos legales en borrador y correos activos.
+        // su texto legal en borrador y correos activos.
         assertThat(contar("select count(*) from rol where organizacion_id = " + acmeId)).isEqualTo(5);
         assertThat(contar("""
                 select count(*) from rol_permiso rp
@@ -129,8 +129,12 @@ public class FlujoDosEmpresasIT {
                 .formatted(acmeId))).isZero();
         assertThat(contar("select count(*) from parametro where organizacion_id = " + acmeId))
                 .isEqualTo(contar("select count(*) from parametro where organizacion_id = " + plataformaId));
+        // NINGUNO: desde la V54 el texto de PROCESO es uno solo para todas, de la
+        // plataforma, con un hueco donde va el nombre de la empresa. A Acme no se le copia
+        // nada, no tiene nada que publicar y puede recibir candidatos desde el primer
+        // minuto. Que sus candidatos lean SU nombre se comprueba al postular, más abajo.
         assertThat(contar("select count(*) from texto_consentimiento where organizacion_id = "
-                + acmeId + " and publicado_en is null")).isEqualTo(2);
+                + acmeId)).isZero();
         assertThat(contar("select count(*) from texto_consentimiento where organizacion_id = "
                 + acmeId + " and publicado_en is not null")).isZero();
         assertThat(contar("select count(*) from plantilla_correo where organizacion_id = "
@@ -255,22 +259,64 @@ public class FlujoDosEmpresasIT {
         conToken(post("/api/v1/panel/vacantes/" + vacanteAcmeId + "/plantilla-prueba"), tokenAcme,
                 "{\"versionPlantillaPruebaId\": %d}".formatted(versionPruebaId)).andExpect(status().isOk());
 
-        // El requisito del día uno (pieza D): sin texto legal publicado con SU nombre,
-        // ACME no publica. Los del alta están en borrador — a propósito, nombran a Renaser.
-        conToken(post("/api/v1/panel/vacantes/" + vacanteAcmeId + "/publicacion"), tokenAcme, null)
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.detail").value(
-                        org.hamcrest.Matchers.containsString("texto de consentimiento")));
+        // Aquí ACME chocaba con un 409: «publica tu texto de consentimiento antes de
+        // publicar la vacante». Se cayó con la V54 —el texto general ya existe y lo nombra
+        // a ella— y publicar sale a la primera, que es lo que se comprueba al final.
 
+        // Lo que ACME NO puede publicar: NINGUNO de los tres. Los dos de la cuenta se
+        // buscan siempre en la plataforma, y el de PROCESO también —es uno solo para todas
+        // y se compone con el nombre de la empresa al leerlo—. Sin este freno, ACME
+        // publicaría textos que ninguna pantalla lee y creería haber cambiado lo que
+        // firman sus candidatos.
         conToken(post("/api/v1/panel/textos-consentimiento"), tokenAcme, """
-                {"tipo": "PROCESO", "texto": "Acme S.A.C. tratará tus datos para evaluar tu \
-                postulación a sus vacantes. Una IA participa y una persona confirma."}""")
-                .andExpect(status().isCreated());
+                {"tipo": "PLATAFORMA", "texto": "Acme se declara dueña de las cuentas."}""")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value(
+                        org.hamcrest.Matchers.containsString("son de la plataforma")));
+        conToken(post("/api/v1/panel/textos-consentimiento"), tokenAcme, """
+                {"tipo": "FUTUROS_CONTACTOS", "texto": "Acme te avisará de sus vacantes."}""")
+                .andExpect(status().isBadRequest());
+        conToken(post("/api/v1/panel/textos-consentimiento"), tokenAcme, """
+                {"tipo": "LO_QUE_SEA", "texto": "Un tipo que no existe."}""")
+                .andExpect(status().isBadRequest());
         assertThat(contar("select count(*) from texto_consentimiento where organizacion_id = "
-                + acmeId + " and tipo = 'PROCESO' and publicado_en is not null")).isEqualTo(1);
+                + acmeId)).isZero();
 
+        // La vacante se publica YA, sin texto propio: ese freno se cayó con la V54.
         conToken(post("/api/v1/panel/vacantes/" + vacanteAcmeId + "/publicacion"), tokenAcme, null)
                 .andExpect(status().isOk());
+
+        // ⚠️ **El caso central del cambio, y va antes de que ACME publique nada suyo**: sin
+        // texto propio, sus candidatos leen el general de la plataforma con el nombre de
+        // ACME dentro. Comprobarlo con el de ACME ya publicado no probaría nada — ese no
+        // lleva hueco y la aserción pasaría aunque componer() no sustituyera.
+        //
+        // Sin token: la ruta es pública a propósito, hay que poder leer lo que se acepta
+        // antes de decidir postular, y sin cuenta.
+        mvc.perform(get("/api/v1/portal/vacantes/" + vacanteAcmeId + "/consentimiento"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.nombreEmpresa").value("Acme S.A.C."))
+                .andExpect(jsonPath("$.texto").value(
+                        org.hamcrest.Matchers.containsString("Acepto que Acme S.A.C. trate")))
+                .andExpect(jsonPath("$.texto").value(org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.containsString("{EMPRESA}"))))
+                // Y la frase de quién presta la plataforma no se la lleva el replace
+                .andExpect(jsonPath("$.texto").value(
+                        org.hamcrest.Matchers.containsString("Renaser, que opera el portal")));
+
+        // Y tampoco el de PROCESO: los tres son de la plataforma. Un texto por empresa es
+        // un texto que nadie revisa y que se queda viejo sin que nadie se entere.
+        conToken(post("/api/v1/panel/textos-consentimiento"), tokenAcme, """
+                {"tipo": "PROCESO", "texto": "Acme S.A.C. tratará tus datos a su manera."}""")
+                .andExpect(status().isBadRequest());
+        assertThat(contar("select count(*) from texto_consentimiento where organizacion_id = "
+                + acmeId)).isZero();
+
+        // La plataforma sí publica, y lo que publique rige para TODAS: sigue siendo el
+        // texto de ACME el que leen sus candidatos, con el nombre de ACME dentro.
+        conToken(post("/api/v1/panel/textos-consentimiento"), tokenPlataforma, """
+                {"tipo": "PLATAFORMA", "texto": "Renaser trata tus datos para tu cuenta."}""")
+                .andExpect(status().isCreated());
     }
 
     // ============ La candidata ============
@@ -312,6 +358,15 @@ public class FlujoDosEmpresasIT {
                         .header("Authorization", "Bearer " + tokenCandidata))
                 .andExpect(status().isCreated());
 
+        // Lo que quedó firmado: el texto tal como ella lo leyó, guardado entero. Aquí ACME
+        // ya publicó el suyo, así que esto comprueba el guardado, no la composición — de
+        // esa se encarga la aserción de más arriba, antes de que ACME publicara nada.
+        String loQueFirmo = jdbc.queryForObject("""
+                select c.texto_firmado from consentimiento c
+                  join postulacion p on p.id = c.postulacion_id
+                 where p.vacante_id = %d""".formatted(vacanteAcmeId), String.class);
+        assertThat(loQueFirmo).contains("Acme S.A.C.").doesNotContain("{EMPRESA}");
+
         // La postulación nace en ACME —la empresa de la vacante—, aunque la cuenta de la
         // candidata cuelgue de la plataforma. Y su evaluación quedó atada al banco de la
         // plataforma: bandera apagada = leer el banco de Renaser.
@@ -329,9 +384,20 @@ public class FlujoDosEmpresasIT {
         // El consentimiento quedó firmado A NOMBRE DE ACME y amarrado a esta postulación:
         // postular a tres empresas serían tres filas, cada una con su papel en regla. El
         // de la cuenta (con la plataforma) sigue ahí, aparte, sin postulación.
+        //
+        // ⚠️ **A nombre de ACME lo dicen la postulación y el texto firmado, no el dueño de
+        // la fila del texto.** Desde la V54 esa fila es de la plataforma —hay una sola para
+        // todas— y lo que identifica a la empresa es el nombre que quedó DENTRO de lo que
+        // la candidata leyó. Mirar `t.organizacion_id` para saber con quién se firmó era
+        // cierto cuando cada empresa tenía su texto, y dejó de serlo.
         assertThat(jdbc.queryForObject("""
                 select t.organizacion_id from consentimiento c
                   join texto_consentimiento t on t.id = c.texto_consentimiento_id
+                 where c.postulacion_id = %d""".formatted(postulacionAcmeId), Long.class))
+                .isEqualTo(plataformaId);
+        assertThat(jdbc.queryForObject("""
+                select p.organizacion_id from consentimiento c
+                  join postulacion p on p.id = c.postulacion_id
                  where c.postulacion_id = %d""".formatted(postulacionAcmeId), Long.class))
                 .isEqualTo(acmeId);
         assertThat(contar("""
@@ -751,7 +817,7 @@ public class FlujoDosEmpresasIT {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                         {"nombre":"Camila","apellidos":"Rojas","correo":"%s",
-                         "contrasena":"unaClaveLarga123","ciudadUbigeo":"1501","aceptaProceso":true,
+                         "contrasena":"unaClaveLarga123","ciudadUbigeo":"1501","aceptaPlataforma":true,
                          "aceptaFuturosContactos":false}""".formatted(correo)))
                 .andExpect(status().isCreated());
         return leer(mvc.perform(post("/api/v1/portal/auth/login")

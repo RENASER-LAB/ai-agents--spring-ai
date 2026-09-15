@@ -38,6 +38,15 @@ demostrar que la regla se cumplió.
 | `application-local.yaml` | trabajar en tu máquina sin tocar nada compartido: cola local y archivos en memoria | **nada: es el de por defecto** (`spring.profiles.default`) |
 | `application-pruebas.yaml` | la aplicación corriendo en EC2 (Supabase + la cola de la propia máquina) | `SPRING_PROFILES_ACTIVE=pruebas`, lo pone `despliegue/docker-compose.yml` |
 
+⚠️ **Una cosa del perfil `pruebas` que no es cosmética: hace caso de las cabeceras del proxy**
+(14/09/2026). Allí hay un proxy delante, y sin decírselo a la aplicación **todos los
+consentimientos se firman desde la dirección interna del proxy**, siempre la misma. No es un dato
+de adorno: el texto que el candidato acepta dice que se guarda su dirección «porque la ley exige
+poder probar que este permiso lo di yo», y una columna con el mismo valor repetido no prueba
+nada. Va **solo en ese perfil** a propósito: en local la aplicación se expone directa y
+cualquiera podría mandar esa cabecera a mano y firmar desde la dirección que quisiera. Si algún
+día se despliega sin proxy delante, esa opción se quita con él.
+
 Los perfiles son aditivos: cada uno solo escribe encima lo que cambia. Quien manda, de menos a
 más fuerza: `application.yaml` → `application-secrets.yaml` → el perfil activo → los argumentos
 del comando. La tabla completa con lo que cambia cada uno está en el

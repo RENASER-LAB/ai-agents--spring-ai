@@ -17,7 +17,9 @@ public class TextoConsentimiento {
     private Long id;
 
     private Long organizacionId;
-    // PROCESO o FUTUROS_CONTACTOS: son dos permisos distintos y se retiran por separado
+    // El valor de TipoConsentimiento: PLATAFORMA (la cuenta, con Renaser), PROCESO (la
+    // vacante, con la empresa que la publica) o FUTUROS_CONTACTOS (el opcional). Son tres
+    // permisos distintos, con responsables distintos, y se retiran por separado.
     private String tipo;
     private String version;
     private String texto;

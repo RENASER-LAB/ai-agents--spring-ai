@@ -84,19 +84,21 @@ class AltaDeEmpresaTest {
         assertThat(creada.id()).isEqualTo(2L);
         assertThat(creada.urlInvitacion()).contains("token=");
 
-        // Las cinco copias de la siembra, cada una contra su tabla
+        // Las cuatro copias de la siembra, cada una contra su tabla
         ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
-        verify(jdbc, org.mockito.Mockito.times(5)).update(sql.capture(), any(Object[].class));
+        verify(jdbc, org.mockito.Mockito.times(4)).update(sql.capture(), any(Object[].class));
         List<String> sentencias = sql.getAllValues();
         assertThat(sentencias.get(0)).contains("INSERT INTO rol ");
         assertThat(sentencias.get(1)).contains("INSERT INTO rol_permiso")
                 // La excepción deliberada: el permiso de la dueña no viaja con la copia
                 .contains("administrar_plataforma");
         assertThat(sentencias.get(2)).contains("INSERT INTO parametro");
-        // Los textos legales nacen en borrador (publicado_en vacío): nombran a Renaser
-        assertThat(sentencias.get(3)).contains("INSERT INTO texto_consentimiento").contains("NULL");
         // Los correos nacen activos: los avisos de sus vacantes tienen que salir
-        assertThat(sentencias.get(4)).contains("INSERT INTO plantilla_correo").contains("true");
+        assertThat(sentencias.get(3)).contains("INSERT INTO plantilla_correo").contains("true");
+        // Y NINGUNA toca texto_consentimiento: desde la V54 el texto de PROCESO es uno solo
+        // para todas, con un hueco donde va el nombre. La empresa nueva no recibe copia, no
+        // tiene nada que publicar y puede recibir candidatos desde el primer minuto.
+        assertThat(sentencias).noneMatch(s -> s.contains("texto_consentimiento"));
     }
 
     @Test
@@ -137,8 +139,8 @@ class AltaDeEmpresaTest {
         servicio.crearEmpresa(DUENA, new CrearEmpresa("Acme S.A.", "ACME", "admin@acme.pe", "50"));
 
         ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
-        verify(jdbc, org.mockito.Mockito.times(6)).update(sql.capture(), any(Object[].class));
-        assertThat(sql.getAllValues().get(5)).contains("tope_mensual_ia");
+        verify(jdbc, org.mockito.Mockito.times(5)).update(sql.capture(), any(Object[].class));
+        assertThat(sql.getAllValues().get(4)).contains("tope_mensual_ia");
 
         assertThatThrownBy(() -> servicio.crearEmpresa(DUENA,
                 new CrearEmpresa("Beta S.A.", "BETA", "admin@beta.pe", "cincuenta")))

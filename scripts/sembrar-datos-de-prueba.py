@@ -392,7 +392,7 @@ def sembrar(api, uid_equipo):
         try:
             api.post("/portal/cuentas", {
                 "nombre": nombre, "apellidos": apellidos, "correo": correo,
-                "contrasena": "Demo12345!", "aceptaProceso": True,
+                "contrasena": "Demo12345!", "aceptaPlataforma": True,
                 "ciudadUbigeo": ubigeo,
                 "aceptaFuturosContactos": i % 3 != 0,
             })

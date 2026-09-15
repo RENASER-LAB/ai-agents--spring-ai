@@ -90,7 +90,8 @@ Qué entra:
 - La Solicitud de Talento con sus resultados esperados: Talento prepara, Dirección aprueba
 - Publicar una vacante y cerrarla (solo desde una solicitud aprobada)
 - El portal del candidato: ver la vacante, crear cuenta, postular, subir el currículum
-- Los dos consentimientos por separado, con su texto guardado
+- Los tres consentimientos por separado, con su texto guardado: el de la cuenta y el opcional
+  se firman con Renaser al registrarse, y el de cada vacante con la empresa que la publica
 - La comprobación de los requisitos indispensables — el único descarte automático
 - La bandeja del equipo, ordenada por **a quién se está esperando**
 - Mover una postulación a mano, siempre con motivo
@@ -306,7 +307,7 @@ Los tres primeros son también los del paso 0.
 | 2 o 3 descripciones reales de oferta de empleo | Escribir la rúbrica del currículum con casos reales y no a ciegas |
 | El marco de Renaser sobre no victimismo, no culpa y no vergüenza, por escrito | Convertirlo en criterios que se puedan observar |
 | El dominio de correo de Renaser, bien configurado | Si los avisos caen en spam, se pierden candidatos que sí querían seguir |
-| El texto de consentimiento que nombre a DeepSeek y a Google | **Desde el 18/08/2026 la IA es de fuera y ya lee currículums.** Sin ese texto no puede pasar por ahí el primer candidato real |
+| La revisión de un abogado sobre los textos de consentimiento | **Desde el 18/08/2026 la IA es de fuera y ya lee currículums.** El texto que lo cuenta se cargó el 14/09/2026 y nombra a los cinco proveedores, la salida de datos del país y el plazo: **ya no falta información, falta la firma**. Sin ella no debería pasar por ahí el primer candidato real |
 | Un tope de gasto para DeepSeek y para Google | La IA ya no corre en una máquina de Renaser: **cada consulta se paga**. Sin saber cuántas postulaciones llegan por vacante, el gasto no se puede estimar |
 
 ---
@@ -337,8 +338,12 @@ Lo que hay que hacer fuera del código, en orden:
    finalización— antes de encender el hito 1.
 3. **Llevar las cuatro decisiones de arriba a Renaser.** Las cuatro son suyas.
 4. **Conseguir el dominio de correo** y configurarlo, o los avisos caen en spam.
-5. **Aprobar el texto de consentimiento** que nombre a DeepSeek y a Google, antes de que pase
-   por ahí el primer candidato real. Hay un borrador en
+5. **Que un abogado firme los textos de consentimiento** antes de que pase por ahí el primer
+   candidato real. Lo primero que hay que ponerle delante es **que al postular ya no hay
+   casilla**: enviar la candidatura es el acto, que es otra figura legal aunque la constancia se
+   siga guardando igual. Y **decidir qué se hace con quien ya tenía cuenta**: la migración que
+   cargó los textos nuevos no toca las aceptaciones firmadas, y no hay mecanismo de
+   re-aceptación. Qué se cargó y qué sigue abierto está en
    [BORRADOR-CONSENTIMIENTO-v1.1.md](BORRADOR-CONSENTIMIENTO-v1.1.md).
 6. **Poner un tope de gasto** a las dos cuentas de IA, que ahora cobran por consulta.
 7. **Avisar a quien mantiene los mockups** de qué pantallas entran en cada hito, porque el
