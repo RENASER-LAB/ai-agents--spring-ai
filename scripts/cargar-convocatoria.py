@@ -340,7 +340,7 @@ def cargar_cv(api, token_equipo, vacante_id, archivo: Path):
     try:
         api.post("/portal/cuentas", {
             "nombre": nombre, "apellidos": apellidos, "correo": correo,
-            "contrasena": CONTRASENA, "aceptaProceso": True,
+            "contrasena": CONTRASENA, "aceptaPlataforma": True,
             "aceptaFuturosContactos": False,
             # La ciudad es obligatoria al crear cuenta y no se puede sacar del nombre del
             # archivo, que es lo unico que hay aqui. Se pone «fuera del Peru» a proposito y

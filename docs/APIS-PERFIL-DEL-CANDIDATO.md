@@ -355,8 +355,14 @@ pide en el alta va en `persona`.
   que nadie pidiera sueldo.
 - **El borrado 29733 se lleva el perfil entero**; `dato_cv` se queda porque sostiene lo ya
   evaluado. Retención: parámetro `meses_conservar_perfil` (24) y el barrido diario
-  `BarridoRetencionPerfil`.
+  `BarridoRetencionPerfil`. **El plazo que se aplica es el más largo de todas las
+  organizaciones** —el perfil es de la persona y es transversal—, y lo que se borra es el
+  perfil: la persona, el usuario, las postulaciones y lo respondido en ellas siguen mientras
+  haya cuenta.
 - Una lectura de `DATOS_CV` **sin hermanos en la tanda no arma el retrato**: la barrera de la
   cola lo ignora hasta que una criba o una entrega encolen a los demás.
-- ⚠️ **No encender con candidatos reales sin el texto de consentimiento nuevo**: el vigente cubre
-  una postulación concreta, no un perfil que se conserva entre convocatorias.
+- ✅ **El texto que cubre el perfil ya está publicado** (14/09/2026): el obligatorio de la cuenta
+  enumera lo que entra al perfil y cuánto se conserva, y el opcional de futuras vacantes dice que
+  lo que se guarda es el perfil y el currículum. ⚠️ **Pero sigue sin firma de abogado**, y **quien
+  creó su cuenta antes no lo firmó** —no hay mecanismo de re-aceptación—, así que esa gente sigue
+  amparada por un texto que solo cubría una postulación concreta.

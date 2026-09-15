@@ -18,13 +18,18 @@ public final class DtosPortal {
     // ciudadUbigeo es obligatoria y solo se pide aquí: a quien ya tiene cuenta no se le
     // vuelve a preguntar nunca. Es el único momento en que sale gratis —el formulario ya
     // está abierto— y sin ella el panel no puede filtrar la tanda por dónde vive nadie.
+    //
+    // aceptaPlataforma se llamaba aceptaProceso hasta la V54, y el nombre venía del tipo
+    // de texto que firmaba: el PROCESO de la plataforma, que habla de «esta vacante»
+    // cuando en el registro todavía no hay ninguna. Ahora firma el texto PLATAFORMA —la
+    // cuenta, el perfil, la IA, los proveedores— y el de la vacante se firma al postular.
     public record CrearCuenta(
             @NotBlank String nombre,
             @NotBlank String apellidos,
             @NotBlank @Email String correo,
             @NotBlank @Size(min = 8, message = "La contraseña necesita al menos 8 caracteres") String contrasena,
             @NotBlank(message = "Hay que decir dónde vives") String ciudadUbigeo,
-            @NotNull Boolean aceptaProceso,
+            @NotNull Boolean aceptaPlataforma,
             Boolean aceptaFuturosContactos) {}
 
     public record Login(@NotBlank String correo, @NotBlank String contrasena) {}
@@ -43,11 +48,22 @@ public final class DtosPortal {
 
     public record RequisitoPublico(Long id, String descripcion) {}
 
+    // Los tres textos de la plataforma: el PLATAFORMA que se acepta al crear la cuenta,
+    // el PROCESO que se firma al postular —uno solo para todas las empresas— y el
+    // FUTUROS_CONTACTOS opcional. Los lee la política pública, que los enseña tal cual
+    // para no escribir por su cuenta un texto que luego se desvía.
+    //
+    // El de PROCESO sale YA COMPUESTO, con «la empresa que publica la vacante» donde va
+    // el nombre: aquí no hay ninguna. El hueco no cruza la frontera del backend.
     public record TextoConsentimientoPublico(String tipo, String version, String texto) {}
 
-    // El texto legal de LA EMPRESA de una vacante, para la casilla del formulario de
-    // postular. Lleva el nombre porque es lo que la ley pide enseñar: quién va a tratar
-    // los datos. El de la plataforma (crear la cuenta) sale por textosDeConsentimiento.
+    // El texto legal de LA EMPRESA de una vacante, ya compuesto con su nombre. Lleva el
+    // nombre aparte porque es lo que la pantalla de postular enseña encima del botón, que
+    // es lo que la ley pide decir: quién va a tratar los datos.
+    //
+    // Lo pide también la política pública cuando se llega a ella desde una vacante
+    // (`?vacante=`): es el único sitio donde se puede leer el texto de una empresa que
+    // publicó el suyo, porque la lista de textos de la plataforma no lo incluye.
     public record ConsentimientoDeVacante(String nombreEmpresa, String version, String texto) {}
 
     /**

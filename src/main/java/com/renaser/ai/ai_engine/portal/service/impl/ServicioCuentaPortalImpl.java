@@ -4,9 +4,10 @@ import com.renaser.ai.ai_engine.auditoria.service.ServicioAuditoria;
 import com.renaser.ai.ai_engine.consentimiento.entity.Consentimiento;
 import com.renaser.ai.ai_engine.consentimiento.entity.SolicitudBorrado;
 import com.renaser.ai.ai_engine.consentimiento.entity.TextoConsentimiento;
+import com.renaser.ai.ai_engine.consentimiento.entity.TipoConsentimiento;
 import com.renaser.ai.ai_engine.consentimiento.repository.ConsentimientoRepository;
 import com.renaser.ai.ai_engine.consentimiento.repository.SolicitudBorradoRepository;
-import com.renaser.ai.ai_engine.consentimiento.repository.TextoConsentimientoRepository;
+import com.renaser.ai.ai_engine.consentimiento.service.TextosDeConsentimiento;
 import com.renaser.ai.ai_engine.notificacion.service.ServicioCorreo;
 import com.renaser.ai.ai_engine.organizacion.entity.Organizacion;
 import com.renaser.ai.ai_engine.organizacion.service.DuenoDelInstrumento;
@@ -38,6 +39,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 /**
  * La cuenta y el acceso: ver {@link ServicioCuentaPortal}. Todo lo de aquí cuelga de la
@@ -53,7 +55,7 @@ public class ServicioCuentaPortalImpl implements ServicioCuentaPortal {
     private final UsuarioRepository usuarios;
     private final RolRepository roles;
     private final UsuarioRolRepository usuarioRoles;
-    private final TextoConsentimientoRepository textosConsentimiento;
+    private final TextosDeConsentimiento textosConsentimiento;
     private final ConsentimientoRepository consentimientos;
     private final SolicitudBorradoRepository solicitudesBorrado;
     private final ServicioCorreo correo;
@@ -66,14 +68,35 @@ public class ServicioCuentaPortalImpl implements ServicioCuentaPortal {
     // que «válida» signifique lo mismo aquí y en el desplegable que la persona vio.
     private final CatalogosDelPerfil catalogos;
 
+    /**
+     * Los textos de la plataforma que la política pública enseña enteros.
+     *
+     * <p>Son los TRES de la plataforma: el obligatorio de la cuenta
+     * ({@link TipoConsentimiento#PLATAFORMA}), el opcional de futuras vacantes, y el de
+     * PROCESO, que desde la V54 es uno solo para todas las empresas y por eso cabe aquí:
+     * la política pública lo enseña, y así el enlace de las casillas tiene a dónde llevar.
+     * Sale ya compuesto con «la empresa que publica la vacante» —el hueco no cruza esta
+     * frontera— porque aquí no hay ninguna empresa de la que sacar el nombre. <b>Lo que NO sale por aquí es el de una empresa
+     * concreta, ya compuesto con su nombre</b>: eso lo sirve
+     * {@code GET /portal/vacantes/&#123;id&#125;/consentimiento}.
+     *
+     * <p>Hasta la V54 este método devolvía el PROCESO de la plataforma como si fuera el de
+     * la cuenta, y el candidato terminaba firmando dos veces el mismo texto: una al
+     * registrarse y otra al postular a una vacante de Renaser.
+     */
     @Override
     public List<TextoConsentimientoPublico> textosDeConsentimiento() {
         Long org = duenos.plataforma().getId();
-        return List.of("PROCESO", "FUTUROS_CONTACTOS").stream()
-                .map(tipo -> textosConsentimiento
-                        .findFirstByOrganizacionIdAndTipoAndPublicadoEnIsNotNullOrderByPublicadoEnDesc(org, tipo))
+        return Stream.of(TipoConsentimiento.PLATAFORMA, TipoConsentimiento.PROCESO,
+                        TipoConsentimiento.FUTUROS_CONTACTOS)
+                .map(tipo -> textosConsentimiento.vigente(org, tipo))
                 .flatMap(Optional::stream)
-                .map(t -> new TextoConsentimientoPublico(t.getTipo(), t.getVersion(), t.getTexto()))
+                // Compuesto ya: el de PROCESO lleva un hueco donde va el nombre de la
+                // empresa y aquí no hay ninguna, así que se rellena diciéndolo en palabras.
+                // El hueco no sale del backend — ver TextosDeConsentimiento#EMPRESA_SIN_NOMBRAR.
+                .map(t -> new TextoConsentimientoPublico(t.getTipo(), t.getVersion(),
+                        textosConsentimiento.componer(t.getTexto(),
+                                TextosDeConsentimiento.EMPRESA_SIN_NOMBRAR)))
                 .toList();
     }
 
@@ -81,7 +104,7 @@ public class ServicioCuentaPortalImpl implements ServicioCuentaPortal {
     @Transactional
     public void crearCuenta(CrearCuenta datos, String ip, String userAgent) {
         // Sin aceptar el tratamiento de datos no hay cuenta: no es una casilla decorativa
-        if (!Boolean.TRUE.equals(datos.aceptaProceso())) {
+        if (!Boolean.TRUE.equals(datos.aceptaPlataforma())) {
             throw new IllegalArgumentException("Hay que aceptar el tratamiento de datos personales para crear la cuenta");
         }
         // La ciudad se comprueba contra el catálogo y no solo contra «no viene vacía»: el
@@ -119,22 +142,24 @@ public class ServicioCuentaPortalImpl implements ServicioCuentaPortal {
                         .usuarioId(usuario.getId()).rolId(rol.getId()).creadoEn(Instant.now())
                         .build()));
 
-        // El consentimiento del proceso es obligatorio; el de futuros contactos, opcional.
-        // De cada uno queda la versión exacta del texto, la IP y el navegador.
-        registrarConsentimiento(persona, org.getId(), "PROCESO", datos, ip, userAgent);
+        // El de la plataforma es obligatorio; el de futuros contactos, opcional. De cada
+        // uno queda la versión exacta del texto, la IP y el navegador.
+        //
+        // Los dos van sin postulacionId: son de la cuenta, con Renaser. El de la empresa
+        // lo firma ServicioPostulacionPortalImpl al postular, ya con su postulación (V38).
+        registrarConsentimiento(persona, org.getId(), TipoConsentimiento.PLATAFORMA, datos, ip, userAgent);
         if (Boolean.TRUE.equals(datos.aceptaFuturosContactos())) {
-            registrarConsentimiento(persona, org.getId(), "FUTUROS_CONTACTOS", datos, ip, userAgent);
+            registrarConsentimiento(persona, org.getId(), TipoConsentimiento.FUTUROS_CONTACTOS,
+                    datos, ip, userAgent);
         }
 
         correo.enviar(org.getId(), usuario.getId(), usuario.getCorreo(), "CUENTA_CREADA",
                 Map.of("nombre", datos.nombre()));
     }
 
-    private void registrarConsentimiento(Persona persona, Long orgId, String tipo,
+    private void registrarConsentimiento(Persona persona, Long orgId, TipoConsentimiento tipo,
                                          CrearCuenta datos, String ip, String userAgent) {
-        TextoConsentimiento texto = textosConsentimiento
-                .findFirstByOrganizacionIdAndTipoAndPublicadoEnIsNotNullOrderByPublicadoEnDesc(orgId, tipo)
-                .orElseThrow(() -> new IllegalStateException("No hay texto de consentimiento publicado: " + tipo));
+        TextoConsentimiento texto = textosConsentimiento.exigirVigente(orgId, tipo);
         consentimientos.save(Consentimiento.builder()
                 .personaId(persona.getId())
                 .textoConsentimientoId(texto.getId())
@@ -205,7 +230,8 @@ public class ServicioCuentaPortalImpl implements ServicioCuentaPortal {
     @Override
     @Transactional
     public void retirarConsentimientoFuturos(ContextoUsuario quien) {
-        Consentimiento vigente = consentimientos.vigenteDeTipo(quien.personaId(), "FUTUROS_CONTACTOS")
+        Consentimiento vigente = consentimientos
+                .vigenteDeTipo(quien.personaId(), TipoConsentimiento.FUTUROS_CONTACTOS.codigo())
                 .orElseThrow(() -> new IllegalStateException("No tienes un consentimiento de futuros contactos vigente"));
         vigente.setRetiradoEn(Instant.now());
         consentimientos.save(vigente);

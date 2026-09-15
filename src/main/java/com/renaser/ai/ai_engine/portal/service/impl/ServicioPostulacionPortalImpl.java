@@ -5,6 +5,7 @@ import com.renaser.ai.ai_engine.archivo.entity.Archivo;
 import com.renaser.ai.ai_engine.archivo.service.AlmacenArchivos;
 import com.renaser.ai.ai_engine.consentimiento.entity.Consentimiento;
 import com.renaser.ai.ai_engine.consentimiento.repository.ConsentimientoRepository;
+import com.renaser.ai.ai_engine.consentimiento.service.TextosDeConsentimiento;
 import com.renaser.ai.ai_engine.notificacion.service.ServicioCorreo;
 import com.renaser.ai.ai_engine.organizacion.entity.Organizacion;
 import com.renaser.ai.ai_engine.organizacion.repository.OrganizacionRepository;
@@ -83,7 +84,7 @@ public class ServicioPostulacionPortalImpl implements ServicioPostulacionPortal 
     private final com.renaser.ai.ai_engine.archivo.repository.ArchivoRepository archivos;
     private final com.renaser.ai.ai_engine.perfil.repository.PerfilCandidatoRepository perfiles;
     private final ServicioCorreo correo;
-    private final TextoProcesoPublicado textoProceso;
+    private final TextosDeConsentimiento textos;
 
     @Override
     @Transactional
@@ -105,8 +106,11 @@ public class ServicioPostulacionPortalImpl implements ServicioPostulacionPortal 
         // lista y aceptarle un POST directo sería un tablón de mentira.
         Vacante vacante = vacantes.findById(vacanteId)
                 .filter(v -> "PUBLICADA".equals(v.getEstado()))
-                .filter(v -> organizaciones.findById(v.getOrganizacionId())
-                        .map(Organizacion::isEsActiva).orElse(false))
+                .orElseThrow(() -> new ResourceNotFoundException("Vacante", "id", vacanteId));
+        // La empresa se resuelve una vez y se usa dos: para el colador de la suspendida y
+        // para el nombre que va dentro del texto que se firma.
+        Organizacion empresaDeLaVacante = organizaciones.findById(vacante.getOrganizacionId())
+                .filter(Organizacion::isEsActiva)
                 .orElseThrow(() -> new ResourceNotFoundException("Vacante", "id", vacanteId));
         if (postulaciones.existsByUsuarioIdAndVacanteId(quien.usuarioId(), vacanteId)) {
             throw new IllegalStateException("Ya postulaste a esta vacante");
@@ -141,14 +145,18 @@ public class ServicioPostulacionPortalImpl implements ServicioPostulacionPortal 
                 .build());
 
         // El registro firmado del texto de LA EMPRESA DE LA VACANTE, amarrado a esta
-        // postulación: versión exacta, IP y navegador, como el de la cuenta. Si la
-        // empresa no tiene texto publicado —no debería pasar: publicar la vacante lo
-        // exige—, el buscador del texto PROCESO corta con un 409 claro antes de guardar
-        // nada más.
+        // postulación: versión exacta, IP y navegador, como el de la cuenta.
+        //
+        // Se guarda el texto YA COMPUESTO con el nombre de la empresa, y no solo la fila a
+        // la que apunta: desde la V54 el texto de PROCESO es uno solo para todas y lleva un
+        // hueco, así que dos candidatos de dos empresas firman la misma fila y han leído
+        // cosas distintas. Lo que sostiene esto ante la autoridad es lo que leyó ella.
         Persona persona = personas.findById(quien.personaId()).orElse(null);
+        var textoFirmado = textos.procesoDe(empresaDeLaVacante.getNombre());
         consentimientos.save(Consentimiento.builder()
                 .personaId(quien.personaId())
-                .textoConsentimientoId(textoProceso.de(organizacionDeLaVacante).getId())
+                .textoConsentimientoId(textoFirmado.fuente().getId())
+                .textoFirmado(textoFirmado.texto())
                 .postulacionId(postulacion.getId())
                 .nombreRegistrado(persona == null ? null
                         : (persona.getNombre() + " " + persona.getApellidos()).trim())

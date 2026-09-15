@@ -152,15 +152,21 @@ pasa), **sin datos** (falta evidencia) o **reserva** (no para esta vacante, pero
 | Frontend | React con Vite, en el repositorio `RenaserOsPostulantes` (portal del candidato y panel de la empresa) |
 | Identidad del equipo | Correo y contraseña, cuentas por invitación (25/08); RENASER OS quedó dormido como integración futura |
 
-**Qué sale de Renaser y qué no.** La base de datos y los archivos viven en servidores de
-Renaser. Los dos modelos son de fuera: DeepSeek califica y Google busca por significado.
-Renaser aceptó que los datos de candidatos salgan hacia ellos el 18 de agosto de 2026.
+**Qué sale de Renaser y qué no.** Prácticamente todo se apoya en empresas de fuera del Perú, y
+conviene decirlo entero: DeepSeek califica, Google busca por significado, **Supabase guarda la
+base de datos y los archivos**, **Amazon Web Services aloja los servidores** y **Vercel sirve
+las páginas del portal**. A eso se suma el proveedor de correo. Renaser aceptó que los datos de
+candidatos salgan hacia los modelos el 18 de agosto de 2026.
 
 ⚠️ **Desde el 18/08/2026 los datos de candidatos sí salen.** Los tres agentes que califican el
 Perfil Integral ya corren, y el currículum viaja hacia DeepSeek —anonimizado: sin edad, sexo ni
-estado civil—. Antes de que pase por ahí el primer candidato real, **Renaser tiene que aprobar un
-texto de consentimiento nuevo** que nombre a las dos empresas y diga qué se les envía: el actual
-no menciona a ninguna. Hay un borrador en
+estado civil—.
+
+✅ **El texto que se lo cuenta al candidato se cargó el 14/09/2026** (`V54`): nombra a los cinco
+proveedores con lo que recibe cada uno, dice que los datos salen del país, declara el plazo de
+conservación y enumera las tres cosas que el sistema hace sin que intervenga una persona.
+**Lo que falta ahora es que un abogado lo firme**, y decidir qué se hace con quien creó su cuenta
+antes de esa fecha, que sigue amparado por el texto viejo. Ver
 [BORRADOR-CONSENTIMIENTO-v1.1.md](BORRADOR-CONSENTIMIENTO-v1.1.md).
 
 ---
@@ -205,7 +211,7 @@ una regla de seguridad desde la primera versión, no algo que se añada después
 | Confirmar el catálogo de puestos y sus nombres definitivos | No: hay once plantillas nombradas |
 | Confirmar la máquina de estados, que es propuesta nuestra | No: está construida y es coherente |
 | **Un tope de gasto para DeepSeek y para Google** | No hoy, pero conviene ponerlo: los modelos ya no corren en una máquina de Renaser, **cada consulta se paga** |
-| **Aprobar el texto de consentimiento que nombre a DeepSeek y a Google** | **Sí, a usar el sistema con gente real.** Ya está decidido que la IA corre fuera y ya lee currículums; falta el texto que se lo diga al candidato |
+| **Que un abogado firme los textos de consentimiento** | **Sí, a usar el sistema con gente real.** El texto ya nombra a los proveedores, dice que los datos salen del país y declara el plazo (14/09/2026): **falta la firma, no la información**. Y falta decidir qué se hace con quien se registró antes y sigue amparado por el texto viejo |
 | **Medir cómo lo hacen hoy**: horas por vacante, postulaciones por vacante y qué tasa de finalización considerarían buena | **Sí, a la medición.** El MVP se puede construir, pero sin línea base no se puede decir si funcionó |
 | **Currículums y pruebas ya corregidos a mano** | **Sí, al paso 0** y a saber si la IA califica igual que una persona |
 

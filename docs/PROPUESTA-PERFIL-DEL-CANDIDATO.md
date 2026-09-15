@@ -95,11 +95,32 @@ LinkedIn sea de LinkedIn y la de GitHub de GitHub. Un enlace que no cumple no se
 acceso de la ley 29733 y hoy no tiene por dónde ejercerse.
 
 **RF-168** Un perfil sin actividad se conserva el tiempo que diga el parámetro
-`meses_conservar_perfil`, y después se anonimiza. Arranca en **24 meses**.
+`meses_conservar_perfil`, y después **se elimina** con todo lo que cuelga de él. Arranca en
+**24 meses**. No se anonimiza: el perfil no sostiene ninguna nota, así que no hay nada que
+conservar vacío.
 
-**RF-169** El perfil es un dato personal permanente y **no cabe en el consentimiento actual**,
-que cubre una postulación concreta. Antes de encenderlo hace falta un texto que diga qué se
-guarda, cuánto tiempo y para qué.
+Dos precisiones que el texto legal ya recoge y que la documentación no debe simplificar:
+**«actividad» es lo más reciente entre tocar el perfil y postular** —quien sigue postulando
+sigue presente aunque no edite su ficha—, y **el plazo que se aplica es el más largo de todas
+las organizaciones**, porque el perfil es de la persona y es transversal. Lo que se borra es el
+perfil: la persona, el usuario, las postulaciones y lo respondido en ellas se conservan mientras
+haya cuenta.
+
+**RF-169** El perfil es un dato personal permanente y **no cabía en el consentimiento anterior**,
+que cubría una postulación concreta. Hacía falta un texto que dijera qué se guarda, cuánto
+tiempo y para qué.
+
+✅ **Ese texto se cargó el 14/09/2026** (`V54`), y en dos sitios. El permiso opcional de futuros
+contactos pasó a una v1.1 que **nombra el perfil** —«conserve mi perfil y mi currículum para
+avisarme de otras vacantes»— y repite que retirarlo no toca ningún proceso en curso, que es la
+duda por la que la gente no lo marcaba. Y el permiso obligatorio de la cuenta, el de tipo
+`PLATAFORMA`, cuenta qué datos entran al perfil, cuáles los lee la inteligencia artificial del
+propio currículum, cuánto se conserva y cómo se corrige.
+
+⚠️ **Sigue pendiente lo mismo que el resto de los textos**: que un abogado los firme, y decidir
+qué se hace con quien creó su cuenta antes del 14/09 — la V54 no toca las aceptaciones ya
+firmadas y no hay mecanismo de re-aceptación. Ver
+[BORRADOR-CONSENTIMIENTO-v1.1.md](BORRADOR-CONSENTIMIENTO-v1.1.md).
 
 **RF-170** Al ejercer el derecho de borrado, el perfil se borra con lo demás. La postulación ya
 evaluada conserva lo suyo, que es lo que sostiene una decisión tomada.

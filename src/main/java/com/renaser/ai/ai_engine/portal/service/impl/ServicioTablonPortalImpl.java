@@ -1,7 +1,7 @@
 package com.renaser.ai.ai_engine.portal.service.impl;
 
 import com.renaser.ai.ai_engine.ai.exception.ResourceNotFoundException;
-import com.renaser.ai.ai_engine.consentimiento.entity.TextoConsentimiento;
+import com.renaser.ai.ai_engine.consentimiento.service.TextosDeConsentimiento;
 import com.renaser.ai.ai_engine.organizacion.entity.Organizacion;
 import com.renaser.ai.ai_engine.organizacion.repository.OrganizacionRepository;
 import com.renaser.ai.ai_engine.portal.dto.DtosPortal.ConsentimientoDeVacante;
@@ -33,7 +33,7 @@ public class ServicioTablonPortalImpl implements ServicioTablonPortal {
     private final VacanteRepository vacantes;
     private final OrganizacionRepository organizaciones;
     private final RequisitoObjetivoRepository requisitos;
-    private final TextoProcesoPublicado textoProceso;
+    private final TextosDeConsentimiento textos;
 
     @Override
     public List<VacantePublica> vacantesPublicadas() {
@@ -89,8 +89,11 @@ public class ServicioTablonPortalImpl implements ServicioTablonPortal {
         Organizacion empresa = organizaciones.findById(vacante.getOrganizacionId())
                 .filter(Organizacion::isEsActiva)
                 .orElseThrow(() -> new ResourceNotFoundException("Vacante", "id", vacanteId));
-        TextoConsentimiento texto = textoProceso.de(empresa.getId());
-        return new ConsentimientoDeVacante(empresa.getNombre(), texto.getVersion(), texto.getTexto());
+        // Ya compuesto con el nombre de la empresa: lo que se devuelve es exactamente lo
+        // que el candidato va a leer, y exactamente lo que se guardará al firmar.
+        var texto = textos.procesoDe(empresa.getNombre());
+        return new ConsentimientoDeVacante(empresa.getNombre(),
+                texto.fuente().getVersion(), texto.texto());
     }
 
     /** Las organizaciones ACTIVAS de un lote de vacantes: el colador del tablón. */

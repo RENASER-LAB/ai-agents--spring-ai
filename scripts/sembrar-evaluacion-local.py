@@ -168,7 +168,7 @@ def main():
     print(f"1. Cuenta nueva: {CORREO}")
     pedir("/cuentas", {"nombre": "Siembra", "apellidos": f"QA {MARCA}",
                        "correo": CORREO, "contrasena": "siembra-qa-2026",
-                       "aceptaProceso": True, "aceptaFuturosContactos": False})
+                       "aceptaPlataforma": True, "aceptaFuturosContactos": False})
     token = pedir("/auth/login", {"correo": CORREO,
                                   "contrasena": "siembra-qa-2026"})["token"]
 

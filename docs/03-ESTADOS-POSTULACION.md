@@ -359,6 +359,25 @@ automático». Quien abra esa postulación dentro de seis meses puede saber que 
 
 ---
 
+## Lo que se mueve sin que intervenga una persona (14/09/2026)
+
+Hay que saber cuáles son, porque **el candidato las lee** antes de aceptar: el texto legal que
+firma al crear su cuenta las enumera una por una. Hasta el 14/09 ese texto prometía que ninguna
+decisión sobre su candidatura se tomaba automáticamente, y era falso.
+
+| Qué se mueve solo | Cuándo | ¿Se puede apagar? |
+|---|---|---|
+| La postulación se cierra al postular, porque el candidato declaró que no cumple un requisito indispensable | En el momento de enviarla | No. Es la regla de los requisitos objetivos |
+| El proceso se cierra porque se acabó el plazo de una evaluación o de una prueba | Un sondeo que corre cada 60 segundos | **No tiene interruptor** |
+| La postulación pasa a la etapa siguiente sin esperar a nadie | Solo con «calificar y avanzar sola» encendido | Sí: el interruptor de la vacante |
+
+**Ninguna de las tres depende de una nota**, y eso es lo que el texto dice con las palabras
+«ninguna nota te contrata ni te descarta por sí sola». Una nota baja no cierra nada: quien
+decide continuar o no es siempre una persona de la empresa. En cualquiera de las tres, el
+candidato puede escribir y pedir que una persona lo revise.
+
+---
+
 ## Descartar a alguien desde el panel (11/09/2026)
 
 La Regla 2 dice que una persona con permiso puede mover una postulación a donde quiera. Hasta

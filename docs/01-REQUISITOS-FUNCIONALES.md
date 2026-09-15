@@ -420,8 +420,60 @@ etapas del proceso. Puede dar más detalle que la convocatoria pública.
 de inteligencia artificial, tratamiento de datos, uso de sus entregables, confidencialidad,
 cuánto tiempo se conservan sus datos y sus derechos de retiro y actualización.
 
-**RF-30** **Son dos consentimientos separados.** Uno para el proceso actual; otro para conservar
-sus datos y contactarlo por futuras oportunidades. El segundo **nunca se da por supuesto**.
+**RF-29b** El texto dice también **quién más ve los datos y que salen del Perú** (14/09/2026):
+las empresas a cuyas vacantes postula, cada una con su permiso aparte, y los proveedores que
+prestan el servicio por encargo de Renaser —nombrados uno a uno, con lo que recibe cada uno—.
+Todos están fuera del país, así que se consiente además el flujo transfronterizo que regula el
+artículo 15 de la Ley 29733.
+
+**RF-29c** El texto dice **qué ocurre sin que intervenga una persona** (14/09/2026). Hasta esa
+fecha prometía que ninguna decisión se tomaba automáticamente, y **eso era falso**. Ahora dice que
+ninguna nota contrata ni descarta por sí sola —quien decide es siempre una persona de la
+empresa— y enumera las tres cosas que sí pasan solas, ninguna de las cuales depende de una nota:
+
+1. Se cierra la postulación al postular, si el propio candidato declara que no cumple un
+   requisito indispensable de la vacante (RF-16).
+2. Se cierra el proceso cuando se acaba el plazo que tenía para responder una evaluación o una
+   prueba. Lo vigila un sondeo que corre cada 60 segundos y **no tiene interruptor**.
+3. Se pasa a la etapa siguiente sin esperar a nadie, en las vacantes que encendieron «calificar
+   y avanzar sola» (ver [Estados de la postulación](03-ESTADOS-POSTULACION.md)).
+
+En cualquiera de las tres, el candidato puede escribir y pedir que una persona lo revise.
+
+**RF-30** **Son tres consentimientos separados, y se firman en dos momentos distintos**
+(14/09/2026). Antes eran dos, y el de la cuenta usaba por descuido el texto de una vacante: quien
+se registraba aceptaba un papel que hablaba de «esta vacante» cuando todavía no había ninguna, y
+si luego postulaba a una vacante de Renaser firmaba dos veces el mismo texto.
+
+| Permiso | Con quién se firma | Cuándo | ¿Obligatorio? |
+|---|---|---|---|
+| **De la plataforma** | Con Renaser | Al crear la cuenta, marcando una casilla | Sí: sin él no hay cuenta |
+| **Del proceso** | Con **la empresa** que publica la vacante | Al postular, uno por postulación | Sí: sin él no hay postulación |
+| **De futuros contactos** | Con Renaser | Al crear la cuenta, marcando una casilla | No, y **nunca se da por supuesto** |
+
+**El contenido pesado vive en el de la plataforma**: la cuenta, el perfil, la inteligencia
+artificial, las empresas de fuera que tratan los datos, la salida de datos del país, el plazo de
+conservación y los derechos. El del proceso dice lo único que es de cada empresa —que **ella**
+decide sobre esa postulación— y por eso es corto: repetir lo técnico empresa por empresa es lo
+que hacía firmar dos veces lo mismo.
+
+**RF-30b** **El texto del proceso es uno solo para todas las empresas** (14/09/2026), con un
+hueco donde va el nombre de quien publica la vacante, que se pone al leerlo. Antes había uno por
+empresa y lo único que cambiaba eran las tres palabras de su razón social: corregir una coma
+obligaba a republicar empresa por empresa, y una empresa nueva no podía recibir candidatos hasta
+publicar el suyo, cosa que nadie hacía bien —publicaban la copia de Renaser, que ni las
+nombraba—.
+
+Los tres textos son de la plataforma, que es quien los mantiene. **Ninguna empresa puede publicar
+ninguno**, dar de alta una empresa no le copia ninguno, y **publicar una vacante ya no exige
+tener texto propio**. Con todo, lo que se firma sigue siendo un permiso **con esa empresa**: el
+texto lleva su nombre y queda amarrado a esa postulación.
+
+**RF-30c** **Se guarda el texto tal como lo leyó la persona** (14/09/2026), con el nombre de la
+empresa ya puesto, y no solo a qué versión apunta. Con el hueco, dos candidatos de dos empresas
+firman la misma versión y han leído cosas distintas, y lo que sostiene la prueba ante la
+autoridad es lo que leyó cada uno. Por lo mismo, **con qué empresa se firmó lo dicen la
+postulación y ese texto**, nunca de quién es la versión firmada.
 
 **RF-31** El registro de aceptación guarda: usuario autenticado, nombre registrado, versión del
 texto aceptado, fecha y hora, dirección desde donde se aceptó, identificador de sesión y huella
@@ -431,6 +483,30 @@ del documento. La evidencia se puede exportar.
 si la validación práctica implica trabajo real. Los textos legales y la forma exacta de firma
 los aprueba el responsable legal antes de producción.
 
+⚠️ **Sigue sin cumplirse, y es lo que falta.** Los textos cargados el 14/09/2026 **no están
+aprobados por ningún abogado**. Lo que cambió es que ya no les falta información.
+
+Y con ellos van tres cosas más que esperan ese mismo visto bueno:
+
+1. **La forma de firma del permiso de la vacante cambió** (15/09/2026). En la pantalla de
+   postular ya no hay casilla: encima del botón se dice quién va a recibir la candidatura y se
+   enlaza el texto entero, y enviarla es el acto. Se pasa de «consentimiento expreso por casilla»
+   a «consentimiento por acto inequívoco», que son dos figuras distintas y las dos defendibles.
+   **La constancia no se retiró**: la firma se sigue guardando con el texto, la fecha y la
+   dirección, y el sistema sigue exigiendo el dato.
+2. **Quien creó su cuenta antes del 14/09 nunca firmó el texto nuevo.** No se tocan las
+   aceptaciones ya hechas, que es precisamente lo que las hace valer, y no existe ningún
+   mecanismo de re-aceptación: esa gente sigue amparada por un texto que no nombra a los
+   proveedores ni dice que sus datos salen del país. Qué hacer con ellos es una decisión de
+   producto sin tomar.
+3. **La explicación junto a la casilla del registro se acortó a una línea** (15/09/2026, decisión
+   de producto). Antes nombraba ahí mismo la inteligencia artificial y los proveedores de fuera
+   del Perú, que es la primera capa del aviso por capas. Al quitarla, **todo el peso informativo
+   recae en el enlace a la política de privacidad**: si ese enlace se rompe o el documento se
+   recorta, el consentimiento deja de estar informado aunque la casilla siga ahí.
+
+Ver [BORRADOR-CONSENTIMIENTO-v1.1.md](BORRADOR-CONSENTIMIENTO-v1.1.md).
+
 ## Conservación de datos
 
 **RF-33** El periodo de conservación se configura según la política aprobada. **No se escribe un
@@ -438,6 +514,15 @@ número de meses en el código.**
 
 **RF-34** Al vencer el periodo, el sistema ejecuta la política definida: eliminar, anonimizar o
 pedir que renueve el consentimiento.
+
+⚠️ **Lo que hoy hace de verdad es más estrecho que RF-34, y el texto legal lo dice así**
+(14/09/2026). De las tres acciones previstas solo ocurre una —**eliminar**— y solo sobre el
+perfil: un barrido nocturno borra el perfil de quien lleve 24 meses sin postular y sin tocarlo.
+**La persona, el usuario, las postulaciones y lo que respondió en ellas se conservan mientras
+haya cuenta**, porque sostienen decisiones ya tomadas. Y el plazo que manda es **el más largo de
+todas las organizaciones**, no el de cada una: el perfil es de la persona y es transversal, así
+que ante dos plazos distintos gana el más conservador. No es «se borra todo a los 24 meses», y
+la documentación no debe resumirlo así.
 
 **RF-35** El candidato puede retirar el consentimiento de futuras oportunidades sin que eso
 afecte a los registros que haya obligación de conservar.

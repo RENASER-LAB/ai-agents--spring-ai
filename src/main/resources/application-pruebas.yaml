@@ -17,6 +17,20 @@ server:
   # quien hospede la aplicación.
   port: ${PORT:8080}
 
+  # La IP del candidato, y no la de Caddy.
+  #
+  # Sin esto, `request.getRemoteAddr()` devuelve la IP interna del contenedor de Caddy
+  # (172.x) y TODOS los consentimientos se firman desde la misma dirección. No es un dato
+  # de registro: el texto que el candidato acepta dice que se guarda su IP «porque la ley
+  # exige poder probar que este permiso lo di yo», y `consentimiento.ip` es esa prueba —
+  # una columna con la misma 172.x repetida no prueba nada ante la autoridad.
+  #
+  # Va SOLO en este perfil y no en application.yaml: aquí hay un proxy delante que escribe
+  # `X-Forwarded-For` de su puño y letra, mientras que en local la aplicación se expone
+  # directa y cualquiera podría mandar esa cabecera a mano y firmar desde la IP que
+  # quisiera. Si algún día se despliega sin Caddy delante, esto se quita con él.
+  forward-headers-strategy: framework
+
 spring:
   datasource:
     # La cadena DIRECTA de Supabase (puerto 5432), no la del pooler (6543): el pooler

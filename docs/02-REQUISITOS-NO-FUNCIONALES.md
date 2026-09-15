@@ -68,12 +68,16 @@ Renaser aceptó que los datos de candidatos salgan hacia ellos (decisión del 18
 eligió así porque un modelo propio exige una máquina cara y dedicada, y la calidad de los de
 fuera es mejor.
 
-⚠️ **Los textos de consentimiento todavía no nombran a ninguna de las dos empresas, y esto ya
-es urgente** (18/08/2026). Antes no rompía nada porque la IA no leía a nadie; **ahora sí lee**:
-los tres agentes del Perfil Integral corren de verdad y el currículum sale hacia DeepSeek,
-anonimizado —sin edad, sexo ni estado civil—. **Renaser tiene que aprobar un texto que nombre a
-las dos empresas y diga qué se les manda, antes de que pase por ahí el primer candidato real.**
-Hay un borrador en [BORRADOR-CONSENTIMIENTO-v1.1.md](BORRADOR-CONSENTIMIENTO-v1.1.md).
+✅ **Desde el 14/09/2026 los textos sí los nombran** (migración `V54`). Y no son dos, sino
+cinco: a DeepSeek y Google se sumaron **Supabase** (la base de datos y los archivos), **Amazon
+Web Services** (los servidores) y **Vercel** (las páginas del portal donde el candidato escribe),
+más el proveedor de correo. Los seis están fuera del Perú, así que el texto dice también que los
+datos salen del país.
+
+⚠️ **Lo que falta ahora es la firma de un abogado, no información.** Los textos cargados no están
+aprobados legalmente. Ver [BORRADOR-CONSENTIMIENTO-v1.1.md](BORRADOR-CONSENTIMIENTO-v1.1.md),
+que cuenta qué se llevó la V54 y qué sigue pendiente — incluido que **quien ya tenía cuenta nunca
+firmó el texto nuevo**.
 
 ### Cuánta gente lo va a usar
 
@@ -158,30 +162,61 @@ parte del requisito**, no un detalle de implementación.
 
 **RNF-11** El sistema cumple la **Ley 29733** de protección de datos personales del Perú.
 
-**RNF-12** **Son dos consentimientos separados**, y el segundo nunca se da por supuesto:
+**RNF-12** **Son tres consentimientos separados** (14/09/2026), con tres responsables distintos,
+y el tercero nunca se da por supuesto:
 
-| Consentimiento | Para qué |
-|---|---|
-| Del proceso | Evaluar su postulación a **esta** vacante |
-| De futuros contactos | Conservar sus datos y avisarle de otras convocatorias |
+| Consentimiento | Con quién | Para qué |
+|---|---|---|
+| De la plataforma | Renaser | La cuenta, el perfil, la inteligencia artificial, los proveedores de fuera, el plazo y los derechos |
+| Del proceso | **La empresa** de la vacante | Que ella decida sobre **esa** postulación |
+| De futuros contactos | Renaser | Conservar su perfil y avisarle de otras convocatorias |
+
+Son tres y no uno porque los responsables son distintos, y la ley obliga a que cada quien que
+trata datos esté nombrado y consentido. Juntarlos en una casilla sería pedir un permiso que
+nadie dio.
+
+**Los tres textos son de la plataforma, y el del proceso es uno solo para todas las empresas**,
+con un hueco donde va el nombre de quien publica la vacante. Ninguna empresa tiene texto propio
+ni puede publicar uno. Eso no cambia con quién se firma: el permiso sigue siendo con la empresa
+de la vacante, y su nombre queda dentro de lo que la persona lee y firma.
 
 De cada aceptación se guarda: usuario autenticado, nombre registrado, versión del texto,
-fecha y hora, dirección desde donde se aceptó, **identificador de sesión** y **huella del
-documento**. La evidencia se puede exportar.
+fecha y hora, dirección desde donde se aceptó, **identificador de sesión**, **huella del
+documento** y, desde el 14/09/2026, **el texto tal como se le pintó**, con el nombre de la
+empresa ya puesto. La evidencia se puede exportar.
+
+⚠️ **Las dos de la cuenta se dan marcando una casilla; la de la vacante, enviando la
+postulación** (15/09/2026). En la pantalla de postular se retiró la casilla: encima del botón se
+dice quién recibirá la candidatura y se enlaza el texto entero. Es un cambio de figura —de
+consentimiento expreso por casilla a consentimiento por acto inequívoco—, **pendiente del visto
+bueno del responsable legal**, y es lo que más lo necesita de todo el cambio. Lo que no cambió es
+la constancia: la firma se sigue guardando igual y el sistema sigue exigiendo el dato.
+
+⚠️ **La dirección desde donde se aceptó depende de una opción del despliegue.** Con un proxy
+delante y sin decírselo a la aplicación, todas las aceptaciones se firman desde la IP interna del
+proxy y esa columna deja de probar nada. Está resuelto en el perfil de despliegue (`pruebas`), y
+**solo ahí**: en local la aplicación se expone directa y cualquiera podría mandar esa cabecera a
+mano. Si algún día se despliega sin proxy delante, la opción se quita con él.
 
 **RNF-12b** El candidato puede retirar el consentimiento de futuros contactos **sin que eso
 afecte** a los registros que haya obligación de conservar, y sin cerrar sus postulaciones en
 curso. Son tres cosas distintas: retirar una postulación, retirar el consentimiento de futuros
 contactos, y pedir el borrado de datos.
 
-**RNF-13** El texto de consentimiento dice **tres cosas** de forma clara:
+**RNF-13** El texto de consentimiento dice **cinco cosas** de forma clara:
 1. Que sus datos se usan para evaluar su postulación, y que participan agentes de inteligencia
    artificial en esa evaluación.
 2. Qué se hace con sus entregables y qué confidencialidad aplica.
 3. Dónde se guardan sus datos y **cuánto tiempo**.
-4. **A qué empresas de fuera se envían y qué se les manda.** La base de datos y los archivos se
-   quedan en Renaser, pero los modelos que califican y buscan por significado son de otras
-   empresas y están fuera del país, así que hay **flujo transfronterizo** que declarar.
+4. **A qué empresas de fuera se envían y qué se les manda**, cada una por su nombre. No solo los
+   modelos que califican y buscan por significado: también **la base de datos y los archivos, y
+   los servidores, y las páginas del portal** son de otras empresas y están fuera del país, así
+   que hay **flujo transfronterizo** que declarar (artículo 15 de la Ley 29733).
+5. **Qué ocurre sin que intervenga una persona** (14/09/2026), enumerado una por una. Hasta hoy
+   el texto prometía lo contrario —que ninguna decisión se tomaba automáticamente— y era falso.
+   Lo que dice ahora es que **ninguna nota contrata ni descarta por sí sola**, y nombra las tres
+   transiciones sin persona: el cierre por requisito indispensable no cumplido, el cierre por
+   plazo vencido y el pase a la etapa siguiente en las vacantes que avanzan solas. Ver RF-29c.
 
 **RNF-13b** El **periodo de conservación es configuración**, fijada según la política aprobada.
 **No se escribe un número de meses en el código.** Al vencer, el sistema ejecuta la política
@@ -189,8 +224,24 @@ definida: eliminar, anonimizar o pedir que renueve el consentimiento.
 *Por qué:* la ley obliga a fijar un plazo y a decirlo en el texto. Escribirlo en el código
 significa un despliegue cada vez que el abogado cambie de opinión.
 
+⚠️ **Hoy el plazo declarado son 24 meses sin actividad, y lo que se borra es el perfil.** Ni la
+persona, ni el usuario, ni las postulaciones, ni lo respondido en ellas: eso se conserva mientras
+haya cuenta, porque sostiene decisiones ya tomadas. Y el plazo que se aplica es **el más largo de
+todas las organizaciones**, porque el perfil es de la persona y es transversal. De las tres
+acciones que prevé este requisito hoy solo ocurre **eliminar**. Los textos cargados dicen
+exactamente eso, y la documentación no debe resumirlo a «se borra todo a los 24 meses».
+
+El plazo del texto y el del barrido son dos archivos que no se citan entre sí, así que hay una
+prueba que falla si alguien cambia uno sin el otro.
+
 **RNF-14** El texto de consentimiento se versiona. Si cambia, los que ya aceptaron quedan
 ligados a la versión que firmaron.
+
+⚠️ **Y ahí está el hueco abierto del 14/09/2026.** La V54 publicó los textos nuevos pero **no
+toca las aceptaciones ya firmadas**, y no existe ningún mecanismo de re-aceptación: quien se
+registró antes sigue amparado por la v1.0, que **no nombra a los encargados ni dice que sus
+datos salen del Perú**. Pedirles la versión nueva, o terminar sus procesos sin inteligencia
+artificial, es una decisión de producto que está sin tomar.
 
 **RNF-15** El candidato puede **pedir que se borren sus datos**. El sistema debe poder
 hacerlo sin romper los registros de auditoría.
@@ -206,9 +257,15 @@ regla se cumplió.
 persona ajena a Renaser ve sus datos**. Nadie aparece como candidato de una vacante sin
 haberse postulado a ella.
 
-Lo que sí sale, y solo eso, es lo que necesitan los modelos para calificar: el currículum ya
-recortado y las respuestas, hacia las dos empresas nombradas en «Inteligencia artificial». Va
+Lo que sí sale hacia los modelos, y solo eso, es lo que necesitan para calificar: el currículum
+ya recortado y las respuestas, hacia las dos empresas nombradas en «Inteligencia artificial». Va
 por máquina, no lo lee nadie, y el candidato lo acepta antes en el texto de consentimiento.
+
+⚠️ **«Ninguna persona ajena a Renaser ve sus datos» hay que leerlo con dos salvedades**, y las
+dos están hoy escritas en el texto que el candidato firma: **la empresa de cada vacante a la que
+postule sí los ve** —es el objeto de su permiso, firmado aparte al postular— y los proveedores
+que guardan la base, los archivos, los servidores y las páginas del portal los alojan por
+encargo de Renaser. Están nombrados uno a uno en el texto de la plataforma.
 
 Distinto es lo que pasa **dentro de sus propias postulaciones**: parte de lo que ya respondió
 puede reutilizarse para no hacérselo repetir. Eso es una comodidad para él, no un uso de sus
@@ -292,14 +349,20 @@ calificación con IA no se enciende para candidatos reales.
 *Por qué:* es lo único que sostiene legalmente al requisito anterior. Un modelo propio evitaba
 tener que contarlo; uno de fuera obliga.
 
+✅ **Cumplido en cuanto al contenido desde el 14/09/2026** (`V54`): el texto de la plataforma
+nombra a DeepSeek, Google, Supabase, Amazon Web Services y Vercel, dice qué recibe cada uno y
+declara que los datos salen del Perú. **Falta que un abogado lo firme**, y decidir qué se hace
+con quien creó su cuenta antes y sigue amparado por el texto viejo.
+
 **RNF-33.2** Antes de salir hacia el modelo, el currículum se recorta: **sin foto, edad, sexo
 ni estado civil**. Son dos archivos, no uno, y lo que sale es siempre la versión recortada,
 nunca el original que subió la persona.
 
 ⚠️ **Desde el 18/08/2026 esto ya pasa de verdad**: seis de los diez agentes del catálogo corren
-contra DeepSeek y el currículum sale anonimizado. Lo que falta no es código sino el texto de
-consentimiento que nombre a DeepSeek y a Google, aprobado por Renaser, antes del primer
-candidato real. Ver [Calificación con IA](CALIFICACION-CON-IA.md) y
+contra DeepSeek y el currículum sale anonimizado. El texto que lo cuenta se cargó el 14/09/2026
+(`V54`) y **falta que Renaser lo apruebe con su abogado** antes del primer candidato real. Ver
+[Calificación con IA](CALIFICACION-CON-IA.md),
+[BORRADOR-CONSENTIMIENTO-v1.1.md](BORRADOR-CONSENTIMIENTO-v1.1.md) y
 [Estado del proyecto](ESTADO-DEL-PROYECTO.md).
 
 **RNF-34** Los textos de instrucción que se envían a la IA se administran como configuración,

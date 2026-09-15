@@ -234,19 +234,16 @@ public class ServicioPlataformaImpl implements ServicioPlataforma {
                 ON CONFLICT (organizacion_id, codigo) DO NOTHING""",
                 empresaId, plataformaId);
 
-        // Los textos legales, como BORRADOR (publicado_en vacío): nombran a Renaser y la
-        // ley 29733 obliga a nombrar a quien trata los datos. Nadie puede operar con el
-        // consentimiento de otro; la empresa los reescribe y publica con su nombre.
-        jdbc.update("""
-                INSERT INTO texto_consentimiento (organizacion_id, tipo, version, texto, hash, publicado_en)
-                SELECT ?, t.tipo, t.version, t.texto, t.hash, NULL
-                FROM texto_consentimiento t
-                WHERE t.organizacion_id = ?
-                  AND t.publicado_en IS NOT NULL
-                  AND t.publicado_en = (SELECT max(t2.publicado_en) FROM texto_consentimiento t2
-                                        WHERE t2.organizacion_id = t.organizacion_id
-                                          AND t2.tipo = t.tipo AND t2.publicado_en IS NOT NULL)""",
-                empresaId, plataformaId);
+        // Aquí se le copiaba a la empresa nueva el texto legal de Renaser, en borrador,
+        // para que lo reescribiera con su nombre y lo publicara. Se cayó con la V54: el
+        // texto de PROCESO es UNO SOLO para todas, de la plataforma, con un hueco donde va
+        // el nombre de quien publica la vacante. La empresa nueva puede recibir candidatos
+        // desde el primer minuto y no tiene nada que redactar ni que publicar.
+        //
+        // Y no hay excepción: publicar textos legales le está prohibido a una empresa
+        // (ServicioAdministracionImpl#publicarTextoConsentimiento). Un texto por empresa es
+        // un texto que nadie revisa y que se queda viejo sin que nadie se entere; el de la
+        // plataforma lo mantiene quien tiene el abogado.
 
         // Los correos, ACTIVOS: al revés que los textos legales, los avisos de sus
         // vacantes tienen que salir desde el primer candidato, y un texto genérico que

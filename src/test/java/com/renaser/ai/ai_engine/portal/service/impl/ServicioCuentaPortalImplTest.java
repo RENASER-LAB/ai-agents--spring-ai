@@ -1,5 +1,6 @@
 package com.renaser.ai.ai_engine.portal.service.impl;
 
+import com.renaser.ai.ai_engine.consentimiento.service.TextosDeConsentimiento;
 import com.renaser.ai.ai_engine.auditoria.service.ServicioAuditoria;
 import com.renaser.ai.ai_engine.consentimiento.repository.ConsentimientoRepository;
 import com.renaser.ai.ai_engine.consentimiento.repository.SolicitudBorradoRepository;
@@ -35,6 +36,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -76,8 +78,12 @@ class ServicioCuentaPortalImplTest {
     void crearElServicio() {
         // El resolutor de la plataforma va de verdad sobre el repositorio simulado: el
         // stub de findByEsPlataformaTrue cuenta la misma historia que antes del corte.
+        // Y el buscador de textos, igual: va de verdad sobre el repositorio simulado, así
+        // los stubs siguen contando la misma historia tras el corte de la V54.
         servicio = new ServicioCuentaPortalImpl(new DuenoDelInstrumento(organizaciones),
-                personas, usuarios, roles, usuarioRoles, textosConsentimiento, consentimientos,
+                personas, usuarios, roles, usuarioRoles,
+                new TextosDeConsentimiento(textosConsentimiento, new DuenoDelInstrumento(organizaciones)),
+                consentimientos,
                 solicitudesBorrado, correo, auditoria, parametros, tokens, intentos, codificador,
                 catalogos);
     }
@@ -143,9 +149,9 @@ class ServicioCuentaPortalImplTest {
                 .thenAnswer(i -> { Usuario u = i.getArgument(0); u.setId(9L); return u; });
         when(textosConsentimiento
                 .findFirstByOrganizacionIdAndTipoAndPublicadoEnIsNotNullOrderByPublicadoEnDesc(
-                        ORGANIZACION, "PROCESO"))
+                        ORGANIZACION, "PLATAFORMA"))
                 .thenReturn(Optional.of(com.renaser.ai.ai_engine.consentimiento.entity
-                        .TextoConsentimiento.builder().id(1L).tipo("PROCESO").build()));
+                        .TextoConsentimiento.builder().id(1L).tipo("PLATAFORMA").build()));
         lenient().when(codificador.encode(anyString())).thenReturn("$hash");
 
         servicio.crearCuenta(cuentaEn("0402"), "10.0.0.1", "Firefox");
@@ -153,6 +159,46 @@ class ServicioCuentaPortalImplTest {
         ArgumentCaptor<Persona> guardada = ArgumentCaptor.forClass(Persona.class);
         verify(personas).save(guardada.capture());
         assertThat(guardada.getValue().getCiudadUbigeo()).isEqualTo("0402");
+    }
+
+    @Test
+    @DisplayName("al crear la cuenta se firma el texto de la plataforma, no el de una vacante")
+    void alCrearLaCuentaSeFirmaElTextoDeLaPlataforma() {
+        // Hasta la V54 aquí se firmaba el texto PROCESO —«evaluar mi postulación a esta
+        // vacante»— cuando todavía no hay ninguna vacante; y quien luego postulaba a una
+        // de Renaser volvía a firmar ESE MISMO texto, ya con su postulación. Dos filas del
+        // mismo texto para la misma persona, y una de ellas hablando de algo que no existe.
+        when(catalogos.esCiudadElegible("0402")).thenReturn(true);
+        when(organizaciones.findByEsPlataformaTrue()).thenReturn(Optional.of(
+                com.renaser.ai.ai_engine.organizacion.entity.Organizacion.builder()
+                        .id(ORGANIZACION).esPlataforma(true).build()));
+        when(usuarios.buscarPorCorreo(ORGANIZACION, "camila@correo.pe"))
+                .thenReturn(Optional.empty());
+        when(personas.save(any(Persona.class)))
+                .thenAnswer(i -> { Persona p = i.getArgument(0); p.setId(5L); return p; });
+        when(usuarios.save(any(Usuario.class)))
+                .thenAnswer(i -> { Usuario u = i.getArgument(0); u.setId(9L); return u; });
+        when(textosConsentimiento
+                .findFirstByOrganizacionIdAndTipoAndPublicadoEnIsNotNullOrderByPublicadoEnDesc(
+                        ORGANIZACION, "PLATAFORMA"))
+                .thenReturn(Optional.of(com.renaser.ai.ai_engine.consentimiento.entity
+                        .TextoConsentimiento.builder().id(77L).tipo("PLATAFORMA").build()));
+        lenient().when(codificador.encode(anyString())).thenReturn("$hash");
+
+        servicio.crearCuenta(cuentaEn("0402"), "10.0.0.1", "Firefox");
+
+        ArgumentCaptor<com.renaser.ai.ai_engine.consentimiento.entity.Consentimiento> firmado =
+                ArgumentCaptor.forClass(
+                        com.renaser.ai.ai_engine.consentimiento.entity.Consentimiento.class);
+        verify(consentimientos).save(firmado.capture());
+        assertThat(firmado.getValue().getTextoConsentimientoId()).isEqualTo(77L);
+        // Sin postulación: este permiso es con la plataforma. El de la empresa se firma al
+        // postular y va amarrado a su postulación (V38).
+        assertThat(firmado.getValue().getPostulacionId()).isNull();
+        // Y nadie fue a buscar el texto de la vacante: aquí no hay vacante que valga.
+        verify(textosConsentimiento, never())
+                .findFirstByOrganizacionIdAndTipoAndPublicadoEnIsNotNullOrderByPublicadoEnDesc(
+                        ORGANIZACION, "PROCESO");
     }
 
     private CrearCuenta cuentaEn(String ciudadUbigeo) {

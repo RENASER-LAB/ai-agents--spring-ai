@@ -214,10 +214,12 @@ Tres cosas están puestas con un criterio que Renaser tiene que confirmar:
 - **Los números que separan un grupo de otro (80 y 65) siguen sin confirmarse.** Son un
   parámetro editable, no están en el código.
 
-- **Los textos de consentimiento todavía no nombran a DeepSeek ni a Google.** Mientras la IA
-  no leyera a nadie eso no rompía nada. Con una carpeta de currículums reales sí: el
-  currículum sale de verdad hacia esos dos. Renaser tiene que aprobar un texto nuevo antes de
-  la primera corrida con candidatos reales.
+- **Los textos de consentimiento ya nombran a DeepSeek y a Google** desde el 14/09/2026, y
+  también a Supabase, Amazon Web Services y Vercel, y dicen que los datos salen del Perú. Lo
+  que falta es **que un abogado los firme** antes de la primera corrida con candidatos reales.
+  Y hay un hueco que sí afecta a esta carga: **las cuentas creadas por este script antes del
+  14/09 firmaron el texto viejo**, que no nombra a ninguno, y no existe mecanismo para pedirles
+  el nuevo. Ver [BORRADOR-CONSENTIMIENTO-v1.1.md](BORRADOR-CONSENTIMIENTO-v1.1.md).
 
 ---
 

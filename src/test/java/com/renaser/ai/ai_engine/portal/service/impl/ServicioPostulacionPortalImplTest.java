@@ -1,5 +1,6 @@
 package com.renaser.ai.ai_engine.portal.service.impl;
 
+import com.renaser.ai.ai_engine.consentimiento.service.TextosDeConsentimiento;
 import com.renaser.ai.ai_engine.archivo.entity.Archivo;
 import com.renaser.ai.ai_engine.archivo.service.AlmacenArchivos;
 import com.renaser.ai.ai_engine.consentimiento.repository.ConsentimientoRepository;
@@ -60,6 +61,8 @@ import static org.mockito.Mockito.when;
 class ServicioPostulacionPortalImplTest {
 
     private static final Long ORGANIZACION = 1L;
+    /** La plataforma, que es de donde sale SIEMPRE el texto que se firma al postular. */
+    private static final Long PLATAFORMA = 1L;
     private static final Long USUARIO = 21L;
     private static final Long PERSONA = 33L;
     private static final Long VACANTE = 40L;
@@ -103,7 +106,8 @@ class ServicioPostulacionPortalImplTest {
     void crearElServicio() {
         // El buscador del texto PROCESO va de verdad sobre el repositorio simulado: así
         // los stubs del repositorio siguen contando la historia completa de postular.
-        TextoProcesoPublicado textoProceso = new TextoProcesoPublicado(textosConsentimiento);
+        TextosDeConsentimiento textoProceso = new TextosDeConsentimiento(textosConsentimiento,
+                new com.renaser.ai.ai_engine.organizacion.service.DuenoDelInstrumento(organizaciones));
         servicio = new ServicioPostulacionPortalImpl(organizaciones, personas, usuarios,
                 consentimientos, vacantes, puestos, requisitos, evaluaciones, postulaciones,
                 transiciones, estados, cvs, enlaces, maquina, propuestaPerfil, lecturaCv,
@@ -160,13 +164,20 @@ class ServicioPostulacionPortalImplTest {
                         com.renaser.ai.ai_engine.organizacion.entity.Organizacion.builder()
                                 .id(organizacionDeLaVacante).nombre("La Empresa").esActiva(true)
                                 .build()));
-        // El texto PROCESO publicado de la empresa de la vacante: postular lo firma
+        // El texto PROCESO que firma quien postula. Sale SIEMPRE de la plataforma —desde la
+        // V54 es uno solo para todas— y va con su hueco {EMPRESA}, porque se compone con el
+        // nombre al leerlo: si el stub no lo llevara, la prueba no vería el paso que de
+        // verdad importa. La organización de la vacante no tiene texto propio ni puede.
+        org.mockito.Mockito.lenient().when(organizaciones.findByEsPlataformaTrue())
+                .thenReturn(Optional.of(com.renaser.ai.ai_engine.organizacion.entity
+                        .Organizacion.builder().id(PLATAFORMA).esPlataforma(true).build()));
         org.mockito.Mockito.lenient().when(textosConsentimiento
                 .findFirstByOrganizacionIdAndTipoAndPublicadoEnIsNotNullOrderByPublicadoEnDesc(
-                        organizacionDeLaVacante, "PROCESO"))
+                        PLATAFORMA, "PROCESO"))
                 .thenReturn(Optional.of(com.renaser.ai.ai_engine.consentimiento.entity
                         .TextoConsentimiento.builder()
-                        .id(500L).organizacionId(organizacionDeLaVacante).tipo("PROCESO")
+                        .id(500L).organizacionId(PLATAFORMA).tipo("PROCESO")
+                        .texto("Acepto que {EMPRESA} trate mis datos para esta vacante.")
                         .build()));
     }
 
@@ -206,6 +217,11 @@ class ServicioPostulacionPortalImplTest {
         org.assertj.core.api.Assertions.assertThat(firmado.getPersonaId()).isEqualTo(PERSONA);
         org.assertj.core.api.Assertions.assertThat(firmado.getIp()).isEqualTo("10.0.0.1");
         org.assertj.core.api.Assertions.assertThat(firmado.getNombreRegistrado()).isEqualTo("Ana Rojas");
+        // Y lo que se guarda es lo que ELLA leyó, con el nombre de la empresa ya puesto:
+        // el texto de la fila lleva un hueco y lo firman candidatos de empresas distintas,
+        // así que apuntar a la fila dejó de bastar para saber qué leyó cada uno.
+        org.assertj.core.api.Assertions.assertThat(firmado.getTextoFirmado())
+                .isEqualTo("Acepto que La Empresa trate mis datos para esta vacante.");
     }
 
     @Test
@@ -220,20 +236,21 @@ class ServicioPostulacionPortalImplTest {
     }
 
     @Test
-    @DisplayName("si la empresa no tiene texto publicado, postular se frena con un error claro")
+    @DisplayName("sin el texto general de proceso, postular se frena con un error claro")
     void sinTextoPublicadoPostularSeFrena() {
-        // Defensa en profundidad: publicar la vacante ya exige el texto, pero si esta
-        // situación llegara a darse el candidato no puede firmar un texto que no existe.
+        // Desde la V54 el general lo publica la migración y esto no debería pasar nunca.
+        // Sigue siendo defensa en profundidad: sin texto, el candidato firmaría un permiso
+        // que no existe, y eso no se resuelve dejándolo pasar.
         armarVacantePublicada(2L);
         when(textosConsentimiento
                 .findFirstByOrganizacionIdAndTipoAndPublicadoEnIsNotNullOrderByPublicadoEnDesc(
-                        2L, "PROCESO"))
+                        PLATAFORMA, "PROCESO"))
                 .thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> servicio.postular(QUIEN, VACANTE, cv, "Un resultado",
                 null, null, null, null, true, "10.0.0.1", "Navegador"))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("texto de consentimiento");
+                .hasMessageContaining("nadie puede postular");
         verifyNoInteractions(consentimientos);
     }
 
