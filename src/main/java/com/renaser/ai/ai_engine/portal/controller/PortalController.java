@@ -182,10 +182,14 @@ public class PortalController {
     }
 
     /**
-     * Apaga el punto.
+     * Apaga el punto de todos de una vez.
      *
-     * <p>Se marca al ABRIR LA CAMPANA y no al abrir cada postulación: enterarse de que hay
-     * algo es lo que lo apaga. El aviso sigue ahí para releerlo, solo deja de contar.
+     * <p>⚠️ <b>Lo dispara el botón de la cabecera, no el hecho de abrir la campana.</b> Se
+     * probó al abrirla y apagaba con ellos el punto de cada fila de «mis postulaciones», sin
+     * que nadie hubiera leído nada. Quien quiere apagarlos todos lo pide; quien solo mira,
+     * los deja como estaban.
+     *
+     * <p>Los avisos siguen ahí para releerlos: lo único que cambia es que dejan de contar.
      */
     @PostMapping("/avisos/lectura")
     @Operation(summary = "Marcar leídos todos mis avisos")

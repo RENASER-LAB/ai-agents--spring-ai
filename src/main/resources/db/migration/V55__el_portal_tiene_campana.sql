@@ -56,5 +56,7 @@ COMMENT ON COLUMN aviso_portal.tipo IS
     'usa para el icono y para agrupar; el texto de lo que pasó va en titulo y cuerpo.';
 
 COMMENT ON COLUMN aviso_portal.leido_en IS
-    'Cuándo lo vio. Vacío: sigue contando para el punto de la campana. Se marca al abrir la '
-    'campana, no al abrir la postulación: enterarse de que hay algo es lo que lo apaga.';
+    'Cuándo lo vio. Vacío: sigue contando para el punto de la campana. Lo apaga la persona, '
+    'no el hecho de abrir: el aviso que pulsa, o todos con el botón de la cabecera. Abrir la '
+    'campana NO marca nada — apagaría también el punto de cada fila de «mis postulaciones» '
+    'sin que nadie hubiera leído nada.';

@@ -42,8 +42,10 @@ public class AvisoPortal {
     // ninguna postulación («completa tu perfil» no cuelga de ninguna).
     private Long postulacionId;
     private Long vacanteId;
-    // Vacío: sigue contando para el punto. Se marca al ABRIR LA CAMPANA y no al abrir la
-    // postulación — enterarse de que hay algo es lo que lo apaga.
+    // Vacío: sigue contando para el punto. Lo apaga LA PERSONA y no el hecho de abrir: el
+    // aviso que pulsa, o todos con el botón de la cabecera. Abrir la campana no marca nada
+    // —apagaría con ellos el punto de cada fila de «mis postulaciones» sin que nadie hubiera
+    // leído nada—.
     private Instant leidoEn;
     private Instant creadoEn;
 }
