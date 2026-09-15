@@ -183,7 +183,10 @@ class RemuneracionDeLaVacanteTest {
     @Test
     @DisplayName("de oculta a rango: se guardan los montos y queda la marca de cuándo cambió")
     void deOcultaARango() {
+        // En BORRADOR, que es donde cruzar esa línea sigue estando permitido: publicada, la
+        // decisión de enseñar el sueldo o no ya no se toca — ver `noSePuedeRevocarLaSimetria`.
         Vacante v = vacantePublicada("OCULTA", null, null);
+        v.setEstado("BORRADOR");
         hayPostulaciones();
 
         RemuneracionActualizadaResponse respuesta =
@@ -205,7 +208,10 @@ class RemuneracionDeLaVacanteTest {
     void apagarlaLimpiaLosMontos() {
         // Una vacante OCULTA con cifras guardadas es un sueldo esperando a que alguien lo lea
         // por descuido — y la restricción de la V54 tampoco lo admitiría.
+        //
+        // En BORRADOR: apagar la remuneración de una PUBLICADA ya no se puede.
         Vacante v = vacantePublicada("RANGO", "3000", "4000");
+        v.setEstado("BORRADOR");
         hayPostulaciones();
 
         servicio.actualizarRemuneracion(QUIEN, VACANTE, cambiarA("OCULTA", null, null));
@@ -250,7 +256,9 @@ class RemuneracionDeLaVacanteTest {
     @Test
     @DisplayName("un rango al revés no se guarda ni avisa a nadie")
     void elRangoInvalidoNoLlegaANadie() {
-        vacantePublicada("OCULTA", null, null);
+        // Sobre una que ya publica el sueldo: así lo que corta es la validación del rango, no
+        // la guarda de la simetría, que es lo que esta prueba quiere ver.
+        vacantePublicada("FIJA", "3500", null);
 
         assertThatThrownBy(() ->
                 servicio.actualizarRemuneracion(QUIEN, VACANTE, cambiarA("RANGO", "4000", "3000")))
@@ -258,6 +266,73 @@ class RemuneracionDeLaVacanteTest {
 
         verify(vacantes, never()).save(any());
         verifyNoInteractions(avisos, correo, auditoria);
+    }
+
+    // ---------- la simetría no se revoca ----------
+
+    /**
+     * El trato se cobra por adelantado, así que no se puede deshacer a mitad.
+     *
+     * <p>Una vacante publicada enseñando el sueldo le exigió su cifra a cada persona que
+     * postuló. Volver a OCULTA es quedarse con lo cobrado y retirar lo pagado — dos clics
+     * para deshacer la única regla que sostiene esto.
+     */
+    @Test
+    @DisplayName("una vacante publicada que enseña el sueldo ya no puede esconderlo")
+    void noSePuedeRevocarLaSimetria() {
+        vacantePublicada("RANGO", "3000", "4000");
+        hayPostulaciones(postulacion(1L, "PERFIL_TURNO_CANDIDATO"));
+
+        assertThatThrownBy(() ->
+                servicio.actualizarRemuneracion(QUIEN, VACANTE, cambiarA("OCULTA", null, null)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("sin dar nada a cambio");
+
+        verify(vacantes, never()).save(any());
+        verifyNoInteractions(avisos, correo, auditoria);
+    }
+
+    @Test
+    @DisplayName("y una publicada sin sueldo tampoco puede empezar a enseñarlo")
+    void tampocoSePuedeEncenderDespues() {
+        // A quienes ya postularon no se les pidió nada y no hay forma de volver atrás a
+        // pedírselo: encenderlo dejaría media tanda con cifra y media sin ella.
+        vacantePublicada("OCULTA", null, null);
+        hayPostulaciones(postulacion(1L, "PERFIL_TURNO_CANDIDATO"));
+
+        assertThatThrownBy(() ->
+                servicio.actualizarRemuneracion(QUIEN, VACANTE, cambiarA("RANGO", "3000", "4000")))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("media tanda");
+
+        verify(vacantes, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("pero entre rango y monto fijo sí se mueve: las dos publican")
+    void entreRangoYFijaSeMueveLibre() {
+        // Es el cambio más frecuente de todos —cerrar un rango en una cifra cuando ya se
+        // sabe el número— y no revoca nada: el sueldo se sigue enseñando.
+        Vacante v = vacantePublicada("RANGO", "3000", "4000");
+        hayPostulaciones(postulacion(1L, "PERFIL_TURNO_CANDIDATO"));
+
+        RemuneracionActualizadaResponse respuesta =
+                servicio.actualizarRemuneracion(QUIEN, VACANTE, cambiarA("FIJA", "3800", null));
+
+        assertThat(v.getRemuneracionTipo()).isEqualTo("FIJA");
+        assertThat(respuesta.candidatosAvisados()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("en borrador se decide libremente: es justo el momento de decidirlo")
+    void enBorradorSeDecideLibremente() {
+        Vacante v = vacantePublicada("RANGO", "3000", "4000");
+        v.setEstado("BORRADOR");
+        hayPostulaciones();
+
+        servicio.actualizarRemuneracion(QUIEN, VACANTE, cambiarA("OCULTA", null, null));
+
+        assertThat(v.getRemuneracionTipo()).isEqualTo("OCULTA");
     }
 
     // ---------- a quién llega ----------

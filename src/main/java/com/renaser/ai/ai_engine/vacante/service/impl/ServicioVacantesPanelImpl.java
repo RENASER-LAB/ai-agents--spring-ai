@@ -914,6 +914,7 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
         if ("CERRADA".equals(vacante.getEstado())) {
             throw new IllegalStateException("Una vacante cerrada no cambia de sueldo");
         }
+        exigirQueLaSimetriaNoSeRevoque(vacante, datos.remuneracion());
 
         // Lo de antes se escribe ANTES de tocar nada: es la mitad del correo que sale, y
         // leerlo después daría las dos veces el valor nuevo.
@@ -949,6 +950,55 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
         // camino normal de rellenar el sueldo antes de publicar.
         int avisados = avisarDelCambio(vacante, antes, ahora);
         return new RemuneracionActualizadaResponse(antes, ahora, avisados);
+    }
+
+    /**
+     * Publicar el sueldo, o no publicarlo, se decide ANTES de publicar la vacante.
+     *
+     * <p>El trato de la V54 se cobra por adelantado: la vacante enseña lo que paga y, a
+     * cambio, cada persona que postula está obligada a decir lo suyo. Sin esta guarda, una
+     * empresa podía publicar un rango, recoger cuarenta pretensiones obligatorias y volver a
+     * {@code OCULTA} al día siguiente — quedándose lo cobrado y retirando lo pagado. Dos
+     * clics para deshacer la única regla que sostiene esto.
+     *
+     * <p>Y al revés también se cierra, aunque parezca inofensivo: encender el sueldo de una
+     * vacante que ya recibió postulaciones deja una tanda partida en dos —los de antes sin
+     * cifra, los de después con ella— que ninguna pantalla puede comparar de frente. Quien
+     * postuló bajo las reglas viejas no puede volver atrás a declarar nada, porque el trato
+     * se juzga con lo que había el día que cada uno envió su candidatura.
+     *
+     * <p>Lo que <b>sí</b> se puede cambiar en una vacante publicada es el <b>monto</b>: subir
+     * el rango, cerrarlo en una cifra fija, bajarlo. Eso no revoca nada —el sueldo se sigue
+     * enseñando— y es justo el cambio que le llega a cada candidato por correo y por su
+     * campana. Moverse entre {@code FIJA} y {@code RANGO} entra ahí: las dos publican.
+     *
+     * <p>En BORRADOR no hay nada que proteger: nadie ha postulado todavía y la decisión es
+     * exactamente la que esta guarda quiere que se tome con calma, antes de abrir la puerta.
+     */
+    private void exigirQueLaSimetriaNoSeRevoque(Vacante vacante, RemuneracionDeLaVacante datos) {
+        if (!"PUBLICADA".equals(vacante.getEstado())) {
+            return;
+        }
+        boolean laEnsenaba = Remuneracion.laEnsena(vacante);
+        String tipoNuevo = datos == null ? Remuneracion.OCULTA : datos.tipo();
+        boolean laEnsenara = !Remuneracion.OCULTA.equals(tipoNuevo);
+
+        if (laEnsenaba && !laEnsenara) {
+            throw new IllegalStateException(
+                    "Esta vacante ya está publicada enseñando lo que paga, y a cada persona "
+                            + "que postuló se le exigió decir cuánto quiere ganar. Dejar de "
+                            + "publicarla ahora sería quedarse con lo que dijeron sin dar nada "
+                            + "a cambio. El monto sí se puede cambiar; si de verdad hay que "
+                            + "esconderlo, ciérrala y abre otra");
+        }
+        if (!laEnsenaba && laEnsenara) {
+            throw new IllegalStateException(
+                    "Esta vacante se publicó sin enseñar lo que paga, así que a quienes ya "
+                            + "postularon no se les pidió su pretensión y no hay forma de "
+                            + "volver atrás a pedírsela. Publicar el sueldo ahora dejaría media "
+                            + "tanda con cifra y media sin ella: decídelo antes de publicar, o "
+                            + "ciérrala y abre otra");
+        }
     }
 
     /**
