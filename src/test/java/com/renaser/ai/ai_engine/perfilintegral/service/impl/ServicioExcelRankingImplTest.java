@@ -481,7 +481,8 @@ class ServicioExcelRankingImplTest {
 
     private static RankingVacante tanda(FilaRanking... filas) {
         return new RankingVacante(13L, "Analista de datos", "Analista", "JUNIOR",
-                filas.length, filas.length, filas.length, 0, 0, true, true, List.of(filas));
+                filas.length, filas.length, filas.length, 0, 0, true, true, true,
+                List.of(filas));
     }
 
     private static NotaCriterioResponse nota(String puntaje) {
@@ -519,7 +520,7 @@ class ServicioExcelRankingImplTest {
                 "A", notaEtapa, notaEtapa, new BigDecimal("70"), new BigDecimal("65"),
                 new BigDecimal("60"), new BigDecimal("75"), "Un resumen corto", 0, 2, 1,
                 Instant.parse("2026-08-30T10:00:00Z"), notas,
-                "Lima — Lima", "1501", null, null, null,
+                "Lima — Lima", "1501", null, null, null, null, null,
                 // Con valores distintos entre sí a propósito: cuatro cifras iguales dejarían
                 // pasar que la hoja las escribiera en el orden equivocado.
                 new Ponderado(new BigDecimal("78.14"), new BigDecimal("76.50"),
@@ -550,6 +551,7 @@ class ServicioExcelRankingImplTest {
                 f.potencial(), f.altoRendimiento(), f.confianzaEvidencia(), f.resumen(),
                 f.riesgosCriticos(), f.fortalezas(), f.alertas(), f.actualizadoEn(),
                 f.notasCriterio(), f.ciudad(), f.ciudadCodigo(), min, max, moneda,
+                f.pretensionDeclarada(), f.pretensionDeclaradaMoneda(),
                 f.ponderado());
     }
 
@@ -645,7 +647,8 @@ class ServicioExcelRankingImplTest {
                 f.potencial(), f.altoRendimiento(), f.confianzaEvidencia(), f.resumen(),
                 f.riesgosCriticos(), f.fortalezas(), f.alertas(), f.actualizadoEn(),
                 f.notasCriterio(), f.ciudad(), f.ciudadCodigo(), f.pretensionMin(),
-                f.pretensionMax(), f.pretensionMoneda(), null);
+                f.pretensionMax(), f.pretensionMoneda(),
+                f.pretensionDeclarada(), f.pretensionDeclaradaMoneda(), null);
     }
 
     /** La misma fila, pero como la deja el ranking cuando la IA aún no la ha mirado. */
@@ -658,6 +661,7 @@ class ServicioExcelRankingImplTest {
                 f.notasCriterio(), f.ciudad(), f.ciudadCodigo(), f.pretensionMin(),
                 // El ponderado NO es parte del retrato: sale de las notas de etapa, no de lo
                 // que la IA dibuja del currículum, y sigue estando cuando el retrato falta.
-                f.pretensionMax(), f.pretensionMoneda(), f.ponderado());
+                f.pretensionMax(), f.pretensionMoneda(),
+                f.pretensionDeclarada(), f.pretensionDeclaradaMoneda(), f.ponderado());
     }
 }

@@ -29,8 +29,29 @@ public class Vacante {
     private String modalidad;
     private String horario;
     private String ubicacion;
-    // Solo si Renaser decide publicarla
+    // RETIRADA (V55): el sueldo vive en los campos de remuneración de abajo. Se mantiene
+    // mapeada porque la columna sigue existiendo con los datos de las vacantes viejas, pero
+    // ninguna pantalla la lee ni la escribe.
+    @Deprecated
     private String compensacionPublica;
+    /**
+     * Qué dice esta vacante sobre el dinero: {@code OCULTA}, {@code FIJA} o {@code RANGO}.
+     *
+     * <p>⚠️ <b>Es lo que decide si al candidato se le exige declarar su pretensión.</b>
+     * Enseñar el sueldo obliga a quien postula a decir el suyo; esconderlo lo libera de
+     * hacerlo. Las dos mitades del trato son la misma columna, y cambiarla cambia las reglas
+     * de las postulaciones que vengan a partir de ese momento —nunca las de las que ya están
+     * hechas—.
+     */
+    @Builder.Default
+    private String remuneracionTipo = "OCULTA";
+    // FIJA guarda aquí su único monto y deja max vacío. La base lo hace cumplir (V55).
+    private BigDecimal remuneracionMin;
+    private BigDecimal remuneracionMax;
+    private String remuneracionMoneda;
+    // Cuándo se tocó el sueldo por última vez. Vacío: nunca desde que se creó. Es lo que el
+    // portal pinta como «actualizado el …» junto al monto.
+    private Instant remuneracionActualizadaEn;
     private String tipoCierre;
     private Integer plazas;
     private Instant abreEn;

@@ -10,6 +10,7 @@ import com.renaser.ai.ai_engine.notificacion.service.ServicioCorreo;
 import com.renaser.ai.ai_engine.organizacion.entity.Organizacion;
 import com.renaser.ai.ai_engine.organizacion.repository.OrganizacionRepository;
 import com.renaser.ai.ai_engine.perfilintegral.service.ServicioEvaluacion;
+import com.renaser.ai.ai_engine.portal.dto.DtosPortal;
 import com.renaser.ai.ai_engine.portal.dto.DtosPortal.MiPostulacion;
 import com.renaser.ai.ai_engine.portal.dto.DtosPortal.MiPostulacionDetalle;
 import com.renaser.ai.ai_engine.portal.dto.DtosPortal.PasoHistorial;
@@ -36,6 +37,8 @@ import com.renaser.ai.ai_engine.vacante.entity.Vacante;
 import com.renaser.ai.ai_engine.vacante.repository.PuestoRepository;
 import com.renaser.ai.ai_engine.vacante.repository.RequisitoObjetivoRepository;
 import com.renaser.ai.ai_engine.vacante.repository.VacanteRepository;
+import com.renaser.ai.ai_engine.vacante.service.Remuneracion;
+import com.renaser.ai.ai_engine.notificacion.service.ServicioAvisosPortal;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -85,12 +88,16 @@ public class ServicioPostulacionPortalImpl implements ServicioPostulacionPortal 
     private final com.renaser.ai.ai_engine.perfil.repository.PerfilCandidatoRepository perfiles;
     private final ServicioCorreo correo;
     private final TextosDeConsentimiento textos;
+    // Para el punto de cada fila de «mis postulaciones»: cuántos avisos de ese proceso
+    // siguen sin ver. Ver ServicioAvisosPortal (V56).
+    private final ServicioAvisosPortal avisos;
 
     @Override
     @Transactional
     public UUID postular(ContextoUsuario quien, Long vacanteId, MultipartFile cv,
                          String resultadoOrgulloso, String portafolio, String linkedin, String github,
                          List<Long> requisitosConfirmados, Boolean aceptaTratamiento,
+                         java.math.BigDecimal pretensionMonto, String pretensionMoneda,
                          String ip, String userAgent) {
         // Sin aceptar el texto de la empresa no hay postulación, igual que sin aceptar el
         // de la plataforma no hay cuenta. Es la capa de la pieza D: al postular consiente
@@ -119,6 +126,33 @@ public class ServicioPostulacionPortalImpl implements ServicioPostulacionPortal 
             throw new IllegalArgumentException("Cuéntanos un resultado del que te sientas orgulloso: es obligatorio");
         }
 
+        /*
+         * El trato de la V55, y es simétrico en las dos direcciones.
+         *
+         * Si la vacante enseña lo que paga, quien postula tiene que decir lo que quiere ganar:
+         * la empresa ya puso su presupuesto sobre la mesa y pedirle el suyo es el otro lado
+         * del mismo gesto. Si la vacante lo esconde, no se le exige nada — y además se ignora
+         * lo que mande, porque aceptarle un número mientras la empresa calla el suyo es
+         * justamente el desequilibrio que esto viene a romper.
+         *
+         * ⚠️ Se comprueba contra la vacante COMO ESTÁ AHORA, no como estaba cuando abrió el
+         * formulario. Es lo correcto —lo que se firma es el estado real— y es también por qué
+         * el portal vuelve a pedir la vacante al enviar: quien tuvo la pantalla abierta
+         * mientras la empresa encendía el sueldo recibe un 400 que se lo explica, en vez de
+         * postular bajo unas reglas que ya no rigen.
+         */
+        java.math.BigDecimal pretension = null;
+        String monedaPretension = null;
+        if (Remuneracion.laEnsena(vacante)) {
+            if (pretensionMonto == null) {
+                throw new IllegalArgumentException("Esta vacante publica lo que paga ("
+                        + Remuneracion.escribir(vacante) + "), así que necesitamos saber "
+                        + "cuánto quieres ganar tú");
+            }
+            monedaPretension = Remuneracion.validarPretension(pretensionMonto, pretensionMoneda);
+            pretension = pretensionMonto;
+        }
+
         // La postulación nace en la organización DE LA VACANTE, no en la del candidato:
         // es lo que hace que el panel de cada empresa vea a sus candidatos y que el
         // aislamiento signifique algo. El mismo criterio arrastra todo lo que el panel de
@@ -134,6 +168,12 @@ public class ServicioPostulacionPortalImpl implements ServicioPostulacionPortal 
                 .vacanteId(vacanteId)
                 .estadoCodigo("POSTULADA")
                 .rondasEvidenciaUsadas(0)
+                // Los tres van juntos o los tres van vacíos: lo exige la restricción de la
+                // V55, y por eso una postulación nunca puede acabar con un monto suelto del
+                // que no se sepa la moneda ni el día en que se dijo.
+                .pretensionMonto(pretension)
+                .pretensionMoneda(monedaPretension)
+                .pretensionDeclaradaEn(pretension == null ? null : Instant.now())
                 .movidoEn(Instant.now())
                 .creadoEn(Instant.now())
                 .build());
@@ -188,6 +228,10 @@ public class ServicioPostulacionPortalImpl implements ServicioPostulacionPortal 
         // carrera por el UNIQUE del perfil entre dos postulaciones a la vez— si tumbaria la
         // postulacion; el try/catch de dentro atrapa el error de logica, no ese.
         propuestaPerfil.proponerEnlaces(quien.personaId(), linkedin, github, portafolio);
+        // Y lo que acaba de decir que quiere ganar, si su perfil no tenía nada: la otra mitad
+        // del modelo híbrido. El perfil prellena este formulario; este formulario rellena el
+        // perfil de quien llegó sin banda. Propone y no pisa, como todo lo de aquí.
+        propuestaPerfil.proponerPretension(quien.personaId(), pretension, monedaPretension);
         lecturaCv.trasPostular(quien.personaId(), postulacion.getId());
 
         Usuario usuario = usuarios.findById(quien.usuarioId()).orElseThrow();
@@ -324,9 +368,15 @@ public class ServicioPostulacionPortalImpl implements ServicioPostulacionPortal 
         // procesos del candidato en todas las empresas y cada uno dice de quién es.
         Map<Long, String> nombrePorOrganizacion = nombresDeOrganizacion(
                 porVacante.values().stream().toList());
+        // Los puntos de toda la lista en una sola consulta. Preguntarlo fila a fila
+        // multiplicaría las consultas por el número de procesos que lleva la persona, en la
+        // pantalla que abre cada vez que entra.
+        Map<Long, Long> puntos = avisos.sinLeerPorPostulacion(quien.usuarioId(),
+                mias.stream().map(Postulacion::getId).toList());
 
         return mias.stream()
-                .map(p -> comoResumen(p, porVacante, nombreEstado, nombrePorOrganizacion))
+                .map(p -> comoResumen(p, porVacante, nombreEstado, nombrePorOrganizacion,
+                        puntos.getOrDefault(p.getId(), 0L)))
                 .toList();
     }
 
@@ -377,13 +427,74 @@ public class ServicioPostulacionPortalImpl implements ServicioPostulacionPortal 
                 .collect(Collectors.toMap(Vacante::getId, Function.identity()));
         Map<String, String> unEstado = estados.findById(p.getEstadoCodigo()).stream()
                 .collect(Collectors.toMap(EstadoPostulacion::getCodigo, EstadoPostulacion::getNombre));
+        /*
+         * El detalle lleva la MISMA cuenta que la lista, y no un cero.
+         *
+         * No es para pintar un punto —abrir la postulación ya es verla—: es lo que decide si
+         * el sueldo sale resaltado con su «actualizado el …». Quien llega aquí desde el aviso
+         * viene justamente a ver qué cambió, y con un cero fijo el resaltado no se encendía
+         * nunca: el recorrido entero para el que se construyó terminaba en una pantalla sin
+         * ninguna marca.
+         *
+         * La fecha del cambio por sí sola no sirve para eso: una vacante que se movió hace un
+         * año y a la que esta persona postuló ayer no tiene ninguna novedad que contarle.
+         */
+        // Del dueño de la postulación, que es quien pregunta: `laMia` ya comprobó que el
+        // token y la postulación son de la misma persona antes de llegar aquí.
+        long sinLeer = avisos
+                .sinLeerPorPostulacion(p.getUsuarioId(), List.of(p.getId()))
+                .getOrDefault(p.getId(), 0L);
         return comoResumen(p, unaVacante, unEstado,
-                nombresDeOrganizacion(unaVacante.values().stream().toList()));
+                nombresDeOrganizacion(unaVacante.values().stream().toList()),
+                sinLeer);
+    }
+
+    // ============ La campana (V56) ============
+
+    @Override
+    public DtosPortal.MisAvisos misAvisos(ContextoUsuario quien) {
+        List<com.renaser.ai.ai_engine.notificacion.entity.AvisoPortal> suyos =
+                avisos.mios(quien.usuarioId());
+
+        // El uuid de la postulación, no su id interno: es el identificador que el portal ya
+        // usa para todo lo del candidato, y el único que sabe convertir en una dirección.
+        // Se traen de una vez las que haga falta, que son pocas y casi siempre repetidas.
+        List<Long> postulacionIds = suyos.stream()
+                .map(com.renaser.ai.ai_engine.notificacion.entity.AvisoPortal::getPostulacionId)
+                .filter(Objects::nonNull).distinct().toList();
+        Map<Long, String> uuidPorId = postulacionIds.isEmpty() ? Map.of()
+                : postulaciones.findAllById(postulacionIds).stream()
+                        .collect(Collectors.toMap(Postulacion::getId,
+                                x -> x.getUuid().toString()));
+
+        List<DtosPortal.AvisoDelPortal> lista = suyos.stream()
+                .map(a -> new DtosPortal.AvisoDelPortal(a.getId(), a.getTipo(), a.getTitulo(),
+                        a.getCuerpo(),
+                        a.getPostulacionId() == null ? null : uuidPorId.get(a.getPostulacionId()),
+                        a.getVacanteId(), a.getLeidoEn(), a.getCreadoEn()))
+                .toList();
+
+        // El contador sale de la consulta y no de contar la lista: la lista podría venir
+        // recortada algún día, y entonces el punto diría un número menor que el real.
+        return new DtosPortal.MisAvisos(avisos.sinLeer(quien.usuarioId()), lista);
+    }
+
+    @Override
+    @Transactional
+    public int marcarAvisosLeidos(ContextoUsuario quien) {
+        return avisos.marcarTodosLeidos(quien.usuarioId());
+    }
+
+    @Override
+    @Transactional
+    public void marcarAvisoLeido(ContextoUsuario quien, Long avisoId) {
+        avisos.marcarLeido(quien.usuarioId(), avisoId);
     }
 
     private MiPostulacion comoResumen(Postulacion p, Map<Long, Vacante> porVacante,
                                       Map<String, String> nombrePorEstado,
-                                      Map<Long, String> nombrePorOrganizacion) {
+                                      Map<Long, String> nombrePorOrganizacion,
+                                      long avisosSinLeer) {
         Optional<Vacante> vacante = Optional.ofNullable(porVacante.get(p.getVacanteId()));
         String titulo = vacante.map(Vacante::getTitulo).orElse("");
         String empresa = vacante.map(Vacante::getOrganizacionId)
@@ -394,6 +505,14 @@ public class ServicioPostulacionPortalImpl implements ServicioPostulacionPortal 
         long dias = Duration.between(p.getMovidoEn(), Instant.now()).toDays();
         return new MiPostulacion(p.getUuid().toString(), titulo, empresa, p.getEstadoCodigo(),
                 nombreEstado, p.getGrupoPrioridad(), dias, p.getCreadoEn(),
-                vacante.map(Vacante::getInstrumentoEtapaTecnica).orElse(null));
+                vacante.map(Vacante::getInstrumentoEtapaTecnica).orElse(null),
+                avisosSinLeer,
+                // Lo que paga HOY, con su marca de cuándo cambió: es lo que el portal resalta
+                // cuando el aviso dice que se movió. Y lo que él pidió, que es suyo y por eso
+                // viaja sin permiso de por medio — a diferencia del panel, donde hace falta
+                // `ver_pretension`.
+                vacante.map(RemuneracionQueVeElCandidato::de)
+                        .orElse(DtosPortal.RemuneracionPublica.OCULTA),
+                RemuneracionQueVeElCandidato.pretensionDe(p));
     }
 }
