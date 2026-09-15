@@ -196,6 +196,36 @@ public class ServicioPropuestaPerfilImpl implements ServicioPropuestaPerfil {
         proponerEnlace(perfil.getId(), "PORTAFOLIO", portafolio);
     }
 
+    @Override
+    @Transactional
+    public void proponerPretension(Long personaId, java.math.BigDecimal monto, String moneda) {
+        if (monto == null || moneda == null) {
+            return;
+        }
+        boolean anonimizada = personas.findById(personaId)
+                .map(p -> p.getAnonimizadoEn() != null).orElse(true);
+        if (anonimizada) {
+            return;   // resucitar datos de quien pidió el borrado, ni por la puerta de atrás
+        }
+        PerfilCandidato perfil = perfiles.findByPersonaId(personaId)
+                .orElseGet(() -> perfiles.save(PerfilCandidato.builder()
+                        .personaId(personaId)
+                        .creadoEn(Instant.now())
+                        .actualizadoEn(Instant.now())
+                        .build()));
+        // Solo si no tenía ninguna. Se mira el mínimo porque es el que nunca falta cuando hay
+        // banda: el máximo puede venir solo en un perfil a medio llenar, y comprobar ese
+        // dejaría pasar una escritura encima de una banda que la persona sí había empezado.
+        if (perfil.getPretensionMin() != null) {
+            return;
+        }
+        perfil.setPretensionMin(monto);
+        perfil.setPretensionMax(monto);
+        perfil.setPretensionMoneda(moneda);
+        perfil.setActualizadoEn(Instant.now());
+        perfiles.save(perfil);
+    }
+
     private void proponerEnlace(Long perfilId, String tipo, String url) {
         if (enBlanco(url) || !ValidacionEnlaces.esValida(tipo, url)) {
             return;   // el formulario de postular no es el sitio para pelear por una URL

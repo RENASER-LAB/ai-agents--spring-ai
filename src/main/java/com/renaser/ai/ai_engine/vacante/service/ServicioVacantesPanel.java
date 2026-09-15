@@ -112,4 +112,24 @@ public interface ServicioVacantesPanel {
 
     // Cerrar detiene postulaciones nuevas; las que están en marcha se deciden una a una
     void cerrar(ContextoUsuario quien, Long id, String motivo);
+
+    /**
+     * Cambia lo que esta vacante dice que paga, y avisa a quien ya postuló (V55).
+     *
+     * <p>No es un campo más del formulario de editar, y por eso tiene verbo propio: cambiar
+     * el sueldo de una vacante viva le manda un correo y un aviso a cada persona con una
+     * postulación abierta. Esconder eso dentro de un «guardar» genérico haría que se disparara
+     * sin querer cada vez que alguien corrige una falta de ortografía en la descripción.
+     *
+     * <p>Se puede en BORRADOR y en PUBLICADA. En borrador no hay a quién avisar y es
+     * simplemente rellenar el dato; en publicada es la noticia. Una vacante CERRADA no se
+     * toca, como con todo lo demás.
+     *
+     * <p>⚠️ <b>Cambiar de OCULTA a FIJA/RANGO no va hacia atrás a pedir pretensiones.</b> El
+     * trato se juzga con las reglas que había el día que cada uno postuló: quien envió su
+     * candidatura cuando el sueldo estaba escondido no declaró el suyo, y eso es correcto —
+     * el panel lo dice con esas palabras en lugar de dejar un hueco.
+     */
+    RemuneracionActualizadaResponse actualizarRemuneracion(ContextoUsuario quien, Long id,
+                                                           ActualizarRemuneracion datos);
 }

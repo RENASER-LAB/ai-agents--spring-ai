@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 
@@ -43,8 +44,37 @@ public final class DtosPortal {
     public record VacantePublica(Long id, String titulo, String nombreEmpresa, String descripcion,
                                  String proposito, String responsabilidades, String requisitos,
                                  String modalidad, String horario, String ubicacion,
-                                 String compensacionPublica,
+                                 RemuneracionPublica remuneracion,
                                  List<RequisitoPublico> requisitosObjetivos) {}
+
+    /**
+     * Lo que esta vacante paga, tal como el candidato puede verlo (V55).
+     *
+     * <p>{@code tipo} es {@code OCULTA}, {@code FIJA} o {@code RANGO}. Con {@code OCULTA} los
+     * montos van vacíos y {@code texto} dice «No la publica»: el campo viaja igualmente
+     * porque el portal tiene que decirlo en voz alta. Un hueco donde debería estar el sueldo
+     * se lee como un fallo de carga, y además es justo el dato que explica por qué el
+     * formulario de postular no le va a exigir declarar el suyo.
+     *
+     * <p>{@code texto} llega ya escrito —«S/ 3 500 a 4 200»— para que la frase del dinero se
+     * arme una sola vez, en el servidor. El portal y el correo dicen exactamente lo mismo, y
+     * los montos sueltos siguen ahí para quien quiera pintarlos de otra forma.
+     *
+     * <p>{@code actualizadaEn} vacío significa que nunca se tocó desde que se publicó. Con
+     * fecha, el portal pinta «actualizado el …» sobre el monto: quien postuló con otro número
+     * delante merece enterarse de que cambió, y no descubrirlo en la negociación.
+     */
+    public record RemuneracionPublica(String tipo, BigDecimal min, BigDecimal max,
+                                      String moneda, String texto, Instant actualizadaEn) {
+
+        public static final RemuneracionPublica OCULTA =
+                new RemuneracionPublica("OCULTA", null, null, null, "No la publica", null);
+
+        /** ¿Obliga a quien postula a declarar la suya? El trato de la V55, en una línea. */
+        public boolean exigePretension() {
+            return !"OCULTA".equals(tipo);
+        }
+    }
 
     public record RequisitoPublico(Long id, String descripcion) {}
 
@@ -110,7 +140,44 @@ public final class DtosPortal {
      */
     public record MiPostulacion(String uuid, String vacante, String empresa, String estado,
                                 String estadoNombre, String grupoPrioridad, long diasSinCambio,
-                                Instant creadoEn, String instrumentoEtapaTecnica) {}
+                                Instant creadoEn, String instrumentoEtapaTecnica,
+                                /**
+                                 * Cuántos avisos suyos de este proceso siguen sin ver: el
+                                 * punto de la fila (V56). Cero = sin punto.
+                                 */
+                                long avisosSinLeer,
+                                /**
+                                 * Lo que paga la vacante HOY, con la marca de cuándo cambió.
+                                 *
+                                 * <p>Viaja en la lista y no solo en el detalle porque el punto
+                                 * de la fila tiene que poder explicarse sin abrir nada: quien
+                                 * ve el aviso quiere saber el número, y hacerle pulsar para
+                                 * enterarse es esconder la noticia detrás de un clic.
+                                 */
+                                RemuneracionPublica remuneracion,
+                                /**
+                                 * Lo que él dijo que quería ganar al postular aquí, o
+                                 * {@code null} si la vacante tenía el sueldo oculto y no se
+                                 * le exigió. Es SUYO: en el portal viaja siempre, sin permiso
+                                 * de por medio.
+                                 */
+                                Pretension miPretension) {}
+
+    /** Un monto con su moneda, ya escrito además en una frase para pintarlo sin traducir. */
+    public record Pretension(BigDecimal monto, String moneda, String texto) {}
+
+    /**
+     * Un aviso de la campana (V56).
+     *
+     * <p>{@code postulacionUuid} y no el id interno: es el identificador que el portal ya usa
+     * para todo lo del candidato, y el que sabe convertir en una dirección.
+     */
+    public record AvisoDelPortal(Long id, String tipo, String titulo, String cuerpo,
+                                 String postulacionUuid, Long vacanteId,
+                                 Instant leidoEn, Instant creadoEn) {}
+
+    /** Lo que pide la campana al abrirse: los avisos y cuántos quedan sin ver. */
+    public record MisAvisos(long sinLeer, List<AvisoDelPortal> avisos) {}
 
     public record PasoHistorial(String estadoAnterior, String estadoNuevo, boolean fueElSistema,
                                 Instant ocurridaEn) {}

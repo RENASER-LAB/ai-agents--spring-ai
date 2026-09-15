@@ -52,4 +52,20 @@ public interface ServicioPropuestaPerfil {
      * postular no es el sitio para pelear por una URL.
      */
     void proponerEnlaces(Long personaId, String linkedin, String github, String portafolio);
+
+    /**
+     * Guarda en el perfil, <b>como banda base</b>, lo que acaba de declarar al postular (V55).
+     *
+     * <p>Es la mitad que faltaba del modelo híbrido: el perfil prellena el formulario de
+     * postular, y postular rellena el perfil de quien todavía no tenía nada. Sin esto, quien
+     * declara su pretensión en tres vacantes seguidas la escribe tres veces desde cero.
+     *
+     * <p>⚠️ <b>Solo si el perfil está vacío.</b> La misma regla que todo lo demás de aquí:
+     * propone, no pisa. Quien ya escribió su banda a mano la decidió mirando su carrera
+     * entera; pisarla con el número que puso en una vacante concreta —que puede ser más bajo
+     * a propósito, porque le interesaba ese puesto— le reescribiría su expectativa general
+     * con una excepción. La banda que se guarda es el monto repetido en los dos extremos,
+     * que es literalmente lo que dijo.
+     */
+    void proponerPretension(Long personaId, java.math.BigDecimal monto, String moneda);
 }

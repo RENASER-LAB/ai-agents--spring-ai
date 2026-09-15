@@ -30,7 +30,6 @@ build/
 !**/src/test/**/build/
 
 ### VS Code ###
-.vscode/
 
 ### Secrets (nunca commitear) ###
 application-secrets.yaml
@@ -99,3 +98,7 @@ verify*.log
 # tocado a la vez hace fallar cada `git pull` que lo traiga cambiado. La plantilla
 # portable es .claude/launch.example.json: se copia a launch.json y ya.
 .claude/launch.json
+branch_structure.json
+temp_auto_push.bat
+temp_interactive_push.bat
+.gitignore

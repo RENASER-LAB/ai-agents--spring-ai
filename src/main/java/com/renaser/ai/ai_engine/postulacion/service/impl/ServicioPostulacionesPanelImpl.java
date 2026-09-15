@@ -29,6 +29,7 @@ import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
 import com.renaser.ai.ai_engine.seguridad.dto.FiltroAlcance;
 import com.renaser.ai.ai_engine.seguridad.service.Permisos;
 import com.renaser.ai.ai_engine.vacante.entity.Vacante;
+import com.renaser.ai.ai_engine.vacante.service.Remuneracion;
 import com.renaser.ai.ai_engine.vacante.repository.VacanteRepository;
 import com.renaser.ai.ai_engine.vacante.service.AlcanceSobreLaVacante;
 import lombok.RequiredArgsConstructor;
@@ -122,7 +123,8 @@ public class ServicioPostulacionesPanelImpl implements ServicioPostulacionesPane
         Postulacion p = laVisible(quien, postulacionId, "abrir_ficha_candidato");
         Usuario usuario = usuarios.findById(p.getUsuarioId()).orElseThrow();
         String candidato = nombres.de(usuario.getId());
-        String vacante = vacantes.findById(p.getVacanteId()).map(Vacante::getTitulo).orElse("");
+        Vacante laVacante = vacantes.findById(p.getVacanteId()).orElse(null);
+        String vacante = laVacante == null ? "" : laVacante.getTitulo();
         String nombreEstado = estados.findById(p.getEstadoCodigo())
                 .map(EstadoPostulacion::getNombre).orElse(p.getEstadoCodigo());
 
@@ -130,11 +132,55 @@ public class ServicioPostulacionesPanelImpl implements ServicioPostulacionesPane
         List<String> urls = cv == null ? List.of()
                 : enlaces.findByCvId(cv.getId()).stream().map(EnlaceCv::getUrl).toList();
 
+        // La pretensión, bajo el mismo permiso de siempre. Se resuelve en dos pasos —la cifra
+        // y, si no la hay, por qué— porque un hueco a secas se lee como «no la declaró», que
+        // es el único de los tres motivos que acusa al candidato.
+        // Las dos llaves: el permiso, y que la vacante publique lo que paga. La segunda es
+        // la misma regla del ranking y del perfil — si no enseñas lo que pagas, no ves lo que
+        // piden. Aquí hoy sería redundante (una vacante oculta nunca guarda pretensión), pero
+        // escribirla explícita es lo que impide que la regla se quede a medias mañana.
+        boolean vePretension = quien.tiene("ver_pretension")
+                && laVacante != null && Remuneracion.laEnsena(laVacante);
+        String suPretension = vePretension
+                ? Remuneracion.escribirPretension(p.getPretensionMonto(), p.getPretensionMoneda())
+                : null;
+        String porQueSin = porQueSinPretension(vePretension, p, laVacante);
+
         return new FichaPostulacion(p.getId(), p.getUuid().toString(), candidato, usuario.getCorreo(),
                 vacante, p.getEstadoCodigo(), nombreEstado, p.getGrupoPrioridad(), p.getMotivoCierre(),
                 cv == null ? null : cv.getResultadoOrgulloso(), urls,
                 cv == null ? null : cv.getArchivoOriginalId(), p.getCreadoEn(), p.getMovidoEn(),
-                quien.tiene("mover_postulacion"));
+                quien.tiene("mover_postulacion"),
+                p.getPretensionMonto() == null ? null : suPretension,
+                porQueSin);
+    }
+
+    /**
+     * Por qué esta ficha no enseña ninguna pretensión.
+     *
+     * <p>Tres motivos y solo uno es verdad cada vez, y no se distinguen desde fuera: quien
+     * pinta un hueco sin explicarlo está afirmando el tercero —«no quiso decirlo»—, que es el
+     * único que acusa al candidato de algo.
+     *
+     * @return la frase, o {@code null} si sí hay pretensión que enseñar
+     */
+    private String porQueSinPretension(boolean vePretension, Postulacion p, Vacante vacante) {
+        if (!vePretension) {
+            return "Tu rol no puede ver la pretensión salarial: solo Dirección la ve, para "
+                    + "que el sueldo no pese al calificar. El dato ni se consultó.";
+        }
+        if (p.getPretensionMonto() != null) {
+            return null;
+        }
+        if (vacante != null && !Remuneracion.laEnsena(vacante)) {
+            return "Esta vacante no publica su remuneración, así que no se le pidió la suya: "
+                    + "quien no enseña lo que paga tampoco pregunta lo que piden.";
+        }
+        // Queda el caso de quien postuló ANTES de que la vacante publicara su sueldo —o antes
+        // de que esto existiera—. El trato se juzga con las reglas del día que postuló, y por
+        // eso tampoco se le puede acusar de reservado.
+        return "No la declaró: cuando postuló, esta vacante todavía no publicaba su "
+                + "remuneración.";
     }
 
     @Override

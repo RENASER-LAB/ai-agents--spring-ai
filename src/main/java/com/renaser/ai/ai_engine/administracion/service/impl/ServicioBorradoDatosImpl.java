@@ -57,6 +57,7 @@ public class ServicioBorradoDatosImpl implements ServicioBorradoDatos {
     private final EnlaceCvRepository enlaces;
     private final ArchivoRepository archivos;
     private final CorreoEnviadoRepository correosEnviados;
+    private final com.renaser.ai.ai_engine.notificacion.repository.AvisoPortalRepository avisosPortal;
     private final AlmacenArchivos almacen;
     private final MaquinaEstados maquina;
     private final ServicioCorreo correo;
@@ -131,6 +132,40 @@ public class ServicioBorradoDatosImpl implements ServicioBorradoDatos {
             c.setNombreRegistrado(null);
             consentimientos.save(c);
         });
+
+        /*
+         * 4b · La pretensión declarada en cada postulación, y los avisos de su campana.
+         *
+         * Las dos llegaron con la V55 y la V56, y las dos son el mismo dato que ya se
+         * borraba por otro lado contado de otra forma:
+         *
+         *   - `postulacion.pretension_monto` es la cifra exacta que dijo, y vive en una
+         *     fila que NO se borra —la postulación se conserva para la trazabilidad del
+         *     proceso—. Sin esto, la banda de su perfil desaparecía en el paso 5b y la
+         *     cifra concreta seguía viva en el ranking de cada empresa. Es el dato más
+         *     sensible que este sistema guarda de una persona y no puede sobrevivir a su
+         *     propio borrado por estar en otra columna.
+         *   - `aviso_portal` guarda el texto ya armado, igual que `correo_enviado` del paso
+         *     4. Los dos salen del mismo hecho; que uno se vacíe y el otro no sería un
+         *     olvido, no una decisión.
+         *
+         * ⚠️ Las tres columnas de la pretensión se limpian JUNTAS: el CHECK
+         * `postulacion_pretension_coherente` (V55) rechaza dejar una puesta y las otras no.
+         */
+        if (usuario != null) {
+            for (Postulacion p : postulaciones.findByUsuarioIdOrderByCreadoEnDesc(usuario.getId())) {
+                if (p.getPretensionMonto() != null) {
+                    p.setPretensionMonto(null);
+                    p.setPretensionMoneda(null);
+                    p.setPretensionDeclaradaEn(null);
+                    postulaciones.save(p);
+                }
+            }
+            // Los avisos se borran enteros y no se vacían: a diferencia del correo, aquí no
+            // hay nada que probar. `correo_enviado` conserva su fila porque demuestra que se
+            // avisó; un aviso del portal no es prueba de nada frente a nadie.
+            avisosPortal.deleteByUsuarioId(usuario.getId());
+        }
 
         // 5b · El perfil del candidato se borra entero, y de verdad — no se anonimiza.
         // No sostiene ninguna decisión (no puntúa), así que no hay nada que conservar.

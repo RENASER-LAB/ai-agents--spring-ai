@@ -5,6 +5,17 @@ import com.renaser.ai.ai_engine.auditoria.service.ServicioAuditoria;
 import com.renaser.ai.ai_engine.notificacion.entity.PlantillaCorreoVacante;
 import com.renaser.ai.ai_engine.notificacion.repository.PlantillaCorreoRepository;
 import com.renaser.ai.ai_engine.notificacion.repository.PlantillaCorreoVacanteRepository;
+import com.renaser.ai.ai_engine.notificacion.entity.AvisoPortal;
+import com.renaser.ai.ai_engine.notificacion.service.DireccionDelCandidato;
+import com.renaser.ai.ai_engine.notificacion.service.ServicioAvisosPortal;
+import com.renaser.ai.ai_engine.notificacion.service.ServicioCorreo;
+import com.renaser.ai.ai_engine.postulacion.entity.Postulacion;
+import com.renaser.ai.ai_engine.postulacion.service.ServicioEnlaceAcceso;
+import com.renaser.ai.ai_engine.usuario.entity.Persona;
+import com.renaser.ai.ai_engine.usuario.entity.Usuario;
+import com.renaser.ai.ai_engine.usuario.repository.PersonaRepository;
+import com.renaser.ai.ai_engine.usuario.repository.UsuarioRepository;
+import com.renaser.ai.ai_engine.vacante.service.Remuneracion;
 import com.renaser.ai.ai_engine.vacante.service.ServicioVacantesPanel;
 import com.renaser.ai.ai_engine.vacante.dto.DtosVacante.*;
 import com.renaser.ai.ai_engine.perfilintegral.entity.PlantillaEvaluacion;
@@ -26,6 +37,7 @@ import com.renaser.ai.ai_engine.solicitud.repository.SolicitudTalentoRepository;
 import com.renaser.ai.ai_engine.vacante.entity.*;
 import com.renaser.ai.ai_engine.vacante.repository.*;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,6 +51,7 @@ import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
 
     /** Los dos instrumentos de la etapa técnica. Uno por vacante, nunca los dos (V43). */
@@ -51,6 +64,19 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
      * al candidato le dé tiempo a leer el enunciado.
      */
     private static final int MINUTOS_MINIMOS = 5;
+
+    /** El aviso del cambio de sueldo. Una empresa puede reescribir su texto; una vacante,
+     *  sustituirlo por otro (V31). */
+    private static final String PLANTILLA_REMUNERACION = "REMUNERACION_ACTUALIZADA";
+
+    /**
+     * A quién NO se le cuenta que el sueldo cambió: a quien ya no está en carrera.
+     *
+     * <p>Son los tres estados finales del catálogo. La noticia no le afecta, y mandarle un
+     * correo sobre lo que paga un puesto que ya perdió es recordárselo sin ganar nada.
+     */
+    private static final java.util.Set<String> ESTADOS_CERRADOS =
+            java.util.Set.of("CONTRATADO", "NO_CONTINUA", "CERRADA");
 
     private final VacanteRepository vacantes;
     private final PuestoRepository puestos;
@@ -70,6 +96,14 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
     private final ServicioAuditoria auditoria;
     private final DuenoDelInstrumento dueno;
     private final com.renaser.ai.ai_engine.postulacion.repository.PostulacionRepository postulaciones;
+    // Las cuatro de contarle a la gente que el sueldo cambió: el aviso que se queda en su
+    // portal, el correo que sale, a qué dirección, y por dónde entrar sin contraseña.
+    private final ServicioAvisosPortal avisos;
+    private final ServicioCorreo correo;
+    private final DireccionDelCandidato direcciones;
+    private final ServicioEnlaceAcceso enlacesDeAcceso;
+    private final UsuarioRepository usuarios;
+    private final PersonaRepository personas;
 
     // ============ Puestos ============
 
@@ -145,6 +179,21 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                         dueno.duenoDe(quien.organizacionId(), Instrumento.PESOS), "PUBLICADA")
                 .orElseThrow(() -> new IllegalStateException("No hay una versión de pesos publicada"));
 
+        // La remuneración se valida ANTES de construir nada, y entra en el builder como un
+        // campo más. Escribirla después obligaría a un segundo `save` sobre la fila recién
+        // insertada: dos viajes a la base y —peor— un instante en que la vacante existe con
+        // un sueldo que todavía no se ha comprobado.
+        //
+        // Sin `remuneracion` en el cuerpo nace OCULTA, que es como han nacido todas hasta la
+        // V55. Y sin marca de «actualizada»: al crearla no se actualizó nada, se declaró, y
+        // ponerla ya haría que la primera persona que abriera la vacante viera una novedad
+        // que no lo es.
+        RemuneracionDeLaVacante sueldo = datos.remuneracion() == null
+                ? RemuneracionDeLaVacante.OCULTA : datos.remuneracion();
+        String monedaSueldo = Remuneracion.validar(sueldo.tipo(), sueldo.min(), sueldo.max(),
+                sueldo.moneda());
+        boolean sueldoOculto = Remuneracion.OCULTA.equals(sueldo.tipo());
+
         Vacante vacante = vacantes.save(Vacante.builder()
                 .organizacionId(quien.organizacionId())
                 .solicitudTalentoId(solicitud.getId())
@@ -157,7 +206,11 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                 .modalidad(datos.modalidad())
                 .horario(datos.horario())
                 .ubicacion(datos.ubicacion())
-                .compensacionPublica(datos.compensacionPublica())
+                .remuneracionTipo(sueldo.tipo())
+                .remuneracionMin(sueldoOculto ? null : sueldo.min())
+                .remuneracionMax(sueldoOculto || Remuneracion.FIJA.equals(sueldo.tipo())
+                        ? null : sueldo.max())
+                .remuneracionMoneda(monedaSueldo)
                 .tipoCierre(datos.tipoCierre())
                 .plazas(datos.plazas())
                 .abreEn(datos.abreEn())
@@ -220,7 +273,12 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
         vacante.setModalidad(datos.modalidad());
         vacante.setHorario(datos.horario());
         vacante.setUbicacion(datos.ubicacion());
-        vacante.setCompensacionPublica(datos.compensacionPublica());
+        // ⚠️ La remuneración NO se escribe aquí, aunque venga en el cuerpo.
+        //
+        // Cambiarla avisa por correo y por la campana a cada candidato vivo, y este método lo
+        // llama el «guardar» general de la vacante: corregir una falta de ortografía en la
+        // descripción no puede mandarle una noticia a cuarenta personas. Tiene verbo propio
+        // —`actualizarRemuneracion`— y el panel lo llama aparte, con su motivo.
         vacante.setTipoCierre(datos.tipoCierre());
         vacante.setPlazas(datos.plazas());
         vacante.setAbreEn(datos.abreEn());
@@ -832,6 +890,244 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                 v.getPublicadaEn(), v.getCerradaEn(), v.isAplicaEvaluacion(),
                 v.getPlantillaEvaluacionId(), v.getVersionPlantillaPruebaId(),
                 v.getVersionPesosId(), v.getInstrumentoEtapaTecnica(),
-                v.getMinutosEtapaTecnica(), v.isCalificacionAutomatica());
+                v.getMinutosEtapaTecnica(), v.isCalificacionAutomatica(),
+                new RemuneracionDeLaVacante(Remuneracion.tipoDe(v), v.getRemuneracionMin(),
+                        v.getRemuneracionMax(), v.getRemuneracionMoneda()),
+                v.getRemuneracionActualizadaEn());
+    }
+
+    // ============ La remuneración ============
+
+    @Override
+    @Transactional
+    public RemuneracionActualizadaResponse actualizarRemuneracion(
+            ContextoUsuario quien, Long id, ActualizarRemuneracion datos) {
+        Vacante vacante = laDeLaOrganizacion(quien, id);
+        if ("CERRADA".equals(vacante.getEstado())) {
+            throw new IllegalStateException("Una vacante cerrada no cambia de sueldo");
+        }
+        exigirQueLaSimetriaNoSeRevoque(vacante, datos.remuneracion());
+
+        // Lo de antes se escribe ANTES de tocar nada: es la mitad del correo que sale, y
+        // leerlo después daría las dos veces el valor nuevo.
+        String antes = Remuneracion.escribir(vacante);
+        Map<String, Object> valorAnterior = comoMapa(vacante);
+        Instant marcaAnterior = vacante.getRemuneracionActualizadaEn();
+
+        escribirRemuneracion(vacante, datos.remuneracion(), Instant.now());
+        String ahora = Remuneracion.escribir(vacante);
+
+        if (antes.equals(ahora)) {
+            // Guardar «lo mismo que ya había» no es un cambio, y avisar de él sería gastarle
+            // la atención a los candidatos con una noticia vacía. Pasa más de lo que parece:
+            // el panel manda el formulario entero, y quien entra a mirar y pulsa guardar sin
+            // tocar nada llega exactamente aquí.
+            //
+            // Tampoco se mueve la marca de «actualizada»: el portal seguiría pintando
+            // «actualizado el …» con la fecha de hoy sobre un número que no cambió. Se
+            // devuelve la que había, sobre la entidad gestionada, porque esta transacción ya
+            // le escribió encima la de ahora.
+            vacante.setRemuneracionActualizadaEn(marcaAnterior);
+            return new RemuneracionActualizadaResponse(antes, ahora, 0);
+        }
+
+        vacantes.save(vacante);
+
+        auditoria.registrar(quien.organizacionId(), quien, "actualizar_remuneracion",
+                "vacante", id, valorAnterior, comoMapa(vacante), datos.motivo());
+
+        // Y ahora la parte que le importa a la gente: contarlo.
+        //
+        // En BORRADOR esto devuelve cero sin más —no hay nadie postulado todavía— y ese es el
+        // camino normal de rellenar el sueldo antes de publicar.
+        int avisados = avisarDelCambio(vacante, antes, ahora);
+        return new RemuneracionActualizadaResponse(antes, ahora, avisados);
+    }
+
+    /**
+     * Publicar el sueldo, o no publicarlo, se decide ANTES de publicar la vacante.
+     *
+     * <p>El trato de la V55 se cobra por adelantado: la vacante enseña lo que paga y, a
+     * cambio, cada persona que postula está obligada a decir lo suyo. Sin esta guarda, una
+     * empresa podía publicar un rango, recoger cuarenta pretensiones obligatorias y volver a
+     * {@code OCULTA} al día siguiente — quedándose lo cobrado y retirando lo pagado. Dos
+     * clics para deshacer la única regla que sostiene esto.
+     *
+     * <p>Y al revés también se cierra, aunque parezca inofensivo: encender el sueldo de una
+     * vacante que ya recibió postulaciones deja una tanda partida en dos —los de antes sin
+     * cifra, los de después con ella— que ninguna pantalla puede comparar de frente. Quien
+     * postuló bajo las reglas viejas no puede volver atrás a declarar nada, porque el trato
+     * se juzga con lo que había el día que cada uno envió su candidatura.
+     *
+     * <p>Lo que <b>sí</b> se puede cambiar en una vacante publicada es el <b>monto</b>: subir
+     * el rango, cerrarlo en una cifra fija, bajarlo. Eso no revoca nada —el sueldo se sigue
+     * enseñando— y es justo el cambio que le llega a cada candidato por correo y por su
+     * campana. Moverse entre {@code FIJA} y {@code RANGO} entra ahí: las dos publican.
+     *
+     * <p>En BORRADOR no hay nada que proteger: nadie ha postulado todavía y la decisión es
+     * exactamente la que esta guarda quiere que se tome con calma, antes de abrir la puerta.
+     */
+    private void exigirQueLaSimetriaNoSeRevoque(Vacante vacante, RemuneracionDeLaVacante datos) {
+        if (!"PUBLICADA".equals(vacante.getEstado())) {
+            return;
+        }
+        boolean laEnsenaba = Remuneracion.laEnsena(vacante);
+        String tipoNuevo = datos == null ? Remuneracion.OCULTA : datos.tipo();
+        boolean laEnsenara = !Remuneracion.OCULTA.equals(tipoNuevo);
+
+        if (laEnsenaba && !laEnsenara) {
+            throw new IllegalStateException(
+                    "Esta vacante ya está publicada enseñando lo que paga, y a cada persona "
+                            + "que postuló se le exigió decir cuánto quiere ganar. Dejar de "
+                            + "publicarla ahora sería quedarse con lo que dijeron sin dar nada "
+                            + "a cambio. El monto sí se puede cambiar; si de verdad hay que "
+                            + "esconderlo, ciérrala y abre otra");
+        }
+        if (!laEnsenaba && laEnsenara) {
+            throw new IllegalStateException(
+                    "Esta vacante se publicó sin enseñar lo que paga, así que a quienes ya "
+                            + "postularon no se les pidió su pretensión y no hay forma de "
+                            + "volver atrás a pedírsela. Publicar el sueldo ahora dejaría media "
+                            + "tanda con cifra y media sin ella: decídelo antes de publicar, o "
+                            + "ciérrala y abre otra");
+        }
+    }
+
+    /**
+     * Escribe los cinco campos del sueldo en una vacante que ya existe, validados y
+     * normalizados, y le pone la marca de cuándo se tocó.
+     *
+     * <p>Una remuneración nula se lee como OCULTA y no como «no lo toques»: el cuerpo lo manda
+     * el panel entero cada vez, y un campo ausente significa que la pantalla decidió que no
+     * hay sueldo publicado.
+     */
+    private void escribirRemuneracion(Vacante vacante, RemuneracionDeLaVacante datos,
+                                      Instant cuando) {
+        RemuneracionDeLaVacante lo = datos == null ? RemuneracionDeLaVacante.OCULTA : datos;
+        String moneda = Remuneracion.validar(lo.tipo(), lo.min(), lo.max(), lo.moneda());
+
+        vacante.setRemuneracionTipo(lo.tipo());
+        if (Remuneracion.OCULTA.equals(lo.tipo())) {
+            // Se limpian los montos en lugar de dejarlos donde estaban. Una vacante OCULTA con
+            // cifras guardadas es un sueldo que sigue en la base esperando a que alguien lo
+            // lea por descuido, y la restricción de la V55 tampoco lo admitiría.
+            vacante.setRemuneracionMin(null);
+            vacante.setRemuneracionMax(null);
+            vacante.setRemuneracionMoneda(null);
+        } else {
+            vacante.setRemuneracionMin(lo.min());
+            vacante.setRemuneracionMax(Remuneracion.FIJA.equals(lo.tipo()) ? null : lo.max());
+            vacante.setRemuneracionMoneda(moneda);
+        }
+        if (cuando != null) {
+            vacante.setRemuneracionActualizadaEn(cuando);
+        }
+    }
+
+    private Map<String, Object> comoMapa(Vacante v) {
+        Map<String, Object> mapa = new java.util.HashMap<>();
+        mapa.put("tipo", Remuneracion.tipoDe(v));
+        mapa.put("min", v.getRemuneracionMin());
+        mapa.put("max", v.getRemuneracionMax());
+        mapa.put("moneda", v.getRemuneracionMoneda());
+        return mapa;
+    }
+
+    /**
+     * Le cuenta a cada candidato vivo que el sueldo cambió: un correo y un aviso en su portal.
+     *
+     * <p>⚠️ <b>Solo a quien sigue en carrera.</b> A quien ya no continúa —descartado, retirado,
+     * cerrado— no se le avisa: la noticia no le afecta, y recibir un correo sobre el sueldo de
+     * un puesto que ya perdió es cruel sin ganar nada.
+     *
+     * <p>⚠️ <b>Y un fallo aquí no deshace el cambio.</b> El sueldo ya está guardado y auditado;
+     * que a una persona no se le pueda escribir no puede revertir lo que el panel decidió. Se
+     * anota y se sigue con las demás, que es la misma regla que sigue {@code ServicioCorreo}.
+     *
+     * @return a cuánta gente se le avisó
+     */
+    private int avisarDelCambio(Vacante vacante, String antes, String ahora) {
+        List<Postulacion> vivas =
+                postulaciones.findByVacanteIdOrderByCreadoEnDesc(vacante.getId()).stream()
+                        .filter(p -> !ESTADOS_CERRADOS.contains(p.getEstadoCodigo()))
+                        .toList();
+        if (vivas.isEmpty()) {
+            return 0;
+        }
+
+        String titulo = "Cambió la remuneración de «" + vacante.getTitulo() + "»";
+        String cuerpo = "Antes: " + antes + " · Ahora: " + ahora
+                + ". Tu postulación sigue su curso y no tienes que hacer nada.";
+
+        int avisados = 0;
+        for (var postulacion : vivas) {
+            try {
+                // El contador sube por el AVISO DEL PORTAL, que es el único de los dos
+                // canales que puede decir si llegó: `publicar` devuelve null cuando falla.
+                //
+                // El correo no cuenta a propósito, y no es descuido: `ServicioCorreo.enviar`
+                // es void y sale por la puerta de atrás tanto si falta la plantilla como si
+                // el SMTP está caído —lo anota y sigue—, así que sumarlo daría un número que
+                // afirma entregas que nadie puede confirmar. Lo que el panel promete con esta
+                // cifra es lo que de verdad quedó esperando a alguien dentro del portal.
+                AvisoPortal publicado = avisos.publicar(vacante.getOrganizacionId(),
+                        postulacion.getUsuarioId(), AvisoPortal.REMUNERACION_ACTUALIZADA,
+                        titulo, cuerpo, postulacion.getId(), vacante.getId());
+                correoDelCambio(vacante, postulacion, antes, ahora);
+                if (publicado != null) {
+                    avisados++;
+                }
+            } catch (RuntimeException e) {
+                log.error("No se pudo avisar del cambio de sueldo a la postulación {}: {}",
+                        postulacion.getId(), e.getMessage());
+            }
+        }
+        return avisados;
+    }
+
+    private void correoDelCambio(Vacante vacante, Postulacion postulacion,
+                                 String antes, String ahora) {
+        Usuario usuario = usuarios.findById(postulacion.getUsuarioId()).orElse(null);
+        if (usuario == null) {
+            return;
+        }
+        // La misma dirección que usa la máquina de estados: la real, o la que se le inventó a
+        // quien entró por una carga de currículums. Ver DireccionDelCandidato.
+        String destino = direcciones.de(usuario, postulacion.getId());
+        String nombre = personas.findById(usuario.getPersonaId())
+                .map(Persona::getNombre)
+                .orElse("");
+
+        // Y el enlace por donde entrar, como en todos los avisos desde la V26: quien llegó por
+        // una carga masiva no tiene contraseña, y «entra a tu portal» a secas no le sirve.
+        String enlace = "";
+        try {
+            enlace = enlacesDeAcceso.generarEnlace(postulacion.getId()).url();
+        } catch (RuntimeException e) {
+            log.error("No se pudo crear el enlace de acceso de la postulación {}: {}",
+                    postulacion.getId(), e.getMessage());
+        }
+
+        correo.enviar(vacante.getOrganizacionId(), usuario.getId(), destino,
+                plantillaDelCambio(vacante.getId()),
+                Map.of("nombre", nombre == null ? "" : nombre,
+                        "vacante", vacante.getTitulo(),
+                        "antes", antes,
+                        "ahora", ahora,
+                        "enlace", enlace));
+    }
+
+    /**
+     * Qué texto sale: el que esta vacante haya elegido para este aviso, o el de la empresa.
+     *
+     * <p>Es la misma sustitución de la V31 que usa la máquina de estados. Se resuelve una vez
+     * por cambio y no una por candidato: la respuesta es la misma para todos, y preguntarla
+     * cuarenta veces sería cuarenta consultas idénticas.
+     */
+    private String plantillaDelCambio(Long vacanteId) {
+        return plantillasPorVacante
+                .findByVacanteIdAndAvisoCodigo(vacanteId, PLANTILLA_REMUNERACION)
+                .map(PlantillaCorreoVacante::getPlantillaCodigo)
+                .orElse(PLANTILLA_REMUNERACION);
     }
 }

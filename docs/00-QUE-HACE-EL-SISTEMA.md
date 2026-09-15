@@ -44,9 +44,27 @@ para ese puesto por una sola cosa.
 
 También se nombra a quien vigila que la prisa por cubrir el puesto no baje el listón.
 
+**Y se decide si se dice cuánto paga.** Se puede no decirlo, decir un monto, o decir un rango. Lo
+que se elija **compromete a la empresa**: si enseña lo que paga, a quien postule se le va a pedir
+que diga cuánto quiere ganar; si no lo enseña, no se le pide nada, y si lo manda igual, se ignora.
+Es un trato simétrico a propósito — pedirle su cifra a alguien mientras la empresa esconde la suya
+es el desequilibrio que esto viene a romper.
+
+**Esa decisión se congela al publicar la convocatoria**, en las dos direcciones. No se puede
+recoger cuarenta cifras obligatorias y esconder el sueldo al día siguiente; y tampoco enseñarlo a
+mitad de camino, porque a quienes ya postularon no se les pidió nada y no hay forma de volver
+atrás a pedírselo: quedaría media tanda con cifra y media sin ella. El monto sí se puede mover —y
+mover el monto de una convocatoria abierta **se le avisa a cada candidato que sigue en carrera**,
+por correo y dentro del portal—. Si de verdad hay que cambiar la decisión, se cierra la
+convocatoria y se abre otra.
+
 ### 3 · La gente postula
 
-Por el portal. Sube su currículum y acepta cómo se van a usar sus datos.
+Por el portal. Sube su currículum y acepta cómo se van a usar sus datos. Si la convocatoria dice
+lo que paga, también dice cuánto quiere ganar: un número, no una horquilla, porque es lo único que
+se puede poner de frente contra el presupuesto y contestar «entra o no entra». Se le propone el
+centro de lo que tenga escrito en su perfil y él confirma o corrige; lo que escriba vuelve a su
+perfil **solo si lo tenía vacío**.
 
 **Son tres permisos distintos, y se piden en dos momentos.** Al crear la cuenta marca dos
 casillas: una por el permiso con Renaser, que es el largo —cuenta qué datos se guardan, que una
@@ -176,9 +194,14 @@ descarta sola. Cada una ordena, y una persona confirma. Cuando alguien no contin
 por qué. Lo único que además se cierra solo es el proceso de quien dejó pasar su plazo sin
 responder, y eso también queda escrito.
 
-**Cualquiera puede pedir que borren sus datos.** Se borran. El registro de las decisiones se
-queda, sin nada que identifique a la persona: así se cumple la ley sin perder la trazabilidad de
-lo que ya se decidió.
+**Cualquiera puede pedir que borren sus datos.** Se borran —lo que pidió ganar incluido, y los
+avisos que tuviera esperándole—. El registro de las decisiones se queda, sin nada que identifique
+a la persona: así se cumple la ley sin perder la trazabilidad de lo que ya se decidió.
+
+**El portal tiene una campana.** Lo que pasó mientras el candidato no estaba le espera dentro,
+con su marca de visto. El correo se pierde —cae en promociones, llega a una dirección que ya nadie
+mira—, así que la campana no lo sustituye: lo acompaña. Hoy avisa de una sola cosa, que cambió el
+sueldo de un puesto al que postuló, y está hecha para las que vengan.
 
 **Y hay un plazo aunque nadie pida nada.** Si alguien pasa dos años sin postular y sin tocar su
 ficha, esa ficha se elimina. Lo que sostiene una decisión ya tomada —sus postulaciones y lo que

@@ -353,6 +353,15 @@ def sembrar(api, uid_equipo):
     print("\n4 · Las vacantes")
     vacantes = []
     titulos = ["Desarrollador web", "Líder de operaciones", "Analista de experiencia del cliente"]
+    # Las tres formas del sueldo, una por vacante (V55). Sembrarlas todas OCULTAS —que es
+    # como nacen si no se dice nada— dejaba el trato entero sin ejercitar: nadie declaraba
+    # pretensión al postular, y ninguna prueba de extremo a extremo pisaba el camino en que
+    # publicar el sueldo la exige. Con esto, una base recién sembrada tiene las dos mitades.
+    SUELDOS = [
+        {"tipo": "RANGO", "min": 3000, "max": 4500, "moneda": "PEN"},
+        {"tipo": "FIJA", "min": 6500, "max": None, "moneda": "PEN"},
+        {"tipo": "OCULTA", "min": None, "max": None, "moneda": None},
+    ]
     for i, (solicitud_id, puesto_cod, _) in enumerate(solicitudes):
         v = api.post("/panel/vacantes", {
             "solicitudTalentoId": solicitud_id, "puestoId": puestos[puesto_cod],
@@ -360,6 +369,7 @@ def sembrar(api, uid_equipo):
                 "Trabajo con gente, no solo con herramientas. Buscamos a alguien que deje el trabajo "
                 "mejor documentado de lo que lo encontró.",
             "tipoCierre": "PERMANENTE", "responsableUsuarioId": yo,
+            "remuneracion": SUELDOS[i],
         })
         req = api.post(f"/panel/vacantes/{v['id']}/requisitos", {
             "descripcion": "Disponibilidad en Arequipa",
@@ -376,8 +386,10 @@ def sembrar(api, uid_equipo):
         api.post(f"/panel/vacantes/{v['id']}/plantilla-prueba",
                  {"versionPlantillaPruebaId": version_prueba})
         api.post(f"/panel/vacantes/{v['id']}/publicacion")
-        vacantes.append({"id": v["id"], "titulo": titulos[i], "requisito": req["id"]})
-    paso(f"{len(vacantes)} vacantes publicadas, cada una con su requisito indispensable")
+        vacantes.append({"id": v["id"], "titulo": titulos[i], "requisito": req["id"],
+                         "sueldo": SUELDOS[i]})
+    paso(f"{len(vacantes)} vacantes publicadas, cada una con su requisito indispensable "
+         "y una forma distinta de decir el sueldo (rango, fijo y sin publicar)")
 
     # ------------------------------------------- 5. los candidatos (el portal)
     print("\n5 · Los candidatos, como si el portal existiera")
@@ -415,6 +427,13 @@ def sembrar(api, uid_equipo):
         # descarte automático del sistema, y conviene que se vea en los datos.
         if cumple:
             campos["requisitosConfirmados"] = (None, str(vacante["requisito"]))
+        # El trato de la V55: si la vacante publica lo que paga, declarar la pretensión es
+        # obligatorio y sin ella el backend responde 400. Si la esconde, no se manda nada —
+        # mandarlo igual escribiría en su registro un número que nadie le pidió.
+        if vacante["sueldo"]["tipo"] != "OCULTA":
+            base = vacante["sueldo"]["max"] or vacante["sueldo"]["min"]
+            campos["pretensionMonto"] = (None, str(base + random.choice([-500, -200, 0, 300])))
+            campos["pretensionMoneda"] = (None, vacante["sueldo"]["moneda"])
         campos["cv"] = (f"cv-{nombre.lower()}.pdf", cv_falso(nombre), "application/pdf")
 
         r = requests.post(f"{api.base}/portal/postulaciones",

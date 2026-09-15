@@ -250,8 +250,9 @@ confirmado se conserva. Eso lo garantiza el backend, pero la pantalla no debe su
 contrario con un mensaje tipo «se reemplazarán tus datos».
 
 **3. La pretensión salarial es delicada.** En el portal es suya y la ve siempre. **En el panel
-solo la ve quien tenga permiso**, y nunca aparece en listas ni rankings. Si construyes el panel,
-no la pintes junto a la nota.
+hacen falta dos llaves**: el permiso `ver_pretension` **y** que esa vacante publique lo que paga
+—si la esconde, no se le exigió la suya a nadie y tampoco se enseña la del perfil—. Si construyes
+el panel, no la pintes junto a la nota.
 
 **4. Explica los niveles de idioma.** El catálogo es A1-C2 y **mucha gente no sabe cuál es el
 suyo**. Cada opción necesita una línea que lo explique («B2 · me manejo en una reunión de
@@ -273,8 +274,9 @@ GET /api/v1/panel/postulaciones/{id}/perfil
 ```
 
 Solo lectura, con el permiso `ver_perfil_candidato`. Devuelve lo mismo que el portal **menos la
-pretensión salarial**, salvo que además se tenga `ver_pretension` — y sin ese permiso el campo
-no aparece en el JSON **ni como `null`**.
+pretensión salarial**, salvo que además se tenga `ver_pretension` **y que la vacante de esa
+postulación publique lo que paga** (desde el 15/09) — faltando cualquiera de las dos, el campo no
+aparece en el JSON **ni como `null`**.
 
 El permiso respeta su alcance, y el alcance que mira es el de `ver_perfil_candidato` y no el de
 otro permiso del panel: si está limitado a «sus vacantes», el candidato de una convocatoria
@@ -350,9 +352,10 @@ pide en el alta va en `persona`.
   copia la ficha `dato_cv` en vez de pagar otra llamada. El disparo al postular se apaga con
   `renaser.perfil.lectura-al-postular=false` (las pruebas de calificación lo usan).
 - **El perfil NO puntúa**: no entra en notas ni rankings.
-- **La pretensión salarial** va detrás del permiso `ver_pretension` y sin él **no viaja ni el
-  nombre del campo** en el JSON del panel. Nunca en listas ni rankings. El vacío no significa
-  que nadie pidiera sueldo.
+- **La pretensión salarial** va detrás de **dos llaves** en el panel —`ver_pretension` y que esa
+  vacante publique su remuneración— y faltando cualquiera **no viaja ni el nombre del campo** en
+  el JSON. El vacío no significa que nadie pidiera sueldo: ver [El sueldo, de los dos
+  lados](EL-SUELDO-DE-LOS-DOS-LADOS.md).
 - **El borrado 29733 se lleva el perfil entero**; `dato_cv` se queda porque sostiene lo ya
   evaluado. Retención: parámetro `meses_conservar_perfil` (24) y el barrido diario
   `BarridoRetencionPerfil`. **El plazo que se aplica es el más largo de todas las

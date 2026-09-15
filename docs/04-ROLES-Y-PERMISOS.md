@@ -154,6 +154,33 @@ administra el sistema, no evalúa personas.
 escondidas en el código de la página (ver «Seguridad» en los no funcionales). Si viajan al
 navegador, cualquiera las lee y el banco entero queda inutilizado.
 
+#### Ver cuánto pide un candidato necesita **dos** llaves
+
+`ver_pretension` —hoy, Dirección— **ya no basta**. Desde el 15/09 la pretensión solo se enseña si
+además **esta vacante publica lo que paga**. Es la misma reciprocidad que rige el formulario de
+postular, aplicada del otro lado: una vacante que esconde su sueldo no le exige la cifra a nadie,
+y tampoco puede leer la que esa persona escribió en su perfil para otra convocatoria.
+
+El agujero que cierra era real y lo ensanchó la propia función: el perfil de la persona es de la
+plataforma, no de ninguna empresa, así que la misma vacante que no preguntaba nada **veía** lo que
+esa persona había declarado ante otra empresa, la que sí puso su presupuesto sobre la mesa. Cobrar
+por un lado lo que no se paga por el otro, dando un rodeo.
+
+Las dos llaves rigen en **los tres sitios** que leen la pretensión: el ranking de la tanda, la
+ficha del candidato y el perfil visto desde el panel. Y la segunda llave, igual que el permiso,
+**no es «no pintarlo»**: sin ella la consulta ni se lanza, y el dato no llega a existir en la
+memoria de la petición.
+
+⚠️ **Al panel le viaja el permiso a secas, no la conjunción de las dos llaves**, y es a propósito:
+son dos motivos distintos para una casilla vacía y la pantalla tiene que poder decir cuál es. Con
+un solo sí/no para los dos, a Dirección le diría «tu rol no puede verla» —que es falso, y además
+la manda a pedir un permiso que ya tiene—.
+
+De regalo, esto vuelve **verdad** el aviso que el panel ya pintaba en esas vacantes: «esta vacante
+no publica su remuneración, así que a nadie se le pidió la suya». Hasta ahora esa frase convivía
+con una columna que sí traía cifras. Ver [El sueldo, de los dos
+lados](EL-SUELDO-DE-LOS-DOS-LADOS.md).
+
 ### Evaluación y notas
 
 | Acción | Candidato | Talento | Resp. área | Dirección | Admin |

@@ -4,6 +4,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Min;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 
 // Los contratos de vacantes, puestos y requisitos.
@@ -22,7 +23,15 @@ public final class DtosVacante {
             String modalidad,
             String horario,
             String ubicacion,
-            String compensacionPublica,
+            /**
+             * Lo que paga, si lo dice (V55).
+             *
+             * <p>Vacío = {@code OCULTA}, que es como nacen todas las vacantes que no digan lo
+             * contrario. No es {@code @NotNull} a propósito: obligar a declarar el sueldo
+             * para poder crear un borrador pondría la decisión más delicada del proceso en el
+             * primer minuto, cuando todavía no está tomada.
+             */
+            RemuneracionDeLaVacante remuneracion,
             @NotBlank String tipoCierre,
             Integer plazas,
             Instant abreEn,
@@ -39,7 +48,48 @@ public final class DtosVacante {
                                Instant publicadaEn, Instant cerradaEn, boolean aplicaEvaluacion,
                                Long plantillaEvaluacionId, Long versionPlantillaPruebaId,
                                Long versionPesosId, String instrumentoEtapaTecnica,
-                               Integer minutosEtapaTecnica, boolean calificacionAutomatica) {}
+                               Integer minutosEtapaTecnica, boolean calificacionAutomatica,
+                               // La remuneración viaja entera —con su marca de cuándo se
+                               // tocó— para que la pantalla de configuración pinte el estado
+                               // real sin pedir nada más.
+                               RemuneracionDeLaVacante remuneracion,
+                               Instant remuneracionActualizadaEn) {}
+
+    /**
+     * Lo que la vacante dice sobre el dinero.
+     *
+     * <p>{@code tipo} es {@code OCULTA}, {@code FIJA} o {@code RANGO}. Con {@code FIJA} el
+     * monto va en {@code min} y {@code max} se queda vacío; con {@code OCULTA} los tres
+     * campos van vacíos. Las reglas las hace cumplir {@code Remuneracion}, y también la base
+     * (V55), porque un formulario no es la única forma de escribir en una tabla.
+     *
+     * <p>⚠️ <b>Esconder el sueldo no es un detalle de presentación.</b> Decide si quien
+     * postula está obligado a declarar cuánto quiere ganar: es el trato de la V55, y las dos
+     * mitades se guardan en este mismo campo.
+     */
+    public record RemuneracionDeLaVacante(@NotBlank String tipo, BigDecimal min,
+                                          BigDecimal max, String moneda) {
+
+        public static final RemuneracionDeLaVacante OCULTA =
+                new RemuneracionDeLaVacante("OCULTA", null, null, null);
+    }
+
+    /**
+     * Cambiar el sueldo de una vacante ya creada, con el motivo de por qué.
+     *
+     * <p>El motivo es obligatorio y no es burocracia: este cambio le manda un correo y un
+     * aviso a cada persona que tiene una postulación viva, y la auditoría tiene que poder
+     * contestar «¿por qué le dijimos a cuarenta candidatos que el sueldo bajó?» con algo más
+     * que una marca de tiempo.
+     */
+    public record ActualizarRemuneracion(@NotNull RemuneracionDeLaVacante remuneracion,
+                                         @NotBlank(message = "Di por qué cambia el sueldo: "
+                                                 + "se les avisa a los candidatos")
+                                         String motivo) {}
+
+    /** A cuánta gente le llegó el cambio, para que el panel lo diga en voz alta. */
+    public record RemuneracionActualizadaResponse(String antes, String ahora,
+                                                  int candidatosAvisados) {}
 
     public record GuardarRequisito(@NotBlank String descripcion, @NotBlank String regla) {}
 
