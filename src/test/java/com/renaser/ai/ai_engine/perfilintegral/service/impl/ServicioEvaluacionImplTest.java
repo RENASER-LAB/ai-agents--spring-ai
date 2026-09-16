@@ -350,17 +350,43 @@ class ServicioEvaluacionImplTest {
         }
 
         @Test
-        @DisplayName("una opción se rechaza, y el vacío también")
-        void sinTextoNoHayRespuesta() {
+        @DisplayName("una opción se rechaza")
+        void unaOpcionSeRechaza() {
             examenConAbierta();
             assertThatThrownBy(() -> servicio.responder(CANDIDATA, CODIGO, 1L,
                     new Responder(5L, null, null, 12)))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("no lleva opciones");
-            assertThatThrownBy(() -> servicio.responder(CANDIDATA, CODIGO, 1L,
-                    new Responder(null, "   ", null, 12)))
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessageContaining("escribir");
+        }
+
+        @Test
+        @DisplayName("borrar lo escrito borra la respuesta, no da error")
+        void elVacioBorraLaRespuesta() {
+            examenConAbierta();
+            Respuesta laQueHabia = Respuesta.builder().id(70L).evaluacionId(60L).preguntaId(1L)
+                    .texto("Monté el cuadre diario de caja.").build();
+            when(respuestas.findByEvaluacionIdAndPreguntaId(60L, 1L))
+                    .thenReturn(Optional.of(laQueHabia));
+
+            // Antes esto era un 400 «Hay que escribir una respuesta» en mitad del examen, y
+            // además dejaba el texto viejo en el servidor: la pantalla en blanco y el
+            // contador diciendo «respondida». Vaciar el recuadro es dejarla sin responder.
+            servicio.responder(CANDIDATA, CODIGO, 1L, new Responder(null, "   ", null, 12));
+
+            verify(respuestas).delete(laQueHabia);
+            verify(respuestas, never()).saveAndFlush(any());
+        }
+
+        @Test
+        @DisplayName("vaciar una que nunca se respondió no revienta")
+        void elVacioSinFilaNoRevienta() {
+            examenConAbierta();
+            when(respuestas.findByEvaluacionIdAndPreguntaId(60L, 1L)).thenReturn(Optional.empty());
+
+            servicio.responder(CANDIDATA, CODIGO, 1L, new Responder(null, null, null, 3));
+
+            verify(respuestas, never()).delete(any());
+            verify(respuestas, never()).saveAndFlush(any());
         }
     }
 

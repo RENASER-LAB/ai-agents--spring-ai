@@ -418,19 +418,34 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
             Set<Long> suyas = opciones.findByPreguntaIdOrderByLetra(preguntaId).stream()
                     .map(Opcion::getId).collect(Collectors.toSet());
             ValidadorDetalleV3.validar(pregunta.getTipo(), suyas, datos.detalle());
-        } else if ("ABIERTA".equals(pregunta.getTipo())) {
-            // Una ABIERTA se responde escribiendo, y solo escribiendo. Aceptar una opción
-            // aquí contaría como respondida para entregar, pero el evaluador —que solo mira
-            // texto— nunca la calificaría, y la postulación se quedaría sin nota de etapa.
-            if (datos.opcionId() != null) {
-                throw new IllegalArgumentException(
-                        "Esta pregunta es de respuesta abierta: no lleva opciones");
-            }
-            if (datos.texto() == null || datos.texto().isBlank()) {
-                throw new IllegalArgumentException("Hay que escribir una respuesta");
-            }
-        } else if (datos.opcionId() == null && (datos.texto() == null || datos.texto().isBlank())) {
-            throw new IllegalArgumentException("Hay que elegir una opción o escribir una respuesta");
+            guardarLaRespuesta(evaluacion.getId(), preguntaId, datos);
+            return;
+        }
+
+        // Una ABIERTA se responde escribiendo, y solo escribiendo. Aceptar una opción aquí
+        // contaría como respondida para entregar, pero el evaluador —que solo mira texto—
+        // nunca la calificaría, y la postulación se quedaría sin nota de etapa.
+        if ("ABIERTA".equals(pregunta.getTipo()) && datos.opcionId() != null) {
+            throw new IllegalArgumentException(
+                    "Esta pregunta es de respuesta abierta: no lleva opciones");
+        }
+
+        // Sin opción y sin texto: el candidato borró lo que tenía puesto.
+        //
+        // ⚠️ <b>Eso no es un error, es dejar la pregunta sin responder</b>, y rebotarlo con un
+        // 400 costaba dos cosas a la vez. La primera, un cartel rojo en mitad del examen que
+        // decía «Hay que escribir una respuesta» a alguien que estaba escribiendo una. La
+        // segunda, peor: la pantalla se quedaba en blanco y el servidor conservaba el texto
+        // viejo, así que el candidato veía un recuadro vacío y el contador lo contaba como
+        // respondido. Nadie podía cuadrar esas dos cifras.
+        //
+        // Borrando, las dos versiones vuelven a decir lo mismo. Y no se pierde nada en
+        // silencio: {@code entregar} sigue rechazando la entrega mientras falte alguna, así
+        // que una respuesta borrada sin querer se ve antes de entregar, no después.
+        if (datos.opcionId() == null && (datos.texto() == null || datos.texto().isBlank())) {
+            respuestas.findByEvaluacionIdAndPreguntaId(evaluacion.getId(), preguntaId)
+                    .ifPresent(respuestas::delete);
+            return;
         }
 
         guardarLaRespuesta(evaluacion.getId(), preguntaId, datos);
