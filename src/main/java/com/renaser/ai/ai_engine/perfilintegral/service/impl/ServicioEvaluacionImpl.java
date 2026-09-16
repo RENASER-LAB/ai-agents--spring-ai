@@ -42,6 +42,7 @@ import com.renaser.ai.ai_engine.vacante.repository.VacanteRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -421,6 +422,14 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
             guardarLaRespuesta(evaluacion.getId(), preguntaId, datos);
             return;
         }
+        // ⚠️ **Los seis formatos del banco v3 salen por arriba, así que en ellos vaciar NO
+        // borra.** No es un olvido: un detalle a medias no se distingue de uno que se está
+        // reordenando, y `ValidadorDetalleV3` lo rechaza justamente para que una respuesta con
+        // mala forma no acabe convertida en una nota. Hoy no se nota porque la pantalla ni
+        // siquiera manda un detalle incompleto (`cambiarDetalle` corta antes). El precio es
+        // que vaciar los campos de una CD deja la pantalla en blanco y la respuesta vieja en
+        // el servidor; el día que eso importe, la salida es un borrado explícito, no aflojar
+        // el validador.
 
         // Una ABIERTA se responde escribiendo, y solo escribiendo. Aceptar una opción aquí
         // contaría como respondida para entregar, pero el evaluador —que solo mira texto—
@@ -487,6 +496,23 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
                     .findByEvaluacionIdAndPreguntaId(evaluacionId, preguntaId)
                     .orElseThrow(() -> carrera);
             respuestas.saveAndFlush(conLoQueMando(suya, datos));
+        } catch (ObjectOptimisticLockingFailureException desaparecio) {
+            // La otra cara de la misma carrera, y **nueva desde que el vacío borra**: leímos la
+            // fila, otra petición la borró, y nuestro UPDATE no encontró nada que actualizar.
+            //
+            // Antes no podía pasar porque la fila no desaparecía nunca. Ahora sí, y sin esto
+            // sería un 500 en mitad del examen por haber tenido dos pestañas abiertas. Se
+            // vuelve a intentar desde cero: como no hay fila, se crea.
+            log.debug("La respuesta de la pregunta {} en la evaluacion {} se borró mientras se"
+                    + " guardaba; se vuelve a crear", preguntaId, evaluacionId);
+            respuestas.saveAndFlush(conLoQueMando(
+                    respuestas.findByEvaluacionIdAndPreguntaId(evaluacionId, preguntaId)
+                            .orElseGet(() -> Respuesta.builder()
+                                    .evaluacionId(evaluacionId)
+                                    .preguntaId(preguntaId)
+                                    .creadoEn(Instant.now())
+                                    .build()),
+                    datos));
         }
     }
 

@@ -300,6 +300,30 @@ class ServicioEvaluacionImplTest {
         }
 
         @Test
+        @DisplayName("si la fila se borró mientras se guardaba, se vuelve a crear")
+        void siLaBorraronMientrasGuardabamos() {
+            examenAbierto();
+            Respuesta laQueLeimos = Respuesta.builder().id(70L).evaluacionId(60L).preguntaId(1L).build();
+            // La leimos, otra peticion la borro, y nuestro UPDATE no encontro nada.
+            //
+            // ⚠️ Esta carrera es NUEVA desde que vaciar el recuadro borra la fila: antes la
+            // fila no desaparecia nunca. Sin cubrirla, es un 500 en mitad del examen por haber
+            // tenido dos pestañas abiertas.
+            when(respuestas.findByEvaluacionIdAndPreguntaId(60L, 1L))
+                    .thenReturn(Optional.of(laQueLeimos))
+                    .thenReturn(Optional.empty());
+            when(respuestas.saveAndFlush(any()))
+                    .thenThrow(new org.springframework.orm.ObjectOptimisticLockingFailureException(
+                            Respuesta.class, 70L))
+                    .thenAnswer(i -> i.getArgument(0));
+
+            // El candidato NO ve un error: su respuesta se guarda en una fila nueva.
+            servicio.responder(CANDIDATA, CODIGO, 1L, new Responder(5L, null, null, 12));
+
+            verify(respuestas, times(2)).saveAndFlush(any());
+        }
+
+        @Test
         @DisplayName("si al releer sigue sin haber fila, el fallo se propaga y no se traga")
         void siNoHayFilaSeCuenta() {
             examenAbierto();

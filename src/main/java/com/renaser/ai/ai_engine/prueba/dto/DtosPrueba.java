@@ -42,8 +42,20 @@ public final class DtosPrueba {
             List<PreguntaCandidato> preguntas,
             List<EntregableRequeridoCandidato> entregables) {}
 
+    /**
+     * Lo que el candidato escribe en una pregunta de la prueba.
+     *
+     * <p>⚠️ <b>Sin {@code @NotBlank}, y a propósito.</b> Lo tuvo, y eso hacía que vaciar el
+     * recuadro rebotara con un 400 antes siquiera de entrar al servicio. Para el candidato
+     * eso era un error en mitad de una prueba cronometrada por haber borrado lo que él mismo
+     * había escrito, y encima el rechazo dejaba el texto viejo guardado: recuadro vacío en la
+     * pantalla y respuesta entera en el servidor.
+     *
+     * <p>Ahora el vacío lo entiende el servicio y significa lo que parece —esta pregunta se
+     * queda sin responder—, igual que en la evaluación del Perfil Integral y en el
+     * cuestionario técnico. El tope de tamaño sí se queda: eso sí es un error.
+     */
     public record Responder(
-            @NotBlank
             @Size(max = 20_000, message = "La respuesta es demasiado larga")
             String texto) {}
 

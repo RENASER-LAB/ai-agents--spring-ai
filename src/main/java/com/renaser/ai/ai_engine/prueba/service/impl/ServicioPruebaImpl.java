@@ -192,11 +192,25 @@ public class ServicioPruebaImpl implements ServicioPrueba {
         exigirIniciado(intento);
         exigirQueLeToca(intento, preguntaId);
 
-        RespuestaPrueba r = respuestas.findByIntentoPruebaIdAndPreguntaPruebaId(intento.getId(), preguntaId)
-                .orElseGet(() -> RespuestaPrueba.builder()
-                        .intentoPruebaId(intento.getId())
-                        .preguntaPruebaId(preguntaId)
-                        .build());
+        var laQueHay = respuestas.findByIntentoPruebaIdAndPreguntaPruebaId(
+                intento.getId(), preguntaId);
+
+        // Vaciar el recuadro es dejar la pregunta sin responder, no un error.
+        //
+        // ⚠️ Antes esto ni llegaba aquí: el {@code @NotBlank} del DTO lo rebotaba con un 400,
+        // que en pantalla era un cartel rojo en mitad de una prueba cronometrada por haber
+        // borrado lo que uno mismo escribió. Y el rechazo dejaba el texto viejo guardado, con
+        // lo cual la pantalla y el servidor decían cosas distintas y no había forma de
+        // cuadrarlas. Es la misma regla que ya siguen la evaluación y el cuestionario técnico.
+        if (datos.texto() == null || datos.texto().isBlank()) {
+            laQueHay.ifPresent(respuestas::delete);
+            return;
+        }
+
+        RespuestaPrueba r = laQueHay.orElseGet(() -> RespuestaPrueba.builder()
+                .intentoPruebaId(intento.getId())
+                .preguntaPruebaId(preguntaId)
+                .build());
         r.setTexto(datos.texto());
         r.setRespondidaEn(Instant.now());
         respuestas.save(r);
