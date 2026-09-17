@@ -353,6 +353,11 @@ Cuando alguien ejerce su derecho a que borren sus datos, se vacían los campos q
 y **se conserva todo lo demás**: el historial de estados, las notas, la auditoría. Un borrado en
 cascada destruiría la trazabilidad que el sistema entero existe para tener.
 
+⚠️ **Esto es sobre lo ya rendido, no sobre lo que alguien está escribiendo.** Desde el
+16/09/2026, un candidato que vacía el recuadro de una pregunta **borra esa respuesta**, y así
+tiene que ser: mientras el examen sigue abierto, lo escrito todavía no es historia de nadie —lo
+es en cuanto se entrega, y desde ahí no se toca—.
+
 Y para la inteligencia artificial hacen falta tres tablas, no una:
 
 - **`agente`** es el catálogo de los nueve, con su versión.
@@ -794,6 +799,16 @@ Cada respuesta se guarda al momento, así que si se corta la luz el candidato re
 Las preguntas y las opciones se muestran en orden aleatorio, distinto para cada persona, y ese
 orden se guarda: es la única forma de mostrar meses después exactamente el examen que rindió.
 
+**Desde el 16/09/2026 una respuesta puede desaparecer: vaciar el recuadro la borra.** Es la única
+forma de que la pantalla y lo guardado digan lo mismo — antes se rechazaba el vacío y el texto
+anterior se quedaba puesto, así que el candidato veía una pregunta en blanco que el sistema
+contaba como respondida. Que la fila desaparezca tiene dos consecuencias que antes no existían:
+dos guardados simultáneos de la misma pregunta pueden encontrarse con que la fila ya no está —se
+vuelve a crear, no es un error—, y **borrar solo es seguro mientras el examen esté abierto**,
+porque la nota de una respuesta apunta a la respuesta. Hoy no se puede llegar ahí: no se
+califica hasta que se entrega, y entregado ya no se toca. Ver
+[Lo que queda pendiente](#lo-que-queda-pendiente).
+
 Una alerta **nunca descarta a nadie**. Lo mismo vale para un rojo en alineación personal. Lo mismo vale para un rojo en alineación
 personal — aunque `resultado_alineacion` sigue vacía: la tabla está y el panel ya la lee, pero
 ningún agente la escribe todavía.
@@ -1216,6 +1231,14 @@ otra modalidad funciona desde el primer día.
 **La integración con RENASER OS.** No está construida ni la usa ningún flujo; la identidad del
 equipo es propia desde el 25/08/2026. Si algún día se conecta, falta decidir reintentos y
 tiempos de espera.
+
+**Qué pasa con la nota de una respuesta que su dueño borra.** Hoy la pregunta no se puede hacer:
+un candidato solo borra mientras el examen está abierto, y ahí todavía no hay nota que borrar.
+Pero la nota apunta a la respuesta, así que **el día que se califique con el examen abierto, o
+que se pueda reabrir uno entregado, vaciar un recuadro pasa a ser un error** —y el candidato
+leería «No se pudo guardar» sin saber por qué—. La salida entonces no es dejar que la nota se
+vaya con la respuesta sin más: es decidir antes qué significa una nota puesta sobre algo que ya
+no existe.
 
 **La ciudad sobrevive al anonimizado.** El borrado vacía nombre, apellidos, teléfono, documento y
 fecha de nacimiento, y deja puesto `persona.ciudad_ubigeo`. Nadie ha decidido todavía si una

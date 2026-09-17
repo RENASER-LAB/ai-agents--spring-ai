@@ -612,6 +612,45 @@ el examen exacto.
 
 **RF-52** Cada respuesta se guarda al momento. Si se corta la conexión, retoma donde quedó.
 
+**RF-52b** **Lo escrito queda a salvo en el mismo momento en que se escribe** (16/09/2026), y
+sale hacia el servidor poco después. Hasta esa fecha se ponía a salvo con retraso, y entre la
+última tecla y ese momento cabía un clic en «Siguiente»: cuando llegaba el turno de guardar, la
+pantalla ya estaba en otra pregunta y ese texto se descartaba sin dejar rastro —ni se mandaba,
+ni se reintentaba, ni figuraba como pendiente—, así que el candidato llegaba al final con
+«9 de 18 respondidas» y sin forma de saber cuál faltaba. Tres cosas más, que valen para las tres
+pantallas donde alguien escribe —la evaluación, el cuestionario técnico y la prueba del puesto—:
+
+- **Cerrar la pestaña ya no cuesta una respuesta.** Lo que aún no ha llegado al servidor queda
+  anotado en el propio navegador y sale solo al volver a abrir el examen, así que apagar el
+  portátil o que el móvil mate la página en segundo plano no borra nada. Lo anotado **caduca a
+  las 24 horas**: reaparecer con una respuesta de anteayer sería peor que perderla. Se reintenta
+  solo, esperando cada vez un poco más, y se deja de insistir cuando el servidor contesta algo
+  que no se arregla esperando.
+- **Cómo va el guardado se dice en una línea debajo del recuadro**, y solo ahí: «Guardando…»,
+  «Respuesta guardada», «Sin responder», «Sin terminar», y «No se pudo guardar» cuando de verdad
+  no se pudo. Ninguna mueve nada de sitio. Desaparecieron los dos avisos rojos que había: el que
+  contaba cuántas respuestas quedaban sin guardar —una avería nuestra contada a quien no puede
+  hacer nada con ella, y que además descuadraba la pantalla al aparecer— y el que le decía «hay
+  que escribir una respuesta» a quien estaba escribiendo una.
+- **Entregar manda lo que quede y espera.** Antes el botón se bloqueaba mientras algo no hubiera
+  llegado, y había que esperar a que un aviso desapareciera solo. Ahora se intenta en el
+  momento; si no lo consigue, la entrega se para y lo dice ahí mismo, no antes.
+
+**RF-52c** **Vaciar el recuadro es dejar la pregunta sin responder, no un error** (16/09/2026), y
+la respuesta se borra de verdad. Hasta esa fecha se rechazaba, y el rechazo dejaba **el texto
+anterior guardado**: la pantalla decía «vacía», el sistema la contaba como respondida, y no había
+forma de cuadrar las dos cifras. Vale para las tres pantallas donde alguien escribe. En la
+evaluación y en el cuestionario técnico **nada se pierde en silencio**, porque entregar se sigue
+rechazando mientras falte una respuesta: una borrada sin querer se ve antes de entregar, no
+después. En la prueba del puesto esa red no existe —la entrega solo exige los entregables
+obligatorios—, así que ahí lo único que avisa es la línea de estado, que dice «Sin responder».
+
+> ⚠️ **Con una excepción: las preguntas que se responden con varias piezas a la vez** —ordenar
+> una secuencia, rellenar los campos de un caso, marcar una matriz— **no se borran al vaciarlas**.
+> Ahí una respuesta a medio armar no se distingue de una que se está reordenando, y lo que
+> comprueba su forma existe justamente para que algo mal armado no acabe convertido en una nota.
+> Hoy no se nota, porque la pantalla ni siquiera manda una de esas a medias.
+
 **RF-53** El candidato **nunca** ve claves, puntajes por opción, nombres internos de dimensiones
 ni la lógica de cálculo.
 
