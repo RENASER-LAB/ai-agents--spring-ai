@@ -119,11 +119,11 @@ en lenguaje normal.
 | POST `/solicitudes-borrado` | Pedir el borrado de sus datos | Candidato |
 | GET `/evaluacion/{uuid}` | Su evaluación: las preguntas en **su** orden y lo que lleva respondido | Candidato |
 | POST `/evaluacion/{uuid}/inicio` | Empezar. La primera vez elige qué preguntas le tocan | Candidato |
-| PUT `/evaluacion/{uuid}/respuestas/{preguntaId}` | Guardar una respuesta | Candidato |
+| PUT `/evaluacion/{uuid}/respuestas/{preguntaId}` | Guardar una respuesta. **Mandarla vacía la borra** (16/09/2026): esa pregunta se queda sin responder, y eso no es un error | Candidato |
 | POST `/evaluacion/{uuid}/entrega` | Entregar. Ya no se cambia, y pasa a calificarse | Candidato |
 | GET `/cuestionario-tecnico/{uuid}` | Su cuestionario técnico, cuando la vacante rinde ese instrumento: las preguntas **sin la PRESENCIAL** y sin la guía de calificación | Candidato |
 | POST `/cuestionario-tecnico/{uuid}/inicio` | Empezar. Aquí arranca el reloj, si la vacante fijó minutos | Candidato |
-| PUT `/cuestionario-tecnico/{uuid}/respuestas/{preguntaId}` | Guardar una respuesta. Solo texto: aquí no se suben archivos | Candidato |
+| PUT `/cuestionario-tecnico/{uuid}/respuestas/{preguntaId}` | Guardar una respuesta. Solo texto: aquí no se suben archivos. **Mandarla vacía la borra**, igual que en la evaluación | Candidato |
 | POST `/cuestionario-tecnico/{uuid}/entrega` | Entregar. Pasa a `PRUEBA_CALIFICANDO` y lo califica el agente EVALUADOR_TECNICO | Candidato |
 
 **El candidato es de la plataforma.** Una sola cuenta, y con ella postula a la vacante de
@@ -162,6 +162,47 @@ decirlo en voz alta, porque un hueco se lee como un fallo de carga. El detalle e
 nadie más: son los del token. El punto se apaga al pulsar cada aviso o todos de una vez, **no al
 abrir la campana**: enterarse de que hay algo no es lo mismo que haberlo leído, y apagarlo al
 abrir apagaba también el punto de cada fila de «Mis procesos» sin que nadie hubiera leído nada.
+
+### Guardar lo que el candidato escribe (16/09/2026)
+
+Las tres pantallas donde alguien escribe —la evaluación del Perfil Integral, el cuestionario
+técnico y la prueba del puesto— guardan desde hoy con la misma regla, y las diferencias que
+quedan se dicen aquí abajo. Lo que ve el candidato está en
+[Requisitos funcionales](01-REQUISITOS-FUNCIONALES.md), RF-52b y RF-52c; esto es lo que necesita
+saber quien llama a los tres endpoints.
+
+**Mandar una respuesta vacía la borra.** Antes se rechazaba con un 400 y el rechazo dejaba
+**el texto anterior guardado**, así que la pantalla decía «vacía», el servidor la contaba como
+respondida y no había forma de cuadrar las dos cifras. Ahora el vacío significa lo que parece:
+esa pregunta se queda sin responder.
+
+En la evaluación y en el cuestionario técnico eso no puede perderse en silencio, porque
+**entregar se sigue rechazando mientras falte alguna respuesta**: una borrada sin querer se ve
+antes de entregar, no después. ⚠️ **En la prueba del puesto el servidor no tiene esa red**: su
+entrega comprueba los entregables obligatorios, nunca que estén todas las preguntas contestadas.
+Ahí lo que protege al candidato es la pantalla, que antes de entregar le dice cuántas van en
+blanco —y le deja entregar igual, porque en una prueba donde lo que se evalúa es el entregable
+dejar una pregunta sin responder puede ser a propósito—. Y mientras responde, la línea de estado
+la llama «Sin responder».
+
+⚠️ **Los seis formatos del banco v3 son la excepción: en ellos vaciar no borra.** Son los que se
+responden con varias piezas a la vez, y ahí una respuesta a medio armar no se distingue de una
+que se está reordenando; la comprobación de forma existe justamente para que algo mal armado no
+acabe convertido en una nota. Hoy no se nota, porque el portal ni siquiera manda una de esas a
+medias — pero quien llame a la API por su cuenta sí verá la diferencia.
+
+**Dos guardados de la misma pregunta a la vez chocan**, porque una pregunta tiene una sola
+respuesta. El portal no manda el segundo hasta que vuelve el primero. En la evaluación y en el
+cuestionario técnico el servidor cubre además las dos carreras que quedan —que otra petición
+escriba primero, y que otra **borre** la fila justo mientras se guarda, que es nueva desde que
+el vacío borra—: ninguna de las dos le sale al candidato como error.
+
+⚠️ **Dos pestañas del mismo examen tardan hasta medio minuto en enterarse la una de la otra.**
+Cada una se pone al día cuando vuelve a mirar, y si el candidato escribe nada más volver a una
+pestaña esa noticia puede tardar dos vueltas: antes de guardar lo suyo se descarta cualquier
+consulta que venga en camino, que es lo que impide que una foto anterior pise una respuesta
+recién confirmada. **No se pierde nada** —lo confirmado manda—, pero explica por qué una pestaña
+puede enseñar una versión más vieja que la otra durante unos segundos.
 
 ## El panel del equipo (`/api/v1/panel`)
 
@@ -419,7 +460,10 @@ del área— se ven solo las propias, y una ajena responde 404.
 
 **El portal del candidato es `/api/v1/portal/prueba/{codigo}`**: ver, iniciar (arranca el
 reloj), responder, subir entregables y entregar. Mismas reglas que la evaluación: nada de
-lo interno viaja, y una prueba ajena responde 404.
+lo interno viaja, y una prueba ajena responde 404. **También al guardar**: desde el 16/09/2026
+mandar una respuesta vacía la borra en vez de rebotar con un 400 —ver
+[Guardar lo que el candidato escribe](#guardar-lo-que-el-candidato-escribe-16092026)—, que aquí
+importaba el doble porque el error salía en mitad de una prueba cronometrada.
 
 ### Simulación de trabajo
 

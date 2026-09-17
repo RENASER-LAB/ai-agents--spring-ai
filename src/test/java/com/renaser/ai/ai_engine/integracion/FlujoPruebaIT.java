@@ -309,6 +309,39 @@ public class FlujoPruebaIT {
                     .andExpect(status().isOk());
         }
 
+        // ⚠️ Vaciar el recuadro NO es un error: es dejar la pregunta sin responder.
+        //
+        // Lo fue, y de la peor manera: un `@NotBlank` en el DTO lo rebotaba con un 400 antes
+        // de entrar al servicio. En pantalla, un cartel rojo en mitad de una prueba
+        // cronometrada por haber borrado lo que uno mismo escribio; y por dentro, el texto
+        // viejo se quedaba guardado, asi que la pantalla decia «vacia» y el servidor
+        // «respondida», sin forma de cuadrarlas.
+        long primeraPregunta = prueba.get("preguntas").get(0).get("id").asLong();
+        mvc.perform(put("/api/v1/portal/prueba/" + codigoPostulacion + "/respuestas/" + primeraPregunta)
+                        .header("Authorization", "Bearer " + tokenCandidato)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"texto\":\"   \"}"))
+                .andExpect(status().isOk());
+
+        // Y de verdad queda sin responder: el portal la vuelve a enseñar vacia.
+        JsonNode trasBorrar = json.readTree(mvc.perform(
+                        get("/api/v1/portal/prueba/" + codigoPostulacion)
+                                .header("Authorization", "Bearer " + tokenCandidato))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString());
+        for (JsonNode p : trasBorrar.get("preguntas")) {
+            if (p.get("id").asLong() == primeraPregunta) {
+                assertThat(p.get("respuestaTexto").isNull()).isTrue();
+            }
+        }
+
+        // Se vuelve a responder para poder entregar.
+        mvc.perform(put("/api/v1/portal/prueba/" + codigoPostulacion + "/respuestas/" + primeraPregunta)
+                        .header("Authorization", "Bearer " + tokenCandidato)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"texto\":\"Respuesta concreta y verificable\"}"))
+                .andExpect(status().isOk());
+
         // Entregar sin el obligatorio no pasa
         mvc.perform(post("/api/v1/portal/prueba/" + codigoPostulacion + "/entrega")
                         .header("Authorization", "Bearer " + tokenCandidato))

@@ -42,6 +42,7 @@ import com.renaser.ai.ai_engine.vacante.repository.VacanteRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -418,19 +419,51 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
             Set<Long> suyas = opciones.findByPreguntaIdOrderByLetra(preguntaId).stream()
                     .map(Opcion::getId).collect(Collectors.toSet());
             ValidadorDetalleV3.validar(pregunta.getTipo(), suyas, datos.detalle());
-        } else if ("ABIERTA".equals(pregunta.getTipo())) {
-            // Una ABIERTA se responde escribiendo, y solo escribiendo. Aceptar una opción
-            // aquí contaría como respondida para entregar, pero el evaluador —que solo mira
-            // texto— nunca la calificaría, y la postulación se quedaría sin nota de etapa.
-            if (datos.opcionId() != null) {
-                throw new IllegalArgumentException(
-                        "Esta pregunta es de respuesta abierta: no lleva opciones");
-            }
-            if (datos.texto() == null || datos.texto().isBlank()) {
-                throw new IllegalArgumentException("Hay que escribir una respuesta");
-            }
-        } else if (datos.opcionId() == null && (datos.texto() == null || datos.texto().isBlank())) {
-            throw new IllegalArgumentException("Hay que elegir una opción o escribir una respuesta");
+            guardarLaRespuesta(evaluacion.getId(), preguntaId, datos);
+            return;
+        }
+        // ⚠️ **Los seis formatos del banco v3 salen por arriba, así que en ellos vaciar NO
+        // borra.** No es un olvido: un detalle a medias no se distingue de uno que se está
+        // reordenando, y `ValidadorDetalleV3` lo rechaza justamente para que una respuesta con
+        // mala forma no acabe convertida en una nota. Hoy no se nota porque la pantalla ni
+        // siquiera manda un detalle incompleto (`cambiarDetalle` corta antes). El precio es
+        // que vaciar los campos de una CD deja la pantalla en blanco y la respuesta vieja en
+        // el servidor; el día que eso importe, la salida es un borrado explícito, no aflojar
+        // el validador.
+
+        // Una ABIERTA se responde escribiendo, y solo escribiendo. Aceptar una opción aquí
+        // contaría como respondida para entregar, pero el evaluador —que solo mira texto—
+        // nunca la calificaría, y la postulación se quedaría sin nota de etapa.
+        if ("ABIERTA".equals(pregunta.getTipo()) && datos.opcionId() != null) {
+            throw new IllegalArgumentException(
+                    "Esta pregunta es de respuesta abierta: no lleva opciones");
+        }
+
+        // Sin opción y sin texto: el candidato borró lo que tenía puesto.
+        //
+        // ⚠️ <b>Eso no es un error, es dejar la pregunta sin responder</b>, y rebotarlo con un
+        // 400 costaba dos cosas a la vez. La primera, un cartel rojo en mitad del examen que
+        // decía «Hay que escribir una respuesta» a alguien que estaba escribiendo una. La
+        // segunda, peor: la pantalla se quedaba en blanco y el servidor conservaba el texto
+        // viejo, así que el candidato veía un recuadro vacío y el contador lo contaba como
+        // respondido. Nadie podía cuadrar esas dos cifras.
+        //
+        // Borrando, las dos versiones vuelven a decir lo mismo. Y no se pierde nada en
+        // silencio: {@code entregar} sigue rechazando la entrega mientras falte alguna, así
+        // que una respuesta borrada sin querer se ve antes de entregar, no después.
+        //
+        // ⚠️ <b>Esto solo es seguro mientras el examen esté abierto.</b> {@code nota_respuesta}
+        // apunta a {@code respuesta} con una clave foránea <b>sin {@code ON DELETE CASCADE}</b>,
+        // así que borrar una respuesta ya calificada revienta contra ella. Hoy no puede pasar:
+        // {@code exigirAbierta} corta antes y la IA solo califica al entregar. Pero el día que
+        // se califique con el examen abierto, o que se pueda reabrir uno entregado, vaciar un
+        // recuadro pasa a ser un error y el candidato lee «No se pudo guardar» sin saber por
+        // qué. La salida entonces no es aflojar la clave: es decidir qué pasa con la nota de
+        // una respuesta que su dueño acaba de borrar.
+        if (datos.opcionId() == null && (datos.texto() == null || datos.texto().isBlank())) {
+            respuestas.findByEvaluacionIdAndPreguntaId(evaluacion.getId(), preguntaId)
+                    .ifPresent(respuestas::delete);
+            return;
         }
 
         guardarLaRespuesta(evaluacion.getId(), preguntaId, datos);
@@ -472,6 +505,23 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
                     .findByEvaluacionIdAndPreguntaId(evaluacionId, preguntaId)
                     .orElseThrow(() -> carrera);
             respuestas.saveAndFlush(conLoQueMando(suya, datos));
+        } catch (ObjectOptimisticLockingFailureException desaparecio) {
+            // La otra cara de la misma carrera, y **nueva desde que el vacío borra**: leímos la
+            // fila, otra petición la borró, y nuestro UPDATE no encontró nada que actualizar.
+            //
+            // Antes no podía pasar porque la fila no desaparecía nunca. Ahora sí, y sin esto
+            // sería un 500 en mitad del examen por haber tenido dos pestañas abiertas. Se
+            // vuelve a intentar desde cero: como no hay fila, se crea.
+            log.debug("La respuesta de la pregunta {} en la evaluacion {} se borró mientras se"
+                    + " guardaba; se vuelve a crear", preguntaId, evaluacionId);
+            respuestas.saveAndFlush(conLoQueMando(
+                    respuestas.findByEvaluacionIdAndPreguntaId(evaluacionId, preguntaId)
+                            .orElseGet(() -> Respuesta.builder()
+                                    .evaluacionId(evaluacionId)
+                                    .preguntaId(preguntaId)
+                                    .creadoEn(Instant.now())
+                                    .build()),
+                    datos));
         }
     }
 

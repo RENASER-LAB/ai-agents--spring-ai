@@ -1496,6 +1496,13 @@ Lo que contestó.
 Se guarda al momento, así que si se corta la luz retoma donde quedó. Una vez enviada no puede
 volver atrás a cambiarla.
 
+⚠️ **La fila desaparece si el candidato vacía el recuadro** (16/09/2026): mandar la respuesta en
+blanco la borra, y esa pregunta queda sin responder. Antes se rechazaba y el texto anterior se
+quedaba guardado, que es lo que hacía imposible cuadrar lo que enseñaba la pantalla con lo que
+contaba el sistema. Los seis formatos del banco v3 —los que responden en `detalle`— son la
+excepción y no borran. El porqué, y lo que habrá que decidir el día que se califique con el
+examen abierto, está en [Modelo de datos](05-MODELO-DE-DATOS.md).
+
 ## `nota_respuesta`
 
 El puntaje de esa respuesta y por qué.
@@ -1890,6 +1897,11 @@ Sus respuestas a las preguntas de la prueba.
 | `respondida_en` | timestamptz | sí | |
 
 **Clave primaria:** `id` · **Único:** `intento_prueba_id` + `pregunta_prueba_id`
+
+⚠️ **Aquí también, la fila desaparece si el candidato vacía el recuadro** (16/09/2026). Es la
+misma regla que en la evaluación, y hasta esa fecha esta pantalla no la seguía: el vacío se
+rechazaba antes de llegar a decidirse nada, lo cual en una prueba cronometrada era un error en
+mitad del reloj por haber borrado lo que uno mismo escribió.
 
 ---
 
