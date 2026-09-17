@@ -11,7 +11,7 @@ haría falta para arreglarlo**. Sin lo tercero, una lista así solo sirve para p
 > descubrir cada pocos meses, normalmente con un candidato dentro. Lo que **ya está arreglado**
 > no vive aquí: vive en el documento de su tema, en `CLAUDE.MD` o en el javadoc de su clase.
 
-Última revisión: **15/09/2026**.
+Última revisión: **16/09/2026**.
 
 ---
 
@@ -168,10 +168,41 @@ produce**. Se escribieron contra una base que tenía otros datos, y el sembrador
 
 **Qué haría falta.** Decidir cuál de las dos, y no a medias: que el sembrador produzca los valores
 que los specs esperan, o que los specs dejen de esperar cifras exactas y comprueben la forma —que
-el orden sea descendente, que la columna exista, que el Excel traiga las hojas— en vez del número.
+el orden sea descendente, que la columna exista, que el Excel traiga su hoja «Datos»— en vez del
+número.
 Lo segundo es más barato y más duradero; lo primero conserva la capacidad de comprobar que una
 cuenta da lo que tiene que dar. Mientras no se haga, **la cifra de arriba es la referencia**: 19
 es el rojo esperado, y cualquier número mayor sí es una regresión.
+
+---
+
+## 7 · Cinco puntos del Perfil Integral están reservados a algo que nadie calcula
+
+**Qué le pasa a alguien.** Quien abra el reparto de pesos de la **versión inicial** ve que el
+Perfil Integral vale 40 y que dentro de ese 40 el **psicométrico se lleva 5**. Es mentira: el
+módulo psicométrico no existe, nadie pone esa nota y **ninguna cuenta del sistema lee ese peso**.
+Quien configure los pesos creyendo que ahí se mide algo —o quien le explique el reparto al
+cliente leyendo la tabla— está contando con una medición que no ocurre.
+
+**Por qué pasa.** La nota del Perfil Integral se arma con **dos cosas y solo dos**: el currículum
+y la evaluación, cada una por su peso y divididas entre lo que suman esas dos. El psicométrico ni
+entra en la suma ni aparece en el divisor, así que esos cinco puntos **no le bajan la nota a
+nadie**: simplemente se ignoran. Lo que sí sigue vivo es el componente: la base lo acepta como
+valor válido de la columna, el endpoint de pesos lo admite y la comprobación de publicar exige
+que los componentes sumen lo mismo que pesa la etapa —con el psicométrico dentro de esa suma—.
+Una versión que le dé peso pasa todas las puertas y no la calcula nadie. De la tercera versión de
+pesos en adelante las migraciones lo dejaron en **0** y repartieron sus puntos entre el currículum
+y la evaluación —que es lo que dicen los documentos—, pero **la versión inicial sembrada sigue
+con 10 / 5 / 25**.
+
+**Qué haría falta.** Decidir una de dos, y no las dos a medias: que la versión inicial deje el
+psicométrico en 0 como las demás —una migración de datos, sin tocar el esquema—, o que publicar
+una versión que le dé peso a un componente que nadie calcula **avise o se niegue**, en vez de
+aceptarlo en silencio. Mientras tanto, al leer un reparto de pesos hay que mirar el número del
+psicométrico: si no es 0, esos puntos no están midiendo nada.
+
+⚠️ **Esto no es parte del formato nuevo del Excel del ranking** (16/09/2026) ni se tocó con él;
+se anota aquí porque salió al verificar los pesos que esa hoja combina.
 
 ---
 

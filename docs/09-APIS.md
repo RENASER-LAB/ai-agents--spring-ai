@@ -219,7 +219,7 @@ del área— se ven solo las propias, y una ajena responde 404.
 | GET `/bandeja?espera_a=` | La bandeja: todo lo que espera a `CANDIDATO`, `SISTEMA`, `TALENTO` o `AREA` | `ver_candidatos` |
 | GET `/vacantes/{id}/embudo` | Cuántas postulaciones hay en cada estado | `ver_embudo` |
 | GET `/vacantes/{id}/ranking?etapa=` | La tanda ordenada de más apto a menos, con las ocho notas del currículum de cada uno. **Incluye a quien todavía no tiene nota**. Sin `etapa` ordena por la del Perfil Integral; con ella, por la nota de esa etapa. Cada fila trae además **dónde vive** (`ciudad`, ya escrito «Departamento — Provincia», y `ciudadCodigo`), **su pretensión salarial**, que pide **dos llaves** —`ver_pretension` y que esta vacante publique lo que paga—, y el **`ponderado`** de lo ya rendido (ver la nota de abajo). La respuesta trae además **`puedeMoverPostulacion`**, por lo mismo que la ficha: es el único modo que tiene el panel de saber si ofrecer el descarte en lote, porque no hay endpoint de «mis permisos» | `ver_embudo` |
-| POST `/vacantes/{id}/ranking/excel` | La tanda seleccionada, en un `.xlsx` de dos hojas —Resumen y Detalle— que se descarga como adjunto. Se le pasan `etapa`, los `postulacionIds` **ya ordenados por quien llama** y `filtroDescrito`, la frase que se pintó encima de la tabla. Solo hay columnas para `PERFIL_INTEGRAL` y `PRUEBA_PUESTO`; otra etapa es un 400. Las dos hojas de Resumen cierran con el **ponderado** y su desglose, cada una sin repetir la cifra que su propia columna «Nota» ya enseña | `ver_embudo` |
+| POST `/vacantes/{id}/ranking/excel` | La tanda seleccionada, en un `.xlsx` de **una sola hoja, llamada «Datos»**, que se descarga como adjunto. Se le pasan `etapa`, los `postulacionIds` **ya ordenados por quien llama** y `filtroDescrito`, la frase que se pintó encima de la tabla. Solo hay columnas para `PERFIL_INTEGRAL` y `PRUEBA_PUESTO`; otra etapa es un 400. **Cada criterio de la rúbrica es una columna** y las explicaciones viajan juntas en la última. ⚠️ La columna «CV» lleva un **enlace firmado que abre el currículum sin pedir sesión** durante unas horas; pide además `descargar_entregables` y, sin ese permiso, va solo el nombre del archivo | `ver_embudo` |
 | GET `/postulaciones/{id}` · `/historial` | La ficha completa y el recorrido. La ficha trae además **`puedeMoverPostulacion`**: si quien pregunta tiene `mover_postulacion`. No es un dato del candidato sino una facultad de quien mira —igual que `puedeVerPretension` en el ranking— y existe porque el login solo devuelve token e id, así que el panel no tiene otra forma de saber si pintar el botón de descartar. ⚠️ Dice si el permiso **está**, no hasta dónde llega su alcance: quien pueda abrir fichas de todos y mover solo las suyas verá el botón y recibirá un **404** al pulsarlo. Desde el 14/09 trae también **lo que esa persona pidió ganar al postular aquí**, con las dos llaves de siempre, y cuando no hay nada **dice cuál de los tres motivos es** | `abrir_ficha_candidato` |
 | POST `/postulaciones/{id}/transiciones` | Mover a cualquier estado. **El motivo es obligatorio, sin excepción**. Es también lo que usan **«Descartar»** de la ficha del panel y **«Descartar a N personas»** de la mesa de la tabla: mandan `NO_CONTINUA` y el servicio rellena solo `motivoCierre = DECISION_PERSONA` (para `CERRADA` sería `CIERRE_MANUAL`). ⚠️ Hacia un estado final **esto avisa al candidato por correo** — `NO_CONTINUA` dispara la plantilla `POSTULACION_NO_CONTINUA` en la misma transacción—, y el motivo escrito **no viaja en ese correo**: queda en el historial y la auditoría. **`avisar: false` calla ese correo y solo eso**: el estado cambia, la transición se guarda y la auditoría se escribe igual. Nulo o ausente = avisar, que es lo de siempre. ⚠️ Que no se avisó **queda escrito en los dos sitios donde alguien lo va a buscar**: el motivo guardado termina en « · sin avisar al candidato» —es lo único de la transición que pinta el historial de la ficha— y la auditoría lleva `avisoAlCandidato: NO_ENVIADO`. Sin eso, un descarte silencioso y uno normal se leen igual seis meses después, y si el candidato llama preguntando nadie sabría que nunca se le dijo | `mover_postulacion` |
 | POST `/postulaciones/{id}/confirmacion-avance` | Confirmar que avanza: el sistema calcula el estado siguiente | `confirmar_avance` |
@@ -275,24 +275,76 @@ del área— se ven solo las propias, y una ajena responde 404.
 > archivo.
 >
 > Los ids que no son de esa vacante **se descartan y se dicen al pie de la hoja**, con su número
-> y su lista; si ninguno de los pedidos es de la vacante, es un 400. La hoja **Resumen** lleva una
-> fila por candidato —con el puesto que ocupa en el ranking, no la posición en el archivo— y la
-> hoja **Detalle** una línea por criterio; no hay hoja de respuestas. El archivo baja como adjunto
-> y se llama `ranking-{etapa}-vacante-{id}-{fecha}.xlsx`, con la fecha dentro porque estas hojas
-> se guardan.
+> y su lista; si ninguno de los pedidos es de la vacante, es un 400. La hoja **«Datos»** —la
+> única— lleva **una fila por candidato**, con el puesto que ocupa en el ranking y no la posición
+> en el archivo; no hay hoja de respuestas. El archivo baja como adjunto y se llama
+> `ranking-{etapa}-vacante-{id}-{fecha}.xlsx`, con la fecha dentro porque estas hojas se guardan.
 >
-> **La columna de pretensión se explica sola.** Vacía significa tres cosas distintas —que nadie la
-> declaró, que el rol de quien descarga no puede verla, o que **esta vacante no publica su
-> remuneración y por tanto a nadie se le pidió la suya**— y solo una es verdad cada vez, así que
-> el pie lo dice. Por eso mismo el ranking devuelve `puedeVerPretension` en su cabecera: sin ese
-> booleano, la pantalla tendría que nombrar las posibilidades sin afirmar ninguna. ⚠️ **Ese
-> booleano es el permiso a secas, no la conjunción con lo que publica la vacante**: son motivos
-> distintos para una casilla vacía y la pantalla tiene que poder decir cuál es — con un solo sí/no
-> para los dos, a Dirección le diría «tu rol no puede verla», que es falso. Sin `ver_pretension`, o
-> con una vacante que esconde su sueldo, el dato ni se consulta. Y quien tiene `ver_embudo` pero no
-> `abrir_ficha_candidato` (el mismo permiso que pide `GET /prueba/notas`, desde el 03/09/2026) se
-> lleva el Detalle de la prueba resumido en una línea que explica qué permiso le falta, en vez de
-> un archivo a medio escribir.
+> **Las columnas, en el orden de la plantilla que pidió el cliente** (16/09/2026). En la pestaña
+> de la prueba del puesto: `#`, Candidato, Correo, CV, Teléfono, `Nota Examen Técnico /100`,
+> `Nota Perfil Integral /100`, **una columna por cada criterio de la rúbrica** —rotulada
+> `Nombre (pts /N)`, con el techo de ese criterio—, `Nota Combinada /100`, `Justificación
+> resumida` y `Justificación detallada`. En la pestaña del Perfil Integral son **las mismas menos
+> la nota técnica y la combinada**: a esas alturas del embudo la prueba todavía no existe para
+> nadie, y esas dos columnas saldrían huecas para casi toda la tanda; ahí las columnas de criterio
+> son las del currículum, que son las notas que esa etapa produce. Las columnas de criterio se
+> arman con **la tanda entera y no con el recorte pedido**, igual que las de la tabla: así el
+> mismo ranking descargado con dos ordenaciones distintas sale con las mismas columnas y en el
+> mismo sitio.
+>
+> ⚠️ **Dos columnas nunca llevan el mismo rótulo encima**, y hace falta decirlo porque es fácil
+> que coincidan: una rúbrica puede tener «Comunicación» oral y «Comunicación» escrita, y una tanda
+> que mezcle dos versiones de la misma plantilla puede traer el mismo criterio con distinto techo.
+> Cuando dos columnas coincidirían en su rótulo, **todas las que coincidan llevan su código entre
+> corchetes** —«Comunicación [COM_ORAL] (pts /20)»—, y si ni con el código se distinguen, un
+> ordinal. Lo que decide si dos notas van a la misma columna son las tres cosas juntas: el nombre,
+> el código y el techo. ⚠️ Las tres hacen falta: **el código de un criterio solo es único dentro de
+> una versión de plantilla**, así que el mismo «C2» puede ser dos criterios distintos en dos
+> versiones, y sin el nombre una nota acabaría leyéndose bajo el criterio equivocado.
+>
+> **De dónde sale cada justificación.** «Justificación resumida» es el resumen que la IA escribió
+> del candidato. «Justificación detallada» son las explicaciones de cada criterio unidas en una
+> sola celda —una detrás de otra, cada una con su puntaje y su techo—, y cuando una persona
+> corrigió una nota, **el motivo de ese ajuste va pegado a su criterio** y no en una columna
+> aparte, porque solo significa algo junto a la nota que corrigió. Eso es lo que hacía falta de
+> la vieja hoja «Detalle», que ponía una línea por criterio y por candidato: con cada criterio
+> convertido en columna, esa hoja se quedaba sin nada propio que contar.
+>
+> ⚠️ **La columna «CV» lleva un enlace firmado, y ese enlace abre el currículum sin pedir sesión
+> ni permiso.** Vale durante el plazo que fije `app.archivos.supabase.horas-enlace-volcado` —ocho
+> horas de fábrica— y **cualquiera que reciba el archivo dentro de ese plazo puede abrir esos
+> currículums**, aunque no tenga cuenta. La propia hoja lo avisa en su pie, con el plazo que de
+> verdad queda. Escribirlo pide `descargar_entregables`, el mismo permiso que la descarga de
+> siempre; sin él la columna va con el nombre del archivo y nada más, y el pie lo dice. El texto
+> de la celda es siempre el nombre del archivo y nunca la URL: doscientos caracteres de firma no
+> se leen, y el nombre sigue sirviendo para dar con el currículum cuando el enlace ya caducó. Un
+> currículum que no se pudo firmar —porque el archivo ya no está en el almacén, o porque la firma
+> falló— deja su fila con el nombre y **se cuenta al pie**: una firma que falla no puede dejar sin
+> archivo a la tanda entera. Los detalles del plazo, y por qué no son los cinco minutos del panel,
+> están en [Los currículums dejan de vivir en el backend](ARCHIVOS-EN-BUCKET.md).
+>
+> **Lo que la hoja ya no trae, y la tabla sí.** Pretensión, Veredicto, Estado, Ciudad y las cifras
+> del retrato de la IA (adecuación, potencial, riesgos, alertas, fortalezas) **no van al archivo**:
+> la plantilla que mandó el cliente es más corta y se siguió. Siguen en la tabla del panel, que es
+> donde se trabaja. Por eso la frase del pie ya no explica por qué salió vacía una columna de
+> pretensión o de ciudad —explicar una columna que no está desorienta más que callar—, mientras
+> que el ranking sí sigue devolviendo `puedeVerPretension` en su cabecera **para la tabla**: sin
+> ese booleano, la pantalla tendría que nombrar las posibilidades sin afirmar ninguna. ⚠️ Ese
+> booleano es el permiso a secas, no la conjunción con lo que publica la vacante: son motivos
+> distintos para una casilla vacía. Sin `ver_pretension`, o con una vacante que esconde su sueldo,
+> el dato ni se consulta.
+>
+> **Por qué los rótulos de las notas no son los de la plantilla del cliente.** Dos diferencias, y
+> las dos deliberadas. La plantilla llamaba «Nota CV /100» a la nota del Perfil Integral: eso es
+> cierto en Administrador y Asistente Administrativo, donde el perfil lo llena el currículum
+> porque tienen el banco apagado, pero **en una vacante con banco esa misma cifra es la de la
+> prueba RENASER**, así que rotularla «CV» diría de dónde sale un número que sale de otro sitio;
+> la hoja la llama «Nota Perfil Integral /100» y el pie lo explica en una línea. Y la plantilla
+> traía «Nota Combinada /40» en la cabecera con `=0.55*F+0.45*G` en las celdas, que da una cifra
+> **sobre 100** —y una hoja de «Metodología» que hablaba de un 30 % y un 12 %, que no son esos
+> pesos—: de las tres versiones se siguió la fórmula, que es la única que coincide con los pesos
+> de etapa de esas vacantes (45 el Perfil Integral y 55 la prueba del puesto, desde las
+> migraciones `V49` y `V50`).
 
 > **El desglose enseña de dónde sale cada 0–4, y no lo recalcula.** Desde el 02/09
 > `/postulaciones/{id}/evaluacion` devuelve, de lo que ya estaba guardado desde que se calificó,

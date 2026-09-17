@@ -2254,8 +2254,15 @@ Cómo se reparte el 40% del Perfil Integral.
 
 **Clave primaria:** `version_pesos_id` + `componente` · **Sin columna `id`**
 
-El módulo psicométrico todavía no existe. Su 5% se reparte entre los otros dos mientras tanto, y
-por eso esto son datos y no números escritos en el código.
+El módulo psicométrico todavía no existe. De la tercera versión de pesos en adelante su 5% está
+repartido entre los otros dos, y por eso esto son datos y no números escritos en el código.
+
+⚠️ **En la versión inicial sembrada `PSICOMETRICO` sigue valiendo 5, y nadie lee ese peso.** La
+nota del Perfil Integral se calcula solo con `CV` y `EVALUACION`, reescalada sobre lo que suman
+esos dos; el psicométrico no entra ni en la suma ni en el divisor. Aun así el componente se
+admite al guardar y la comprobación de publicar cuenta su peso dentro de lo que los componentes
+tienen que sumar, así que una versión que le dé peso pasa todas las puertas. Ver
+[Defectos conocidos](DEFECTOS-CONOCIDOS.md).
 
 ## `peso_dimension`
 

@@ -104,6 +104,30 @@ public interface AlmacenArchivos {
     }
 
     /**
+     * El mismo enlace, pero para el que se escribe DENTRO del Excel del ranking.
+     *
+     * <p><b>Por qué no vale el de arriba.</b> Aquel dura cinco minutos porque lo abre un
+     * navegador que ya tiene la pantalla delante. Este se escribe en una hoja que se
+     * descarga y se abre más tarde: con cinco minutos el archivo nace con la columna del
+     * currículum ya muerta, que es peor que no ponerla.
+     *
+     * <p><b>Y por qué NO es como el de consigna.</b> El enunciado de una prueba no es el
+     * dato de nadie y por eso dura meses; un currículum sí lo es. De ahí que esto sean
+     * horas —{@code horas-enlace-volcado}, ocho por defecto— y no días: lo justo para que la
+     * hoja sirva la jornada en que se descargó.
+     *
+     * <p>⚠️ <b>Este enlace no vuelve a preguntar nada</b>, igual que el de descarga: quien
+     * reciba el Excel abre esos currículums sin sesión y sin permiso mientras no caduque.
+     * Quien lo escriba en una hoja tiene que decirlo en ella.
+     *
+     * <p>Por defecto es el enlace corriente: un almacén que no sepa firmar para tanto tiempo
+     * no tiene que fingir que sí.
+     */
+    default Optional<EnlaceFirmado> urlDeVolcado(Archivo archivo) {
+        return urlDeDescarga(archivo);
+    }
+
+    /**
      * Reserva un sitio en el almacén y devuelve por dónde subir sin pasar por aquí.
      *
      * <p>La fila de {@code archivo} se crea ya, con {@code subidoEn} vacío: existe el hueco,

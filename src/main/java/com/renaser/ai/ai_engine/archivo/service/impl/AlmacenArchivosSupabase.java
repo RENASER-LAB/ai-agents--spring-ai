@@ -193,6 +193,18 @@ public class AlmacenArchivosSupabase implements AlmacenArchivos {
         return firmar(archivo, Duration.ofDays(config.getDiasEnlaceConsigna()));
     }
 
+    /**
+     * El currículum que se escribe en el Excel del ranking se firma para horas.
+     *
+     * <p>El porqué —y lo que cuesta— está en {@link AlmacenArchivos#urlDeVolcado}: la hoja
+     * se descarga y se abre más tarde, así que cinco minutos la dejarían nacer muerta; y
+     * mientras no caduque, el enlace abre el currículum sin preguntar nada.
+     */
+    @Override
+    public Optional<EnlaceFirmado> urlDeVolcado(Archivo archivo) {
+        return firmar(archivo, Duration.ofHours(config.getHorasEnlaceVolcado()));
+    }
+
     private Optional<EnlaceFirmado> firmar(Archivo archivo, Duration vida) {
         exigirContenido(archivo);
 

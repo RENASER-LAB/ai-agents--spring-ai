@@ -138,6 +138,14 @@ un 404, no como un 403 que confirmaría que existe.
 | **Ver las claves de puntuación** | ○ | ● | ○ | ● | ○ |
 | Descargar entregables | ○ | ● | ◐ | ● | ○ |
 
+⚠️ **«Descargar entregables» decide también lo que lleva la columna «CV» del Excel del ranking**
+(16/09/2026). Con el permiso, esa columna trae **un enlace que abre el currículum sin pedir
+sesión** y que vive unas horas: quien reciba la hoja dentro de ese plazo puede abrirlo aunque no
+tenga cuenta —la hoja lo avisa en su pie—. Sin el permiso va solo el nombre del archivo. Es el
+mismo permiso que la descarga de siempre, y a propósito: si una de las dos formas de entregar el
+mismo currículum no comprobara nada, sería la puerta de atrás. Ver
+[Los currículums dejan de vivir en el backend](ARCHIVOS-EN-BUCKET.md).
+
 **Las claves de puntuación las ven el Equipo de Talento y Dirección.** Lo que dice el documento
 del cliente es esto, textual:
 

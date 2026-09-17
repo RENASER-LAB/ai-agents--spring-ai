@@ -53,4 +53,23 @@ public interface ServicioPostulacionesPanel {
      *                               y entonces toca {@link #descargarArchivo}
      */
     EnlaceArchivo enlaceDeArchivo(ContextoUsuario quien, Long archivoId);
+
+    /**
+     * El mismo enlace, pero el que se escribe DENTRO del Excel del ranking.
+     *
+     * <p>Se diferencia en una sola cosa —dura horas en vez de minutos— y existe como metodo
+     * aparte, y no como un parametro del de arriba, justamente para que esa diferencia
+     * tenga que pedirse por su nombre. El porque y lo que cuesta estan en
+     * {@code AlmacenArchivos.urlDeVolcado}.
+     *
+     * <p>Comprueba el MISMO permiso que la descarga: son dos formas de entregar lo mismo, y
+     * la que no comprobara nada seria la puerta de atras.
+     *
+     * @return vacio si este almacen no sabe firmar. Aqui devuelve vacio en vez de reventar
+     *         porque quien llama vuelca ochenta filas y una excepcion por una dejaria sin
+     *         archivo a las ochenta. ⚠️ El almacen de Supabase, que es el unico que hay hoy,
+     *         nunca devuelve vacio: o firma o lanza. Quien llame tiene que atender los dos
+     *         caminos igual, porque el que sobra hoy es el que queda cuando aparezca otro
+     */
+    java.util.Optional<EnlaceArchivo> enlaceDeVolcado(ContextoUsuario quien, Long archivoId);
 }

@@ -963,8 +963,12 @@ Casi todo lo que el cliente cambia seguido vive aquí, no en el código.
 que cambia por vacante es a qué versión apunta. Donde el nivel **sí** sigue mandando es en el
 peso de cada criterio y de cada dimensión.
 
-El módulo psicométrico todavía no existe. Su 5% se reparte entre las otras dos partes mientras
-tanto, y por eso los pesos de los componentes son datos y no números escritos en el código.
+El módulo psicométrico todavía no existe. De la tercera versión de pesos en adelante su 5% está
+repartido entre las otras dos partes, y por eso los pesos de los componentes son datos y no
+números escritos en el código. ⚠️ **La versión inicial sembrada todavía le da 5, y ninguna cuenta
+lee ese peso**: la nota del Perfil Integral se arma solo con el currículum y la evaluación. Está
+anotado en [Defectos conocidos](DEFECTOS-CONOCIDOS.md), en «Cinco puntos del Perfil Integral
+están reservados a algo que nadie calcula».
 
 Las instrucciones que recibe cada agente son configuración versionada, igual que las preguntas.
 Solo Dirección las cambia, y cada calificación guarda con qué versión se produjo.
