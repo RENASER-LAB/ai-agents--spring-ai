@@ -231,7 +231,7 @@ Dos endpoints más en `PostulacionesPanelController`:
 |---|---|
 | Ordenar la tanda por la nota de otra etapa | `GET /panel/vacantes/{id}/ranking?etapa=PRUEBA_PUESTO` |
 | Abrir la evaluación del banco por dentro | `GET /panel/postulaciones/{id}/evaluacion` |
-| Bajar la tanda a Excel | `GET /panel/vacantes/{id}/ranking/excel` |
+| Bajar la tanda a Excel | `POST /panel/vacantes/{id}/ranking/excel` |
 
 - **`?etapa=` cambia con qué nota se ordena, y en una sola etapa también las columnas.** Con
   `PRUEBA_PUESTO` (desde el 03/09/2026) cada fila trae **los criterios de la rúbrica con la que
@@ -251,6 +251,18 @@ Dos endpoints más en `PostulacionesPanelController`:
 - **Es una sobrecarga, no un cambio de firma, a propósito**: sin pedir etapa, el ranking
   ordena por la nota de la preselección, que es lo que hacía antes de que existieran las
   pestañas. Sin el parámetro el camino es el de antes, sin una consulta de más.
+- **Lo que se descarga es una hoja, no dos** (16/09/2026). El botón «Descargar Excel», encima de
+  la tabla, baja un `.xlsx` con **una sola hoja, «Datos»**, en el formato corto que pidió el
+  cliente: una fila por candidato, **una columna por cada criterio** de la rúbrica que se le
+  aplicó —las mismas que enseña la tabla— y, al final, el resumen de la IA y todas las
+  explicaciones juntas. Antes eran
+  «Resumen» y «Detalle», y la segunda ponía una línea por criterio y por candidato: una tanda de
+  ochenta con ocho criterios eran seiscientas cuarenta filas que nadie leía. **La columna «CV»
+  lleva un enlace que abre el currículum sin pedir sesión y caduca en unas horas**: quien reciba
+  la hoja dentro de ese plazo puede abrirlo, y la hoja lo avisa en su pie. Pretensión, Veredicto,
+  Estado, Ciudad y las cifras del retrato de la IA **se quedan en la tabla y no van al archivo**.
+  Las columnas, una por una, están en [Las APIs](09-APIS.md); el plazo del enlace, en
+  [Los currículums dejan de vivir en el backend](ARCHIVOS-EN-BUCKET.md).
 - **El desglose es de solo lectura y nunca da 404.** Sin evaluación asignada devuelve vacíos:
   una vacante publicada con el banco apagado es un caso normal. Lo guarda
   `ver_respuestas_evaluacion`, que estaba en el catálogo desde V12 y no lo comprobaba nadie;

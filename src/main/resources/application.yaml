@@ -280,6 +280,10 @@ app:
       # Lo que dura un enlace de descarga. Corto a propósito: el enlace no vuelve a
       # preguntar quién eres, así que es tan secreto como el currículum que abre.
       minutos-enlace: 5
+      # Lo que dura el enlace al CV que se escribe dentro del Excel del ranking. Horas y no
+      # minutos porque esa hoja se descarga y se abre mas tarde; y horas y no dias porque
+      # mientras viva lo abre cualquiera que reciba el archivo, sin sesion ni permiso.
+      horas-enlace-volcado: 8
   seguridad:
     # Clave HMAC para firmar los tokens. Va en application-secrets.yaml (no se versiona)
     # o por variable de entorno. Mínimo 32 bytes; sin ella la aplicación no arranca.

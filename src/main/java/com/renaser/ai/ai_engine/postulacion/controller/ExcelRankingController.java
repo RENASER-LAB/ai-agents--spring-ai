@@ -35,7 +35,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/panel")
 @RequiredArgsConstructor
-@Tag(name = "Panel · Ranking en Excel", description = "La tanda seleccionada, en dos hojas")
+@Tag(name = "Panel · Ranking en Excel", description = "La tanda seleccionada, en una hoja")
 public class ExcelRankingController {
 
     private static final String XLSX =
@@ -46,10 +46,14 @@ public class ExcelRankingController {
 
     @PostMapping("/vacantes/{id}/ranking/excel")
     @PreAuthorize("@permisos.tiene('ver_embudo')")
-    @Operation(summary = "El ranking en un .xlsx de dos hojas —Resumen y Detalle—, con los "
+    @Operation(summary = "El ranking en un .xlsx de UNA hoja llamada «Datos», con los "
             + "candidatos en el MISMO orden en que llegan los postulacionIds: filtrar y "
-            + "ordenar es cosa del cliente y aquí no se vuelve a ordenar. Solo hay columnas "
-            + "para PERFIL_INTEGRAL y PRUEBA_PUESTO")
+            + "ordenar es cosa del cliente y aquí no se vuelve a ordenar. Cada criterio de la "
+            + "rúbrica es una columna. La columna CV lleva un enlace firmado que abre el "
+            + "currículum sin pedir sesión y que caduca al cabo de unas horas —el plazo lo "
+            + "fija «horas-enlace-volcado» y la propia hoja dice cuál es—: pide "
+            + "«descargar_entregables», y sin ese permiso va solo el nombre del archivo. Solo "
+            + "hay columnas para PERFIL_INTEGRAL y PRUEBA_PUESTO")
     public ResponseEntity<byte[]> excel(@PathVariable Long id,
                                         @Valid @RequestBody PedidoExcelRanking pedido) {
         ExcelDeRanking libro = excel.generar(permisos.actual(), id, pedido);

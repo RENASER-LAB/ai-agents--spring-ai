@@ -81,5 +81,22 @@ public class PropiedadesAlmacen {
          * mandar el correo en vez de al subirlo.
          */
         private int diasEnlaceConsigna = 180;
+
+        /**
+         * Cuánto vale el enlace al currículum que se escribe dentro del Excel del ranking.
+         *
+         * <p><b>Horas, y no los cinco minutos de arriba.</b> Es el mismo dato de la misma
+         * persona y la regla no cambia: lo que cambia es para qué sirve el enlace. El de
+         * cinco minutos lo abre un navegador que ya tiene la pantalla delante; este se
+         * escribe en una hoja que se descarga, se guarda y se abre más tarde —a veces al día
+         * siguiente—, y con cinco minutos el Excel nacería con la columna del CV ya muerta.
+         *
+         * <p>⚠️ <b>Y el precio es real, dicho aquí para que nadie lo descubra después:</b>
+         * durante estas horas el enlace NO vuelve a preguntar nada. Quien reciba el archivo
+         * abre esos currículums sin sesión, sin permiso y sin dejar rastro. El plazo es
+         * corto por eso, y es una propiedad para poder bajarlo sin tocar código el día que
+         * ocho horas parezcan muchas.
+         */
+        private int horasEnlaceVolcado = 8;
     }
 }

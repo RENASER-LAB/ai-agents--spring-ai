@@ -271,6 +271,25 @@ public class ServicioPostulacionesPanelImpl implements ServicioPostulacionesPane
     }
 
     /**
+     * El enlace largo, el del Excel del ranking.
+     *
+     * <p>Pasa por {@link #elVisible} igual que los otros dos: el permiso se comprueba antes
+     * de firmar, porque despues ya no hay a quien preguntarle.
+     *
+     * <p>Devuelve vacio —y no revienta— cuando el almacen no sabe firmar o el archivo ya no
+     * esta: quien llama esta volcando una tanda entera, y una excepcion por una fila dejaria
+     * sin hoja a las otras setenta y nueve.
+     */
+    @Override
+    public java.util.Optional<EnlaceArchivo> enlaceDeVolcado(ContextoUsuario quien, Long archivoId) {
+        Archivo archivo = elVisible(quien, archivoId);
+        return almacen.urlDeVolcado(archivo)
+                .map(firmado -> new EnlaceArchivo(firmado.url(), firmado.expira(),
+                        archivo.getNombreOriginal() == null
+                                ? "archivo" : archivo.getNombreOriginal()));
+    }
+
+    /**
      * El archivo, si quien pregunta puede verlo.
      *
      * <p>Lo comparten la descarga y el enlace <b>a proposito</b>: son dos formas de entregar

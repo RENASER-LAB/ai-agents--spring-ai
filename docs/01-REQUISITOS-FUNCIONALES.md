@@ -1199,7 +1199,8 @@ reescalados **sobre la suma de sus pesos**. Existe porque hasta que las cuatro e
 hay ninguna cifra que compare la tanda, y el equipo decide a quién seguir mucho antes de eso. **No
 es la Puntuación Global**: no se guarda, no se compara con los umbrales del semáforo y no mueve a
 nadie de estado. Si falta cualquiera de las dos notas, no hay cifra —media cuenta no es una
-cuenta—. Va también al Excel del ranking, con su desglose.
+cuenta—. Va también al Excel del ranking de esa pestaña, como **«Nota Combinada /100»**, con las
+dos notas que la componen en sus propias columnas.
 
 ---
 

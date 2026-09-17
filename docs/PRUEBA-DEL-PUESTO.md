@@ -155,6 +155,12 @@ valga por las dos etapas de preguntas: se carga como prueba del puesto, lo calif
   Las notas ya calculadas no se recalculan; cambia cómo se combinan de aquí en adelante, y el
   orden del ranking cambia con ello. La migración localiza la versión por lo que la define (la
   que usan esas vacantes y tiene la prueba al 100), nunca por su número: en otra base no toca nada.
+- ✅ **Ese 45/55 es el mismo que el cliente tenía en su plantilla de Excel**, comprobado el
+  16/09/2026: las celdas de su columna combinada calculan `=0.55*F+0.45*G`, o sea 55 la prueba
+  del puesto y 45 el Perfil Integral. Su cabecera decía «/40» y su hoja de «Metodología» hablaba
+  de un 30 % y un 12 %, que no son esos pesos: **de las tres versiones se siguió la fórmula**, que
+  es la única que coincide con lo que la vacante tiene configurado. El archivo que hoy descarga el
+  panel da esa misma cifra, sobre 100.
 
 El flujo entero está cubierto por `FlujoSinBancoIT`.
 
@@ -176,12 +182,16 @@ al modelo cuesta dinero y a quién se califica lo decide quien lleva la vacante.
 - **Una pregunta ya contestada no se borra.** Volver a pedir las preguntas rehace solo las que
   nadie llegó a hacer.
 - **Leer el desglose de la rúbrica pide el permiso de abrir la ficha, no el de corregirla**
-  (03/09/2026). `GET /prueba/notas` y el Excel del ranking pedían `ajustar_nota`, que solo
-  tienen Talento y Dirección: Responsable de Área veía la nota en el embudo de su vacante y
-  recibía 403 al abrir su desglose. Ahora piden `abrir_ficha_candidato`, el mismo con el que ya
-  ve lo que el candidato entregó; escribir sigue pidiendo `ajustar_nota`. ⚠️ Los dos sitios
-  tienen que pedir el mismo: cuando divergieron, el Excel negaba un detalle que la pantalla sí
-  enseñaba.
+  (03/09/2026). `GET /prueba/notas` pedía `ajustar_nota`, que solo tienen Talento y Dirección:
+  Responsable de Área veía la nota en el embudo de su vacante y recibía 403 al abrir su desglose.
+  Ahora pide `abrir_ficha_candidato`, el mismo con el que ya ve lo que el candidato entregó;
+  escribir sigue pidiendo `ajustar_nota`. ⚠️ Cuando dos sitios enseñan lo mismo tienen que pedir
+  el mismo permiso: mientras divergieron, el Excel del ranking negaba un detalle que la pantalla
+  sí enseñaba.
+- **El Excel del ranking ya no lee la rúbrica por su cuenta** (16/09/2026). Saca los criterios de
+  la misma tanda que pinta la tabla, así que enseña exactamente las mismas columnas que la
+  pantalla desde la que se descargó y no puede volver a contradecirla. Lo que decide qué filas
+  salen sigue siendo `ver_embudo`, con el alcance de quien descarga.
 - **La rúbrica se lee siempre ordenada** (`findByVersionPlantillaPruebaIdOrderByOrden`): acaba
   en una pantalla y en las columnas del ranking, y sin `orden` salía como la devolviera la base.
   La pestaña «Prueba del puesto» del ranking enseña esos criterios por candidato: ver
@@ -264,9 +274,12 @@ que compare la tanda, y el equipo decide a quién seguir mucho antes.
   nota del banco de preguntas suelta**: lo guardado es su mezcla con el currículum, y despejarla
   restando da un número falso a quien no tiene evaluación asignada y a las vacantes que califica
   `CalificacionCriterios`.
-- Va también al Excel del ranking de esa pestaña, con su desglose. Solo en esa pestaña: en la del
-  perfil la mitad de la cuenta no existe para nadie, y en simulación y validación ya hay notas
-  posteriores que la cifra ignoraría.
+- Va también al Excel del ranking de esa pestaña, en la columna **«Nota Combinada /100»** y con
+  las dos notas que la componen a la vista —la técnica y la del Perfil Integral—, cada una en su
+  propia columna. Solo en esa pestaña: en la del perfil la mitad de la cuenta no existe para
+  nadie, y en simulación y validación ya hay notas posteriores que la cifra ignoraría. ⚠️ Cuando
+  falta una de las dos notas de etapa, esas celdas dicen «falta una nota de etapa» en vez de
+  quedarse en blanco: un cero ahí se leería como un juicio que nadie ha hecho.
 - ⚠️ **No es la Puntuación Global.** No se guarda, no se compara con los umbrales del semáforo y
   no mueve a nadie de estado.
 - Se calcula por tanda, con una sola lectura de los pesos, nunca una consulta por candidato.

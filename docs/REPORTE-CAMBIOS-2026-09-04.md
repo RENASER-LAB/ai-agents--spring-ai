@@ -29,7 +29,9 @@ código.
 - Ocupa una columna de cifra, ordenable y apagable. **El desglose vive en el título**: las tres
   notas que hay detrás de la cifra.
 - Sin alguna de las dos notas no hay cifra, sino un guion que dice **cuál falta**.
-- Va también al Excel del ranking, en las dos hojas de Resumen.
+- Va también al Excel del ranking, en las dos hojas de Resumen. *(Desde el 16/09/2026 el archivo
+  tiene una sola hoja, «Datos», y esa cifra es su columna «Nota Combinada /100»: ver
+  [Las APIs](09-APIS.md).)*
 
 ## La decisión que cambió por el camino
 

@@ -628,6 +628,7 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
                     comoVa,
                     pasada,
                     nombreDelArchivo(cvPorPostulacion.get(p.getId()), archivosPorId),
+                    idDelArchivo(cvPorPostulacion.get(p.getId()), archivosPorId),
                     pintarDatos(fichas.get(p.getId())),
                     p.getGrupoPrioridad(),
                     etapa(etapaPorPostulacion.get(p.getId())),
@@ -680,7 +681,7 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
             FilaRanking f = filas.get(i);
             numeradas.add(new FilaRanking(i + 1, f.postulacionId(), f.uuid(), f.candidato(),
                     f.correo(), f.estado(), f.estadoNombre(), f.estadoCalificacion(),
-                    f.pasada(), f.archivoNombre(), f.datos(),
+                    f.pasada(), f.archivoNombre(), f.archivoId(), f.datos(),
                     f.grupoPrioridad(), f.notaEtapa(), f.notaCurriculum(), f.adecuacion(),
                     f.potencial(), f.altoRendimiento(), f.confianzaEvidencia(), f.resumen(),
                     f.riesgosCriticos(), f.fortalezas(), f.alertas(), f.actualizadoEn(),
@@ -723,6 +724,20 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
         if (cv == null || cv.getArchivoOriginalId() == null) return null;
         Archivo archivo = archivosPorId.get(cv.getArchivoOriginalId());
         return archivo == null ? null : archivo.getNombreOriginal();
+    }
+
+    /**
+     * El id de ese mismo archivo, con la misma comprobación y de la misma tanda.
+     *
+     * <p>⚠️ Se pregunta por el archivo en el mapa aunque el id ya esté en el {@code cv}: si
+     * la fila del archivo no vino en la tanda —porque se borró, o porque es de otra
+     * organización— devolver el id igualmente prometería un enlace que luego no se puede
+     * firmar. Nulo aquí y nulo en el nombre fallan juntos, que es lo honesto.
+     */
+    private Long idDelArchivo(Cv cv, Map<Long, Archivo> archivosPorId) {
+        if (cv == null || cv.getArchivoOriginalId() == null) return null;
+        Archivo archivo = archivosPorId.get(cv.getArchivoOriginalId());
+        return archivo == null ? null : archivo.getId();
     }
 
     private BigDecimal etapa(NotaEtapa nota) {

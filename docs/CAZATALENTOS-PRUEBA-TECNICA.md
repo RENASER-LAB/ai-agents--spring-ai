@@ -253,7 +253,15 @@ enseñárselo.*
 > **Dónde vive ese 45/55 en el sistema, desde la V49.** Es el `peso_etapa` de las dos versiones
 > del cazatalentos: **Perfil Integral 45** —donde se guarda la prueba RENASER— y **Prueba del
 > puesto 55** —donde se guarda la técnica—. Suman 100 sobre esas dos únicas etapas, porque este
-> instrumento no contempla simulación ni validación.
+> instrumento no contempla simulación ni validación. Desde la V50 es también el reparto de
+> Administrador y Asistente Administrativo.
+>
+> ✅ **Y es exactamente la cuenta que hacía la plantilla de Excel del cliente**, comprobado el
+> 16/09/2026: sus celdas calculan `=0.55*F+0.45*G`. Su cabecera la rotulaba «/40» y su hoja de
+> «Metodología» hablaba de un 30 % y un 12 % que no son estos pesos; de las tres versiones se
+> siguió **la fórmula**, que es la única que coincide con lo que la vacante tiene configurado. La
+> hoja que hoy baja el panel trae esa misma cifra, sobre 100, en la columna «Nota Combinada /100»
+> (ver [Las APIs](09-APIS.md)).
 >
 > Hasta la V49 esas dos versiones no tenían ningún `peso_etapa`: la V41 les sembró los pesos de
 > pilar y nada más. Sin ese reparto no había con qué combinar las dos notas, y el daño no era

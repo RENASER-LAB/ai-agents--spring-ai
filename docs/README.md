@@ -64,7 +64,7 @@ requisitos nuevos el 14 de agosto y cambian bastante.
 | [El perfil, para Renaser](PARA-RENASER-EL-PERFIL-DEL-CANDIDATO.md) | La explicación sin tecnicismos, para decidir si merece la pena |
 | [CI/CD](CI-CD.md) | Qué corre en cada cambio, cómo se despliega a Pruebas en AWS y qué variables de entorno hacen falta |
 | [Conectar la base a Supabase](CONEXION-SUPABASE.md) | **Retirado.** El perfil `supabase` se borró el 21/08: apuntaba tu máquina a la única base que hay, la de producción. Queda la explicación de por qué |
-| [Los currículums dejan de vivir en el backend](ARCHIVOS-EN-BUCKET.md) | El bucket, los dos enlaces firmados, y por qué un PDF en el disco del backend se pierde en el primer despliegue |
+| [Los currículums dejan de vivir en el backend](ARCHIVOS-EN-BUCKET.md) | El bucket, los enlaces firmados y lo que dura cada uno —incluido el de ocho horas que el Excel del ranking escribe en su columna «CV»—, y por qué un PDF en el disco del backend se pierde en el primer despliegue |
 
 ### Lo que se hizo cada día
 

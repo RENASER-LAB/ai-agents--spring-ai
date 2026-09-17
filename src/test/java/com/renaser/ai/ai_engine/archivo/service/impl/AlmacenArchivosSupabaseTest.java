@@ -24,6 +24,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.springframework.test.web.client.match.MockRestRequestMatchers.content;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
@@ -62,6 +63,7 @@ class AlmacenArchivosSupabaseTest {
         propiedades.getSupabase().setClave(CLAVE);
         propiedades.getSupabase().setBucket("curriculums");
         propiedades.getSupabase().setMinutosEnlace(5);
+        propiedades.getSupabase().setHorasEnlaceVolcado(8);
 
         RestClient.Builder constructor = RestClient.builder();
         supabase = MockRestServiceServer.bindTo(constructor).build();
@@ -138,6 +140,40 @@ class AlmacenArchivosSupabaseTest {
         // Caduca pronto: el enlace no vuelve a preguntar quién eres, así que mientras viva
         // es tan bueno como el currículum.
         assertThat(enlace.get().expira()).isBefore(java.time.Instant.now().plusSeconds(310));
+    }
+
+    /*
+     * ⚠️ **El enlace del Excel se firma para HORAS, y esto es lo único que lo comprueba.**
+     * Los dos métodos se parecen tanto que llamar al de cinco minutos desde el volcado
+     * compila, pasa todos los demás tests y produce un Excel que nace con la columna del CV
+     * ya muerta: el archivo se descarga, se guarda, y cuando alguien lo abre los enlaces
+     * caducaron hace rato. Lo que se comprueba es el `expiresIn` que sale hacia Supabase,
+     * porque es el único sitio donde la diferencia es visible.
+     */
+    @Test
+    void elEnlaceDelVolcadoSeFirmaParaHorasYNoParaMinutos() {
+        supabase.expect(requestTo(URL + "/storage/v1/object/sign/curriculums/1/abc.pdf"))
+                .andExpect(method(org.springframework.http.HttpMethod.POST))
+                .andExpect(content().json("{\"expiresIn\":28800}"))
+                .andRespond(withSuccess(
+                        "{\"signedURL\":\"/object/sign/curriculums/1/abc.pdf?token=t\"}",
+                        MediaType.APPLICATION_JSON));
+
+        Optional<AlmacenArchivos.EnlaceFirmado> enlace = almacen.urlDeVolcado(archivoEn("1/abc.pdf"));
+
+        supabase.verify();
+        assertThat(enlace).isPresent();
+        // Y su caducidad es la misma que se pidió: ocho horas, no cinco minutos.
+        assertThat(enlace.get().expira())
+                .isAfter(java.time.Instant.now().plusSeconds(7 * 3600))
+                .isBefore(java.time.Instant.now().plusSeconds(9 * 3600));
+    }
+
+    @Test
+    void delVolcadoDeUnArchivoBorradoTampocoSeFirmaNada() {
+        assertThatThrownBy(() -> almacen.urlDeVolcado(archivoEn(null)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("borrado");
     }
 
     @Test

@@ -219,6 +219,19 @@ public final class DtosPerfilIntegral {
             // Cómo se llama su archivo. Es lo que permite dar con el currículum
             // en la carpeta donde vive, sin tener que servirlo desde aquí.
             String archivoNombre,
+            /**
+             * El id de ese archivo, para pedirle al almacén un enlace firmado.
+             *
+             * <p>Va ADEMÁS del nombre y no en su lugar: el nombre es lo que se lee, y este es
+             * con lo que se pide. La pantalla ya usaba el id —el botón de descarga lo tiene
+             * por otro camino—; lo que no lo tenía era el volcado a Excel, que necesita
+             * firmar un enlace por fila.
+             *
+             * <p>⚠️ <b>Un id NO es permiso para nada.</b> Quien lo use sigue pasando por
+             * {@code descargar_entregables} y por el filtro de organización, igual que la
+             * descarga de siempre. Viaja nulo cuando no hay currículum subido.
+             */
+            Long archivoId,
             DatosCandidato datos,
             String grupoPrioridad,
             BigDecimal notaEtapa,
