@@ -451,6 +451,15 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
         // Borrando, las dos versiones vuelven a decir lo mismo. Y no se pierde nada en
         // silencio: {@code entregar} sigue rechazando la entrega mientras falte alguna, así
         // que una respuesta borrada sin querer se ve antes de entregar, no después.
+        //
+        // ⚠️ <b>Esto solo es seguro mientras el examen esté abierto.</b> {@code nota_respuesta}
+        // apunta a {@code respuesta} con una clave foránea <b>sin {@code ON DELETE CASCADE}</b>,
+        // así que borrar una respuesta ya calificada revienta contra ella. Hoy no puede pasar:
+        // {@code exigirAbierta} corta antes y la IA solo califica al entregar. Pero el día que
+        // se califique con el examen abierto, o que se pueda reabrir uno entregado, vaciar un
+        // recuadro pasa a ser un error y el candidato lee «No se pudo guardar» sin saber por
+        // qué. La salida entonces no es aflojar la clave: es decidir qué pasa con la nota de
+        // una respuesta que su dueño acaba de borrar.
         if (datos.opcionId() == null && (datos.texto() == null || datos.texto().isBlank())) {
             respuestas.findByEvaluacionIdAndPreguntaId(evaluacion.getId(), preguntaId)
                     .ifPresent(respuestas::delete);
