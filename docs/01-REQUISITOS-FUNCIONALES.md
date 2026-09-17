@@ -642,8 +642,10 @@ anterior guardado**: la pantalla decía «vacía», el sistema la contaba como r
 forma de cuadrar las dos cifras. Vale para las tres pantallas donde alguien escribe. En la
 evaluación y en el cuestionario técnico **nada se pierde en silencio**, porque entregar se sigue
 rechazando mientras falte una respuesta: una borrada sin querer se ve antes de entregar, no
-después. En la prueba del puesto esa red no existe —la entrega solo exige los entregables
-obligatorios—, así que ahí lo único que avisa es la línea de estado, que dice «Sin responder».
+después. En la prueba del puesto el sistema no exige las preguntas —solo los entregables
+obligatorios—, así que ahí **se avisa en vez de impedir**: antes de confirmar la entrega se dice
+cuántas preguntas van en blanco, y se puede entregar igual, porque en una prueba cuyo peso está
+en el entregable dejar una sin responder puede ser una decisión y no un descuido.
 
 > ⚠️ **Con una excepción: las preguntas que se responden con varias piezas a la vez** —ordenar
 > una secuencia, rellenar los campos de un caso, marcar una matriz— **no se borran al vaciarlas**.

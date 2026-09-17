@@ -178,10 +178,12 @@ esa pregunta se queda sin responder.
 
 En la evaluación y en el cuestionario técnico eso no puede perderse en silencio, porque
 **entregar se sigue rechazando mientras falte alguna respuesta**: una borrada sin querer se ve
-antes de entregar, no después. ⚠️ **En la prueba del puesto no hay esa red**: su entrega solo
-comprueba los entregables obligatorios, nunca que estén todas las preguntas contestadas, así que
-ahí una pregunta vaciada sin querer sí se puede entregar en blanco. Lo que la delata es la línea
-de estado, que la llama «Sin responder».
+antes de entregar, no después. ⚠️ **En la prueba del puesto el servidor no tiene esa red**: su
+entrega comprueba los entregables obligatorios, nunca que estén todas las preguntas contestadas.
+Ahí lo que protege al candidato es la pantalla, que antes de entregar le dice cuántas van en
+blanco —y le deja entregar igual, porque en una prueba donde lo que se evalúa es el entregable
+dejar una pregunta sin responder puede ser a propósito—. Y mientras responde, la línea de estado
+la llama «Sin responder».
 
 ⚠️ **Los seis formatos del banco v3 son la excepción: en ellos vaciar no borra.** Son los que se
 responden con varias piezas a la vez, y ahí una respuesta a medio armar no se distingue de una
