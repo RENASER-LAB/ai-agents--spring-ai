@@ -1,0 +1,12 @@
+{
+  "name": "renaser-e2e",
+  "version": "0.0.0",
+  "private": true,
+  "description": "E2E repetibles de la API, que ejecuta QA del harness contra el preview de su trabajo.",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.62.1"
+  }
+}

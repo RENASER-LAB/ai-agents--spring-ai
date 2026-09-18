@@ -61,6 +61,7 @@ import com.renaser.ai.ai_engine.vacante.service.AlcanceSobreLaVacante;
 
 import lombok.RequiredArgsConstructor;
 import com.renaser.ai.ai_engine.prueba.entity.IntentoPrueba;
+import com.renaser.ai.ai_engine.prueba.service.EstadoPruebaDelPuesto;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -474,8 +475,18 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
           Fuera de esa etapa el mapa se queda vacío y no se consulta nada.
         */
         boolean laTecnica = ETAPA_TECNICA.equals(etapa);
+        /*
+          Los intentos de la tanda se piden UNA vez y sostienen dos cosas: con qué rúbrica se
+          midió a cada quien —que es para lo que existían— y en qué punto está su prueba, que
+          es lo que la columna Nota necesita para no decir lo mismo en tres casos distintos.
+
+          Antes esta consulta vivía dentro de `rubricasDeLaPrueba`. Sale de ahí para no
+          repetirla: dos usos, una sola ida a la base.
+        */
+        Map<Long, IntentoPrueba> intentoPorPostulacion =
+                laTecnica ? intentosDeLaTanda(vacante, ids) : Map.of();
         Map<Long, List<Criterio>> rubricaPorPostulacion =
-                laTecnica ? rubricasDeLaPrueba(vacante, ids) : Map.of();
+                laTecnica ? rubricasDeLaPrueba(intentoPorPostulacion) : Map.of();
 
         Map<Long, List<NotaCriterio>> notasPorPostulacion = notasCriterio.findByPostulacionIdIn(ids)
                 .stream().collect(Collectors.groupingBy(NotaCriterio::getPostulacionId));
@@ -659,7 +670,12 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
                     puedeVerPretension ? p.getPretensionMoneda() : null,
                     ponderadoDeLoRendido(perfilPorPostulacionParaPonderar.get(p.getId()),
                             pruebaPorPostulacion.get(p.getId()), notaDelCurriculum,
-                            pesoDeLaEtapa)));
+                            pesoDeLaEtapa),
+                    // Solo en la pestaña de la prueba: en las demás la columna Nota no habla
+                    // de ella, y traerlo obligaría a una consulta que nadie leería.
+                    laTecnica ? estadoDeLaPrueba(p.getId(),
+                            etapa(pruebaPorPostulacion.get(p.getId())),
+                            intentoPorPostulacion.get(p.getId())) : null));
         }
 
         filas.sort(Comparator
@@ -689,7 +705,7 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
                     f.ciudad(), f.ciudadCodigo(),
                     f.pretensionMin(), f.pretensionMax(), f.pretensionMoneda(),
                     f.pretensionDeclarada(), f.pretensionDeclaradaMoneda(),
-                    f.ponderado()));
+                    f.ponderado(), f.estadoPrueba()));
         }
 
         return new RankingVacante(vacanteId, vacante.getTitulo(),
@@ -927,21 +943,73 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
     }
 
     /**
+     * Los intentos de la tanda, de una sola consulta y sin poder tumbar el ranking.
+     *
+     * <p>Quien no ha llegado a la etapa técnica simplemente no sale en el mapa: <b>no es un
+     * error</b>, es lo normal en una tanda a medio recorrer.
+     *
+     * <p><b>El cuestionario técnico ni se pregunta.</b> Esas vacantes no usan la prueba del
+     * puesto —se califican pregunta a pregunta, sobre {@code Evaluacion} y no sobre
+     * {@code intento_prueba}—, así que la consulta no traería nada y la etapa se lee como lo
+     * que es: sin prueba del puesto que mirar.
+     *
+     * <p><b>Si la consulta falla, la tanda sigue.</b> Sin intentos el ranking pierde las
+     * columnas de la rúbrica y el estado de cada prueba se queda en el valor neutro, pero las
+     * filas, el orden y el conteo son los mismos: una avería del detalle no puede dejar al
+     * equipo sin la pantalla con la que decide. Queda escrito en el registro para poder
+     * mirarlo después.
+     */
+    private Map<Long, IntentoPrueba> intentosDeLaTanda(Vacante vacante, List<Long> ids) {
+        if (ids.isEmpty() || CUESTIONARIO_TECNICO.equals(vacante.getInstrumentoEtapaTecnica())) {
+            return Map.of();
+        }
+        try {
+            return porPostulacion(intentos.findByPostulacionIdIn(ids),
+                    IntentoPrueba::getPostulacionId);
+        } catch (RuntimeException e) {
+            log.warn("No se pudieron leer los intentos de la prueba de la vacante {} "
+                    + "({} postulaciones): el ranking sale sin el detalle de la prueba",
+                    vacante.getId(), ids.size(), e);
+            return Map.of();
+        }
+    }
+
+    /**
+     * En qué punto está la prueba de esa fila, sin que una fila rara tumbe la tanda.
+     *
+     * <p>La regla vive en {@link EstadoPruebaDelPuesto}: aquí solo se la protege. Un dato raro
+     * de un candidato no puede dejar sin ranking a los otros setenta y nueve, así que esa fila
+     * se conserva con el valor neutro y el caso queda escrito para poder mirarlo.
+     */
+    private EstadoPruebaDelPuesto estadoDeLaPrueba(Long postulacionId, BigDecimal notaDeLaPrueba,
+                                                   IntentoPrueba intento) {
+        try {
+            return EstadoPruebaDelPuesto.de(notaDeLaPrueba, intento);
+        } catch (RuntimeException e) {
+            log.warn("No se pudo determinar el estado de la prueba de la postulación {}: "
+                    + "la fila sale con el estado neutro", postulacionId, e);
+            return EstadoPruebaDelPuesto.NO_APLICA;
+        }
+    }
+
+    /**
      * Con qué rúbrica se midió a cada candidato de esta tanda.
      *
      * <p>Los criterios de la prueba del puesto <b>son de su plantilla</b>, no globales: dos
      * vacantes traen columnas distintas, y por eso la cabecera de la tabla se arma de lo que
      * llegue en las filas y nunca de una lista escrita a mano.
      *
-     * <p>Dos consultas para la tanda entera —los intentos, y las rúbricas de las versiones
-     * que aparezcan—, nunca una por fila. Es la misma regla por la que existe
-     * {@code ciudadesDe}: el bucle del ranking no toca la base.
+     * <p>Los intentos llegan ya traídos ({@link #intentosDeLaTanda}) y aquí solo se consultan
+     * las rúbricas de las versiones que aparezcan: una consulta para la tanda entera, nunca
+     * una por fila. Es la misma regla por la que existe {@code ciudadesDe}: el bucle del
+     * ranking no toca la base.
      *
      * <p>Tres caminos devuelven el mapa vacío, y ninguno es un error:
      * <ul>
      *   <li><b>El cuestionario técnico</b> no tiene rúbrica: se califica pregunta a pregunta
      *       contando criterios, no repartiendo cien puntos entre unos apartados. Lo mismo que
-     *       ya hace {@code ServicioCalificacionPruebaImpl.laRubricaDe}.</li>
+     *       ya hace {@code ServicioCalificacionPruebaImpl.laRubricaDe}. Llega aquí como un
+     *       mapa de intentos vacío.</li>
      *   <li><b>Nadie ha abierto todavía su prueba</b>, que es lo normal en una tanda que
      *       sigue en perfil integral.</li>
      *   <li><b>Una versión sin criterios</b>, que es una plantilla a medio escribir.</li>
@@ -949,13 +1017,9 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
      *
      * <p>Y quien no salga en el mapa se queda sin columnas, no con las del currículum.
      */
-    private Map<Long, List<Criterio>> rubricasDeLaPrueba(Vacante vacante, List<Long> ids) {
-        if (ids.isEmpty()
-                || CUESTIONARIO_TECNICO.equals(vacante.getInstrumentoEtapaTecnica())) {
-            return Map.of();
-        }
-
-        Map<Long, Long> versionPorPostulacion = intentos.findByPostulacionIdIn(ids).stream()
+    private Map<Long, List<Criterio>> rubricasDeLaPrueba(
+            Map<Long, IntentoPrueba> intentoPorPostulacion) {
+        Map<Long, Long> versionPorPostulacion = intentoPorPostulacion.values().stream()
                 .filter(i -> i.getVersionPlantillaPruebaId() != null)
                 .collect(Collectors.toMap(IntentoPrueba::getPostulacionId,
                         IntentoPrueba::getVersionPlantillaPruebaId, (a, b) -> a));

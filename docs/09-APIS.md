@@ -259,7 +259,7 @@ del área— se ven solo las propias, y una ajena responde 404.
 | POST `/postulaciones/{id}/enlace-acceso` | Generar un enlace de acceso nuevo para ese candidato (entra sin contraseña; ver «Cómo entrar») | `mover_postulacion` |
 | GET `/bandeja?espera_a=` | La bandeja: todo lo que espera a `CANDIDATO`, `SISTEMA`, `TALENTO` o `AREA` | `ver_candidatos` |
 | GET `/vacantes/{id}/embudo` | Cuántas postulaciones hay en cada estado | `ver_embudo` |
-| GET `/vacantes/{id}/ranking?etapa=` | La tanda ordenada de más apto a menos, con las ocho notas del currículum de cada uno. **Incluye a quien todavía no tiene nota**. Sin `etapa` ordena por la del Perfil Integral; con ella, por la nota de esa etapa. Cada fila trae además **dónde vive** (`ciudad`, ya escrito «Departamento — Provincia», y `ciudadCodigo`), **su pretensión salarial**, que pide **dos llaves** —`ver_pretension` y que esta vacante publique lo que paga—, y el **`ponderado`** de lo ya rendido (ver la nota de abajo). La respuesta trae además **`puedeMoverPostulacion`**, por lo mismo que la ficha: es el único modo que tiene el panel de saber si ofrecer el descarte en lote, porque no hay endpoint de «mis permisos» | `ver_embudo` |
+| GET `/vacantes/{id}/ranking?etapa=` | La tanda ordenada de más apto a menos, con las ocho notas del currículum de cada uno. **Incluye a quien todavía no tiene nota**. Sin `etapa` ordena por la del Perfil Integral; con ella, por la nota de esa etapa. Cada fila trae además **dónde vive** (`ciudad`, ya escrito «Departamento — Provincia», y `ciudadCodigo`), **su pretensión salarial**, que pide **dos llaves** —`ver_pretension` y que esta vacante publique lo que paga—, y el **`ponderado`** de lo ya rendido (ver la nota de abajo). La respuesta trae además **`puedeMoverPostulacion`**, por lo mismo que la ficha: es el único modo que tiene el panel de saber si ofrecer el descarte en lote, porque no hay endpoint de «mis permisos». Con `etapa=PRUEBA_PUESTO` cada fila trae además **`estadoPrueba`** —`CALIFICADA`, `PENDIENTE_CALIFICACION`, `INCOMPLETA` o `NO_APLICA`—, que es lo que deja distinguir una prueba que nadie terminó (o que cerró el sistema al vencer el plazo) de una entregada a mano que espera calificación; en las otras etapas viaja vacío | `ver_embudo` |
 | POST `/vacantes/{id}/ranking/excel` | La tanda seleccionada, en un `.xlsx` de **una sola hoja, llamada «Datos»**, que se descarga como adjunto. Se le pasan `etapa`, los `postulacionIds` **ya ordenados por quien llama** y `filtroDescrito`, la frase que se pintó encima de la tabla. Solo hay columnas para `PERFIL_INTEGRAL` y `PRUEBA_PUESTO`; otra etapa es un 400. **Cada criterio de la rúbrica es una columna** y las explicaciones viajan juntas en la última. ⚠️ La columna «CV» lleva un **enlace firmado que abre el currículum sin pedir sesión** durante unas horas; pide además `descargar_entregables` y, sin ese permiso, va solo el nombre del archivo | `ver_embudo` |
 | GET `/postulaciones/{id}` · `/historial` | La ficha completa y el recorrido. La ficha trae además **`puedeMoverPostulacion`**: si quien pregunta tiene `mover_postulacion`. No es un dato del candidato sino una facultad de quien mira —igual que `puedeVerPretension` en el ranking— y existe porque el login solo devuelve token e id, así que el panel no tiene otra forma de saber si pintar el botón de descartar. ⚠️ Dice si el permiso **está**, no hasta dónde llega su alcance: quien pueda abrir fichas de todos y mover solo las suyas verá el botón y recibirá un **404** al pulsarlo. Desde el 14/09 trae también **lo que esa persona pidió ganar al postular aquí**, con las dos llaves de siempre, y cuando no hay nada **dice cuál de los tres motivos es** | `abrir_ficha_candidato` |
 | POST `/postulaciones/{id}/transiciones` | Mover a cualquier estado. **El motivo es obligatorio, sin excepción**. Es también lo que usan **«Descartar»** de la ficha del panel y **«Descartar a N personas»** de la mesa de la tabla: mandan `NO_CONTINUA` y el servicio rellena solo `motivoCierre = DECISION_PERSONA` (para `CERRADA` sería `CIERRE_MANUAL`). ⚠️ Hacia un estado final **esto avisa al candidato por correo** — `NO_CONTINUA` dispara la plantilla `POSTULACION_NO_CONTINUA` en la misma transacción—, y el motivo escrito **no viaja en ese correo**: queda en el historial y la auditoría. **`avisar: false` calla ese correo y solo eso**: el estado cambia, la transición se guarda y la auditoría se escribe igual. Nulo o ausente = avisar, que es lo de siempre. ⚠️ Que no se avisó **queda escrito en los dos sitios donde alguien lo va a buscar**: el motivo guardado termina en « · sin avisar al candidato» —es lo único de la transición que pinta el historial de la ficha— y la auditoría lleva `avisoAlCandidato: NO_ENVIADO`. Sin eso, un descarte silencioso y uno normal se leen igual seis meses después, y si el candidato llama preguntando nadie sabría que nunca se le dijo | `mover_postulacion` |
@@ -307,6 +307,28 @@ del área— se ven solo las propias, y una ajena responde 404.
 >
 > ⚠️ **No es la Puntuación Global y no la sustituye.** No se persiste, no se compara con los
 > umbrales del semáforo y no mueve a nadie de estado: es una vista de lo que ya está calculado.
+
+> **`estadoPrueba`: por qué esa prueba no tiene nota** (18/09/2026). Viaja en cada fila **solo con
+> `?etapa=PRUEBA_PUESTO`**; en las demás etapas llega nulo, porque ahí la columna Nota no habla de
+> la prueba. Cuatro valores, con esta prioridad: `CALIFICADA` si hay nota de la etapa —**un cero es
+> una nota**, así que lo que decide es que exista, no que sea mayor que cero—; si no la hay,
+> `INCOMPLETA` cuando el intento no tiene `entregadoEn` o lo cerró el sistema al vencer el plazo
+> (`esEntregaAutomatica`), y `PENDIENTE_CALIFICACION` cuando la entregó una persona y su rúbrica
+> todavía no ha dejado nota. `NO_APLICA` es que no hay intento del que hablar.
+>
+> **Se calcula al leer y no se guarda.** Ni columna, ni migración, ni estado nuevo: sale de
+> `NotaEtapa` y de `IntentoPrueba` tal como estén en ese momento, sobre la **misma consulta de
+> intentos** que ya arma las columnas de la rúbrica —ninguna consulta de más—. Consultar o
+> descargar el ranking no escribe nada, y volver a abrirlo después de una entrega o de una
+> calificación da el valor nuevo. La regla vive en un solo sitio, el enum `EstadoPruebaDelPuesto`.
+>
+> ⚠️ **No son los estados de la postulación ni se pintan tal cual**: son el insumo con el que el
+> panel escribe «Prueba incompleta» o «Pendiente de calificación». Con `NO_APLICA` la celda
+> conserva el texto de siempre, y ahí caen también **las vacantes que rinden el cuestionario
+> técnico**, que no usan `intento_prueba`. Ver [Defectos conocidos](DEFECTOS-CONOCIDOS.md).
+>
+> ⚠️ **Si la consulta de los intentos falla, el ranking no falla.** Las filas, el orden y el conteo
+> son los mismos; esas filas salen con `NO_APLICA` y el caso queda escrito en el registro.
 
 > **Quién ordena y quién filtra el Excel: el cliente.** El volcado no filtra ni reordena nada. Le
 > llegan los `postulacionIds` en el orden en que se quieren las filas y los escribe en ese orden,
@@ -374,6 +396,13 @@ del área— se ven solo las propias, y una ajena responde 404.
 > booleano es el permiso a secas, no la conjunción con lo que publica la vacante: son motivos
 > distintos para una casilla vacía. Sin `ver_pretension`, o con una vacante que esconde su sueldo,
 > el dato ni se consulta.
+>
+> ⚠️ **La hoja no distingue por qué falta una nota, y la tabla sí.** `filtroDescrito` se escribe
+> tal cual en el pie, así que desde el 18/09/2026 dice «Pendiente» donde decía «Por revisar» —lo
+> manda el panel, aquí no se redacta—, pero la nota técnica que falta sigue diciendo **«rúbrica
+> incompleta»** venga de una prueba que nadie terminó o de una entregada sin calificar:
+> `estadoPrueba` no llega al volcado. Quien necesite saber si esa prueba se entregó tiene que
+> mirar la pestaña.
 >
 > **Por qué los rótulos de las notas no son los de la plantilla del cliente.** Dos diferencias, y
 > las dos deliberadas. La plantilla llamaba «Nota CV /100» a la nota del Perfil Integral: eso es

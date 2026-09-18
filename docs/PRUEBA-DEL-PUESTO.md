@@ -221,6 +221,35 @@ falta alguno no suma y **nombra cuál** en el registro.
 - ⚠️ `nota_criterio` es de las tres etapas: sumar sin filtrar por rúbrica dio un 675 sobre 100.
   Hay que delegar en `CalificacionPorCriterio`.
 
+### Sin nota no quiere decir sin entregar (18/09)
+
+Justo por lo de arriba, una prueba **entregada** puede estar semanas sin nota de etapa: basta con
+que falte un criterio de los que pone una persona. En el ranking eso se leía igual que el caso
+contrario —el candidato que nunca la terminó—, y el equipo salía a perseguir a quien ya había
+hecho lo suyo.
+
+Desde el 18/09 el ranking de la etapa dice cuál de los dos es. La regla es una sola y vive en el
+enum `EstadoPruebaDelPuesto`:
+
+| Lo que hay | Lo que se lee en la pestaña |
+|---|---|
+| Nota de la etapa | La nota. **Un cero es una nota**, y manda aunque la entrega la hiciera el reloj |
+| Sin nota y sin `entregado_en` | «Prueba incompleta»: no llegó a haber entrega |
+| Sin nota, con `entregado_en` y `es_entrega_automatica` | «Prueba incompleta»: la cerró el sistema al vencer el plazo, que no es un «ya está» del candidato |
+| Sin nota, con `entregado_en` puesto por la persona | «Pendiente de calificación»: hay entrega que mirar |
+| Sin intento | El texto de siempre. No hay prueba de la que hablar |
+
+- **No se guarda en ninguna parte.** Se calcula al abrir el ranking con la nota y el intento tal
+  como estén; consultar o descargar no escribe nada, y quien entregue o califique hoy ve el texto
+  nuevo al recargar. Ni migración, ni columna.
+- **Viaja al panel en `estadoPrueba`**, y solo con `?etapa=PRUEBA_PUESTO`: en las demás pestañas
+  la columna Nota no habla de esta prueba. Los cuatro valores, en [Las APIs](09-APIS.md).
+- ⚠️ **Las vacantes que rinden el cuestionario técnico se quedan fuera**: no usan
+  `intento_prueba`, así que todas sus filas sin nota caen en el caso neutro, incluidas las ya
+  entregadas. Es alcance decidido, no un fallo — está en [Defectos conocidos](DEFECTOS-CONOCIDOS.md).
+- ⚠️ **El Excel no lo hereda**: su columna de nota técnica sigue diciendo «rúbrica incompleta»
+  para cualquier fila sin nota. La distinción vive solo en la tabla del panel.
+
 ---
 
 ## El panel ve lo que el candidato entregó (V48)

@@ -1635,7 +1635,10 @@ class ServicioExcelRankingImplTest {
                 // Con valores distintos entre sí a propósito: cuatro cifras iguales dejarían
                 // pasar que la hoja las escribiera en el orden equivocado.
                 new Ponderado(new BigDecimal("78.14"), new BigDecimal("76.50"),
-                        new BigDecimal("82.00"), new BigDecimal("73.00")));
+                        new BigDecimal("82.00"), new BigDecimal("73.00")),
+                // El estado de la prueba no se escribe en la hoja: es lo que decide el texto
+                // de una celda de la TABLA cuando no hay nota, y aquí siempre la hay.
+                null);
     }
 
     /**
@@ -1699,7 +1702,7 @@ class ServicioExcelRankingImplTest {
                 f.resumen(), f.riesgosCriticos(), f.fortalezas(), f.alertas(), f.actualizadoEn(),
                 notas, f.ciudad(), f.ciudadCodigo(), f.pretensionMin(), f.pretensionMax(),
                 f.pretensionMoneda(), f.pretensionDeclarada(), f.pretensionDeclaradaMoneda(),
-                ponderado);
+                ponderado, f.estadoPrueba());
     }
 
     // ---- Leer el libro que se acaba de escribir ----

@@ -244,6 +244,15 @@ Dos endpoints más en `PostulacionesPanelController`:
   `etapa`; uno que no esté da 400. Quien no tenga nota en esa etapa sale al final, sin heredar la
   de otra. Son dos consultas para la tanda entera (los intentos y las rúbricas de las versiones
   que aparezcan), nunca una por fila.
+- **Con `PRUEBA_PUESTO` cada fila dice además en qué punto está esa prueba** (desde el
+  18/09/2026), en `estadoPrueba`. Hasta entonces, una nota que faltaba se leía igual en tres
+  situaciones que no se parecen: **no la terminó**, **el sistema la cerró al vencer el plazo** o
+  **la entregó y falta calificarla** —la única en la que el trabajo pendiente es del equipo—. Sale
+  de la nota de etapa y del intento, **sobre la consulta de intentos que ya se hacía**: no se
+  guarda nada, no hay migración y abrir el ranking no escribe. Un cero es una nota y se muestra
+  como número. Sin intento el valor es neutro y la celda conserva el texto de siempre; ahí caen
+  las postulaciones que aún no llegaron a la etapa técnica y las vacantes con cuestionario
+  técnico. Los cuatro valores, uno por uno, en [Las APIs](09-APIS.md).
 - **Con `PRUEBA_PUESTO` cada fila trae además el `ponderado`** (desde el 04/09/2026, RF-155): lo
   ya rendido —Perfil Integral y prueba— reescalado sobre la suma de sus dos pesos, con su
   desglose. Vacío si falta cualquiera de las dos notas. **No es la Puntuación Global.** Está
