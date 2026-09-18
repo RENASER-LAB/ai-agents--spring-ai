@@ -598,6 +598,90 @@ public class FlujoPerfilIT {
                 postulacionId)).isEqualTo(1);
     }
 
+    /*
+      La ciudad del registro, por HTTP y de punta a punta.
+
+      Va aquí y no en una clase nueva porque montar otro Postgres y otro RabbitMQ para
+      siete POST que tienen que rebotar cuesta más que la prueba entera, y esta clase ya
+      tiene el alta del candidato como primer paso de todo lo demás.
+    */
+    @DisplayName("Al crear la cuenta la ciudad es obligatoria: sin una del catálogo, 400 y "
+            + "ninguna fila")
+    @Test
+    @Order(12)
+    void laCiudadEsObligatoriaAlCrearLaCuenta() throws Exception {
+        int usuariosAntes = cuantosUsuarios();
+        String correo = "sin.ciudad@correo.pe";
+
+        /*
+          Los siete rechazos. Los cuatro primeros los para el contrato del DTO —@NotBlank,
+          que es un 400 de validación—; los tres últimos, el catálogo, con su propio 400.
+          Se comprueban juntos porque a quien llama le da igual cuál de los dos le dijo no:
+          lo que no puede pasar es que alguno responda 201.
+        */
+        for (String ciudad : List.of(
+                "",                                 // ausente: el campo no viene
+                "\"ciudadUbigeo\":null,",
+                "\"ciudadUbigeo\":\"\",",
+                "\"ciudadUbigeo\":\"   \",",          // solo espacios: no es una cadena vacía
+                "\"ciudadUbigeo\":\"9999\",",         // no existe en la tabla
+                "\"ciudadUbigeo\":\"15\",",           // existe, y es el DEPARTAMENTO de Lima
+                "\"ciudadUbigeo\":\"ext\",")) {       // EXT en minúscula no es EXT
+            intentarCrearCuenta(correo, ciudad).andExpect(status().isBadRequest());
+        }
+
+        // Y una provincia archivada: su fila sigue ahí —hay personas apuntando a ella— pero
+        // el desplegable ya no la ofrece, así que la API tampoco la acepta.
+        jdbc.update("update ubigeo set activo = false where codigo = '1505'");
+        try {
+            intentarCrearCuenta(correo, "\"ciudadUbigeo\":\"1505\",")
+                    .andExpect(status().isBadRequest());
+        } finally {
+            jdbc.update("update ubigeo set activo = true where codigo = '1505'");
+        }
+
+        // Ocho intentos y ni un usuario nuevo: el rechazo es antes de escribir nada, no un
+        // rollback que deja la secuencia movida y el correo enviado.
+        assertThat(cuantosUsuarios()).isEqualTo(usuariosAntes);
+        assertThat(jdbc.queryForObject("select count(*) from usuario where correo = ?",
+                Integer.class, correo)).isZero();
+
+        // «Fuera del Perú» sí es una elección válida, y se guarda tal cual.
+        intentarCrearCuenta(correo, "\"ciudadUbigeo\":\"EXT\",")
+                .andExpect(status().isCreated());
+        assertThat(laCiudadDe(correo)).isEqualTo("EXT");
+    }
+
+    @DisplayName("A quien ya tenía cuenta sin ciudad no se le pide: entra y ve su perfil")
+    @Test
+    @Order(13)
+    void aQuienNoTieneCiudadNoSeLeExigeNada() throws Exception {
+        /*
+          Las cuentas anteriores al 01/09 no traen ciudad y no hay ninguna pantalla que se la
+          pida: el dato solo entra por el alta. Así que se deja la fila como están las suyas
+          —en null— y se comprueba lo único que importa, que nada se le cierra: entra con su
+          contraseña y su perfil responde 200.
+        */
+        String correo = "sin.ciudad@correo.pe";
+        jdbc.update("""
+                update persona set ciudad_ubigeo = null
+                 where id = (select persona_id from usuario where correo = ?)""", correo);
+        assertThat(laCiudadDe(correo)).isNull();
+
+        String token = leer(mvc.perform(post("/api/v1/portal/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"correo\":\"%s\",\"contrasena\":\"unaClaveLarga123\"}"
+                                .formatted(correo)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString(), "token");
+
+        conTokenGet("/api/v1/portal/perfil", token)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.lecturaCv.estado").value("SIN_CV"));
+        // Y sigue sin ciudad: consultar el perfil no la inventa ni la exige.
+        assertThat(laCiudadDe(correo)).isNull();
+    }
+
     // ==================== Apoyo ====================
 
     /** La vacante publicable minima, calcada de FlujoEvaluacionIT. */
@@ -694,6 +778,35 @@ public class FlujoPerfilIT {
                     + "/preguntas"), tokenEquipo,
                     "{\"preguntaPruebaId\": %d}".formatted(id)).andExpect(status().isOk());
         }
+    }
+
+    /**
+     * El alta tal como la manda el portal, con el trozo de la ciudad puesto a mano.
+     *
+     * <p>El cuerpo se arma como texto y no con un record para poder mandar lo que un record
+     * no sabe expresar: el campo ausente y el campo en null, que son dos de los casos.
+     */
+    private ResultActions intentarCrearCuenta(String correo, String trozoDeCiudad)
+            throws Exception {
+        return mvc.perform(post("/api/v1/portal/cuentas")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                        {"nombre":"Sin","apellidos":"Ciudad","correo":"%s",
+                         "contrasena":"unaClaveLarga123",%s"aceptaPlataforma":true,
+                         "aceptaFuturosContactos":false}"""
+                        .formatted(correo, trozoDeCiudad)));
+    }
+
+    /** La ciudad guardada de quien tiene ese correo, leída de `persona`. */
+    private String laCiudadDe(String correo) {
+        return jdbc.queryForObject("""
+                select p.ciudad_ubigeo from persona p
+                 join usuario u on u.persona_id = p.id
+                 where u.correo = ?""", String.class, correo);
+    }
+
+    private int cuantosUsuarios() {
+        return jdbc.queryForObject("select count(*) from usuario", Integer.class);
     }
 
     private String crearCandidatoYEntrar(String correo) throws Exception {

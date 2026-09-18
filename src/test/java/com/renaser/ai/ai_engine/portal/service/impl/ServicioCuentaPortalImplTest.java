@@ -20,10 +20,16 @@ import com.renaser.ai.ai_engine.usuario.repository.RolRepository;
 import com.renaser.ai.ai_engine.usuario.repository.UsuarioRepository;
 import com.renaser.ai.ai_engine.usuario.repository.UsuarioRolRepository;
 
+import jakarta.validation.Validation;
+import jakarta.validation.Validator;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -55,6 +61,18 @@ import static org.mockito.Mockito.when;
 class ServicioCuentaPortalImplTest {
 
     private static final Long ORGANIZACION = 1L;
+
+    /**
+     * El mismo validador que corre Spring en el controlador.
+     *
+     * <p>Lo que aquí sale como violación es literalmente el 400 de
+     * {@code POST /api/v1/portal/cuentas}: el {@code @Valid} del controlador lanza
+     * {@code MethodArgumentNotValidException} y nunca llega a llamar al servicio. Se
+     * comprueba aquí porque el servicio, visto solo, no puede contar esa mitad de la
+     * historia — y es la mitad por la que entran el nulo y la cadena en blanco.
+     */
+    private static final Validator VALIDADOR =
+            Validation.buildDefaultValidatorFactory().getValidator();
 
     @Mock private OrganizacionRepository organizaciones;
     @Mock private PersonaRepository personas;
@@ -113,6 +131,38 @@ class ServicioCuentaPortalImplTest {
 
     // ============ La ciudad, al crear la cuenta ============
 
+    @ParameterizedTest(name = "ciudadUbigeo = [{0}]")
+    @NullSource
+    @ValueSource(strings = {"", " ", "      ", "\t\n"})
+    @DisplayName("ausente, nula, vacía o solo espacios: el contrato la rechaza y el servicio "
+            + "ni se entera")
+    void unaCiudadVaciaNoPasaElContrato(String ciudad) {
+        // Ausente y nula son el mismo caso: un JSON sin `ciudadUbigeo` deja el campo en
+        // null. Y la de solo espacios hace falta aparte porque «  » NO es una cadena
+        // vacía: con un @NotNull o un length > 0 pasaría, y esa persona quedaría con una
+        // ciudad de dos espacios que ningún filtro encuentra.
+        var violaciones = VALIDADOR.validate(cuentaEn(ciudad));
+
+        assertThat(violaciones)
+                .extracting(v -> v.getPropertyPath().toString())
+                .contains("ciudadUbigeo");
+    }
+
+    @ParameterizedTest(name = "ciudadUbigeo = [{0}]")
+    @NullSource
+    @ValueSource(strings = {"", "      "})
+    @DisplayName("y si igual llegara vacía al servicio, tampoco nace nada")
+    void unaCiudadVaciaTampocoPasaElServicio(String ciudad) {
+        // El cinturón de detrás del contrato: el servicio se puede llamar desde un sitio
+        // sin @Valid —una carga, una tarea, otro servicio— y entonces la única defensa es
+        // esta. No se apoya en «no viene vacía» sino en el catálogo, que es quien sabe.
+        assertThatThrownBy(() -> servicio.crearCuenta(cuentaEn(ciudad), "10.0.0.1", "Firefox"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("/api/v1/portal/catalogos/ubigeo");
+
+        verifyNoInteractions(personas, usuarios, correo);
+    }
+
     @Test
     @DisplayName("una ciudad que el catálogo no ofrece no crea la cuenta: 400 y ni una fila")
     void unaCiudadQueNoExisteNoCreaLaCuenta() {
@@ -132,12 +182,16 @@ class ServicioCuentaPortalImplTest {
         verifyNoInteractions(personas, usuarios, correo);
     }
 
-    @Test
+    @ParameterizedTest(name = "ciudadUbigeo = {0}")
+    @ValueSource(strings = {"0402", CatalogosDelPerfil.FUERA_DEL_PERU})
     @DisplayName("la ciudad elegida queda escrita en la persona, no en el perfil")
-    void laCiudadSeGuardaEnLaPersona() {
+    void laCiudadSeGuardaEnLaPersona(String ciudadElegida) {
         // Va en persona y no en perfil_candidato porque el perfil se crea perezosamente:
         // en este instante la única fila que existe de esta candidata es la persona.
-        when(catalogos.esCiudadElegible("0402")).thenReturn(true);
+        //
+        // Y con EXT también: «fuera del Perú» es una elección como cualquier provincia, no
+        // un «sin ciudad». Quien vive fuera tiene que poder registrarse.
+        when(catalogos.esCiudadElegible(ciudadElegida)).thenReturn(true);
         when(organizaciones.findByEsPlataformaTrue()).thenReturn(Optional.of(
                 com.renaser.ai.ai_engine.organizacion.entity.Organizacion.builder()
                         .id(ORGANIZACION).esPlataforma(true).build()));
@@ -154,11 +208,11 @@ class ServicioCuentaPortalImplTest {
                         .TextoConsentimiento.builder().id(1L).tipo("PLATAFORMA").build()));
         lenient().when(codificador.encode(anyString())).thenReturn("$hash");
 
-        servicio.crearCuenta(cuentaEn("0402"), "10.0.0.1", "Firefox");
+        servicio.crearCuenta(cuentaEn(ciudadElegida), "10.0.0.1", "Firefox");
 
         ArgumentCaptor<Persona> guardada = ArgumentCaptor.forClass(Persona.class);
         verify(personas).save(guardada.capture());
-        assertThat(guardada.getValue().getCiudadUbigeo()).isEqualTo("0402");
+        assertThat(guardada.getValue().getCiudadUbigeo()).isEqualTo(ciudadElegida);
     }
 
     @Test
