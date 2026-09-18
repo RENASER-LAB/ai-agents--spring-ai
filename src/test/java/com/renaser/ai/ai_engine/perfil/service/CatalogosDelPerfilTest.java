@@ -121,6 +121,18 @@ class CatalogosDelPerfilTest {
         assertThat(catalogos.esCiudadElegible(null)).isFalse();
     }
 
+    @Test
+    @DisplayName("Una cadena vacía o de solo espacios tampoco es una ciudad")
+    void unCodigoEnBlancoNoEsElegible() {
+        // El contrato del alta lo para antes con @NotBlank, pero el catálogo tiene que
+        // saber contestarlo por su cuenta: es el que responde a quien pregunta sin pasar
+        // por el formulario, y «   » no es un código de ubigeo por muy cadena que sea.
+        assertThat(catalogos.esCiudadElegible("")).isFalse();
+        assertThat(catalogos.esCiudadElegible("   ")).isFalse();
+        // Ni con la forma correcta mal escrita: el código viaja tal cual, sin recortes.
+        assertThat(catalogos.esCiudadElegible(" 1501 ")).isFalse();
+    }
+
     /** Dos departamentos con dos provincias cada uno, más EXT. Basta para el orden. */
     private List<Ubigeo> elCatalogoDePrueba() {
         return List.of(
