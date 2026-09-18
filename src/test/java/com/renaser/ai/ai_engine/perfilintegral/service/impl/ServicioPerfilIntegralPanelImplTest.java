@@ -48,7 +48,12 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.renaser.ai.ai_engine.prueba.entity.IntentoPrueba;
+import com.renaser.ai.ai_engine.prueba.service.EstadoPruebaDelPuesto;
+
 import java.math.BigDecimal;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -1457,6 +1462,202 @@ class ServicioPerfilIntegralPanelImplTest {
             org.assertj.core.api.Assertions.assertThatThrownBy(() -> servicio.recalificar(quien, 2L))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining("no tiene evaluación");
+        }
+    }
+
+    // ================== En qué punto está la prueba del puesto ==================
+
+    /**
+     * Lo que la columna de la prueba enseña cuando no hay nota, decidido en el backend.
+     *
+     * <p>Antes la tabla escribía lo mismo —«sin cerrar»— para tres situaciones que no se
+     * parecen: quien no ha terminado la prueba, aquella que el sistema cerró al vencer el
+     * plazo, y la que alguien entregó y espera a que el equipo la califique. Solo la última es
+     * trabajo del equipo, y confundirlas mandaba a perseguir a quien ya había hecho lo suyo.
+     *
+     * <p>⚠️ <b>La pantalla no puede deducirlo de que la nota venga vacía</b>, y por eso el
+     * estado viaja en la fila: desde el navegador los tres casos se ven igual.
+     *
+     * <p>Las fechas de los intentos son relativas al momento de la prueba: una fecha escrita a
+     * mano caduca, y el día que caduque el fallo no dirá nada de esta regla.
+     */
+    @org.junit.jupiter.api.Nested
+    @DisplayName("El estado de la prueba que viaja en cada fila")
+    class EstadoDeLaPrueba {
+
+        @Test
+        @DisplayName("un intento sin empezar sale como prueba incompleta")
+        void elPendienteEstaIncompleto() {
+            candidatos(candidato(1L, "ALTA", null));
+            losIntentos(sinEmpezar(1L));
+
+            assertThat(laFilaDe(1L).estadoPrueba()).isEqualTo(EstadoPruebaDelPuesto.INCOMPLETA);
+        }
+
+        @Test
+        @DisplayName("uno empezado y sin entregar, también")
+        void elEnCursoEstaIncompleto() {
+            candidatos(candidato(1L, "ALTA", null));
+            losIntentos(enCurso(1L));
+
+            assertThat(laFilaDe(1L).estadoPrueba()).isEqualTo(EstadoPruebaDelPuesto.INCOMPLETA);
+        }
+
+        /**
+         * La que cerró el sistema al vencer el plazo NO es una entrega del candidato.
+         *
+         * <p>Es la confusión que más duele: sin distinguirla, una prueba que nadie terminó
+         * aparecería en la bandeja del equipo como si hubiera algo que calificar.
+         */
+        @Test
+        @DisplayName("la que entregó el sistema al vencer el plazo sigue incompleta sin nota")
+        void laAutomaticaSinNotaEstaIncompleta() {
+            candidatos(candidato(1L, "ALTA", null));
+            losIntentos(entregado(1L, true));
+
+            assertThat(laFilaDe(1L).estadoPrueba()).isEqualTo(EstadoPruebaDelPuesto.INCOMPLETA);
+        }
+
+        @Test
+        @DisplayName("la que entregó una persona y no tiene nota espera al equipo")
+        void laManualSinNotaEsperaAlEquipo() {
+            candidatos(candidato(1L, "ALTA", null));
+            losIntentos(entregado(1L, false));
+
+            assertThat(laFilaDe(1L).estadoPrueba())
+                    .isEqualTo(EstadoPruebaDelPuesto.PENDIENTE_CALIFICACION);
+        }
+
+        /** Con nota manda la nota, incluso si la entrega la hizo el sistema. */
+        @Test
+        @DisplayName("con nota de etapa está calificada, venga la entrega de donde venga")
+        void conNotaEstaCalificada() {
+            candidatos(candidato(1L, "ALTA", null));
+            losIntentos(entregado(1L, true));
+            notaDeLaPrueba(1L, "73");
+
+            assertThat(laFilaDe(1L).estadoPrueba()).isEqualTo(EstadoPruebaDelPuesto.CALIFICADA);
+            assertThat(laFilaDe(1L).notaEtapa()).isEqualByComparingTo("73");
+        }
+
+        /**
+         * Un cero es una nota.
+         *
+         * <p>Es la frontera que convierte a quien rindió mal en quien no rindió: leerlo como
+         * ausencia le pondría «Prueba incompleta» a alguien que entregó y sacó cero.
+         */
+        @Test
+        @DisplayName("una nota de cero es nota, no un hueco")
+        void elCeroEsNota() {
+            candidatos(candidato(1L, "ALTA", null));
+            losIntentos(entregado(1L, false));
+            notaDeLaPrueba(1L, "0");
+
+            assertThat(laFilaDe(1L).estadoPrueba()).isEqualTo(EstadoPruebaDelPuesto.CALIFICADA);
+            assertThat(laFilaDe(1L).notaEtapa()).isEqualByComparingTo("0");
+        }
+
+        /**
+         * Quien todavía no ha llegado a la etapa técnica no tiene intento, y eso no es una
+         * entrega esperando calificación: es que no hay prueba de la que hablar.
+         *
+         * <p>El estado de su postulación no entra en la decisión, y esa es justo la mejora:
+         * el texto sale del intento y de la nota, no de un código interno.
+         */
+        @Test
+        @DisplayName("quien no ha llegado a la etapa técnica no aplica, y nunca «pendiente de calificación»")
+        void sinIntentoNoAplica() {
+            candidatos(candidato(1L, "ALTA", null), candidato(2L, "ALTA", null));
+            losIntentos(entregado(1L, false));
+
+            assertThat(laFilaDe(2L).estadoPrueba()).isEqualTo(EstadoPruebaDelPuesto.NO_APLICA);
+            assertThat(laFilaDe(2L).estadoPrueba())
+                    .isNotEqualTo(EstadoPruebaDelPuesto.PENDIENTE_CALIFICACION);
+        }
+
+        /**
+         * Una avería leyendo los intentos no puede dejar al equipo sin la pantalla con la que
+         * decide: las filas siguen, con el valor neutro, y el ranking contesta.
+         */
+        @Test
+        @DisplayName("si los intentos no se pueden leer, las filas siguen con el estado neutro")
+        void unFalloLeyendoLosIntentosNoTumbaLaTanda() {
+            candidatos(candidato(1L, "ALTA", null), candidato(2L, "ALTA", null));
+            lenient().when(etapasCatalogo.existsById("PRUEBA_PUESTO")).thenReturn(true);
+            lenient().when(intentos.findByPostulacionIdIn(anyList()))
+                    .thenThrow(new org.springframework.dao.DataAccessResourceFailureException(
+                            "la base no contesta"));
+
+            List<FilaRanking> filas = servicio.ranking(quien, VACANTE, "PRUEBA_PUESTO").filas();
+
+            assertThat(filas).hasSize(2);
+            assertThat(filas).extracting(FilaRanking::estadoPrueba)
+                    .containsOnly(EstadoPruebaDelPuesto.NO_APLICA);
+        }
+
+        /**
+         * Fuera de la pestaña de la prueba el campo no viaja, y los intentos ni se consultan.
+         *
+         * <p>Ahí la columna Nota habla de otra etapa: un estado de la prueba al lado se leería
+         * como si fuera suyo, y la consulta sería una ida a la base por tanda para un dato que
+         * nadie mira.
+         */
+        @Test
+        @DisplayName("en las otras etapas el estado no viaja y no se pregunta por los intentos")
+        void fueraDeLaPruebaNiSePregunta() {
+            candidatos(candidato(1L, "ALTA", "90"));
+
+            List<FilaRanking> filas = servicio.ranking(quien, VACANTE, "PERFIL_INTEGRAL").filas();
+
+            assertThat(filas.get(0).estadoPrueba()).isNull();
+            verifyNoInteractions(intentos);
+        }
+
+        /** Mirar el ranking no escribe nada: ni el intento, ni la nota, ni la postulación. */
+        @Test
+        @DisplayName("consultar el ranking no toca ningún registro")
+        void consultarNoEscribe() {
+            candidatos(candidato(1L, "ALTA", null));
+            losIntentos(entregado(1L, false));
+
+            servicio.ranking(quien, VACANTE, "PRUEBA_PUESTO");
+
+            verify(intentos, never()).save(any());
+            verify(notasEtapa, never()).save(any());
+            verify(postulaciones, never()).save(any());
+        }
+
+        // ---- Lo que hace falta para pedir el ranking de la prueba ----
+
+        private FilaRanking laFilaDe(Long postulacionId) {
+            return porId(servicio.ranking(quien, VACANTE, "PRUEBA_PUESTO").filas(), postulacionId);
+        }
+
+        private void losIntentos(IntentoPrueba... suyos) {
+            lenient().when(etapasCatalogo.existsById("PRUEBA_PUESTO")).thenReturn(true);
+            lenient().when(intentos.findByPostulacionIdIn(anyList())).thenReturn(List.of(suyos));
+        }
+
+        /** Le asignaron la prueba y no la ha abierto. */
+        private IntentoPrueba sinEmpezar(Long postulacionId) {
+            return IntentoPrueba.builder().id(postulacionId * 10).postulacionId(postulacionId)
+                    .venceEn(Instant.now().plus(Duration.ofDays(2))).build();
+        }
+
+        /** La abrió y el reloj corre: todavía no ha entregado. */
+        private IntentoPrueba enCurso(Long postulacionId) {
+            return IntentoPrueba.builder().id(postulacionId * 10).postulacionId(postulacionId)
+                    .iniciadoEn(Instant.now().minus(Duration.ofMinutes(20)))
+                    .venceEn(Instant.now().plus(Duration.ofMinutes(40))).build();
+        }
+
+        /** Entregada hace un rato: por el candidato, o por el sistema al vencer el plazo. */
+        private IntentoPrueba entregado(Long postulacionId, boolean porElSistema) {
+            return IntentoPrueba.builder().id(postulacionId * 10).postulacionId(postulacionId)
+                    .iniciadoEn(Instant.now().minus(Duration.ofHours(2)))
+                    .venceEn(Instant.now().minus(Duration.ofHours(1)))
+                    .entregadoEn(Instant.now().minus(Duration.ofHours(1)))
+                    .esEntregaAutomatica(porElSistema).build();
         }
     }
 }

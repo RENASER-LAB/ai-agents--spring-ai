@@ -1,5 +1,7 @@
 package com.renaser.ai.ai_engine.perfilintegral.dto;
 
+import com.renaser.ai.ai_engine.prueba.service.EstadoPruebaDelPuesto;
+
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -277,7 +279,25 @@ public final class DtosPerfilIntegral {
             // Lo ya rendido sobre 100. Es un objeto y no cuatro cifras sueltas a propósito:
             // este record se copia campo a campo al numerar las filas, y cuatro BigDecimal
             // vecinos son cuatro ocasiones de intercambiar dos sin que el compilador chiste.
-            Ponderado ponderado) {}
+            Ponderado ponderado,
+            /**
+             * En qué punto está su prueba del puesto, dicho aquí para que la pantalla no lo
+             * deduzca de que {@code notaEtapa} venga vacía.
+             *
+             * <p>⚠️ <b>Un {@code notaEtapa} nulo tiene tres causas distintas</b> —no la ha
+             * terminado, el sistema la cerró al vencer el plazo, o la entregó y falta
+             * calificarla— y desde el navegador no se distinguen. Antes la tabla escribía «sin
+             * cerrar» para todas, que mandaba a perseguir al candidato cuando el trabajo
+             * pendiente era del equipo. Ver {@link EstadoPruebaDelPuesto}.
+             *
+             * <p>⚠️ <b>Viaja SOLO en el ranking de la prueba del puesto</b>; en las otras
+             * pestañas es nulo. Fuera de esa etapa la columna Nota no habla de la prueba, y
+             * traerlo obligaría a una consulta por tanda para un dato que nadie lee.
+             *
+             * <p>No lleva estados de la postulación: son códigos internos, y esto es lo que
+             * decide un texto de pantalla.
+             */
+            EstadoPruebaDelPuesto estadoPrueba) {}
 
     // ============ El desglose de la evaluación del banco ============
 

@@ -1846,7 +1846,7 @@ Cuando un candidato rinde.
 | `iniciado_en` | timestamptz | sí | Desde aquí corre el reloj |
 | `vence_en` | timestamptz | sí | Cuándo se le cierra. Sale de la fecha de la vacante si la tiene; si no, **se calcula al empezar y se guarda** |
 | `plazo_propio` | boolean | sí | A esta persona se le fijó su fecha a mano. Mover la de la vacante no se la toca |
-| `entregado_en` | timestamptz | no | |
+| `entregado_en` | timestamptz | no | Cuándo se entregó. Vacío = no llegó a entregarse |
 | `es_entrega_automatica` | boolean | sí | Si lo entregó el reloj por él |
 | `variante_cambio_id` | bigint | no | Cuál le tocó |
 | `minuto_cambio` | integer | no | El sorteado dentro del rango |
@@ -1862,6 +1862,12 @@ una consulta sobre una columna indexada, y no depende de que la plantilla siga i
 
 Cuando se acaba, el sistema entrega solo. **No existe entregar tarde**, y por eso hay una marca en
 vez de un estado.
+
+`entregado_en` y `es_entrega_automatica` son además **lo que decide el texto de la pestaña «Prueba
+del puesto»** del ranking cuando esa persona no tiene nota de etapa: sin entrega, o con una que
+puso el reloj, se lee «Prueba incompleta»; con una entrega suya, «Pendiente de calificación». **No
+se guarda ningún estado nuevo**: se calcula al leer, con estas dos columnas y la nota. Ver
+[La prueba del puesto, por dentro](PRUEBA-DEL-PUESTO.md).
 
 ## `entregable`
 

@@ -257,9 +257,38 @@ la tabla aprende a distinguir la franja horaria antes de que el desvío importe.
 
 ---
 
+## 10 · La diferencia entre «no la terminó» y «falta calificarla» no llega a todas partes
+
+**Qué le pasa a alguien.** Desde el 18/09/2026 la pestaña «Prueba del puesto» separa la prueba que
+el candidato no terminó de la que entregó y espera nota. **En dos sitios no.** Quien lleva una
+vacante que rinde el **cuestionario técnico** sigue viendo el texto de siempre en todas las filas
+sin nota, también en las de quien ya entregó, y no tiene desde el ranking manera de saber cuál es
+cuál. Y quien descarga el Excel lee «rúbrica incompleta» en la columna de la nota técnica pase lo
+que pase, aunque la pantalla desde la que lo bajó sí lo distinga: la hoja se reenvía y se lee lejos
+del panel, que es donde más falta hace la explicación.
+
+**Por qué pasa.** La distinción sale de `intento_prueba`, y el cuestionario técnico no escribe
+ahí: se rinde y se califica pregunta a pregunta sobre `Evaluacion`. Esas filas salen con el valor
+neutro y conservan el texto anterior. En el volcado, `estadoPrueba` ni se consulta: la celda de la
+nota tiene un solo texto para cualquier ausencia.
+
+**No es una regresión, es el alcance que se decidió.** Antes de esa fecha la diferencia no se veía
+en ninguno de los dos sitios. Se escribe aquí para que no se vuelva a descubrir con una tanda
+delante.
+
+**Qué haría falta.** Para el cuestionario: sacar del examen técnico lo mismo que hoy dice el
+intento —si hubo entrega y si la hizo la persona o el reloj— y traducirlo a los mismos cuatro
+valores. Para el Excel: llevar `estadoPrueba` al volcado y escribir en la celda el texto que ya
+usa la tabla. Antes de eso conviene decidir si la hoja debe decir exactamente lo mismo que la
+pantalla, porque hoy el cliente no espera que difieran.
+
+---
+
 ## Documentos relacionados
 
 - [El modelo cambió de nombre](EL-MODELO-CAMBIO-DE-NOMBRE.md) — de dónde salen el 8 y el 9
+- [La prueba del puesto, por dentro](PRUEBA-DEL-PUESTO.md) — de dónde sale el 10: qué dice la
+  pestaña cuando no hay nota, y con qué se decide
 - [Requisitos funcionales](01-REQUISITOS-FUNCIONALES.md) — el rango de duración retirado está en
   RF-76 y el cambio inesperado en RF-77
 - [Modelo de datos](05-MODELO-DE-DATOS.md) — qué impide la base y qué no
