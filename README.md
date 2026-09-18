@@ -24,9 +24,16 @@ tener las claves en `application-secrets.yaml`.
 
 | Modelo | Uso | Notas |
 |---|---|---|
-| `deepseek-v4-flash` | El que decide: califica currículums y razona en los 15 agentes | Temperatura 0 en todo lo que pone una nota, para poder repetir una corrida si un candidato reclama |
-| `deepseek-chat` | La primera pasada de la criba | Contesta sin razonar: ~19 s por currículum en vez de 48. Sirve para ordenar la tanda, no para decidir a quién se contrata |
+| `deepseek-flash` | El que decide: califica currículums y razona en los agentes, salvo el orquestador | Es DeepSeek-V4.1-Flash, y el nombre de API **no lleva el 4.1 dentro**. Temperatura 0 en todo lo que pone una nota, para poder repetir una corrida si un candidato reclama |
+| `deepseek-v4-pro` | El orquestador de agentes, y solo él | Es el único que justifica pagar varias veces más por corrida: de él depende cuántos otros agentes llegan a correr |
+| `deepseek-chat` | La primera pasada de la criba | ⚠️ **Es un nombre retirado que hoy sigue atendiendo como alias**, y es la única forma de pedir el modelo sin razonar: ~19 s por currículum en vez de 48. Sirve para ordenar la tanda, no para decidir a quién se contrata. Ver [El modelo cambió de nombre](docs/EL-MODELO-CAMBIO-DE-NOMBRE.md) |
 | `gemini-embedding-2` | Embeddings del vector store (RAG) | 1536 dimensiones. Solo en la ingesta y búsqueda de documentos |
+
+**El catálogo vivo de DeepSeek son dos nombres**, `deepseek-flash` y `deepseek-v4-pro`; se
+comprueba con `GET https://api.deepseek.com/models`. Los demás nombres que aparecen aquí y en la
+configuración siguen contestando porque el proveedor los dejó enrutando al nuevo. Que contesten
+no significa que existan, y confundir las dos cosas dejó el contador del gasto en cero una semana
+entera (10-17/09/2026): lo cuenta [El modelo cambió de nombre](docs/EL-MODELO-CAMBIO-DE-NOMBRE.md).
 
 Hubo una etapa con modelos locales por Ollama (`gemma4:e4b`, `qwen3-embedding:0.6b`) y se
 abandonó. Si encuentras una referencia a Ollama en algún documento, está desfasada.

@@ -23,7 +23,7 @@ Sirve para tres cosas:
 - **Entender el sistema.** Un modelo de datos bien contado explica el negocio mejor que
   cualquier otro documento.
 
-**La base ya está construida.** Las migraciones `V1` a `V56` viven en
+**La base ya está construida.** Las migraciones `V1` a `V57` viven en
 `src/main/resources/db/migration` —**104 tablas de este módulo**, 107 en la base contando la de
 Flyway y las dos del motor de agentes— y Flyway es el dueño del esquema. Cambiar algo de aquí
 ya cuesta una migración nueva, y **una migración aplicada no se edita nunca**: se escribe otra
@@ -73,6 +73,14 @@ pone precio por millón de tokens a cada modelo, con vigencia por fecha; el esta
 mensual de IA; y se siembra la plantilla de correo del aviso del 80% (`TOPE_IA_AVISO`) para
 todas las organizaciones. La `V39` es de una línea: siembra la tarifa del modelo rápido, que
 a la `V38` se le quedó fuera y dejaba invisible el gasto de leer currículums.
+
+La `V57` (17/09/2026) **no crea ninguna tabla: siembra dos precios que faltaban**, y es el mismo
+agujero de la `V39` entrando por otra puerta. El 10/09 DeepSeek renombró su modelo y empezó a
+contestar un nombre que la tabla de precios no tenía, así que durante una semana todas las
+calificaciones y todas las lecturas de currículum se anotaron sin costo y el tope mensual no vio
+nada. La segunda fila es del modelo del orquestador, que nunca tuvo precio desde que existe el
+control del gasto. Por qué un cambio de nombre llega hasta aquí, y por qué se sembró el precio de
+fuera de punta: [El modelo cambió de nombre](EL-MODELO-CAMBIO-DE-NOMBRE.md).
 
 La `V54` (14/09/2026) **no añade ninguna tabla y cambia quién firma qué**. Hasta ella había dos
 tipos de texto —`PROCESO` y `FUTUROS_CONTACTOS`— y el de la cuenta usaba el primero, que habla de
@@ -1005,6 +1013,17 @@ nueva y lo ya ejecutado conserva la suya —sin vigencia, un cambio de precios r
 pasado—. La tarifa no tiene «vigente hasta»: rige la de fecha más reciente que ya empezó, así
 no hay huecos ni solapes que validar. Sin tarifa registrada el costo queda vacío y se anota
 un aviso: la contabilidad nunca rompe una calificación.
+
+⚠️ **El modelo por el que se busca el precio es el que el proveedor dice haber usado, no el que
+se pidió.** Los dos nombres pueden no ser el mismo —el proveedor puede renombrar su catálogo y
+dejar el nombre viejo atendiendo—, y cuando dejan de coincidir el costo sale vacío sin que nada
+falle. Pasó entre el 10 y el 17/09/2026: [El modelo cambió de
+nombre](EL-MODELO-CAMBIO-DE-NOMBRE.md).
+
+⚠️ **Lo que esta tabla dice que se gastó no es el importe de la factura.** No distingue franja
+horaria ni acierto de caché. Los precios sembrados son los de fuera de punta, que es la franja
+donde ocurre casi todo el trabajo real, y la entrada es la de consulta nueva, que es la cara. El
+número sirve para frenar, no para cobrar; se queda corto en lo que se llame de madrugada.
 
 Sobre ese costo trabaja el **tope mensual por organización** (parámetro `tope_mensual_ia`,
 que administra la plataforma): al cruzar el 80% del mes sale un aviso único, y al 100% los

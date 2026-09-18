@@ -166,10 +166,14 @@ que hay que saber antes de escribir una línea:
   plataforma. Lo dicen la postulación (`consentimiento.postulacion_id` → `postulacion`) y el
   texto guardado (`consentimiento.texto_firmado`), que lleva el nombre dentro. Cruzar por
   `texto_consentimiento.organizacion_id` era correcto con un texto por empresa, y dejó de serlo.
-- **Cada llamada al modelo tiene precio** (V38-V39): `ejecucion_ia.costo` se escribe al cerrar
+- **Cada llamada al modelo tiene precio** (V38-V39, V57): `ejecucion_ia.costo` se escribe al cerrar
   con la tarifa vigente de `tarifa_modelo`. La bitácora guarda el modelo QUE EL PROVEEDOR
   REPORTA, y por eso **todo modelo de `application.yaml` necesita su tarifa**: un IT recorre los
-  modelos configurados y exige tarifa vigente para cada uno. Al 80% del tope un correo
+  modelos configurados —y desde el 17/09/2026 también los que elige `AgentModelSelector`— y exige
+  tarifa vigente para cada uno. ⚠️ **Ese IT comprueba los nombres que se PIDEN, y el costo se
+  anota por el que el proveedor RESPONDE**: el 10/09/2026 DeepSeek renombró su catálogo, dejó los
+  nombres viejos como alias, y el costo salió NULL una semana con la prueba en verde. Lo cuenta
+  [El modelo cambió de nombre](EL-MODELO-CAMBIO-DE-NOMBRE.md). Al 80% del tope un correo
   `TOPE_IA_AVISO` una vez por mes (en su PROPIA transacción; su fallo se traga); al 100% los
   trabajos nuevos nacen **EN_ESPERA** y el sondeo de atascados los despierta cuando vuelve el
   cupo. El retrato que cierra una tanda no pasa por el tope: sus insumos ya se pagaron.

@@ -2,6 +2,8 @@ package com.renaser.ai.ai_engine.integracion;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.renaser.ai.ai_engine.ai.dto.RespuestaModelo;
+import com.renaser.ai.ai_engine.ai.model.AgentType;
+import com.renaser.ai.ai_engine.ai.prompt.AgentModelSelector;
 import com.renaser.ai.ai_engine.ai.service.ClienteModelo;
 import com.renaser.ai.ai_engine.ai.service.ColaCalificacionIa;
 import com.renaser.ai.ai_engine.integracion.soporte.ImagenesDeContenedores;
@@ -41,6 +43,7 @@ import java.time.YearMonth;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.function.BooleanSupplier;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.fail;
@@ -113,21 +116,29 @@ public class FlujoPlataformaIT {
                     if (!"DATOS_CV".equals(agenteCodigo)) {
                         throw new IllegalStateException("agente inesperado: " + agenteCodigo);
                     }
-                    // El modelo que reporta es EL DE LA PASADA RÁPIDA ('deepseek-chat',
-                    // renaser.ai.chat.modelo-rapido), que es lo que el proveedor real
-                    // contesta para DATOS_CV (razona=false) y lo que la bitácora guarda.
-                    // Es la fila que la V39 tarifa: si esa tarifa faltara, el costo
-                    // saldría NULL y la aserción de 0.0007 lo delataría — el descase
-                    // entre lo configurado y lo tarifado no puede volver a pasar callado.
-                    // 1200 de entrada y 340 de salida a 0.27/1.10 por millón: 0.0007 USD.
+                    // El modelo que reporta NO depende de razona, y ese es el punto.
+                    //
+                    // Hasta el 17/09/2026 aquí se devolvía 'deepseek-v4-flash' o
+                    // 'deepseek-chat' según la pasada, imitando lo que el proveedor
+                    // contestaba entonces. El 10/09 DeepSeek renombró todo a
+                    // 'deepseek-flash' y empezó a responder ESE nombre en las dos pasadas,
+                    // aunque se le sigan pidiendo los dos alias viejos (comprobado contra
+                    // la API real ese día). El costo se fue a NULL una semana entera.
+                    //
+                    // Esta prueba tenía que haberlo cazado y no pudo: el descase estaba
+                    // entre lo que el proveedor responde y lo que la tabla tarifa, y este
+                    // doble respondía de memoria. Si mañana vuelve a cambiar el nombre,
+                    // esta constante es lo que hay que mover, y la aserción de 0.0004
+                    // volverá a delatar la tarifa que falte.
+                    //
+                    // 1200 de entrada y 340 de salida a 0.15/0.60 por millón (V57): 0.0004.
                     return new RespuestaModelo("""
                             {"nombre":"Se Lee Del Curriculum","email":"x@correo.pe",
                              "telefono":"999888777","perfilResumen":"Analista.",
                              "habilidades":["SQL"],"experienciaMesesTotal":48,
                              "ultimoPuesto":"Analista","ultimaEmpresa":"Andina",
                              "ultimaMesesDuracion":24,"educacionMaxima":"Universitaria completa"}""",
-                            razona ? "deepseek-v4-flash" : "deepseek-chat",
-                            "deepseek", "prueba", 1200, 340);
+                            "deepseek-flash", "deepseek", "prueba", 1200, 340);
                 }
             };
         }
@@ -137,6 +148,7 @@ public class FlujoPlataformaIT {
     @Autowired JdbcTemplate jdbc;
     @Autowired ColaCalificacionIa cola;
     @Autowired org.springframework.core.env.Environment entorno;
+    @Autowired AgentModelSelector selectorDeModelo;
     final ObjectMapper json = new ObjectMapper();
 
     static final String MES = YearMonth.now(ZoneId.of("America/Lima")).toString();
@@ -247,18 +259,21 @@ public class FlujoPlataformaIT {
         postular("carmen@correo.pe", "Carmen");
         esperarLecturaDe("carmen@correo.pe");
 
-        // 1200 tokens a 0.27 + 340 a 1.10, entre un millón: 0.0007 USD, escala de la columna.
-        // Y la bitácora guarda lo que el proveedor reportó —'deepseek-chat', la pasada
-        // rápida—, que es el nombre contra el que se buscó la tarifa (V39).
+        // 1200 tokens a 0.15 + 340 a 0.60, entre un millón: 0.000384, que a la escala 4 de
+        // la columna redondea a 0.0004 USD.
+        //
+        // Y la bitácora guarda lo que el proveedor reportó —'deepseek-flash', el mismo
+        // nombre para las dos pasadas desde el 10/09/2026—, que es el nombre contra el que
+        // se busca la tarifa. Esa fila la siembra la V57: si faltara, esto sería NULL.
         assertThat(jdbc.queryForObject("""
                 select costo from ejecucion_ia
                  where organizacion_id = %d and agente_codigo = 'DATOS_CV' and es_exitosa"""
                 .formatted(acmeId), BigDecimal.class))
-                .isEqualByComparingTo("0.0007");
+                .isEqualByComparingTo("0.0004");
         assertThat(jdbc.queryForObject("""
                 select modelo from ejecucion_ia
                  where organizacion_id = %d and agente_codigo = 'DATOS_CV' and es_exitosa"""
-                .formatted(acmeId), String.class)).isEqualTo("deepseek-chat");
+                .formatted(acmeId), String.class)).isEqualTo("deepseek-flash");
         // Lejos del 80% del tope de 10: ninguna campana suena todavía
         assertThat(contar("select count(*) from correo_enviado where "
                 + "plantilla_correo_codigo = 'TOPE_IA_AVISO'")).isZero();
@@ -397,16 +412,30 @@ public class FlujoPlataformaIT {
     @Order(6)
     void todoModeloConfiguradoTieneTarifa() {
         // El freno entero de la pieza E depende de que el nombre que la bitácora guarda
-        // —el que el proveedor reporta, que es el pedido— case con una fila de
-        // tarifa_modelo. La V38 sembró el default-model y el embedding pero se olvidó
-        // del modelo-rapido (la lectura de CV, la llamada más frecuente): todo ese gasto
-        // salía NULL y el tope no lo veía. La V39 lo arregló; esta prueba impide que
-        // cambiar un modelo en application.yaml sin registrar su tarifa vuelva a dejar
-        // ciego el consumo sin que nadie se entere.
-        List<String> configurados = List.of(
-                entorno.getRequiredProperty("renaser.ai.chat.default-model"),
-                entorno.getRequiredProperty("renaser.ai.chat.modelo-rapido"),
-                entorno.getRequiredProperty("spring.ai.google.genai.embedding.text.model"));
+        // case con una fila de tarifa_modelo. La V38 sembró el default-model y el embedding
+        // pero se olvidó del modelo-rapido (la lectura de CV, la llamada más frecuente):
+        // todo ese gasto salía NULL y el tope no lo veía. La V39 lo arregló.
+        //
+        // ⚠️ OJO CON EL ALCANCE DE ESTA PRUEBA, que es menor de lo que parece. Comprueba
+        // los nombres que la aplicación PIDE, y la bitácora guarda el que el proveedor
+        // RESPONDE. Mientras los dos coincidan da igual; el 10/09/2026 dejaron de
+        // coincidir —DeepSeek renombró todo a 'deepseek-flash' y dejó los nombres viejos
+        // como alias— y esta prueba siguió en verde una semana entera mientras el costo
+        // salía NULL en producción. Lo que caza es que alguien cambie un modelo en
+        // application.yaml sin registrar su tarifa; lo que NO puede cazar es que el
+        // proveedor conteste otro nombre. Para eso está el doble de arriba, y hay que
+        // moverlo a mano cuando el proveedor cambie.
+        //
+        // Los modelos de chat se preguntan al selector y no se leen solo de la
+        // configuración: ORCHESTRATOR no usa el default-model sino un override cableado en
+        // AgentModelSelectorImpl, y ese nombre estuvo sin tarifa desde la V38 hasta la V57
+        // justamente porque aquí no se miraba.
+        List<String> configurados = Stream.concat(
+                        Stream.of(AgentType.values()).map(selectorDeModelo::selectModel),
+                        Stream.of(entorno.getRequiredProperty("renaser.ai.chat.modelo-rapido"),
+                                entorno.getRequiredProperty(
+                                        "spring.ai.google.genai.embedding.text.model")))
+                .distinct().toList();
         for (String modelo : configurados) {
             assertThat(contar("""
                     select count(*) from tarifa_modelo
@@ -476,8 +505,8 @@ public class FlujoPlataformaIT {
 
     /**
      * Simula gasto del mes: una ejecución con costo, colgada de un trabajo terminado.
-     * Por jdbc y no por el doble del modelo, porque llegar a 8.50 USD a 0.0007 por
-     * lectura serían doce mil postulaciones.
+     * Por jdbc y no por el doble del modelo, porque llegar a 8.50 USD a 0.0004 por
+     * lectura serían más de veinte mil postulaciones.
      */
     private void sembrarConsumo(String costo) {
         Long trabajoId = jdbc.queryForObject("""
@@ -489,7 +518,7 @@ public class FlujoPlataformaIT {
                         version_agente, objetivo, modelo, proveedor, envio, tokens_entrada,
                         tokens_salida, costo, es_exitosa, creado_en)
                 values (?, ?, 'DATOS_CV', 1, 'consumo sembrado para la prueba',
-                        'deepseek-v4-flash', 'deepseek', 'siembra', 1000000, 100000, ?, true, now())""",
+                        'deepseek-flash', 'deepseek', 'siembra', 1000000, 100000, ?, true, now())""",
                 trabajoId, acmeId, new BigDecimal(costo));
     }
 

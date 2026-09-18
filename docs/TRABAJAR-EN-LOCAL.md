@@ -14,7 +14,7 @@ qué trampas tiene montar un backend propio para una rama. Las reglas del códig
 | Spring Boot | 4.1 |
 | Base de datos | PostgreSQL con pgvector (`pgvector/pgvector:pg16`), en `docker-compose.yml`, puerto 5433 |
 | Cola | RabbitMQ, para calificar en segundo plano |
-| IA · chat | Spring AI con **DeepSeek** (`deepseek-v4-flash`), API externa |
+| IA · chat | Spring AI con **DeepSeek** (`deepseek-flash`, y `deepseek-chat` para la primera pasada de la criba), API externa |
 | IA · embeddings | **Google Gemini** (`gemini-embedding-2`, 1536 dimensiones), API externa |
 | Otros | MapStruct, Lombok, hilos virtuales, Flyway, Security, JWT, Validation, Swagger |
 
@@ -26,6 +26,12 @@ variables de entorno en tu máquina.
 los datos de candidatos salgan hacia esos dos (18/08/2026). El currículum se anonimiza antes de
 salir: edad, sexo y estado civil quedan tapados, y se guardan las dos versiones para poder
 demostrar que la regla se cumplió.
+
+⚠️ **Los nombres de modelo no se tocan a ojo.** El de arriba cambió el 17/09/2026 y el motivo no
+fue que el viejo fallara: el proveedor renombró su catálogo y dejó los nombres retirados
+atendiendo como alias, así que todo seguía funcionando mientras el gasto se anotaba en cero.
+Antes de cambiar uno hay que sembrar su precio en la misma rama, y conviene leer
+[El modelo cambió de nombre](EL-MODELO-CAMBIO-DE-NOMBRE.md), que cuenta la trampa entera.
 
 ---
 

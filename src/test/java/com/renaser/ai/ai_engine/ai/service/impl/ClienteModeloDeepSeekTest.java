@@ -36,7 +36,7 @@ import static org.mockito.Mockito.when;
 @DisplayName("El cliente de DeepSeek y el modelo que anota en la bitácora")
 class ClienteModeloDeepSeekTest {
 
-    private static final String RAZONA = "deepseek-v4-flash";
+    private static final String RAZONA = "deepseek-flash";
     private static final String RAPIDO = "deepseek-chat";
 
     @Mock(answer = Answers.RETURNS_DEEP_STUBS)
@@ -74,13 +74,17 @@ class ClienteModeloDeepSeekTest {
     @Test
     @DisplayName("si el proveedor sí dice qué modelo usó, manda él sobre lo pedido")
     void elModeloReportadoManda() {
-        elProveedorContesta("deepseek-chat");
+        elProveedorContesta("deepseek-flash");
 
-        RespuestaModelo respuesta = cliente().preguntar("EVALUADOR", "instrucción json", "datos", true);
+        RespuestaModelo respuesta = cliente().preguntar("EVALUADOR", "instrucción json", "datos",
+                false);
 
-        // Se pidió el que razona, pero el proveedor resolvió al mismo modelo con otro
-        // nombre: la bitácora dice la verdad del proveedor, y la tarifa se busca por ella.
-        assertThat(respuesta.modelo()).isEqualTo("deepseek-chat");
+        // Este es el caso real desde el 10/09/2026, no un supuesto: se pidió la pasada
+        // RÁPIDA ('deepseek-chat') y el proveedor contestó 'deepseek-flash', porque el
+        // nombre pedido es un alias del nuevo. La bitácora dice la verdad del proveedor, y
+        // la tarifa se busca por ella — por eso la V57 siembra 'deepseek-flash' y no el
+        // nombre que está en la configuración.
+        assertThat(respuesta.modelo()).isEqualTo("deepseek-flash");
         assertThat(respuesta.proveedor()).isEqualTo("deepseek");
         assertThat(respuesta.tokensEntrada()).isEqualTo(1200);
         assertThat(respuesta.tokensSalida()).isEqualTo(340);

@@ -119,7 +119,7 @@ public class FlujoFichaYRedactorIT {
                 throw new IllegalStateException("agente inesperado: " + agente);
             }
             return new RespuestaModelo(cuestionario("DIRECCION", rota),
-                    "deepseek-v4-flash", "deepseek", "prueba", 1500, 900);
+                    "deepseek-flash", "deepseek", "prueba", 1500, 900);
         }
 
         /** Un cuestionario que respeta la receta del nivel — o la rompe, si se le pide. */

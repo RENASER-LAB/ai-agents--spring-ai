@@ -156,11 +156,50 @@ renaser:
 
   ai:
     chat:
-      default-model: deepseek-v4-flash
+      # DeepSeek-V4.1-Flash. El nombre de API es 'deepseek-flash' a secas — no lleva el 4.1
+      # dentro, aunque el modelo se anuncie así.
+      #
+      # Hasta el 17/09/2026 aquí decía 'deepseek-v4-flash'. Ese nombre NO dejó de funcionar:
+      # el 10/09 DeepSeek retiró V4 Flash y dejó el nombre viejo enrutando al nuevo, así que
+      # el sistema llevaba una semana hablando con V4.1 Flash sin que nadie lo cambiara. Lo
+      # que se arregla al escribirlo bien es otra cosa, y está en la V57: el proveedor
+      # RESPONDE 'deepseek-flash' y la bitácora guarda lo que él responde, no lo que se pide
+      # (ver ClienteModeloDeepSeek#preguntar), de modo que el costo caía en un modelo sin
+      # tarifa y salía NULL.
+      #
+      # Alias que hoy siguen vivos y a los que no hay que volver: deepseek-v4-flash y
+      # deepseek-v4-flash-vision-exp. El catálogo real son dos nombres, deepseek-flash y
+      # deepseek-v4-pro; se comprueba con GET https://api.deepseek.com/models.
+      default-model: deepseek-flash
       # El de la primera pasada. Contesta sin razonar: 19 segundos por currículum en vez de
       # 48, porque se ahorra los ~5.000 tokens de pensamiento interno que el otro gasta
       # antes de escribir. A cambio ordena distinto el medio de la tabla y ve menos riesgos,
       # así que sirve para ordenar la tanda, no para decidir a quién se contrata.
+      #
+      # ⚠️ Sigue siendo 'deepseek-chat' a propósito, y es el único valor de este archivo que
+      # apunta a un nombre retirado. Desde el 10/09/2026 'deepseek-chat' es un ALIAS: enruta
+      # a deepseek-flash CON EL PENSAMIENTO APAGADO, mientras que pedir 'deepseek-flash' a
+      # secas lo trae encendido. Medido el 17/09/2026 con la misma pregunta: deepseek-chat
+      # devolvió 1 token de salida y 0 de pensamiento; deepseek-flash, 82 de salida y 80 de
+      # pensamiento.
+      #
+      # Es decir: este alias es HOY la única forma de pedir la pasada rápida. La forma nueva
+      # es el parámetro thinking={"type":"disabled"}, y DeepSeekChatOptions de Spring AI 2.0
+      # no tiene dónde ponerlo — el mismo agujero que ya tiene la semilla, unas líneas más
+      # abajo. Cambiarlo a 'deepseek-flash' sin esa palanca no da error: pone a razonar la
+      # llamada más frecuente del sistema (una por candidato) y la triplica en tiempo.
+      #
+      # El día que DeepSeek toque el alias hay DOS finales posibles, y conviene no confundir
+      # el que se espera con el que puede tocar:
+      #
+      #   · Si lo REENRUTA a deepseek-flash sin más, no falla nada: leer un currículum pasa a
+      #     tardar ~48 segundos y a gastar ~5.000 tokens de más, en silencio.
+      #   · Si lo RETIRA de verdad, la API contesta error, ClienteModeloDeepSeek#llamar lo
+      #     envuelve en IllegalStateException, no casa con ningún caso conocido de
+      #     explicarFallo (401, 402, 429, timeout) y la lectura de CV muere FALLIDA tras los
+      #     tres intentos. Ruidoso, pero con un mensaje que no señala la causa.
+      #
+      # En cualquiera de los dos, lo que hay que mirar es si Spring AI ya expone thinking.
       modelo-rapido: deepseek-chat
       # 4096 truncaba el envelope: V4 Pro razona y esos tokens cuentan como salida.
       max-tokens: 16384
