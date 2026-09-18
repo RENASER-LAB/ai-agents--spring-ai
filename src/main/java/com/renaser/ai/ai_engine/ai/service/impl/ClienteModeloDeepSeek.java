@@ -192,8 +192,11 @@ public class ClienteModeloDeepSeek implements ClienteModelo {
      * Anota cuántos tokens de la entrada los puso la caché de DeepSeek y cuántos se pagaron.
      *
      * <p><b>Por qué se mide.</b> DeepSeek guarda en disco los prefijos que se repiten: lo que
-     * entra por caché cuesta $0,014 por millón de tokens en vez de $0,14 —diez veces menos— y
-     * además el primer token tarda mucho menos en llegar. No hay nada que encender: es
+     * entra por caché cuesta $0,003 por millón de tokens en vez de $0,15 —cincuenta veces
+     * menos, precios de deepseek-flash fuera de hora punta, los que siembra la V57— y además
+     * el primer token tarda mucho menos en llegar. (Hasta el 17/09/2026 aquí decía $0,014
+     * contra $0,14, que eran los de V4 Flash: el modelo cambió de nombre y de precio, y el
+     * ahorro es mayor que el que este javadoc prometía.) No hay nada que encender: es
      * automático, y por eso mismo es fácil que deje de acertar sin que nadie se entere. Una
      * calificación con acierto cero significa que el prefijo dejó de coincidir, casi siempre
      * porque alguien metió algo variable delante de la instrucción.

@@ -174,7 +174,7 @@ public class FlujoCalificacionIaIT {
                 throw new IllegalStateException("el proveedor del modelo no responde");
             }
             return new RespuestaModelo(respuestaDe(agenteCodigo, contenido),
-                    "deepseek-v4-flash", "deepseek", "prueba", 1200, 340);
+                    "deepseek-flash", "deepseek", "prueba", 1200, 340);
         }
 
         private String respuestaDe(String agenteCodigo, String contenido) {

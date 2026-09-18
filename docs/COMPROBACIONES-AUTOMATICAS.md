@@ -122,7 +122,9 @@ hallazgo real. El gordo: el modelo rápido (`deepseek-chat`, la lectura de CV �
 por candidato) no tenía tarifa en la V38 y todo ese gasto salía NULL, invisible para el
 tope; la V39 la siembra, `ClienteModeloDeepSeek` anota el modelo PEDIDO cuando el proveedor
 calla (antes anotaba siempre el caro), y un IT nuevo exige tarifa vigente para todo modelo
-de `application.yaml`. Los otros: la suspendida que congela también sus trabajos de IA
+de `application.yaml`. **Ese IT volvió a dejar pasar el mismo fallo el 10/09/2026**, y lo que
+le falta está contado más abajo y en [El modelo cambió de
+nombre](EL-MODELO-CAMBIO-DE-NOMBRE.md). Los otros: la suspendida que congela también sus trabajos de IA
 nuevos y a la que el barrido no despierta ni con cupo (unitarias, más el viaje
 suspensión→reactivación dentro del IT del tope), la campana del 80% que ya no puede tumbar
 una postulación (corre en su propia transacción y su fallo se traga), la doble llave de la
@@ -268,6 +270,28 @@ al intentar publicar cualquiera de los tres tipos** o uno inventado; y que lo qu
 
 ⚠️ **El total de arriba no se recontó con estas ocho**; la cifra solo se sostiene recontando los
 `<testcase>`, nunca sumando a ojo.
+
+### Una prueba en verde que tapaba el fallo (17/09)
+
+**La lección de esta fecha no es que falte una prueba: es que había una y miraba el sitio
+equivocado.** El cambio de nombre del modelo de DeepSeek no añade casos nuevos; corrige los
+dobles de los que ya existen, que llevaban una semana contestando nombres que el proveedor ya no
+responde. Eran ellos los que dejaron pasar el fallo.
+
+- **La prueba que exige tarifa para todo modelo configurado comprueba los nombres que la
+  aplicación PIDE**, y el gasto se anota con el nombre que el proveedor RESPONDE. Mientras los
+  dos coincidan da igual; el 10/09 dejaron de coincidir y la prueba siguió en verde mientras el
+  costo salía vacío en producción. Lo que caza es que alguien cambie un modelo sin registrar su
+  precio; lo que no puede cazar —y hay que decirlo donde se lea— es que el proveedor conteste
+  otro nombre.
+- **Ahora esa prueba recorre también los modelos del selector de agentes**, no solo los de la
+  configuración. Así apareció que el modelo del orquestador nunca tuvo precio: no está escrito en
+  `application.yaml`, y por eso nadie lo miraba.
+- **El doble del modelo en el recorrido del tope devuelve un solo nombre para las dos pasadas**,
+  que es lo que la API real hace desde el 10/09. Es una constante que hay que mover a mano cuando
+  el proveedor vuelva a cambiar: ninguna prueba puede enterarse sola.
+
+El porqué entero, en [El modelo cambió de nombre](EL-MODELO-CAMBIO-DE-NOMBRE.md).
 
 ---
 

@@ -15,7 +15,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @DisplayName("Qué modelo usa cada agente")
 class AgentModelSelectorImplTest {
 
-    private static final String FLASH = "deepseek-v4-flash";
+    private static final String FLASH = "deepseek-flash";
     private static final String PRO = "deepseek-v4-pro";
 
     private final AgentModelSelectorImpl selector = new AgentModelSelectorImpl(FLASH);

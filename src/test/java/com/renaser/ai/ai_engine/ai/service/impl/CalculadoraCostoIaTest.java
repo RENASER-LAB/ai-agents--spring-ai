@@ -39,7 +39,7 @@ class CalculadoraCostoIaTest {
 
     private TarifaModelo tarifa(String entrada, String salida) {
         return TarifaModelo.builder()
-                .proveedor("deepseek").modelo("deepseek-v4-flash")
+                .proveedor("deepseek").modelo("deepseek-flash")
                 .precioEntradaPorMillon(new BigDecimal(entrada))
                 .precioSalidaPorMillon(new BigDecimal(salida))
                 .vigenteDesde(Instant.now().minusSeconds(3600))
@@ -49,14 +49,14 @@ class CalculadoraCostoIaTest {
     @Test
     void elCostoEsTokensPorPrecioEntreUnMillon() {
         when(tarifas.findFirstByProveedorIgnoreCaseAndModeloIgnoreCaseAndVigenteDesdeLessThanEqualOrderByVigenteDesdeDesc(
-                eq("deepseek"), eq("deepseek-v4-flash"), any(Instant.class)))
-                .thenReturn(Optional.of(tarifa("0.27", "1.10")));
+                eq("deepseek"), eq("deepseek-flash"), any(Instant.class)))
+                .thenReturn(Optional.of(tarifa("0.15", "0.60")));
 
-        BigDecimal costo = calculadora().costoDe("deepseek", "deepseek-v4-flash",
+        BigDecimal costo = calculadora().costoDe("deepseek", "deepseek-flash",
                 1_000_000, 100_000, Instant.now());
 
-        // 1M de entrada a 0.27 + 100k de salida a 1.10 = 0.27 + 0.11
-        assertThat(costo).isEqualByComparingTo("0.38");
+        // 1M de entrada a 0.15 + 100k de salida a 0.60 = 0.15 + 0.06 (tarifa de la V57)
+        assertThat(costo).isEqualByComparingTo("0.21");
     }
 
     @Test
@@ -67,14 +67,14 @@ class CalculadoraCostoIaTest {
         // hoy reescribiría lo ejecutado ayer.
         Instant cierre = Instant.parse("2026-08-15T12:00:00Z");
         when(tarifas.findFirstByProveedorIgnoreCaseAndModeloIgnoreCaseAndVigenteDesdeLessThanEqualOrderByVigenteDesdeDesc(
-                "deepseek", "deepseek-v4-flash", cierre))
-                .thenReturn(Optional.of(tarifa("0.27", "1.10")));
+                "deepseek", "deepseek-flash", cierre))
+                .thenReturn(Optional.of(tarifa("0.15", "0.60")));
 
-        calculadora().costoDe("deepseek", "deepseek-v4-flash", 10, 10, cierre);
+        calculadora().costoDe("deepseek", "deepseek-flash", 10, 10, cierre);
 
         verify(tarifas)
                 .findFirstByProveedorIgnoreCaseAndModeloIgnoreCaseAndVigenteDesdeLessThanEqualOrderByVigenteDesdeDesc(
-                        "deepseek", "deepseek-v4-flash", cierre);
+                        "deepseek", "deepseek-flash", cierre);
     }
 
     @Test
@@ -90,7 +90,7 @@ class CalculadoraCostoIaTest {
     @Test
     void sinNingunTokenNoHayNadaQueCobrarNiTarifaQueBuscar() {
         // El proveedor no devolvió el uso: no se midió nada y no se inventa un precio.
-        assertThat(calculadora().costoDe("deepseek", "deepseek-v4-flash", null, null, Instant.now()))
+        assertThat(calculadora().costoDe("deepseek", "deepseek-flash", null, null, Instant.now()))
                 .isNull();
         verifyNoInteractions(tarifas);
     }

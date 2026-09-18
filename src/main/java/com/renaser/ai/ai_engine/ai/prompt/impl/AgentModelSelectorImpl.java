@@ -10,9 +10,18 @@ import java.util.Map;
 @Component
 public class AgentModelSelectorImpl implements AgentModelSelector {
 
-    // El modelo por defecto es deepseek-v4-flash; este mapa lista las excepciones que
-    // justifican pagar deepseek-v4-pro, 3.4x más caro por corrida ($0.0035 contra $0.0120,
-    // medido el 2026-08-16 sobre 20 corridas end-to-end de cada modelo).
+    // El modelo por defecto es deepseek-flash (DeepSeek-V4.1-Flash, renaser.ai.chat
+    // .default-model); este mapa lista las excepciones que justifican pagar deepseek-v4-pro,
+    // 3.4x más caro por corrida ($0.0035 contra $0.0120, medido el 2026-08-16 sobre 20
+    // corridas end-to-end de cada modelo).
+    //
+    // La medición es de agosto y comparaba V4 Flash contra V4 Pro. Hoy el por defecto es
+    // V4.1 Flash, que no es el modelo que se midió, así que esa proporción es una referencia
+    // vieja. Con los precios fuera de punta del 17/09/2026 —flash a $0.15/$0.60 por millón y
+    // v4-pro a $0.66/$1.98, que son los que siembra la V57— la diferencia sale 4.4x en
+    // entrada y 3.3x en salida; en hora punta es el doble de cada uno y la proporción no
+    // cambia. No se vuelve a medir aquí porque lo que decide este mapa no es el precio, es lo
+    // de abajo.
     //
     // La tasa de parseo no los separa: ambos sostuvieron el contrato 20/20 sin un solo
     // reintento. Lo que separa a ORCHESTRATOR es cómo se consume su salida.

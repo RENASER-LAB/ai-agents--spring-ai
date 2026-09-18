@@ -64,10 +64,10 @@ class DeepSeekChatOptionsFactoryTest {
         // deepseek-v4-pro. Si la factory ignorara al selector, poblar MODEL_OVERRIDES
         // no tendría ningún efecto y el ahorro sería silenciosamente cero.
         AgentModelSelector selector = agentType ->
-                agentType == AgentType.NARRATIVE_MESSAGE ? "deepseek-v4-flash" : "deepseek-v4-pro";
+                agentType == AgentType.NARRATIVE_MESSAGE ? "deepseek-flash" : "deepseek-v4-pro";
 
         assertThat(optionsFor(AgentType.NARRATIVE_MESSAGE, selector).getModel())
-                .isEqualTo("deepseek-v4-flash");
+                .isEqualTo("deepseek-flash");
         assertThat(optionsFor(AgentType.ORCHESTRATOR, selector).getModel())
                 .isEqualTo("deepseek-v4-pro");
     }

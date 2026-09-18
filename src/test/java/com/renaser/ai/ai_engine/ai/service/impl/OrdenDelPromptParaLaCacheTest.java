@@ -83,7 +83,7 @@ class OrdenDelPromptParaLaCacheTest {
             public RespuestaModelo preguntar(String agenteCodigo, String instruccion,
                                              String contenido, boolean razona) {
                 envios.add(new Envio(instruccion, contenido));
-                return new RespuestaModelo("{\"nombre\":\"Ana\"}", "deepseek-chat", "deepseek",
+                return new RespuestaModelo("{\"nombre\":\"Ana\"}", "deepseek-flash", "deepseek",
                         "v1", 100, 50);
             }
         };

@@ -11,7 +11,7 @@ haría falta para arreglarlo**. Sin lo tercero, una lista así solo sirve para p
 > descubrir cada pocos meses, normalmente con un candidato dentro. Lo que **ya está arreglado**
 > no vive aquí: vive en el documento de su tema, en `CLAUDE.MD` o en el javadoc de su clase.
 
-Última revisión: **16/09/2026**.
+Última revisión: **18/09/2026**.
 
 ---
 
@@ -206,8 +206,60 @@ se anota aquí porque salió al verificar los pesos que esa hoja combina.
 
 ---
 
+## 8 · La lectura de currículums depende de un nombre que el proveedor ya retiró
+
+**Qué le pasa a alguien.** Depende de cómo caiga el día que el proveedor toque ese nombre, y los
+dos finales están comprobados en la configuración:
+
+- **Si lo reenruta**, nadie ve un error: leer cada currículum pasa a tardar varias veces más
+  —medido el 17/09/2026, cuatro—, así que quien acaba de cargar una tanda la ve arrastrarse sin
+  ninguna explicación en pantalla.
+- **Si lo retira de verdad**, la lectura del currículum muere tras los tres intentos y el mensaje
+  del registro **no señala la causa**: no casa con ninguna de las conocidas —saldo, clave, exceso
+  de llamadas—, así que quien lo mire buscará en el sitio equivocado.
+
+**Por qué pasa.** Al leer un currículum no se quiere que el modelo piense antes de contestar: se
+quiere ordenar la tanda rápido. Ese nombre retirado es **hoy la única forma de pedirlo callado**,
+porque la forma nueva es un parámetro que la versión de Spring AI del proyecto no expone. Es deuda
+tomada a sabiendas, no un descuido.
+
+**Qué haría falta.** Que Spring AI deje apagar el pensamiento por su cuenta; entonces el alias
+sobra y el nombre se cambia en una línea. Hasta ese día, lo único que se puede hacer es mirar de
+vez en cuando qué nombres sigue sirviendo el proveedor. El contexto entero está en
+[El modelo cambió de nombre](EL-MODELO-CAMBIO-DE-NOMBRE.md).
+
+---
+
+## 9 · El gasto de IA que se muestra no es el importe de la factura
+
+**Qué le pasa a alguien.** Quien mire cuánto lleva gastado una empresa **está viendo una
+aproximación**, no la factura, y no hay nada en pantalla que lo diga. Se queda corta en lo que se
+haya llamado de madrugada —el proveedor cobra el doble en esa franja— y se pasa en lo que el
+proveedor haya reconocido de una consulta repetida, que cuesta cincuenta veces menos. La tabla de
+precios **no distingue ninguna de las dos cosas**.
+
+**Por qué pasa.** Hay que elegir un número por modelo, y se eligió el de fuera de punta, que es la
+franja donde ocurre casi todo el trabajo real: en horario de oficina peruano la punta ni siquiera
+ha empezado. Elegir el caro habría significado equivocarse el doble en el 100% del tráfico para
+cubrir una minoría, y el coste de equivocarse por ahí es peor que el del importe: es lo
+de abajo.
+
+**Y hay un freno que no avisa.** Cuando una empresa cruza su tope, los trabajos nuevos se quedan
+esperando, **no sale ningún correo** y el candidato ve su proceso «en curso», indistinguible de
+uno que avanza; no se destraba hasta que alguien sube el tope o empieza el mes. Eso es
+independiente del precio, pero es lo que convierte un error de cálculo en una postulación
+congelada en silencio. **Hoy no le pasa a nadie porque ninguna empresa tiene tope puesto.**
+
+**Qué haría falta.** Para el importe: cuadrar contra una factura real y registrar entonces la
+tarifa buena —una nueva, nunca editando la vieja, o se reescribiría el pasado—. Para el freno: que
+avise a alguien, que hoy no lo hace. Y si algún día se programan tandas de madrugada, decidir si
+la tabla aprende a distinguir la franja horaria antes de que el desvío importe.
+
+---
+
 ## Documentos relacionados
 
+- [El modelo cambió de nombre](EL-MODELO-CAMBIO-DE-NOMBRE.md) — de dónde salen el 8 y el 9
 - [Requisitos funcionales](01-REQUISITOS-FUNCIONALES.md) — el rango de duración retirado está en
   RF-76 y el cambio inesperado en RF-77
 - [Modelo de datos](05-MODELO-DE-DATOS.md) — qué impide la base y qué no
