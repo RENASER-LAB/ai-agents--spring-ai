@@ -111,6 +111,7 @@ urgencia la fija Talento o Dirección, para que nadie se salte la cola por decis
 | Editar una vacante | ○ | ● | ○ | ● | ○ |
 | Publicarla, sin aprobación | ○ | ● | ○ | ● | ○ |
 | Cerrar una vacante | ○ | ● | ○ | ● | ○ |
+| Archivar o desarchivar una vacante cerrada | ○ | ● | ○ | ● | ○ |
 | Elegir qué prueba y qué plantilla de evaluación se aplican | ○ | ● | ◐ | ● | ○ |
 | Definir los requisitos objetivos indispensables | ○ | ● | ◐ | ● | ○ |
 | Definir las barreras críticas de la vacante | ○ | ● | ◐ | ● | ○ |
@@ -124,6 +125,21 @@ Desde el 19/09/2026 **respeta su alcance**: con alcance a sus vacantes, solo se 
 esa persona dirige; en las demás no sale el lápiz, y pedirlo por la API responde 404, no 403. Sin
 el permiso, 403. No hay permiso aparte para el sueldo: quien corrige la vacante corrige lo que
 paga.
+
+**«Cerrar una vacante» (`cerrar_vacante`) archiva y desarchiva también** (21/09/2026). **No hay
+permiso nuevo**, y es deliberado: archivar es el paso siguiente de cerrar —retirar de la mesa lo
+que ya terminó—, no una decisión distinta, y un permiso recién creado habría que repartirlo rol
+por rol, así que el día del reparto no lo tendría nadie. Respeta su alcance igual que el lápiz:
+fuera de él, **404**; sin el permiso, **403**, y ni el icono de archivo ni «Desarchivar» aparecen
+—lo dicen `puedeArchivar` y `puedeDesarchivar` de cada fila, no una lista de roles en el
+navegador—.
+
+⚠️ **Consultar «Vacantes archivadas» va con `ver_vacantes`, el permiso de lectura de siempre.**
+Quien no puede archivar puede necesitar mirar una convocatoria vieja: el botón «Archivadas (N)»
+de la cabecera, su lista y el detalle en lectura no exigen `cerrar_vacante`. Lo que sí lo exige
+es la acción. El conteo se saca del mismo universo que la vista —las vacantes de la organización
+de quien pregunta, igual que la lista habitual—, para que el botón no prometa siete y la pantalla
+enseñe cinco.
 
 ### Candidatos
 

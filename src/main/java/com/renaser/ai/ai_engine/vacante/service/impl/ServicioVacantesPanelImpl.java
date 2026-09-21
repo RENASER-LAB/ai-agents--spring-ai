@@ -14,6 +14,7 @@ import com.renaser.ai.ai_engine.vacante.service.AlcanceSobreLaVacante;
 import com.renaser.ai.ai_engine.vacante.service.CambiosDeLaVacante;
 import com.renaser.ai.ai_engine.vacante.service.Remuneracion;
 import com.renaser.ai.ai_engine.vacante.service.ServicioVacantesPanel;
+import com.renaser.ai.ai_engine.vacante.service.VacanteArchivada;
 import com.renaser.ai.ai_engine.vacante.dto.DtosVacante.*;
 import com.renaser.ai.ai_engine.perfilintegral.entity.PlantillaEvaluacion;
 import com.renaser.ai.ai_engine.perfilintegral.repository.EvaluacionRepository;
@@ -70,6 +71,17 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
 
     /** El permiso que abre el lápiz de la lista y el PUT de la vacante. */
     private static final String PERMISO_EDITAR = "editar_vacante";
+
+    /**
+     * El permiso que archiva y desarchiva, y es el mismo que cierra.
+     *
+     * <p>Archivar es el paso siguiente de cerrar —retirar de la mesa lo que ya terminó— y no
+     * una decisión distinta: quien puede dar por terminada una convocatoria puede guardarla,
+     * y quien no puede cerrarla tampoco tiene por qué poder esconderla de la lista de los
+     * demás. Un permiso nuevo habría que repartirlo a mano rol por rol, y el día del reparto
+     * nadie lo tendría.
+     */
+    private static final String PERMISO_ARCHIVAR = "cerrar_vacante";
 
     private final VacanteRepository vacantes;
     private final PuestoRepository puestos;
@@ -276,6 +288,11 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
         // Con SUS_VACANTES, la de otro responsable no existe: 404 y no 403, como en todo el
         // panel. Lo decide el guardián, que es el único que sabe qué alcanza cada alcance.
         Vacante vacante = alcance.laVacanteVisible(quien, id, PERMISO_EDITAR);
+        // ⚠️ El archivo se comprueba ANTES que el estado y antes de tocar nada: el formulario
+        // que alguien dejó abierto sigue sabiendo la URL del PUT, y entre abrirlo y guardarlo
+        // cabe que otro usuario la archive. Sin esto, el guardado se aplicaría sobre una
+        // vacante que ya nadie ve en la lista.
+        VacanteArchivada.exigirQueNoLoEste(vacante);
         if (ESTADO_CERRADA.equals(vacante.getEstado())) {
             throw new IllegalStateException("Una vacante cerrada no se edita");
         }
@@ -363,22 +380,51 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
     }
 
     @Override
-    public List<VacantePanel> listar(ContextoUsuario quien) {
+    public List<VacantePanel> listar(ContextoUsuario quien, boolean archivadas) {
         // Un solo conteo para toda la lista: preguntar por fila multiplicaría las consultas
         // por el número de convocatorias de la empresa en la pantalla que más se abre.
         Map<Long, Integer> porVacante = enCarrera.cuantasPorVacante(quien.organizacionId());
         FiltroAlcance alcanceDeEdicion = alcanceDeEdicionDe(quien);
-        return vacantes.findByOrganizacionIdOrderByCreadoEnDesc(quien.organizacionId()).stream()
+        FiltroAlcance alcanceDeArchivo = alcanceDeArchivoDe(quien);
+        // ⚠️ Dos consultas distintas y no un filtro sobre la lista entera. La lista habitual
+        // ni siquiera lee las archivadas: es lo que hace que no reaparezcan al buscar, al
+        // filtrar por estado ni al paginar, porque nunca llegaron a la pantalla.
+        List<Vacante> filas = archivadas
+                ? vacantes.findByOrganizacionIdAndArchivadaEnIsNotNullOrderByArchivadaEnDesc(
+                        quien.organizacionId())
+                : vacantes.findByOrganizacionIdAndArchivadaEnIsNullOrderByCreadoEnDesc(
+                        quien.organizacionId());
+        return filas.stream()
                 .map(v -> comoPanel(v, porVacante.getOrDefault(v.getId(), 0),
-                        puedeEditar(quien, alcanceDeEdicion, v)))
+                        puedeEditar(quien, alcanceDeEdicion, v),
+                        alcanceDeArchivo, quien))
                 .toList();
+    }
+
+    /**
+     * El número del botón «Archivadas (N)».
+     *
+     * <p>Se cuenta sobre exactamente el mismo universo que devuelve {@link #listar}: la
+     * organización de quien pregunta. Que salgan de la misma regla es lo que impide que el
+     * botón prometa siete y la vista enseñe cinco, que es la forma en que un contador deja de
+     * creerse.
+     *
+     * <p>Consultar Archivadas va con el permiso de lectura de siempre ({@code ver_vacantes},
+     * que exige el controlador) y no con el de archivar: quien puede ver las vacantes de la
+     * empresa puede ver las que se guardaron.
+     */
+    @Override
+    public ConteoDeArchivadas contarArchivadas(ContextoUsuario quien) {
+        return new ConteoDeArchivadas(
+                vacantes.countByOrganizacionIdAndArchivadaEnIsNotNull(quien.organizacionId()));
     }
 
     @Override
     public VacantePanel detalle(ContextoUsuario quien, Long id) {
         Vacante vacante = laDeLaOrganizacion(quien, id);
         return comoPanel(vacante, enCarrera.cuantasEnLaVacante(id),
-                puedeEditar(quien, alcanceDeEdicionDe(quien), vacante));
+                puedeEditar(quien, alcanceDeEdicionDe(quien), vacante),
+                alcanceDeArchivoDe(quien), quien);
     }
 
     /** El alcance de {@code editar_vacante}, o vacío si quien pregunta no lo tiene. */
@@ -386,16 +432,24 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
         return quien.tiene(PERMISO_EDITAR) ? permisos.alcanceDe(PERMISO_EDITAR) : null;
     }
 
+    /** El alcance de {@code cerrar_vacante}, o vacío si quien pregunta no lo tiene. */
+    private FiltroAlcance alcanceDeArchivoDe(ContextoUsuario quien) {
+        return quien.tiene(PERMISO_ARCHIVAR) ? permisos.alcanceDe(PERMISO_ARCHIVAR) : null;
+    }
+
     /**
      * Si quien mira puede tocar ESTA vacante: tiene el permiso, su alcance la alcanza y la
-     * vacante no está cerrada.
+     * vacante no está cerrada ni archivada.
      *
      * <p>Una cerrada no se edita —lo hace cumplir {@link #editar}—, así que el lápiz no
-     * aparece: un botón que siempre contesta 409 es una promesa rota.
+     * aparece: un botón que siempre contesta 409 es una promesa rota. Una archivada está
+     * siempre cerrada, así que lo de la archivada ya estaría dicho; se escribe igual porque
+     * la razón es otra y el día que se archive algo que no esté cerrado, esto no se cae.
      */
     private boolean puedeEditar(ContextoUsuario quien, FiltroAlcance alcanceDeEdicion,
                                 Vacante vacante) {
         return alcanceDeEdicion != null
+                && vacante.getArchivadaEn() == null
                 && !ESTADO_CERRADA.equals(vacante.getEstado())
                 && alcance.alcanzaALaVacante(quien, alcanceDeEdicion, vacante);
     }
@@ -413,7 +467,7 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
     @Override
     @Transactional
     public Long agregarRequisito(ContextoUsuario quien, Long vacanteId, GuardarRequisito datos) {
-        laDeLaOrganizacion(quien, vacanteId);
+        laQueSePuedeTocar(quien, vacanteId);
         RequisitoObjetivo requisito = requisitos.save(RequisitoObjetivo.builder()
                 .vacanteId(vacanteId)
                 .descripcion(datos.descripcion())
@@ -430,7 +484,7 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
     @Override
     @Transactional
     public void desactivarRequisito(ContextoUsuario quien, Long vacanteId, Long requisitoId) {
-        laDeLaOrganizacion(quien, vacanteId);
+        laQueSePuedeTocar(quien, vacanteId);
         RequisitoObjetivo requisito = requisitos.findById(requisitoId)
                 .filter(r -> r.getVacanteId().equals(vacanteId))
                 .orElseThrow(() -> new ResourceNotFoundException("Requisito objetivo", "id", requisitoId));
@@ -446,7 +500,7 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
     @Override
     @Transactional
     public void publicar(ContextoUsuario quien, Long id) {
-        Vacante vacante = laDeLaOrganizacion(quien, id);
+        Vacante vacante = laQueSePuedeTocar(quien, id);
         if (!"BORRADOR".equals(vacante.getEstado())) {
             throw new IllegalStateException("Solo se publica una vacante en borrador; está " + vacante.getEstado());
         }
@@ -487,7 +541,7 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
     @Override
     @Transactional
     public void asignarPlantillaEvaluacion(ContextoUsuario quien, Long id, Long plantillaEvaluacionId) {
-        Vacante vacante = laDeLaOrganizacion(quien, id);
+        Vacante vacante = laQueSePuedeTocar(quien, id);
         // Del dueño resuelto: con la bandera apagada la vacante usa las plantillas de la
         // plataforma; encendida, solo las propias. Cualquier otra es un «no existe».
         PlantillaEvaluacion plantilla = plantillas
@@ -522,7 +576,7 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
     @Override
     @Transactional
     public void asignarPlantillaPrueba(ContextoUsuario quien, Long id, Long versionPlantillaPruebaId) {
-        Vacante vacante = laDeLaOrganizacion(quien, id);
+        Vacante vacante = laQueSePuedeTocar(quien, id);
         VersionPlantillaPrueba version = versionesPrueba.findById(versionPlantillaPruebaId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Versión de prueba", "id", versionPlantillaPruebaId));
@@ -551,7 +605,7 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
     @Override
     @Transactional
     public void definirAplicacionEvaluacion(ContextoUsuario quien, Long id, boolean aplica) {
-        Vacante vacante = laDeLaOrganizacion(quien, id);
+        Vacante vacante = laQueSePuedeTocar(quien, id);
         if ("CERRADA".equals(vacante.getEstado())) {
             throw new IllegalStateException("Una vacante cerrada no se edita");
         }
@@ -571,7 +625,7 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
     @Override
     @Transactional
     public void activarCalificacionAutomatica(ContextoUsuario quien, Long id, boolean activa) {
-        Vacante vacante = laDeLaOrganizacion(quien, id);
+        Vacante vacante = laQueSePuedeTocar(quien, id);
         if ("CERRADA".equals(vacante.getEstado())) {
             throw new IllegalStateException("Una vacante cerrada no se edita");
         }
@@ -596,7 +650,7 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
     @Override
     @Transactional
     public void asignarVersionPesos(ContextoUsuario quien, Long id, Long versionPesosId) {
-        Vacante vacante = laDeLaOrganizacion(quien, id);
+        Vacante vacante = laQueSePuedeTocar(quien, id);
         VersionPesos version = versionesPesos
                 .findByIdAndOrganizacionId(versionPesosId,
                         dueno.duenoDe(quien.organizacionId(), Instrumento.PESOS))
@@ -647,7 +701,7 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
     @Transactional
     public void elegirInstrumentoTecnico(ContextoUsuario quien, Long id,
                                          String instrumento, Integer minutos) {
-        Vacante vacante = laDeLaOrganizacion(quien, id);
+        Vacante vacante = laQueSePuedeTocar(quien, id);
         if (!PLANTILLA.equals(instrumento) && !CUESTIONARIO_TECNICO.equals(instrumento)) {
             throw new IllegalArgumentException(
                     "El instrumento de la etapa técnica es «" + PLANTILLA + "» o «"
@@ -826,7 +880,7 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
     @Transactional
     public void asignarPlantillaCorreo(ContextoUsuario quien, Long vacanteId,
                                        AsignarPlantillaCorreo datos) {
-        laDeLaOrganizacion(quien, vacanteId);
+        laQueSePuedeTocar(quien, vacanteId);
         // Un aviso que ya no sale por correo no se sustituye por otro texto: sería configurar
         // con cuidado algo que no llega a ninguna parte. Ver TextosDeCorreoRetirados.
         TextosDeCorreoRetirados.exigirQueSigaEnUso(datos.avisoCodigo());
@@ -865,7 +919,7 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
     @Override
     @Transactional
     public void quitarPlantillaCorreo(ContextoUsuario quien, Long vacanteId, String avisoCodigo) {
-        laDeLaOrganizacion(quien, vacanteId);
+        laQueSePuedeTocar(quien, vacanteId);
         PlantillaCorreoVacante fila = plantillasPorVacante
                 .findByVacanteIdAndAvisoCodigo(vacanteId, avisoCodigo)
                 .orElseThrow(() -> new ResourceNotFoundException(
@@ -879,7 +933,7 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
     @Transactional
     public CierrePruebaResponse definirCierrePrueba(ContextoUsuario quien, Long vacanteId,
                                                     DefinirCierrePrueba datos) {
-        Vacante vacante = laDeLaOrganizacion(quien, vacanteId);
+        Vacante vacante = laQueSePuedeTocar(quien, vacanteId);
         if ("CERRADA".equals(vacante.getEstado())) {
             throw new IllegalStateException("Una vacante cerrada no se edita");
         }
@@ -966,7 +1020,7 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
     @Override
     @Transactional
     public void cerrar(ContextoUsuario quien, Long id, String motivo) {
-        Vacante vacante = laDeLaOrganizacion(quien, id);
+        Vacante vacante = laQueSePuedeTocar(quien, id);
         if ("CERRADA".equals(vacante.getEstado())) {
             throw new IllegalStateException("La vacante ya está cerrada");
         }
@@ -980,6 +1034,105 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                 "vacante", id, Map.of("estado", anterior), Map.of("estado", "CERRADA"), motivo);
     }
 
+    // ============ Archivar y desarchivar ============
+
+    /**
+     * Retira de la lista habitual una vacante que ya terminó, sin perder nada de su proceso.
+     *
+     * <p><b>Las dos condiciones se vuelven a mirar AQUÍ</b>, aunque el panel ya las haya
+     * enseñado en su modal. Entre abrir ese modal y confirmarlo caben minutos: una
+     * postulación puede haber vuelto a la carrera, o el compañero de al lado puede haberla
+     * archivado ya. Un modal es una foto; la decisión se toma sobre lo que hay.
+     *
+     * <ul>
+     *   <li><b>Cerrada</b>, y no se cierra sola al intentar archivarla: cerrar tiene su
+     *       motivo y su aviso a quien esté dentro, y hacerlo de rebote convertiría un gesto
+     *       de orden en una decisión que nadie tomó.
+     *   <li><b>Sin nadie en carrera</b>: quien sigue esperando una decisión no puede quedar
+     *       fuera de la mesa de trabajo. La misma definición de «en carrera» de todo el
+     *       sistema ({@code PostulacionesEnCarrera}).
+     * </ul>
+     *
+     * <p>Archivar dos veces no es un error nuevo ni un archivo doble: se rechaza sin efectos,
+     * como reenviar cualquier otra acción ya aplicada. Y no libera la solicitud de talento ni
+     * deja ningún aviso: para el candidato no ha pasado nada, porque de verdad no ha pasado
+     * nada en su proceso.
+     */
+    @Override
+    @Transactional
+    public void archivar(ContextoUsuario quien, Long id) {
+        Vacante vacante = alcance.laVacanteVisible(quien, id, PERMISO_ARCHIVAR);
+        if (vacante.getArchivadaEn() != null) {
+            throw new IllegalStateException("Esta vacante ya está archivada");
+        }
+        if (!ESTADO_CERRADA.equals(vacante.getEstado())) {
+            throw new IllegalStateException("Solo se archiva una vacante cerrada; esta está "
+                    + enPalabras(vacante.getEstado()) + ". Ciérrala primero, con su motivo");
+        }
+        int quedan = enCarrera.cuantasEnLaVacante(id);
+        if (quedan > 0) {
+            throw new IllegalStateException("Quedan " + quedan + " postulantes en carrera. "
+                    + "Decide cada uno, o descártalos en lote, desde la vacante antes de "
+                    + "archivarla");
+        }
+
+        /*
+         * ⚠️ **La condición viaja dentro del UPDATE, y no es un adorno.**
+         *
+         * Las cuatro comprobaciones de arriba leen; esta escribe. Entre lo uno y lo otro cabe
+         * otra petición —un doble clic manda dos, separadas por milisegundos—, y con un
+         * `save()` normal las dos archivarían: dos filas de auditoría diciendo las dos «de no
+         * archivada a archivada», y `archivada_en` con la fecha de la segunda. La traza deja
+         * de poder contestar cuándo se archivó.
+         *
+         * Con la condición dentro, la segunda espera a que la primera confirme, vuelve a
+         * mirar y actualiza cero filas. Cero filas es «alguien se me adelantó», y se rechaza
+         * igual que archivar una que ya lo estaba: sin efectos duplicados (punto 12).
+         */
+        Instant cuando = Instant.now();
+        if (vacantes.archivarSiNoLoEstaba(id, cuando) == 0) {
+            throw new IllegalStateException("Esta vacante ya está archivada");
+        }
+        auditoria.registrar(quien.organizacionId(), quien, "archivar_vacante",
+                "vacante", id, Map.of("archivada", false),
+                Map.of("archivada", true, "archivadaEn", cuando.toString()), null);
+    }
+
+    /**
+     * La devuelve a la lista habitual, y no hace nada más.
+     *
+     * <p>Vuelve {@code CERRADA}, que es como estaba: desarchivar no reabre la convocatoria ni
+     * mueve ninguna postulación, y el candidato ve su proceso exactamente igual antes y
+     * después. Por eso tampoco avisa a nadie — no hay noticia que dar.
+     */
+    @Override
+    @Transactional
+    public void desarchivar(ContextoUsuario quien, Long id) {
+        Vacante vacante = alcance.laVacanteVisible(quien, id, PERMISO_ARCHIVAR);
+        if (vacante.getArchivadaEn() == null) {
+            throw new IllegalStateException("Esta vacante no está archivada");
+        }
+        // La misma carrera al revés, y la misma defensa: dos peticiones seguidas no pueden
+        // dejar dos filas de auditoría diciendo las dos que la devolvieron a la lista.
+        Instant archivadaEn = vacante.getArchivadaEn();
+        if (vacantes.desarchivarSiLoEstaba(id) == 0) {
+            throw new IllegalStateException("Esta vacante no está archivada");
+        }
+        auditoria.registrar(quien.organizacionId(), quien, "desarchivar_vacante",
+                "vacante", id,
+                Map.of("archivada", true, "archivadaEn", archivadaEn.toString()),
+                Map.of("archivada", false), null);
+    }
+
+    /** El estado, dicho como se lee en la pantalla y no como se guarda. */
+    private String enPalabras(String estado) {
+        return switch (estado == null ? "" : estado) {
+            case "BORRADOR" -> "en borrador";
+            case ESTADO_PUBLICADA -> "publicada";
+            default -> String.valueOf(estado).toLowerCase(Locale.ROOT);
+        };
+    }
+
     // ============ ayudas ============
 
     private Vacante laDeLaOrganizacion(ContextoUsuario quien, Long id) {
@@ -987,7 +1140,32 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                 .orElseThrow(() -> new ResourceNotFoundException("Vacante", "id", id));
     }
 
-    private VacantePanel comoPanel(Vacante v, int postulantesEnCarrera, boolean puedeEditar) {
+    /**
+     * La misma vacante, pero solo si todavía se puede mover.
+     *
+     * <p>Lo usan TODAS las acciones que escriben, y por eso es un método y no una línea
+     * repetida: la lista de entradas que tienen que respetar el archivo es larga —publicar,
+     * cerrar, los cuatro instrumentos, los pesos, el cierre de la prueba, los requisitos, los
+     * textos de correo— y la que se olvide sería un agujero que no da ninguna señal.
+     * Consultar sigue entrando por {@link #laDeLaOrganizacion}: una archivada se lee entera.
+     */
+    private Vacante laQueSePuedeTocar(ContextoUsuario quien, Long id) {
+        Vacante vacante = laDeLaOrganizacion(quien, id);
+        VacanteArchivada.exigirQueNoLoEste(vacante);
+        return vacante;
+    }
+
+    private VacantePanel comoPanel(Vacante v, int postulantesEnCarrera, boolean puedeEditar,
+                                   FiltroAlcance alcanceDeArchivo, ContextoUsuario quien) {
+        boolean alcanzaParaArchivar = alcanceDeArchivo != null
+                && alcance.alcanzaALaVacante(quien, alcanceDeArchivo, v);
+        // ⚠️ `puedeArchivar` NO mira cuánta gente sigue en carrera. El icono tiene que estar
+        // para que su modal pueda decir «quedan N, decídelos antes»: escondiéndolo, quien
+        // mira la fila no tiene forma de saber por qué esa vacante no se puede guardar.
+        boolean puedeArchivar = alcanzaParaArchivar
+                && v.getArchivadaEn() == null
+                && ESTADO_CERRADA.equals(v.getEstado());
+        boolean puedeDesarchivar = alcanzaParaArchivar && v.getArchivadaEn() != null;
         return new VacantePanel(v.getId(), v.getTitulo(), v.getEstado(), v.getTipoCierre(),
                 v.getPuestoId(), v.getSolicitudTalentoId(), v.getResponsableUsuarioId(),
                 v.getPublicadaEn(), v.getCerradaEn(), v.isAplicaEvaluacion(),
@@ -1000,7 +1178,8 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                 v.getDescripcion(), v.getProposito(), v.getResponsabilidades(),
                 v.getRequisitos(), v.getModalidad(), v.getHorario(), v.getUbicacion(),
                 v.getPlazas(), v.getAbreEn(), v.getCierraEn(),
-                postulantesEnCarrera, puedeEditar);
+                postulantesEnCarrera, v.getArchivadaEn(), puedeEditar,
+                puedeArchivar, puedeDesarchivar);
     }
 
     // ============ La remuneración ============
@@ -1010,6 +1189,10 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
     public RemuneracionActualizadaResponse actualizarRemuneracion(
             ContextoUsuario quien, Long id, ActualizarRemuneracion datos) {
         Vacante vacante = alcance.laVacanteVisible(quien, id, PERMISO_EDITAR);
+        // La otra puerta del sueldo, con la misma guarda que el formulario: la tarjeta del
+        // detalle sigue siendo visible en una archivada —el monto es información del
+        // proceso— y su botón tiene que encontrarse el 409 igual que el PUT.
+        VacanteArchivada.exigirQueNoLoEste(vacante);
         if (ESTADO_CERRADA.equals(vacante.getEstado())) {
             throw new IllegalStateException("Una vacante cerrada no cambia de sueldo");
         }

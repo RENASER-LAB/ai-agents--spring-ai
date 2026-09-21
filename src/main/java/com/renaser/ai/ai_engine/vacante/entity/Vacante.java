@@ -85,5 +85,14 @@ public class Vacante {
     private Long responsableUsuarioId;
     private Instant publicadaEn;
     private Instant cerradaEn;
+    /**
+     * Cuándo se retiró de la lista habitual del panel. Vacío: no archivada (V59).
+     *
+     * <p>⚠️ <b>No es un estado.</b> Una archivada sigue {@code CERRADA} y conserva sus
+     * postulaciones tal como quedaron: lo único que cambia es que deja de salir en
+     * {@code /admin} y pasa a consultarse en «Archivadas». Desarchivar la vacía y la
+     * devuelve a la lista sin reabrir nada.
+     */
+    private Instant archivadaEn;
     private Instant creadoEn;
 }

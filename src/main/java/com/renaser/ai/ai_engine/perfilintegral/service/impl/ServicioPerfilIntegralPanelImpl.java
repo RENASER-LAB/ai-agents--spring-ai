@@ -58,6 +58,7 @@ import com.renaser.ai.ai_engine.vacante.service.Remuneracion;
 import com.renaser.ai.ai_engine.vacante.repository.PuestoRepository;
 import com.renaser.ai.ai_engine.vacante.repository.VacanteRepository;
 import com.renaser.ai.ai_engine.vacante.service.AlcanceSobreLaVacante;
+import com.renaser.ai.ai_engine.vacante.service.VacanteArchivada;
 
 import lombok.RequiredArgsConstructor;
 import com.renaser.ai.ai_engine.prueba.entity.IntentoPrueba;
@@ -258,6 +259,16 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
     @Transactional
     public PasadaEncolada calificarTanda(ContextoUsuario quien, Long vacanteId) {
         Vacante vacante = vacanteVisible(quien, vacanteId, "ajustar_nota");
+        /*
+         * ⚠️ Una archivada no encola trabajo, aunque ese trabajo acabara sin mover a nadie.
+         *
+         * Aquí no hay a quién calificar —archivar exige que no quede nadie en carrera— así que
+         * la pasada saldría vacía y el daño sería cero. Lo que no sería cero es la fila de
+         * auditoría: quedaría una acción escrita sobre una vacante que la pantalla declara de
+         * solo lectura, y la trazabilidad de una archivada es justo lo que archivar promete
+         * conservar intacta. Se rechaza como las demás mutaciones.
+         */
+        VacanteArchivada.exigirQueNoLoEste(vacante);
         Set<String> cerrados = cerrados();
         List<Postulacion> suyas = postulaciones.findByVacanteIdOrderByCreadoEnDesc(vacanteId);
         List<Long> ids = suyas.stream().map(Postulacion::getId).toList();

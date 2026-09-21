@@ -81,6 +81,23 @@ public class PaseAutomatico {
         }
 
         /*
+         * ⚠️ **Una vacante archivada no mueve a nadie, tampoco sola.**
+         *
+         * Aquí no se lanza ningún error: esto no es una petición de nadie, es el final de un
+         * trabajo de IA que ya se pagó, y reventar lo daría por fallido y volvería a pagarlo
+         * al reintentar. Se deja la postulación donde está y se anota, que es lo mismo que
+         * hacen las otras dos guardas de más abajo.
+         *
+         * Que esto salte significa que algo se salió de lo previsto —archivar exige que no
+         * quede nadie en carrera—, y por eso se registra en vez de pasar en silencio.
+         */
+        if (vacante.getArchivadaEn() != null) {
+            log.warn("PASE_AUTOMATICO: la postulación {} no se mueve: su vacante está "
+                    + "archivada desde {}", postulacionId, vacante.getArchivadaEn());
+            return;
+        }
+
+        /*
          * ⚠️ **La guarda que impide mandar a la prueba a quien no ha contestado el banco.**
          *
          * Hay cuatro caminos que terminan en un retrato: el botón de calificar la tanda, la

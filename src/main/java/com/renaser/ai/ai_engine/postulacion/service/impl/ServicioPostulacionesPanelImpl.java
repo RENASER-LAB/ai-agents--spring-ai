@@ -32,6 +32,7 @@ import com.renaser.ai.ai_engine.vacante.entity.Vacante;
 import com.renaser.ai.ai_engine.vacante.service.Remuneracion;
 import com.renaser.ai.ai_engine.vacante.repository.VacanteRepository;
 import com.renaser.ai.ai_engine.vacante.service.AlcanceSobreLaVacante;
+import com.renaser.ai.ai_engine.vacante.service.VacanteArchivada;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -196,6 +197,7 @@ public class ServicioPostulacionesPanelImpl implements ServicioPostulacionesPane
     @Transactional
     public void transicionar(ContextoUsuario quien, Long postulacionId, Transicionar datos) {
         Postulacion p = laVisible(quien, postulacionId, "mover_postulacion");
+        exigirVacanteNoArchivada(p);
         // Si el destino es un cierre, hace falta decir de qué clase
         String motivoCierre = datos.motivoCierre();
         if ("CERRADA".equals(datos.estadoDestino()) && motivoCierre == null) {
@@ -214,6 +216,7 @@ public class ServicioPostulacionesPanelImpl implements ServicioPostulacionesPane
     @Transactional
     public void confirmarAvance(ContextoUsuario quien, Long postulacionId, String motivo) {
         Postulacion p = laVisible(quien, postulacionId, "confirmar_avance");
+        exigirVacanteNoArchivada(p);
         EstadoPostulacion siguiente = maquina.siguiente(p.getEstadoCodigo())
                 .orElseThrow(() -> new IllegalStateException(
                         "Desde " + p.getEstadoCodigo() + " no hay un avance que calcular: "
@@ -345,6 +348,28 @@ public class ServicioPostulacionesPanelImpl implements ServicioPostulacionesPane
 
     private void vacanteVisible(ContextoUsuario quien, Long vacanteId, String permiso) {
         alcanceVacante.laVacanteVisible(quien, vacanteId, permiso);
+    }
+
+    /**
+     * Que la vacante de esta postulación no esté archivada.
+     *
+     * <p>Una archivada se lee entera —el ranking, las fichas, el historial, las descargas—
+     * pero no se mueve: es la mitad de la regla que no puede sostenerse escondiendo botones,
+     * porque el panel es un cliente más del API. Ver {@code VacanteArchivada}.
+     *
+     * <p>Se pregunta con un {@code exists} y no cargando la vacante: de ella hace falta saber
+     * una sola cosa, y un {@code findById} suelto aquí sería justo la búsqueda que la regla de
+     * arquitectura del aislamiento entre empresas vigila.
+     *
+     * <p>⚠️ <b>Esto no debería poder dispararse casi nunca</b>, y aun así está: archivar exige
+     * que no quede nadie en carrera, así que en una archivada todas las postulaciones están
+     * terminadas y la máquina de estados ya se planta sola. La guarda cubre el hueco entre las
+     * dos reglas —un estado terminal que mañana admita volver atrás— y dice con palabras lo
+     * que pasa, en vez de dejar un mensaje sobre estados que no menciona el archivo.
+     */
+    private void exigirVacanteNoArchivada(Postulacion p) {
+        VacanteArchivada.exigirQueNoLoEste(
+                vacantes.existsByIdAndArchivadaEnIsNotNull(p.getVacanteId()));
     }
 
     /**

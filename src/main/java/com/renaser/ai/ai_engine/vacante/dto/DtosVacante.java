@@ -97,6 +97,14 @@ public final class DtosVacante {
                                 */
                                int postulantesEnCarrera,
                                /**
+                                * Cuándo se archivó, o vacío si sigue en la lista habitual.
+                                *
+                                * <p>Es lo que la vista de Archivadas pinta en cada fila y lo
+                                * que el detalle enseña como «Archivada el …». No es un estado:
+                                * la vacante sigue {@code CERRADA} (V59).
+                                */
+                               Instant archivadaEn,
+                               /**
                                 * Si quien pregunta puede editar ESTA vacante.
                                 *
                                 * <p>Viaja en la fila y no en un endpoint de permisos aparte: el
@@ -104,7 +112,29 @@ public final class DtosVacante {
                                 * alcanzas las que diriges— y una respuesta general no podría
                                 * contestarlo sin repetir aquí la regla del backend.
                                 */
-                               boolean puedeEditar) {}
+                               boolean puedeEditar,
+                               /**
+                                * Si quien pregunta puede archivar ESTA vacante.
+                                *
+                                * <p>Cierto con {@code cerrar_vacante}, alcance que llegue,
+                                * estado {@code CERRADA} y sin archivar todavía. <b>No mira
+                                * cuánta gente sigue en carrera</b>, y es deliberado: el icono
+                                * tiene que aparecer para que el modal pueda explicar por qué
+                                * no se puede confirmar. Esconderlo dejaría la pregunta sin
+                                * respuesta y a los postulantes sin decidir.
+                                */
+                               boolean puedeArchivar,
+                               /** Si quien pregunta puede devolverla a la lista habitual. */
+                               boolean puedeDesarchivar) {}
+
+    /**
+     * Cuántas vacantes archivadas hay, para el botón «Archivadas (N)» de la cabecera.
+     *
+     * <p>Se cuenta en el servidor y no contando filas en el navegador: el número tiene que
+     * poder decirse sin traerse la lista entera, y las dos vistas —la habitual y la de
+     * archivadas— se filtran también aquí.
+     */
+    public record ConteoDeArchivadas(long archivadas) {}
 
     /**
      * Cómo acabó un guardado de la vacante.

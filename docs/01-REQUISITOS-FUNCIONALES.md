@@ -367,6 +367,19 @@ avisar a nadie. Cada campo cambiado queda en la auditoría con su valor de antes
 **Guardar sin cambios**, o solo con espacios de más al principio o al final, **no guarda ni
 avisa nada**.
 
+**RF-14c** **Una vacante `CERRADA` y sin nadie en carrera se archiva** (21/09/2026): sale de la
+lista de todos los días del panel —también de sus búsquedas, filtros y páginas— y se consulta en
+«Vacantes archivadas». **Archivar no es un estado nuevo ni una decisión sobre nadie**: la vacante
+sigue `CERRADA`, sus postulaciones quedan como estaban, no se libera la solicitud de talento y no
+se avisa a ningún candidato, que sigue viendo su proceso igual en el portal. Si queda alguien en
+carrera —la misma definición del RF-14b— no se archiva: hay que decidir a esas personas antes, y
+archivar **nunca cierra la vacante de rebote**. **Es reversible**: desarchivar la devuelve a la
+lista, `CERRADA`, sin reabrir ninguna postulación (RF-14). Una archivada **se lee entera**
+—postulantes, etapas, ranking, fichas, historial y descargas, según los permisos de cada quien— y
+**no se mueve**: no se edita, no se cambia el sueldo, no se publica, no se reconfigura y no se
+mueve ni reabre ninguna postulación. Archivar y desarchivar quedan en la auditoría con persona y
+fecha.
+
 **RF-15** El sistema permite varias vacantes abiertas a la vez.
 
 **RF-16** Los requisitos objetivos indispensables se configuran por vacante antes de publicarla.

@@ -47,11 +47,34 @@ public class VacantesPanelController {
 
     // ---------- Vacantes ----------
 
+    /**
+     * Las vacantes de la organización, en una de sus dos listas.
+     *
+     * <p>Sin parámetro devuelve la lista de todos los días: las que nadie ha archivado. Con
+     * {@code archivadas=true}, solo las archivadas. <b>El corte lo hace el servidor</b>: si lo
+     * hiciera la pantalla, una archivada reaparecería en cuanto alguien buscara, filtrara por
+     * estado o pasara de página.
+     */
     @GetMapping("/vacantes")
     @PreAuthorize("@permisos.tiene('ver_vacantes')")
-    @Operation(summary = "Todas las vacantes de la organización")
-    public List<VacantePanel> listar() {
-        return servicio.listar(permisos.actual());
+    @Operation(summary = "Las vacantes de la organización. Por defecto, las no archivadas; "
+            + "con «archivadas=true», solo las archivadas")
+    public List<VacantePanel> listar(
+            @RequestParam(name = "archivadas", defaultValue = "false") boolean archivadas) {
+        return servicio.listar(permisos.actual(), archivadas);
+    }
+
+    /**
+     * Cuántas archivadas hay: el número del botón «Archivadas (N)» de la cabecera.
+     *
+     * <p>Va con {@code ver_vacantes} y no con {@code cerrar_vacante}: consultar lo guardado es
+     * leer, y quien no puede archivar puede necesitar mirar una convocatoria vieja.
+     */
+    @GetMapping("/vacantes/archivadas/conteo")
+    @PreAuthorize("@permisos.tiene('ver_vacantes')")
+    @Operation(summary = "Cuántas vacantes archivadas tiene la organización")
+    public ConteoDeArchivadas conteoDeArchivadas() {
+        return servicio.contarArchivadas(permisos.actual());
     }
 
     @GetMapping("/vacantes/{id}")
@@ -235,6 +258,42 @@ public class VacantesPanelController {
     @Operation(summary = "Cerrar: detiene postulaciones nuevas; las que están en marcha se deciden una a una")
     public void cerrar(@PathVariable Long id, @Valid @RequestBody CerrarVacante datos) {
         servicio.cerrar(permisos.actual(), id, datos.motivo());
+    }
+
+    /**
+     * Archivar: la vacante cerrada deja la lista habitual y se consulta en «Archivadas».
+     *
+     * <p><b>Verbo propio y no un campo del formulario.</b> Archivar no es corregir la vacante:
+     * es retirarla de la mesa de trabajo de todo el equipo, y pasa por otro permiso. Metido en
+     * el PUT, cualquier guardado del formulario podría archivarla de rebote — y el cuerpo del
+     * PUT lo manda la pantalla entero cada vez.
+     *
+     * <p>No cierra la vacante para poder archivarla: si no está {@code CERRADA}, se rechaza.
+     * Tampoco si queda alguien en carrera, y eso se vuelve a comprobar aquí aunque el panel ya
+     * lo haya mirado al abrir su modal.
+     */
+    @PostMapping("/vacantes/{id}/archivo")
+    @PreAuthorize("@permisos.tiene('cerrar_vacante')")
+    @Operation(summary = "Archivar una vacante CERRADA y sin nadie en carrera: sale de la "
+            + "lista habitual del panel y su proceso se sigue consultando en Archivadas. No "
+            + "cierra postulaciones ni avisa a nadie")
+    public void archivar(@PathVariable Long id) {
+        servicio.archivar(permisos.actual(), id);
+    }
+
+    /**
+     * Desarchivar: vuelve a la lista habitual, {@code CERRADA} y sin reabrir nada.
+     *
+     * <p>{@code DELETE} sobre el mismo recurso que creó el {@code POST}: lo que se quita es la
+     * marca de archivo, no la vacante. La eliminación de una vacante es de la entrega 03 y
+     * tendrá su propia dirección.
+     */
+    @DeleteMapping("/vacantes/{id}/archivo")
+    @PreAuthorize("@permisos.tiene('cerrar_vacante')")
+    @Operation(summary = "Devolver una vacante archivada a la lista habitual. Sigue CERRADA y "
+            + "sus postulaciones no se tocan")
+    public void desarchivar(@PathVariable Long id) {
+        servicio.desarchivar(permisos.actual(), id);
     }
 
     // ---------- Requisitos objetivos ----------
