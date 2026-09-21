@@ -119,6 +119,12 @@ urgencia la fija Talento o Dirección, para que nadie se salte la cola por decis
 El responsable del área opina sobre **sus** vacantes, pero quien fija la configuración es
 Talento. La versión de pesos es de Dirección: define qué valora Renaser.
 
+**«Editar una vacante» (`editar_vacante`) es el lápiz de la lista y la tarjeta del sueldo.**
+Desde el 19/09/2026 **respeta su alcance**: con alcance a sus vacantes, solo se corrigen las que
+esa persona dirige; en las demás no sale el lápiz, y pedirlo por la API responde 404, no 403. Sin
+el permiso, 403. No hay permiso aparte para el sueldo: quien corrige la vacante corrige lo que
+paga.
+
 ### Candidatos
 
 | Acción | Candidato | Talento | Resp. área | Dirección | Admin |

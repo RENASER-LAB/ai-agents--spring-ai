@@ -6,6 +6,7 @@ import com.renaser.ai.ai_engine.auditoria.repository.*;
 import com.renaser.ai.ai_engine.auditoria.service.*;
 import com.renaser.ai.ai_engine.notificacion.entity.*;
 import com.renaser.ai.ai_engine.notificacion.repository.*;
+import com.renaser.ai.ai_engine.notificacion.service.TextosDeCorreoRetirados;
 import com.renaser.ai.ai_engine.parametro.entity.*;
 import com.renaser.ai.ai_engine.parametro.repository.*;
 import com.renaser.ai.ai_engine.consentimiento.entity.*;
@@ -102,9 +103,18 @@ public class ServicioAdministracionImpl implements ServicioAdministracion {
 
     // ============ Plantillas de correo ============
 
+    /**
+     * Los textos que la empresa puede reescribir.
+     *
+     * <p>Los retirados no salen: un texto que el sistema ya no manda, ofrecido para editar,
+     * hace trabajar en balde y deja creyendo que al candidato le llega un correo que no
+     * existe. Sus filas se conservan —los correos ya enviados las necesitan para explicarse—,
+     * pero no se enseñan aquí. Ver {@code TextosDeCorreoRetirados}.
+     */
     @Override
     public List<PlantillaPanel> plantillas(ContextoUsuario quien) {
         return plantillas.findByOrganizacionIdOrderByCodigoAscVersionDesc(quien.organizacionId()).stream()
+                .filter(p -> !TextosDeCorreoRetirados.estaRetirado(p.getCodigo()))
                 .map(p -> new PlantillaPanel(p.getId(), p.getCodigo(), p.getVersion(),
                         p.getAsunto(), p.getCuerpo(), p.isEsActiva()))
                 .toList();
@@ -113,6 +123,10 @@ public class ServicioAdministracionImpl implements ServicioAdministracion {
     @Override
     @Transactional
     public Long nuevaVersionPlantilla(ContextoUsuario quien, NuevaPlantilla datos) {
+        // Lo retirado no vuelve por la puerta de atrás: la pantalla ya no lo ofrece, y la API
+        // tampoco lo acepta. Sin esto, escribir una versión nueva sería posible y no serviría
+        // de nada, que es la peor de las dos formas de decir que no.
+        TextosDeCorreoRetirados.exigirQueSigaEnUso(datos.codigo());
         int siguienteVersion = plantillas
                 .findFirstByOrganizacionIdAndCodigoOrderByVersionDesc(quien.organizacionId(), datos.codigo())
                 .map(p -> p.getVersion() + 1)

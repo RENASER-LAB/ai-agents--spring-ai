@@ -1,7 +1,7 @@
 # Diccionario de datos
 
 Sistema de selección de personal — Renaser Consulting
-Versión 2.7 · 2026-09-17 · Puesto al día con las migraciones hasta la `V57` (la V49 y la V50 solo siembran pesos; la V51 trae la tabla `lectura_cv_perfil` y los archivos del perfil; la V52 y la V53 no crean tablas; la V55 pone el sueldo en la vacante y la pretensión en la postulación; la V56 trae la tabla `aviso_portal`; la V57 no crea tablas, solo siembra los precios de los dos modelos de DeepSeek)
+Versión 2.8 · 2026-09-20 · Puesto al día con las migraciones hasta la `V58` (la V49 y la V50 solo siembran pesos; la V51 trae la tabla `lectura_cv_perfil` y los archivos del perfil; la V52 y la V53 no crean tablas; la V55 pone el sueldo en la vacante y la pretensión en la postulación; la V56 trae la tabla `aviso_portal`; la V57 no crea tablas, solo siembra los precios de los dos modelos de DeepSeek; la V58 no crea tablas: suma el aviso `VACANTE_ACTUALIZADA` y apaga el correo `REMUNERACION_ACTUALIZADA`)
 
 Cada tabla con todas sus columnas, tipos y claves. **Este documento se consulta**, no se lee de
 corrido: es la base para escribir las migraciones de Flyway.
@@ -2349,9 +2349,15 @@ Los textos que se envían, versionados.
 | `version` | integer | sí | |
 | `asunto` | text | sí | |
 | `cuerpo` | text | sí | |
-| `es_activa` | boolean | sí | |
+| `es_activa` | boolean | sí | La versión que sale hoy. **Falsa en todas las versiones de un código** significa que ese correo ya no se manda |
 
 **Clave primaria:** `id` · **Único:** `organizacion_id` + `codigo` + `version`
+
+**`REMUNERACION_ACTUALIZADA` está retirado desde la `V58`** (19/09/2026): todas sus versiones
+quedan con `es_activa = false`, no sale en la pantalla de textos de correo y no admite versión
+nueva. Las filas **no se borran**: `correo_enviado` guarda el código y la versión con que salió
+cada correo, y los que ya salieron tienen que poder explicarse. El cambio de sueldo se avisa
+ahora solo por la campana (`aviso_portal`).
 
 ## `instruccion_ia`
 
@@ -2554,7 +2560,7 @@ leído.
 | `id` | bigint | sí | Clave |
 | `usuario_id` | bigint | sí | A quién. **Del usuario y no de la persona**: la campana es de quien entra al portal, y es el usuario el que tiene sesión |
 | `organizacion_id` | bigint | sí | De qué empresa viene. La misma regla que la postulación: el aviso nace en la organización **de la vacante**, que es la que hizo algo que contar |
-| `tipo` | text | sí | Qué clase de noticia es. Hoy solo `REMUNERACION_ACTUALIZADA` |
+| `tipo` | text | sí | Qué clase de noticia es. `REMUNERACION_ACTUALIZADA` (`V55`): el sueldo cambiado desde la tarjeta del detalle. `VACANTE_ACTUALIZADA` (`V58`): la vacante corregida con el formulario, **uno solo por guardado** con todo lo que cambió, sueldo incluido. Sin CHECK: un tipo nuevo no pide migración |
 | `titulo` | text | sí | El texto **ya armado** |
 | `cuerpo` | text | sí | El texto **ya armado** |
 | `postulacion_id` | bigint | no | A dónde lleva al pulsarlo |
@@ -2569,9 +2575,9 @@ campana, que corre en cada carga del portal; y `aviso_portal_sin_leer` (`usuario
 sobre los no leídos**, para el contador del punto — los leídos son la inmensa mayoría en cuanto la
 tabla lleva un tiempo viva, y contarlos para descartarlos sería pagar por lo que ya no importa.
 
-**Complementa al correo, no lo sustituye.** Los dos salen del mismo hecho. El correo se pierde
-—cae en promociones, se marca leído sin abrir, llega a una dirección que el cargador de currículums
-inventó—; el aviso queda esperando dentro.
+**Para lo que cambia en una vacante es el único canal** desde la `V58`: no sale correo. El correo
+se pierde —cae en promociones, se marca leído sin abrir, llega a una dirección que el cargador de
+currículums inventó—; el aviso queda esperando dentro.
 
 **El texto se guarda ya armado, no como plantilla con variables**, igual que en `correo_enviado`.
 Un aviso que se reconstruyera al leerlo diría el sueldo de hoy y no el que cambió aquel día: la

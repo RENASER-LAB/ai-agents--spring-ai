@@ -55,8 +55,13 @@ recoger cuarenta cifras obligatorias y esconder el sueldo al día siguiente; y t
 mitad de camino, porque a quienes ya postularon no se les pidió nada y no hay forma de volver
 atrás a pedírselo: quedaría media tanda con cifra y media sin ella. El monto sí se puede mover —y
 mover el monto de una convocatoria abierta **se le avisa a cada candidato que sigue en carrera**,
-por correo y dentro del portal—. Si de verdad hay que cambiar la decisión, se cierra la
+con un aviso dentro de su portal—. Si de verdad hay que cambiar la decisión, se cierra la
 convocatoria y se abre otra.
+
+**La convocatoria se puede corregir después de abierta**: el horario, la ubicación, los textos o
+el sueldo. Si ya está publicada, a cada candidato que sigue en carrera le llega **un solo aviso
+en su portal** con lo que cambió, y ningún correo. Quién lleva el proceso, cuántas plazas quedan
+o cuándo cierra se cambian sin avisar a nadie: no salen de la empresa.
 
 ### 3 · La gente postula
 

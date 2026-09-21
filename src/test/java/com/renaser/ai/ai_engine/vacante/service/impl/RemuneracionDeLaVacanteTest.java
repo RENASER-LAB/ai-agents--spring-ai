@@ -4,9 +4,7 @@ import com.renaser.ai.ai_engine.auditoria.service.ServicioAuditoria;
 import com.renaser.ai.ai_engine.notificacion.entity.AvisoPortal;
 import com.renaser.ai.ai_engine.notificacion.repository.PlantillaCorreoRepository;
 import com.renaser.ai.ai_engine.notificacion.repository.PlantillaCorreoVacanteRepository;
-import com.renaser.ai.ai_engine.notificacion.service.DireccionDelCandidato;
 import com.renaser.ai.ai_engine.notificacion.service.ServicioAvisosPortal;
-import com.renaser.ai.ai_engine.notificacion.service.ServicioCorreo;
 import com.renaser.ai.ai_engine.organizacion.service.DuenoDelInstrumento;
 import com.renaser.ai.ai_engine.perfilintegral.repository.EvaluacionRepository;
 import com.renaser.ai.ai_engine.perfilintegral.repository.PlantillaEvaluacionRepository;
@@ -14,20 +12,18 @@ import com.renaser.ai.ai_engine.perfilintegral.repository.VersionBancoRepository
 import com.renaser.ai.ai_engine.pesos.repository.VersionPesosRepository;
 import com.renaser.ai.ai_engine.postulacion.entity.Postulacion;
 import com.renaser.ai.ai_engine.postulacion.repository.PostulacionRepository;
-import com.renaser.ai.ai_engine.postulacion.service.ServicioEnlaceAcceso;
+import com.renaser.ai.ai_engine.postulacion.service.PostulacionesEnCarrera;
 import com.renaser.ai.ai_engine.prueba.repository.IntentoPruebaRepository;
 import com.renaser.ai.ai_engine.prueba.repository.PlantillaPruebaRepository;
 import com.renaser.ai.ai_engine.prueba.repository.VersionPlantillaPruebaRepository;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
+import com.renaser.ai.ai_engine.seguridad.service.Permisos;
 import com.renaser.ai.ai_engine.solicitud.repository.SolicitudTalentoRepository;
-import com.renaser.ai.ai_engine.usuario.entity.Persona;
-import com.renaser.ai.ai_engine.usuario.entity.Usuario;
-import com.renaser.ai.ai_engine.usuario.repository.PersonaRepository;
-import com.renaser.ai.ai_engine.usuario.repository.UsuarioRepository;
 import com.renaser.ai.ai_engine.vacante.dto.DtosVacante.ActualizarRemuneracion;
 import com.renaser.ai.ai_engine.vacante.dto.DtosVacante.RemuneracionActualizadaResponse;
 import com.renaser.ai.ai_engine.vacante.dto.DtosVacante.RemuneracionDeLaVacante;
 import com.renaser.ai.ai_engine.vacante.entity.Vacante;
+import com.renaser.ai.ai_engine.vacante.service.AlcanceSobreLaVacante;
 import com.renaser.ai.ai_engine.vacante.repository.PuestoRepository;
 import com.renaser.ai.ai_engine.vacante.repository.RequisitoObjetivoRepository;
 import com.renaser.ai.ai_engine.vacante.repository.VacanteRepository;
@@ -63,9 +59,14 @@ import static org.mockito.Mockito.when;
  * Cambiar lo que la vacante dice que paga (V55).
  *
  * <p>Lo que se protege aquí es <b>a quién llega la noticia</b>. Cambiar un sueldo no es
- * guardar un campo: es escribirle a cada persona que tiene una candidatura abierta, y las
+ * guardar un campo: es contárselo a cada persona que tiene una candidatura abierta, y las
  * tres formas de equivocarse son avisar a quien ya no está, avisar de un cambio que no
- * ocurrió, y no avisar a nadie porque una dirección de correo falló.
+ * ocurrió, y dejar sin aviso a los demás porque con uno falló algo.
+ *
+ * <p>⚠️ <b>Y desde la V58, por un solo canal.</b> El correo se retiró: la campana se queda
+ * quieta hasta que la persona entra, mientras que el correo se pierde. Que ya no salga no se
+ * comprueba con una aserción sino con el compilador — este servicio ya no conoce
+ * {@code ServicioCorreo}, así que no hay forma de que mande nada.
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("La remuneración de la vacante")
@@ -92,12 +93,10 @@ class RemuneracionDeLaVacanteTest {
     @Mock private ServicioAuditoria auditoria;
     @Mock private DuenoDelInstrumento dueno;
     @Mock private PostulacionRepository postulaciones;
+    @Mock private PostulacionesEnCarrera enCarrera;
     @Mock private ServicioAvisosPortal avisos;
-    @Mock private ServicioCorreo correo;
-    @Mock private DireccionDelCandidato direcciones;
-    @Mock private ServicioEnlaceAcceso enlacesDeAcceso;
-    @Mock private UsuarioRepository usuarios;
-    @Mock private PersonaRepository personas;
+    @Mock private AlcanceSobreLaVacante alcance;
+    @Mock private Permisos permisos;
 
     private ServicioVacantesPanelImpl servicio;
 
@@ -106,8 +105,7 @@ class RemuneracionDeLaVacanteTest {
         servicio = new ServicioVacantesPanelImpl(vacantes, puestos, requisitos, solicitudes,
                 versionesPesos, plantillas, versionesPrueba, plantillasPrueba, plantillasCorreo,
                 plantillasPorVacante, intentos, evaluaciones, versionesBanco,
-                auditoria, dueno, postulaciones, avisos, correo, direcciones, enlacesDeAcceso,
-                usuarios, personas);
+                auditoria, dueno, postulaciones, enCarrera, avisos, alcance, permisos);
     }
 
     // ---------- el escenario ----------
@@ -123,11 +121,13 @@ class RemuneracionDeLaVacanteTest {
                 .remuneracionMax(max == null ? null : new BigDecimal(max))
                 .remuneracionMoneda("OCULTA".equals(tipo) ? null : "PEN")
                 .build();
-        when(vacantes.findByIdAndOrganizacionId(VACANTE, ORGANIZACION)).thenReturn(Optional.of(v));
+        // El guardián es quien resuelve la vacante: con SUS_VACANTES, la de otro responsable
+        // no existe para quien pregunta. Aquí se le deja contestar que sí.
+        when(alcance.laVacanteVisible(QUIEN, VACANTE, "editar_vacante")).thenReturn(v);
         return v;
     }
 
-    /** Una candidatura en el estado que se le diga, con su usuario y su persona detrás. */
+    /** Una candidatura en el estado que se le diga. */
     private Postulacion postulacion(Long id, String estado) {
         return Postulacion.builder()
                 .id(id).organizacionId(ORGANIZACION).vacanteId(VACANTE)
@@ -136,7 +136,12 @@ class RemuneracionDeLaVacanteTest {
     }
 
     /**
-     * Quiénes están postulados a esta vacante, con su usuario y su persona detrás.
+     * Quiénes están postulados a esta vacante.
+     *
+     * <p>Se le pasan todos, en carrera o no, y el doble devuelve <b>solo los que siguen</b>
+     * usando la misma definición que el sistema: {@link PostulacionesEnCarrera}. Así la
+     * prueba no reescribe qué significa «en carrera» —que es justo el fallo que esa clase
+     * viene a cerrar— y sigue comprobando lo suyo: que al servicio solo le llegan esos.
      *
      * <p>Todo con {@code lenient()} a propósito: las pruebas que comprueban que NO se avisa
      * —la que guarda lo mismo, la del rango al revés— cortan antes de preguntar quién hay, y
@@ -144,25 +149,12 @@ class RemuneracionDeLaVacanteTest {
      * tenga gente viva es justamente lo que da fuerza a esas pruebas.
      */
     private void hayPostulaciones(Postulacion... unas) {
-        lenient().when(postulaciones.findByVacanteIdOrderByCreadoEnDesc(VACANTE))
-                .thenReturn(List.of(unas));
-        for (Postulacion p : unas) {
-            lenient().when(usuarios.findById(p.getUsuarioId())).thenReturn(Optional.of(
-                    Usuario.builder().id(p.getUsuarioId()).personaId(p.getUsuarioId())
-                            .correo("candidato" + p.getId() + "@correo.pe").build()));
-            lenient().when(personas.findById(p.getUsuarioId())).thenReturn(Optional.of(
-                    Persona.builder().id(p.getUsuarioId()).nombre("Ana").build()));
-        }
-        lenient().when(direcciones.de(any(), anyLong())).thenReturn("ana@correo.pe");
-        lenient().when(enlacesDeAcceso.generarEnlace(anyLong()))
-                .thenReturn(new ServicioEnlaceAcceso.EnlaceGenerado("https://portal/e/abc",
-                        Instant.now().plusSeconds(3600)));
-        lenient().when(plantillasPorVacante.findByVacanteIdAndAvisoCodigo(eq(VACANTE), anyString()))
-                .thenReturn(Optional.empty());
+        lenient().when(enCarrera.deLaVacante(VACANTE)).thenReturn(
+                List.of(unas).stream().filter(PostulacionesEnCarrera::sigueEnCarrera).toList());
         // El aviso se publica de verdad. Hace falta decirlo porque el contador de
-        // «a cuánta gente le llegó» sube por el AVISO y no por el correo: `publicar`
-        // devuelve null cuando falla, y un doble que devuelve null por defecto haría que
-        // el servicio contara cero con toda la razón.
+        // «a cuánta gente le llegó» sube por lo que quedó publicado: `publicar` devuelve null
+        // cuando falla, y un doble que devuelve null por defecto haría que el servicio
+        // contara cero con toda la razón.
         lenient().when(avisos.publicar(anyLong(), anyLong(), anyString(), anyString(),
                         anyString(), anyLong(), anyLong()))
                 .thenAnswer(invocacion -> AvisoPortal.builder().id(1L).build());
@@ -248,7 +240,7 @@ class RemuneracionDeLaVacanteTest {
                 .hasMessageContaining("cerrada no cambia de sueldo");
 
         verify(vacantes, never()).save(any());
-        verifyNoInteractions(avisos, correo);
+        verifyNoInteractions(avisos);
     }
 
     @Test
@@ -263,7 +255,7 @@ class RemuneracionDeLaVacanteTest {
                 .isInstanceOf(IllegalArgumentException.class);
 
         verify(vacantes, never()).save(any());
-        verifyNoInteractions(avisos, correo, auditoria);
+        verifyNoInteractions(avisos, auditoria);
     }
 
     // ---------- la simetría no se revoca ----------
@@ -287,7 +279,7 @@ class RemuneracionDeLaVacanteTest {
                 .hasMessageContaining("sin dar nada a cambio");
 
         verify(vacantes, never()).save(any());
-        verifyNoInteractions(avisos, correo, auditoria);
+        verifyNoInteractions(avisos, auditoria);
     }
 
     @Test
@@ -355,30 +347,29 @@ class RemuneracionDeLaVacanteTest {
         verify(avisos, times(2)).publicar(eq(ORGANIZACION), anyLong(),
                 eq(AvisoPortal.REMUNERACION_ACTUALIZADA), anyString(), anyString(),
                 anyLong(), eq(VACANTE));
-        verify(correo, times(2)).enviar(eq(ORGANIZACION), anyLong(), anyString(),
-                eq("REMUNERACION_ACTUALIZADA"), any());
     }
 
     @Test
-    @DisplayName("el correo lleva el antes y el ahora, escritos igual que en el portal")
-    void elCorreoDiceLasDosCifras() {
+    @DisplayName("el aviso lleva el antes y el ahora, escritos igual que en el portal")
+    void elAvisoDiceLasDosCifras() {
         vacantePublicada("FIJA", "3000", null);
         hayPostulaciones(postulacion(1L, "PERFIL_TURNO_CANDIDATO"));
 
         servicio.actualizarRemuneracion(QUIEN, VACANTE, cambiarA("RANGO", "3500", "4200"));
 
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<Map<String, String>> variables = ArgumentCaptor.forClass(Map.class);
-        verify(correo).enviar(eq(ORGANIZACION), anyLong(), anyString(),
-                eq("REMUNERACION_ACTUALIZADA"), variables.capture());
+        ArgumentCaptor<String> titulo = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<String> cuerpo = ArgumentCaptor.forClass(String.class);
+        verify(avisos).publicar(eq(ORGANIZACION), anyLong(),
+                eq(AvisoPortal.REMUNERACION_ACTUALIZADA), titulo.capture(), cuerpo.capture(),
+                anyLong(), eq(VACANTE));
 
-        assertThat(variables.getValue())
-                .containsEntry("antes", "S/ 3 000")
-                .containsEntry("ahora", "S/ 3 500 a 4 200")
-                .containsEntry("vacante", "Coordinador de sede")
-                // El enlace por donde entrar: quien llegó por una carga de currículums no
-                // tiene contraseña, y «entra a tu portal» a secas no le sirve de nada.
-                .containsEntry("enlace", "https://portal/e/abc");
+        assertThat(titulo.getValue()).contains("Coordinador de sede");
+        // Las dos cifras, escritas por Remuneracion y no por la pantalla: si divergieran, el
+        // aviso diría una cosa y el portal otra sobre el mismo sueldo.
+        assertThat(cuerpo.getValue())
+                .contains("S/ 3 000")
+                .contains("S/ 3 500 a 4 200")
+                .endsWith("Tu postulación sigue su curso y no tienes que hacer nada.");
     }
 
     @Test
@@ -392,7 +383,7 @@ class RemuneracionDeLaVacanteTest {
                 servicio.actualizarRemuneracion(QUIEN, VACANTE, cambiarA("RANGO", "3000", "4000"));
 
         assertThat(respuesta.candidatosAvisados()).isZero();
-        verifyNoInteractions(avisos, correo);
+        verifyNoInteractions(avisos);
         // Pero sí se guarda: rellenar el sueldo antes de publicar es el camino normal.
         assertThat(v.getRemuneracionTipo()).isEqualTo("RANGO");
     }
@@ -411,7 +402,7 @@ class RemuneracionDeLaVacanteTest {
                 servicio.actualizarRemuneracion(QUIEN, VACANTE, cambiarA("RANGO", "3000", "4000"));
 
         assertThat(respuesta.candidatosAvisados()).isZero();
-        verifyNoInteractions(avisos, correo);
+        verifyNoInteractions(avisos);
         verify(vacantes, never()).save(any());
         // Y el portal sigue diciendo «actualizado el 1 de septiembre», no «hoy».
         assertThat(v.getRemuneracionActualizadaEn()).isEqualTo(marcaVieja);
@@ -420,37 +411,22 @@ class RemuneracionDeLaVacanteTest {
     @Test
     @DisplayName("que a uno no se le pueda escribir no deja sin aviso a los demás")
     void unFalloNoTumbaElResto() {
-        vacantePublicada("RANGO", "3000", "4000");
+        Vacante v = vacantePublicada("RANGO", "3000", "4000");
         hayPostulaciones(
                 postulacion(1L, "PERFIL_TURNO_CANDIDATO"),
                 postulacion(2L, "PERFIL_TURNO_CANDIDATO"));
-        // Al primero le revienta el correo; el segundo tiene que recibir el suyo igual.
-        when(usuarios.findById(101L)).thenThrow(new RuntimeException("la base se cayó"));
+        // Al primero le revienta el aviso; el segundo tiene que recibir el suyo igual, y el
+        // sueldo ya guardado no puede deshacerse por eso.
+        when(avisos.publicar(anyLong(), eq(101L), anyString(), anyString(), anyString(),
+                anyLong(), anyLong())).thenThrow(new RuntimeException("la base se cayó"));
 
         RemuneracionActualizadaResponse respuesta =
                 servicio.actualizarRemuneracion(QUIEN, VACANTE, cambiarA("RANGO", "3500", "4500"));
 
         assertThat(respuesta.candidatosAvisados()).isEqualTo(1);
-        verify(correo).enviar(eq(ORGANIZACION), eq(102L), anyString(), anyString(), any());
-    }
-
-    @Test
-    @DisplayName("la vacante puede sustituir el texto del aviso por el suyo, como cualquier otro")
-    void laVacantePuedeElegirSuTexto() {
-        vacantePublicada("RANGO", "3000", "4000");
-        hayPostulaciones(postulacion(1L, "PERFIL_TURNO_CANDIDATO"));
-        when(plantillasPorVacante.findByVacanteIdAndAvisoCodigo(VACANTE, "REMUNERACION_ACTUALIZADA"))
-                .thenReturn(Optional.of(
-                        com.renaser.ai.ai_engine.notificacion.entity.PlantillaCorreoVacante.builder()
-                                .vacanteId(VACANTE)
-                                .avisoCodigo("REMUNERACION_ACTUALIZADA")
-                                .plantillaCodigo("SUELDO_SUBE_CON_CARINO")
-                                .build()));
-
-        servicio.actualizarRemuneracion(QUIEN, VACANTE, cambiarA("RANGO", "3500", "4500"));
-
-        verify(correo).enviar(eq(ORGANIZACION), anyLong(), anyString(),
-                eq("SUELDO_SUBE_CON_CARINO"), any());
+        verify(avisos).publicar(eq(ORGANIZACION), eq(102L), anyString(), anyString(),
+                anyString(), anyLong(), eq(VACANTE));
+        assertThat(v.getRemuneracionMin()).isEqualByComparingTo("3500");
     }
 
     // ---------- la auditoría ----------

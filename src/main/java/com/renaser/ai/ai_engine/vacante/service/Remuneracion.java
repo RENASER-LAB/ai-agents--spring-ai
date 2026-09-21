@@ -22,9 +22,9 @@ import java.util.Set;
  *       no le dice a nadie qué escribió mal.
  *   <li><b>¿Obliga al candidato?</b> El trato de la V55: enseñar el sueldo obliga a quien
  *       postula a decir el suyo; esconderlo lo libera.
- *   <li><b>¿Cómo se escribe?</b> El correo del cambio de sueldo dice «antes» y «ahora», y
- *       esa frase la arma este archivo — no la plantilla de cada empresa, que tendría que
- *       repetir el formato de moneda y acabaría diciéndolo distinto en cada una.
+ *   <li><b>¿Cómo se escribe?</b> El aviso del cambio de sueldo dice «antes» y «ahora», y
+ *       esa frase la arma este archivo — no la pantalla ni el texto de cada empresa, que
+ *       tendrían que repetir el formato de moneda y acabarían diciéndolo distinto.
  * </ol>
  *
  * <p>Es una clase de utilidad sin estado a propósito: no necesita transacción, ni repositorio,
@@ -208,9 +208,9 @@ public final class Remuneracion {
     }
 
     /**
-     * Escribe la remuneración de una vacante en una frase, para el correo y la auditoría.
+     * Escribe la remuneración de una vacante en una frase, para el aviso y la auditoría.
      *
-     * <p>Una OCULTA se escribe «sin publicar» y no «—»: el correo de que el sueldo cambió
+     * <p>Una OCULTA se escribe «sin publicar» y no «—»: el aviso de que el sueldo cambió
      * puede tener a la OCULTA en cualquiera de los dos lados, y un guion ahí deja al
      * candidato preguntándose si es que no le dijeron o es que no hay.
      */
@@ -251,7 +251,7 @@ public final class Remuneracion {
      *
      * <p>El formateador se crea en cada llamada y eso no es un descuido: {@link DecimalFormat}
      * no es seguro entre hilos, y guardarlo en un campo estático de una clase que llaman a la
-     * vez el correo de una vacante y el tablón de otra es una carrera silenciosa que produce
+     * vez el aviso de una vacante y el tablón de otra es una carrera silenciosa que produce
      * cifras mal escritas una vez cada mil.
      */
     private static String escribirMonto(BigDecimal monto) {

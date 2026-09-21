@@ -68,11 +68,25 @@ public class VacantesPanelController {
         return Map.of("id", servicio.crear(permisos.actual(), datos));
     }
 
+    /**
+     * Guardar el formulario de una vacante que no esté cerrada.
+     *
+     * <p>El cuerpo es el mismo del alta, remuneración incluida: el panel reutiliza esa
+     * pantalla para corregir. Lo que llega se compara con lo guardado —sin contar los
+     * espacios del principio y del final—, y si la vacante está publicada y cambió algo que
+     * el candidato ve, sale <b>un único aviso</b> a la campana de cada postulación en
+     * carrera. Sin correo.
+     *
+     * <p>Lo que devuelve es lo que el panel no puede deducir: si de verdad cambió algo y a
+     * cuánta gente le llegó.
+     */
     @PutMapping("/vacantes/{id}")
     @PreAuthorize("@permisos.tiene('editar_vacante')")
-    @Operation(summary = "Editar una vacante que no esté cerrada")
-    public void editar(@PathVariable Long id, @Valid @RequestBody GuardarVacante datos) {
-        servicio.editar(permisos.actual(), id, datos);
+    @Operation(summary = "Editar una vacante que no esté cerrada. Si está publicada, avisa "
+            + "por la campana del portal a cada postulación en carrera de lo que cambió")
+    public VacanteActualizadaResponse editar(@PathVariable Long id,
+                                             @Valid @RequestBody GuardarVacante datos) {
+        return servicio.editar(permisos.actual(), id, datos);
     }
 
     @PostMapping("/vacantes/{id}/plantilla-evaluacion")
@@ -188,11 +202,12 @@ public class VacantesPanelController {
     }
 
     /**
-     * Cambiar lo que la vacante dice que paga.
+     * Cambiar solo lo que la vacante dice que paga, desde la tarjeta del detalle.
      *
-     * <p>Verbo propio y no un campo del PUT general: este cambio le manda un correo y un aviso
-     * a cada candidato vivo, y eso no puede dispararse al corregir una falta de ortografía en
-     * la descripción.
+     * <p>Sigue teniendo verbo propio porque sigue teniendo pantalla propia: la tarjeta del
+     * sueldo, con su motivo y su botón, que existe para cambiarlo sin abrir el formulario
+     * entero. Quien abre el formulario cambia el sueldo por el PUT de la vacante, y entonces
+     * sale un solo aviso con todo lo que tocó.
      *
      * <p>Va con {@code editar_vacante}: quien puede cambiar el puesto puede cambiar el sueldo.
      * Partirlo en un permiso aparte le daría a alguien la mitad del formulario, y la empresa
@@ -201,8 +216,8 @@ public class VacantesPanelController {
     @PostMapping("/vacantes/{id}/remuneracion")
     @PreAuthorize("@permisos.tiene('editar_vacante')")
     @Operation(summary = "Definir o cambiar la remuneración (OCULTA, FIJA o RANGO). Si la "
-            + "vacante está publicada, avisa por correo y por la campana del portal a cada "
-            + "candidato que sigue en carrera. El motivo es obligatorio")
+            + "vacante está publicada, avisa por la campana del portal a cada candidato que "
+            + "sigue en carrera. No se manda correo. El motivo es obligatorio")
     public RemuneracionActualizadaResponse actualizarRemuneracion(
             @PathVariable Long id, @Valid @RequestBody ActualizarRemuneracion datos) {
         return servicio.actualizarRemuneracion(permisos.actual(), id, datos);

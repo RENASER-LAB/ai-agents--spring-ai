@@ -355,6 +355,18 @@ indicadores confidenciales ni puntuaciones mínimas internas.
 marcha**. El equipo decide candidato por candidato: continuar, detener, o mandar al Radar
 cuando hay consentimiento válido.
 
+**RF-14b** **Una vacante en borrador o publicada se corrige desde la lista del panel**
+(19/09/2026), con el mismo formulario con que se creó. Una cerrada no se edita. La solicitud y el
+puesto no se cambian: el puesto decide el nivel y la familia de la evaluación, y para cambiarlo se
+crea otra vacante. Si la vacante está publicada y cambió algo que ve quien postula —título,
+descripción, propósito, responsabilidades, requisitos, modalidad, horario, ubicación o sueldo—,
+cada postulante **en carrera** recibe **un solo aviso en la campana de su portal, sin correo**, con
+lo que cambió. En carrera es toda postulación que no esté contratada, cerrada ni en «no
+continúa». Lo interno —responsable, forma de cierre, plazas y fecha de cierre— se guarda sin
+avisar a nadie. Cada campo cambiado queda en la auditoría con su valor de antes y el nuevo.
+**Guardar sin cambios**, o solo con espacios de más al principio o al final, **no guarda ni
+avisa nada**.
+
 **RF-15** El sistema permite varias vacantes abiertas a la vez.
 
 **RF-16** Los requisitos objetivos indispensables se configuran por vacante antes de publicarla.
@@ -1281,10 +1293,12 @@ con esas palabras en lugar de dejar una opción gris sin explicación — un con
 se lee como que la pantalla está rota, no como una regla.
 
 **RF-159** **Cambiar el monto de una vacante publicada le avisa a cada candidato que sigue en
-carrera**, por correo y por la campana de su portal. A quien ya no continúa no se le escribe: la
-noticia no le afecta. El cambio **exige motivo escrito** y no viaja con la edición general de la
-vacante: corregir una falta de ortografía en la descripción no puede mandarle una noticia a
-cuarenta personas. **Guardar lo mismo que ya había no cuenta como cambio** y no avisa a nadie.
+carrera**, en la campana de su portal. **No se manda correo** desde el 19/09/2026: la campana
+espera a que la persona entre, y el correo se pierde. A quien ya no continúa no se le avisa: la
+noticia no le afecta. El cambio **exige motivo escrito**, que queda en la auditoría y no en el
+aviso. Se cambia desde la tarjeta del sueldo del detalle o desde el formulario de la vacante
+(RF-14b); si el mismo guardado cambia el sueldo y otros datos que ve el candidato, sale **un solo
+aviso** con todo. **Guardar lo mismo que ya había no cuenta como cambio** y no avisa a nadie.
 
 **RF-160** **Nada de esto va hacia atrás.** Encender o apagar la remuneración no vuelve a pedirle
 la pretensión a quien ya postuló, porque no hay forma de hacerlo: el trato se juzga con las reglas
@@ -1313,9 +1327,11 @@ también viaja en dólares: lo que se para es el error de magnitud, no la oferta
 **RF-164** **El portal tiene una campana**: lo que pasó mientras el candidato no estaba le espera
 dentro, con su marca de leído. **Complementa al correo, no lo sustituye** — el correo cae en
 promociones, se marca leído sin abrir, o llega a una dirección que el cargador de currículums
-inventó y que nadie mira. Nace con un solo tipo de aviso, el cambio de remuneración, y está hecha
-para los que vengan. El aviso se marca leído **al pulsarlo**, o todos a la vez con el botón de la
-cabecera: abrir la campana no es haber leído nada.
+inventó y que nadie mira. **Lo que cambia en una vacante es la excepción**: desde el 19/09/2026
+se cuenta **solo** por la campana (RF-14b y RF-159). Hoy tiene dos tipos de aviso —el cambio de
+sueldo hecho desde su tarjeta y la vacante corregida— y está hecha para los que vengan. El aviso
+se marca leído **al pulsarlo**, o todos a la vez con el botón de la cabecera: abrir la campana no
+es haber leído nada.
 
 ---
 
