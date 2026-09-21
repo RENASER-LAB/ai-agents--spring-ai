@@ -24,6 +24,7 @@ import com.renaser.ai.ai_engine.seguridad.service.Permisos;
 import com.renaser.ai.ai_engine.vacante.entity.Vacante;
 import com.renaser.ai.ai_engine.vacante.repository.VacanteRepository;
 import com.renaser.ai.ai_engine.vacante.service.AlcanceSobreLaVacante;
+import com.renaser.ai.ai_engine.vacante.service.VacanteArchivada;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -80,6 +81,10 @@ public class ServicioDecisionImpl implements ServicioDecision {
     @Transactional
     public Long definirBarrera(ContextoUsuario quien, Long vacanteId, CrearBarrera datos) {
         Vacante vacante = vacanteVisible(quien, vacanteId, "definir_barreras_criticas");
+        // La otra mutación que cuelga de una vacante y no de una postulación: definirle una
+        // barrera nueva a una archivada es reconfigurar cómo se decide en ella. Listarlas
+        // sigue abierto — una archivada se lee entera.
+        VacanteArchivada.exigirQueNoLoEste(vacante);
         BarreraCritica b = barrerasCriticas.save(BarreraCritica.builder()
                 .vacanteId(vacante.getId())
                 .descripcion(datos.descripcion())

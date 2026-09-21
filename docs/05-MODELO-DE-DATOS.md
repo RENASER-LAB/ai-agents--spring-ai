@@ -89,6 +89,14 @@ borrarse**: las versiones de `REMUNERACION_ACTUALIZADA` en `plantilla_correo` qu
 `es_activa = false`. Lo que cambia en una vacante se cuenta desde entonces solo por la campana.
 Ver [El sueldo, de los dos lados](EL-SUELDO-DE-LOS-DOS-LADOS.md).
 
+La `V59` (21/09/2026) **añade una sola columna**, `vacante.archivada_en`, para retirar de la
+lista de todos los días lo que ya terminó. No inventa un estado —una archivada sigue `CERRADA`,
+y meterlo en `estado` habría obligado a la máquina de estados, al portal y al ranking a aprender
+un estado que no les dice nada, perdiendo además cómo terminó la vacante— y no borra nada:
+quitar la fecha la devuelve a la lista sin reabrir ninguna postulación. Trae su CHECK (solo se
+archiva una `CERRADA`) y un índice parcial para la lista habitual; ninguna vacante existente
+queda archivada. Ver `vacante` en el [diccionario de datos](07-DICCIONARIO-DE-DATOS.md).
+
 La `V54` (14/09/2026) **no añade ninguna tabla y cambia quién firma qué**. Hasta ella había dos
 tipos de texto —`PROCESO` y `FUTUROS_CONTACTOS`— y el de la cuenta usaba el primero, que habla de
 «esta vacante» cuando al registrarse todavía no hay ninguna: quien luego postulaba a una vacante

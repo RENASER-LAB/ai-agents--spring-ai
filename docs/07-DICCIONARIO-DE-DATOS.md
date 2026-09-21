@@ -653,6 +653,7 @@ Una convocatoria concreta.
 | `responsable_usuario_id` | bigint | sí | Quién se hace cargo de contratar |
 | `publicada_en` | timestamptz | no | |
 | `cerrada_en` | timestamptz | no | |
+| `archivada_en` | timestamptz | no | (`V59`) Cuándo se retiró de la lista habitual del panel. Vacío = no archivada, y es lo que trae por defecto `/admin`. **No es un estado**: la vacante sigue `CERRADA` y sus postulaciones quedan como estaban. Desarchivar la vuelve a dejar vacía. Quién la archivó no está aquí: eso lo guarda `auditoria`, con persona, fecha y acción |
 
 **Clave primaria:** `id`
 **Apunta a:** `organizacion`, `solicitud_talento`, `puesto`, `version_pesos`,
@@ -678,6 +679,15 @@ que se para es el error de magnitud, no la oferta modesta.
 a la versión que usa, y una versión puede ser una copia privada de una vacante. Flyway no puede
 crear las dos a la vez: se crean las tablas primero y una de las dos claves foráneas se añade
 después.
+
+**Restricción `vacante_archivada_solo_si_cerrada` (`V59`).** Solo se archiva una `CERRADA`, y lo
+dice también la base: archivar una publicada la sacaría de la lista del panel dejándola viva en
+el portal, o sea recibiendo postulaciones que nadie mira. «Sin nadie en carrera» es la otra
+mitad de la regla y **no** se comprueba aquí —depende de `postulacion` y cambia con cada
+movimiento—: vive en `ServicioVacantesPanelImpl`. El índice **parcial**
+`ix_vacante_sin_archivar` (`organizacion_id`, `creado_en DESC`) `WHERE archivada_en IS NULL` es
+el de la pantalla que más se abre; no es único, así que archivar no tiene ningún orden de
+escritura que respetar.
 
 Cerrar una vacante **detiene las postulaciones nuevas pero no cierra las que van a mitad**.
 

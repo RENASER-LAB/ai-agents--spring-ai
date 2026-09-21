@@ -15,6 +15,7 @@ import com.renaser.ai.ai_engine.vacante.entity.Vacante;
 import com.renaser.ai.ai_engine.vacante.repository.FichaVacanteRepository;
 import com.renaser.ai.ai_engine.vacante.repository.VacanteRepository;
 import com.renaser.ai.ai_engine.vacante.service.ServicioFichaVacante;
+import com.renaser.ai.ai_engine.vacante.service.VacanteArchivada;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -52,6 +53,10 @@ public class ServicioFichaVacanteImpl implements ServicioFichaVacante {
     @Transactional
     public FichaResponse guardar(ContextoUsuario quien, Long vacanteId, GuardarFicha datos) {
         Vacante vacante = laDeLaOrganizacion(quien, vacanteId);
+        // Archivada se lee entera —la ficha es parte de la trazabilidad del proceso— pero no
+        // se escribe: ver VacanteArchivada. La comprobación va antes que la del estado porque
+        // es la que explica mejor qué pasó.
+        VacanteArchivada.exigirQueNoLoEste(vacante);
         if ("CERRADA".equals(vacante.getEstado())) {
             throw new IllegalStateException("Una vacante cerrada no cambia su ficha");
         }

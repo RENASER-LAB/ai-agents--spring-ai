@@ -514,14 +514,14 @@ class EditarVacanteTest {
         Vacante cerrada = Vacante.builder().id(41L).organizacionId(ORGANIZACION)
                 .titulo("Analista").estado("CERRADA").responsableUsuarioId(7L)
                 .remuneracionTipo("OCULTA").build();
-        when(vacantes.findByOrganizacionIdOrderByCreadoEnDesc(ORGANIZACION))
+        when(vacantes.findByOrganizacionIdAndArchivadaEnIsNullOrderByCreadoEnDesc(ORGANIZACION))
                 .thenReturn(List.of(publicada, cerrada));
         when(enCarrera.cuantasPorVacante(ORGANIZACION)).thenReturn(Map.of(VACANTE, 3));
         when(permisos.alcanceDe("editar_vacante"))
                 .thenReturn(FiltroAlcance.desde("TODO", QUIEN.usuarioId()));
         when(alcance.alcanzaALaVacante(eq(QUIEN), any(), any())).thenReturn(true);
 
-        List<VacantePanel> lista = servicio.listar(QUIEN);
+        List<VacantePanel> lista = servicio.listar(QUIEN, false);
 
         assertThat(lista.get(0).postulantesEnCarrera()).isEqualTo(3);
         assertThat(lista.get(0).descripcion()).isEqualTo("Lleva la operación de la sede");
@@ -541,11 +541,11 @@ class EditarVacanteTest {
         Vacante publicada = Vacante.builder().id(VACANTE).organizacionId(ORGANIZACION)
                 .titulo("Coordinador de sede").estado("PUBLICADA").responsableUsuarioId(7L)
                 .remuneracionTipo("OCULTA").build();
-        when(vacantes.findByOrganizacionIdOrderByCreadoEnDesc(ORGANIZACION))
+        when(vacantes.findByOrganizacionIdAndArchivadaEnIsNullOrderByCreadoEnDesc(ORGANIZACION))
                 .thenReturn(List.of(publicada));
         when(enCarrera.cuantasPorVacante(ORGANIZACION)).thenReturn(Map.of());
 
-        assertThat(servicio.listar(mirón).get(0).puedeEditar()).isFalse();
+        assertThat(servicio.listar(mirón, false).get(0).puedeEditar()).isFalse();
         // Y no se le pregunta por un alcance que no tiene: `alcanceDe` lanzaría.
         verifyNoInteractions(permisos);
     }

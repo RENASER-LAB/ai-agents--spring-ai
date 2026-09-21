@@ -26,7 +26,39 @@ public interface ServicioVacantesPanel {
      */
     VacanteActualizadaResponse editar(ContextoUsuario quien, Long id, GuardarVacante datos);
 
-    List<VacantePanel> listar(ContextoUsuario quien);
+    /**
+     * Las vacantes de la empresa, en una de sus dos listas.
+     *
+     * <p>{@code archivadas} falso —lo que pide {@code /admin}— trae solo las que nadie ha
+     * archivado; cierto trae solo las archivadas, la última arriba. <b>El corte lo hace la
+     * consulta</b>, no la pantalla: filtrado en el navegador, una archivada reaparecería en
+     * cuanto alguien escribiera en el buscador o pasara de página.
+     */
+    List<VacantePanel> listar(ContextoUsuario quien, boolean archivadas);
+
+    /** Cuántas archivadas hay, para el botón «Archivadas (N)» de la cabecera. */
+    ConteoDeArchivadas contarArchivadas(ContextoUsuario quien);
+
+    /**
+     * Retira de la lista habitual una vacante cerrada, conservando su proceso.
+     *
+     * <p>Solo una {@code CERRADA} y <b>solo si no queda nadie en carrera</b>: archivarla con
+     * gente esperando una decisión sería esconder de la mesa de trabajo a quien todavía
+     * depende de ella. No cierra la vacante por su cuenta —eso es una decisión aparte, con su
+     * motivo— ni toca ninguna postulación.
+     *
+     * <p>El estado y el conteo se vuelven a mirar aquí aunque el panel ya los haya enseñado:
+     * entre abrir el modal y confirmarlo cabe una postulación nueva y cabe otro usuario.
+     */
+    void archivar(ContextoUsuario quien, Long id);
+
+    /**
+     * La devuelve a la lista habitual, {@code CERRADA} y con sus postulaciones intactas.
+     *
+     * <p>Desarchivar no reabre nada: el candidato ve su proceso exactamente igual antes y
+     * después, y por eso no genera ningún aviso.
+     */
+    void desarchivar(ContextoUsuario quien, Long id);
 
     VacantePanel detalle(ContextoUsuario quien, Long id);
 
