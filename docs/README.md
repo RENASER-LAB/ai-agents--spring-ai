@@ -34,7 +34,7 @@ requisitos nuevos el 14 de agosto y cambian bastante.
 | [02 · Requisitos no funcionales](02-REQUISITOS-NO-FUNCIONALES.md) | RNF-01 a RNF-66. Tecnología, seguridad, rendimiento |
 | [03 · Estados de la postulación](03-ESTADOS-POSTULACION.md) | Los 18 estados de una postulación y sus transiciones |
 | [04 · Roles y permisos](04-ROLES-Y-PERMISOS.md) | Los 77 permisos, acción por acción. En la base hay 71 sembrados |
-| [05 · Modelo de datos](05-MODELO-DE-DATOS.md) | Las 107 tablas (V1-V57) por área y por qué el modelo es así. Se lee |
+| [05 · Modelo de datos](05-MODELO-DE-DATOS.md) | Las 107 tablas (V1-V58) por área y por qué el modelo es así. Se lee |
 | [06 · Inventario de pantallas](06-INVENTARIO-DE-PANTALLAS-MOCKUPS.md) | Las 21 pantallas base, estados, ventanas, campos y datos de los mockups |
 | [07 · Diccionario de datos](07-DICCIONARIO-DE-DATOS.md) | Cada tabla con todas sus columnas, tipos y claves. Se consulta |
 | [08 · Alcance del MVP](08-ALCANCE-DEL-MVP.md) | Qué se construye primero, en tres hitos, y qué queda fuera |
@@ -48,7 +48,7 @@ requisitos nuevos el 14 de agosto y cambian bastante.
 | [La prueba del puesto, por dentro](PRUEBA-DEL-PUESTO.md) | Los dos instrumentos de la etapa técnica; componer una versión antes de publicarla; la guía de calificación; los minutos de la vacante; el cierre en dos niveles; la vacante sin banco; la nota de la etapa y qué dice el ranking cuando no la hay; lo que el panel ve de los entregables |
 | [Diseño de la prueba técnica](DISENO-PRUEBA-TECNICA-FICHA-Y-REDACTOR.md) · [Una vacante, una versión](DECISION-UNA-VACANTE-UNA-VERSION.md) | La ficha del puesto (las 10 preguntas al dueño) y el redactor que arma el cuestionario; y por qué una vacante rinde una sola versión |
 | [CAZATALENTOS · banco](CAZATALENTOS-BANCO-RENASER.md) · [prueba técnica](CAZATALENTOS-PRUEBA-TECNICA.md) | Los bancos por nivel del método CAZATALENTOS (V41) y su prueba técnica |
-| [El sueldo, de los dos lados](EL-SUELDO-DE-LOS-DOS-LADOS.md) | El trato de la remuneración (V55): la vacante que enseña lo que paga exige la pretensión, la que la esconde no pide nada y tampoco ve nada. La campana del portal (V56) y lo que se lleva el borrado de datos |
+| [El sueldo, de los dos lados](EL-SUELDO-DE-LOS-DOS-LADOS.md) | El trato de la remuneración (V55): la vacante que enseña lo que paga exige la pretensión, la que la esconde no pide nada y tampoco ve nada. La campana del portal (V56), que desde la V58 es el único canal de lo que cambia en una vacante, y lo que se lleva el borrado de datos |
 | [El modelo cambió de nombre](EL-MODELO-CAMBIO-DE-NOMBRE.md) | Por qué renombrar un modelo de IA dejó el contador del gasto en cero una semana (V57): el nombre que se pide y el que contesta el proveedor no son el mismo, la primera pasada de la criba cuelga de un nombre retirado, y el precio sembrado es el de fuera de hora punta |
 | [Criba de currículums](CRIBA-DE-CURRICULUMS.md) | Cargar una convocatoria con una carpeta de currículums, pedir que la IA los lea y ver quién es el más apto |
 | [Fallos corregidos de la criba](FALLOS-CORREGIDOS-CRIBA.md) | Los cinco fallos que salieron al pasar 190 currículums reales. Cuatro no daban error |

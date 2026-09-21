@@ -33,10 +33,36 @@ public final class DtosVacante {
              */
             RemuneracionDeLaVacante remuneracion,
             @NotBlank String tipoCierre,
+            /**
+             * Cuántas plazas, cuando la forma de cierre es {@code PLAZAS}.
+             *
+             * <p>Al editar solo se lee si esa es la forma elegida, que es cuando el
+             * formulario la enseña. Con cualquier otra forma, lo que haya guardado se
+             * conserva —el formulario no lo mostraba— salvo que la forma de cierre acabe de
+             * cambiar, y entonces se limpia porque ya no rige nada.
+             */
             Integer plazas,
+            /**
+             * Cuándo abre la convocatoria.
+             *
+             * <p>⚠️ <b>Solo se lee al CREAR.</b> El formulario de edición no la enseña, así
+             * que al editar se conserva la que tenga: tratar su ausencia como un nulo la
+             * vaciaba en silencio cada vez que alguien guardaba sin tocar nada.
+             */
             Instant abreEn,
+            /** Cuándo cierra. Misma regla que {@code plazas}, con la forma {@code FECHA}. */
             Instant cierraEn,
-            @NotNull Long responsableUsuarioId) {}
+            @NotNull Long responsableUsuarioId,
+            /**
+             * Por qué cambia el sueldo, cuando este guardado lo cambia.
+             *
+             * <p>Solo se lee al editar, y solo si la remuneración de verdad cambia: crear una
+             * vacante declara lo que paga, no lo cambia, y no hay nadie a quien explicárselo.
+             * En una vacante publicada es obligatorio —a cada persona en carrera le va a
+             * llegar la noticia, y la auditoría tiene que poder contestar por qué—, y queda
+             * como motivo de la fila de auditoría, nunca en el aviso del candidato.
+             */
+            String motivoRemuneracion) {}
 
     // Los últimos campos son la configuración de la vacante: qué evaluación y qué prueba
     // tiene asignadas, qué pesos la rigen, si la evaluación del banco está encendida, y qué
@@ -53,7 +79,42 @@ public final class DtosVacante {
                                // tocó— para que la pantalla de configuración pinte el estado
                                // real sin pedir nada más.
                                RemuneracionDeLaVacante remuneracion,
-                               Instant remuneracionActualizadaEn) {}
+                               Instant remuneracionActualizadaEn,
+                               // El texto de la convocatoria, entero. Sin él, el lápiz de la
+                               // lista abriría un formulario a medio llenar y guardar borraría
+                               // lo que no viajó: el cuerpo del PUT es el formulario completo.
+                               String descripcion, String proposito, String responsabilidades,
+                               String requisitos, String modalidad, String horario,
+                               String ubicacion, Integer plazas, Instant abreEn,
+                               Instant cierraEn,
+                               /**
+                                * Cuánta gente sigue en carrera en esta vacante.
+                                *
+                                * <p>Es el número que el panel dice en voz alta antes de
+                                * guardar —«avisaremos a N postulantes»—. Cuenta las
+                                * postulaciones que no terminaron; ver
+                                * {@code PostulacionesEnCarrera}.
+                                */
+                               int postulantesEnCarrera,
+                               /**
+                                * Si quien pregunta puede editar ESTA vacante.
+                                *
+                                * <p>Viaja en la fila y no en un endpoint de permisos aparte: el
+                                * alcance se decide por vacante —con {@code SUS_VACANTES} solo
+                                * alcanzas las que diriges— y una respuesta general no podría
+                                * contestarlo sin repetir aquí la regla del backend.
+                                */
+                               boolean puedeEditar) {}
+
+    /**
+     * Cómo acabó un guardado de la vacante.
+     *
+     * <p>Las dos cosas que el panel necesita decir y no puede deducir: si de verdad cambió
+     * algo —guardar el formulario sin tocar nada es el camino más normal del mundo, y
+     * merece «no había cambios que guardar» y no un «guardado» que no guardó nada— y a
+     * cuánta gente le llegó el aviso, que es el mismo contador que ya da el sueldo.
+     */
+    public record VacanteActualizadaResponse(boolean huboCambios, int postulantesAvisados) {}
 
     /**
      * Lo que la vacante dice sobre el dinero.
@@ -77,10 +138,10 @@ public final class DtosVacante {
     /**
      * Cambiar el sueldo de una vacante ya creada, con el motivo de por qué.
      *
-     * <p>El motivo es obligatorio y no es burocracia: este cambio le manda un correo y un
-     * aviso a cada persona que tiene una postulación viva, y la auditoría tiene que poder
+     * <p>El motivo es obligatorio y no es burocracia: este cambio le deja un aviso en el
+     * portal a cada persona que tiene una postulación viva, y la auditoría tiene que poder
      * contestar «¿por qué le dijimos a cuarenta candidatos que el sueldo bajó?» con algo más
-     * que una marca de tiempo.
+     * que una marca de tiempo. Desde la V58 no sale ningún correo.
      */
     public record ActualizarRemuneracion(@NotNull RemuneracionDeLaVacante remuneracion,
                                          @NotBlank(message = "Di por qué cambia el sueldo: "

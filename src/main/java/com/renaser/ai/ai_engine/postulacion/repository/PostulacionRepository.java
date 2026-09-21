@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -52,6 +53,38 @@ public interface PostulacionRepository extends JpaRepository<Postulacion, Long> 
     List<Object[]> embudo(@Param("vacanteId") Long vacanteId);
 
     List<Postulacion> findByVacanteIdOrderByCreadoEnDesc(Long vacanteId);
+
+    /**
+     * Las postulaciones de una vacante que siguen en carrera, las nuevas arriba.
+     *
+     * <p>Quiénes son «en carrera» lo decide {@code PostulacionesEnCarrera} y no cada
+     * llamador: aquí solo entra la lista de estados que esa clase pasa. Ver su javadoc.
+     */
+    @Query("""
+            select p from Postulacion p
+             where p.vacanteId = :vacanteId
+               and p.estadoCodigo not in :terminados
+             order by p.creadoEn desc
+            """)
+    List<Postulacion> enCarreraDeLaVacante(@Param("vacanteId") Long vacanteId,
+                                           @Param("terminados") Collection<String> terminados);
+
+    /**
+     * Cuántas siguen en carrera en cada vacante de una empresa, en una sola consulta.
+     *
+     * <p>La lista del panel pinta ese número en cada fila. Preguntarlo vacante a vacante
+     * convertiría una pantalla en tantas consultas como convocatorias tenga la empresa.
+     */
+    @Query("""
+            select p.vacanteId, count(p) from Postulacion p
+             where p.organizacionId = :organizacionId
+               and p.estadoCodigo not in :terminados
+             group by p.vacanteId
+            """)
+    List<Object[]> enCarreraPorVacante(@Param("organizacionId") Long organizacionId,
+                                       @Param("terminados") Collection<String> terminados);
+
+    long countByVacanteIdAndEstadoCodigoNotIn(Long vacanteId, Collection<String> estadoCodigos);
 
     // La guarda de «una vacante, una versión» pregunta si ya hay alguien midiéndose:
     // desde la primera postulación, los instrumentos de la vacante no se cambian.

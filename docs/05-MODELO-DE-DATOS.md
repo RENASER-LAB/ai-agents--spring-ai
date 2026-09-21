@@ -23,7 +23,7 @@ Sirve para tres cosas:
 - **Entender el sistema.** Un modelo de datos bien contado explica el negocio mejor que
   cualquier otro documento.
 
-**La base ya está construida.** Las migraciones `V1` a `V57` viven en
+**La base ya está construida.** Las migraciones `V1` a `V58` viven en
 `src/main/resources/db/migration` —**104 tablas de este módulo**, 107 en la base contando la de
 Flyway y las dos del motor de agentes— y Flyway es el dueño del esquema. Cambiar algo de aquí
 ya cuesta una migración nueva, y **una migración aplicada no se edita nunca**: se escribe otra
@@ -51,7 +51,7 @@ lados](EL-SUELDO-DE-LOS-DOS-LADOS.md).
 
 La `V56` (14/09/2026) le da al portal **una campana**: la tabla `aviso_portal` guarda lo que pasó
 mientras el candidato no estaba, con su estado de leído. Nace con un solo tipo de aviso —el cambio
-de sueldo de la V55— y está hecha para los que vengan.
+de sueldo de la V55— y está hecha para los que vengan; la V58 suma el segundo.
 
 La `V37` convierte el esquema en **multiempresa**: `organizacion.es_plataforma` marca a la
 dueña de la plataforma (solo una puede serlo) y reemplaza al código `'RENASER'` que estaba
@@ -81,6 +81,13 @@ calificaciones y todas las lecturas de currículum se anotaron sin costo y el to
 nada. La segunda fila es del modelo del orquestador, que nunca tuvo precio desde que existe el
 control del gasto. Por qué un cambio de nombre llega hasta aquí, y por qué se sembró el precio de
 fuera de punta: [El modelo cambió de nombre](EL-MODELO-CAMBIO-DE-NOMBRE.md).
+
+La `V58` (19/09/2026) **no crea tablas ni columnas**. Acompaña a la edición de la vacante desde
+el panel: la campana suma el tipo de aviso `VACANTE_ACTUALIZADA` —`aviso_portal.tipo` ya era
+texto libre, así que solo cambia su comentario— y **el correo del cambio de sueldo se apaga sin
+borrarse**: las versiones de `REMUNERACION_ACTUALIZADA` en `plantilla_correo` quedan con
+`es_activa = false`. Lo que cambia en una vacante se cuenta desde entonces solo por la campana.
+Ver [El sueldo, de los dos lados](EL-SUELDO-DE-LOS-DOS-LADOS.md).
 
 La `V54` (14/09/2026) **no añade ninguna tabla y cambia quién firma qué**. Hasta ella había dos
 tipos de texto —`PROCESO` y `FUTUROS_CONTACTOS`— y el de la cuenta usaba el primero, que habla de
@@ -979,7 +986,7 @@ Casi todo lo que el cliente cambia seguido vive aquí, no en el código.
 | `peso_dimension` | Cuánto pesa cada dimensión en cada nivel | version_pesos_id, nivel_puesto_codigo, dimension_codigo, peso |
 | `peso_criterio` | Cuánto vale cada criterio en cada nivel, en las tres etapas globales | version_pesos_id, nivel_puesto_codigo, criterio_id, peso |
 | `parametro` | Los valores sueltos: días sin avanzar antes de cerrar, tope de rondas de evidencia, cupo por defecto, qué datos se ocultan del currículum | organizacion_id, codigo, valor, tipo, descripcion, modificado_por_usuario_id |
-| `plantilla_correo` | Los textos que se envían, versionados | organizacion_id, codigo, version, asunto, cuerpo |
+| `plantilla_correo` | Los textos que se envían, versionados. Un código sin ninguna versión activa ya no se manda (desde la `V58`, `REMUNERACION_ACTUALIZADA`) | organizacion_id, codigo, version, asunto, cuerpo, es_activa |
 | `instruccion_ia` | Los textos que se le mandan a cada agente, versionados | agente_codigo, version, texto, publicada_por_usuario_id |
 
 **El nivel salió de la clave de `peso_etapa`.** Los pesos son 40 / 30 / 15 / 15 para todos, y lo
@@ -1067,14 +1074,15 @@ para permitirlo. También registra los cambios de permisos.
 Del correo se guarda el cuerpo ya armado, no solo cuál plantilla se usó. Si mañana alguien edita
 la plantilla, lo que se le envió a esa persona sigue siendo lo que dice el registro.
 
-`aviso_portal` (`V56`) es **la otra mitad del correo, no su reemplazo**: los dos salen del mismo
-hecho. El correo sale y no vuelve —cae en promociones, llega a una dirección que el cargador de
-currículums inventó—, y hasta la V56 lo que pasaba mientras el candidato no estaba no quedaba en
-ninguna parte: su lista de postulaciones se veía igual el día que todo seguía igual y el día que
-le cambiaron el sueldo. Guarda el texto ya armado por la misma razón que el correo. Hoy nace un
-solo tipo de aviso, el cambio de remuneración; la tabla está hecha para los que vengan
-—«avanzaste de etapa», «tienes una prueba por rendir», «te queda un día»—, que hoy existen solo
-como correos que salen y no vuelven.
+`aviso_portal` (`V56`) nació como **la otra mitad del correo, no su reemplazo**. El correo sale y
+no vuelve —cae en promociones, llega a una dirección que el cargador de currículums inventó—, y
+hasta la V56 lo que pasaba mientras el candidato no estaba no quedaba en ninguna parte: su lista
+de postulaciones se veía igual el día que todo seguía igual y el día que le cambiaron el sueldo.
+Guarda el texto ya armado por la misma razón que el correo. **Desde la `V58` es el único canal de
+lo que cambia en una vacante**, con dos tipos: `REMUNERACION_ACTUALIZADA` (el sueldo cambiado
+desde su tarjeta) y `VACANTE_ACTUALIZADA` (la vacante corregida con el formulario, un solo aviso
+por guardado). La tabla está hecha para los que vengan —«avanzaste de etapa», «tienes una prueba
+por rendir», «te queda un día»—, que hoy existen solo como correos que salen y no vuelven.
 
 La base guarda la ruta del archivo, nunca el archivo. Así los entregables pesados —vídeos,
 diseños, archivos de hasta 200 MB— no inflan la base de datos. **El almacén es propio de este

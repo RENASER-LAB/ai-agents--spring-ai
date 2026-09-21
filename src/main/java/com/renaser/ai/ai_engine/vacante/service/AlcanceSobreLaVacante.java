@@ -75,6 +75,22 @@ public class AlcanceSobreLaVacante {
     }
 
     /**
+     * Si este alcance llega a esta vacante, que ya se tiene en la mano.
+     *
+     * <p>Para las listas: el panel pinta en cada fila si quien mira puede tocarla, y
+     * preguntarlo con {@link #laVacanteVisible} obligaría a volver a buscar por id lo que ya
+     * está cargado —y a tratar un 404 como un «no»—. La regla es la misma de siempre y vive
+     * en el mismo {@code switch}: aquí solo se abre la puerta para preguntarla.
+     *
+     * <p>Nombre propio y no otro {@code alcanzaA}: con un tercer parámetro nulo, el
+     * compilador no sabría si le hablan de una vacante o de una postulación.
+     */
+    public boolean alcanzaALaVacante(ContextoUsuario quien, FiltroAlcance alcance,
+                                     Vacante vacante) {
+        return alcanza(quien, alcance, Optional.ofNullable(vacante));
+    }
+
+    /**
      * Si este alcance llega a esa postulación, con la vacante ya cargada.
      *
      * <p>La vacante se pide por una función y no por id para que quien tenga una tanda pueda

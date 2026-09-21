@@ -14,7 +14,17 @@ public interface ServicioVacantesPanel {
     // Crear exige una solicitud ABIERTA (aprobada por Dirección). Nace en BORRADOR.
     Long crear(ContextoUsuario quien, GuardarVacante datos);
 
-    void editar(ContextoUsuario quien, Long id, GuardarVacante datos);
+    /**
+     * Guardar el formulario de una vacante que ya existe.
+     *
+     * <p>Compara campo a campo, audita lo que cambió y —si está publicada y cambió algo que
+     * el candidato ve— deja <b>un único aviso</b> en la campana de cada postulación en
+     * carrera. El sueldo entra en esta comparación: es lo que evita que cambiarlo junto al
+     * horario mande dos noticias por un solo cambio.
+     *
+     * <p>Sin cambios no se guarda ni se avisa nada, y la respuesta lo dice.
+     */
+    VacanteActualizadaResponse editar(ContextoUsuario quien, Long id, GuardarVacante datos);
 
     List<VacantePanel> listar(ContextoUsuario quien);
 
@@ -116,10 +126,12 @@ public interface ServicioVacantesPanel {
     /**
      * Cambia lo que esta vacante dice que paga, y avisa a quien ya postuló (V55).
      *
-     * <p>No es un campo más del formulario de editar, y por eso tiene verbo propio: cambiar
-     * el sueldo de una vacante viva le manda un correo y un aviso a cada persona con una
-     * postulación abierta. Esconder eso dentro de un «guardar» genérico haría que se disparara
-     * sin querer cada vez que alguien corrige una falta de ortografía en la descripción.
+     * <p>Tiene verbo propio porque tiene pantalla propia: la tarjeta del detalle, para
+     * cambiar SOLO el sueldo sin abrir el formulario entero. Quien abre el formulario lo
+     * cambia con {@link #editar}, y entonces sale un único aviso con todo lo que tocó.
+     *
+     * <p>Cambiarlo en una vacante viva le deja un aviso en la campana del portal a cada
+     * persona con una postulación abierta. Desde la V58 no sale ningún correo.
      *
      * <p>Se puede en BORRADOR y en PUBLICADA. En borrador no hay a quién avisar y es
      * simplemente rellenar el dato; en publicada es la noticia. Una vacante CERRADA no se

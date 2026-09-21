@@ -65,6 +65,11 @@ cuatro ramas arrastradas desde el 02/09 sin volver a correrlo entero.
 integración levantan la aplicación entera contra una base con todas las migraciones aplicadas, y
 son las únicas que ven los efectos a distancia de un cambio de datos. Es lo que corre el CI.
 
+⚠️ **El recibo del harness no es este recuento.** La entrega de editar vacantes (20/09/2026) pasó
+en verde con **1006 unitarias y 163 de integración**, pero esa batería elige las clases por su
+nombre (`*Test`, `*Tests`, `*IT`) y aparta las que gastan saldo o mandan correo. No se suma ni se
+compara con las 1276: para dar el total hay que volver a correr `./mvnw verify` entero.
+
 ⚠️ **El total está al día; la tabla de abajo no.** Su reparto por filas es el del recuento del
 28/08/2026 (877 = 770 + 107), antes del módulo de vacantes —los tiempos de la etapa técnica, la
 edición de las plantillas de prueba, el CRUD de áreas y la guía de calificación—, y esas casi
@@ -78,6 +83,7 @@ verdad de las nuevas y conviene saber dónde vive:
 | Editar y quitar sobre versiones en borrador | `ServicioPlantillaPruebaEdicionTest` · `ServicioPlantillaPruebaListadoTest` |
 | El reloj de la etapa técnica y sus dos instrumentos | `ServicioPruebaImplTest` · `ServicioEvaluacionImplTest` · `RelojDeLaEtapaTecnicaQaTest` |
 | Que la guía de calificación no pueda mandar sobre la rúbrica | `AgentePruebaPuestoGuiaHostilTest` |
+| Corregir una vacante (19/09): qué cambió, quién sigue en carrera, un solo aviso sin correo, el alcance del rol y el sueldo por sus dos puertas | `CambiosDeLaVacanteTest` · `PostulacionesEnCarreraTest` · `EditarVacanteTest` · `FlujoRemuneracionIT` |
 
 ⚠️ **Uno de esos tests está saltado a propósito y señala un defecto abierto**: el método
 `elCambioInesperadoCabeDentroDelReloj` de `RelojDeLaEtapaTecnicaQaTest`. La clase **no** está

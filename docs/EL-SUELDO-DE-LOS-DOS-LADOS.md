@@ -2,7 +2,8 @@
 
 Qué dice la vacante sobre el dinero, qué se le pide a quien postula a cambio, y por qué las dos
 cosas son la misma decisión. Reúne lo que se construyó el 14 y el 15/09/2026 (migraciones `V55` y
-`V56`).
+`V56`) y lo que cambió el 19/09/2026 (`V58`): el sueldo se corrige también desde el formulario de
+la vacante, y el cambio ya no se avisa por correo, solo por la campana.
 
 ---
 
@@ -77,13 +78,27 @@ Subirlo, bajarlo, o cerrar un rango en una cifra fija. **Moverse entre fijo y ra
 las dos formas publican, no se revoca nada, y cerrar el rango cuando ya se sabe el número es de
 los cambios más frecuentes.
 
-Ese cambio **le escribe a cada candidato que sigue en carrera**: correo y aviso en su portal. A
-quien ya no continúa no se le escribe, porque la noticia no le afecta.
+Ese cambio **le deja un aviso en la campana del portal a cada candidato que sigue en carrera**. A
+quien ya no continúa —contratado, cerrado o «no continúa»— no se le avisa, porque la noticia no le
+afecta.
 
-Por eso **tiene verbo propio y no viaja en la edición general de la vacante**: corregir una falta
-de ortografía en la descripción no puede mandarle una noticia a cuarenta personas. Y **exige
-motivo escrito**: la auditoría tiene que poder contestar «¿por qué le dijimos a cuarenta
-candidatos que el sueldo bajó?» con algo más que una marca de tiempo.
+**No sale correo desde el 19/09/2026.** Antes salían los dos, y el panel prometía una entrega que
+nadie podía confirmar: el correo cae en promociones o llega a una dirección que el cargador de
+currículums inventó. La campana espera a que la persona entre. El texto de correo
+`REMUNERACION_ACTUALIZADA` queda apagado (`V58`) y ya no se ofrece para editar, pero sus filas se
+conservan: los correos que sí salieron tienen que poder explicarse.
+
+**Se cambia por dos puertas**, y las dos avisan igual:
+
+- **La tarjeta del sueldo**, en el detalle de la vacante: cambia solo el sueldo.
+- **El formulario de la vacante**, con el lápiz de la lista: si el mismo guardado cambia el sueldo
+  y, por ejemplo, la ubicación, sale **un solo aviso** con los dos cambios. Nunca dos avisos por
+  un guardado.
+
+Y **exige motivo escrito** en una vacante publicada: la auditoría tiene que poder contestar «¿por
+qué les dijimos a cuarenta candidatos que el sueldo bajó?» con algo más que una marca de tiempo.
+El motivo va a la auditoría, no al aviso. Desde el formulario, en borrador no se pide, porque
+nadie ha visto la vacante.
 
 **Guardar lo mismo que ya había no cuenta como cambio** y no avisa a nadie.
 
@@ -93,9 +108,8 @@ fila de auditoría, incluso atrapando la excepción. El precio es que puede qued
 que luego no se guardó; es el lado correcto del que equivocarse — **un aviso de más se explica; un
 sueldo revertido en silencio, no**.
 
-⚠️ **«A cuánta gente le llegó» cuenta avisos del portal, no correos.** El correo sale por la
-puerta de atrás tanto si falta la plantilla como si el servidor está caído, así que contar intentos
-dejaba al panel diciendo «avisamos a 40 candidatos» cuando podían ser cero.
+⚠️ **«A cuánta gente le llegó» cuenta los avisos que de verdad se publicaron.** Si el de una
+persona falla, no se cuenta, el cambio se queda y los demás sí se enteran.
 
 ### 5 · Nada va hacia atrás
 
@@ -157,7 +171,7 @@ y se rechaza diciendo cómo escribirlo.
 **Sin decimales, y esa es la clave**: con ellos no hay forma de distinguir tres soles y medio de un
 3500 mal tecleado. Antes de esta regla, escribir «3,500» quedaba registrado como **S/ 3.50** —en el
 portal, como pretensión copiada al perfil; en el panel, como monto fijo de una vacante publicada,
-disparando los correos que decían «Ahora: S/ 3.50»—.
+disparando los avisos que decían «Ahora: S/ 3.50»—.
 
 El **suelo de 100 no es el sueldo mínimo legal**, y es a propósito: la cifra también viaja en
 dólares, y un umbral pegado a la ley peruana rechazaría una práctica pagada en USD que es
@@ -185,11 +199,16 @@ que el cargador de currículums inventó y que nadie mira. Y lo que pasaba mient
 estaba **no quedaba en ninguna parte**: su lista de postulaciones se veía exactamente igual el día
 que todo seguía igual y el día que le cambiaron el sueldo.
 
-La campana es la otra mitad: **lo que pasó queda esperándolo dentro, hasta que lo vea.**
-**Complementa al correo, no lo sustituye** — los dos salen del mismo hecho.
+La campana es la otra mitad: **lo que pasó queda esperándolo dentro, hasta que lo vea.** Para lo
+que pasa en el proceso **complementa al correo, no lo sustituye**. Lo que cambia en una vacante
+es la excepción: desde el 19/09/2026 se cuenta **solo** aquí.
 
-- **Nace con un solo tipo de aviso**, el cambio de remuneración, y está hecha para los que vengan:
-  «avanzaste de etapa», «tienes una prueba por rendir», «te queda un día». Hoy esos avisos existen
+- **Tiene dos tipos de aviso.** `REMUNERACION_ACTUALIZADA`, el cambio de sueldo hecho desde su
+  tarjeta, y `VACANTE_ACTUALIZADA` (19/09/2026), el de la vacante corregida con el formulario: uno
+  solo por guardado, con los cambios cortos como «antes → ahora», los textos largos solo nombrados
+  («se actualizaron la descripción y los requisitos») y el cierre «Tu postulación sigue su curso y
+  no tienes que hacer nada». Pulsarlo lleva al proceso del candidato. Está hecha para los que
+  vengan: «avanzaste de etapa», «tienes una prueba por rendir», «te queda un día», que hoy existen
   solo como correos que salen y no vuelven.
 - **El texto se guarda ya armado**, no como una plantilla con variables. Un aviso que se
   reconstruyera al leerlo diría el sueldo de hoy, no el que cambió aquel día: la noticia se
@@ -242,9 +261,10 @@ fila porque demuestra que se avisó, **un aviso del portal no es prueba de nada 
 
 ## Lo que no está hecho
 
-- **La campana tiene un solo tipo de aviso.** Todo lo demás que el sistema cuenta —cambios de
-  etapa, pruebas por rendir, plazos que vencen— sigue existiendo solo como correo.
+- **La campana solo cuenta lo que cambia en la vacante.** Todo lo demás que el sistema cuenta
+  —cambios de etapa, pruebas por rendir, plazos que vencen— sigue existiendo solo como correo.
 - **No hay histórico de sueldos de una vacante.** La columna guarda cuándo se cambió por última
   vez, no la serie de cambios; para reconstruirla hay que leer la auditoría.
-- **El correo del cambio no se prueba contra un servidor real** en las comprobaciones automáticas,
-  como todos los demás: se comprueba que se manda, no que llegue.
+- **Un sueldo con céntimos guardado antes de la regla de cifras enteras** hace que el formulario
+  de la vacante responda con error al guardar, aunque no se toque el sueldo, hasta que se escribe
+  el monto sin céntimos.

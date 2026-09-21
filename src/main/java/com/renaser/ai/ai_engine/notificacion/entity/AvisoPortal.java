@@ -23,8 +23,17 @@ import java.time.Instant;
 @Getter @Setter @Builder @NoArgsConstructor @AllArgsConstructor
 public class AvisoPortal {
 
-    /** El primer tipo, y por ahora el único. Los siguientes entran aquí al lado. */
+    /** El primero: el sueldo de la vacante cambió (V55). */
     public static final String REMUNERACION_ACTUALIZADA = "REMUNERACION_ACTUALIZADA";
+
+    /**
+     * La convocatoria cambió: título, texto, modalidad, horario, ubicación o remuneración.
+     *
+     * <p>Uno solo por guardado, aunque cambien cinco campos a la vez: quien corrige la
+     * vacante hace un cambio, no cinco, y cinco campanas seguidas se leen como un fallo.
+     * Lo que cambió va escrito dentro; lo arma {@code CambiosDeLaVacante}.
+     */
+    public static final String VACANTE_ACTUALIZADA = "VACANTE_ACTUALIZADA";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
