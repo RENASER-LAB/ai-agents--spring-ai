@@ -96,6 +96,7 @@ class ServicioVacantesPanelImplTest {
     // Las de contarle a la gente lo que cambió en su vacante (V56, V58). Son dobles: lo que
     // hacen de verdad lo comprueban sus propias pruebas; aquí se vigila A QUIÉN se llama.
     @Mock private com.renaser.ai.ai_engine.postulacion.service.PostulacionesEnCarrera enCarrera;
+    @Mock private com.renaser.ai.ai_engine.postulacion.service.MaquinaEstados maquina;
     @Mock private com.renaser.ai.ai_engine.notificacion.service.ServicioAvisosPortal avisos;
     @Mock private com.renaser.ai.ai_engine.vacante.service.AlcanceSobreLaVacante alcance;
     @Mock private com.renaser.ai.ai_engine.seguridad.service.Permisos permisos;
@@ -107,7 +108,7 @@ class ServicioVacantesPanelImplTest {
         servicio = new ServicioVacantesPanelImpl(vacantes, puestos, requisitos, solicitudes,
                 versionesPesos, plantillas, versionesPrueba, plantillasPrueba, plantillasCorreo,
                 plantillasPorVacante, intentos, evaluaciones, versionesBanco,
-                auditoria, dueno, postulaciones, enCarrera, avisos, alcance, permisos);
+                auditoria, dueno, postulaciones, enCarrera, maquina, avisos, alcance, permisos);
         // En estas pruebas la organizacion no personaliza nada: el resolutor contesta
         // que el dueño de todo instrumento es ella misma (aqui hace de plataforma).
         org.mockito.Mockito.lenient()
@@ -145,7 +146,7 @@ class ServicioVacantesPanelImplTest {
                 .puestoId(PUESTO)
                 .versionPlantillaPruebaId(31L)
                 .build();
-        when(vacantes.findByIdAndOrganizacionId(VACANTE, ORGANIZACION)).thenReturn(Optional.of(v));
+        when(vacantes.findByIdAndOrganizacionIdAndEliminadaEnIsNull(VACANTE, ORGANIZACION)).thenReturn(Optional.of(v));
         return v;
     }
 
@@ -723,8 +724,8 @@ class ServicioVacantesPanelImplTest {
         Vacante v = Vacante.builder().id(VACANTE).organizacionId(ORGANIZACION)
                 .estado("PUBLICADA").puestoId(PUESTO).versionPlantillaPruebaId(31L)
                 .pruebaCierraEn(Instant.parse("2026-09-20T23:59:00Z")).build();
-        when(vacantes.findByOrganizacionIdAndArchivadaEnIsNullOrderByCreadoEnDesc(ORGANIZACION))
-                .thenReturn(List.of(v));
+        when(vacantes.findByOrganizacionIdAndArchivadaEnIsNullAndEliminadaEnIsNullOrderByCreadoEnDesc(
+                ORGANIZACION)).thenReturn(List.of(v));
         when(enCarrera.cuantasPorVacante(ORGANIZACION)).thenReturn(Map.of());
 
         var fila = servicio.listar(QUIEN, false).get(0);

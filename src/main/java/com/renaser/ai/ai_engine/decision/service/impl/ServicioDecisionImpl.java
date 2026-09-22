@@ -107,7 +107,7 @@ public class ServicioDecisionImpl implements ServicioDecision {
     @Override
     @Transactional
     public Long registrarBarreraDetectada(ContextoUsuario quien, Long postulacionId, RegistrarBarrera datos) {
-        Postulacion postulacion = laVisible(quien, postulacionId, "decidir_contratacion");
+        Postulacion postulacion = laQueSePuedeTocar(quien, postulacionId, "decidir_contratacion");
         // La barrera tiene que ser de la MISMA vacante que la postulación: la barrera
         // cuelga de una vacante, y sin esta comprobación se podía marcar a un candidato
         // con la barrera de otra vacante — incluso de otra empresa.
@@ -139,7 +139,7 @@ public class ServicioDecisionImpl implements ServicioDecision {
     @Override
     @Transactional
     public void decidir(ContextoUsuario quien, Long postulacionId, Decidir datos) {
-        Postulacion postulacion = laVisible(quien, postulacionId, "ver_semaforo_decision");
+        Postulacion postulacion = laQueSePuedeTocar(quien, postulacionId, "ver_semaforo_decision");
         Decision existente = decisiones.findByPostulacionId(postulacionId).orElse(null);
 
         // La primera vez hace falta decidir_contratacion; corregir una ya tomada, cambiar_decision
@@ -174,7 +174,7 @@ public class ServicioDecisionImpl implements ServicioDecision {
     @Override
     @Transactional
     public void pedirEvidenciaAdicional(ContextoUsuario quien, Long postulacionId, PedirEvidencia datos) {
-        Postulacion postulacion = laVisible(quien, postulacionId, "pedir_evidencia_adicional");
+        Postulacion postulacion = laQueSePuedeTocar(quien, postulacionId, "pedir_evidencia_adicional");
         int tope = parametros.entero(quien.organizacionId(), "tope_rondas_evidencia", 2);
         List<EvidenciaAdicional> previas = evidencias.findByPostulacionIdOrderByNumero(postulacionId);
         if (previas.size() >= tope) {
@@ -303,6 +303,19 @@ public class ServicioDecisionImpl implements ServicioDecision {
 
     private Postulacion laVisible(ContextoUsuario quien, Long postulacionId, String permiso) {
         return alcanceVacante.laPostulacionVisible(quien, postulacionId, permiso);
+    }
+
+    /**
+     * La postulación sobre la que se va a <b>escribir</b>: visible y de una vacante que sigue
+     * existiendo. Una eliminada contesta 404 (V60); ver
+     * {@link AlcanceSobreLaVacante#exigirQueSuVacanteSigaExistiendo}. Las lecturas siguen por
+     * {@code laVisible}.
+     */
+    private Postulacion laQueSePuedeTocar(ContextoUsuario quien, Long postulacionId,
+                                          String permiso) {
+        Postulacion postulacion = laVisible(quien, postulacionId, permiso);
+        alcanceVacante.exigirQueSuVacanteSigaExistiendo(postulacion);
+        return postulacion;
     }
 
     private Vacante vacanteVisible(ContextoUsuario quien, Long vacanteId, String permiso) {

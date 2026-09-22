@@ -143,4 +143,51 @@ class ServicioValidacionImplTest {
 
         verify(validaciones).findByPostulacionId(POSTULACION);
     }
+
+    // ============ Una vacante eliminada (V60) ============
+
+    /**
+     * Las cuatro escrituras del periodo de validación: antes, las que transicionan se
+     * frenaban en la máquina de estados con su propio texto, y cerrar ni siquiera eso —dejaba
+     * el periodo TERMINADO y la nota calculada—. Ahora contestan 404 antes de llegar ahí.
+     */
+    @org.junit.jupiter.api.Nested
+    @DisplayName("Si su vacante se eliminó, su periodo de validación no se toca")
+    class DeUnaVacanteEliminada {
+
+        @BeforeEach
+        void suVacanteSeElimino() {
+            org.mockito.Mockito.doThrow(new ResourceNotFoundException("Vacante", "id", VACANTE))
+                    .when(alcance).exigirQueSuVacanteSigaExistiendo(any());
+        }
+
+        private void contestaComoLaVacante(
+                org.assertj.core.api.ThrowableAssert.ThrowingCallable accion) {
+            assertThatThrownBy(accion)
+                    .isInstanceOf(ResourceNotFoundException.class)
+                    .hasMessageContaining("Vacante")
+                    .hasMessageContaining(String.valueOf(VACANTE));
+        }
+
+        @Test
+        @DisplayName("habilitar, iniciar, completar una métrica y cerrar contestan 404")
+        void ningunaEscritura() {
+            alcanzable("habilitar_validacion");
+            alcanzable("iniciar_validacion");
+            alcanzable("completar_metricas_validacion");
+            alcanzable("cerrar_validacion");
+
+            contestaComoLaVacante(() -> servicio.habilitar(QUIEN, POSTULACION,
+                    new com.renaser.ai.ai_engine.validacion.dto.DtosValidacion.HabilitarValidacion(
+                            "SIMULACION_EXTENDIDA", null, 5, USUARIO)));
+            contestaComoLaVacante(() -> servicio.iniciar(QUIEN, POSTULACION));
+            contestaComoLaVacante(() -> servicio.completarMetrica(QUIEN, POSTULACION, 3L,
+                    new com.renaser.ai.ai_engine.validacion.dto.DtosValidacion.CompletarMetrica(
+                            8.0, "Cumplió")));
+            contestaComoLaVacante(() -> servicio.cerrar(QUIEN, POSTULACION));
+
+            org.mockito.Mockito.verifyNoInteractions(validaciones, calificacion, maquina,
+                    auditoria, roles, usuarioRoles);
+        }
+    }
 }

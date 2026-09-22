@@ -250,7 +250,7 @@ public class ServicioCalificacionPruebaImpl implements ServicioCalificacionPrueb
 
     @Override
     public CalificacionIaEncolada calificarConIa(ContextoUsuario quien, Long postulacionId) {
-        Postulacion postulacion = laVisible(quien, postulacionId, "ajustar_nota");
+        Postulacion postulacion = laQueSePuedeTocar(quien, postulacionId, "ajustar_nota");
 
         // ⚠️ Con el cuestionario técnico, este botón es la ÚNICA forma de recuperar una
         // calificación que no salió: si la IA estaba apagada al entregar, o el modelo devolvió
@@ -307,7 +307,7 @@ public class ServicioCalificacionPruebaImpl implements ServicioCalificacionPrueb
     @Override
     @Transactional
     public void ponerNota(ContextoUsuario quien, Long postulacionId, Long criterioId, PonerNotaCriterio datos) {
-        Postulacion postulacion = laVisible(quien, postulacionId, "ajustar_nota");
+        Postulacion postulacion = laQueSePuedeTocar(quien, postulacionId, "ajustar_nota");
         Criterio criterio = criterios.findById(criterioId)
                 .orElseThrow(() -> new ResourceNotFoundException("Criterio", "id", criterioId));
         if (!laRubricaDe(postulacion).contains(criterio)) {
@@ -342,7 +342,7 @@ public class ServicioCalificacionPruebaImpl implements ServicioCalificacionPrueb
     @Override
     @Transactional
     public BigDecimal calcularNotaEtapa(ContextoUsuario quien, Long postulacionId) {
-        Postulacion postulacion = laVisible(quien, postulacionId, "ajustar_nota");
+        Postulacion postulacion = laQueSePuedeTocar(quien, postulacionId, "ajustar_nota");
         // El cuestionario técnico no se pondera por rúbrica: su nota es el índice sobre las
         // calificaciones de sus respuestas. Recalcularlo aquí le da al equipo la misma
         // palanca que tiene con la prueba del puesto — pedirlo cuando ya están las notas.
@@ -367,7 +367,7 @@ public class ServicioCalificacionPruebaImpl implements ServicioCalificacionPrueb
     @Transactional
     public PlazoPrueba definirPlazo(ContextoUsuario quien, Long postulacionId,
                                     DefinirPlazoPrueba datos) {
-        Postulacion postulacion = laVisible(quien, postulacionId, "mover_postulacion");
+        Postulacion postulacion = laQueSePuedeTocar(quien, postulacionId, "mover_postulacion");
         IntentoPrueba intento = intentos.findByPostulacionId(postulacion.getId())
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Prueba del puesto", "postulación", postulacionId));
@@ -493,5 +493,26 @@ public class ServicioCalificacionPruebaImpl implements ServicioCalificacionPrueb
 
     private Postulacion laVisible(ContextoUsuario quien, Long postulacionId, String permiso) {
         return alcance.laPostulacionVisible(quien, postulacionId, permiso);
+    }
+
+    /**
+     * La postulación sobre la que se va a <b>escribir</b>: visible, y de una vacante que sigue
+     * existiendo.
+     *
+     * <p>⚠️ <b>Las cuatro escrituras de este servicio pasan por aquí</b> —el plazo de la
+     * persona, la nota de un criterio, la nota de la etapa y la calificación con IA— y ninguna
+     * la miraba. Con el formulario «El plazo de esta persona» abierto desde antes de eliminar
+     * la vacante, «Guardar el plazo» movía el intento, lo marcaba como propio y dejaba
+     * auditoría sobre una postulación cerrada de una convocatoria retirada, cuando la fecha de
+     * la vacante y mover la postulación ya contestaban 404. Es la misma respuesta que
+     * esas dos: una eliminada no existe, y eso es un 404 y no un 409 (V60).
+     *
+     * <p>Las lecturas siguen por {@link #laVisible}, igual que la ficha de la postulación.
+     */
+    private Postulacion laQueSePuedeTocar(ContextoUsuario quien, Long postulacionId,
+                                          String permiso) {
+        Postulacion postulacion = laVisible(quien, postulacionId, permiso);
+        alcance.exigirQueSuVacanteSigaExistiendo(postulacion);
+        return postulacion;
     }
 }

@@ -140,6 +140,12 @@ class ServicioPostulacionPortalImplTest {
      * que un requisito nuevo se les cuele por debajo.
      */
     private void armarVacantePublicada(Long organizacionDeLaVacante, String tipoRemuneracion) {
+        // El pestillo de la V60: la vacante sigue viva y queda sujeta mientras dura
+        // postular. Con los repositorios simulados solo se puede acreditar que se pide y
+        // que su respuesta manda; que de verdad ordene las dos peticiones lo prueba
+        // FlujoEliminacionVacanteIT con dos hilos y una base de verdad.
+        org.mockito.Mockito.lenient().when(vacantes.bloquearSiSigueViva(VACANTE))
+                .thenReturn(Optional.of(1));
         // La vacante se busca en el tablón entero (findById): el candidato es de la
         // plataforma y postula a la vacante de cualquier empresa.
         org.mockito.Mockito.lenient().when(vacantes.findById(VACANTE))
@@ -388,6 +394,26 @@ class ServicioPostulacionPortalImplTest {
                 null, null, null, null, true, null, null, "10.0.0.1", "Navegador"))
                 .isInstanceOf(com.renaser.ai.ai_engine.ai.exception.ResourceNotFoundException.class);
         verifyNoInteractions(consentimientos);
+    }
+
+    @Test
+    @DisplayName("si la vacante se elimina mientras se postula, no se crea nada: ni siquiera se sube el CV")
+    void laVacanteEliminadaAMitadDeLaOperacionNoDejaPostulacion() {
+        // El pestillo no encuentra fila viva: alguien la eliminó y confirmó primero. Es el
+        // caso de AC-17 que no se veía con una sola petición, porque la lectura de la
+        // vacante sí la encontraba viva al empezar.
+        armarVacantePublicada(ORGANIZACION);
+        when(vacantes.bloquearSiSigueViva(VACANTE)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> servicio.postular(QUIEN, VACANTE, cv, "Abrí dos sedes",
+                null, null, null, null, true, null, null, "10.0.0.1", "Navegador"))
+                .isInstanceOf(com.renaser.ai.ai_engine.ai.exception.ResourceNotFoundException.class);
+
+        // Ni postulación, ni consentimiento firmado, ni currículum en el almacén: quien
+        // llega tarde se entera ANTES de que se escriba nada suyo.
+        verify(postulaciones, never()).save(any(Postulacion.class));
+        verifyNoInteractions(consentimientos);
+        verify(almacen, never()).guardar(any(), any());
     }
 
     @Test

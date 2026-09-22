@@ -296,6 +296,36 @@ public class VacantesPanelController {
         servicio.desarchivar(permisos.actual(), id);
     }
 
+    /**
+     * Eliminar: la vacante que no debió existir se retira de todas las pantallas.
+     *
+     * <p><b>{@code DELETE} sobre la vacante, y no otro sub-recurso como el archivo.</b> Lo
+     * que se retira aquí es la convocatoria entera, no una marca suya: archivar y desarchivar
+     * son el {@code POST} y el {@code DELETE} de {@code /archivo} precisamente porque lo que
+     * se pone y se quita es esa marca. Aquí el recurso que deja de estar disponible es la
+     * vacante.
+     *
+     * <p><b>Con cuerpo, porque el motivo es obligatorio.</b> Un {@code DELETE} suele no
+     * llevarlo, y aquí lo lleva por lo mismo que el cambio de sueldo: esta acción cierra las
+     * postulaciones de otras personas y no se deshace desde el panel, así que la auditoría
+     * tiene que poder contestar por qué. Sin motivo —o con espacios— es un 400, aunque el
+     * botón del panel esté apagado: el panel es un cliente más del API.
+     *
+     * <p>Permiso propio, {@code eliminar_vacante}, y no el de cerrar. Fuera del alcance del
+     * rol contesta 404 y no 403, como todo el panel. Repetirlo sobre una ya eliminada
+     * contesta 404 sin volver a cerrar ni avisar a nadie.
+     */
+    @DeleteMapping("/vacantes/{id}")
+    @PreAuthorize("@permisos.tiene('eliminar_vacante')")
+    @Operation(summary = "Eliminar una vacante por borrado lógico, con motivo obligatorio. "
+            + "Cierra sus postulaciones en carrera avisándolas por la campana del portal —sin "
+            + "correo—, devuelve su solicitud a ABIERTA y la retira del panel, del portal, de "
+            + "los rankings y de los procesos automáticos. No se deshace desde el panel")
+    public VacanteEliminadaResponse eliminar(@PathVariable Long id,
+                                             @Valid @RequestBody EliminarVacante datos) {
+        return servicio.eliminar(permisos.actual(), id, datos);
+    }
+
     // ---------- Requisitos objetivos ----------
 
     @GetMapping("/vacantes/{id}/requisitos")

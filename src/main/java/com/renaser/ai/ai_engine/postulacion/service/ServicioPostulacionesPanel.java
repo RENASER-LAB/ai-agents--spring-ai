@@ -36,6 +36,17 @@ public interface ServicioPostulacionesPanel {
     ContactoDelCandidato corregirContacto(ContextoUsuario quien, Long postulacionId,
                                           CorregirContacto datos);
 
+    /**
+     * El enlace para que el candidato de esta postulación entre al portal sin contraseña.
+     *
+     * <p>Pasa por el mismo guardián que el resto de escrituras sobre una postulación: que sea
+     * de esta empresa, que el alcance de {@code mover_postulacion} llegue a ella y que su
+     * vacante siga existiendo —una eliminada contesta 404 (V60)—. Antes el controlador
+     * llamaba directo al generador, que busca la postulación por id suelto y no preguntaba
+     * ninguna de las tres cosas.
+     */
+    ServicioEnlaceAcceso.EnlaceGenerado enlaceDeAcceso(ContextoUsuario quien, Long postulacionId);
+
     byte[] descargarArchivo(ContextoUsuario quien, Long archivoId, StringBuilder nombreSalida);
 
     /**

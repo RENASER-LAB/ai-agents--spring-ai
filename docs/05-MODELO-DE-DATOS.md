@@ -51,7 +51,7 @@ lados](EL-SUELDO-DE-LOS-DOS-LADOS.md).
 
 La `V56` (14/09/2026) le da al portal **una campana**: la tabla `aviso_portal` guarda lo que pasó
 mientras el candidato no estaba, con su estado de leído. Nace con un solo tipo de aviso —el cambio
-de sueldo de la V55— y está hecha para los que vengan; la V58 suma el segundo.
+de sueldo de la V55— y está hecha para los que vengan; la V58 suma el segundo y la V60 el tercero.
 
 La `V37` convierte el esquema en **multiempresa**: `organizacion.es_plataforma` marca a la
 dueña de la plataforma (solo una puede serlo) y reemplaza al código `'RENASER'` que estaba
@@ -96,6 +96,20 @@ un estado que no les dice nada, perdiendo además cómo terminó la vacante— y
 quitar la fecha la devuelve a la lista sin reabrir ninguna postulación. Trae su CHECK (solo se
 archiva una `CERRADA`) y un índice parcial para la lista habitual; ninguna vacante existente
 queda archivada. Ver `vacante` en el [diccionario de datos](07-DICCIONARIO-DE-DATOS.md).
+
+La `V60` (21/09/2026) es el **borrado lógico de la vacante**, y tampoco borra filas: añade
+`vacante.eliminada_en`, una fecha como la del archivo. Con ella puesta, la vacante sale del panel,
+del portal, de los rankings, de las exportaciones, de la simulación y de los procesos automáticos,
+pero sus postulaciones, transiciones, notas, currículums y correos siguen enteros —y el borrado de
+datos personales las sigue alcanzando—, y quién la eliminó y por qué queda en `auditoria` (acción
+`eliminar_vacante`). **Sin CHECK a propósito**: se elimina
+en cualquier estado, archivada incluida, y el CHECK de la `V59` sigue igual. Sustituye el índice
+parcial de la lista habitual por `ix_vacante_lista_habitual` (sin archivar **y** sin eliminar) y
+añade `ix_vacante_archivadas_vivas` para Archivadas. Suma el motivo de cierre
+`VACANTE_ELIMINADA` al CHECK de `postulacion.motivo_cierre`, el tipo de aviso
+`VACANTE_ELIMINADA` —solo en el comentario de `aviso_portal.tipo`, que es texto libre— y el
+permiso `eliminar_vacante`. Ninguna vacante existente queda eliminada. Restaurar una es quitar
+la fecha a mano en la base: no hay vuelta desde el panel.
 
 La `V54` (14/09/2026) **no añade ninguna tabla y cambia quién firma qué**. Hasta ella había dos
 tipos de texto —`PROCESO` y `FUTUROS_CONTACTOS`— y el de la cuenta usaba el primero, que habla de
@@ -609,7 +623,7 @@ agente que la produjo.
 | `familia` | Las siete familias de trabajo | codigo, nombre |
 | `familia_afin` | Qué familias se parecen lo bastante para reutilizar evaluaciones | familia_codigo, familia_afin_codigo |
 | `puesto` | El catálogo de puestos, con su nivel y su familia | organizacion_id, codigo, nombre, nivel_puesto_codigo, familia_codigo |
-| `vacante` | Una convocatoria concreta | organizacion_id, solicitud_talento_id, puesto_id, titulo, descripcion, tipo_cierre, plazas, cierra_en, estado, version_pesos_id, version_plantilla_prueba_id, plantilla_evaluacion_id, responsable_usuario_id, remuneracion_tipo, remuneracion_min, remuneracion_max, remuneracion_moneda, remuneracion_actualizada_en |
+| `vacante` | Una convocatoria concreta | organizacion_id, solicitud_talento_id, puesto_id, titulo, descripcion, tipo_cierre, plazas, cierra_en, estado, version_pesos_id, version_plantilla_prueba_id, plantilla_evaluacion_id, responsable_usuario_id, remuneracion_tipo, remuneracion_min, remuneracion_max, remuneracion_moneda, remuneracion_actualizada_en, archivada_en, eliminada_en |
 | `requisito_objetivo` | Lo único que puede detener una postulación sin que intervenga nadie | vacante_id, descripcion, regla, es_activo |
 | `barrera_critica` | Lo que ningún promedio alto compensa, definido por vacante | vacante_id, descripcion, es_activa |
 | `evaluador_estandar` | Quién revisa que la urgencia no baje el nivel, en esta vacante | vacante_id, usuario_id, puede_bloquear, asignado_por_usuario_id |
@@ -1089,7 +1103,9 @@ de postulaciones se veía igual el día que todo seguía igual y el día que le 
 Guarda el texto ya armado por la misma razón que el correo. **Desde la `V58` es el único canal de
 lo que cambia en una vacante**, con dos tipos: `REMUNERACION_ACTUALIZADA` (el sueldo cambiado
 desde su tarjeta) y `VACANTE_ACTUALIZADA` (la vacante corregida con el formulario, un solo aviso
-por guardado). La tabla está hecha para los que vengan —«avanzaste de etapa», «tienes una prueba
+por guardado). La `V60` suma `VACANTE_ELIMINADA`: la empresa retiró la vacante y la postulación
+quedó cerrada; es el único que **no enlaza** a ninguna parte, y los avisos anteriores de una
+vacante eliminada se siguen enseñando, sin enlace. La tabla está hecha para los que vengan —«avanzaste de etapa», «tienes una prueba
 por rendir», «te queda un día»—, que hoy existen solo como correos que salen y no vuelven.
 
 La base guarda la ruta del archivo, nunca el archivo. Así los entregables pesados —vídeos,

@@ -35,6 +35,18 @@ public class AvisoPortal {
      */
     public static final String VACANTE_ACTUALIZADA = "VACANTE_ACTUALIZADA";
 
+    /**
+     * La empresa retiró la vacante y la postulación quedó cerrada (V60).
+     *
+     * <p>⚠️ <b>El único que no enlaza a ninguna parte.</b> El proceso al que llevaría ya no
+     * se puede abrir —la vacante no existe para el portal—, y un aviso que termina en un 404
+     * hace creer al candidato que se rompió algo suyo justo cuando acaba de perder el puesto
+     * por algo que no hizo. Por eso se publica con {@code postulacionId} y {@code vacanteId}
+     * vacíos, y por eso los avisos <b>anteriores</b> de esa misma vacante también dejan de
+     * enlazar cuando se leen.
+     */
+    public static final String VACANTE_ELIMINADA = "VACANTE_ELIMINADA";
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;

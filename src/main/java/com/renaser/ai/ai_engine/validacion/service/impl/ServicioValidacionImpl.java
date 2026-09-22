@@ -76,7 +76,7 @@ public class ServicioValidacionImpl implements ServicioValidacion {
     @Override
     @Transactional
     public void habilitar(ContextoUsuario quien, Long postulacionId, HabilitarValidacion datos) {
-        laVisible(quien, postulacionId, "habilitar_validacion");
+        laQueSePuedeTocar(quien, postulacionId, "habilitar_validacion");
         Validacion validacion = la(postulacionId);
         if (!"POR_HABILITAR".equals(validacion.getEstado())) {
             throw new IllegalStateException("Este periodo ya está " + validacion.getEstado());
@@ -107,7 +107,7 @@ public class ServicioValidacionImpl implements ServicioValidacion {
     @Override
     @Transactional
     public void iniciar(ContextoUsuario quien, Long postulacionId) {
-        Postulacion postulacion = laVisible(quien, postulacionId, "iniciar_validacion");
+        Postulacion postulacion = laQueSePuedeTocar(quien, postulacionId, "iniciar_validacion");
         Validacion validacion = la(postulacionId);
         if (!"POR_HABILITAR".equals(validacion.getEstado())) {
             throw new IllegalStateException("Este periodo ya está " + validacion.getEstado());
@@ -141,7 +141,7 @@ public class ServicioValidacionImpl implements ServicioValidacion {
     @Transactional
     public void completarMetrica(ContextoUsuario quien, Long postulacionId, Long criterioId,
                                  CompletarMetrica datos) {
-        laVisible(quien, postulacionId, "completar_metricas_validacion");
+        laQueSePuedeTocar(quien, postulacionId, "completar_metricas_validacion");
         exigirRolQueCompleta(quien);
 
         List<Criterio> rubrica = calificacion.rubricaGlobalDe(ETAPA);
@@ -152,7 +152,7 @@ public class ServicioValidacionImpl implements ServicioValidacion {
     @Override
     @Transactional
     public void cerrar(ContextoUsuario quien, Long postulacionId) {
-        Postulacion postulacion = laVisible(quien, postulacionId, "cerrar_validacion");
+        Postulacion postulacion = laQueSePuedeTocar(quien, postulacionId, "cerrar_validacion");
         Validacion validacion = la(postulacionId);
 
         calificacion.calcularNotaEtapa(postulacion, ETAPA, calificacion.rubricaGlobalDe(ETAPA));
@@ -229,5 +229,18 @@ public class ServicioValidacionImpl implements ServicioValidacion {
 
     private Postulacion laVisible(ContextoUsuario quien, Long postulacionId, String permiso) {
         return alcance.laPostulacionVisible(quien, postulacionId, permiso);
+    }
+
+    /**
+     * La postulación sobre la que se va a <b>escribir</b>: visible y de una vacante que sigue
+     * existiendo. Una eliminada contesta 404 (V60); ver
+     * {@link AlcanceSobreLaVacante#exigirQueSuVacanteSigaExistiendo}. Las lecturas siguen por
+     * {@code laVisible}.
+     */
+    private Postulacion laQueSePuedeTocar(ContextoUsuario quien, Long postulacionId,
+                                          String permiso) {
+        Postulacion postulacion = laVisible(quien, postulacionId, permiso);
+        alcance.exigirQueSuVacanteSigaExistiendo(postulacion);
+        return postulacion;
     }
 }

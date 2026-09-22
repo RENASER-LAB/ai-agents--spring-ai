@@ -57,7 +57,7 @@ class ServicioFichaVacanteImplTest {
             5L, 6L, ORG, "EQUIPO", List.of(1L), Map.of("editar_vacante", "TODO"));
 
     private void conVacante() {
-        when(vacantes.findByIdAndOrganizacionId(VACANTE, ORG)).thenReturn(Optional.of(
+        when(vacantes.findByIdAndOrganizacionIdAndEliminadaEnIsNull(VACANTE, ORG)).thenReturn(Optional.of(
                 Vacante.builder().id(VACANTE).organizacionId(ORG).estado("BORRADOR").build()));
     }
 
@@ -167,7 +167,7 @@ class ServicioFichaVacanteImplTest {
         @Test
         @DisplayName("una vacante cerrada no cambia su ficha")
         void cerradaNoSeToca() {
-            when(vacantes.findByIdAndOrganizacionId(VACANTE, ORG)).thenReturn(Optional.of(
+            when(vacantes.findByIdAndOrganizacionIdAndEliminadaEnIsNull(VACANTE, ORG)).thenReturn(Optional.of(
                     Vacante.builder().id(VACANTE).organizacionId(ORG).estado("CERRADA").build()));
 
             assertThatThrownBy(() -> servicio.guardar(quien, VACANTE, completa()))
@@ -177,7 +177,7 @@ class ServicioFichaVacanteImplTest {
         @Test
         @DisplayName("una vacante de otra organización ni aparece")
         void ajenaNoAparece() {
-            when(vacantes.findByIdAndOrganizacionId(VACANTE, ORG)).thenReturn(Optional.empty());
+            when(vacantes.findByIdAndOrganizacionIdAndEliminadaEnIsNull(VACANTE, ORG)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> servicio.guardar(quien, VACANTE, completa()))
                     .isInstanceOf(ResourceNotFoundException.class);

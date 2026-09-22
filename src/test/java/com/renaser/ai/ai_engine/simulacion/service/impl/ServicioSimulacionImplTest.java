@@ -39,6 +39,7 @@ import com.renaser.ai.ai_engine.vacante.repository.VacanteRepository;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -1122,6 +1123,139 @@ class ServicioSimulacionImplTest {
 
             // Y el permiso ni se consulta: primero es si la sesión existe para este usuario.
             verifyNoInteractions(inscripciones, nombres);
+        }
+    }
+
+    // ============ Una vacante eliminada (V60) ============
+
+    /**
+     * El enlace de la simulación de una vacante que se eliminó.
+     *
+     * <p>La vacante ya salía de la selección de vacantes de las sesiones, pero el candidato
+     * conserva el enlace de su proceso: sin la guarda seguía viendo las fechas de su vacante,
+     * podía reservar plaza y veía «mi sesión» de un proceso que ya no existe. Mismo hueco que
+     * QA-830D-C2-1 encontró en la prueba del puesto.
+     */
+    @Nested
+    @DisplayName("Si su vacante se eliminó, su simulación ya no existe para el candidato")
+    class DeUnaVacanteEliminada {
+
+        private final ContextoUsuario candidato = new ContextoUsuario(
+                USUARIO, 3L, ORGANIZACION, "CANDIDATO", List.of(), Map.of());
+
+        @BeforeEach
+        void suVacanteSeElimino() {
+            when(postulaciones.findByUuid(UUID_POSTULACION)).thenReturn(Optional.of(
+                    Postulacion.builder().id(POSTULACION).uuid(UUID_POSTULACION)
+                            .usuarioId(USUARIO).organizacionId(ORGANIZACION).vacanteId(VACANTE)
+                            .estadoCodigo(PUEDE_ELEGIR).build()));
+            when(vacantes.existsByIdAndEliminadaEnIsNotNull(VACANTE)).thenReturn(true);
+        }
+
+        private void contestaComoSuProceso(
+                org.assertj.core.api.ThrowableAssert.ThrowingCallable accion) {
+            assertThatThrownBy(accion)
+                    .isInstanceOf(ResourceNotFoundException.class)
+                    .hasMessageContaining("Postulación")
+                    .hasMessageContaining(UUID_POSTULACION.toString());
+        }
+
+        @Test
+        @DisplayName("sus fechas, inscribirse y «mi sesión» contestan 404, y no se reserva plaza")
+        void ningunaDeSusPuertas() {
+            contestaComoSuProceso(() -> servicio.sesionesDisponibles(candidato, UUID_POSTULACION));
+            contestaComoSuProceso(() -> servicio.inscribirse(candidato, UUID_POSTULACION, SESION));
+            contestaComoSuProceso(() -> servicio.miSesion(candidato, UUID_POSTULACION));
+
+            verifyNoInteractions(sesiones, inscripciones, maquina);
+        }
+    }
+
+    // ============ Una vacante eliminada, desde el panel (V60) ============
+
+    /**
+     * Las escrituras de la simulación sobre alguien cuya vacante se eliminó: decidir sobre
+     * un ausente, la conversación final y, por su inscripción, marcar eventos y asistencia.
+     * Todas contestan 404 como la vacante, y ninguna transiciona, guarda ni encola.
+     */
+    @org.junit.jupiter.api.Nested
+    @DisplayName("Si su vacante se eliminó, nada de su simulación se escribe desde el panel")
+    class DesdeElPanelDeUnaVacanteEliminada {
+
+        @BeforeEach
+        void suVacanteSeElimino() {
+            org.mockito.Mockito.doThrow(new ResourceNotFoundException("Vacante", "id", VACANTE))
+                    .when(alcanceVacante).exigirQueSuVacanteSigaExistiendo(any());
+        }
+
+        private void contestaComoLaVacante(
+                org.assertj.core.api.ThrowableAssert.ThrowingCallable accion) {
+            assertThatThrownBy(accion)
+                    .isInstanceOf(ResourceNotFoundException.class)
+                    .hasMessageContaining("Vacante")
+                    .hasMessageContaining(String.valueOf(VACANTE));
+        }
+
+        @Test
+        @DisplayName("decidir sobre un ausente contesta 404 y no lo mueve ni le busca fecha")
+        void decidirSobreUnAusente() {
+            hayPostulacion(ESPERANDO, "decidir_sobre_ausente");
+
+            contestaComoLaVacante(() -> servicio.decidirSobreAusente(QUIEN, POSTULACION,
+                    new DecidirSobreAusente("CERRAR", "No vino")));
+            verifyNoInteractions(maquina, disponibilidad, auditoria);
+        }
+
+        @Test
+        @DisplayName("la conversación final: registrar, responder y generar preguntas contestan 404")
+        void laConversacionFinal() {
+            hayPostulacion(PUEDE_ELEGIR, "hacer_conversacion_final");
+            when(preguntas.findById(5L)).thenReturn(Optional.of(PreguntaGenerada.builder()
+                    .id(5L).postulacionId(POSTULACION).texto("¿Por qué?").orden(1).build()));
+
+            contestaComoLaVacante(() -> servicio.registrarPregunta(QUIEN, POSTULACION,
+                    new RegistrarPregunta("¿Qué harías distinto?", null)));
+            contestaComoLaVacante(() -> servicio.responderPregunta(QUIEN, 5L,
+                    new com.renaser.ai.ai_engine.simulacion.dto.DtosSimulacion.ResponderPregunta(
+                            "Lo haría antes", true, null)));
+            contestaComoLaVacante(() -> servicio.generarPreguntas(QUIEN, POSTULACION));
+
+            verify(preguntas, never()).save(any());
+            verifyNoInteractions(cola, alertas);
+        }
+
+        @Test
+        @DisplayName("marcar su asistencia contesta 404 y no la transiciona")
+        void marcarSuAsistencia() {
+            hayInscripcionDe(postulacionEn(PUEDE_ELEGIR));
+            alcanceDeAsistencia();
+
+            contestaComoLaVacante(() -> servicio.marcarAsistencia(QUIEN, INSCRIPCION,
+                    new MarcarAsistencia(true)));
+            verify(inscripciones, never()).save(any());
+            verifyNoInteractions(maquina, auditoria);
+        }
+
+        @Test
+        @DisplayName("marcar un evento de su sesión contesta 404 y no deja marca")
+        void marcarUnEvento() {
+            hayInscripcionDe(postulacionEn(PUEDE_ELEGIR));
+            when(permisos.alcanceDe("marcar_eventos_simulacion"))
+                    .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.TODO, USUARIO));
+            // Quien marca es facilitador: el 404 tiene que salir de la vacante, no del rol.
+            when(parametros.lista(eq(ORGANIZACION), eq("roles_facilitador_simulacion"), any()))
+                    .thenReturn(List.of("TALENTO"));
+            when(usuarioRoles.findByUsuarioId(USUARIO)).thenReturn(List.of(
+                    com.renaser.ai.ai_engine.usuario.entity.UsuarioRol.builder()
+                            .usuarioId(USUARIO).rolId(2L).build()));
+            when(roles.findAllById(List.of(2L))).thenReturn(List.of(
+                    com.renaser.ai.ai_engine.usuario.entity.Rol.builder()
+                            .id(2L).codigo("TALENTO").build()));
+
+            contestaComoLaVacante(() -> servicio.marcarEvento(QUIEN, INSCRIPCION,
+                    new com.renaser.ai.ai_engine.simulacion.dto.DtosSimulacion.MarcarEvento(
+                            "INICIO", null)));
+            verifyNoInteractions(marcas, responsables);
         }
     }
 }

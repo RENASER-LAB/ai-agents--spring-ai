@@ -1,7 +1,7 @@
 # Diccionario de datos
 
 Sistema de selección de personal — Renaser Consulting
-Versión 2.8 · 2026-09-20 · Puesto al día con las migraciones hasta la `V58` (la V49 y la V50 solo siembran pesos; la V51 trae la tabla `lectura_cv_perfil` y los archivos del perfil; la V52 y la V53 no crean tablas; la V55 pone el sueldo en la vacante y la pretensión en la postulación; la V56 trae la tabla `aviso_portal`; la V57 no crea tablas, solo siembra los precios de los dos modelos de DeepSeek; la V58 no crea tablas: suma el aviso `VACANTE_ACTUALIZADA` y apaga el correo `REMUNERACION_ACTUALIZADA`)
+Versión 2.9 · 2026-09-22 · Puesto al día con las migraciones hasta la `V60` (la V49 y la V50 solo siembran pesos; la V51 trae la tabla `lectura_cv_perfil` y los archivos del perfil; la V52 y la V53 no crean tablas; la V55 pone el sueldo en la vacante y la pretensión en la postulación; la V56 trae la tabla `aviso_portal`; la V57 no crea tablas, solo siembra los precios de los dos modelos de DeepSeek; la V58 no crea tablas: suma el aviso `VACANTE_ACTUALIZADA` y apaga el correo `REMUNERACION_ACTUALIZADA`; la V59 añade `vacante.archivada_en`; la V60 añade `vacante.eliminada_en` —el borrado lógico—, el motivo de cierre y el tipo de aviso `VACANTE_ELIMINADA`, y el permiso `eliminar_vacante`)
 
 Cada tabla con todas sus columnas, tipos y claves. **Este documento se consulta**, no se lee de
 corrido: es la base para escribir las migraciones de Flyway.
@@ -485,7 +485,7 @@ Por qué hace falta contratar, antes de que exista la vacante.
 | `organizacion_id` | bigint | sí | |
 | `origen` | text | sí | `DIRECTA` o `DETECTADA` |
 | `urgencia` | text | sí | `NORMAL`, `PRIORITARIA` o `URGENTE` |
-| `estado` | text | sí | `BORRADOR`, `ABIERTA`, `CON_VACANTE`, `RECHAZADA`, `ARCHIVADA` |
+| `estado` | text | sí | `BORRADOR`, `ABIERTA`, `CON_VACANTE`, `RECHAZADA`, `ARCHIVADA`. Eliminar su vacante (`V60`) la devuelve de `CON_VACANTE` a `ABIERTA`, auditado como `liberar_solicitud`; si ya no estaba en `CON_VACANTE`, no se toca |
 | `area_id` | bigint | sí | |
 | `nivel_puesto_codigo` | text | no | |
 | `familia_codigo` | text | no | |
@@ -654,6 +654,7 @@ Una convocatoria concreta.
 | `publicada_en` | timestamptz | no | |
 | `cerrada_en` | timestamptz | no | |
 | `archivada_en` | timestamptz | no | (`V59`) Cuándo se retiró de la lista habitual del panel. Vacío = no archivada, y es lo que trae por defecto `/admin`. **No es un estado**: la vacante sigue `CERRADA` y sus postulaciones quedan como estaban. Desarchivar la vuelve a dejar vacía. Quién la archivó no está aquí: eso lo guarda `auditoria`, con persona, fecha y acción |
+| `eliminada_en` | timestamptz | no | (`V60`) Cuándo se eliminó por **borrado lógico**. Vacío = existe, como todas las anteriores a la `V60`. Con fecha, deja de salir en el panel (lista habitual, Archivadas y su contador), el tablón, «Mis procesos», los rankings, las exportaciones, la selección de sesiones de simulación y los procesos automáticos, y consultarla por id responde 404. **No se borra ninguna fila**. Persona y motivo van en `auditoria`, acción `eliminar_vacante`. No hay vuelta desde el panel: soporte la restaura vaciando la fecha en la base |
 
 **Clave primaria:** `id`
 **Apunta a:** `organizacion`, `solicitud_talento`, `puesto`, `version_pesos`,
@@ -684,10 +685,20 @@ después.
 dice también la base: archivar una publicada la sacaría de la lista del panel dejándola viva en
 el portal, o sea recibiendo postulaciones que nadie mira. «Sin nadie en carrera» es la otra
 mitad de la regla y **no** se comprueba aquí —depende de `postulacion` y cambia con cada
-movimiento—: vive en `ServicioVacantesPanelImpl`. El índice **parcial**
-`ix_vacante_sin_archivar` (`organizacion_id`, `creado_en DESC`) `WHERE archivada_en IS NULL` es
-el de la pantalla que más se abre; no es único, así que archivar no tiene ningún orden de
+movimiento—: vive en `ServicioVacantesPanelImpl`. La eliminada sigue sujeta a este CHECK: una
+archivada tiene que estar `CERRADA`, eliminada o no.
+
+**Índices parciales de las dos listas (`V60`).** `ix_vacante_lista_habitual` (`organizacion_id`,
+`creado_en DESC`) `WHERE archivada_en IS NULL AND eliminada_en IS NULL` es el de la pantalla que
+más se abre y sustituye al `ix_vacante_sin_archivar` de la `V59`; `ix_vacante_archivadas_vivas`
+(`organizacion_id`, `archivada_en DESC`) `WHERE archivada_en IS NOT NULL AND eliminada_en IS
+NULL` es el de Archivadas. Ninguno es único, así que archivar o eliminar no tiene ningún orden de
 escritura que respetar.
+
+**`eliminada_en` no lleva CHECK, a propósito** (`V60`): una vacante mal creada se elimina esté
+donde esté —borrador, publicada, cerrada o archivada—. Quién puede hacerlo lo decide el permiso
+`eliminar_vacante`. Dos eliminaciones a la vez no duplican nada: la marca se escribe con un
+`UPDATE` condicional (`... WHERE eliminada_en IS NULL`) y la segunda responde 404.
 
 Cerrar una vacante **detiene las postulaciones nuevas pero no cierra las que van a mitad**.
 
@@ -913,7 +924,11 @@ adivinar cuántas postulaciones hay.
 | Estado | Motivos |
 |---|---|
 | `NO_CONTINUA` | `REQUISITO_OBJETIVO`, `BARRERA_CRITICA`, `DECISION_ROJA`, `DECISION_PERSONA`, `PASA_A_RESERVA` |
-| `CERRADA` | `INACTIVIDAD`, `CIERRE_MANUAL`, `RETIRO_CANDIDATO`, `PLAZO_VENCIDO`, `BORRADO_DATOS` |
+| `CERRADA` | `INACTIVIDAD`, `CIERRE_MANUAL`, `RETIRO_CANDIDATO`, `PLAZO_VENCIDO`, `BORRADO_DATOS`, `VACANTE_ELIMINADA` |
+
+`VACANTE_ELIMINADA` (`V60`) no es un `CIERRE_MANUAL`, aunque también lo decide una persona: es el
+cierre que provoca eliminar la vacante entera, y se separa para que «¿por qué se cerró?» pueda
+contestar «porque se retiró la convocatoria» en cualquier informe de motivos.
 
 `movido_en` es lo que alimenta «cuántos días lleva sin avanzar» y el cierre por inactividad.
 
@@ -2570,7 +2585,7 @@ leído.
 | `id` | bigint | sí | Clave |
 | `usuario_id` | bigint | sí | A quién. **Del usuario y no de la persona**: la campana es de quien entra al portal, y es el usuario el que tiene sesión |
 | `organizacion_id` | bigint | sí | De qué empresa viene. La misma regla que la postulación: el aviso nace en la organización **de la vacante**, que es la que hizo algo que contar |
-| `tipo` | text | sí | Qué clase de noticia es. `REMUNERACION_ACTUALIZADA` (`V55`): el sueldo cambiado desde la tarjeta del detalle. `VACANTE_ACTUALIZADA` (`V58`): la vacante corregida con el formulario, **uno solo por guardado** con todo lo que cambió, sueldo incluido. Sin CHECK: un tipo nuevo no pide migración |
+| `tipo` | text | sí | Qué clase de noticia es. `REMUNERACION_ACTUALIZADA` (`V55`): el sueldo cambiado desde la tarjeta del detalle. `VACANTE_ACTUALIZADA` (`V58`): la vacante corregida con el formulario, **uno solo por guardado** con todo lo que cambió, sueldo incluido. `VACANTE_ELIMINADA` (`V60`): la empresa retiró la vacante y la postulación quedó cerrada; **es el único sin enlace**, con `postulacion_id` y `vacante_id` vacíos. Sin CHECK: un tipo nuevo no pide migración |
 | `titulo` | text | sí | El texto **ya armado** |
 | `cuerpo` | text | sí | El texto **ya armado** |
 | `postulacion_id` | bigint | no | A dónde lleva al pulsarlo |

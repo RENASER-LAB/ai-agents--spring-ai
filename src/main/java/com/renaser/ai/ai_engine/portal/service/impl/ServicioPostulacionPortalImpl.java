@@ -38,6 +38,7 @@ import com.renaser.ai.ai_engine.vacante.repository.PuestoRepository;
 import com.renaser.ai.ai_engine.vacante.repository.RequisitoObjetivoRepository;
 import com.renaser.ai.ai_engine.vacante.repository.VacanteRepository;
 import com.renaser.ai.ai_engine.vacante.service.Remuneracion;
+import com.renaser.ai.ai_engine.vacante.service.VacanteEliminada;
 import com.renaser.ai.ai_engine.notificacion.service.ServicioAvisosPortal;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -111,8 +112,28 @@ public class ServicioPostulacionPortalImpl implements ServicioPostulacionPortal 
         // Con el mismo colador del tablón: la vacante de una empresa suspendida no
         // recibe postulaciones ni con el id en la mano (pieza F) — esconderla de la
         // lista y aceptarle un POST directo sería un tablón de mentira.
+        //
+        // ⚠️ Y el colador de la V60, que es el que cierra el caso del formulario abierto
+        // desde antes: alguien abrió «Postular» con la vacante viva, el equipo la eliminó
+        // mientras escribía, y al enviar su POST sigue sabiendo la URL. Sin esta línea se le
+        // crearía una postulación a una convocatoria que ya no existe —y que además nadie
+        // volvería a mirar, porque no sale en ninguna bandeja.
+        //
+        // ⚠️⚠️ Y el colador NO basta con mirarlo: hay que sujetar la vacante mientras dura
+        // esto. Postular no es una escritura corta —sube el currículum, firma el
+        // consentimiento, manda a leer el CV—, y una eliminación cabe entera en ese hueco:
+        // la que elimina lista a quién cerrar antes de que esta postulación exista, y esta
+        // confirma sobre lo que leyó al empezar. Quedaba una postulación abierta sobre una
+        // vacante retirada, sin cierre y sin aviso, que ni el candidato ni el panel pueden
+        // ver. El cerrojo compartido de bloquearSiSigueViva ordena las dos peticiones sin
+        // ponerle cola a quienes postulan a la vez; ver su comentario para los dos
+        // desenlaces posibles.
+        if (vacantes.bloquearSiSigueViva(vacanteId).isEmpty()) {
+            throw new ResourceNotFoundException("Vacante", "id", vacanteId);
+        }
         Vacante vacante = vacantes.findById(vacanteId)
                 .filter(v -> "PUBLICADA".equals(v.getEstado()))
+                .filter(v -> v.getEliminadaEn() == null)
                 .orElseThrow(() -> new ResourceNotFoundException("Vacante", "id", vacanteId));
         // La empresa se resuelve una vez y se usa dos: para el colador de la suspendida y
         // para el nombre que va dentro del texto que se firma.
@@ -352,7 +373,8 @@ public class ServicioPostulacionPortalImpl implements ServicioPostulacionPortal 
 
     @Override
     public List<MiPostulacion> misPostulaciones(ContextoUsuario quien) {
-        List<Postulacion> mias = postulaciones.findByUsuarioIdOrderByCreadoEnDesc(quien.usuarioId());
+        List<Postulacion> todasLasMias =
+                postulaciones.findByUsuarioIdOrderByCreadoEnDesc(quien.usuarioId());
 
         // Son pocas —las de una sola persona—, pero el catálogo de estados son dieciocho filas
         // fijas y se estaba pidiendo una por postulación. Traerlo entero cuesta lo mismo que
@@ -360,10 +382,26 @@ public class ServicioPostulacionPortalImpl implements ServicioPostulacionPortal 
         Map<String, String> nombreEstado = estados.findAllByOrderByOrden().stream()
                 .collect(Collectors.toMap(EstadoPostulacion::getCodigo,
                         EstadoPostulacion::getNombre, (a, b) -> a));
-        List<Long> vacanteIds = mias.stream().map(Postulacion::getVacanteId)
+        List<Long> vacanteIds = todasLasMias.stream().map(Postulacion::getVacanteId)
                 .filter(Objects::nonNull).distinct().toList();
+        /*
+         * ⚠️ Las vacantes ELIMINADAS ni siquiera entran en el mapa (V60), y con ellas se van
+         * sus procesos de esta lista.
+         *
+         * La regla es la de la spec: el proceso deja de verse en el portal junto con la
+         * vacante. No se borra nada —la postulación sigue en la base, con su historial y su
+         * cierre anotado—, pero a esta persona ya se le contó por la campana que la empresa
+         * retiró el puesto, y dejarle la fila la mandaría a un proceso que contesta 404.
+         *
+         * Se recorta la LISTA y no solo el título: una fila sin nombre de vacante se lee como
+         * un fallo de la pantalla, no como un puesto retirado.
+         */
         Map<Long, Vacante> porVacante = vacantes.findAllById(vacanteIds).stream()
+                .filter(v -> v.getEliminadaEn() == null)
                 .collect(Collectors.toMap(Vacante::getId, Function.identity()));
+        List<Postulacion> mias = todasLasMias.stream()
+                .filter(p -> p.getVacanteId() != null && porVacante.containsKey(p.getVacanteId()))
+                .toList();
         // El nombre de cada empresa, por lo mismo que en el tablón: esta lista mezcla los
         // procesos del candidato en todas las empresas y cada uno dice de quién es.
         Map<Long, String> nombrePorOrganizacion = nombresDeOrganizacion(
@@ -415,10 +453,25 @@ public class ServicioPostulacionPortalImpl implements ServicioPostulacionPortal 
                 .collect(Collectors.toMap(Organizacion::getId, Organizacion::getNombre));
     }
 
+    /**
+     * La postulación de quien pregunta, si su vacante sigue existiendo.
+     *
+     * <p>⚠️ <b>La segunda condición es de la V60.</b> El proceso deja de verse junto con la
+     * vacante, y eso tiene que valer también para el enlace directo: la dirección del proceso
+     * está en su navegador, en el correo que se le mandó y en los avisos viejos de su
+     * campana. Enseñarlo sería abrir la ficha de un puesto que el portal ya no reconoce; el
+     * portal traduce este 404 a «esta vacante ya no está disponible».
+     *
+     * <p>La pregunta es la de {@link VacanteEliminada#exigirQueSuProcesoSigaExistiendo}, la
+     * misma que hacen la evaluación, el cuestionario técnico, la prueba del puesto y la
+     * simulación: los enlaces de esas pantallas cuelgan del mismo código de postulación.
+     */
     private Postulacion laMia(ContextoUsuario quien, UUID uuid) {
-        return postulaciones.findByUuid(uuid)
+        Postulacion mia = postulaciones.findByUuid(uuid)
                 .filter(p -> p.getUsuarioId().equals(quien.usuarioId()))
                 .orElseThrow(() -> new ResourceNotFoundException("Postulación", "código", uuid));
+        VacanteEliminada.exigirQueSuProcesoSigaExistiendo(mia, vacantes);
+        return mia;
     }
 
     /** Una sola: la vacante y su estado se piden sueltos porque no hay tanda con la que ir. */
@@ -462,21 +515,68 @@ public class ServicioPostulacionPortalImpl implements ServicioPostulacionPortal 
         List<Long> postulacionIds = suyos.stream()
                 .map(com.renaser.ai.ai_engine.notificacion.entity.AvisoPortal::getPostulacionId)
                 .filter(Objects::nonNull).distinct().toList();
-        Map<Long, String> uuidPorId = postulacionIds.isEmpty() ? Map.of()
-                : postulaciones.findAllById(postulacionIds).stream()
-                        .collect(Collectors.toMap(Postulacion::getId,
-                                x -> x.getUuid().toString()));
+        List<Postulacion> deLosAvisos = postulacionIds.isEmpty() ? List.of()
+                : postulaciones.findAllById(postulacionIds);
+        Map<Long, String> uuidPorId = deLosAvisos.stream()
+                .collect(Collectors.toMap(Postulacion::getId, x -> x.getUuid().toString()));
+
+        /*
+         * Los avisos VIEJOS de una vacante eliminada se quedan, y dejan de llevar a ninguna
+         * parte (V60).
+         *
+         * Borrarlos sería reescribir lo que se le dijo a esa persona: «te cambiamos el
+         * sueldo» ocurrió, y el día que pregunte por qué le avisaron de algo que ya no existe
+         * la respuesta tiene que seguir ahí. Pero el enlace sí tiene que apagarse: llevaría
+         * al detalle de una vacante que el portal ya no reconoce, o a un proceso que contesta
+         * 404, y el candidato lo leería como que se rompió algo suyo.
+         *
+         * Se miran los DOS caminos porque los avisos no son iguales: unos traen la vacante
+         * (el cambio de convocatoria) y otros solo la postulación. De ahí se deduce la
+         * vacante de cada uno, y una sola consulta dice cuáles de ellas están retiradas.
+         */
+        Map<Long, Long> vacanteDeLaPostulacion = deLosAvisos.stream()
+                .filter(p -> p.getVacanteId() != null)
+                .collect(Collectors.toMap(Postulacion::getId, Postulacion::getVacanteId));
+        List<Long> vacantesDeLosAvisos = suyos.stream()
+                .map(a -> vacanteDeCadaAviso(a, vacanteDeLaPostulacion))
+                .filter(Objects::nonNull).distinct().toList();
+        Set<Long> retiradas = vacantesDeLosAvisos.isEmpty() ? Set.of()
+                : Set.copyOf(vacantes.idsEliminadasDe(vacantesDeLosAvisos));
 
         List<DtosPortal.AvisoDelPortal> lista = suyos.stream()
-                .map(a -> new DtosPortal.AvisoDelPortal(a.getId(), a.getTipo(), a.getTitulo(),
-                        a.getCuerpo(),
-                        a.getPostulacionId() == null ? null : uuidPorId.get(a.getPostulacionId()),
-                        a.getVacanteId(), a.getLeidoEn(), a.getCreadoEn()))
+                .map(a -> {
+                    Long suVacante = vacanteDeCadaAviso(a, vacanteDeLaPostulacion);
+                    boolean sinEnlace = suVacante != null && retiradas.contains(suVacante);
+                    return new DtosPortal.AvisoDelPortal(a.getId(), a.getTipo(), a.getTitulo(),
+                            a.getCuerpo(),
+                            sinEnlace || a.getPostulacionId() == null
+                                    ? null : uuidPorId.get(a.getPostulacionId()),
+                            sinEnlace ? null : a.getVacanteId(),
+                            a.getLeidoEn(), a.getCreadoEn());
+                })
                 .toList();
 
         // El contador sale de la consulta y no de contar la lista: la lista podría venir
         // recortada algún día, y entonces el punto diría un número menor que el real.
         return new DtosPortal.MisAvisos(avisos.sinLeer(quien.usuarioId()), lista);
+    }
+
+    /**
+     * De qué vacante habla un aviso: la suya, o la de su postulación.
+     *
+     * <p>Los avisos no son todos iguales —unos traen la vacante, otros solo la postulación, y
+     * el de la eliminación no trae ninguna de las dos—, así que preguntar solo por
+     * {@code vacanteId} dejaría enlazando la mitad de los avisos viejos de una vacante
+     * retirada.
+     */
+    private Long vacanteDeCadaAviso(
+            com.renaser.ai.ai_engine.notificacion.entity.AvisoPortal aviso,
+            Map<Long, Long> vacanteDeLaPostulacion) {
+        if (aviso.getVacanteId() != null) {
+            return aviso.getVacanteId();
+        }
+        return aviso.getPostulacionId() == null ? null
+                : vacanteDeLaPostulacion.get(aviso.getPostulacionId());
     }
 
     @Override

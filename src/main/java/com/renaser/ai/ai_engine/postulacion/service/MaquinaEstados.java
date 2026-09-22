@@ -46,6 +46,38 @@ public class MaquinaEstados {
     private static final List<String> MOMENTOS =
             List.of("POR_HABILITAR", "TURNO_CANDIDATO", "CALIFICANDO", "POR_CONFIRMAR");
 
+    /**
+     * Cómo se entera el candidato de esta transición. Tres casos y no dos.
+     *
+     * <p>Hasta la V60 esto era un booleano, y el booleano confundía dos cosas muy distintas
+     * bajo el mismo «no se avisa»: que el equipo decidiera <b>no contárselo</b> —porque ya
+     * habló con esa persona por otro lado— y que el correo no salga porque <b>la noticia va
+     * por otro canal</b>. La diferencia no es de matiz: al primero se le añade la coletilla
+     * «sin avisar al candidato» en el motivo que pinta el historial, y ponérsela al segundo
+     * deja escrito en la ficha que a alguien no se le dijo nada cuando sí se le dijo.
+     */
+    public enum AvisoDeLaTransicion {
+        /** El correo de siempre, que es lo que toca casi siempre. */
+        CORREO,
+        /**
+         * A propósito no se le cuenta nada, por ningún canal.
+         *
+         * <p>Queda marcado en el motivo y en la auditoría: quien abra esa postulación dentro
+         * de seis meses tiene que poder saber que nunca se le avisó.
+         */
+        NINGUNO,
+        /**
+         * Sin correo porque lo cuenta la campana del portal.
+         *
+         * <p>Es el cierre por vacante eliminada (V60): el correo se calla para no mandar un
+         * «tu postulación se cerró» genérico que no explica nada, y en su lugar sale un aviso
+         * propio —{@code VACANTE_ELIMINADA}— con lo que de verdad pasó. Sin coletilla,
+         * porque al candidato <b>sí</b> se le está contando; lo que de verdad llegó se sabe
+         * por el resultado de los avisos, que el panel cuenta aparte.
+         */
+        POR_LA_CAMPANA
+    }
+
     private final EstadoPostulacionRepository estados;
     private final PostulacionRepository postulaciones;
     private final TransicionEstadoRepository transiciones;
@@ -194,6 +226,22 @@ public class MaquinaEstados {
                              ContextoUsuario quien, String motivo,
                              boolean esSistema, boolean esPorLote, String motivoCierre,
                              boolean avisar) {
+        transicionar(postulacion, estadoNuevoCodigo, quien, motivo, esSistema, esPorLote,
+                motivoCierre, avisar ? AvisoDeLaTransicion.CORREO : AvisoDeLaTransicion.NINGUNO);
+    }
+
+    /**
+     * La firma completa: la misma transición diciendo <b>cómo</b> se entera el candidato.
+     *
+     * <p>Ver {@link AvisoDeLaTransicion}. Lo único que cambia entre los tres casos es el
+     * correo y lo que queda escrito sobre él; el estado, la transición guardada y la
+     * auditoría ocurren igual en los tres.
+     */
+    public void transicionar(Postulacion postulacion, String estadoNuevoCodigo,
+                             ContextoUsuario quien, String motivo,
+                             boolean esSistema, boolean esPorLote, String motivoCierre,
+                             AvisoDeLaTransicion aviso) {
+        boolean avisar = aviso == AvisoDeLaTransicion.CORREO;
         EstadoPostulacion nuevo = estados.findById(estadoNuevoCodigo)
                 .orElseThrow(() -> new IllegalArgumentException("No existe el estado " + estadoNuevoCodigo));
 
@@ -223,7 +271,13 @@ public class MaquinaEstados {
         // ficha pinta: `transicion_estado` no tiene columna para esto y una columna nueva es
         // una migración. Separada con « · » y al final, para que se lea como lo que es —un
         // hecho añadido— y no como parte de lo que escribió la persona.
-        String motivoGuardado = avisar || motivo == null || motivo.isBlank()
+        //
+        // ⚠️ Solo la lleva NINGUNO. Callar el correo porque la noticia sale por la campana
+        // (V60) no es «no avisar»: poner ahí la coletilla dejaría escrito en el historial de
+        // la ficha que a esa persona no se le dijo nada, cuando sí se le dijo y por un canal
+        // que además se queda quieto hasta que entra a verlo.
+        String motivoGuardado = aviso != AvisoDeLaTransicion.NINGUNO
+                || motivo == null || motivo.isBlank()
                 ? motivo
                 : motivo + " · sin avisar al candidato";
 
@@ -253,9 +307,16 @@ public class MaquinaEstados {
                 // El valor nuevo se serializa entero a JSON, así que el «no se avisó» cabe sin
                 // tocar el esquema. Solo se escribe cuando es cierto: un `avisado: true` en las
                 // decenas de miles de transiciones normales sería ruido en cada fila.
-                avisar
-                        ? Map.of("estado", estadoNuevoCodigo)
-                        : Map.of("estado", estadoNuevoCodigo, "avisoAlCandidato", "NO_ENVIADO"),
+                //
+                // Los dos silencios se anotan distinto: NO_ENVIADO es «nadie se lo contó» y
+                // POR_LA_CAMPANA es «se lo contamos por dentro del portal, no por correo».
+                switch (aviso) {
+                    case CORREO -> Map.of("estado", estadoNuevoCodigo);
+                    case NINGUNO -> Map.of("estado", estadoNuevoCodigo,
+                            "avisoAlCandidato", "NO_ENVIADO");
+                    case POR_LA_CAMPANA -> Map.of("estado", estadoNuevoCodigo,
+                            "avisoAlCandidato", "POR_LA_CAMPANA");
+                },
                 motivoGuardado);
 
         if (avisar) {

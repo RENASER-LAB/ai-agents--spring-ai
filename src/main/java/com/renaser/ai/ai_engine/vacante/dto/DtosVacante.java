@@ -127,6 +127,20 @@ public final class DtosVacante {
                                /** Si quien pregunta puede devolverla a la lista habitual. */
                                boolean puedeDesarchivar,
                                /**
+                                * Si quien pregunta puede eliminar ESTA vacante (V60).
+                                *
+                                * <p>Cierto con {@code eliminar_vacante} y alcance que llegue,
+                                * <b>sea cual sea su estado</b>: un borrador mal creado, una
+                                * publicada, una cerrada y una archivada se eliminan igual.
+                                * Por eso no mira ni el estado ni cuánta gente sigue dentro —
+                                * eso lo cuenta el modal, que para eso tiene
+                                * {@code postulantesEnCarrera}.
+                                *
+                                * <p>Viaja en la fila como los otros dos y no en un endpoint
+                                * de permisos aparte: el alcance se decide por vacante.
+                                */
+                               boolean puedeEliminar,
+                               /**
                                 * Cuándo cierra la prueba de esta vacante, para todos.
                                 *
                                 * <p>Vacío = no hay fecha común y a cada persona se le cuenta
@@ -219,6 +233,35 @@ public final class DtosVacante {
     /** A cuánta gente le llegó el cambio, para que el panel lo diga en voz alta. */
     public record RemuneracionActualizadaResponse(String antes, String ahora,
                                                   int candidatosAvisados) {}
+
+    /**
+     * Retirar una vacante que no debió existir, con el porqué (V60).
+     *
+     * <p>El motivo es obligatorio y es lo único que se pide. No es burocracia: esta acción
+     * cierra las postulaciones de otras personas, les deja un aviso y no se deshace desde el
+     * panel. Quien abra la auditoría dentro de un año tiene que poder contestar «¿por qué
+     * desapareció esta convocatoria y por qué se cerraron sus catorce procesos?» con algo más
+     * que una marca de tiempo.
+     *
+     * <p>El mensaje del {@code @NotBlank} es el que ve quien manda el formulario vacío: la
+     * validación contesta 400 aunque el botón del panel esté apagado, porque el panel es un
+     * cliente más del API.
+     */
+    public record EliminarVacante(
+            @NotBlank(message = "Di por qué se elimina la vacante: se cierran las "
+                    + "postulaciones en carrera y queda en la auditoría")
+            String motivo) {}
+
+    /**
+     * Cómo acabó la eliminación, en los dos números que el panel no puede deducir.
+     *
+     * <p><b>Cerradas y avisadas se cuentan por separado a propósito.</b> Casi siempre son el
+     * mismo número, y entonces el panel dice «se cerraron N postulaciones y se les avisó». El
+     * día que un aviso falle no son el mismo, y decir que a todos se les avisó sería mentir
+     * sobre lo único que el candidato puede comprobar. Un aviso que falla no deshace la
+     * eliminación: se anota y se sigue.
+     */
+    public record VacanteEliminadaResponse(int postulacionesCerradas, int postulantesAvisados) {}
 
     public record GuardarRequisito(@NotBlank String descripcion, @NotBlank String regla) {}
 

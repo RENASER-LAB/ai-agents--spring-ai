@@ -9,6 +9,7 @@ import com.renaser.ai.ai_engine.notificacion.entity.AvisoPortal;
 import com.renaser.ai.ai_engine.notificacion.service.ServicioAvisosPortal;
 import com.renaser.ai.ai_engine.notificacion.service.TextosDeCorreoRetirados;
 import com.renaser.ai.ai_engine.postulacion.entity.Postulacion;
+import com.renaser.ai.ai_engine.postulacion.service.MaquinaEstados;
 import com.renaser.ai.ai_engine.postulacion.service.PostulacionesEnCarrera;
 import com.renaser.ai.ai_engine.vacante.service.AlcanceSobreLaVacante;
 import com.renaser.ai.ai_engine.vacante.service.CambiosDeLaVacante;
@@ -83,6 +84,29 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
      */
     private static final String PERMISO_ARCHIVAR = "cerrar_vacante";
 
+    /**
+     * El permiso que elimina, y este sí es propio (V60).
+     *
+     * <p>Al revés que el archivo, y por una razón concreta: archivar es el paso siguiente de
+     * cerrar —retirar de la mesa lo que ya terminó— y no reparte ningún poder nuevo.
+     * Eliminar cierra las postulaciones de otras personas, les manda un aviso, retira la
+     * convocatoria de todas las pantallas y no se deshace desde el panel. Que eso venga
+     * incluido en «puede cerrar convocatorias» no se sigue de nada, y el día que alguien
+     * reparta {@code cerrar_vacante} a un rol nuevo estaría regalando esto sin enterarse.
+     */
+    private static final String PERMISO_ELIMINAR = "eliminar_vacante";
+
+    /**
+     * El motivo de cierre de quien estaba dentro cuando la vacante se retiró (V60).
+     *
+     * <p>Código propio y no {@code CIERRE_MANUAL}: los dos dejan la postulación en
+     * {@code CERRADA}, pero la pregunta que se contesta meses después es distinta. «Se cerró
+     * porque la convocatoria se retiró» y «se cerró porque alguien lo decidió» no se pueden
+     * contar juntas en un informe de motivos de cierre sin perder la única que el candidato
+     * no provocó.
+     */
+    private static final String CIERRE_POR_ELIMINACION = "VACANTE_ELIMINADA";
+
     private final VacanteRepository vacantes;
     private final PuestoRepository puestos;
     private final RequisitoObjetivoRepository requisitos;
@@ -105,6 +129,10 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
     private final com.renaser.ai.ai_engine.postulacion.repository.PostulacionRepository postulaciones;
     // Quién sigue en carrera en una vacante, decidido en un solo sitio para todo el sistema.
     private final PostulacionesEnCarrera enCarrera;
+    // Cerrar una postulación se hace por aquí y solo por aquí: es lo que garantiza que el
+    // cierre por eliminación guarde su transición, su motivo y su auditoría como cualquier
+    // otro, y que libere lo mismo que un cierre decidido a mano desde la bandeja.
+    private final MaquinaEstados maquina;
     // El aviso que se queda esperando dentro del portal. Desde esta entrega es el ÚNICO
     // canal de las noticias de la vacante: lo que cambia en una convocatoria no sale por
     // correo. Ver `avisarDeLaEdicion`.
@@ -389,11 +417,17 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
         // ⚠️ Dos consultas distintas y no un filtro sobre la lista entera. La lista habitual
         // ni siquiera lee las archivadas: es lo que hace que no reaparezcan al buscar, al
         // filtrar por estado ni al paginar, porque nunca llegaron a la pantalla.
+        //
+        // ⚠️ Y ninguna de las dos trae eliminadas (V60). No es un tercer filtro sobre lo
+        // mismo: una eliminada no está «en otra lista», no está en ninguna.
         List<Vacante> filas = archivadas
-                ? vacantes.findByOrganizacionIdAndArchivadaEnIsNotNullOrderByArchivadaEnDesc(
+                ? vacantes
+                    .findByOrganizacionIdAndArchivadaEnIsNotNullAndEliminadaEnIsNullOrderByArchivadaEnDesc(
                         quien.organizacionId())
-                : vacantes.findByOrganizacionIdAndArchivadaEnIsNullOrderByCreadoEnDesc(
+                : vacantes
+                    .findByOrganizacionIdAndArchivadaEnIsNullAndEliminadaEnIsNullOrderByCreadoEnDesc(
                         quien.organizacionId());
+        FiltroAlcance alcanceDeEliminacion = alcanceDeEliminacionDe(quien);
         return filas.stream()
                 // ⚠️ Sin el plazo vigente, y es deliberado: resolverlo pide la versión de la
                 // plantilla y los intentos abiertos de CADA vacante, o sea dos consultas por
@@ -402,7 +436,8 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                 // se configura.
                 .map(v -> comoPanel(v, porVacante.getOrDefault(v.getId(), 0),
                         puedeEditar(quien, alcanceDeEdicion, v),
-                        alcanceDeArchivo, quien, PlazoDeLaPrueba.SIN_DATO))
+                        alcanceDeArchivo, alcanceDeEliminacion, quien,
+                        PlazoDeLaPrueba.SIN_DATO))
                 .toList();
     }
 
@@ -421,7 +456,8 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
     @Override
     public ConteoDeArchivadas contarArchivadas(ContextoUsuario quien) {
         return new ConteoDeArchivadas(
-                vacantes.countByOrganizacionIdAndArchivadaEnIsNotNull(quien.organizacionId()));
+                vacantes.countByOrganizacionIdAndArchivadaEnIsNotNullAndEliminadaEnIsNull(
+                        quien.organizacionId()));
     }
 
     @Override
@@ -429,7 +465,8 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
         Vacante vacante = laDeLaOrganizacion(quien, id);
         return comoPanel(vacante, enCarrera.cuantasEnLaVacante(id),
                 puedeEditar(quien, alcanceDeEdicionDe(quien), vacante),
-                alcanceDeArchivoDe(quien), quien, loQueRigeHoy(quien, vacante));
+                alcanceDeArchivoDe(quien), alcanceDeEliminacionDe(quien), quien,
+                loQueRigeHoy(quien, vacante));
     }
 
     /**
@@ -511,6 +548,11 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
     /** El alcance de {@code cerrar_vacante}, o vacío si quien pregunta no lo tiene. */
     private FiltroAlcance alcanceDeArchivoDe(ContextoUsuario quien) {
         return quien.tiene(PERMISO_ARCHIVAR) ? permisos.alcanceDe(PERMISO_ARCHIVAR) : null;
+    }
+
+    /** El alcance de {@code eliminar_vacante}, o vacío si quien pregunta no lo tiene. */
+    private FiltroAlcance alcanceDeEliminacionDe(ContextoUsuario quien) {
+        return quien.tiene(PERMISO_ELIMINAR) ? permisos.alcanceDe(PERMISO_ELIMINAR) : null;
     }
 
     /**
@@ -1197,6 +1239,174 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                 Map.of("archivada", false), null);
     }
 
+    // ============ Eliminar ============
+
+    /**
+     * Retira la vacante que no debió existir, y con ella lo que colgaba de su existencia.
+     *
+     * <p><b>El orden de las cuatro cosas no es casual.</b>
+     *
+     * <ol>
+     *   <li><b>Se mira quién pregunta y si la vacante existe.</b> Una ya eliminada no se
+     *       encuentra —el guardián filtra por eliminada— y eso es el 404 de repetir la
+     *       eliminación, sin volver a cerrar, auditar ni avisar.
+     *   <li><b>Se exige el motivo antes de escribir nada.</b> Vacío o en blanco es un 400, y
+     *       la comprobación vive aquí y no solo en el {@code @NotBlank}: un motivo que son
+     *       tres espacios pasa la validación del contrato y no contesta nada a quien pregunte
+     *       mañana por qué desapareció la convocatoria.
+     *   <li><b>Se marca eliminada, con la condición dentro del UPDATE, ANTES de tocar las
+     *       postulaciones.</b> Es el punto donde dos peticiones simultáneas se ordenan: la
+     *       segunda espera a que la primera confirme, vuelve a mirar y actualiza cero filas.
+     *       Si esto fuera lo último, las dos habrían cerrado ya las mismas postulaciones y
+     *       mandado dos campanas por el mismo hecho antes de descubrir que una llegaba tarde.
+     *   <li><b>Y después se cierra a quien estaba dentro y se libera la solicitud</b>, todo
+     *       en la misma transacción: si algo de esto falla, tampoco queda marcada la
+     *       eliminación.
+     * </ol>
+     *
+     * <p><b>Los avisos van al final y fuera de la garantía.</b> La campana se publica en
+     * transacción propia ({@code ServicioAvisosPortal}); uno que falle se anota y no deshace
+     * la eliminación, que ya está decidida. Por eso la respuesta cuenta las dos cifras por
+     * separado, y el panel dice la verdad aunque no coincidan.
+     */
+    @Override
+    @Transactional
+    public VacanteEliminadaResponse eliminar(ContextoUsuario quien, Long id,
+                                             EliminarVacante datos) {
+        Vacante vacante = alcance.laVacanteVisible(quien, id, PERMISO_ELIMINAR);
+        String motivo = datos == null || datos.motivo() == null ? "" : datos.motivo().trim();
+        if (motivo.isEmpty()) {
+            throw new IllegalArgumentException("Di por qué se elimina la vacante: se cierran "
+                    + "las postulaciones en carrera y queda en la auditoría");
+        }
+
+        // ⚠️ Lo que haga falta de la entidad se copia AHORA: el UPDATE de abajo vacía el
+        // contexto de persistencia y la deja desligada.
+        Long organizacionId = vacante.getOrganizacionId();
+        String titulo = vacante.getTitulo();
+        Long solicitudId = vacante.getSolicitudTalentoId();
+
+        Instant cuando = Instant.now();
+        if (vacantes.eliminarSiSeguiaViva(id, cuando) == 0) {
+            // Alguien se adelantó. Para quien llega segundo la vacante ya no existe, y es
+            // exactamente lo mismo que contestarle a quien repite la eliminación un rato
+            // después: el mismo 404, sin efectos.
+            throw new ResourceNotFoundException("Vacante", "id", id);
+        }
+
+        // Se leen DESPUÉS del UPDATE, y no antes: entre mirar y escribir cabe una postulación
+        // nueva, y la lista que se cierra tiene que ser la que había cuando la vacante dejó
+        // de existir. A partir de aquí nadie más puede postular — el portal ya no la ve.
+        List<Postulacion> aCerrar = enCarrera.deLaVacante(id);
+        for (Postulacion postulacion : aCerrar) {
+            /*
+             * Cierre de PERSONA y no del sistema: alguien decidió retirar la vacante, y eso
+             * es tan humano como descartar a un candidato. Marcarlo como automático dejaría
+             * catorce cierres sin nadie detrás.
+             *
+             * ⚠️ Y POR_LA_CAMPANA en vez del viejo `avisar = false`: el correo se calla
+             * porque el aviso de abajo lo cuenta mucho mejor —un «tu postulación se cerró»
+             * genérico no explica que la empresa retiró el puesto—, no porque se haya
+             * decidido no contárselo. Con el booleano, el historial de la ficha se habría
+             * quedado con la coletilla «sin avisar al candidato», que sería falsa.
+             */
+            maquina.transicionar(postulacion, ESTADO_CERRADA, quien,
+                    "Se eliminó la vacante: " + motivo, false, false, CIERRE_POR_ELIMINACION,
+                    MaquinaEstados.AvisoDeLaTransicion.POR_LA_CAMPANA);
+        }
+
+        // Y la solicitud vuelve a estar libre, que es para lo que se elimina una vacante mal
+        // creada: para poder crear la correcta con el mismo respaldo de Dirección. Sin esto,
+        // la solicitud se quedaría en CON_VACANTE señalando a una vacante que ya no existe, y
+        // habría que pedir a Dirección que aprobara otra por un error de tecleo.
+        liberarLaSolicitud(quien, solicitudId, titulo);
+
+        auditoria.registrar(organizacionId, quien, "eliminar_vacante", "vacante", id,
+                Map.of("eliminada", false),
+                Map.of("eliminada", true, "eliminadaEn", cuando.toString(),
+                        "postulacionesCerradas", String.valueOf(aCerrar.size())),
+                motivo);
+
+        /*
+         * ⚠️ **Todo lo anterior baja a la base ANTES de publicar un solo aviso.**
+         *
+         * Los avisos se publican en transacción propia ({@code REQUIRES_NEW}), y eso los pone
+         * fuera de la garantía de esta: confirman aunque lo de aquí se deshaga. Hibernate, sin
+         * este empujón, guarda los cambios de las postulaciones hasta el final —así trabaja— y
+         * un fallo de base al escribirlos saldría DESPUÉS de haber avisado. El resultado sería
+         * el peor de todos: la vacante sigue ahí, las postulaciones siguen abiertas y a cada
+         * candidato le ha llegado una campana diciendo que su proceso se cerró.
+         *
+         * Con el flush aquí, si algo de arriba no cabe en la base, se rompe ahora y no se
+         * avisa a nadie. Lo de después sigue valiendo: un aviso que falla no deshace nada.
+         */
+        postulaciones.flush();
+
+        int avisados = avisarDeLaEliminacion(organizacionId, titulo, aCerrar);
+        return new VacanteEliminadaResponse(aCerrar.size(), avisados);
+    }
+
+    /**
+     * Devuelve a {@code ABIERTA} la solicitud que respaldaba la vacante.
+     *
+     * <p>Solo si sigue en {@code CON_VACANTE}: si alguien ya la cerró o la anuló por su
+     * cuenta, reabrirla sería deshacer una decisión que nadie ha pedido deshacer. Y si la
+     * solicitud ya no está —una base vieja, un borrado de soporte—, la eliminación no se cae
+     * por eso: lo que se estaba retirando es la vacante.
+     */
+    private void liberarLaSolicitud(ContextoUsuario quien, Long solicitudId, String titulo) {
+        if (solicitudId == null) {
+            return;
+        }
+        solicitudes.findByIdAndOrganizacionId(solicitudId, quien.organizacionId())
+                .filter(s -> "CON_VACANTE".equals(s.getEstado()))
+                .ifPresent(solicitud -> {
+                    solicitud.setEstado("ABIERTA");
+                    solicitudes.save(solicitud);
+                    auditoria.registrar(quien.organizacionId(), quien, "liberar_solicitud",
+                            "solicitud_talento", solicitud.getId(),
+                            Map.of("estado", "CON_VACANTE"), Map.of("estado", "ABIERTA"),
+                            "Se eliminó la vacante «" + titulo + "» que la respaldaba");
+                });
+    }
+
+    /**
+     * Le cuenta a cada persona que estaba dentro que la vacante se retiró.
+     *
+     * <p><b>Sin enlace, y es la única diferencia con los otros dos avisos.</b> El proceso al
+     * que llevaría ya no se puede abrir: un aviso que lleva a un 404 hace creer al candidato
+     * que se rompió algo suyo, justo cuando acaba de perder el puesto por algo que no hizo.
+     *
+     * <p>El texto dice las dos cosas que le importan —qué pasó y que no tiene nada que
+     * hacer— y no dice el motivo que escribió el equipo: ese es de la auditoría, y casi
+     * siempre habla de un error interno de la empresa.
+     *
+     * @return a cuánta gente le llegó de verdad
+     */
+    private int avisarDeLaEliminacion(Long organizacionId, String titulo,
+                                      List<Postulacion> cerradas) {
+        String tituloAviso = "Se retiró la vacante «" + titulo + "»";
+        String cuerpo = "La empresa retiró esta vacante y tu postulación quedó cerrada. "
+                + "No tienes que hacer nada";
+        int avisados = 0;
+        for (Postulacion postulacion : cerradas) {
+            try {
+                AvisoPortal publicado = avisos.publicar(organizacionId,
+                        postulacion.getUsuarioId(), AvisoPortal.VACANTE_ELIMINADA, tituloAviso,
+                        cuerpo,
+                        // Los dos enlaces vacíos, a propósito: ni al proceso ni a la vacante.
+                        null, null);
+                if (publicado != null) {
+                    avisados++;
+                }
+            } catch (RuntimeException e) {
+                log.error("No se pudo avisar de la eliminación a la postulación {}: {}",
+                        postulacion.getId(), e.getMessage());
+            }
+        }
+        return avisados;
+    }
+
     /** El estado, dicho como se lee en la pantalla y no como se guarda. */
     private String enPalabras(String estado) {
         return switch (estado == null ? "" : estado) {
@@ -1208,8 +1418,16 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
 
     // ============ ayudas ============
 
+    /**
+     * La vacante de la empresa de quien pregunta, si todavía existe.
+     *
+     * <p>Una eliminada no sale de aquí y por eso su detalle, sus requisitos, su ficha y sus
+     * textos de correo contestan 404 sin que ninguno tenga que preguntarlo (V60). Archivada
+     * sí sale: archivar conserva la consulta, eliminar la retira — es la diferencia entera
+     * entre las dos acciones, dicha en una consulta.
+     */
     private Vacante laDeLaOrganizacion(ContextoUsuario quien, Long id) {
-        return vacantes.findByIdAndOrganizacionId(id, quien.organizacionId())
+        return vacantes.findByIdAndOrganizacionIdAndEliminadaEnIsNull(id, quien.organizacionId())
                 .orElseThrow(() -> new ResourceNotFoundException("Vacante", "id", id));
     }
 
@@ -1229,7 +1447,8 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
     }
 
     private VacantePanel comoPanel(Vacante v, int postulantesEnCarrera, boolean puedeEditar,
-                                   FiltroAlcance alcanceDeArchivo, ContextoUsuario quien,
+                                   FiltroAlcance alcanceDeArchivo,
+                                   FiltroAlcance alcanceDeEliminacion, ContextoUsuario quien,
                                    PlazoDeLaPrueba plazo) {
         boolean alcanzaParaArchivar = alcanceDeArchivo != null
                 && alcance.alcanzaALaVacante(quien, alcanceDeArchivo, v);
@@ -1240,6 +1459,13 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                 && v.getArchivadaEn() == null
                 && ESTADO_CERRADA.equals(v.getEstado());
         boolean puedeDesarchivar = alcanzaParaArchivar && v.getArchivadaEn() != null;
+        // ⚠️ La papelera NO mira el estado ni cuánta gente sigue dentro. Un borrador mal
+        // creado, una publicada, una cerrada y una archivada se eliminan igual —es lo que
+        // hace distinta a esta acción del archivo—, y lo que hay gente dentro lo cuenta el
+        // modal, que para eso recibe `postulantesEnCarrera`. Lo único que decide si aparece
+        // es el permiso y su alcance.
+        boolean puedeEliminar = alcanceDeEliminacion != null
+                && alcance.alcanzaALaVacante(quien, alcanceDeEliminacion, v);
         return new VacantePanel(v.getId(), v.getTitulo(), v.getEstado(), v.getTipoCierre(),
                 v.getPuestoId(), v.getSolicitudTalentoId(), v.getResponsableUsuarioId(),
                 v.getPublicadaEn(), v.getCerradaEn(), v.isAplicaEvaluacion(),
@@ -1253,7 +1479,7 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                 v.getRequisitos(), v.getModalidad(), v.getHorario(), v.getUbicacion(),
                 v.getPlazas(), v.getAbreEn(), v.getCierraEn(),
                 postulantesEnCarrera, v.getArchivadaEn(), puedeEditar,
-                puedeArchivar, puedeDesarchivar,
+                puedeArchivar, puedeDesarchivar, puedeEliminar,
                 v.getPruebaCierraEn(), plazo.modalidad(), plazo.minutos(), plazo.dias(),
                 plazo.abiertosSinPlazoPropio(), plazo.abiertosConPlazoPropio());
     }

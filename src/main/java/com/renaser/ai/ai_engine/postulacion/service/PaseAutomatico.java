@@ -98,6 +98,23 @@ public class PaseAutomatico {
         }
 
         /*
+         * ⚠️ **Y una eliminada no mueve a nadie, tampoco sola** (V60).
+         *
+         * Por la misma razón y con el mismo silencio que la de arriba: esto no es la petición
+         * de nadie, es el final de un trabajo de IA que ya se pagó. Aquí además hay un motivo
+         * extra para no dejarlo al azar: eliminar cierra a quien estaba en carrera, pero un
+         * trabajo que empezó ANTES de la eliminación puede terminar después y llegar hasta
+         * aquí con la postulación ya cerrada; entonces la máquina de estados se plantaría con
+         * una excepción, que se leería como una avería del pase automático y no como lo que
+         * es. Se anota y se deja donde está.
+         */
+        if (vacante.getEliminadaEn() != null) {
+            log.warn("PASE_AUTOMATICO: la postulación {} no se mueve: su vacante se eliminó "
+                    + "el {}", postulacionId, vacante.getEliminadaEn());
+            return;
+        }
+
+        /*
          * ⚠️ **La guarda que impide mandar a la prueba a quien no ha contestado el banco.**
          *
          * Hay cuatro caminos que terminan en un retrato: el botón de calificar la tanda, la

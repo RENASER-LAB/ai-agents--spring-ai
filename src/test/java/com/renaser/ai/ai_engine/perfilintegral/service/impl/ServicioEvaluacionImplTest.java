@@ -566,4 +566,61 @@ class ServicioEvaluacionImplTest {
         }
     }
 
+    // ============ Una vacante eliminada (V60) ============
+
+    /**
+     * El enlace de la evaluación, o del cuestionario técnico, de una vacante que se eliminó.
+     *
+     * <p>Mismo hueco que QA-830D-C2-1 encontró en la prueba del puesto: las dos pantallas
+     * cuelgan del código de la postulación, que ya contestaba 404 en su detalle, y aquí se
+     * seguían abriendo. La postulación lleva los DOS exámenes puestos para que el 404 solo
+     * pueda salir de la vacante eliminada y no de que le falte el examen.
+     */
+    @Nested
+    @DisplayName("Si su vacante se eliminó, ni la evaluación ni el cuestionario técnico se abren")
+    class DeUnaVacanteEliminada {
+
+        private static final Long VACANTE = 40L;
+
+        @org.junit.jupiter.api.BeforeEach
+        void suVacanteSeElimino() {
+            when(postulaciones.findByUuid(CODIGO)).thenReturn(Optional.of(Postulacion.builder()
+                    .id(50L).uuid(CODIGO).usuarioId(CANDIDATA.usuarioId()).vacanteId(VACANTE)
+                    .evaluacionId(60L).evaluacionTecnicaId(61L).build()));
+            when(vacantes.existsByIdAndEliminadaEnIsNotNull(VACANTE)).thenReturn(true);
+        }
+
+        private void contestaComoSuProceso(
+                org.assertj.core.api.ThrowableAssert.ThrowingCallable accion) {
+            assertThatThrownBy(accion)
+                    .isInstanceOf(com.renaser.ai.ai_engine.ai.exception.ResourceNotFoundException.class)
+                    .hasMessageContaining("Postulación")
+                    .hasMessageContaining(CODIGO.toString());
+            // Ni se busca el examen: con o sin él, la respuesta es la misma.
+            verify(evaluaciones, never()).findById(any());
+            verify(evaluaciones, never()).save(any());
+            verify(respuestas, never()).save(any());
+            org.mockito.Mockito.verifyNoInteractions(maquina);
+        }
+
+        @Test
+        @DisplayName("la evaluación: verla, empezarla, responderla y entregarla contestan 404")
+        void laEvaluacion() {
+            contestaComoSuProceso(() -> servicio.ver(CANDIDATA, CODIGO));
+            contestaComoSuProceso(() -> servicio.iniciar(CANDIDATA, CODIGO));
+            contestaComoSuProceso(() -> servicio.responder(CANDIDATA, CODIGO, 1L,
+                    new Responder(11L, null, null, 30)));
+            contestaComoSuProceso(() -> servicio.entregar(CANDIDATA, CODIGO));
+        }
+
+        @Test
+        @DisplayName("el cuestionario técnico: verlo, empezarlo, responderlo y entregarlo contestan 404")
+        void elCuestionarioTecnico() {
+            contestaComoSuProceso(() -> servicio.verTecnico(CANDIDATA, CODIGO));
+            contestaComoSuProceso(() -> servicio.iniciarTecnico(CANDIDATA, CODIGO));
+            contestaComoSuProceso(() -> servicio.responderTecnico(CANDIDATA, CODIGO, 1L,
+                    new Responder(null, "Lo resolvería así", null, 30)));
+            contestaComoSuProceso(() -> servicio.entregarTecnico(CANDIDATA, CODIGO));
+        }
+    }
 }

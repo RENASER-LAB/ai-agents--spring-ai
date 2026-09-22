@@ -27,6 +27,7 @@ import com.renaser.ai.ai_engine.postulacion.service.MaquinaEstados;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
 import com.renaser.ai.ai_engine.vacante.entity.Vacante;
 import com.renaser.ai.ai_engine.vacante.repository.VacanteRepository;
+import com.renaser.ai.ai_engine.vacante.service.VacanteEliminada;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -281,6 +282,23 @@ public class ServicioPruebaImpl implements ServicioPrueba {
         for (IntentoPrueba intento : vencidos) {
             Postulacion postulacion = porId.get(intento.getPostulacionId());
             if (postulacion == null) continue;
+            /*
+             * ⚠️ **A quien ya terminó no se le entrega nada**, y sin esto el barrido entero
+             * se caía.
+             *
+             * Una prueba abierta se queda abierta cuando su postulación se cierra por otro
+             * lado: el candidato se retira, el equipo lo descarta o —desde la V60— se elimina
+             * la vacante y sus procesos se cierran de golpe. Su intento vence igual, y aquí
+             * se intentaría moverlo a «calificando»: la máquina de estados se planta —de un
+             * estado final no se sale— y la excepción se lleva por delante a TODOS los demás
+             * intentos de la misma tanda, cada minuto, sin que nadie lo vea más que en un log.
+             *
+             * Es la misma comprobación que ya hacía el cuestionario técnico en
+             * {@code entregarTecnicasVencidas}; faltaba en esta mitad.
+             */
+            if (maquina.yaTermino(postulacion)) {
+                continue;
+            }
             cerrarIntento(intento, postulacion, true);
         }
     }
@@ -539,10 +557,21 @@ public class ServicioPruebaImpl implements ServicioPrueba {
                 .orElseThrow(() -> new IllegalStateException("La versión de esta prueba ya no existe"));
     }
 
+    /**
+     * La postulación y su intento, si son de quien pregunta y su vacante sigue existiendo.
+     *
+     * <p>⚠️ <b>La vacante eliminada se pregunta aquí porque esta es la única puerta</b>: ver,
+     * empezar, responder, subir un entregable y entregar pasan todas por este método. Sin
+     * ella, el enlace «tu prueba está lista» de una vacante retirada seguía abriendo el
+     * enunciado y arrancaba el reloj, y solo la entrega fallaba —con el texto crudo de la
+     * máquina de estados—. Va antes de buscar el intento: una eliminada contesta lo mismo
+     * tenga o no tenga prueba (V60).
+     */
     private Par laMia(ContextoUsuario quien, UUID uuid) {
         Postulacion postulacion = postulaciones.findByUuid(uuid)
                 .filter(p -> p.getUsuarioId().equals(quien.usuarioId()))
                 .orElseThrow(() -> new ResourceNotFoundException("Postulación", "código", uuid));
+        VacanteEliminada.exigirQueSuProcesoSigaExistiendo(postulacion, vacantes);
         IntentoPrueba intento = intentos.findByPostulacionId(postulacion.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Prueba del puesto", "postulación", uuid));
         return new Par(postulacion, intento);

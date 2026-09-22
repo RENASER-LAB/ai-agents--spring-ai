@@ -64,9 +64,43 @@ public class AlcanceSobreLaVacante {
         return p;
     }
 
-    /** La vacante de esta empresa, si el alcance del permiso llega a ella. */
+    /**
+     * Que la vacante de esta postulación siga existiendo, <b>antes de escribir sobre ella</b>.
+     *
+     * <p>Es la guarda de todas las escrituras del panel que llegan por una postulación: notas,
+     * calificaciones, plazos, currículum, contacto, validación, decisión, simulación y
+     * conversación final. Una eliminada no existe (V60), y eso es un 404 con el mismo texto
+     * que una vacante que nunca existió —no un 409, y no el texto de la máquina de estados
+     * que antes salía en las que transicionan—.
+     *
+     * <p><b>No va dentro de {@link #laPostulacionVisible}, y es a propósito</b>: las lecturas
+     * de esas postulaciones —su ficha, su prueba, su plazo— siguen contestando, por decisión
+     * del producto. Solo se cierra lo que escribe, así que cada escritura lo pide después de
+     * resolver la postulación.
+     *
+     * <p>Se pregunta con un {@code exists}: de la vacante solo hace falta saber esto.
+     *
+     * @throws ResourceNotFoundException si la vacante de la postulación está eliminada
+     */
+    public void exigirQueSuVacanteSigaExistiendo(Postulacion p) {
+        Long vacanteId = p.getVacanteId();
+        VacanteEliminada.exigirQueSigaExistiendo(
+                vacanteId != null && vacantes.existsByIdAndEliminadaEnIsNotNull(vacanteId),
+                vacanteId);
+    }
+
+    /**
+     * La vacante de esta empresa, si el alcance del permiso llega a ella.
+     *
+     * <p>⚠️ <b>Una eliminada no se encuentra aquí</b> (V60), y por eso el 404 de una vacante
+     * retirada sale solo en todas las pantallas que entran por este guardián: el detalle, la
+     * edición, el ranking y su Excel, la remuneración, el archivo y la propia eliminación
+     * repetida. Es un filtro de la consulta y no un {@code if} después, porque un {@code if}
+     * hay que acordarse de escribirlo en cada llamada.
+     */
     public Vacante laVacanteVisible(ContextoUsuario quien, Long vacanteId, String permiso) {
-        Vacante v = vacantes.findByIdAndOrganizacionId(vacanteId, quien.organizacionId())
+        Vacante v = vacantes
+                .findByIdAndOrganizacionIdAndEliminadaEnIsNull(vacanteId, quien.organizacionId())
                 .orElseThrow(() -> new ResourceNotFoundException("Vacante", "id", vacanteId));
         if (!alcanza(quien, permisos.alcanceDe(permiso), Optional.of(v))) {
             throw new ResourceNotFoundException("Vacante", "id", vacanteId);

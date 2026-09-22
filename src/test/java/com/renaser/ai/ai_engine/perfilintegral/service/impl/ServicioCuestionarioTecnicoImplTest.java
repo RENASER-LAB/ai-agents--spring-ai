@@ -60,7 +60,7 @@ class ServicioCuestionarioTecnicoImplTest {
             5L, 6L, ORG, "EQUIPO", List.of(1L), Map.of("editar_vacante", "TODO"));
 
     private void conVacante() {
-        when(vacantes.findByIdAndOrganizacionId(VACANTE, ORG)).thenReturn(Optional.of(
+        when(vacantes.findByIdAndOrganizacionIdAndEliminadaEnIsNull(VACANTE, ORG)).thenReturn(Optional.of(
                 Vacante.builder().id(VACANTE).organizacionId(ORG).estado("BORRADOR").build()));
     }
 
@@ -182,7 +182,7 @@ class ServicioCuestionarioTecnicoImplTest {
         @Test
         @DisplayName("ver, generar y publicar responden «no existe», nunca «prohibido»")
         void nadaAjenoSeVe() {
-            when(vacantes.findByIdAndOrganizacionId(VACANTE, ORG)).thenReturn(Optional.empty());
+            when(vacantes.findByIdAndOrganizacionIdAndEliminadaEnIsNull(VACANTE, ORG)).thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> servicio.ver(quien, VACANTE))
                     .isInstanceOf(ResourceNotFoundException.class);

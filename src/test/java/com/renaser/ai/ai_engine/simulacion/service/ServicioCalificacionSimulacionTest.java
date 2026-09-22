@@ -109,4 +109,40 @@ class ServicioCalificacionSimulacionTest {
 
         verify(alcance).laPostulacionVisible(any(), eq(POSTULACION), eq("calificar_simulacion"));
     }
+
+    // ============ Una vacante eliminada (V60) ============
+
+    @org.junit.jupiter.api.Nested
+    @DisplayName("Si su vacante se eliminó, su simulación no se califica")
+    class DeUnaVacanteEliminada {
+
+        @BeforeEach
+        void suVacanteSeElimino() {
+            alcanzable();
+            org.mockito.Mockito.doThrow(new ResourceNotFoundException("Vacante", "id", VACANTE))
+                    .when(alcance).exigirQueSuVacanteSigaExistiendo(any());
+        }
+
+        private void contestaComoLaVacante(
+                org.assertj.core.api.ThrowableAssert.ThrowingCallable accion) {
+            assertThatThrownBy(accion)
+                    .isInstanceOf(ResourceNotFoundException.class)
+                    .hasMessageContaining("Vacante")
+                    .hasMessageContaining(String.valueOf(VACANTE));
+        }
+
+        @Test
+        @DisplayName("poner la nota de un criterio contesta 404 y no la guarda")
+        void laNotaDeUnCriterio() {
+            contestaComoLaVacante(() -> servicio.ponerNota(QUIEN, POSTULACION, 3L, 8.0, "Bien"));
+            verifyNoInteractions(calificacion);
+        }
+
+        @Test
+        @DisplayName("calcular la nota de la etapa contesta 404")
+        void laNotaDeLaEtapa() {
+            contestaComoLaVacante(() -> servicio.calcularNota(QUIEN, POSTULACION));
+            verifyNoInteractions(calificacion);
+        }
+    }
 }

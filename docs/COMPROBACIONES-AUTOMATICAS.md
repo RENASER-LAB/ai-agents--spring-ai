@@ -70,6 +70,13 @@ en verde con **1006 unitarias y 163 de integración**, pero esa batería elige l
 nombre (`*Test`, `*Tests`, `*IT`) y aparta las que gastan saldo o mandan correo. No se suma ni se
 compara con las 1276: para dar el total hay que volver a correr `./mvnw verify` entero.
 
+⚠️ **Y ese filtro por nombre deja fuera las clases `@Nested`.** Las unitarias del harness corren
+con `-Dtest=*Test,*Tests` (`harness/config.json`), y una anidada se llama `Externa$Interna`, que
+no casa con el patrón: no se ejecuta ni aparece en `target/surefire-reports`, así que su verde no
+tiene recibo del harness. Pasó en la entrega de eliminar vacantes (22/09/2026) con los bloques
+`DeUnaVacanteEliminada`, anidados en nueve clases de servicio. **El CI sí las corre**, porque
+lanza `./mvnw -B verify` sin filtro, y en local basta con lo mismo.
+
 ⚠️ **El total está al día; la tabla de abajo no.** Su reparto por filas es el del recuento del
 28/08/2026 (877 = 770 + 107), antes del módulo de vacantes —los tiempos de la etapa técnica, la
 edición de las plantillas de prueba, el CRUD de áreas y la guía de calificación—, y esas casi

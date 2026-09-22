@@ -85,6 +85,7 @@ class ServicioPostulacionesPanelImplTest {
     @Mock private com.renaser.ai.ai_engine.simulacion.service.ServicioDisponibilidadSimulacion disponibilidad;
     @Mock private com.renaser.ai.ai_engine.postulacion.repository.DatoCvRepository datosCv;
     @Mock private com.renaser.ai.ai_engine.auditoria.service.ServicioAuditoria auditoria;
+    @Mock private com.renaser.ai.ai_engine.postulacion.service.ServicioEnlaceAcceso enlacesDeAcceso;
 
     @InjectMocks
     private ServicioPostulacionesPanelImpl servicio;
@@ -478,4 +479,83 @@ class ServicioPostulacionesPanelImplTest {
         }
     }
 
+    // ============ Una vacante eliminada (V60) ============
+
+    /**
+     * Corregir el contacto y generar el enlace de acceso de alguien cuya vacante se eliminó.
+     *
+     * <p>El enlace además no preguntaba nada: el controlador llamaba al generador, que busca
+     * la postulación por id suelto. Ahora pasa por el guardián —empresa y alcance de
+     * {@code mover_postulacion}— y por la vacante eliminada, como el resto de escrituras.
+     */
+    @org.junit.jupiter.api.Nested
+    @DisplayName("Si su vacante se eliminó, ni su contacto ni su enlace de acceso se tocan")
+    class DeUnaVacanteEliminada {
+
+        private Postulacion p;
+
+        @BeforeEach
+        void laPostulacion() {
+            p = new Postulacion();
+            p.setId(1L);
+            p.setOrganizacionId(ORGANIZACION);
+            p.setVacanteId(40L);
+        }
+
+        private void suVacanteSeElimino() {
+            org.mockito.Mockito.doThrow(new ResourceNotFoundException("Vacante", "id", 40L))
+                    .when(alcanceVacante).exigirQueSuVacanteSigaExistiendo(p);
+        }
+
+        @Test
+        @DisplayName("corregir su contacto contesta 404 y no pisa la ficha ni deja auditoría")
+        void elContacto() {
+            when(alcanceVacante.laPostulacionVisible(any(), eq(1L),
+                    eq("corregir_contacto_candidato"))).thenReturn(p);
+            suVacanteSeElimino();
+
+            assertThatThrownBy(() -> servicio.corregirContacto(quien, 1L,
+                    new CorregirContacto("otra@ejemplo.pe", null, "No debería guardarse")))
+                    .isInstanceOf(ResourceNotFoundException.class)
+                    .hasMessageContaining("Vacante");
+            verifyNoInteractions(datosCv, auditoria);
+        }
+
+        @Test
+        @DisplayName("generar su enlace de acceso contesta 404 y no crea ningún enlace")
+        void elEnlaceDeAcceso() {
+            when(alcanceVacante.laPostulacionVisible(any(), eq(1L), eq("mover_postulacion")))
+                    .thenReturn(p);
+            suVacanteSeElimino();
+
+            assertThatThrownBy(() -> servicio.enlaceDeAcceso(quien, 1L))
+                    .isInstanceOf(ResourceNotFoundException.class)
+                    .hasMessageContaining("Vacante");
+            verifyNoInteractions(enlacesDeAcceso);
+        }
+
+        @Test
+        @DisplayName("con la vacante viva el enlace se genera, y solo si el alcance llega")
+        void elEnlaceDeUnaViva() {
+            when(alcanceVacante.laPostulacionVisible(any(), eq(1L), eq("mover_postulacion")))
+                    .thenReturn(p);
+            var generado = new com.renaser.ai.ai_engine.postulacion.service.ServicioEnlaceAcceso
+                    .EnlaceGenerado("https://portal/acceso?token=x", Instant.now());
+            when(enlacesDeAcceso.generarEnlace(1L)).thenReturn(generado);
+
+            assertThat(servicio.enlaceDeAcceso(quien, 1L)).isEqualTo(generado);
+            verify(alcanceVacante).exigirQueSuVacanteSigaExistiendo(p);
+        }
+
+        @Test
+        @DisplayName("fuera de su empresa o de su alcance, el enlace contesta 404 y no se crea")
+        void elEnlaceFueraDeAlcance() {
+            when(alcanceVacante.laPostulacionVisible(any(), eq(1L), eq("mover_postulacion")))
+                    .thenThrow(new ResourceNotFoundException("Postulación", "id", 1L));
+
+            assertThatThrownBy(() -> servicio.enlaceDeAcceso(quien, 1L))
+                    .isInstanceOf(ResourceNotFoundException.class);
+            verifyNoInteractions(enlacesDeAcceso);
+        }
+    }
 }
