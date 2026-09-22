@@ -70,6 +70,17 @@ public class CalificacionPruebaController {
         servicio.ponerNota(permisos.actual(), postulacionId, criterioId, datos);
     }
 
+    @GetMapping("/plazo")
+    @PreAuthorize("@permisos.tiene('abrir_ficha_candidato')")
+    @Operation(summary = "Qué plazo rige hoy para este candidato: cuándo le cierra la prueba, "
+            + "de dónde sale esa fecha (VACANTE, RELOJ o PROPIO), cuándo la abrió y cuándo "
+            + "entregó. Sin prueba del puesto —no llegó a la etapa, o su vacante rinde el "
+            + "cuestionario técnico— contesta «existeIntento: false» y el instrumento, no un "
+            + "404. Pide el permiso de LEER la ficha: quien no puede mover el plazo lo ve")
+    public PlazoVigente verPlazo(@PathVariable Long postulacionId) {
+        return servicio.verPlazo(permisos.actual(), postulacionId);
+    }
+
     @PostMapping("/plazo")
     @PreAuthorize("@permisos.tiene('mover_postulacion')")
     @Operation(summary = "Fijarle a ESTE candidato la fecha en que se le cierra la prueba. "

@@ -429,9 +429,15 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                         quien.organizacionId());
         FiltroAlcance alcanceDeEliminacion = alcanceDeEliminacionDe(quien);
         return filas.stream()
+                // ⚠️ Sin el plazo vigente, y es deliberado: resolverlo pide la versión de la
+                // plantilla y los intentos abiertos de CADA vacante, o sea dos consultas por
+                // fila en la pantalla que más se abre. La fecha de cierre sí viaja —es una
+                // columna de la propia vacante—; lo demás lo trae el detalle, que es donde
+                // se configura.
                 .map(v -> comoPanel(v, porVacante.getOrDefault(v.getId(), 0),
                         puedeEditar(quien, alcanceDeEdicion, v),
-                        alcanceDeArchivo, alcanceDeEliminacion, quien))
+                        alcanceDeArchivo, alcanceDeEliminacion, quien,
+                        PlazoDeLaPrueba.SIN_DATO))
                 .toList();
     }
 
@@ -459,7 +465,79 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
         Vacante vacante = laDeLaOrganizacion(quien, id);
         return comoPanel(vacante, enCarrera.cuantasEnLaVacante(id),
                 puedeEditar(quien, alcanceDeEdicionDe(quien), vacante),
-                alcanceDeArchivoDe(quien), alcanceDeEliminacionDe(quien), quien);
+                alcanceDeArchivoDe(quien), alcanceDeEliminacionDe(quien), quien,
+                loQueRigeHoy(quien, vacante));
+    }
+
+    /**
+     * Lo que rige HOY en la etapa técnica de una vacante: su reloj y a cuánta gente
+     * alcanzaría moverle la fecha.
+     *
+     * <p>Existe porque el panel no puede deducirlo. La fecha de cierre sola no dice nada: con
+     * una plantilla cronometrada conviven los dos plazos —los minutos de cada persona y la
+     * fecha para todos— y gana el que caiga antes; con una de plazo abierto y sin fecha, lo
+     * que rige son los días de la plantilla, que están en otra tabla.
+     *
+     * <p>⚠️ <b>La modalidad es la EFECTIVA.</b> Unos minutos propios de la vacante convierten
+     * en cronometrada hasta una plantilla de plazo abierto, y es exactamente lo que hace
+     * {@code ServicioPruebaImpl} al arrancar el reloj. Si esta pantalla leyera la modalidad
+     * de la fila de la plantilla, diría «N días» sobre una prueba que cierra en una hora.
+     *
+     * <p>⚠️ <b>La versión se pide con su dueño resuelto, no por id suelto.</b> Una versión de
+     * prueba no sabe de organizaciones —eso vive en su plantilla—, así que se busca por el
+     * guardián que deriva al padre ({@code laDeLaOrganizacion}) con el dueño que resuelve
+     * {@link DuenoDelInstrumento}, igual que al asignarla. La que no sea de esta empresa se
+     * lee como «sin dato» y no como el plazo de otra: con una sola organización las dos
+     * formas funcionan idéntico, y eso es justo lo que nadie nota hasta que hay dos.
+     */
+    private PlazoDeLaPrueba loQueRigeHoy(ContextoUsuario quien, Vacante v) {
+        Integer minutosVacante = v.getMinutosEtapaTecnica();
+        if (CUESTIONARIO_TECNICO.equals(v.getInstrumentoEtapaTecnica())) {
+            // El cuestionario técnico no se cierra con una fecha: su plazo son los minutos
+            // de la vacante y, si no los fijó, los del banco que le toca. Y no usa
+            // `intento_prueba`, así que no hay ningún examen al que mover nada.
+            Integer minutos = minutosVacante != null ? minutosVacante
+                    : versionesBanco.findFirstByVacanteIdAndEstado(v.getId(), "PUBLICADA")
+                            .map(banco -> banco.getMinutosObjetivo())
+                            .orElse(null);
+            return new PlazoDeLaPrueba(null, minutos, null, 0, 0);
+        }
+        VersionPlantillaPrueba version = v.getVersionPlantillaPruebaId() == null ? null
+                : versionesPrueba.laDeLaOrganizacion(v.getVersionPlantillaPruebaId(),
+                        dueno.duenoDe(quien.organizacionId(), Instrumento.PRUEBA)).orElse(null);
+        String modalidad = minutosVacante != null ? "CRONOMETRADA"
+                : version == null ? null : version.getModalidad();
+        Integer minutos = minutosVacante != null ? minutosVacante
+                : version != null && "CRONOMETRADA".equals(version.getModalidad())
+                        ? version.getDuracionMinutos()
+                        : null;
+        Integer dias = version != null && "PLAZO_ABIERTO".equals(modalidad)
+                ? version.getPlazoDias()
+                : null;
+        int conPlazoPropio = 0;
+        int sinPlazoPropio = 0;
+        for (IntentoPrueba intento : intentos.abiertosDeLaVacante(v.getId())) {
+            if (intento.isPlazoPropio()) {
+                conPlazoPropio++;
+            } else {
+                sinPlazoPropio++;
+            }
+        }
+        return new PlazoDeLaPrueba(modalidad, minutos, dias, sinPlazoPropio, conPlazoPropio);
+    }
+
+    /**
+     * El plazo vigente de una vacante, tal como lo enseña el detalle.
+     *
+     * <p>{@link #SIN_DATO} es lo que sabe la lista: nada. Viaja con todo en vacío para que el
+     * panel lo lea como «sin dato» en vez de inventarse un plazo.
+     */
+    private record PlazoDeLaPrueba(String modalidad, Integer minutos, Integer dias,
+                                   Integer abiertosSinPlazoPropio,
+                                   Integer abiertosConPlazoPropio) {
+
+        static final PlazoDeLaPrueba SIN_DATO =
+                new PlazoDeLaPrueba(null, null, null, null, null);
     }
 
     /** El alcance de {@code editar_vacante}, o vacío si quien pregunta no lo tiene. */
@@ -994,16 +1072,13 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                         + "así que no hay una fecha de cierre que fijarle: su etapa técnica es "
                         + "el cuestionario, y su tiempo son los minutos de la vacante");
             }
-            // Y no tiene sentido sobre un cronómetro: ahí el plazo son los minutos que corren
-            // desde que cada uno empieza, y una fecha fija los anularía sin decirlo.
-            versionesPrueba.findById(vacante.getVersionPlantillaPruebaId())
-                    .filter(v -> "CRONOMETRADA".equals(v.getModalidad()))
-                    .ifPresent(v -> {
-                        throw new IllegalArgumentException(
-                                "La prueba de esta vacante es cronometrada (" + v.getDuracionMinutos()
-                                        + " minutos desde que cada candidato empieza): una fecha "
-                                        + "de cierre para todos anularía el reloj");
-                    });
+            // ⚠️ **Una plantilla CRONOMETRADA SÍ admite fecha, y aquí se rechazaba.** La
+            // regla decía que la fecha «anularía el reloj», y dejó de ser cierta cuando
+            // `ServicioPruebaImpl.iniciar` pasó a quedarse con el plazo que caiga ANTES entre
+            // el reloj y la fecha de la vacante: quien abre temprano tiene sus minutos
+            // completos y quien abre pegado a la fecha cierra a la fecha. Las dos cosas
+            // conviven, y la fecha es justamente lo que impide empezar el examen la semana
+            // siguiente a que cerrara la convocatoria.
         }
 
         Instant anterior = vacante.getPruebaCierraEn();
@@ -1373,7 +1448,8 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
 
     private VacantePanel comoPanel(Vacante v, int postulantesEnCarrera, boolean puedeEditar,
                                    FiltroAlcance alcanceDeArchivo,
-                                   FiltroAlcance alcanceDeEliminacion, ContextoUsuario quien) {
+                                   FiltroAlcance alcanceDeEliminacion, ContextoUsuario quien,
+                                   PlazoDeLaPrueba plazo) {
         boolean alcanzaParaArchivar = alcanceDeArchivo != null
                 && alcance.alcanzaALaVacante(quien, alcanceDeArchivo, v);
         // ⚠️ `puedeArchivar` NO mira cuánta gente sigue en carrera. El icono tiene que estar
@@ -1403,7 +1479,9 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                 v.getRequisitos(), v.getModalidad(), v.getHorario(), v.getUbicacion(),
                 v.getPlazas(), v.getAbreEn(), v.getCierraEn(),
                 postulantesEnCarrera, v.getArchivadaEn(), puedeEditar,
-                puedeArchivar, puedeDesarchivar, puedeEliminar);
+                puedeArchivar, puedeDesarchivar, puedeEliminar,
+                v.getPruebaCierraEn(), plazo.modalidad(), plazo.minutos(), plazo.dias(),
+                plazo.abiertosSinPlazoPropio(), plazo.abiertosConPlazoPropio());
     }
 
     // ============ La remuneración ============

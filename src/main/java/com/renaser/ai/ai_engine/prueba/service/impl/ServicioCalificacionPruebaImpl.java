@@ -20,6 +20,7 @@ import com.renaser.ai.ai_engine.prueba.repository.EntregableRepository;
 import com.renaser.ai.ai_engine.prueba.repository.EntregableRequeridoRepository;
 import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.NotaCriterioResponse;
 import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.PlazoPrueba;
+import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.PlazoVigente;
 import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.PonerNotaCriterio;
 import com.renaser.ai.ai_engine.perfilintegral.service.CalificacionPorCriterio;
 import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.RespuestaDePrueba;
@@ -36,6 +37,7 @@ import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
 
 import static com.renaser.ai.ai_engine.vacante.service.impl.ServicioVacantesPanelImpl.CUESTIONARIO_TECNICO;
 import com.renaser.ai.ai_engine.seguridad.service.Permisos;
+import com.renaser.ai.ai_engine.vacante.entity.Vacante;
 import com.renaser.ai.ai_engine.vacante.service.AlcanceSobreLaVacante;
 
 import lombok.RequiredArgsConstructor;
@@ -248,7 +250,7 @@ public class ServicioCalificacionPruebaImpl implements ServicioCalificacionPrueb
 
     @Override
     public CalificacionIaEncolada calificarConIa(ContextoUsuario quien, Long postulacionId) {
-        Postulacion postulacion = laVisible(quien, postulacionId, "ajustar_nota");
+        Postulacion postulacion = laQueSePuedeTocar(quien, postulacionId, "ajustar_nota");
 
         // ⚠️ Con el cuestionario técnico, este botón es la ÚNICA forma de recuperar una
         // calificación que no salió: si la IA estaba apagada al entregar, o el modelo devolvió
@@ -305,7 +307,7 @@ public class ServicioCalificacionPruebaImpl implements ServicioCalificacionPrueb
     @Override
     @Transactional
     public void ponerNota(ContextoUsuario quien, Long postulacionId, Long criterioId, PonerNotaCriterio datos) {
-        Postulacion postulacion = laVisible(quien, postulacionId, "ajustar_nota");
+        Postulacion postulacion = laQueSePuedeTocar(quien, postulacionId, "ajustar_nota");
         Criterio criterio = criterios.findById(criterioId)
                 .orElseThrow(() -> new ResourceNotFoundException("Criterio", "id", criterioId));
         if (!laRubricaDe(postulacion).contains(criterio)) {
@@ -340,7 +342,7 @@ public class ServicioCalificacionPruebaImpl implements ServicioCalificacionPrueb
     @Override
     @Transactional
     public BigDecimal calcularNotaEtapa(ContextoUsuario quien, Long postulacionId) {
-        Postulacion postulacion = laVisible(quien, postulacionId, "ajustar_nota");
+        Postulacion postulacion = laQueSePuedeTocar(quien, postulacionId, "ajustar_nota");
         // El cuestionario técnico no se pondera por rúbrica: su nota es el índice sobre las
         // calificaciones de sus respuestas. Recalcularlo aquí le da al equipo la misma
         // palanca que tiene con la prueba del puesto — pedirlo cuando ya están las notas.
@@ -365,7 +367,7 @@ public class ServicioCalificacionPruebaImpl implements ServicioCalificacionPrueb
     @Transactional
     public PlazoPrueba definirPlazo(ContextoUsuario quien, Long postulacionId,
                                     DefinirPlazoPrueba datos) {
-        Postulacion postulacion = laVisible(quien, postulacionId, "mover_postulacion");
+        Postulacion postulacion = laQueSePuedeTocar(quien, postulacionId, "mover_postulacion");
         IntentoPrueba intento = intentos.findByPostulacionId(postulacion.getId())
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Prueba del puesto", "postulación", postulacionId));
@@ -397,6 +399,77 @@ public class ServicioCalificacionPruebaImpl implements ServicioCalificacionPrueb
                 intento.getIniciadoEn() != null);
     }
 
+    /**
+     * Lo que rige hoy para esta persona. Ver {@link ServicioCalificacionPrueba#verPlazo}.
+     *
+     * <p>⚠️ <b>Ninguna de las dos ausencias es un error.</b> Ni la vacante del cuestionario
+     * técnico —que no usa {@code intento_prueba}— ni quien todavía no llegó a la etapa tienen
+     * nada que enseñar, y {@code definirPlazo} contesta a los dos «Prueba del puesto no
+     * encontrada», que en la ficha se lee como una avería. Aquí se contestan con
+     * {@code existeIntento=false} para que la pantalla diga cuál de los dos casos es.
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public PlazoVigente verPlazo(ContextoUsuario quien, Long postulacionId) {
+        Postulacion postulacion = laVisible(quien, postulacionId, "abrir_ficha_candidato");
+        /*
+          ⚠️ **Por id Y organización, no por id suelto.** La dueña sale de la propia
+          postulación —que `laVisible` ya resolvió contra quien pregunta—, que es el mismo
+          criterio de `ServicioPruebaImpl.minutosDeLaVacante`: así la cadena entera cuelga de
+          una sola cosa verificada y no de dos que podrían no casar. Con una sola empresa las
+          dos formas se comportan igual; con dos, la suelta enseña el plazo de la otra.
+
+          Una vacante que no aparezca se lee como «sin instrumento conocido» en vez de
+          reventar: la ficha tiene que abrirse igual.
+        */
+        Vacante vacante = vacantes
+                .findByIdAndOrganizacionId(postulacion.getVacanteId(),
+                        postulacion.getOrganizacionId())
+                .orElse(null);
+        String instrumento = vacante == null ? null : vacante.getInstrumentoEtapaTecnica();
+        if (CUESTIONARIO_TECNICO.equals(instrumento)) {
+            return new PlazoVigente(false, null, null, null, null, instrumento);
+        }
+        return intentos.findByPostulacionId(postulacion.getId())
+                .map(intento -> new PlazoVigente(true, intento.getVenceEn(),
+                        origenDe(intento, vacante), intento.getIniciadoEn(),
+                        intento.getEntregadoEn(), instrumento))
+                .orElseGet(() -> new PlazoVigente(false, null, null, null, null, instrumento));
+    }
+
+    /**
+     * De dónde sale la fecha que tiene este intento.
+     *
+     * <p>No se guarda en ninguna columna —{@code plazo_propio} solo marca una de las tres—,
+     * así que se deduce, y el orden importa:
+     *
+     * <ol>
+     *   <li><b>{@code PROPIO}</b>: alguien se la puso a mano. Se mira primero porque esa
+     *       fecha puede coincidir con la de la vacante y seguiría siendo suya: mover la de la
+     *       convocatoria no se la toca, y la ficha tiene que seguir diciendo «a mano».
+     *   <li><b>{@code VACANTE}</b>: es exactamente la fecha común de la convocatoria.
+     *   <li><b>{@code RELOJ}</b>: ya empezó y su fecha no es la de la vacante, así que la
+     *       calculó el servidor al abrir —sus minutos, o los días de su plantilla—.
+     * </ol>
+     *
+     * <p>Quien no ha empezado y tiene una fecha que ya no es la de la vacante se lee como
+     * {@code VACANTE}: es la que heredó al entrar en la etapa, y el reloj todavía no ha
+     * corrido para él.
+     */
+    private String origenDe(IntentoPrueba intento, Vacante vacante) {
+        if (intento.getVenceEn() == null) {
+            return null;
+        }
+        if (intento.isPlazoPropio()) {
+            return "PROPIO";
+        }
+        Instant deLaVacante = vacante == null ? null : vacante.getPruebaCierraEn();
+        if (intento.getVenceEn().equals(deLaVacante)) {
+            return "VACANTE";
+        }
+        return intento.getIniciadoEn() != null ? "RELOJ" : "VACANTE";
+    }
+
     // ============ Apoyo ============
 
     /**
@@ -420,5 +493,26 @@ public class ServicioCalificacionPruebaImpl implements ServicioCalificacionPrueb
 
     private Postulacion laVisible(ContextoUsuario quien, Long postulacionId, String permiso) {
         return alcance.laPostulacionVisible(quien, postulacionId, permiso);
+    }
+
+    /**
+     * La postulación sobre la que se va a <b>escribir</b>: visible, y de una vacante que sigue
+     * existiendo.
+     *
+     * <p>⚠️ <b>Las cuatro escrituras de este servicio pasan por aquí</b> —el plazo de la
+     * persona, la nota de un criterio, la nota de la etapa y la calificación con IA— y ninguna
+     * la miraba. Con el formulario «El plazo de esta persona» abierto desde antes de eliminar
+     * la vacante, «Guardar el plazo» movía el intento, lo marcaba como propio y dejaba
+     * auditoría sobre una postulación cerrada de una convocatoria retirada, cuando la fecha de
+     * la vacante y mover la postulación ya contestaban 404. Es la misma respuesta que
+     * esas dos: una eliminada no existe, y eso es un 404 y no un 409 (V60).
+     *
+     * <p>Las lecturas siguen por {@link #laVisible}, igual que la ficha de la postulación.
+     */
+    private Postulacion laQueSePuedeTocar(ContextoUsuario quien, Long postulacionId,
+                                          String permiso) {
+        Postulacion postulacion = laVisible(quien, postulacionId, permiso);
+        alcance.exigirQueSuVacanteSigaExistiendo(postulacion);
+        return postulacion;
     }
 }

@@ -70,6 +70,7 @@ public class ServicioPostulacionesPanelImpl implements ServicioPostulacionesPane
     private final ServicioDisponibilidadSimulacion disponibilidad;
     private final DatoCvRepository datosCv;
     private final ServicioAuditoria auditoria;
+    private final ServicioEnlaceAcceso enlacesDeAcceso;
 
     @Override
     public List<FilaBandeja> bandeja(ContextoUsuario quien, String esperaA) {
@@ -347,6 +348,16 @@ public class ServicioPostulacionesPanelImpl implements ServicioPostulacionesPane
         return alcanceVacante.laPostulacionVisible(quien, postulacionId, permiso);
     }
 
+    @Override
+    @Transactional
+    public ServicioEnlaceAcceso.EnlaceGenerado enlaceDeAcceso(ContextoUsuario quien,
+                                                            Long postulacionId) {
+        Postulacion p = laVisible(quien, postulacionId, "mover_postulacion");
+        // Un enlace para entrar a un proceso que ya no existe no lleva a ninguna parte (V60).
+        alcanceVacante.exigirQueSuVacanteSigaExistiendo(p);
+        return enlacesDeAcceso.generarEnlace(p.getId());
+    }
+
     private void vacanteVisible(ContextoUsuario quien, Long vacanteId, String permiso) {
         alcanceVacante.laVacanteVisible(quien, vacanteId, permiso);
     }
@@ -393,6 +404,8 @@ public class ServicioPostulacionesPanelImpl implements ServicioPostulacionesPane
     public ContactoDelCandidato corregirContacto(ContextoUsuario quien, Long postulacionId,
                                                  CorregirContacto datos) {
         Postulacion p = laVisible(quien, postulacionId, "corregir_contacto_candidato");
+        // Una eliminada no existe: su contacto ya no se corrige (V60).
+        alcanceVacante.exigirQueSuVacanteSigaExistiendo(p);
 
         if ((datos.email() == null || datos.email().isBlank())
                 && (datos.telefono() == null || datos.telefono().isBlank())) {

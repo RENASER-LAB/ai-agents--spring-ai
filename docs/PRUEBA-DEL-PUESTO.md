@@ -121,6 +121,19 @@ decir «esta convocatoria cierra el domingo».
   las pide. Marca `intento_prueba.plazo_propio`, y **a esos no les afecta mover la fecha de la
   vacante**.
 - Empezar la prueba no recalcula una fecha ya puesta.
+- **Una prueba cronometrada también admite fecha** (22/09/2026). Antes se rechazaba «porque
+  anularía el reloj», y dejó de ser cierto cuando empezar pasó a quedarse con **el plazo que
+  caiga antes** entre el reloj y la fecha de la convocatoria: quien abre temprano tiene sus
+  minutos completos, quien abre pegado a la fecha cierra a la fecha, y quien llega después ya
+  no puede abrirla. Las dos cosas conviven.
+- **El plazo vigente se puede leer**, que es lo que le faltaba al panel para enseñarlo antes
+  de cambiarlo: el de la vacante viaja en `GET /panel/vacantes/{id}` —con la modalidad que de
+  verdad rige, los minutos o días vigentes y cuántos exámenes abiertos movería el cambio— y el
+  de cada persona en `GET /panel/postulaciones/{id}/prueba/plazo`, que además dice de dónde
+  sale su fecha —la de la vacante, el reloj o una puesta a mano—. Lo pide el permiso de **leer**
+  la ficha (`abrir_ficha_candidato`): quien no puede mover el plazo igualmente lo ve. **El panel
+  ya los consume** desde el 22/09/2026, en la configuración de la vacante y en la ficha del
+  candidato, así que la nota de «falta el frontend» de los plazos quedó vieja.
 - **El correo de la prueba** (`PRUEBA_DISPONIBLE`, V29) lleva el PDF del enunciado por vacante,
   el plazo según la modalidad y el WhatsApp como parámetro.
 - **Cada vacante puede elegir sus textos de correo** (V31, tabla `plantilla_correo_vacante`):

@@ -27,6 +27,7 @@ import com.renaser.ai.ai_engine.postulacion.service.MaquinaEstados;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
 import com.renaser.ai.ai_engine.vacante.entity.Vacante;
 import com.renaser.ai.ai_engine.vacante.repository.VacanteRepository;
+import com.renaser.ai.ai_engine.vacante.service.VacanteEliminada;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -556,10 +557,21 @@ public class ServicioPruebaImpl implements ServicioPrueba {
                 .orElseThrow(() -> new IllegalStateException("La versión de esta prueba ya no existe"));
     }
 
+    /**
+     * La postulación y su intento, si son de quien pregunta y su vacante sigue existiendo.
+     *
+     * <p>⚠️ <b>La vacante eliminada se pregunta aquí porque esta es la única puerta</b>: ver,
+     * empezar, responder, subir un entregable y entregar pasan todas por este método. Sin
+     * ella, el enlace «tu prueba está lista» de una vacante retirada seguía abriendo el
+     * enunciado y arrancaba el reloj, y solo la entrega fallaba —con el texto crudo de la
+     * máquina de estados—. Va antes de buscar el intento: una eliminada contesta lo mismo
+     * tenga o no tenga prueba (V60).
+     */
     private Par laMia(ContextoUsuario quien, UUID uuid) {
         Postulacion postulacion = postulaciones.findByUuid(uuid)
                 .filter(p -> p.getUsuarioId().equals(quien.usuarioId()))
                 .orElseThrow(() -> new ResourceNotFoundException("Postulación", "código", uuid));
+        VacanteEliminada.exigirQueSuProcesoSigaExistiendo(postulacion, vacantes);
         IntentoPrueba intento = intentos.findByPostulacionId(postulacion.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Prueba del puesto", "postulación", uuid));
         return new Par(postulacion, intento);

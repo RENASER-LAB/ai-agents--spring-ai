@@ -28,6 +28,7 @@ import com.renaser.ai.ai_engine.vacante.repository.VacanteRepository;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -553,6 +554,135 @@ class ServicioCalificacionPruebaImplTest {
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
+    // ============ Qué plazo rige hoy para esta persona ============
+    //
+    // La ficha ofrecía el campo de fecha en blanco sobre cuatro situaciones que no se
+    // parecen en nada. Lo que se prueba aquí es que las cuatro se distinguen sin reventar:
+    // las dos ausencias —no llegó a la etapa, rinde el cuestionario— son caminos normales, y
+    // `definirPlazo` las contesta a las dos con «Prueba del puesto no encontrada».
+
+    @Test
+    @DisplayName("con la fecha de la convocatoria, el origen es la vacante")
+    void elPlazoVieneDeLaVacante() {
+        Instant domingo = Instant.parse("2026-09-20T23:59:00Z");
+        conPostulacionVisible("abrir_ficha_candidato");
+        hayVacante("PLANTILLA", domingo);
+        when(intentos.findByPostulacionId(POSTULACION)).thenReturn(Optional.of(
+                IntentoPrueba.builder().id(9L).postulacionId(POSTULACION)
+                        .iniciadoEn(Instant.parse("2026-09-18T10:00:00Z"))
+                        .venceEn(domingo).plazoPropio(false).build()));
+
+        var plazo = servicio.verPlazo(QUIEN, POSTULACION);
+
+        assertThat(plazo.existeIntento()).isTrue();
+        assertThat(plazo.venceEn()).isEqualTo(domingo);
+        assertThat(plazo.origen()).isEqualTo("VACANTE");
+        assertThat(plazo.entregadoEn()).isNull();
+    }
+
+    @Test
+    @DisplayName("la fecha puesta a mano se dice «propia» aunque coincida con la de la vacante")
+    void laFechaAManoSeDistingue() {
+        // El caso que obliga a mirar `plazoPropio` PRIMERO: las dos fechas pueden coincidir y
+        // la suya sigue siendo suya — mover la de la convocatoria no se la toca.
+        Instant domingo = Instant.parse("2026-09-20T23:59:00Z");
+        conPostulacionVisible("abrir_ficha_candidato");
+        hayVacante("PLANTILLA", domingo);
+        when(intentos.findByPostulacionId(POSTULACION)).thenReturn(Optional.of(
+                IntentoPrueba.builder().id(9L).postulacionId(POSTULACION)
+                        .venceEn(domingo).plazoPropio(true).build()));
+
+        assertThat(servicio.verPlazo(QUIEN, POSTULACION).origen()).isEqualTo("PROPIO");
+    }
+
+    @Test
+    @DisplayName("ya empezado y con otra fecha que la de la vacante, la calculó el reloj")
+    void elPlazoLoCalculoElReloj() {
+        conPostulacionVisible("abrir_ficha_candidato");
+        hayVacante("PLANTILLA", null);
+        Instant empezo = Instant.parse("2026-09-18T10:00:00Z");
+        when(intentos.findByPostulacionId(POSTULACION)).thenReturn(Optional.of(
+                IntentoPrueba.builder().id(9L).postulacionId(POSTULACION)
+                        .iniciadoEn(empezo).venceEn(empezo.plusSeconds(1800))
+                        .plazoPropio(false).build()));
+
+        var plazo = servicio.verPlazo(QUIEN, POSTULACION);
+
+        assertThat(plazo.origen()).isEqualTo("RELOJ");
+        assertThat(plazo.iniciadoEn()).isEqualTo(empezo);
+    }
+
+    @Test
+    @DisplayName("sin intento no es un error: todavía no llegó a la etapa")
+    void sinIntentoSeContestaQueTodaviaNoTiene() {
+        conPostulacionVisible("abrir_ficha_candidato");
+        hayVacante("PLANTILLA", null);
+        when(intentos.findByPostulacionId(POSTULACION)).thenReturn(Optional.empty());
+
+        var plazo = servicio.verPlazo(QUIEN, POSTULACION);
+
+        assertThat(plazo.existeIntento())
+                .as("un 404 aquí se lee en la ficha como una avería, y es el camino normal")
+                .isFalse();
+        assertThat(plazo.instrumento()).isEqualTo("PLANTILLA");
+        assertThat(plazo.venceEn()).isNull();
+    }
+
+    @Test
+    @DisplayName("con cuestionario técnico no se mira ningún intento: no lo usa")
+    void conCuestionarioTecnicoNoHayIntentoQueMirar() {
+        conPostulacionVisible("abrir_ficha_candidato");
+        hayVacante("CUESTIONARIO_TECNICO", null);
+
+        var plazo = servicio.verPlazo(QUIEN, POSTULACION);
+
+        assertThat(plazo.existeIntento()).isFalse();
+        assertThat(plazo.instrumento()).isEqualTo("CUESTIONARIO_TECNICO");
+        verifyNoInteractions(intentos);
+    }
+
+    @Test
+    @DisplayName("una fecha vacía se dice como «todavía no tiene», no como un origen")
+    void sinFechaNoHayOrigen() {
+        conPostulacionVisible("abrir_ficha_candidato");
+        hayVacante("PLANTILLA", null);
+        when(intentos.findByPostulacionId(POSTULACION)).thenReturn(Optional.of(
+                IntentoPrueba.builder().id(9L).postulacionId(POSTULACION).build()));
+
+        var plazo = servicio.verPlazo(QUIEN, POSTULACION);
+
+        assertThat(plazo.existeIntento()).isTrue();
+        assertThat(plazo.venceEn())
+                .as("los datos antiguos son así y no son un error")
+                .isNull();
+        assertThat(plazo.origen()).isNull();
+    }
+
+    @Test
+    @DisplayName("leer el plazo pide el permiso de abrir la ficha, no el de moverla")
+    void leerElPlazoPideAbrirLaFicha() {
+        fueraDeAlcance("abrir_ficha_candidato");
+
+        assertThatThrownBy(() -> servicio.verPlazo(QUIEN, POSTULACION))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    /**
+     * La vacante de la postulación: qué instrumento rinde y con qué fecha común.
+     *
+     * <p>Se dobla {@code findByIdAndOrganizacionId} y no {@code findById}: el servicio la
+     * busca con la organización de la propia postulación, que es lo que impide que con dos
+     * empresas la ficha enseñe el plazo de la otra.
+     */
+    private void hayVacante(String instrumento, Instant pruebaCierraEn) {
+        when(vacantes.findByIdAndOrganizacionId(VACANTE, ORGANIZACION))
+                .thenReturn(Optional.of(Vacante.builder()
+                        .id(VACANTE).organizacionId(ORGANIZACION)
+                        .instrumentoEtapaTecnica(instrumento)
+                        .pruebaCierraEn(pruebaCierraEn)
+                        .build()));
+    }
+
     /** La rúbrica publicada, con el método de verificación de cada criterio. */
     private void hayRubricaCon(String... metodos) {
         List<Criterio> rubrica = new java.util.ArrayList<>();
@@ -567,5 +697,76 @@ class ServicioCalificacionPruebaImplTest {
         }
         when(criterios.findByVersionPlantillaPruebaIdOrderByOrden(VERSION_PLANTILLA))
                 .thenReturn(rubrica);
+    }
+
+    // ============ Una vacante eliminada (V60) ============
+
+    /**
+     * Las escrituras sobre la prueba de alguien cuya vacante se eliminó.
+     *
+     * <p>Es la regresión de QA-830D-C2-2: con el formulario «El plazo de esta persona»
+     * abierto desde antes de eliminar, «Guardar el plazo» contestaba 200, movía el intento y
+     * dejaba auditoría, cuando la fecha de la vacante y mover la postulación ya contestaban
+     * 404. Las otras tres escrituras del servicio entraban por la misma puerta sin guarda.
+     */
+    @Nested
+    @DisplayName("Si su vacante se eliminó, nada de su prueba se escribe desde el panel")
+    class DeUnaVacanteEliminada {
+
+        /** Lo que contesta el guardián sobre una postulación de una vacante eliminada. */
+        private void suVacanteSeElimino(String permiso) {
+            conPostulacionVisible(permiso);
+            org.mockito.Mockito.doThrow(new ResourceNotFoundException("Vacante", "id", VACANTE))
+                    .when(alcanceVacante).exigirQueSuVacanteSigaExistiendo(any());
+        }
+
+        /** El mismo 404 que la vacante por su id: una eliminada no existe (404, no 409). */
+        private void contestaComoLaVacante(
+                org.assertj.core.api.ThrowableAssert.ThrowingCallable accion) {
+            assertThatThrownBy(accion)
+                    .isInstanceOf(ResourceNotFoundException.class)
+                    .hasMessageContaining("Vacante")
+                    .hasMessageContaining(String.valueOf(VACANTE));
+            // Ni se lee el intento, ni se escribe nota, ni se encola, ni se audita nada.
+            verifyNoInteractions(intentos, criterios, notasCriterio, notasEtapa, cola,
+                    auditoria, calificacion, cuestionarioTecnico);
+        }
+
+        @Test
+        @DisplayName("su plazo no se mueve: 404, sin tocar el intento ni dejar auditoría")
+        void elPlazo() {
+            suVacanteSeElimino("mover_postulacion");
+
+            contestaComoLaVacante(() -> servicio.definirPlazo(QUIEN, POSTULACION,
+                    new DefinirPlazoPrueba(
+                            Instant.now().plus(10, java.time.temporal.ChronoUnit.DAYS),
+                            "Más días para una vacante que ya no existe")));
+        }
+
+        @Test
+        @DisplayName("la nota de un criterio no se pone: 404")
+        void laNotaDeUnCriterio() {
+            suVacanteSeElimino("ajustar_nota");
+
+            contestaComoLaVacante(() -> servicio.ponerNota(QUIEN, POSTULACION, 3L,
+                    new com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba
+                            .PonerNotaCriterio(8.0, "Resolvió el caso")));
+        }
+
+        @Test
+        @DisplayName("la nota de la etapa no se calcula: 404")
+        void laNotaDeLaEtapa() {
+            suVacanteSeElimino("ajustar_nota");
+
+            contestaComoLaVacante(() -> servicio.calcularNotaEtapa(QUIEN, POSTULACION));
+        }
+
+        @Test
+        @DisplayName("la IA no se encola: 404, y no se le paga al proveedor por nada")
+        void laCalificacionConIa() {
+            suVacanteSeElimino("ajustar_nota");
+
+            contestaComoLaVacante(() -> servicio.calificarConIa(QUIEN, POSTULACION));
+        }
     }
 }

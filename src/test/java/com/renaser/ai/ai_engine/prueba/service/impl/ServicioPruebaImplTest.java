@@ -1,5 +1,6 @@
 package com.renaser.ai.ai_engine.prueba.service.impl;
 
+import com.renaser.ai.ai_engine.ai.exception.ResourceNotFoundException;
 import com.renaser.ai.ai_engine.archivo.service.AlmacenArchivos;
 import com.renaser.ai.ai_engine.postulacion.entity.Postulacion;
 import com.renaser.ai.ai_engine.postulacion.repository.PostulacionRepository;
@@ -22,6 +23,7 @@ import com.renaser.ai.ai_engine.vacante.repository.VacanteRepository;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -35,12 +37,14 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -266,6 +270,21 @@ class ServicioPruebaImplTest {
         assertThat(intento.getVenceEn()).isEqualTo(cierraEn);
     }
 
+    @Test
+    @DisplayName("pasada la fecha de la convocatoria ya no se abre, y se dice por qué")
+    void pasadaLaFechaNoSeEmpieza() {
+        // La otra mitad de que una cronometrada acepte fecha: la fecha es lo que impide
+        // empezar el examen la semana siguiente a que cerrara la convocatoria. Sin esto,
+        // quien no la hubiera abierto estrenaría sus minutos completos cuando quisiera.
+        IntentoPrueba intento = intentoSinEmpezar();
+        intento.setVenceEn(Instant.now().minus(1, ChronoUnit.HOURS));
+
+        assertThatThrownBy(() -> servicio.iniciar(QUIEN, UUID_POSTULACION))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("ya se agotó");
+        assertThat(intento.getIniciadoEn()).isNull();
+    }
+
     // ============ plazoPropio es sagrado ============
 
     @Test
@@ -475,5 +494,82 @@ class ServicioPruebaImplTest {
                 .guardar(org.mockito.ArgumentMatchers.eq(empresaDeLaVacante), any());
         org.mockito.Mockito.verify(almacen, org.mockito.Mockito.never())
                 .guardar(org.mockito.ArgumentMatchers.eq(ORGANIZACION), any());
+    }
+
+    // ============ Una vacante eliminada (V60) ============
+
+    /**
+     * El enlace «tu prueba está lista» de una vacante que se eliminó.
+     *
+     * <p>Es la regresión de QA-830D-C2-1: el proceso ya contestaba 404, pero la prueba se
+     * abría con su enunciado, arrancaba el reloj y dejaba responder; solo la entrega fallaba,
+     * y con el texto crudo de la máquina de estados. Todas sus puertas pasan por
+     * {@code laMia}, y cada una se prueba por separado porque basta con que una se salte la
+     * guarda para que el hueco siga abierto.
+     */
+    @Nested
+    @DisplayName("Si su vacante se eliminó, la prueba ya no existe para el candidato")
+    class DeUnaVacanteEliminada {
+
+        @BeforeEach
+        void suVacanteSeElimino() {
+            Postulacion p = Postulacion.builder()
+                    .id(POSTULACION).uuid(UUID_POSTULACION).usuarioId(QUIEN.usuarioId())
+                    .organizacionId(ORGANIZACION).vacanteId(VACANTE)
+                    .build();
+            when(postulaciones.findByUuid(UUID_POSTULACION)).thenReturn(Optional.of(p));
+            when(vacantes.existsByIdAndEliminadaEnIsNotNull(VACANTE)).thenReturn(true);
+        }
+
+        /** El mismo 404 que su proceso: una postulación por su código, no una vacante. */
+        private void contestaComoSuProceso(org.assertj.core.api.ThrowableAssert.ThrowingCallable accion) {
+            assertThatThrownBy(accion)
+                    .isInstanceOf(ResourceNotFoundException.class)
+                    .hasMessageContaining("Postulación")
+                    .hasMessageContaining(UUID_POSTULACION.toString());
+            // Ni siquiera se busca el intento: tenga o no prueba, contesta lo mismo.
+            verify(intentos, never()).findByPostulacionId(anyLong());
+            verify(intentos, never()).save(any(IntentoPrueba.class));
+        }
+
+        @Test
+        @DisplayName("verla contesta 404")
+        void verla() {
+            contestaComoSuProceso(() -> servicio.ver(QUIEN, UUID_POSTULACION));
+        }
+
+        @Test
+        @DisplayName("empezarla contesta 404 y no arranca ningún reloj")
+        void empezarla() {
+            contestaComoSuProceso(() -> servicio.iniciar(QUIEN, UUID_POSTULACION));
+        }
+
+        @Test
+        @DisplayName("responder una pregunta contesta 404 y no guarda nada")
+        void responderla() {
+            contestaComoSuProceso(() -> servicio.responder(QUIEN, UUID_POSTULACION, 3L,
+                    new com.renaser.ai.ai_engine.prueba.dto.DtosPrueba.Responder("Lo haría así")));
+            verify(respuestas, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("subir un entregable, archivo o enlace, contesta 404 y no guarda nada")
+        void subirEntregables() {
+            contestaComoSuProceso(() -> servicio.subirEntregableArchivo(QUIEN, UUID_POSTULACION,
+                    5L, new org.springframework.mock.web.MockMultipartFile(
+                            "archivo", "informe.pdf", "application/pdf", "algo".getBytes())));
+            contestaComoSuProceso(() -> servicio.subirEntregableEnlace(QUIEN, UUID_POSTULACION,
+                    5L, new com.renaser.ai.ai_engine.prueba.dto.DtosPrueba.SubirEntregableEnlace(
+                            "https://ejemplo.pe/informe")));
+            verify(almacen, never()).guardar(anyLong(), any());
+            verify(entregables, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("entregarla contesta 404 en vez del texto de la máquina de estados")
+        void entregarla() {
+            contestaComoSuProceso(() -> servicio.entregar(QUIEN, UUID_POSTULACION));
+            verifyNoInteractions(maquina);
+        }
     }
 }

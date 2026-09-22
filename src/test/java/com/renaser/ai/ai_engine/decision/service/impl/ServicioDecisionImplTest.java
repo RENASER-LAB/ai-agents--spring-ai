@@ -229,4 +229,68 @@ class ServicioDecisionImplTest {
         assertThatThrownBy(() -> servicio.listarBarrerasDeVacante(QUIEN, VACANTE))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
+
+    // ============ Una vacante eliminada (V60) ============
+
+    /**
+     * Decidir, registrar una barrera detectada y pedir evidencia adicional sobre alguien cuya
+     * vacante se eliminó. Decidir transiciona, y antes se frenaba en la máquina de estados con
+     * su propio texto; ahora las tres contestan 404 antes de llegar ahí.
+     */
+    @org.junit.jupiter.api.Nested
+    @DisplayName("Si su vacante se eliminó, sobre esa persona ya no se decide nada")
+    class DeUnaVacanteEliminada {
+
+        @BeforeEach
+        void suVacanteSeElimino() {
+            org.mockito.Mockito.doThrow(new ResourceNotFoundException("Vacante", "id", VACANTE))
+                    .when(alcanceVacante).exigirQueSuVacanteSigaExistiendo(any());
+        }
+
+        private void visible(String permiso) {
+            when(alcanceVacante.laPostulacionVisible(any(), eq(POSTULACION), eq(permiso)))
+                    .thenReturn(Postulacion.builder().id(POSTULACION).organizacionId(ORGANIZACION)
+                            .vacanteId(VACANTE).estadoCodigo("CERRADA").build());
+        }
+
+        private void contestaComoLaVacante(
+                org.assertj.core.api.ThrowableAssert.ThrowingCallable accion) {
+            assertThatThrownBy(accion)
+                    .isInstanceOf(ResourceNotFoundException.class)
+                    .hasMessageContaining("Vacante")
+                    .hasMessageContaining(String.valueOf(VACANTE));
+        }
+
+        @Test
+        @DisplayName("decidir contesta 404 y no la mueve")
+        void decidir() {
+            visible("ver_semaforo_decision");
+
+            contestaComoLaVacante(() -> servicio.decidir(QUIEN, POSTULACION,
+                    new com.renaser.ai.ai_engine.decision.dto.DtosDecision.Decidir(
+                            "VERDE", "Cumple todo")));
+            org.mockito.Mockito.verifyNoInteractions(decisiones, maquina, auditoria, notasEtapa);
+        }
+
+        @Test
+        @DisplayName("registrar una barrera detectada contesta 404 y no la guarda")
+        void registrarUnaBarrera() {
+            visible("decidir_contratacion");
+
+            contestaComoLaVacante(() -> servicio.registrarBarreraDetectada(QUIEN, POSTULACION,
+                    new RegistrarBarrera(7L, "Antecedentes")));
+            org.mockito.Mockito.verifyNoInteractions(barrerasCriticas, barrerasDetectadas);
+        }
+
+        @Test
+        @DisplayName("pedir evidencia adicional contesta 404 y no la pide")
+        void pedirEvidencia() {
+            visible("pedir_evidencia_adicional");
+
+            contestaComoLaVacante(() -> servicio.pedirEvidenciaAdicional(QUIEN, POSTULACION,
+                    new com.renaser.ai.ai_engine.decision.dto.DtosDecision.PedirEvidencia(
+                            "Falta una referencia", "Cuéntanos tu último proyecto")));
+            org.mockito.Mockito.verifyNoInteractions(evidencias, maquina, auditoria);
+        }
+    }
 }

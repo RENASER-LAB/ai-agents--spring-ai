@@ -38,6 +38,7 @@ import com.renaser.ai.ai_engine.vacante.repository.PuestoRepository;
 import com.renaser.ai.ai_engine.vacante.repository.RequisitoObjetivoRepository;
 import com.renaser.ai.ai_engine.vacante.repository.VacanteRepository;
 import com.renaser.ai.ai_engine.vacante.service.Remuneracion;
+import com.renaser.ai.ai_engine.vacante.service.VacanteEliminada;
 import com.renaser.ai.ai_engine.notificacion.service.ServicioAvisosPortal;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -461,17 +462,15 @@ public class ServicioPostulacionPortalImpl implements ServicioPostulacionPortal 
      * campana. Enseñarlo sería abrir la ficha de un puesto que el portal ya no reconoce; el
      * portal traduce este 404 a «esta vacante ya no está disponible».
      *
-     * <p>Se pregunta con un {@code exists} para no cargar la vacante entera de una
-     * postulación de la que solo hace falta saber eso.
+     * <p>La pregunta es la de {@link VacanteEliminada#exigirQueSuProcesoSigaExistiendo}, la
+     * misma que hacen la evaluación, el cuestionario técnico, la prueba del puesto y la
+     * simulación: los enlaces de esas pantallas cuelgan del mismo código de postulación.
      */
     private Postulacion laMia(ContextoUsuario quien, UUID uuid) {
         Postulacion mia = postulaciones.findByUuid(uuid)
                 .filter(p -> p.getUsuarioId().equals(quien.usuarioId()))
                 .orElseThrow(() -> new ResourceNotFoundException("Postulación", "código", uuid));
-        if (mia.getVacanteId() != null
-                && vacantes.existsByIdAndEliminadaEnIsNotNull(mia.getVacanteId())) {
-            throw new ResourceNotFoundException("Postulación", "código", uuid);
-        }
+        VacanteEliminada.exigirQueSuProcesoSigaExistiendo(mia, vacantes);
         return mia;
     }
 

@@ -139,7 +139,45 @@ public final class DtosVacante {
                                 * <p>Viaja en la fila como los otros dos y no en un endpoint
                                 * de permisos aparte: el alcance se decide por vacante.
                                 */
-                               boolean puedeEliminar) {}
+                               boolean puedeEliminar,
+                               /**
+                                * Cuándo cierra la prueba de esta vacante, para todos.
+                                *
+                                * <p>Vacío = no hay fecha común y a cada persona se le cuenta
+                                * su plazo desde que empieza. Sale también en la lista porque
+                                * es un campo de la propia vacante y no cuesta ninguna
+                                * consulta.
+                                */
+                               Instant pruebaCierraEn,
+                               /**
+                                * La modalidad que de verdad rige hoy en la etapa técnica:
+                                * {@code CRONOMETRADA}, {@code PLAZO_ABIERTO} o vacío.
+                                *
+                                * <p>Es la <b>efectiva</b>, no la de la fila de la plantilla:
+                                * con minutos propios de la vacante cualquier prueba se
+                                * comporta como cronometrada, y es el mismo criterio que usa
+                                * {@code ServicioPruebaImpl} al arrancar el reloj. Vacío en
+                                * una vacante con cuestionario técnico o sin prueba elegida.
+                                *
+                                * <p>⚠️ <b>Solo viaja en el detalle</b> —lo mismo que los
+                                * cuatro campos de abajo—: sacarlo en la lista costaría una
+                                * consulta por fila en la pantalla que más se abre. En la
+                                * lista llega vacío y el panel lo lee como «sin dato».
+                                */
+                               String modalidadPrueba,
+                               /** Los minutos que rigen hoy, o vacío si esta prueba se mide en días. */
+                               Integer minutosPruebaVigentes,
+                               /** Los días que rigen hoy desde que cada persona empieza, o vacío. */
+                               Integer diasPruebaVigentes,
+                               /**
+                                * Cuántos exámenes abiertos se moverían al cambiar la fecha.
+                                *
+                                * <p>Es la cifra que el panel dice ANTES de guardar; hasta
+                                * ahora solo se conocía después, en la respuesta del POST.
+                                */
+                               Integer intentosAbiertosSinPlazoPropio,
+                               /** Y cuántos se quedarían como están por tener fecha propia. */
+                               Integer intentosAbiertosConPlazoPropio) {}
 
     /**
      * Cuántas vacantes archivadas hay, para el botón «Archivadas (N)» de la cabecera.

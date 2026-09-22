@@ -281,4 +281,36 @@ class AlcanceSobreLaVacanteTest {
                 new FiltroAlcance(FiltroAlcance.Tipo.TODO, QUIEN_MIRA), null, id -> Optional.empty()))
                 .isFalse();
     }
+
+    // ============ Antes de escribir: que su vacante siga existiendo (V60) ============
+
+    @Test
+    @DisplayName("Si su vacante se eliminó, escribir sobre la postulación contesta 404 como la vacante")
+    void conLaVacanteEliminadaNoSeEscribe() {
+        when(vacantes.existsByIdAndEliminadaEnIsNotNull(VACANTE)).thenReturn(true);
+
+        assertThatThrownBy(() -> alcance.exigirQueSuVacanteSigaExistiendo(laPostulacion()))
+                .isInstanceOf(ResourceNotFoundException.class)
+                .hasMessageContaining("Vacante")
+                .hasMessageContaining(String.valueOf(VACANTE));
+    }
+
+    @Test
+    @DisplayName("Con la vacante viva no se interpone, y no se trae la vacante entera")
+    void conLaVacanteVivaPasa() {
+        when(vacantes.existsByIdAndEliminadaEnIsNotNull(VACANTE)).thenReturn(false);
+
+        alcance.exigirQueSuVacanteSigaExistiendo(laPostulacion());
+
+        verify(vacantes, never()).findById(any());
+    }
+
+    @Test
+    @DisplayName("Una postulación sin vacante no se toma por eliminada ni se pregunta nada")
+    void sinVacanteNoSePregunta() {
+        alcance.exigirQueSuVacanteSigaExistiendo(Postulacion.builder()
+                .id(POSTULACION).organizacionId(ORGANIZACION).build());
+
+        verifyNoInteractions(vacantes);
+    }
 }

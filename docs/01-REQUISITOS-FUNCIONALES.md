@@ -402,9 +402,14 @@ conocidos](DEFECTOS-CONOCIDOS.md), §11).
 el panel responde 404; no sale en la lista habitual, en Archivadas ni en su contador, en el
 tablón, en «Mis procesos», en los rankings, en las exportaciones ni en la selección de vacantes de
 las sesiones de simulación; en el portal, su detalle público y sus procesos dicen «Esta vacante ya
-no está disponible»; rechaza postulaciones nuevas, y ningún proceso automático —vencimientos, pase
-automático, calificación— la procesa. Tampoco se edita, se cambia el sueldo, se publica, se
-reconfigura, se archiva ni se desarchiva, aunque el formulario se hubiera abierto antes. Los
+no está disponible», y lo mismo su evaluación, su cuestionario técnico, su prueba del puesto y las
+fechas de su simulación, también si el candidato las tenía abiertas: lo que empiece, responda,
+suba o entregue ahí ya no se guarda; rechaza postulaciones nuevas, y ningún proceso automático
+—vencimientos, pase automático, calificación— la procesa. Tampoco se edita, se cambia el sueldo,
+se publica, se reconfigura, se archiva ni se desarchiva, ni se escribe nada sobre sus
+postulaciones —notas, plazos, currículum, contacto, enlace de acceso, simulación, validación o
+decisión—, aunque el formulario se hubiera abierto antes. La ficha de esas postulaciones, su
+prueba y su plazo siguen consultables por su id, sin escritura (decisión del 22/09/2026). Los
 avisos antiguos de la campana que apuntaban a ella se conservan, sin enlace. Repetir la
 eliminación responde 404 sin volver a cerrar, auditar ni avisar. **No se restaura desde el
 panel**: solo soporte, directamente en la base. Su título se puede reutilizar, y el borrado de

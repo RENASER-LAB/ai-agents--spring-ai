@@ -24,6 +24,7 @@ import com.renaser.ai.ai_engine.usuario.service.NombresDeUsuarios;
 import com.renaser.ai.ai_engine.vacante.entity.Vacante;
 import com.renaser.ai.ai_engine.vacante.repository.VacanteRepository;
 import com.renaser.ai.ai_engine.vacante.service.AlcanceSobreLaVacante;
+import com.renaser.ai.ai_engine.vacante.service.VacanteEliminada;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -507,6 +508,7 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
 
         InscripcionYPostulacion par = laInscripcion(quien, inscripcionId);
         exigirQueAlcance(quien, alcance, par);
+        alcanceVacante.exigirQueSuVacanteSigaExistiendo(par.postulacion());
         exigirSerDeLosResponsables(quien, par.inscripcion().getSesionSimulacionId());
 
         // Cada evento ocurre una vez. Volver a marcarlo corrige la hora, no crea otro.
@@ -541,6 +543,8 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
         // propósito: puede estar en la sala sin ser responsable de esa vacante (V18). Con TODO
         // esto no recorta nada; está aquí para que siga siendo verdad si alguien edita la fila.
         exigirQueAlcance(quien, permisos.alcanceDe("marcar_asistencia"), par);
+        // Marcar asistencia TRANSICIONA la postulación: sobre una eliminada, 404 (V60).
+        alcanceVacante.exigirQueSuVacanteSigaExistiendo(par.postulacion());
 
         InscripcionSesion inscripcion = par.inscripcion();
         inscripcion.setAsistio(datos.asistio());
@@ -574,7 +578,7 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
     @Override
     @Transactional
     public void decidirSobreAusente(ContextoUsuario quien, Long postulacionId, DecidirSobreAusente datos) {
-        Postulacion postulacion = laVisible(quien, postulacionId, "decidir_sobre_ausente");
+        Postulacion postulacion = laQueSePuedeTocar(quien, postulacionId, "decidir_sobre_ausente");
         if (!ESPERANDO.equals(postulacion.getEstadoCodigo())) {
             throw new IllegalStateException(
                     "Esta postulación no está esperando que se decida qué hacer con ella");
@@ -597,7 +601,7 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
     @Override
     @Transactional
     public Long registrarPregunta(ContextoUsuario quien, Long postulacionId, RegistrarPregunta datos) {
-        laVisible(quien, postulacionId, "hacer_conversacion_final");
+        laQueSePuedeTocar(quien, postulacionId, "hacer_conversacion_final");
         // La alerta que la pregunta cita tiene que ser de ESTA postulación: sin la
         // comprobación, la fila guardaba una clave foránea hacia el expediente de otra
         // empresa y la ficha la enseñaba después como si fuera propia.
@@ -622,7 +626,7 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
     public void responderPregunta(ContextoUsuario quien, Long preguntaId, ResponderPregunta datos) {
         PreguntaGenerada pregunta = preguntas.findById(preguntaId)
                 .orElseThrow(() -> new ResourceNotFoundException("Pregunta", "id", preguntaId));
-        laVisible(quien, pregunta.getPostulacionId(), "hacer_conversacion_final");
+        laQueSePuedeTocar(quien, pregunta.getPostulacionId(), "hacer_conversacion_final");
 
         pregunta.setRespuesta(datos.respuesta());
         pregunta.setRiesgoResuelto(datos.riesgoResuelto());
@@ -633,7 +637,7 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
 
     @Override
     public PreguntasEncoladas generarPreguntas(ContextoUsuario quien, Long postulacionId) {
-        laVisible(quien, postulacionId, "hacer_conversacion_final");
+        laQueSePuedeTocar(quien, postulacionId, "hacer_conversacion_final");
         if (!cola.encolarPreguntasSimulacion(postulacionId)) {
             return new PreguntasEncoladas("SIN_CAMBIOS",
                     "No se pidió nada: o las preguntas ya están preparadas, o hay una petición "
@@ -743,14 +747,37 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
     /** Una inscripción con su postulación: aquí nunca hace falta una sin la otra. */
     private record InscripcionYPostulacion(InscripcionSesion inscripcion, Postulacion postulacion) {}
 
+    /**
+     * La postulación de quien pregunta desde el portal, si su vacante sigue existiendo.
+     *
+     * <p>Las fechas disponibles, inscribirse y «mi sesión» entran por aquí. Una vacante
+     * eliminada ya salió de la selección de vacantes de las sesiones; esto cierra además el
+     * enlace viejo del candidato, para que no pueda reservar plaza en —ni seguir viendo— la
+     * sesión de un proceso que ya no existe (V60).
+     */
     private Postulacion laMia(ContextoUsuario quien, UUID uuid) {
-        return postulaciones.findByUuid(uuid)
+        Postulacion mia = postulaciones.findByUuid(uuid)
                 .filter(p -> p.getUsuarioId().equals(quien.usuarioId()))
                 .orElseThrow(() -> new ResourceNotFoundException("Postulación", "código", uuid));
+        VacanteEliminada.exigirQueSuProcesoSigaExistiendo(mia, vacantes);
+        return mia;
     }
 
     private Postulacion laVisible(ContextoUsuario quien, Long postulacionId, String permiso) {
         return alcanceVacante.laPostulacionVisible(quien, postulacionId, permiso);
+    }
+
+    /**
+     * La postulación sobre la que se va a <b>escribir</b>: visible y de una vacante que sigue
+     * existiendo. Una eliminada contesta 404 (V60); ver
+     * {@link AlcanceSobreLaVacante#exigirQueSuVacanteSigaExistiendo}. Las lecturas siguen por
+     * {@code laVisible}.
+     */
+    private Postulacion laQueSePuedeTocar(ContextoUsuario quien, Long postulacionId,
+                                          String permiso) {
+        Postulacion postulacion = laVisible(quien, postulacionId, permiso);
+        alcanceVacante.exigirQueSuVacanteSigaExistiendo(postulacion);
+        return postulacion;
     }
 
     /**

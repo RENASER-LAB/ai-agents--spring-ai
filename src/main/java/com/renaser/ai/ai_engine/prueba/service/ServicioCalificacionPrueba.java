@@ -5,6 +5,7 @@ import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.DefinirPlazoPr
 import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.EntregaDeLaPrueba;
 import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.NotaCriterioResponse;
 import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.PlazoPrueba;
+import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.PlazoVigente;
 import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.PonerNotaCriterio;
 import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.RespuestaDePrueba;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
@@ -100,4 +101,22 @@ public interface ServicioCalificacionPrueba {
      *                               que ya se entregó no cambia nada y engaña al que lo mira
      */
     PlazoPrueba definirPlazo(ContextoUsuario quien, Long postulacionId, DefinirPlazoPrueba datos);
+
+    /**
+     * Qué plazo rige hoy para esta persona, y en qué estado está su prueba.
+     *
+     * <p>Es la lectura que le faltaba a {@link #definirPlazo}: el panel ofrecía el campo de
+     * fecha en blanco sin poder decir cuándo le cierra, de dónde sale esa fecha ni si ya
+     * entregó —y a quien ya entregó el servidor le contesta que no—. Con esto la ficha lo
+     * dice antes de que nadie escriba nada.
+     *
+     * <p><b>No revienta cuando no hay prueba.</b> Ni el candidato que aún no llegó a la
+     * etapa ni la vacante que rinde el cuestionario técnico tienen {@code intento_prueba}, y
+     * los dos son caminos normales: se contestan con {@code existeIntento=false} y el
+     * instrumento de la vacante, para que la pantalla diga cuál de los dos es.
+     *
+     * <p>Pide {@code abrir_ficha_candidato} —leer, como las respuestas y los entregables— y
+     * no {@code mover_postulacion}: quien no puede cambiar el plazo tiene que poder verlo.
+     */
+    PlazoVigente verPlazo(ContextoUsuario quien, Long postulacionId);
 }

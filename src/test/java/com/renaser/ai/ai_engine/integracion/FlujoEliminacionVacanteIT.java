@@ -40,6 +40,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -797,6 +798,200 @@ public class FlujoEliminacionVacanteIT {
                         .isZero();
             }
         }
+    }
+
+    // ============ 16. Su prueba del puesto tampoco tiene puertas (QA-830D-C2) ============
+
+    /**
+     * La prueba del puesto de quien estaba dentro, por las dos puertas que siguen abiertas
+     * después de eliminar: el enlace del portal y el plazo de cada persona en el panel.
+     *
+     * <p>Es la regresión de QA-830D-C2-1 y C2-2. El proceso ya contestaba 404, pero
+     * {@code /portal/prueba/{uuid}} abría el enunciado y {@code /inicio} arrancaba el reloj;
+     * y {@code POST /panel/postulaciones/{id}/prueba/plazo} movía la fecha y dejaba auditoría
+     * sobre una postulación cerrada de una convocatoria retirada. Se le da a Ana un intento
+     * sin empezar y con plazo futuro para que ningún 404 pueda salir de que le falte la
+     * prueba o de que ya se le venció: solo de la vacante eliminada.
+     */
+    @Test
+    @Order(16)
+    @DisplayName("su prueba del puesto no se abre por el enlace del portal ni se toca desde el panel")
+    void suPruebaDelPuestoYaNoTienePuertas() throws Exception {
+        long intento = jdbc.queryForObject("""
+                insert into intento_prueba (postulacion_id, version_plantilla_prueba_id, vence_en)
+                values (?, ?, date_trunc('second', now()) + interval '7 days') returning id""",
+                Long.class, postulacionA, versionPruebaId);
+        String antes = elIntento(intento);
+        long anotadosAntes = contar("select count(*) from auditoria where entidad = "
+                + "'intento_prueba' and entidad_id = " + intento);
+        long criterio = jdbc.queryForObject("select id from criterio where "
+                + "version_plantilla_prueba_id = ? order by id limit 1", Long.class, versionPruebaId);
+
+        // El portal: el mismo 404 que su proceso, en cada puerta del enlace viejo.
+        String ana = "Bearer " + tokenCandidatoA;
+        mvc.perform(get("/api/v1/portal/prueba/" + uuidA).header("Authorization", ana))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.Resource").value("Postulación"));
+        mvc.perform(post("/api/v1/portal/prueba/" + uuidA + "/inicio").header("Authorization", ana))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.Resource").value("Postulación"));
+        mvc.perform(put("/api/v1/portal/prueba/" + uuidA + "/respuestas/1")
+                        .header("Authorization", ana)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"texto\":\"Así\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.Resource").value("Postulación"));
+        mvc.perform(post("/api/v1/portal/prueba/" + uuidA + "/entrega").header("Authorization", ana))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.Resource").value("Postulación"));
+        // Y la simulación, que sin la guarda contestaba 200 con las fechas de su vacante.
+        mvc.perform(get("/api/v1/portal/simulacion/" + uuidA + "/sesiones")
+                        .header("Authorization", ana))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.Resource").value("Postulación"));
+
+        // El panel: sus cuatro escrituras contestan como la vacante, 404 y no 409.
+        conToken(post("/api/v1/panel/postulaciones/" + postulacionA + "/prueba/plazo"),
+                tokenEquipo, """
+                {"venceEn": "%s", "motivo": "Más días para una vacante que ya no existe"}"""
+                        .formatted(Instant.now().plus(10, java.time.temporal.ChronoUnit.DAYS)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.Resource").value("Vacante"));
+        conToken(post("/api/v1/panel/postulaciones/" + postulacionA + "/prueba/criterios/"
+                + criterio + "/nota"), tokenEquipo, """
+                {"puntaje": 50, "explicacion": "No debería guardarse"}""")
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.Resource").value("Vacante"));
+        conToken(post("/api/v1/panel/postulaciones/" + postulacionA + "/prueba/calificacion"),
+                tokenEquipo, null).andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.Resource").value("Vacante"));
+        conToken(post("/api/v1/panel/postulaciones/" + postulacionA + "/prueba/calificacion-ia"),
+                tokenEquipo, null).andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.Resource").value("Vacante"));
+
+        assertThat(elIntento(intento))
+                .as("nadie empezó el examen ni le movió el plazo")
+                .isEqualTo(antes);
+        assertThat(contar("select count(*) from auditoria where entidad = 'intento_prueba' "
+                + "and entidad_id = " + intento))
+                .as("no queda auditoría de un cambio que no se hizo")
+                .isEqualTo(anotadosAntes);
+        assertThat(contar("select count(*) from nota_criterio where postulacion_id = "
+                + postulacionA)).isZero();
+    }
+
+    // ============ 17. Ninguna escritura del panel sobre su gente; las lecturas siguen ============
+
+    /**
+     * Toda escritura del panel que llega por una postulación de la vacante eliminada contesta
+     * 404, como la vacante: perfil integral, currículum, contacto, enlace de acceso,
+     * simulación, conversación final, validación y decisión. Las que transicionan se frenaban
+     * antes en la máquina de estados con su propio texto; las que no, escribían.
+     *
+     * <p>Y las lecturas siguen contestando —su ficha y el plazo de su prueba—, por decisión
+     * del producto: lo que se cierra es escribir, no mirar lo que ya pasó.
+     */
+    @Test
+    @Order(17)
+    @DisplayName("ninguna escritura del panel sobre sus postulaciones: 404; su ficha se sigue leyendo")
+    void ningunaEscrituraDelPanelSobreSuGente() throws Exception {
+        // Cada 404 dice de qué recurso habla: algunas de estas puertas contestarían 404 igual
+        // por otra razón —no hay periodo de validación, no existe esa barrera—, y lo que se
+        // prueba es que las corta la vacante eliminada, antes de llegar ahí.
+        String deA = "/api/v1/panel/postulaciones/" + postulacionA;
+        long transicionesAntes = contar(
+                "select count(*) from transicion_estado where postulacion_id = " + postulacionA);
+        long auditadasAntes = contar("select count(*) from auditoria where entidad = "
+                + "'postulacion' and entidad_id = " + postulacionA);
+
+        // El perfil integral y el currículum.
+        conToken(post(deA + "/calificacion-perfil-integral"), tokenEquipo, null)
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.Resource").value("Vacante"));
+        conToken(post(deA + "/criba-cv"), tokenEquipo, null).andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.Resource").value("Vacante"));
+        mvc.perform(multipart(deA + "/cv").file(unCurriculum())
+                        .header("Authorization", "Bearer " + tokenEquipo))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.Resource").value("Vacante"));
+        conToken(post(deA + "/reapertura-evaluacion"), tokenEquipo, """
+                {"dias": 7, "motivo": "Otra oportunidad"}""").andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.Resource").value("Vacante"));
+
+        // Su contacto y su enlace para entrar al portal.
+        conToken(patch(deA + "/contacto"), tokenEquipo, """
+                {"email": "otra@ejemplo.pe", "motivo": "No debería guardarse"}""")
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.Resource").value("Vacante"));
+        conToken(post(deA + "/enlace-acceso"), tokenEquipo, null).andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.Resource").value("Vacante"));
+
+        // La simulación y la conversación final.
+        conToken(post(deA + "/ausencia-simulacion"), tokenEquipo, """
+                {"decision": "CERRAR", "motivo": "No vino"}""").andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.Resource").value("Vacante"));
+        conToken(post(deA + "/simulacion/criterios/1/nota"), tokenEquipo, """
+                {"puntaje": 5, "explicacion": "No debería guardarse"}""")
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.Resource").value("Vacante"));
+        conToken(post(deA + "/simulacion/calificacion"), tokenEquipo, null)
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.Resource").value("Vacante"));
+        conToken(post(deA + "/conversacion-final"), tokenEquipo, """
+                {"texto": "¿Qué harías distinto?"}""").andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.Resource").value("Vacante"));
+        conToken(post(deA + "/conversacion-final/generar"), tokenEquipo, null)
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.Resource").value("Vacante"));
+
+        // La validación práctica.
+        conToken(post(deA + "/validacion/habilitacion"), tokenEquipo, """
+                {"modalidad": "SIMULACION_EXTENDIDA", "dias": 5}""")
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.Resource").value("Vacante"));
+        conToken(post(deA + "/validacion/inicio"), tokenEquipo, null)
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.Resource").value("Vacante"));
+        conToken(post(deA + "/validacion/metricas/1"), tokenEquipo, """
+                {"puntaje": 5, "explicacion": "No debería guardarse"}""")
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.Resource").value("Vacante"));
+        conToken(post(deA + "/validacion/cierre"), tokenEquipo, null)
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.Resource").value("Vacante"));
+
+        // Y la decisión.
+        conToken(post(deA + "/decision"), tokenEquipo, """
+                {"semaforo": "VERDE", "motivo": "No debería decidirse"}""")
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.Resource").value("Vacante"));
+        conToken(post(deA + "/barreras-detectadas"), tokenEquipo, """
+                {"barreraCriticaId": 1, "explicacion": "No debería guardarse"}""")
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.Resource").value("Vacante"));
+        conToken(post(deA + "/evidencia-adicional"), tokenEquipo, """
+                {"motivo": "Falta una referencia", "enunciado": "Cuéntanos tu último proyecto"}""")
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.Resource").value("Vacante"));
+
+        assertThat(contar("select count(*) from transicion_estado where postulacion_id = "
+                + postulacionA)).as("nadie la movió").isEqualTo(transicionesAntes);
+        assertThat(contar("select count(*) from auditoria where entidad = 'postulacion' "
+                + "and entidad_id = " + postulacionA)).isEqualTo(auditadasAntes);
+        for (String tabla : List.of("enlace_acceso", "pregunta_generada", "validacion",
+                "decision", "barrera_detectada", "evidencia_adicional")) {
+            assertThat(contar("select count(*) from " + tabla + " where postulacion_id = "
+                    + postulacionA)).as("nada nuevo en %s", tabla).isZero();
+        }
+
+        // Las lecturas no cambian: su ficha y el plazo de su prueba se siguen consultando.
+        conToken(get(deA), tokenEquipo, null).andExpect(status().isOk());
+        conToken(get(deA + "/prueba/plazo"), tokenEquipo, null).andExpect(status().isOk());
+    }
+
+    /** Lo que se mira del intento, en una sola cadena para compararlo entero. */
+    private String elIntento(long id) {
+        return jdbc.queryForObject("select concat_ws('|', vence_en, iniciado_en, plazo_propio, "
+                + "entregado_en) from intento_prueba where id = ?", String.class, id);
     }
 
     // ---------- ayudas ----------

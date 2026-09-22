@@ -37,19 +37,29 @@ public class ServicioCalificacionSimulacion {
     @Transactional
     public void ponerNota(ContextoUsuario quien, Long postulacionId, Long criterioId,
                           double puntaje, String explicacion) {
-        laVisible(quien, postulacionId);
+        laQueSePuedeTocar(quien, postulacionId);
         List<Criterio> rubrica = calificacion.rubricaGlobalDe(ETAPA);
         calificacion.ponerNota(quien, postulacionId, rubrica, criterioId, puntaje, explicacion);
     }
 
     @Transactional
     public BigDecimal calcularNota(ContextoUsuario quien, Long postulacionId) {
-        Postulacion postulacion = laVisible(quien, postulacionId);
+        Postulacion postulacion = laQueSePuedeTocar(quien, postulacionId);
         return calificacion.calcularNotaEtapa(postulacion, ETAPA, calificacion.rubricaGlobalDe(ETAPA));
     }
 
     /** Los tres caminos miran el mismo permiso, así que va escrito aquí y no por parámetro. */
     private Postulacion laVisible(ContextoUsuario quien, Long postulacionId) {
         return alcance.laPostulacionVisible(quien, postulacionId, "calificar_simulacion");
+    }
+
+    /**
+     * Para las dos que escriben: además, que su vacante siga existiendo. Una eliminada
+     * contesta 404 (V60); ver {@link AlcanceSobreLaVacante#exigirQueSuVacanteSigaExistiendo}.
+     */
+    private Postulacion laQueSePuedeTocar(ContextoUsuario quien, Long postulacionId) {
+        Postulacion postulacion = laVisible(quien, postulacionId);
+        alcance.exigirQueSuVacanteSigaExistiendo(postulacion);
+        return postulacion;
     }
 }

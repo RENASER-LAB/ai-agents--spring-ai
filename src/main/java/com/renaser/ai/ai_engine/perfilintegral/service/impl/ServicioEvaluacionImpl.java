@@ -38,6 +38,7 @@ import com.renaser.ai.ai_engine.parametro.service.ServicioParametros;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
 import com.renaser.ai.ai_engine.vacante.entity.Vacante;
 import com.renaser.ai.ai_engine.vacante.repository.VacanteRepository;
+import com.renaser.ai.ai_engine.vacante.service.VacanteEliminada;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -873,11 +874,17 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
      * técnico de su vacante (etapa 2), en columnas distintas desde la V43. El propósito elige
      * de cuál se habla; lo demás —incluido el 404 de «no es tuya», que no distingue entre no
      * existir y ser de otro— es idéntico para los dos.
+     *
+     * <p>⚠️ <b>Y el de «su vacante se eliminó» también</b> (V60): ver, empezar, responder y
+     * entregar cualquiera de los dos pasan por aquí, y el enlace de una evaluación de una
+     * vacante retirada no puede seguir abriéndola. Va antes de mirar qué examen se pide,
+     * para que la respuesta no dependa de si lo tenía o no.
      */
     private Par laMia(ContextoUsuario quien, UUID uuid, String proposito) {
         Postulacion postulacion = postulaciones.findByUuid(uuid)
                 .filter(p -> p.getUsuarioId().equals(quien.usuarioId()))
                 .orElseThrow(() -> new ResourceNotFoundException("Postulación", "código", uuid));
+        VacanteEliminada.exigirQueSuProcesoSigaExistiendo(postulacion, vacantes);
         Long evaluacionId = CUESTIONARIO_TECNICO.equals(proposito)
                 ? postulacion.getEvaluacionTecnicaId()
                 : postulacion.getEvaluacionId();

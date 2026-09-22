@@ -172,6 +172,18 @@ quedaron; el portal lo traduce a «Esta vacante ya no está disponible». En `GE
 anteriores de esa vacante se conservan pero llegan **sin enlace** —vacíos el de la postulación y
 el de la vacante—, y el nuevo `VACANTE_ELIMINADA` nace así.
 
+**Lo mismo en todas las puertas que entran por el código de la postulación** (22/09/2026):
+`/postulaciones/{uuid}/retiro`; `/evaluacion/{uuid}` y `/cuestionario-tecnico/{uuid}` —ver,
+`/inicio`, `/respuestas` y `/entrega`—; `/prueba/{uuid}` —ver, `/inicio`, responder, subir
+entregables y `/entrega`—, y `/simulacion/{uuid}` —las fechas, inscribirse y la suya—. Sobre una
+vacante eliminada responden **404 como postulación inexistente** («Postulación» por su código, el
+mismo texto que una ajena), antes de mirar si hay examen, así que ni el reloj arranca ni se guarda
+nada. Es una sola pregunta, `VacanteEliminada.exigirQueSuProcesoSigaExistiendo`, porque el enlace
+de cualquiera de ellas sigue en el correo, el historial del navegador y los avisos viejos.
+⚠️ **Un 404 de esas pantallas no basta para decir «vacante retirada»**: en la simulación también
+es «todavía no elegiste fecha» y en la prueba, «todavía no te toca». El portal lo confirma
+pidiendo `GET /postulaciones/{uuid}`: si ese también responde 404, la vacante ya no está.
+
 ### Guardar lo que el candidato escribe (16/09/2026)
 
 Las tres pantallas donde alguien escribe —la evaluación del Perfil Integral, el cuestionario
@@ -244,12 +256,12 @@ del área— se ven solo las propias, y una ajena responde 404.
 | POST `/vacantes/{id}/plantilla-prueba` | Qué prueba del puesto rendirá quien llegue a esa etapa. **Hace falta antes de publicar** | `elegir_plantilla_prueba` |
 | POST `/vacantes/{id}/aplicacion-evaluacion` | Encender o apagar la evaluación del banco en esta vacante. Apagada, quien postule cae directo en la bandeja del equipo y su única evaluación es la prueba; publicar deja de exigir plantilla de evaluación | `elegir_plantilla_evaluacion` |
 | POST `/vacantes/{id}/version-pesos` | Qué versión de pesos (publicada) rige la decisión de esta vacante. No recalcula nada hacia atrás | `publicar_version_pesos` |
-| POST `/vacantes/{id}/cierre-prueba` | Fijar cuándo cierra la prueba de esta vacante, para todos. **Mueve también los intentos ya abiertos**, salvo los de quien tenga fecha propia. Con `cierraEn` vacío se quita y se vuelven a contar los días de la plantilla | `elegir_plantilla_prueba` |
+| POST `/vacantes/{id}/cierre-prueba` | Fijar cuándo cierra la prueba de esta vacante, para todos. **Mueve también los intentos ya abiertos**, salvo los de quien tenga fecha propia. Con `cierraEn` vacío se quita y se vuelven a contar los días de la plantilla. **Una plantilla CRONOMETRADA también admite fecha** (desde el 22/09/2026): el reloj y la fecha conviven y al empezar rige el que caiga antes, así que la fecha es lo que impide abrir el examen después de que cerrara la convocatoria. Sigue rechazando una fecha ya pasada, una vacante cerrada y una vacante sin prueba del puesto | `elegir_plantilla_prueba` |
 | GET/PUT `/vacantes/{id}/ficha` | La ficha del método CAZATALENTOS: las 10 preguntas al dueño, guardable a medias (BORRADOR). El tamaño (MICRO/MEDIA/GRANDE) se deriva de la gente en la empresa y la respuesta sugiere la `version_pesos` que toca; COMPLETA es lo que permite generar el cuestionario. Los riesgos van en orden de velocidad de daño y no admiten huecos | `ver_vacantes` / `editar_vacante` |
 | GET `/vacantes/{id}/cuestionario-tecnico` | El cuestionario de la vacante: el borrador si hay, si no la publicada, con el estado de la generación (SIN_PEDIR·EN_CURSO·FALLIDA·LISTA) y si quedó desactualizado respecto a la ficha | `ver_vacantes` |
 | POST `/vacantes/{id}/cuestionario-tecnico/generacion` | Pedir al agente REDACTOR el borrador (202). Exige la ficha COMPLETA; con una generación viva o la IA apagada responde `encolada=false`. Cuenta contra el tope mensual de IA | `editar_vacante` |
 | PUT `/vacantes/{id}/cuestionario-tecnico/preguntas/{preguntaId}` | Corregir una pregunta del borrador con las palabras del dueño (enunciado y guía C3/C4/señal) | `editar_vacante` |
-| GET `/vacantes/{id}` | La vacante con su configuración: qué evaluación y qué prueba tiene, sus pesos, y **qué instrumento y cuántos minutos** rigen su etapa técnica. Trae además lo mismo que cada fila de la lista: el texto de la convocatoria, `postulantesEnCarrera`, `puedeEditar`, `archivadaEn`, `puedeArchivar`, `puedeDesarchivar` y `puedeEliminar`. **Una archivada se consulta por aquí igual que cualquier otra**: es lo que sostiene su detalle de solo lectura. **Una eliminada responde 404** | `ver_vacantes` |
+| GET `/vacantes/{id}` | La vacante con su configuración: qué evaluación y qué prueba tiene, sus pesos, y **qué instrumento y cuántos minutos** rigen su etapa técnica. Trae además **el plazo que rige hoy en su prueba**: `pruebaCierraEn`, la `modalidadPrueba` efectiva (con minutos propios de la vacante, cualquier prueba es CRONOMETRADA), `minutosPruebaVigentes`, `diasPruebaVigentes` y cuántos exámenes abiertos movería un cambio de fecha (`intentosAbiertosSinPlazoPropio`) y cuántos no (`intentosAbiertosConPlazoPropio`). ⚠️ **Esos cinco solo viajan aquí, no en la lista**: resolverlos cuesta dos consultas por vacante y la lista es la pantalla que más se abre; ahí llegan vacíos y el panel los lee como «sin dato». `pruebaCierraEn` sí viaja en las dos. Trae además lo mismo que cada fila de la lista: el texto de la convocatoria, `postulantesEnCarrera`, `puedeEditar`, `archivadaEn`, `puedeArchivar`, `puedeDesarchivar` y `puedeEliminar`. **Una archivada se consulta por aquí igual que cualquier otra**: es lo que sostiene su detalle de solo lectura. **Una eliminada responde 404** | `ver_vacantes` |
 | POST `/vacantes/{id}/calificacion-automatica` | Encender o apagar el recorrido automático. Encendido, quien postule se califica solo y llega hasta la prueba del puesto sin que nadie confirme nada; la primera persona que hace falta decide quién va a la simulación. **Apagado de fábrica**: en automático cada postulante gasta una llamada al modelo desde que postula | `elegir_plantilla_evaluacion` |
 | POST `/vacantes/{id}/instrumento-tecnico` | Qué se rinde en la etapa técnica de esta vacante —`PLANTILLA` (la prueba del puesto) o `CUESTIONARIO_TECNICO` (el cuestionario CAZATALENTOS)— y en cuántos minutos. **Uno de los dos, nunca los dos**: publicar exige tener listo el que se eligió. **Se frena en cuanto alguien EMPEZÓ su etapa técnica**, no al recibir la primera postulación: postular no es rendir, y quien no ha abierto nada no tiene nada que moverle debajo. Minutos vacíos = los del instrumento; si se ponen, **al menos 5**, rigen los DOS instrumentos y se leen al empezar el examen, así que corregirlos alcanza a todo el que aún no lo haya abierto | `elegir_plantilla_prueba` |
 | POST `/vacantes/{id}/cuestionario-tecnico/publicacion` | Publicar el borrador: el acto humano que vuelve real el cuestionario. Re-pasa la aduana entera (cantidades del nivel, presencial donde toca, guía completa, temas prohibidos) y archiva la publicada anterior **de esta vacante** — los bancos por nivel ni se miran | `editar_vacante` |
@@ -282,13 +294,27 @@ pase automático, los vencimientos y la calificación no la procesan. El guardi�
 por id, que ya filtra `eliminada_en IS NULL`, y `VacanteEliminada` para los caminos que llegan
 desde una postulación.
 
+⚠️ **Sobre las postulaciones de una eliminada, el panel lee pero no escribe** (22/09/2026). Toda
+escritura que llega por una de ellas responde **404 «Vacante»**, aunque la pantalla se hubiera
+abierto antes: el plazo de la prueba de esa persona, la nota de un criterio y la de la etapa,
+calificar la prueba con IA, recalificar el Perfil Integral, cribar y reemplazar el currículum,
+reabrir la evaluación, corregir el contacto, generar un enlace de acceso, poner y ponderar las
+notas de la simulación, marcar eventos y asistencia, decidir sobre un ausente, registrar,
+responder y generar las preguntas de la conversación final, la validación —habilitar, iniciar,
+completar una métrica y cerrar— y la decisión —decidir, registrar una barrera y pedir evidencia—.
+Se comprueba después de resolver la postulación y su alcance, con
+`AlcanceSobreLaVacante.exigirQueSuVacanteSigaExistiendo`, y no dentro de `laPostulacionVisible`
+a propósito: **las lecturas por id siguen en 200, por decisión del producto** —la ficha, el
+historial, la prueba (respuestas, entregables y notas) y su plazo—, aunque ninguna lista del
+panel lleve ya a ellas.
+
 ### Postulaciones
 
 | Método y ruta | Qué hace | Permiso |
 |---|---|---|
 | PATCH `/postulaciones/{id}/contacto` | Corregir el correo o el teléfono de una ficha cuando el currículum los traía mal escritos (V27). Queda auditado | `corregir_contacto_candidato` |
 | POST `/postulaciones/{id}/reapertura-evaluacion` | Volver a abrir la evaluación de quien no llegó a entregarla en plazo, para darle otra oportunidad | `mover_postulacion` |
-| POST `/postulaciones/{id}/enlace-acceso` | Generar un enlace de acceso nuevo para ese candidato (entra sin contraseña; ver «Cómo entrar») | `mover_postulacion` |
+| POST `/postulaciones/{id}/enlace-acceso` | Generar un enlace de acceso nuevo para ese candidato (entra sin contraseña; ver «Cómo entrar»). **Desde el 22/09/2026 respeta la empresa y el alcance** de `mover_postulacion`: antes buscaba la postulación solo por su id, de cualquier empresa. Fuera de la empresa o del alcance, y sobre una vacante eliminada, **404** | `mover_postulacion` |
 | GET `/bandeja?espera_a=` | La bandeja: todo lo que espera a `CANDIDATO`, `SISTEMA`, `TALENTO` o `AREA` | `ver_candidatos` |
 | GET `/vacantes/{id}/embudo` | Cuántas postulaciones hay en cada estado | `ver_embudo` |
 | GET `/vacantes/{id}/ranking?etapa=` | La tanda ordenada de más apto a menos, con las ocho notas del currículum de cada uno. **Incluye a quien todavía no tiene nota**. Sin `etapa` ordena por la del Perfil Integral; con ella, por la nota de esa etapa. Cada fila trae además **dónde vive** (`ciudad`, ya escrito «Departamento — Provincia», y `ciudadCodigo`), **su pretensión salarial**, que pide **dos llaves** —`ver_pretension` y que esta vacante publique lo que paga—, y el **`ponderado`** de lo ya rendido (ver la nota de abajo). La respuesta trae además **`puedeMoverPostulacion`**, por lo mismo que la ficha: es el único modo que tiene el panel de saber si ofrecer el descarte en lote, porque no hay endpoint de «mis permisos». Con `etapa=PRUEBA_PUESTO` cada fila trae además **`estadoPrueba`** —`CALIFICADA`, `PENDIENTE_CALIFICACION`, `INCOMPLETA` o `NO_APLICA`—, que es lo que deja distinguir una prueba que nadie terminó (o que cerró el sistema al vencer el plazo) de una entregada a mano que espera calificación; en las otras etapas viaja vacío | `ver_embudo` |
@@ -512,6 +538,7 @@ desde una postulación.
 | PUT `/plantillas-prueba/versiones/{id}` · POST `…/{id}/consigna` · PUT y DELETE sobre `/entregables/{id}`, `/rubrica/{id}`, `/variantes/{id}` · DELETE `…/preguntas/{id}` · PUT `…/orden` | **Componer un borrador**: corregir, quitar y reordenar cada pieza, y subir el ENUNCIADO como PDF o Word. **Solo en `BORRADOR`**; sobre una versión publicada responden 409 y la salida a un error sigue siendo una versión nueva | `editar_plantillas_prueba` |
 | POST `/plantillas-prueba/versiones/{id}/publicacion` | Publicar: exige 8-10 preguntas universales, 3-5 específicas, y la rúbrica sumando 100. **Una versión sin entregables es un cuestionario**: la cuota no rige y basta con una pregunta. La duración, si es cronometrada, **al menos 5 minutos y sin techo** (el rango 60-120 se retiró el 31/08/2026) | `editar_plantillas_prueba` |
 | POST `/postulaciones/{id}/prueba/plazo` | Fijarle a ESE candidato su fecha de cierre, normalmente para darle más horas. **Queda marcada como suya**: mover después la fecha de la vacante no se la toca. Antes de empezar, la fecha puesta manda sobre el cálculo por días | `mover_postulacion` |
+| GET `/postulaciones/{id}/prueba/plazo` | **Qué plazo rige hoy para esa persona**, para poder enseñarlo antes de tocarlo: `venceEn`, de dónde sale (`origen`: `VACANTE`, `RELOJ` o `PROPIO`), `iniciadoEn`, `entregadoEn` y el `instrumento` de la vacante. **No contesta 404 cuando no hay prueba**: quien todavía no llegó a la etapa y la vacante que rinde el cuestionario técnico —que no usa `intento_prueba`— salen con `existeIntento: false`, y el instrumento distingue los dos casos. `venceEn` vacío es «se le calculará al abrirla», no un error. Pide el permiso de **leer** la ficha: quien no puede mover el plazo igual lo ve | `abrir_ficha_candidato` |
 | GET `/postulaciones/{id}/prueba/respuestas` | Lo que contestó, pregunta a pregunta. Las preguntas son **las de la versión que él vio**, en su orden, no las del catálogo de hoy: una versión publicada después puede llevar otras | `abrir_ficha_candidato` |
 | GET `/postulaciones/{id}/prueba/entregables` | **Lo que subió**: los archivos y los enlaces que la prueba pedía, entregados o no —que falte un obligatorio es lo que hay que ver antes de poner una nota—. De cada uno, **la última versión**: pudo entregarlo tres veces. ⚠️ El `enlace` y el `archivoId` **viajan solo con `descargar_entregables`**; sin él se dice qué entregó y cuándo, y `porQueNoSeVe` explica el hueco. Con cuestionario técnico devuelve **lista vacía, no 404** | `abrir_ficha_candidato` |
 | GET `/postulaciones/{id}/prueba/notas` | La rúbrica entera, **en su orden**, con lo que lleva puesto cada criterio: puntaje, explicación y **de quién viene la nota**, si de la IA o de una persona. Lo que aún no tiene nota sale en nulo. Desde el 03/09/2026 **leer pide el permiso de abrir la ficha, no el de corregir**: Responsable de Área veía la nota en el embudo y recibía 403 al abrir su desglose | `abrir_ficha_candidato` |

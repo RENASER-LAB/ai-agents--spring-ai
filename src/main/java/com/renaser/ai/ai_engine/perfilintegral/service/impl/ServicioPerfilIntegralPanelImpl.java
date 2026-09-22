@@ -197,7 +197,7 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
     @Override
     @Transactional
     public CalificacionEncoladaResponse recalificar(ContextoUsuario quien, Long postulacionId) {
-        Postulacion postulacion = laVisible(quien, postulacionId, "ajustar_nota");
+        Postulacion postulacion = laQueSePuedeTocar(quien, postulacionId, "ajustar_nota");
 
         // Sin evaluación entregada no hay respuestas que calificar ni nota de lo cerrado
         // sobre la que apoyarse: encolar aquí solo produciría un trabajo condenado a fallar.
@@ -225,7 +225,7 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
     @Override
     @Transactional
     public CalificacionEncoladaResponse cribarCv(ContextoUsuario quien, Long postulacionId) {
-        Postulacion postulacion = laVisible(quien, postulacionId, "ajustar_nota");
+        Postulacion postulacion = laQueSePuedeTocar(quien, postulacionId, "ajustar_nota");
 
         // Lo único indispensable. Sin archivo el agente se plantaría al pedir el texto, y
         // más vale decirlo aquí que gastar tres reintentos para llegar a la misma frase.
@@ -361,6 +361,8 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
         Postulacion postulacion = postulaciones.findByIdAndOrganizacionId(
                         postulacionId, quien.organizacionId())
                 .orElseThrow(() -> new ResourceNotFoundException("Postulación", "id", postulacionId));
+        // Antes que «ya terminó»: una eliminada no existe, y eso es un 404 (V60).
+        alcanceVacante.exigirQueSuVacanteSigaExistiendo(postulacion);
 
         if (maquina.yaTermino(postulacion)) {
             throw new IllegalStateException("Esta postulación ya terminó: no se le reabre nada");
@@ -913,7 +915,7 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
     @Override
     @Transactional
     public void reemplazarCv(ContextoUsuario quien, Long postulacionId, MultipartFile archivo) {
-        laVisible(quien, postulacionId, "ajustar_nota");
+        laQueSePuedeTocar(quien, postulacionId, "ajustar_nota");
         Cv curriculum = cvs.findByPostulacionId(postulacionId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Currículum", "postulación", postulacionId));
@@ -1160,5 +1162,18 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
     /** La postulación, comprobando organización y alcance del permiso. */
     private Postulacion laVisible(ContextoUsuario quien, Long postulacionId, String permiso) {
         return alcanceVacante.laPostulacionVisible(quien, postulacionId, permiso);
+    }
+
+    /**
+     * La postulación sobre la que se va a <b>escribir</b>: visible y de una vacante que sigue
+     * existiendo. Una eliminada contesta 404 (V60); ver
+     * {@link AlcanceSobreLaVacante#exigirQueSuVacanteSigaExistiendo}. Las lecturas siguen por
+     * {@code laVisible}.
+     */
+    private Postulacion laQueSePuedeTocar(ContextoUsuario quien, Long postulacionId,
+                                          String permiso) {
+        Postulacion postulacion = laVisible(quien, postulacionId, permiso);
+        alcanceVacante.exigirQueSuVacanteSigaExistiendo(postulacion);
+        return postulacion;
     }
 }

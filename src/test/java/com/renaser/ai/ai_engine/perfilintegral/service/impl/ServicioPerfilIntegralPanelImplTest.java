@@ -1660,4 +1660,63 @@ class ServicioPerfilIntegralPanelImplTest {
                     .esEntregaAutomatica(porElSistema).build();
         }
     }
+
+    // ============ Una vacante eliminada (V60) ============
+
+    /**
+     * Las escrituras del perfil integral sobre alguien cuya vacante se eliminó: recalificar,
+     * cribar el currículum, reemplazarlo y reabrir la evaluación. Las cuatro contestan 404
+     * como la vacante y ninguna paga al proveedor, sube un archivo ni deja auditoría.
+     */
+    @org.junit.jupiter.api.Nested
+    @DisplayName("Si su vacante se eliminó, nada de su perfil integral se escribe")
+    class DeUnaVacanteEliminada {
+
+        private static final long POSTULACION = 88L;
+
+        @BeforeEach
+        void suVacanteSeElimino() {
+            lenient().when(postulaciones.findByIdAndOrganizacionId(POSTULACION, ORGANIZACION))
+                    .thenReturn(Optional.of(Postulacion.builder().id(POSTULACION)
+                            .organizacionId(ORGANIZACION).vacanteId(VACANTE)
+                            .evaluacionId(60L).estadoCodigo("CERRADA").build()));
+            org.mockito.Mockito.doThrow(new ResourceNotFoundException("Vacante", "id", VACANTE))
+                    .when(alcanceVacante).exigirQueSuVacanteSigaExistiendo(any());
+        }
+
+        private void contestaComoLaVacante(
+                org.assertj.core.api.ThrowableAssert.ThrowingCallable accion) {
+            assertThatThrownBy(accion)
+                    .isInstanceOf(ResourceNotFoundException.class)
+                    .hasMessageContaining("Vacante");
+            verifyNoInteractions(cola, cvs, almacen, auditoria, evaluaciones, maquina);
+        }
+
+        @Test
+        @DisplayName("recalificar contesta 404 y no encola nada")
+        void recalificar() {
+            contestaComoLaVacante(() -> servicio.recalificar(quien, POSTULACION));
+        }
+
+        @Test
+        @DisplayName("cribar el currículum contesta 404 y no encola nada")
+        void cribarElCurriculum() {
+            contestaComoLaVacante(() -> servicio.cribarCv(quien, POSTULACION));
+        }
+
+        @Test
+        @DisplayName("reemplazar el currículum contesta 404 y no guarda el archivo")
+        void reemplazarElCurriculum() {
+            contestaComoLaVacante(() -> servicio.reemplazarCv(quien, POSTULACION,
+                    new org.springframework.mock.web.MockMultipartFile(
+                            "cv", "cv.pdf", "application/pdf", "otro".getBytes())));
+        }
+
+        @Test
+        @DisplayName("reabrir la evaluación contesta 404, antes de mirar si ya terminó")
+        void reabrirLaEvaluacion() {
+            contestaComoLaVacante(() -> servicio.reabrirEvaluacion(quien, POSTULACION, 7,
+                    "Se le cortó la luz"));
+        }
+    }
 }

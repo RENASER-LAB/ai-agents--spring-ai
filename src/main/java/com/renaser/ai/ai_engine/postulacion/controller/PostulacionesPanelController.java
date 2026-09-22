@@ -33,7 +33,6 @@ public class PostulacionesPanelController {
     private final ServicioPostulacionesPanel servicio;
     private final ServicioPerfilIntegralPanel perfilIntegral;
     private final com.renaser.ai.ai_engine.perfilintegral.service.ServicioDesgloseEvaluacion desglose;
-    private final ServicioEnlaceAcceso enlaces;
     private final Permisos permisos;
 
     @GetMapping("/bandeja")
@@ -168,7 +167,7 @@ public class PostulacionesPanelController {
             + "contraseña. El token viaja en el enlace y NO se puede recuperar después: "
             + "sale una sola vez, aquí")
     public ServicioEnlaceAcceso.EnlaceGenerado enlaceDeAcceso(@PathVariable Long id) {
-        return enlaces.generarEnlace(id);
+        return servicio.enlaceDeAcceso(permisos.actual(), id);
     }
 
     @PostMapping("/postulaciones/{id}/confirmacion-avance")
