@@ -60,6 +60,38 @@ public interface ServicioVacantesPanel {
      */
     void desarchivar(ContextoUsuario quien, Long id);
 
+    /**
+     * Retira por borrado lógico una vacante que no debió existir (V60).
+     *
+     * <p>Es lo contrario de archivar y no su versión fuerte. Archivar guarda lo que terminó
+     * bien: su proceso se sigue consultando. Eliminar retira la convocatoria de todas las
+     * pantallas —el panel, el tablón, «Mis procesos», los rankings, las exportaciones— porque
+     * lo que hay que decir de ella es que no tenía que estar.
+     *
+     * <p>Las tres cosas que arrastra van <b>en la misma transacción</b>, y si falla una no se
+     * aplica ninguna:
+     * <ul>
+     *   <li>Cada postulación <b>en carrera</b> pasa a {@code CERRADA} con el motivo de cierre
+     *       «vacante eliminada», como decisión de una persona y sin correo. Las que ya
+     *       terminaron no se tocan: su proceso acabó por otra razón y reescribirlo sería
+     *       falsear su historia.
+     *   <li>La vacante queda marcada como eliminada, con fecha, persona y motivo en la
+     *       auditoría. Ni una fila se borra.
+     *   <li>Su solicitud de talento vuelve a {@code ABIERTA}, libre para respaldar la vacante
+     *       correcta — que es justo para lo que se elimina una mal creada.
+     * </ul>
+     *
+     * <p>Los avisos van <b>después</b> y por la campana, no por correo: uno que falle se
+     * anota y no deshace nada, y por eso la respuesta cuenta por separado cuántas se cerraron
+     * y a cuántas de verdad se les avisó.
+     *
+     * <p>Eliminar una ya eliminada es un 404, no un error nuevo: no vuelve a cerrar nada, no
+     * audita y no avisa.
+     *
+     * @return cuántas postulaciones se cerraron y a cuántas les llegó el aviso
+     */
+    VacanteEliminadaResponse eliminar(ContextoUsuario quien, Long id, EliminarVacante datos);
+
     VacantePanel detalle(ContextoUsuario quien, Long id);
 
     List<RequisitoPanel> requisitos(ContextoUsuario quien, Long vacanteId);

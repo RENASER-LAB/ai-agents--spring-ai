@@ -45,7 +45,13 @@ public class ServicioTablonPortalImpl implements ServicioTablonPortal {
         // De todas las ACTIVAS: una empresa suspendida no puede responder, y nadie debe
         // postularle mientras tanto (pieza F). Sus vacantes siguen PUBLICADAS en la base
         // a propósito — reactivar es volver a verlas, no volver a publicarlas.
-        List<Vacante> todas = vacantes.findByEstadoOrderByPublicadaEnDesc("PUBLICADA");
+        //
+        // Y de las que siguen existiendo: una eliminada se retira del tablón aunque su fila
+        // siga diciendo PUBLICADA (V60). El estado no se toca al eliminar —cómo iba la
+        // convocatoria cuando se retiró es parte de lo que hay que conservar—, así que el
+        // corte lo hace la fecha de eliminación y no el estado.
+        List<Vacante> todas = vacantes
+                .findByEstadoAndEliminadaEnIsNullOrderByPublicadaEnDesc("PUBLICADA");
         Map<Long, Organizacion> organizacionesActivas = organizacionesActivasDe(todas);
         List<Vacante> publicadas = todas.stream()
                 .filter(v -> organizacionesActivas.containsKey(v.getOrganizacionId()))
@@ -69,8 +75,12 @@ public class ServicioTablonPortalImpl implements ServicioTablonPortal {
         // Lo que sí se exige es que esté PUBLICADA — un borrador no existe para nadie —
         // y que su empresa esté activa: la vacante de una suspendida tampoco existe para
         // el tablón (pieza F).
+        // El tercer colador es el de la V60: una vacante eliminada no existe para el portal
+        // ni con el id en la mano —el enlace que alguien guardó ayer, el resultado viejo de
+        // un buscador—. El portal lo traduce a «esta vacante ya no está disponible».
         Vacante vacante = vacantes.findById(id)
                 .filter(v -> "PUBLICADA".equals(v.getEstado()))
+                .filter(v -> v.getEliminadaEn() == null)
                 .orElseThrow(() -> new ResourceNotFoundException("Vacante", "id", id));
         Organizacion empresa = organizaciones.findById(vacante.getOrganizacionId())
                 .filter(Organizacion::isEsActiva)
@@ -81,10 +91,11 @@ public class ServicioTablonPortalImpl implements ServicioTablonPortal {
 
     @Override
     public ConsentimientoDeVacante consentimientoDeVacante(Long vacanteId) {
-        // Mismo guardián que el detalle público: una vacante sin publicar —o de una
-        // empresa suspendida— no existe para nadie, y su texto legal tampoco.
+        // Mismo guardián que el detalle público: una vacante sin publicar, eliminada —o de
+        // una empresa suspendida— no existe para nadie, y su texto legal tampoco.
         Vacante vacante = vacantes.findById(vacanteId)
                 .filter(v -> "PUBLICADA".equals(v.getEstado()))
+                .filter(v -> v.getEliminadaEn() == null)
                 .orElseThrow(() -> new ResourceNotFoundException("Vacante", "id", vacanteId));
         Organizacion empresa = organizaciones.findById(vacante.getOrganizacionId())
                 .filter(Organizacion::isEsActiva)

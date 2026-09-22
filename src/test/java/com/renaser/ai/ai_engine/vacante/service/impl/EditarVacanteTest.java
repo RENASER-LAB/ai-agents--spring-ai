@@ -13,6 +13,7 @@ import com.renaser.ai.ai_engine.perfilintegral.repository.VersionBancoRepository
 import com.renaser.ai.ai_engine.pesos.repository.VersionPesosRepository;
 import com.renaser.ai.ai_engine.postulacion.entity.Postulacion;
 import com.renaser.ai.ai_engine.postulacion.repository.PostulacionRepository;
+import com.renaser.ai.ai_engine.postulacion.service.MaquinaEstados;
 import com.renaser.ai.ai_engine.postulacion.service.PostulacionesEnCarrera;
 import com.renaser.ai.ai_engine.prueba.repository.IntentoPruebaRepository;
 import com.renaser.ai.ai_engine.prueba.repository.PlantillaPruebaRepository;
@@ -100,6 +101,7 @@ class EditarVacanteTest {
     @Mock private DuenoDelInstrumento dueno;
     @Mock private PostulacionRepository postulaciones;
     @Mock private PostulacionesEnCarrera enCarrera;
+    @Mock private MaquinaEstados maquina;
     @Mock private ServicioAvisosPortal avisos;
     @Mock private AlcanceSobreLaVacante alcance;
     @Mock private Permisos permisos;
@@ -111,7 +113,7 @@ class EditarVacanteTest {
         servicio = new ServicioVacantesPanelImpl(vacantes, puestos, requisitos, solicitudes,
                 versionesPesos, plantillas, versionesPrueba, plantillasPrueba, plantillasCorreo,
                 plantillasPorVacante, intentos, evaluaciones, versionesBanco,
-                auditoria, dueno, postulaciones, enCarrera, avisos, alcance, permisos);
+                auditoria, dueno, postulaciones, enCarrera, maquina, avisos, alcance, permisos);
     }
 
     // ---------- el escenario ----------
@@ -514,7 +516,7 @@ class EditarVacanteTest {
         Vacante cerrada = Vacante.builder().id(41L).organizacionId(ORGANIZACION)
                 .titulo("Analista").estado("CERRADA").responsableUsuarioId(7L)
                 .remuneracionTipo("OCULTA").build();
-        when(vacantes.findByOrganizacionIdAndArchivadaEnIsNullOrderByCreadoEnDesc(ORGANIZACION))
+        when(vacantes.findByOrganizacionIdAndArchivadaEnIsNullAndEliminadaEnIsNullOrderByCreadoEnDesc(ORGANIZACION))
                 .thenReturn(List.of(publicada, cerrada));
         when(enCarrera.cuantasPorVacante(ORGANIZACION)).thenReturn(Map.of(VACANTE, 3));
         when(permisos.alcanceDe("editar_vacante"))
@@ -541,7 +543,7 @@ class EditarVacanteTest {
         Vacante publicada = Vacante.builder().id(VACANTE).organizacionId(ORGANIZACION)
                 .titulo("Coordinador de sede").estado("PUBLICADA").responsableUsuarioId(7L)
                 .remuneracionTipo("OCULTA").build();
-        when(vacantes.findByOrganizacionIdAndArchivadaEnIsNullOrderByCreadoEnDesc(ORGANIZACION))
+        when(vacantes.findByOrganizacionIdAndArchivadaEnIsNullAndEliminadaEnIsNullOrderByCreadoEnDesc(ORGANIZACION))
                 .thenReturn(List.of(publicada));
         when(enCarrera.cuantasPorVacante(ORGANIZACION)).thenReturn(Map.of());
 

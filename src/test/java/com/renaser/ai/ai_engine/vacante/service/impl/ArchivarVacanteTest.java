@@ -11,6 +11,7 @@ import com.renaser.ai.ai_engine.perfilintegral.repository.PlantillaEvaluacionRep
 import com.renaser.ai.ai_engine.perfilintegral.repository.VersionBancoRepository;
 import com.renaser.ai.ai_engine.pesos.repository.VersionPesosRepository;
 import com.renaser.ai.ai_engine.postulacion.repository.PostulacionRepository;
+import com.renaser.ai.ai_engine.postulacion.service.MaquinaEstados;
 import com.renaser.ai.ai_engine.postulacion.service.PostulacionesEnCarrera;
 import com.renaser.ai.ai_engine.prueba.repository.IntentoPruebaRepository;
 import com.renaser.ai.ai_engine.prueba.repository.PlantillaPruebaRepository;
@@ -101,6 +102,7 @@ class ArchivarVacanteTest {
     @Mock private DuenoDelInstrumento dueno;
     @Mock private PostulacionRepository postulaciones;
     @Mock private PostulacionesEnCarrera enCarrera;
+    @Mock private MaquinaEstados maquina;
     @Mock private ServicioAvisosPortal avisos;
     @Mock private AlcanceSobreLaVacante alcance;
     @Mock private Permisos permisos;
@@ -112,7 +114,7 @@ class ArchivarVacanteTest {
         servicio = new ServicioVacantesPanelImpl(vacantes, puestos, requisitos, solicitudes,
                 versionesPesos, plantillas, versionesPrueba, plantillasPrueba, plantillasCorreo,
                 plantillasPorVacante, intentos, evaluaciones, versionesBanco,
-                auditoria, dueno, postulaciones, enCarrera, avisos, alcance, permisos);
+                auditoria, dueno, postulaciones, enCarrera, maquina, avisos, alcance, permisos);
     }
 
     // ---------- el escenario ----------
@@ -150,7 +152,7 @@ class ArchivarVacanteTest {
     /** La que devuelve la búsqueda por organización, para el resto de entradas. */
     private Vacante laDeLaOrganizacion(String estado, Instant archivadaEn) {
         Vacante v = vacante(estado, archivadaEn);
-        when(vacantes.findByIdAndOrganizacionId(VACANTE, ORGANIZACION)).thenReturn(Optional.of(v));
+        when(vacantes.findByIdAndOrganizacionIdAndEliminadaEnIsNull(VACANTE, ORGANIZACION)).thenReturn(Optional.of(v));
         return v;
     }
 
@@ -474,7 +476,7 @@ class ArchivarVacanteTest {
         @DisplayName("por defecto se piden solo las no archivadas: no es un filtro de pantalla")
         void laListaHabitualNoLasPide() {
             Vacante viva = vacante("PUBLICADA", null);
-            when(vacantes.findByOrganizacionIdAndArchivadaEnIsNullOrderByCreadoEnDesc(ORGANIZACION))
+            when(vacantes.findByOrganizacionIdAndArchivadaEnIsNullAndEliminadaEnIsNullOrderByCreadoEnDesc(ORGANIZACION))
                     .thenReturn(List.of(viva));
             when(enCarrera.cuantasPorVacante(ORGANIZACION)).thenReturn(Map.of());
             when(permisos.alcanceDe(anyString()))
@@ -486,14 +488,14 @@ class ArchivarVacanteTest {
             assertThat(lista).hasSize(1);
             assertThat(lista.get(0).archivadaEn()).isNull();
             verify(vacantes, never())
-                    .findByOrganizacionIdAndArchivadaEnIsNotNullOrderByArchivadaEnDesc(anyLong());
+                    .findByOrganizacionIdAndArchivadaEnIsNotNullAndEliminadaEnIsNullOrderByArchivadaEnDesc(anyLong());
         }
 
         @Test
         @DisplayName("la vista de archivadas trae su fecha y el botón de desarchivar")
         void laVistaDeArchivadas() {
             Instant archivada = Instant.parse("2026-09-01T10:00:00Z");
-            when(vacantes.findByOrganizacionIdAndArchivadaEnIsNotNullOrderByArchivadaEnDesc(
+            when(vacantes.findByOrganizacionIdAndArchivadaEnIsNotNullAndEliminadaEnIsNullOrderByArchivadaEnDesc(
                     ORGANIZACION)).thenReturn(List.of(vacante("CERRADA", archivada)));
             when(enCarrera.cuantasPorVacante(ORGANIZACION)).thenReturn(Map.of());
             when(permisos.alcanceDe(anyString()))
@@ -519,7 +521,7 @@ class ArchivarVacanteTest {
         @Test
         @DisplayName("el icono de archivar no depende del conteo: lo explica su modal")
         void elIconoNoDependeDelConteo() {
-            when(vacantes.findByOrganizacionIdAndArchivadaEnIsNullOrderByCreadoEnDesc(ORGANIZACION))
+            when(vacantes.findByOrganizacionIdAndArchivadaEnIsNullAndEliminadaEnIsNullOrderByCreadoEnDesc(ORGANIZACION))
                     .thenReturn(List.of(vacante("CERRADA", null)));
             when(enCarrera.cuantasPorVacante(ORGANIZACION)).thenReturn(Map.of(VACANTE, 3));
             when(permisos.alcanceDe(anyString()))
@@ -535,7 +537,7 @@ class ArchivarVacanteTest {
         @Test
         @DisplayName("sin «cerrar_vacante» ninguna fila ofrece archivar ni desarchivar")
         void sinPermisoNoHayArchivo() {
-            when(vacantes.findByOrganizacionIdAndArchivadaEnIsNotNullOrderByArchivadaEnDesc(
+            when(vacantes.findByOrganizacionIdAndArchivadaEnIsNotNullAndEliminadaEnIsNullOrderByArchivadaEnDesc(
                     ORGANIZACION)).thenReturn(
                             List.of(vacante("CERRADA", Instant.parse("2026-09-01T10:00:00Z"))));
             when(enCarrera.cuantasPorVacante(ORGANIZACION)).thenReturn(Map.of());
@@ -552,7 +554,7 @@ class ArchivarVacanteTest {
         @Test
         @DisplayName("el contador cuenta en el servidor, sobre el mismo universo que la lista")
         void elContador() {
-            when(vacantes.countByOrganizacionIdAndArchivadaEnIsNotNull(ORGANIZACION)).thenReturn(7L);
+            when(vacantes.countByOrganizacionIdAndArchivadaEnIsNotNullAndEliminadaEnIsNull(ORGANIZACION)).thenReturn(7L);
 
             assertThat(servicio.contarArchivadas(SOLO_MIRA).archivadas()).isEqualTo(7L);
         }

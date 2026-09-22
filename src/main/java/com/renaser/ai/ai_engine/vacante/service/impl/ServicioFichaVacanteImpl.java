@@ -189,8 +189,9 @@ public class ServicioFichaVacanteImpl implements ServicioFichaVacante {
                 sugerenciaDePesos(quien, vacante, f.getTamano()));
     }
 
+    /** La vacante de la empresa, si todavía existe: una eliminada es un 404 (V60). */
     private Vacante laDeLaOrganizacion(ContextoUsuario quien, Long id) {
-        return vacantes.findByIdAndOrganizacionId(id, quien.organizacionId())
+        return vacantes.findByIdAndOrganizacionIdAndEliminadaEnIsNull(id, quien.organizacionId())
                 .orElseThrow(() -> new ResourceNotFoundException("Vacante", "id", id));
     }
 }

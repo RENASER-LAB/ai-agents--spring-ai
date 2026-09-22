@@ -353,7 +353,8 @@ indicadores confidenciales ni puntuaciones mínimas internas.
 
 **RF-14** Cerrar una vacante **detiene las postulaciones nuevas pero no cierra las que están en
 marcha**. El equipo decide candidato por candidato: continuar, detener, o mandar al Radar
-cuando hay consentimiento válido.
+cuando hay consentimiento válido. **Eliminar** una vacante mal creada es otra acción y sí cierra
+a quienes siguen en carrera (RF-14d).
 
 **RF-14b** **Una vacante en borrador o publicada se corrige desde la lista del panel**
 (19/09/2026), con el mismo formulario con que se creó. Una cerrada no se edita. La solicitud y el
@@ -379,6 +380,36 @@ lista, `CERRADA`, sin reabrir ninguna postulación (RF-14). Una archivada **se l
 **no se mueve**: no se edita, no se cambia el sueldo, no se publica, no se reconfigura y no se
 mueve ni reabre ninguna postulación. Archivar y desarchivar quedan en la auditoría con persona y
 fecha.
+
+**RF-14d** **Una vacante que no debió existir se elimina por borrado lógico** (21/09/2026), esté
+en borrador, publicada, cerrada o archivada, sin archivarla antes. Es excepcional: permiso propio
+(`eliminar_vacante`), **motivo escrito obligatorio** —vacío o solo espacios no vale— y un modal
+que cuenta las consecuencias antes de confirmar; abrirlo, cancelarlo o cerrarlo no cambia nada.
+Al confirmar, **en una sola transacción**: cada postulación en carrera —la definición del
+RF-14b— pasa a `CERRADA` con el motivo «vacante eliminada», como decisión de una persona y **sin
+correo**; la vacante queda marcada como eliminada, con fecha, persona y motivo en la auditoría; y
+la solicitud que la respaldaba vuelve a `ABIERTA` para poder respaldar la vacante correcta. Si
+algo de eso falla, no se aplica nada. Después, cada postulación cerrada recibe en la campana de su
+portal un aviso **sin enlace**: «Se retiró la vacante «{título}»» / «La empresa retiró esta
+vacante y tu postulación quedó cerrada. No tienes que hacer nada». Un aviso que falla no deshace
+la eliminación, y el panel dice por separado cuántas postulaciones se cerraron y cuántos avisos
+salieron de verdad. Las postulaciones ya terminadas no cambian ni reciben aviso. Cerrar por
+eliminación libera lo mismo que un cierre manual, incluida una sesión de simulación reservada;
+hoy el cierre manual no suelta esa plaza y la eliminación tampoco (ver [Defectos
+conocidos](DEFECTOS-CONOCIDOS.md), §11).
+
+**No se borra ninguna fila, pero para el sistema la vacante deja de existir**: consultarla desde
+el panel responde 404; no sale en la lista habitual, en Archivadas ni en su contador, en el
+tablón, en «Mis procesos», en los rankings, en las exportaciones ni en la selección de vacantes de
+las sesiones de simulación; en el portal, su detalle público y sus procesos dicen «Esta vacante ya
+no está disponible»; rechaza postulaciones nuevas, y ningún proceso automático —vencimientos, pase
+automático, calificación— la procesa. Tampoco se edita, se cambia el sueldo, se publica, se
+reconfigura, se archiva ni se desarchiva, aunque el formulario se hubiera abierto antes. Los
+avisos antiguos de la campana que apuntaban a ella se conservan, sin enlace. Repetir la
+eliminación responde 404 sin volver a cerrar, auditar ni avisar. **No se restaura desde el
+panel**: solo soporte, directamente en la base. Su título se puede reutilizar, y el borrado de
+datos personales sigue alcanzando sus postulaciones. Para conservar un proceso consultable se
+archiva (RF-14c); no se elimina.
 
 **RF-15** El sistema permite varias vacantes abiertas a la vez.
 

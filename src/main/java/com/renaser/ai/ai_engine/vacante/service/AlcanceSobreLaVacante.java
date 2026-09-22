@@ -64,9 +64,18 @@ public class AlcanceSobreLaVacante {
         return p;
     }
 
-    /** La vacante de esta empresa, si el alcance del permiso llega a ella. */
+    /**
+     * La vacante de esta empresa, si el alcance del permiso llega a ella.
+     *
+     * <p>⚠️ <b>Una eliminada no se encuentra aquí</b> (V60), y por eso el 404 de una vacante
+     * retirada sale solo en todas las pantallas que entran por este guardián: el detalle, la
+     * edición, el ranking y su Excel, la remuneración, el archivo y la propia eliminación
+     * repetida. Es un filtro de la consulta y no un {@code if} después, porque un {@code if}
+     * hay que acordarse de escribirlo en cada llamada.
+     */
     public Vacante laVacanteVisible(ContextoUsuario quien, Long vacanteId, String permiso) {
-        Vacante v = vacantes.findByIdAndOrganizacionId(vacanteId, quien.organizacionId())
+        Vacante v = vacantes
+                .findByIdAndOrganizacionIdAndEliminadaEnIsNull(vacanteId, quien.organizacionId())
                 .orElseThrow(() -> new ResourceNotFoundException("Vacante", "id", vacanteId));
         if (!alcanza(quien, permisos.alcanceDe(permiso), Optional.of(v))) {
             throw new ResourceNotFoundException("Vacante", "id", vacanteId);

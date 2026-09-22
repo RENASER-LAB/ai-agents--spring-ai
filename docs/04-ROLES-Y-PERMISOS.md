@@ -112,6 +112,7 @@ urgencia la fija Talento o Dirección, para que nadie se salte la cola por decis
 | Publicarla, sin aprobación | ○ | ● | ○ | ● | ○ |
 | Cerrar una vacante | ○ | ● | ○ | ● | ○ |
 | Archivar o desarchivar una vacante cerrada | ○ | ● | ○ | ● | ○ |
+| Eliminar una vacante | ○ | ● | ○ | ● | ○ |
 | Elegir qué prueba y qué plantilla de evaluación se aplican | ○ | ● | ◐ | ● | ○ |
 | Definir los requisitos objetivos indispensables | ○ | ● | ◐ | ● | ○ |
 | Definir las barreras críticas de la vacante | ○ | ● | ◐ | ● | ○ |
@@ -140,6 +141,16 @@ de la cabecera, su lista y el detalle en lectura no exigen `cerrar_vacante`. Lo 
 es la acción. El conteo se saca del mismo universo que la vista —las vacantes de la organización
 de quien pregunta, igual que la lista habitual—, para que el botón no prometa siete y la pantalla
 enseñe cinco.
+
+**«Eliminar una vacante» (`eliminar_vacante`, grupo `VACANTES`) sí es un permiso nuevo**
+(`V60`, 21/09/2026), al revés que el archivo. Archivar es el paso siguiente de cerrar; eliminar
+cierra las postulaciones de otras personas y retira la convocatoria de todas las pantallas, y eso
+no se sigue de poder cerrarla: si un día se reparte `cerrar_vacante` a un rol nuevo, no se estaría
+regalando esto sin saberlo. La `V60` lo da a **Talento y Dirección con alcance `TODO` en todas
+las organizaciones que ya existían**; las que se den de alta después lo reciben al copiarse la
+matriz de la plataforma. Fuera del alcance, **404**; sin el permiso, **403**, y la papelera no
+aparece: lo dice `puedeEliminar` de cada fila, sin endpoint de permisos. Repetirlo sobre una ya
+eliminada también responde 404, porque para el panel ya no existe.
 
 ### Candidatos
 

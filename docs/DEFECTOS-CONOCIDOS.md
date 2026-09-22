@@ -11,7 +11,7 @@ haría falta para arreglarlo**. Sin lo tercero, una lista así solo sirve para p
 > descubrir cada pocos meses, normalmente con un candidato dentro. Lo que **ya está arreglado**
 > no vive aquí: vive en el documento de su tema, en `CLAUDE.MD` o en el javadoc de su clase.
 
-Última revisión: **18/09/2026**.
+Última revisión: **22/09/2026**.
 
 ---
 
@@ -281,6 +281,27 @@ intento —si hubo entrega y si la hizo la persona o el reloj— y traducirlo a 
 valores. Para el Excel: llevar `estadoPrueba` al volcado y escribir en la celda el texto que ya
 usa la tabla. Antes de eso conviene decidir si la hoja debe decir exactamente lo mismo que la
 pantalla, porque hoy el cliente no espera que difieran.
+
+---
+
+## 11 · Cerrar una postulación no suelta su plaza en la sesión de simulación
+
+**Qué le pasa a alguien.** Quien ya eligió fecha para la simulación ocupa una plaza del cupo de
+esa sesión. Si su postulación se cierra a mano —o porque se eliminó su vacante (RF-14d)—, la
+plaza **sigue ocupada**: la sesión puede figurar llena y otro candidato —de la misma vacante o de
+otra que comparta la sesión— se queda esperando fecha sin que haga falta.
+
+**Por qué pasa.** El cupo cuenta las inscripciones con `es_vigente = true`
+(`SesionSimulacionRepository.disponiblesPara`), y solo dos caminos las marcan como no vigentes:
+cancelar la sesión y marcar que la persona no asistió. `MaquinaEstados` no toca inscripciones al
+cerrar. La eliminación de vacantes reutiliza ese mismo cierre y tiene, a propósito, exactamente
+la misma paridad: el RF-14d pide que libere lo mismo que un cierre manual, incluida esta plaza, y
+hoy ninguno de los dos la libera. QA lo registró como limitación previa al aprobar la entrega del
+21/09/2026.
+
+**Qué haría falta.** Al cerrar una postulación, marcar no vigente su inscripción y recalcular la
+disponibilidad de la sesión, como ya hace la cancelación. Antes, decidir si vale para cualquier
+cierre o solo para los que decide una persona, y si a quien esperaba fecha se le avisa.
 
 ---
 

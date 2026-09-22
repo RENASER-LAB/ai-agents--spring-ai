@@ -12,6 +12,7 @@ import com.renaser.ai.ai_engine.perfilintegral.repository.VersionBancoRepository
 import com.renaser.ai.ai_engine.pesos.repository.VersionPesosRepository;
 import com.renaser.ai.ai_engine.postulacion.entity.Postulacion;
 import com.renaser.ai.ai_engine.postulacion.repository.PostulacionRepository;
+import com.renaser.ai.ai_engine.postulacion.service.MaquinaEstados;
 import com.renaser.ai.ai_engine.postulacion.service.PostulacionesEnCarrera;
 import com.renaser.ai.ai_engine.prueba.repository.IntentoPruebaRepository;
 import com.renaser.ai.ai_engine.prueba.repository.PlantillaPruebaRepository;
@@ -94,6 +95,7 @@ class RemuneracionDeLaVacanteTest {
     @Mock private DuenoDelInstrumento dueno;
     @Mock private PostulacionRepository postulaciones;
     @Mock private PostulacionesEnCarrera enCarrera;
+    @Mock private MaquinaEstados maquina;
     @Mock private ServicioAvisosPortal avisos;
     @Mock private AlcanceSobreLaVacante alcance;
     @Mock private Permisos permisos;
@@ -105,7 +107,7 @@ class RemuneracionDeLaVacanteTest {
         servicio = new ServicioVacantesPanelImpl(vacantes, puestos, requisitos, solicitudes,
                 versionesPesos, plantillas, versionesPrueba, plantillasPrueba, plantillasCorreo,
                 plantillasPorVacante, intentos, evaluaciones, versionesBanco,
-                auditoria, dueno, postulaciones, enCarrera, avisos, alcance, permisos);
+                auditoria, dueno, postulaciones, enCarrera, maquina, avisos, alcance, permisos);
     }
 
     // ---------- el escenario ----------

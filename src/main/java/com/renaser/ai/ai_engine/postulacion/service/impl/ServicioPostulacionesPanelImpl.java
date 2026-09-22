@@ -33,6 +33,7 @@ import com.renaser.ai.ai_engine.vacante.service.Remuneracion;
 import com.renaser.ai.ai_engine.vacante.repository.VacanteRepository;
 import com.renaser.ai.ai_engine.vacante.service.AlcanceSobreLaVacante;
 import com.renaser.ai.ai_engine.vacante.service.VacanteArchivada;
+import com.renaser.ai.ai_engine.vacante.service.VacanteEliminada;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -368,6 +369,11 @@ public class ServicioPostulacionesPanelImpl implements ServicioPostulacionesPane
      * que pasa, en vez de dejar un mensaje sobre estados que no menciona el archivo.
      */
     private void exigirVacanteNoArchivada(Postulacion p) {
+        // La eliminada va PRIMERO y contesta distinto: 404 y no 409. Una archivada está ahí y
+        // no se puede mover; una eliminada no existe, y decir «no puedes» sobre algo que
+        // ninguna pantalla enseña ya sería contradecir al panel (V60).
+        VacanteEliminada.exigirQueSigaExistiendo(
+                vacantes.existsByIdAndEliminadaEnIsNotNull(p.getVacanteId()), p.getVacanteId());
         VacanteArchivada.exigirQueNoLoEste(
                 vacantes.existsByIdAndArchivadaEnIsNotNull(p.getVacanteId()));
     }

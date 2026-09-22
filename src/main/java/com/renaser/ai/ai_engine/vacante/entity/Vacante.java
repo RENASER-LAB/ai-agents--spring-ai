@@ -94,5 +94,19 @@ public class Vacante {
      * devuelve a la lista sin reabrir nada.
      */
     private Instant archivadaEn;
+    /**
+     * Cuándo se eliminó por borrado lógico. Vacío: la vacante existe (V60).
+     *
+     * <p>⚠️ <b>Tampoco es un estado, y no es lo mismo que archivar.</b> Una archivada se
+     * consulta entera desde «Archivadas»; una eliminada se retira de todas las pantallas —el
+     * panel, el tablón, «Mis procesos», los rankings, las exportaciones y los procesos
+     * automáticos—, sus postulaciones en carrera se cierran con aviso y su solicitud vuelve a
+     * estar libre. Lo que no se pierde es ni una fila: quién la eliminó, cuándo y por qué
+     * están en la auditoría, y las postulaciones conservan todo su rastro.
+     *
+     * <p>No se deshace desde el panel. Quitar esta fecha es cosa de soporte, directamente en
+     * la base.
+     */
+    private Instant eliminadaEn;
     private Instant creadoEn;
 }

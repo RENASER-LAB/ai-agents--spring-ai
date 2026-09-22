@@ -223,7 +223,7 @@ class AlcanceSobreLaVacanteTest {
     void laVacanteSuyaSiYLaAjenaNo() {
         when(permisos.alcanceDe(PERMISO))
                 .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.SUS_VACANTES, QUIEN_MIRA));
-        when(vacantes.findByIdAndOrganizacionId(VACANTE, ORGANIZACION)).thenReturn(Optional.of(
+        when(vacantes.findByIdAndOrganizacionIdAndEliminadaEnIsNull(VACANTE, ORGANIZACION)).thenReturn(Optional.of(
                 Vacante.builder().id(VACANTE).organizacionId(ORGANIZACION)
                         .responsableUsuarioId(QUIEN_MIRA).build()));
 
@@ -235,7 +235,7 @@ class AlcanceSobreLaVacanteTest {
     void laVacanteAjenaEs404() {
         when(permisos.alcanceDe(PERMISO))
                 .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.SUS_VACANTES, QUIEN_MIRA));
-        when(vacantes.findByIdAndOrganizacionId(VACANTE, ORGANIZACION)).thenReturn(Optional.of(
+        when(vacantes.findByIdAndOrganizacionIdAndEliminadaEnIsNull(VACANTE, ORGANIZACION)).thenReturn(Optional.of(
                 Vacante.builder().id(VACANTE).organizacionId(ORGANIZACION)
                         .responsableUsuarioId(OTRO).build()));
 
@@ -251,7 +251,7 @@ class AlcanceSobreLaVacanteTest {
     void conPropioTampocoLaVacante() {
         when(permisos.alcanceDe(PERMISO))
                 .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.PROPIO, QUIEN_MIRA));
-        when(vacantes.findByIdAndOrganizacionId(VACANTE, ORGANIZACION)).thenReturn(Optional.of(
+        when(vacantes.findByIdAndOrganizacionIdAndEliminadaEnIsNull(VACANTE, ORGANIZACION)).thenReturn(Optional.of(
                 Vacante.builder().id(VACANTE).organizacionId(ORGANIZACION)
                         .responsableUsuarioId(QUIEN_MIRA).build()));
 

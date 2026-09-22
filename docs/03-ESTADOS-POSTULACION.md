@@ -202,7 +202,7 @@ Cada uno guarda además su **motivo**:
 | Estado | Motivos posibles |
 |---|---|
 | `NO_CONTINUA` | Requisito objetivo no cumplido · Barrera crítica confirmada · Decisión roja · Decisión de una persona · **Pasa a reserva** |
-| `CERRADA` | Sin avanzar 60 días (configurable) · Cierre manual · **El candidato se retiró** · Se acabó el plazo de la evaluación · Pidió borrar sus datos |
+| `CERRADA` | Sin avanzar 60 días (configurable) · Cierre manual · **El candidato se retiró** · Se acabó el plazo de la evaluación · Pidió borrar sus datos · **Se eliminó la vacante** |
 
 Así son 2 estados con motivo, en vez de 10 estados.
 
@@ -486,6 +486,18 @@ Radar de Talento cuando hay consentimiento válido para futuros contactos.
 
 Esto cambió respecto de versiones anteriores de este documento, donde el cierre de la vacante
 arrastraba a todas las postulaciones a la vez.
+
+### Se elimina la convocatoria
+
+Eliminar no es cerrar (21/09/2026): es para la vacante que no debió existir, y **sí** cierra a
+quien sigue en carrera. Cada una de esas postulaciones pasa a `CERRADA` con el motivo
+`VACANTE_ELIMINADA`, como transición **de la persona** que eliminó la vacante y escribió su
+motivo, no del sistema. No sale el correo de cierre habitual: el candidato se entera por un aviso
+en la campana de su portal que dice que la empresa retiró la vacante y que no tiene que hacer
+nada, y su historial no lleva la coletilla «sin avisar al candidato». Las postulaciones que ya
+estaban en `CONTRATADO`, `NO_CONTINUA` o `CERRADA` no cambian. Después, el proceso deja de verse
+en su portal junto con la vacante. Ver RF-14d en los [requisitos
+funcionales](01-REQUISITOS-FUNCIONALES.md).
 
 ### El candidato se retira
 

@@ -281,6 +281,23 @@ public class ServicioPruebaImpl implements ServicioPrueba {
         for (IntentoPrueba intento : vencidos) {
             Postulacion postulacion = porId.get(intento.getPostulacionId());
             if (postulacion == null) continue;
+            /*
+             * ⚠️ **A quien ya terminó no se le entrega nada**, y sin esto el barrido entero
+             * se caía.
+             *
+             * Una prueba abierta se queda abierta cuando su postulación se cierra por otro
+             * lado: el candidato se retira, el equipo lo descarta o —desde la V60— se elimina
+             * la vacante y sus procesos se cierran de golpe. Su intento vence igual, y aquí
+             * se intentaría moverlo a «calificando»: la máquina de estados se planta —de un
+             * estado final no se sale— y la excepción se lleva por delante a TODOS los demás
+             * intentos de la misma tanda, cada minuto, sin que nadie lo vea más que en un log.
+             *
+             * Es la misma comprobación que ya hacía el cuestionario técnico en
+             * {@code entregarTecnicasVencidas}; faltaba en esta mitad.
+             */
+            if (maquina.yaTermino(postulacion)) {
+                continue;
+            }
             cerrarIntento(intento, postulacion, true);
         }
     }

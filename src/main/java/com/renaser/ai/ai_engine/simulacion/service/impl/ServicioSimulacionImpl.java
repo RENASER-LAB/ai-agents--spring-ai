@@ -114,7 +114,11 @@ public class ServicioSimulacionImpl implements ServicioSimulacion {
                 .build());
 
         for (Long vacanteId : datos.vacanteIds()) {
-            vacantes.findByIdAndOrganizacionId(vacanteId, quien.organizacionId())
+            // Una vacante eliminada no se puede elegir para una sesión (V60): no existe para
+            // el panel, y colgar una sala de simulación de ella dejaría una sesión que nadie
+            // puede abrir desde ninguna pantalla.
+            vacantes.findByIdAndOrganizacionIdAndEliminadaEnIsNull(vacanteId,
+                            quien.organizacionId())
                     .orElseThrow(() -> new ResourceNotFoundException("Vacante", "id", vacanteId));
             sesionesVacante.save(SesionVacante.builder()
                     .sesionSimulacionId(sesion.getId()).vacanteId(vacanteId)
