@@ -35,6 +35,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -264,6 +265,21 @@ class ServicioPruebaImplTest {
         servicio.iniciar(QUIEN, UUID_POSTULACION);
 
         assertThat(intento.getVenceEn()).isEqualTo(cierraEn);
+    }
+
+    @Test
+    @DisplayName("pasada la fecha de la convocatoria ya no se abre, y se dice por qué")
+    void pasadaLaFechaNoSeEmpieza() {
+        // La otra mitad de que una cronometrada acepte fecha: la fecha es lo que impide
+        // empezar el examen la semana siguiente a que cerrara la convocatoria. Sin esto,
+        // quien no la hubiera abierto estrenaría sus minutos completos cuando quisiera.
+        IntentoPrueba intento = intentoSinEmpezar();
+        intento.setVenceEn(Instant.now().minus(1, ChronoUnit.HOURS));
+
+        assertThatThrownBy(() -> servicio.iniciar(QUIEN, UUID_POSTULACION))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("ya se agotó");
+        assertThat(intento.getIniciadoEn()).isNull();
     }
 
     // ============ plazoPropio es sagrado ============
