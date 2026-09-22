@@ -305,6 +305,14 @@ public class FlujoSinBancoIT {
                 "{\"cierraEn\":\"%s\",\"motivo\":\"Cierre único de la convocatoria\"}".formatted(domingo))
                 .andExpect(status().isOk());
 
+        // Y desde aquí se puede LEER lo que rige, que es lo que la pantalla no podía decir:
+        // la fecha, la modalidad efectiva y los días de la plantilla.
+        conTokenGet("/api/v1/panel/vacantes/" + vacanteId, tokenTalento)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.pruebaCierraEn").value(domingo))
+                .andExpect(jsonPath("$.modalidadPrueba").value("PLAZO_ABIERTO"))
+                .andExpect(jsonPath("$.diasPruebaVigentes").value(7));
+
         // Dos candidatos nuevos: uno se queda con la fecha de la vacante, al otro se le dan
         // más horas a mano.
         Cand hereda = invitarUno("hereda@correo.pe");
@@ -333,6 +341,23 @@ public class FlujoSinBancoIT {
         // Perder «más horas para esta persona» al mover la convocatoria sería silencioso
         conTokenGet("/api/v1/portal/prueba/" + conLoSuyo.uuid(), conLoSuyo.token())
                 .andExpect(jsonPath("$.venceEn").value(suya));
+
+        // Y la ficha del panel lo dice con las mismas palabras que la pantalla: de dónde
+        // sale la fecha de cada uno. Sin esto, las dos se leen igual y nadie sabría que a
+        // la segunda ya no la mueve cambiar la de la convocatoria.
+        conTokenGet("/api/v1/panel/postulaciones/" + hereda.id() + "/prueba/plazo", tokenTalento)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.existeIntento").value(true))
+                .andExpect(jsonPath("$.venceEn").value(lunes))
+                .andExpect(jsonPath("$.origen").value("VACANTE"))
+                // `isEmpty` y no `doesNotExist`: el campo viaja con valor nulo, que es lo
+                // que significa «no ha entregado», no que falte del contrato.
+                .andExpect(jsonPath("$.entregadoEn").isEmpty())
+                .andExpect(jsonPath("$.instrumento").value("PLANTILLA"));
+        conTokenGet("/api/v1/panel/postulaciones/" + conLoSuyo.id() + "/prueba/plazo", tokenTalento)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.venceEn").value(suya))
+                .andExpect(jsonPath("$.origen").value("PROPIO"));
 
         // Y empezar no le recalcula la fecha a ninguno
         mvc.perform(post("/api/v1/portal/prueba/" + hereda.uuid() + "/inicio")

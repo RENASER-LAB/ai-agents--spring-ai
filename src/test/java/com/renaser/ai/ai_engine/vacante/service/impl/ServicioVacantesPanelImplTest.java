@@ -559,17 +559,37 @@ class ServicioVacantesPanelImplTest {
     }
 
     @Test
-    @DisplayName("sobre una prueba cronometrada no se fija fecha: anularía el reloj")
-    void sobreUnaCronometradaNoSeFijaFecha() {
-        vacante("PUBLICADA", false, null);
-        when(versionesPrueba.findById(31L)).thenReturn(Optional.of(
-                VersionPlantillaPrueba.builder().id(31L)
-                        .modalidad("CRONOMETRADA").duracionMinutos(90).build()));
+    @DisplayName("una prueba cronometrada SÍ admite fecha: conviven, y rige la que caiga antes")
+    void sobreUnaCronometradaSeFijaFecha() {
+        // Aquí había una prueba que exigía lo contrario —«anularía el reloj»—, y dejó de ser
+        // cierta cuando `ServicioPruebaImpl.iniciar` pasó a quedarse con el plazo más cercano
+        // entre el reloj y la fecha de la vacante: quien abre temprano tiene sus 90 minutos
+        // completos, y quien abre pegado a la fecha cierra a la fecha. Sin fecha no había
+        // forma de impedir que alguien empezara el examen la semana siguiente.
+        Vacante v = vacante("PUBLICADA", false, null);
+        Instant domingo = Instant.now().plus(3, java.time.temporal.ChronoUnit.DAYS);
+
+        var salida = servicio.definirCierrePrueba(QUIEN, VACANTE,
+                new DefinirCierrePrueba(domingo, "Nadie sigue después del domingo"));
+
+        assertThat(v.getPruebaCierraEn()).isEqualTo(domingo);
+        assertThat(salida.cierraEn()).isEqualTo(domingo);
+        verify(vacantes).save(v);
+    }
+
+    @Test
+    @DisplayName("sin prueba del puesto elegida no hay fecha que fijar, y se dice por qué")
+    void sinPlantillaDePruebaNoSeFijaFecha() {
+        // El otro camino que sigue cerrado, y que la pantalla usa para no ofrecer el control:
+        // una vacante con cuestionario técnico no tiene versión de plantilla y su plazo son
+        // los minutos de la vacante.
+        Vacante v = vacante("PUBLICADA", false, null);
+        v.setVersionPlantillaPruebaId(null);
 
         assertThatThrownBy(() -> servicio.definirCierrePrueba(QUIEN, VACANTE,
                 new DefinirCierrePrueba(Instant.now().plusSeconds(86400), "cierre único")))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("cronometrada");
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("no rinde una prueba del puesto");
     }
 
     @Test
@@ -588,6 +608,146 @@ class ServicioVacantesPanelImplTest {
         assertThat(sinEmpezar.getVenceEn())
                 .as("sin fecha, al empezar se vuelven a contar los días de la plantilla")
                 .isNull();
+    }
+
+    // ============ Qué plazo rige hoy, para poder enseñarlo ============
+    //
+    // El panel ofrecía el campo de fecha en blanco y decía en voz alta que no podía saber
+    // cuál regía. Estos cuatro casos son las cuatro frases de la pantalla, y ninguna se
+    // puede deducir solo de `prueba_cierra_en`: los días viven en la plantilla, y unos
+    // minutos de la vacante convierten en cronometrada hasta una de plazo abierto.
+
+    @Test
+    @DisplayName("plazo abierto sin fecha: el detalle trae los días de la plantilla")
+    void elDetalleTraeLosDiasDeLaPlantilla() {
+        vacante("PUBLICADA", false, null);
+        // ⚠️ Se dobla el guardián, no `findById`: la versión no sabe de organizaciones —el
+        // dueño vive en su plantilla— y el detalle la pide con el dueño ya resuelto.
+        laVersionDeLaEmpresa(VersionPlantillaPrueba.builder().id(31L)
+                .modalidad("PLAZO_ABIERTO").plazoDias(5).build());
+        when(intentos.abiertosDeLaVacante(VACANTE)).thenReturn(List.of(
+                IntentoPrueba.builder().id(1L).postulacionId(11L).plazoPropio(false).build(),
+                IntentoPrueba.builder().id(2L).postulacionId(12L).plazoPropio(false).build(),
+                IntentoPrueba.builder().id(3L).postulacionId(13L).plazoPropio(true).build()));
+
+        var panel = servicio.detalle(QUIEN, VACANTE);
+
+        assertThat(panel.pruebaCierraEn()).isNull();
+        assertThat(panel.modalidadPrueba()).isEqualTo("PLAZO_ABIERTO");
+        assertThat(panel.diasPruebaVigentes()).isEqualTo(5);
+        assertThat(panel.minutosPruebaVigentes()).isNull();
+        assertThat(panel.intentosAbiertosSinPlazoPropio())
+                .as("es la cifra que la pantalla dice ANTES de guardar: «se moverán X»")
+                .isEqualTo(2);
+        assertThat(panel.intentosAbiertosConPlazoPropio()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName("cronometrada con fecha: viajan los minutos Y la fecha, que conviven")
+    void elDetalleTraeLosMinutosYLaFecha() {
+        Vacante v = vacante("PUBLICADA", false, null);
+        Instant domingo = Instant.parse("2026-09-20T23:59:00Z");
+        v.setPruebaCierraEn(domingo);
+        laVersionDeLaEmpresa(VersionPlantillaPrueba.builder().id(31L)
+                .modalidad("CRONOMETRADA").duracionMinutos(30).build());
+
+        var panel = servicio.detalle(QUIEN, VACANTE);
+
+        assertThat(panel.modalidadPrueba()).isEqualTo("CRONOMETRADA");
+        assertThat(panel.minutosPruebaVigentes()).isEqualTo(30);
+        assertThat(panel.diasPruebaVigentes()).isNull();
+        assertThat(panel.pruebaCierraEn())
+                .as("enseñar una sola de las dos es esconder la mitad del plazo")
+                .isEqualTo(domingo);
+    }
+
+    @Test
+    @DisplayName("con minutos propios de la vacante, la modalidad que rige es cronometrada")
+    void losMinutosDeLaVacanteMandanSobreLaModalidad() {
+        // La misma regla que `ServicioPruebaImpl` aplica al arrancar el reloj. Leyendo la
+        // modalidad de la plantilla, la pantalla diría «7 días» sobre una prueba de 45
+        // minutos.
+        Vacante v = vacante("PUBLICADA", false, null);
+        v.setMinutosEtapaTecnica(45);
+        laVersionDeLaEmpresa(VersionPlantillaPrueba.builder().id(31L)
+                .modalidad("PLAZO_ABIERTO").plazoDias(7).build());
+
+        var panel = servicio.detalle(QUIEN, VACANTE);
+
+        assertThat(panel.modalidadPrueba()).isEqualTo("CRONOMETRADA");
+        assertThat(panel.minutosPruebaVigentes()).isEqualTo(45);
+        assertThat(panel.diasPruebaVigentes()).isNull();
+    }
+
+    @Test
+    @DisplayName("una versión que no es de esta empresa se lee como «sin dato», no como su plazo")
+    void laVersionDeOtraEmpresaNoSeLee() {
+        // Con una sola organización esto no pasa nunca, y por eso la fuga es invisible hasta
+        // que hay dos: el guardián no la encuentra y la pantalla dice que no sabe, en vez de
+        // pintar el reloj de la prueba de otra empresa.
+        vacante("PUBLICADA", false, null);
+        when(versionesPrueba.laDeLaOrganizacion(31L, ORGANIZACION)).thenReturn(Optional.empty());
+
+        var panel = servicio.detalle(QUIEN, VACANTE);
+
+        assertThat(panel.modalidadPrueba()).isNull();
+        assertThat(panel.minutosPruebaVigentes()).isNull();
+        assertThat(panel.diasPruebaVigentes()).isNull();
+    }
+
+    @Test
+    @DisplayName("con cuestionario técnico no hay modalidad ni días: son los minutos del banco")
+    void elCuestionarioTecnicoSeMideEnMinutos() {
+        Vacante v = vacante("PUBLICADA", false, null);
+        v.setInstrumentoEtapaTecnica("CUESTIONARIO_TECNICO");
+        v.setVersionPlantillaPruebaId(null);
+        when(versionesBanco.findFirstByVacanteIdAndEstado(VACANTE, "PUBLICADA"))
+                .thenReturn(Optional.of(
+                        com.renaser.ai.ai_engine.perfilintegral.entity.VersionBanco.builder()
+                                .id(70L).estado("PUBLICADA").minutosObjetivo(60).build()));
+
+        var panel = servicio.detalle(QUIEN, VACANTE);
+
+        assertThat(panel.modalidadPrueba())
+                .as("no rinde una plantilla: su tiempo son minutos y no admite fecha")
+                .isNull();
+        assertThat(panel.minutosPruebaVigentes()).isEqualTo(60);
+        assertThat(panel.intentosAbiertosSinPlazoPropio())
+                .as("el cuestionario no usa intento_prueba: no hay nada que mover")
+                .isZero();
+    }
+
+    @Test
+    @DisplayName("la lista trae la fecha, pero no gasta dos consultas por fila en el resto")
+    void laListaNoResuelveElPlazoDeCadaFila() {
+        Vacante v = Vacante.builder().id(VACANTE).organizacionId(ORGANIZACION)
+                .estado("PUBLICADA").puestoId(PUESTO).versionPlantillaPruebaId(31L)
+                .pruebaCierraEn(Instant.parse("2026-09-20T23:59:00Z")).build();
+        when(vacantes.findByOrganizacionIdAndArchivadaEnIsNullOrderByCreadoEnDesc(ORGANIZACION))
+                .thenReturn(List.of(v));
+        when(enCarrera.cuantasPorVacante(ORGANIZACION)).thenReturn(Map.of());
+
+        var fila = servicio.listar(QUIEN, false).get(0);
+
+        assertThat(fila.pruebaCierraEn()).isEqualTo(Instant.parse("2026-09-20T23:59:00Z"));
+        assertThat(fila.modalidadPrueba())
+                .as("en la lista llega vacío y el panel lo lee como «sin dato»")
+                .isNull();
+        verify(intentos, never()).abiertosDeLaVacante(VACANTE);
+        verify(versionesPrueba, never()).laDeLaOrganizacion(31L, ORGANIZACION);
+    }
+
+    /**
+     * La versión de prueba que esta empresa sí puede leer.
+     *
+     * <p>Va por {@code laDeLaOrganizacion} —el guardián que deriva al padre— y no por
+     * {@code findById}: la versión no guarda organización, la guarda su plantilla, y el
+     * dueño lo resuelve {@code DuenoDelInstrumento} porque los instrumentos pueden ser de la
+     * plataforma y compartirse.
+     */
+    private void laVersionDeLaEmpresa(VersionPlantillaPrueba version) {
+        when(versionesPrueba.laDeLaOrganizacion(version.getId(), ORGANIZACION))
+                .thenReturn(Optional.of(version));
     }
 
     // ============ Los textos de correo de la vacante ============

@@ -109,6 +109,10 @@ public class EntradaEtapaTecnica {
             throw new IllegalStateException(
                     "Esta vacante no tiene plantilla de prueba asignada: no se puede avanzar");
         }
+        // La fecha de la convocatoria viaja siempre, **también si su prueba es
+        // cronometrada**: no anula el reloj —al empezar rige el plazo que caiga antes— y es
+        // lo que impide abrir el examen después de que la convocatoria cerrara. Hasta el
+        // 22/09/2026 el panel ni siquiera dejaba fijarla sobre una cronometrada.
         prueba.crearAlEntrar(organizacionId, postulacion.getId(),
                 vacante.getVersionPlantillaPruebaId(), vacante.getPruebaCierraEn());
     }

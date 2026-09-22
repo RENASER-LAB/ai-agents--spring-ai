@@ -67,4 +67,27 @@ public final class DtosCalificacionPrueba {
     public record DefinirPlazoPrueba(@NotNull Instant venceEn, @NotBlank String motivo) {}
 
     public record PlazoPrueba(Long postulacionId, Instant venceEn, boolean yaEmpezo) {}
+
+    /**
+     * El plazo que rige HOY para esta persona, para poder enseñarlo antes de tocarlo.
+     *
+     * <p>Hasta ahora la ficha ofrecía el campo de fecha en blanco sobre cuatro situaciones que
+     * no se parecen en nada —todavía no llegó a la etapa, no la ha abierto, la está haciendo,
+     * ya la entregó— y quien lo usaba no sabía qué estaba cambiando.
+     *
+     * <ul>
+     *   <li>{@code existeIntento} falso = no hay prueba del puesto que mirar: o no ha llegado
+     *       a la etapa, o su vacante rinde el cuestionario técnico, que no usa
+     *       {@code intento_prueba}. Lo distingue {@code instrumento}.
+     *   <li>{@code venceEn} vacío = todavía no tiene fecha; se le calculará al abrirla. <b>No
+     *       es un error</b>, y los datos antiguos son así.
+     *   <li>{@code origen} dice de dónde sale esa fecha: {@code VACANTE} (la común de la
+     *       convocatoria), {@code RELOJ} (la calculó el servidor al empezar) o {@code PROPIO}
+     *       (se la puso alguien a mano, y mover la de la vacante ya no la toca).
+     *   <li>{@code instrumento} es el de la vacante: {@code PLANTILLA} o
+     *       {@code CUESTIONARIO_TECNICO}.
+     * </ul>
+     */
+    public record PlazoVigente(boolean existeIntento, Instant venceEn, String origen,
+                               Instant iniciadoEn, Instant entregadoEn, String instrumento) {}
 }

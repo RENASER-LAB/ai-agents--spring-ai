@@ -649,7 +649,7 @@ Una convocatoria concreta.
 | `plantilla_evaluacion_id` | bigint | no | |
 | `aplica_evaluacion` | boolean | sí | Apagado, quien postula no recibe la evaluación del banco: va directo a la bandeja del equipo y su única evaluación es la prueba del puesto. Por defecto encendido |
 | `calificacion_automatica` | boolean | sí | Encendido, la postulación se califica y avanza sola hasta que termina la prueba del puesto, y solo entonces espera a una persona. Por defecto **apagado**: en automático cada postulante cuesta una llamada al modelo desde el momento en que postula |
-| `prueba_cierra_en` | timestamptz | no | Cuándo cierra la prueba de esta vacante, para todos. Vacío: se cuentan los días de la versión de la plantilla desde que cada uno empieza |
+| `prueba_cierra_en` | timestamptz | no | Cuándo cierra la prueba de esta vacante, para todos. Vacío: se cuentan los días de la versión de la plantilla desde que cada uno empieza. **También se puede fijar sobre una versión `CRONOMETRADA`** (22/09/2026): al empezar rige el plazo que caiga antes entre el reloj y esta fecha, así que no anula el cronómetro — lo que hace es impedir empezar la prueba después de esta fecha |
 | `responsable_usuario_id` | bigint | sí | Quién se hace cargo de contratar |
 | `publicada_en` | timestamptz | no | |
 | `cerrada_en` | timestamptz | no | |
@@ -1854,7 +1854,7 @@ Cuando un candidato rinde.
 | `postulacion_id` | bigint | sí | |
 | `version_plantilla_prueba_id` | bigint | sí | La versión congelada con que rindió |
 | `iniciado_en` | timestamptz | sí | Desde aquí corre el reloj |
-| `vence_en` | timestamptz | sí | Cuándo se le cierra. Sale de la fecha de la vacante si la tiene; si no, **se calcula al empezar y se guarda** |
+| `vence_en` | timestamptz | sí | Cuándo se le cierra. **Se calcula al empezar y se guarda**: entre el reloj de la prueba (`ahora + minutos`) y la fecha de la vacante (`prueba_cierra_en`) rige **el que caiga antes**, y sin ninguno de los dos, los días de la versión de la plantilla desde que empieza. ⚠️ **Los días nunca acercan la fecha de la vacante**, solo un cronómetro puede; y con `plazo_propio` manda la fecha puesta a mano |
 | `plazo_propio` | boolean | sí | A esta persona se le fijó su fecha a mano. Mover la de la vacante no se la toca |
 | `entregado_en` | timestamptz | no | Cuándo se entregó. Vacío = no llegó a entregarse |
 | `es_entrega_automatica` | boolean | sí | Si lo entregó el reloj por él |
