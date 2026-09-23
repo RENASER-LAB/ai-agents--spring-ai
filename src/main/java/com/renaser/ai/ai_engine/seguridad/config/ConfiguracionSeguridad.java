@@ -53,6 +53,11 @@ public class ConfiguracionSeguridad {
                 // está en ServicioEnlaceAcceso: 32 bytes de azar, solo se guarda el hash,
                 // vence, y se puede revocar.
                 .requestMatchers(HttpMethod.POST, "/api/v1/portal/auth/acceso").permitAll()
+                // «Me olvidé mi contraseña»: quien la usa, por definición, no puede entrar.
+                // Pedir el enlace responde siempre lo mismo; elegir la contraseña lleva su
+                // credencial dentro, el token de un solo uso del correo.
+                .requestMatchers(HttpMethod.POST, "/api/v1/portal/auth/recuperacion").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/v1/portal/auth/restablecer").permitAll()
                 .anyRequest().hasAuthority("TIPO_CANDIDATO"))
             .exceptionHandling(e -> e.authenticationEntryPoint(entradaSinIdentidad()));
         return http.build();
@@ -72,6 +77,9 @@ public class ConfiguracionSeguridad {
                 .requestMatchers(HttpMethod.POST, "/api/v1/panel/auth/login").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/panel/auth/invitacion").permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/v1/panel/auth/dev-login").permitAll()
+                // Y las dos de la contraseña olvidada, por lo mismo que en el portal.
+                .requestMatchers(HttpMethod.POST, "/api/v1/panel/auth/recuperacion").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/v1/panel/auth/restablecer").permitAll()
                 .anyRequest().hasAuthority("TIPO_EQUIPO"))
             .exceptionHandling(e -> e.authenticationEntryPoint(entradaSinIdentidad()));
         return http.build();

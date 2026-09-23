@@ -61,6 +61,18 @@ public class DireccionDelCandidato {
      * direcciones reales y raras, que es peor que dejar pasar una que rebota.
      */
     private boolean sirve(String direccion) {
+        return esEntregable(direccion);
+    }
+
+    /**
+     * La misma comprobacion de {@link #sirve}, para quien no tiene una postulacion delante.
+     *
+     * <p>La usa la solicitud de contraseña nueva: a una cuenta de carga masiva no se le manda
+     * el enlace, porque el correo inventado no llega a nadie. Vive aqui y no copiada alli
+     * porque es la misma regla, y el dia que cambie el dominio inventado tiene que cambiar
+     * para los dos a la vez.
+     */
+    public static boolean esEntregable(String direccion) {
         if (direccion == null) {
             return false;
         }

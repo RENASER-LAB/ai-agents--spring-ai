@@ -99,7 +99,9 @@ docker compose up -d                       # Postgres (5433) y RabbitMQ
   `smtp`, y entonces solo se registra en `correo_enviado`. Para encenderlo hacen falta
   `CORREO_TRANSPORTE=smtp`, `CORREO_REMITENTE` y una cuenta que autentique, y `starttls` en
   `application.yaml`: sin eso Gmail rechaza todo con «530-5.7.0 Must issue a STARTTLS command
-  first», que no nombra ni el TLS ni la propiedad que falta.
+  first», que no nombra ni el TLS ni la propiedad que falta. Con `log`, el enlace de
+  «¿Olvidaste tu contraseña?» se lee del cuerpo guardado en `correo_enviado`: vale 60 minutos y
+  una sola vez, y pedir otro anula el anterior.
 - **El enlace firmado no falla en local.** `AlmacenArchivosEnMemoria.urlDeDescarga` devuelve
   `memoria://...`, así que `GET /archivos/{id}/enlace` responde 200 con una url que nadie abre.
   Quien lo llame tiene que mirar el esquema de la url y caer a `/archivos/{id}/descarga` cuando no

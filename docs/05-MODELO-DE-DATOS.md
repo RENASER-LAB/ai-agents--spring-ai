@@ -23,8 +23,8 @@ Sirve para tres cosas:
 - **Entender el sistema.** Un modelo de datos bien contado explica el negocio mejor que
   cualquier otro documento.
 
-**La base ya está construida.** Las migraciones `V1` a `V58` viven en
-`src/main/resources/db/migration` —**104 tablas de este módulo**, 107 en la base contando la de
+**La base ya está construida.** Las migraciones `V1` a `V61` viven en
+`src/main/resources/db/migration` —**105 tablas de este módulo**, 108 en la base contando la de
 Flyway y las dos del motor de agentes— y Flyway es el dueño del esquema. Cambiar algo de aquí
 ya cuesta una migración nueva, y **una migración aplicada no se edita nunca**: se escribe otra
 encima.
@@ -110,6 +110,19 @@ añade `ix_vacante_archivadas_vivas` para Archivadas. Suma el motivo de cierre
 `VACANTE_ELIMINADA` —solo en el comentario de `aviso_portal.tipo`, que es texto libre— y el
 permiso `eliminar_vacante`. Ninguna vacante existente queda eliminada. Restaurar una es quitar
 la fecha a mano en la base: no hay vuelta desde el panel.
+
+La `V61` (22/09/2026) trae **«¿Olvidaste tu contraseña?»**, en el portal y en el panel. Crea la
+tabla `recuperacion_clave`: cada fila es un enlace para elegir una contraseña nueva, y guarda la
+huella del token (nunca el token), cuándo vence, cuándo se usó y cuándo quedó sin efecto porque
+se pidió otro. Cuelga de la **cuenta** (`usuario`) y no del correo, porque un mismo correo puede
+tener cuenta de equipo en dos empresas y cada una tiene su contraseña; y se borra con ella
+(`ON DELETE CASCADE`), que en la práctica solo alcanza a las cuentas de prueba —las reales no se
+borran, se anonimizan—. Siembra además tres parámetros de la plataforma
+(`minutos_vida_recuperacion`, 60; `max_recuperaciones_por_hora`, 3 por cuenta;
+`max_recuperaciones_por_ip_hora`, 30) y los dos correos, `RECUPERAR_CLAVE_CANDIDATO` y
+`RECUPERAR_CLAVE_EQUIPO`, solo para la plataforma: las empresas que ya existían no tienen copia y
+el envío usa el de la plataforma. Ver `recuperacion_clave` en el
+[diccionario de datos](07-DICCIONARIO-DE-DATOS.md).
 
 La `V54` (14/09/2026) **no añade ninguna tabla y cambia quién firma qué**. Hasta ella había dos
 tipos de texto —`PROCESO` y `FUTUROS_CONTACTOS`— y el de la cuenta usaba el primero, que habla de
@@ -480,7 +493,7 @@ Hay una versión dibujada de este mismo mapa en
 
 ## Las tablas
 
-Ciento cuatro en total, agrupadas por área para poder leerlas de a poco. En cada una se nombran
+Ciento cinco en total, agrupadas por área para poder leerlas de a poco. En cada una se nombran
 las columnas que importan para entender qué hace, no todas.
 
 **Para verlas todas, con tipo y clave, está el [Diccionario de datos](07-DICCIONARIO-DE-DATOS.md).**
@@ -500,7 +513,7 @@ Arranca con una sola fila. Todo lo demás la referencia, directamente o a travé
 
 ---
 
-### Personas, acceso y permisos · 8 tablas
+### Personas, acceso y permisos · 9 tablas
 
 Un rol es un conjunto de permisos con nombre guardado en la base de datos, no algo fijo en el
 código. El Administrador puede crear roles nuevos y repartir permisos sin que nadie programe.
@@ -515,6 +528,7 @@ código. El Administrador puede crear roles nuevos y repartir permisos sin que n
 | `permiso` | Una acción suelta que se puede conceder o no. Son 77 diseñados, 71 sembrados | codigo, etiqueta, grupo |
 | `usuario_rol` | Una persona puede tener varios roles. Puede hacer lo que le permita cualquiera de ellos | usuario_id, rol_id |
 | `rol_permiso` | Qué permisos tiene un rol y **con qué alcance** | rol_id, permiso_id, alcance |
+| `recuperacion_clave` | El enlace de «¿Olvidaste tu contraseña?»: un solo uso, vida corta, y solo vale el último que se pidió (`V61`) | usuario_id, token_hash, vence_en, usado_en, invalidado_en |
 
 `contrasena_hash` y `usuario_renaser_os_id` son **excluyentes**: quien tiene uno no tiene el
 otro. Desde el 25/08/2026 el equipo entra también con contraseña (cuentas por invitación) y
@@ -1143,6 +1157,8 @@ cuáles sí, porque las que no, hay que probarlas en el código.
   desde el código ni desde una carga masiva.
 - **La pretensión de una postulación va entera o no va**: monto, moneda y fecha de declaración,
   los tres o ninguno.
+- **Una cuenta tiene como mucho un enlace de contraseña nueva vivo** (`V61`): si dos solicitudes
+  llegaran a la vez, la base rechaza la segunda en vez de dejar dos enlaces que sirvan.
 
 ### Tienen que vivir en el código
 

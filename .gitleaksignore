@@ -9,3 +9,10 @@
 # 15/08/2026: «PEGA_AQUI_UNA_CLAVE_DE_AL_MENOS_32_BYTES». Es un hueco para rellenar, no
 # una clave; la regla generic-api-key lo marcó solo por ser una cadena larga y variada.
 f884582bacd62c7c289d4c6e58f8026d1ad2211f:application-secrets.yaml.example:generic-api-key:8
+
+# La contraseña de prueba «UnaTerceraClave2026» de FlujoRecuperacionClaveIT, en el commit de
+# «me olvidé mi contraseña» (23/09/2026). Es la clave inventada que una candidata ficticia
+# intenta poner con un enlace ya gastado, contra un Postgres de Testcontainers; la regla
+# generic-api-key la marcó solo por ir justo detrás de la variable del enlace. En el árbol
+# ya vive en una constante y no vuelve a saltar.
+85adc53f8f32d5f020e026c2c9daaa42e479ef05:src/test/java/com/renaser/ai/ai_engine/integracion/FlujoRecuperacionClaveIT.java:generic-api-key:238
