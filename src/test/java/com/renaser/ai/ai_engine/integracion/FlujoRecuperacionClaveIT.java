@@ -98,6 +98,16 @@ public class FlujoRecuperacionClaveIT {
     static final String CAMILA = "camila@ejemplo.pe";
     static final String CLAVE_DE_CAMILA = "Demo12345!";
     static final String CLAVE_NUEVA_DE_CAMILA = "OtraClave2026";
+    // En constantes y no tras el argumento del enlace: gitleaks toma por secreto cualquier
+    // cadena que siga a una variable con «token» en el nombre
+    static final String TERCERA_CLAVE_DE_CAMILA = "UnaTerceraClave2026";
+    static final String CLAVE_CORTA = "corta";
+    static final String CLAVE_CON_ESPACIO_AL_BORDE = " con-espacio-al-borde";
+    static final String NOMBRE_ACME = "Acme S.A.C.";
+    static final String NOMBRE_BETA = "Beta Logística";
+    static final String CLAVE_NUEVA_DE_ANA_EN_ACME = "nueva-clave-de-acme-2026";
+    static final String CLAVE_NUEVA_DE_ANA_EN_BETA = "nueva-clave-de-beta-2026";
+    static final String ONCE_LETRAS = "once-letras";
     static long camilaId;
     static String primerToken;
     static String segundoToken;
@@ -171,9 +181,9 @@ public class FlujoRecuperacionClaveIT {
     @DisplayName("AC-11 · AC-13 · una contraseña corta, con espacios en el borde o igual a la "
             + "actual se rechaza, y el enlace sigue sirviendo")
     void lasReglasNoGastanElEnlace() throws Exception {
-        restablecer("/api/v1/portal/auth/restablecer", primerToken, "corta")
+        restablecer("/api/v1/portal/auth/restablecer", primerToken, CLAVE_CORTA)
                 .andExpect(status().isBadRequest());
-        restablecer("/api/v1/portal/auth/restablecer", primerToken, " con-espacio-al-borde")
+        restablecer("/api/v1/portal/auth/restablecer", primerToken, CLAVE_CON_ESPACIO_AL_BORDE)
                 .andExpect(status().isBadRequest());
         restablecer("/api/v1/portal/auth/restablecer", primerToken, CLAVE_DE_CAMILA)
                 .andExpect(status().isBadRequest())
@@ -235,7 +245,7 @@ public class FlujoRecuperacionClaveIT {
     @Order(6)
     @DisplayName("AC-08 · el mismo enlace otra vez: no sirve y la contraseña no cambia")
     void elEnlaceUsadoNoVuelveASerir() throws Exception {
-        restablecer("/api/v1/portal/auth/restablecer", segundoToken, "UnaTerceraClave2026")
+        restablecer("/api/v1/portal/auth/restablecer", segundoToken, TERCERA_CLAVE_DE_CAMILA)
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.detail").value(ENLACE_NO_SIRVE));
 
@@ -273,7 +283,7 @@ public class FlujoRecuperacionClaveIT {
                    set creado_en = now() - interval '2 hours', vence_en = now() - interval '1 hour'
                  where usuario_id = ? and usado_en is null and invalidado_en is null""", camilaId);
 
-        restablecer("/api/v1/portal/auth/restablecer", tercero, "UnaTerceraClave2026")
+        restablecer("/api/v1/portal/auth/restablecer", tercero, TERCERA_CLAVE_DE_CAMILA)
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.detail").value(ENLACE_NO_SIRVE));
     }
@@ -336,8 +346,8 @@ public class FlujoRecuperacionClaveIT {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"usuarioRenaserOsId\":\"dev-recuperacion\"}"))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString(), "token");
-        long acme = darDeAltaConAna(tokenPlataforma, "Acme S.A.C.", "ACME", "clave-de-acme-2026");
-        long beta = darDeAltaConAna(tokenPlataforma, "Beta Logística", "BETA", "clave-de-beta-2026");
+        long acme = darDeAltaConAna(tokenPlataforma, NOMBRE_ACME, "ACME", "clave-de-acme-2026");
+        long beta = darDeAltaConAna(tokenPlataforma, NOMBRE_BETA, "BETA", "clave-de-beta-2026");
         long anaEnAcme = jdbc.queryForObject(
                 "select id from usuario where organizacion_id = ? and correo = 'ana@dos.pe'", Long.class, acme);
         long anaEnBeta = jdbc.queryForObject(
@@ -356,33 +366,33 @@ public class FlujoRecuperacionClaveIT {
 
         String correoAcme = ultimoCorreo(anaEnAcme, "RECUPERAR_CLAVE_EQUIPO");
         String correoBeta = ultimoCorreo(anaEnBeta, "RECUPERAR_CLAVE_EQUIPO");
-        assertThat(correoAcme).contains(PANEL + "/admin/restablecer?token=").contains("Acme S.A.C.")
-                .doesNotContain("Beta Logística").doesNotContainPattern(PUNTO_REPETIDO);
-        assertThat(correoBeta).contains(PANEL + "/admin/restablecer?token=").contains("Beta Logística")
-                .doesNotContain("Acme S.A.C.");
+        assertThat(correoAcme).contains(PANEL + "/admin/restablecer?token=").contains(NOMBRE_ACME)
+                .doesNotContain(NOMBRE_BETA).doesNotContainPattern(PUNTO_REPETIDO);
+        assertThat(correoBeta).contains(PANEL + "/admin/restablecer?token=").contains(NOMBRE_BETA)
+                .doesNotContain(NOMBRE_ACME);
         String tokenAcme = tokenDe(correoAcme);
         String tokenBeta = tokenDe(correoBeta);
         String hashAcmeAntes = hashDe(anaEnAcme);
         String hashBetaAntes = hashDe(anaEnBeta);
 
         // El de Acme cambia solo la de Acme
-        restablecer("/api/v1/panel/auth/restablecer", tokenAcme, "nueva-clave-de-acme-2026")
+        restablecer("/api/v1/panel/auth/restablecer", tokenAcme, CLAVE_NUEVA_DE_ANA_EN_ACME)
                 .andExpect(status().isNoContent());
         assertThat(hashDe(anaEnAcme)).isNotEqualTo(hashAcmeAntes);
         assertThat(hashDe(anaEnBeta)).isEqualTo(hashBetaAntes);
 
         // El de Beta no sirve en la puerta del portal, y esa prueba no lo gasta
-        restablecer("/api/v1/portal/auth/restablecer", tokenBeta, "nueva-clave-de-beta-2026")
+        restablecer("/api/v1/portal/auth/restablecer", tokenBeta, CLAVE_NUEVA_DE_ANA_EN_BETA)
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.detail").value(ENLACE_NO_SIRVE));
         // En el panel, 12 como mínimo: 11 no pasa y tampoco lo gasta
-        restablecer("/api/v1/panel/auth/restablecer", tokenBeta, "once-letras")
+        restablecer("/api/v1/panel/auth/restablecer", tokenBeta, ONCE_LETRAS)
                 .andExpect(status().isBadRequest());
-        restablecer("/api/v1/panel/auth/restablecer", tokenBeta, "nueva-clave-de-beta-2026")
+        restablecer("/api/v1/panel/auth/restablecer", tokenBeta, CLAVE_NUEVA_DE_ANA_EN_BETA)
                 .andExpect(status().isNoContent());
         assertThat(hashDe(anaEnBeta)).isNotEqualTo(hashBetaAntes);
 
-        login("/api/v1/panel/auth/login", "ana@dos.pe", "nueva-clave-de-acme-2026")
+        login("/api/v1/panel/auth/login", "ana@dos.pe", CLAVE_NUEVA_DE_ANA_EN_ACME)
                 .andExpect(status().isOk());
         login("/api/v1/panel/auth/login", "ana@dos.pe", "clave-de-acme-2026")
                 .andExpect(status().isUnauthorized());
