@@ -297,7 +297,19 @@ public final class DtosPerfilIntegral {
              * <p>No lleva estados de la postulación: son códigos internos, y esto es lo que
              * decide un texto de pantalla.
              */
-            EstadoPruebaDelPuesto estadoPrueba) {}
+            EstadoPruebaDelPuesto estadoPrueba,
+            /**
+             * Cuándo se postuló: {@code postulacion.creado_en}, tal cual. Es lo que permite al
+             * panel filtrar la tanda por fecha de postulación sin pedir nada más al servidor.
+             *
+             * <p>⚠️ <b>Puede venir nulo</b> en registros antiguos. El panel deja esas filas
+             * fuera de un filtro de fecha activo y lo dice; no se les inventa una fecha.
+             *
+             * <p>Va al final del record y lejos de {@code actualizadoEn} a propósito: son dos
+             * {@code Instant}, y vecinos se podrían intercambiar al copiar la fila sin que el
+             * compilador diga nada.
+             */
+            Instant postuladoEn) {}
 
     // ============ El desglose de la evaluación del banco ============
 

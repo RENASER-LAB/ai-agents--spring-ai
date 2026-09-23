@@ -643,6 +643,59 @@ class ServicioPerfilIntegralPanelImplTest {
         verifyNoInteractions(ubigeos);
     }
 
+    // ============ La fecha de postulación ============
+
+    @Test
+    @DisplayName("La fecha de postulación viaja con cada fila y sobrevive al numerado")
+    void laFechaDePostulacionViajaConLaFila() {
+        // El panel filtra la tanda por el día en que cada quien se postuló. Se mira sobre
+        // la lista YA ordenada y numerada: numerar copia el record campo a campo, y
+        // olvidar el campo en esa copia compila y deja todas las filas sin fecha.
+        Instant laDeAna = Instant.parse("2026-09-12T14:30:00Z");
+        Instant laDeLuis = Instant.parse("2026-09-15T03:10:00Z");
+        Postulacion ana = candidato(1L, "ALTA", "60");
+        ana.setCreadoEn(laDeAna);
+        Postulacion luis = candidato(2L, "ALTA", "90");
+        luis.setCreadoEn(laDeLuis);
+        candidatos(ana, luis);
+
+        List<FilaRanking> filas = servicio.ranking(quien, VACANTE).filas();
+
+        // Luis va primero por nota: la fecha sigue a su dueño y no a la posición.
+        assertThat(filas).extracting(FilaRanking::postulacionId).containsExactly(2L, 1L);
+        assertThat(filas).extracting(FilaRanking::postuladoEn).containsExactly(laDeLuis, laDeAna);
+        // No se confunde con la otra fecha de la fila, que es de la calificación.
+        assertThat(filas.get(0).actualizadoEn()).isNull();
+    }
+
+    @Test
+    @DisplayName("Sin fecha de postulación la fila sale con el campo vacío — no se inventa una")
+    void sinFechaDePostulacionNoSeInventa() {
+        // Registros antiguos pueden no tenerla. El panel deja esas filas fuera de un filtro
+        // de fecha y lo avisa; ponerles «ahora» las colaría en el filtro «Hoy».
+        candidatos(candidato(1L, "ALTA", "70"));
+
+        FilaRanking fila = servicio.ranking(quien, VACANTE).filas().get(0);
+
+        assertThat(fila.postuladoEn()).isNull();
+    }
+
+    @Test
+    @DisplayName("La fecha de postulación viaja también en las etapas posteriores")
+    void laFechaDePostulacionViajaEnLaPruebaDelPuesto() {
+        // Los filtros se conservan al cambiar de etapa: si la fecha solo viajara en la
+        // primera, el mismo filtro dejaría la tabla vacía en las demás.
+        Instant cuando = Instant.parse("2026-09-01T12:00:00Z");
+        Postulacion p = candidato(1L, "ALTA", "82");
+        p.setCreadoEn(cuando);
+        candidatos(p);
+        pesosDeEtapa("PERFIL_INTEGRAL", "40", "PRUEBA_PUESTO", "30");
+
+        FilaRanking fila = servicio.ranking(quien, VACANTE, "PRUEBA_PUESTO").filas().get(0);
+
+        assertThat(fila.postuladoEn()).isEqualTo(cuando);
+    }
+
     // ============ La pretensión ============
 
     @Test

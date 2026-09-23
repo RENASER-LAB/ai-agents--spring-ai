@@ -257,6 +257,11 @@ Dos endpoints más en `PostulacionesPanelController`:
   ya rendido —Perfil Integral y prueba— reescalado sobre la suma de sus dos pesos, con su
   desglose. Vacío si falta cualquiera de las dos notas. **No es la Puntuación Global.** Está
   contado en [Prueba del puesto](PRUEBA-DEL-PUESTO.md) y en [Las APIs](09-APIS.md).
+- **Cada fila dice cuándo se postuló** (desde el 23/09/2026), en `postuladoEn`, en todas las
+  pestañas. Es la fecha de la postulación, que ya estaba guardada: sin migración y sin consulta
+  de más. Puede venir vacía en registros antiguos; el panel deja esas filas fuera de un filtro por
+  fecha y lo dice. Filtrar, marcar a muchos y elegir qué va al Excel sigue pasando entero en el
+  panel, sobre las filas que ya trajo.
 - **Es una sobrecarga, no un cambio de firma, a propósito**: sin pedir etapa, el ranking
   ordena por la nota de la preselección, que es lo que hacía antes de que existieran las
   pestañas. Sin el parámetro el camino es el de antes, sin una consulta de más.
