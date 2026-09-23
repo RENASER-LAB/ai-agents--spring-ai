@@ -1638,7 +1638,9 @@ class ServicioExcelRankingImplTest {
                         new BigDecimal("82.00"), new BigDecimal("73.00")),
                 // El estado de la prueba no se escribe en la hoja: es lo que decide el texto
                 // de una celda de la TABLA cuando no hay nota, y aquí siempre la hay.
-                null);
+                null,
+                // La fecha de postulación tampoco: filtra la tabla del panel, no el Excel.
+                Instant.parse("2026-08-12T15:00:00Z"));
     }
 
     /**
@@ -1702,7 +1704,7 @@ class ServicioExcelRankingImplTest {
                 f.resumen(), f.riesgosCriticos(), f.fortalezas(), f.alertas(), f.actualizadoEn(),
                 notas, f.ciudad(), f.ciudadCodigo(), f.pretensionMin(), f.pretensionMax(),
                 f.pretensionMoneda(), f.pretensionDeclarada(), f.pretensionDeclaradaMoneda(),
-                ponderado, f.estadoPrueba());
+                ponderado, f.estadoPrueba(), f.postuladoEn());
     }
 
     // ---- Leer el libro que se acaba de escribir ----

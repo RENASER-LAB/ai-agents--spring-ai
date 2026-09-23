@@ -688,7 +688,10 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
                     // de ella, y traerlo obligaría a una consulta que nadie leería.
                     laTecnica ? estadoDeLaPrueba(p.getId(),
                             etapa(pruebaPorPostulacion.get(p.getId())),
-                            intentoPorPostulacion.get(p.getId())) : null));
+                            intentoPorPostulacion.get(p.getId())) : null,
+                    // Cuándo se postuló, para el filtro de fecha del panel. Nulo en registros
+                    // antiguos: el panel los deja fuera de ese filtro y lo avisa.
+                    p.getCreadoEn()));
         }
 
         filas.sort(Comparator
@@ -718,7 +721,7 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
                     f.ciudad(), f.ciudadCodigo(),
                     f.pretensionMin(), f.pretensionMax(), f.pretensionMoneda(),
                     f.pretensionDeclarada(), f.pretensionDeclaradaMoneda(),
-                    f.ponderado(), f.estadoPrueba()));
+                    f.ponderado(), f.estadoPrueba(), f.postuladoEn()));
         }
 
         return new RankingVacante(vacanteId, vacante.getTitulo(),
