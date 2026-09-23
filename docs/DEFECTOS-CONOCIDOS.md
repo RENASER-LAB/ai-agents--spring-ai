@@ -165,6 +165,12 @@ base recién sembrada, no una suma de lo que fue arrastrando cada rama.
 `06-sin-ciudad`, `07-movil`, `08-teclado`, `14-vacante`, `18-ranking-contra-api` y
 `20-prueba-y-empresas` **esperan notas y cifras concretas que el sembrador de datos de prueba no
 produce**. Se escribieron contra una base que tenía otros datos, y el sembrador siguió su camino.
+Además, `05-excel` sigue buscando las hojas «Resumen» y «Detalle», y desde el 16/09/2026 el
+backend escribe una sola, «Datos».
+
+El 23/09/2026, en la entrega de los filtros del ranking, una corrida amplia (no completa) dio
+**16 fallos**, los mismos de las corridas anteriores, en `04-filtros`, `05-excel`, `07-movil` y
+`08-teclado`. No sustituye a la referencia de 19, que sí sale de una corrida completa.
 
 **Qué haría falta.** Decidir cuál de las dos, y no a medias: que el sembrador produzca los valores
 que los specs esperan, o que los specs dejen de esperar cifras exactas y comprueben la forma —que
@@ -341,6 +347,25 @@ consentimientos de la `V54` no. QA lo vio el 22/09/2026 y quedó fuera de esa en
 reescribirlas en una versión nueva del texto —los textos publicados no se editan—, o que quien
 compone el texto no añada un punto si el nombre ya acaba en uno. Lo primero pasa por el
 abogado que tiene que firmar los textos.
+
+---
+
+## 14 · La ficha le dice a Dirección que no puede ver la pretensión, cuando es la vacante la que no publica sueldo
+
+**Qué le pasa a alguien.** Alguien de Dirección, que sí tiene permiso para ver lo que pide cada
+candidato, abre la ficha de una fila del ranking en una vacante que no publica su sueldo. En vez
+de «esta vacante no publica su remuneración, así que no se le pidió», lee «Tu rol no puede ver la
+pretensión salarial: solo Dirección la ve…». Se le dice que le falta un permiso que tiene.
+
+**Por qué pasa.** La ficha (`GET /panel/postulaciones/{id}`) junta en una sola condición dos
+cosas distintas: tener `ver_pretension` y que la vacante enseñe lo que paga. Cuando falla la
+segunda, el motivo que se elige es el de la primera, y la frase sobre la vacante no llega a
+salir nunca. Viene de antes; QA lo vio el 23/09/2026 al revisar los filtros del ranking y quedó
+fuera de esa entrega. El panel «Filtros» sí dice lo correcto en su ayuda de Pretensión.
+
+**Qué haría falta.** Mirar el permiso y la vacante por separado al elegir el motivo: sin
+permiso, la frase del rol; con permiso y vacante que no publica sueldo, la de la vacante. Las
+reglas del sueldo están en [El sueldo, de los dos lados](EL-SUELDO-DE-LOS-DOS-LADOS.md).
 
 ---
 

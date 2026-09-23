@@ -409,12 +409,14 @@ Tres cosas que conviene tener claras antes de pulsarlo:
 
 ### Descartar a varios de una vez
 
-Hacerlo de uno en uno son tantas fichas abiertas como personas. La mesa de la tabla —la que ya
-tiene las casillas y el motivo con que se hace avanzar a una tanda— trae ahora también
-**«Descartar a N personas»**. Se marca a quien sea, se escribe **un motivo que vale para todas**
-y se elige qué hacer con ellas: avanzar o descartar.
+Hacerlo de uno en uno son tantas fichas abiertas como personas. Al marcar filas en la tabla
+aparece una barra pegada abajo (desde el 23/09/2026; antes era una mesa al final de la tabla) con
+el motivo, **«Avanzar a N personas»** y **«Descartar…»**. Se marca a quien sea, se escribe **un
+motivo que vale para todas** y se elige qué hacer con ellas: avanzar o descartar. Solo cuentan
+las marcadas que se ven: si un filtro esconde a alguna, la barra lo dice y no la incluye.
 
-**Ese botón no actúa al pulsarlo.** Abre una ventana con **los nombres escritos**, uno por uno y
+**Ese botón no actúa al pulsarlo.** Abre la ventana «Descartar a N personas» con **los nombres
+escritos**, uno por uno y
 sin recortar. No es ceremonia: el error que de verdad ocurre no es equivocarse de botón, es
 llegar ahí con alguien marcado de una pestaña anterior, y una cifra —«descartar a 6»— parece
 correcta hasta que se leen los seis nombres.
