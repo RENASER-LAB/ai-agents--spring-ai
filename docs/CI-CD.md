@@ -88,13 +88,14 @@ nombre y revertir obliga a reconstruir desde el código.
 lanza un comando; quien lee el `.env` es el propio servidor.
 
 La lista completa, con de qué clave sale cada valor, está en
-[`despliegue/.env.example`](../despliegue/.env.example). Las tres que más se copian mal:
+[`despliegue/.env.example`](../despliegue/.env.example). Las que más se copian mal:
 
 | Variable | Cuidado |
 |---|---|
 | `SPRING_DATASOURCE_URL` | La cadena **directa** de Supabase, puerto **5432** — la del pooler de transacciones (6543) rompe las migraciones de Flyway |
 | `RABBITMQ_HOST` | **`rabbitmq`**, el nombre del servicio del compose — el broker es otro contenedor de la misma máquina. Ni puerto ni TLS hacen falta aquí: `application-pruebas.yaml` ya trae 5672 en claro |
 | `JWT_SECRETO` | Una clave nueva de 32+ caracteres, **distinta** de la local: si se reutiliza, un token emitido en la máquina de cualquiera vale en producción |
+| `CORREO_TRANSPORTE` | **`smtp`**, junto con `CORREO_REMITENTE` y las credenciales del servidor de correo. Si falta, vale `log`: la aplicación arranca igual, nada sale y nada avisa. Desde el 22/09/2026 eso deja sin servicio «¿Olvidaste tu contraseña?»: la pantalla dice que el enlace salió y nadie lo recibe |
 
 ## Configuración que se hace una sola vez
 
@@ -147,4 +148,6 @@ el esquema y volver a desplegar.
 - **Supabase gratuito se pausa a los 7 días sin uso** y despierta en ~30 segundos.
   El smoke test ya lo tolera. En cuanto entre el primer candidato real, Producción
   necesita plan de pago.
-- **El correo sigue sin salir** (`EnviadorCorreoLog`): se registra en la base, no se envía.
+- **El correo sigue sin salir** (`EnviadorCorreoLog`): se registra en la base, no se envía. Con
+  él tampoco sale el enlace de «¿Olvidaste tu contraseña?», y el envío real de ese enlace por
+  SMTP no se ha probado todavía.

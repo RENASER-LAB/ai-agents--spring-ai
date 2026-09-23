@@ -2,7 +2,9 @@ package com.renaser.ai.ai_engine.usuario.repository;
 
 import com.renaser.ai.ai_engine.usuario.entity.Usuario;
 
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -26,6 +28,14 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
     List<Usuario> equipoPorCorreo(@Param("correo") String correo);
 
     Optional<Usuario> findFirstByPersonaId(Long personaId);
+
+    // La cuenta, con su fila bloqueada hasta que acabe la transacción. Lo usa la solicitud
+    // de contraseña nueva: dos peticiones simultáneas del mismo correo cuentan cuántos
+    // enlaces van en la hora de una en una, y el límite no se puede pasar por llegar a la vez.
+    // El bloqueo dura lo que dura esa transacción corta; el correo sale después, sin él.
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select u from Usuario u where u.id = :id")
+    Optional<Usuario> bloquear(@Param("id") Long id);
 
     // Quiénes cuelgan de un área. Hacen falta para poder borrarla: `usuario.area_id` admite
     // NULL pero su clave ajena NO declara ON DELETE, así que Postgres aplica NO ACTION y el

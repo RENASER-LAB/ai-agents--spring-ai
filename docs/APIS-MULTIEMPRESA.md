@@ -77,10 +77,13 @@ cuentas nacen solo por invitación.
 | Login del panel | `POST /panel/auth/login` `{correo, contrasena}` | Devuelve `{token, usuarioId}`. Mismo 401 genérico exista o no el correo; **401 con mensaje claro si la organización está suspendida**; 429 con `Retry-After` tras demasiados intentos |
 | Aceptar invitación | `POST /panel/auth/invitacion` `{token, nombre, apellidos, contrasena}` | El token llega en el enlace del correo (`?token=...`); el frontend lo manda **en el cuerpo**, nunca en la URL de la API. Contraseña mínima **12**. Un solo uso; vencida/usada/revocada dan el mismo error genérico. Devuelve sesión: el invitado entra directo |
 | Invitar al equipo | `POST /panel/usuarios/invitaciones` `{correo, roles}` | La respuesta trae la **URL del enlace** por si se quiere mostrar/copiar además del correo que sale solo. `GET` lista, `DELETE /{id}` revoca |
+| Pedir enlace de contraseña nueva | `POST /panel/auth/recuperacion` `{correo}` | **202 vacío siempre**, exista o no la cuenta. Si el correo tiene cuenta en varias empresas, sale un enlace por cada una |
+| Elegir la contraseña nueva | `POST /panel/auth/restablecer` `{token, contrasena}` | El token llega en el enlace del correo (`/admin/restablecer?token=...`) y va **en el cuerpo**. Mínimo **12**. 204 sin sesión; el mismo 401 para cualquier enlace que no sirva |
 
-**No hay «olvidé mi contraseña» todavía.** No existe endpoint de recuperación: si alguien
-la pierde, hoy el camino es que su administrador lo invite de nuevo. Está anotado como
-pendiente — no diseñes la pantalla asumiendo que existe.
+**«Olvidé mi contraseña» existe desde el 22/09/2026**, en el panel y en el portal. Las reglas
+completas —topes, qué pasa con cada caso, qué cuentas no pueden usarlo— están en
+[09-APIS.md](09-APIS.md), «Cómo entrar». Si el correo no llega o la cuenta está desactivada,
+el camino sigue siendo que su administrador lo invite de nuevo.
 
 **El login de desarrollo (`dev-login`) está apagado en producción.** Ningún flujo del
 frontend debe depender de él.

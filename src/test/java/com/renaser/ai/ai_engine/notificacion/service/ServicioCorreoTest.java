@@ -169,6 +169,73 @@ class ServicioCorreoTest {
         assertThat(transporte.veces).isZero();
     }
 
+    // ============ La plantilla de recambio (contraseña nueva) ============
+
+    private static final Long PLATAFORMA = 1L;
+    private static final Long EMPRESA = 5L;
+
+    private PlantillaCorreo plantillaDe(Long organizacionId) {
+        return PlantillaCorreo.builder().id(organizacionId * 10).organizacionId(organizacionId)
+                .codigo("RECUPERAR_CLAVE_EQUIPO").version(1)
+                .asunto("Contraseña nueva para {{nombre_empresa}}")
+                .cuerpo("Abre {{enlace}} antes del {{vence}}.").esActiva(true).build();
+    }
+
+    @Test
+    @DisplayName("con plantilla propia, la empresa usa la suya y no mira la de la plataforma")
+    void recambioUsaLaPropiaSiLaHay() {
+        when(plantillas.findFirstByOrganizacionIdAndCodigoAndEsActivaTrueOrderByVersionDesc(
+                EMPRESA, "RECUPERAR_CLAVE_EQUIPO")).thenReturn(Optional.of(plantillaDe(EMPRESA)));
+
+        assertThat(servicio.plantillaConRecambio(EMPRESA, PLATAFORMA, "RECUPERAR_CLAVE_EQUIPO"))
+                .get().extracting(PlantillaCorreo::getOrganizacionId).isEqualTo(EMPRESA);
+        verify(plantillas, never()).findFirstByOrganizacionIdAndCodigoAndEsActivaTrueOrderByVersionDesc(
+                PLATAFORMA, "RECUPERAR_CLAVE_EQUIPO");
+    }
+
+    @Test
+    @DisplayName("a una empresa sin la plantilla le sale la de la plataforma, no el silencio")
+    void recambioCaeALaPlataforma() {
+        when(plantillas.findFirstByOrganizacionIdAndCodigoAndEsActivaTrueOrderByVersionDesc(
+                EMPRESA, "RECUPERAR_CLAVE_EQUIPO")).thenReturn(Optional.empty());
+        when(plantillas.findFirstByOrganizacionIdAndCodigoAndEsActivaTrueOrderByVersionDesc(
+                PLATAFORMA, "RECUPERAR_CLAVE_EQUIPO")).thenReturn(Optional.of(plantillaDe(PLATAFORMA)));
+
+        assertThat(servicio.plantillaConRecambio(EMPRESA, PLATAFORMA, "RECUPERAR_CLAVE_EQUIPO"))
+                .get().extracting(PlantillaCorreo::getOrganizacionId).isEqualTo(PLATAFORMA);
+    }
+
+    @Test
+    @DisplayName("si no la tiene nadie, vacío: quien llama decide, y no se promete nada")
+    void recambioSinNingunaEsVacio() {
+        when(plantillas.findFirstByOrganizacionIdAndCodigoAndEsActivaTrueOrderByVersionDesc(
+                any(), anyString())).thenReturn(Optional.empty());
+
+        assertThat(servicio.plantillaConRecambio(EMPRESA, PLATAFORMA, "RECUPERAR_CLAVE_EQUIPO"))
+                .isEmpty();
+        // La propia plataforma no se pregunta dos veces a sí misma
+        assertThat(servicio.plantillaConRecambio(PLATAFORMA, PLATAFORMA, "RECUPERAR_CLAVE_EQUIPO"))
+                .isEmpty();
+    }
+
+    @Test
+    @DisplayName("enviar con una plantilla ya elegida deja la fila y devuelve cómo acabó")
+    void enviarConDevuelveElResultado() {
+        when(enviados.save(any(CorreoEnviado.class))).thenAnswer(i -> i.getArgument(0));
+        transporte.aDevolver = EnviadorCorreo.Resultado.FALLIDO;
+
+        EnviadorCorreo.Resultado resultado = servicio.enviarCon(plantillaDe(PLATAFORMA), USUARIO,
+                DESTINO, Map.of("nombre_empresa", "Acme", "enlace", "https://x.test/r?token=t",
+                        "vence", "22/09/2026 a las 20:15"));
+
+        assertThat(resultado).isEqualTo(EnviadorCorreo.Resultado.FALLIDO);
+        CorreoEnviado fila = loGuardado();
+        assertThat(fila.getEstadoEntrega()).isEqualTo("FALLIDO");
+        assertThat(fila.getAsunto()).isEqualTo("Contraseña nueva para Acme");
+        assertThat(fila.getCuerpo()).isEqualTo("Abre https://x.test/r?token=t antes del 22/09/2026 a las 20:15.");
+        assertThat(fila.getPlantillaCorreoCodigo()).isEqualTo("RECUPERAR_CLAVE_EQUIPO");
+    }
+
     // ============ El transporte por defecto ============
 
     @Test

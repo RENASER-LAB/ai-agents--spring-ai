@@ -7,6 +7,8 @@ import com.renaser.ai.ai_engine.postulacion.service.ServicioEnlaceAcceso;
 
 import com.renaser.ai.ai_engine.portal.dto.DtosPortal.*;
 import com.renaser.ai.ai_engine.seguridad.service.Permisos;
+import com.renaser.ai.ai_engine.seguridad.service.ServicioRecuperacionClave;
+import com.renaser.ai.ai_engine.seguridad.service.ServicioRecuperacionClave.Publico;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
@@ -37,6 +39,7 @@ public class PortalController {
     private final ServicioTablonPortal tablon;
     private final ServicioPostulacionPortal postulaciones;
     private final ServicioEnlaceAcceso enlaces;
+    private final ServicioRecuperacionClave recuperacion;
     private final Permisos permisos;
 
     // ---------- público ----------
@@ -101,6 +104,37 @@ public class PortalController {
         // justo lo que esta puerta no tenía: quien entra por el enlace del correo nunca se
         // registró, así que el portal no lo sabía por ningún otro sitio.
         return cuentas.sesionDe(sesion.token(), sesion.usuarioId());
+    }
+
+    /**
+     * «Me olvidé mi contraseña»: pide el enlace para elegir una nueva.
+     *
+     * <p>202 siempre y sin cuerpo, exista o no la cuenta, sea de carga masiva, esté
+     * desactivada o sea de equipo: si la respuesta cambiara, esta ruta serviría para
+     * averiguar qué correos están registrados. El trabajo se hace después de responder,
+     * así que tampoco cambia lo que tarda.
+     */
+    @PostMapping("/auth/recuperacion")
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    @Operation(summary = "Pedir el enlace para elegir una contraseña nueva. Responde 202 "
+            + "siempre, exista o no la cuenta")
+    public void pedirRecuperacion(@RequestBody PedirRecuperacion datos, HttpServletRequest request) {
+        recuperacion.solicitar(Publico.CANDIDATO, datos.correo(), request.getRemoteAddr());
+    }
+
+    /**
+     * Elegir la contraseña nueva con el token del enlace. No abre sesión: quien la cambia
+     * vuelve a entrar con ella.
+     *
+     * <p>Público a la fuerza, como {@code /auth/acceso}: el token es la credencial. Un token
+     * inexistente, vencido, usado o reemplazado por uno más nuevo devuelven el mismo 401.
+     */
+    @PostMapping("/auth/restablecer")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Elegir la contraseña nueva con el enlace del correo. 204 si cambió; "
+            + "el mismo 401 para cualquier enlace que no sirva")
+    public void restablecerClave(@Valid @RequestBody RestablecerClave datos) {
+        recuperacion.restablecer(Publico.CANDIDATO, datos.token(), datos.contrasena());
     }
 
     // ---------- con token de candidato ----------

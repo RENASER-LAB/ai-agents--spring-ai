@@ -512,6 +512,17 @@ public class FlujoCalificacionIaIT {
                         "select estado_codigo from postulacion where id = ?", String.class, idB)),
                 "los dos recién llegados terminen su retrato");
 
+        // Luis también volvió a entrar en la tanda, y la prueba siguiente lo cuenta como
+        // calificado. Hay que esperar su retrato y no suponer que acaba a la par que los
+        // otros dos: su cadena es más larga —él sí entregó, y pasa por el evaluador— y
+        // cuando la cola se atrasa un poco, el ranking lo encontraba todavía a medias.
+        long idLuis = idDe(codigoFallido);
+        esperarA(() -> contar("""
+                        select count(*) from trabajo_ia
+                        where postulacion_id = %d and agente_codigo = 'POTENCIAL_RIESGO'
+                          and estado = 'TERMINADO'""".formatted(idLuis)) == 1,
+                "Luis, que volvió a entrar en la tanda, termine su retrato");
+
         // 1 · Los agentes que JUZGAN razonaron todos. Es la única pasada que queda: hasta la
         // V53 había otra barata que no razonaba y dejaba notas provisionales que nadie
         // miraba, y que obligaba a pulsar dos botones para llegar a la nota que sí se usa.

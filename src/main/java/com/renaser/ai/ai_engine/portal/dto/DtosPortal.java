@@ -3,7 +3,13 @@ package com.renaser.ai.ai_engine.portal.dto;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+
+import com.renaser.ai.ai_engine.seguridad.dto.CabeEnBcrypt;
+
+import static com.renaser.ai.ai_engine.seguridad.dto.DtosSeguridad.MENSAJE_ESPACIOS_EN_LOS_BORDES;
+import static com.renaser.ai.ai_engine.seguridad.dto.DtosSeguridad.SIN_ESPACIOS_EN_LOS_BORDES;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -36,6 +42,20 @@ public final class DtosPortal {
     public record Login(@NotBlank String correo, @NotBlank String contrasena) {}
 
     public record PedirBorrado(String motivo) {}
+
+    // Pedir el enlace de contraseña nueva. Sin validación a propósito: la respuesta es
+    // siempre la misma (202), y un 400 por un correo mal escrito sería la única distinta.
+    public record PedirRecuperacion(String correo) {}
+
+    // El token sin @NotBlank: uno vacío es un enlace que no sirve y contesta el mismo 401.
+    // La contraseña, con la regla del registro (8) y el tope de BCrypt (72 bytes).
+    public record RestablecerClave(String token,
+                                   @NotBlank(message = "Escribe la contraseña nueva")
+                                   @Size(min = 8, message = "La contraseña necesita al menos 8 caracteres")
+                                   @Pattern(regexp = SIN_ESPACIOS_EN_LOS_BORDES,
+                                           message = MENSAJE_ESPACIOS_EN_LOS_BORDES)
+                                   @CabeEnBcrypt
+                                   String contrasena) {}
 
     // ---------- lo que sale ----------
 

@@ -1,7 +1,7 @@
 # Diccionario de datos
 
 Sistema de selección de personal — Renaser Consulting
-Versión 2.9 · 2026-09-22 · Puesto al día con las migraciones hasta la `V60` (la V49 y la V50 solo siembran pesos; la V51 trae la tabla `lectura_cv_perfil` y los archivos del perfil; la V52 y la V53 no crean tablas; la V55 pone el sueldo en la vacante y la pretensión en la postulación; la V56 trae la tabla `aviso_portal`; la V57 no crea tablas, solo siembra los precios de los dos modelos de DeepSeek; la V58 no crea tablas: suma el aviso `VACANTE_ACTUALIZADA` y apaga el correo `REMUNERACION_ACTUALIZADA`; la V59 añade `vacante.archivada_en`; la V60 añade `vacante.eliminada_en` —el borrado lógico—, el motivo de cierre y el tipo de aviso `VACANTE_ELIMINADA`, y el permiso `eliminar_vacante`)
+Versión 3.0 · 2026-09-23 · Puesto al día con las migraciones hasta la `V61` (la V49 y la V50 solo siembran pesos; la V51 trae la tabla `lectura_cv_perfil` y los archivos del perfil; la V52 y la V53 no crean tablas; la V55 pone el sueldo en la vacante y la pretensión en la postulación; la V56 trae la tabla `aviso_portal`; la V57 no crea tablas, solo siembra los precios de los dos modelos de DeepSeek; la V58 no crea tablas: suma el aviso `VACANTE_ACTUALIZADA` y apaga el correo `REMUNERACION_ACTUALIZADA`; la V59 añade `vacante.archivada_en`; la V60 añade `vacante.eliminada_en` —el borrado lógico—, el motivo de cierre y el tipo de aviso `VACANTE_ELIMINADA`, y el permiso `eliminar_vacante`; la V61 trae la tabla `recuperacion_clave`, tres parámetros y los dos correos de «¿Olvidaste tu contraseña?»)
 
 Cada tabla con todas sus columnas, tipos y claves. **Este documento se consulta**, no se lee de
 corrido: es la base para escribir las migraciones de Flyway.
@@ -11,8 +11,8 @@ Lo que llegó después de la versión 2.0 va marcado con su migración entre par
 ⚠️ **Tres tablas de la base no tienen ficha aquí.** `agent_run` es del motor de agentes y no de
 selección, así que no la tendrá nunca. `invitacion` (`V37`) y `tarifa_modelo` (`V38`) sí
 deberían tenerla: llegaron con el multiempresa y su ficha está pendiente. Hasta que se
-escriban, para esas dos manda la migración. De las **103 tablas de selección** que existen hoy,
-aquí hay ficha de 101, más otras diez que están solo diseñadas y todavía no existen.
+escriban, para esas dos manda la migración. De las **104 tablas de selección** que existen hoy,
+aquí hay ficha de 102, más otras diez que están solo diseñadas y todavía no existen.
 
 Para entender *por qué* el modelo es así, está el [Modelo de datos](05-MODELO-DE-DATOS.md).
 
@@ -143,7 +143,7 @@ Cómo entra al sistema. Apunta a una persona.
 | `organizacion_id` | bigint | sí | |
 | `persona_id` | bigint | sí | |
 | `correo` | text | no | Se anula al borrar los datos |
-| `contrasena_hash` | text | no | **Solo los candidatos.** Vacío en el equipo |
+| `contrasena_hash` | text | no | BCrypt. Candidatos y, desde el 25/08/2026, también el equipo. Se cambia con el enlace de `recuperacion_clave` (`V61`) |
 | `usuario_renaser_os_id` | text | no | **Solo el equipo.** Vacío en los candidatos |
 | `area_id` | bigint | no | Vacío en los candidatos |
 | `es_activo` | boolean | sí | |
@@ -327,6 +327,41 @@ candidato.
 
 Las dos fechas de uso no son adorno: un enlace mandado y nunca usado señala **a un candidato al
 que hay que llamar**, y sin ellas no hay forma de distinguirlo de uno que entró y se fue.
+
+## `recuperacion_clave`
+
+El enlace de «¿Olvidaste tu contraseña?», del portal y del panel: quien lo abre elige una
+contraseña nueva. Llegó con la `V61`.
+
+| Columna | Tipo | Oblig. | Qué guarda |
+|---|---|---|---|
+| `id` | bigint | sí | Clave |
+| `usuario_id` | bigint | sí | La cuenta cuya contraseña cambia. **Se borra con ella** (`ON DELETE CASCADE`) |
+| `token_hash` | text | sí | El SHA-256 del token en hexadecimal, 64 caracteres |
+| `creado_en` | timestamptz | sí | Cuándo se pidió. Por defecto, ahora |
+| `vence_en` | timestamptz | sí | `creado_en` + `minutos_vida_recuperacion` (60 por defecto) |
+| `usado_en` | timestamptz | no | Se llena al guardar la contraseña nueva. Usado, ya no sirve |
+| `invalidado_en` | timestamptz | no | Se llena cuando la misma cuenta pide otro: vale solo el último |
+
+**Clave primaria:** `id` · **Único:** `token_hash` · **Apunta a:** `usuario`
+**Restricción:** `vence_en` posterior a `creado_en`
+
+**Índices:** `recuperacion_clave_usuario_idx` (`usuario_id`, `creado_en`), con el que se cuentan
+los enlaces que pidió una cuenta en la última hora; y `recuperacion_clave_una_viva_idx`
+(`usuario_id`), **único y parcial** sobre las filas sin usar ni invalidar: una cuenta tiene como
+mucho un enlace vivo, aunque dos solicitudes lleguen a la vez.
+
+Como `enlace_acceso` e `invitacion`, se guarda **la huella del token, no el token**. El token
+existe una sola vez, dentro del correo: con transporte `log`, en el cuerpo guardado en
+`correo_enviado`, que es de donde lo leen las pruebas.
+
+**Abrir el enlace no lo gasta**, porque los programas de correo abren los enlaces por su cuenta
+para mostrar una vista previa. Solo lo gasta guardar la contraseña nueva, y el gasto es
+condicional en la base: con el mismo enlace abierto en dos pestañas, solo la primera lo consigue.
+
+Cuelga de la cuenta y no del correo: el mismo correo puede tener cuenta de equipo en dos
+empresas, y cada enlace cambia solo la contraseña de la suya. Los vencidos se quedan: la tabla
+se consulta siempre acotada por fecha.
 
 ---
 
@@ -2362,6 +2397,15 @@ Arranca con: días sin avanzar antes de cerrar (60), tope de rondas de evidencia
 cupo por defecto de una sesión, tope de repreguntas por respuesta, y **qué datos se ocultan del
 currículum** antes de mandárselo a la máquina.
 
+La `V61` suma tres, **solo de la plataforma** —antes de saber quién escribe no se sabe de qué
+empresa es—: `minutos_vida_recuperacion` (60, cuánto vale el enlace de contraseña nueva),
+`max_recuperaciones_por_hora` (3 enlaces por cuenta y hora) y `max_recuperaciones_por_ip_hora`
+(30 solicitudes por dirección IP y hora). Si faltan, el código usa esos mismos valores.
+⚠️ **La pantalla dice «Vale por 60 minutos» escrito a mano**: si se cambia
+`minutos_vida_recuperacion`, hay que cambiar ese texto en el portal y en el panel. ⚠️ **El tope
+por IP se cuenta en la memoria del servidor**, no en la base: se reinicia cada vez que el
+servidor arranca.
+
 ## `plantilla_correo`
 
 Los textos que se envían, versionados.
@@ -2383,6 +2427,13 @@ quedan con `es_activa = false`, no sale en la pantalla de textos de correo y no 
 nueva. Las filas **no se borran**: `correo_enviado` guarda el código y la versión con que salió
 cada correo, y los que ya salieron tienen que poder explicarse. El cambio de sueldo se avisa
 ahora solo por la campana (`aviso_portal`).
+
+**`RECUPERAR_CLAVE_CANDIDATO` y `RECUPERAR_CLAVE_EQUIPO` (`V61`) se sembraron solo para la
+plataforma.** Las empresas dadas de alta después reciben copia; las que ya existían no la tienen,
+y para estos dos correos el envío usa la de la plataforma cuando a la empresa le falta. Si
+tampoco la tiene la plataforma, no se crea el enlace y queda un error en el registro del
+servidor: la pantalla ya le dijo a la persona que revise su correo. Ninguna frase termina en
+`{{nombre_empresa}}`, porque el nombre de la plataforma ya acaba en punto y saldría «S.A.C..».
 
 ## `instruccion_ia`
 

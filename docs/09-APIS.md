@@ -75,6 +75,44 @@ caracteres, porque una cuenta de panel ve los datos de muchas personas. El token
 solo uso y caduca (parámetro `dias_invitacion`, 7 por defecto); una invitación vencida,
 revocada o ya canjeada responde siempre el mismo 401.
 
+**Quien olvidó su contraseña pide un enlace por correo** (22/09/2026, `V61`). Son dos pasos, y
+cada puerta tiene los suyos, sin token:
+
+1. `POST /portal/auth/recuperacion` o `POST /panel/auth/recuperacion` con `{correo}`. Responde
+   **202 vacío siempre**: exista o no la cuenta, esté desactivada, sea de la otra puerta o se
+   haya pasado el tope. Así nadie puede usarla para averiguar qué correos están registrados.
+   El trabajo se hace **después de responder**, así que tampoco tarda distinto (decisión
+   aprobada: en vez de imitar el señuelo de tiempo del login, se responde al instante y el
+   correo sale en diferido). Si la cuenta existe, está activa y su correo es real, se anula el
+   enlace anterior, se crea uno nuevo que vale 60 minutos (`minutos_vida_recuperacion`) y sale
+   el correo. En el panel, un correo con cuenta en varias empresas recibe **un enlace por
+   cada cuenta**, y cada correo dice de qué empresa es.
+2. `POST /portal/auth/restablecer` o `POST /panel/auth/restablecer` con `{token, contrasena}`.
+   **204** si cambió. **No abre sesión**: la persona vuelve a entrar con la nueva. Un enlace
+   que no existe, venció, ya se usó, fue reemplazado por otro o es de la otra puerta responde
+   **el mismo 401**, «Este enlace ya no sirve. Pide uno nuevo.». Una contraseña que no cumple
+   la regla —8 caracteres en el portal, 12 en el panel, sin espacios al principio ni al final,
+   como mucho 72 bytes— o que es **igual a la actual** responde **400 con el error en el
+   campo**, y el enlace sigue sirviendo. Al cambiarla se levanta el bloqueo por intentos
+   fallidos de ese correo.
+
+Los topes (decisión aprobada): **3 enlaces por cuenta y hora** y **30 solicitudes por IP y
+hora**; pasado cualquiera de los dos, la respuesta es la misma y no sale nada. ⚠️ El de la IP
+se cuenta **en la memoria del servidor**: se reinicia cada vez que arranca. Las dos acciones
+quedan en la auditoría como acciones del sistema (`solicitar_recuperacion_clave`,
+`restablecer_clave`, sobre la entidad `usuario`), nunca con el token.
+
+⚠️ **El tope de 72 bytes** es el límite de BCrypt, y se cuenta en bytes: una tilde o una «ñ»
+ocupan dos y un emoji cuatro. El mensaje es «La contraseña es demasiado larga. Usa como máximo
+72 caracteres; las letras con tilde, la ñ y los emojis cuentan por más de uno.». Crear la
+cuenta y aceptar la invitación **todavía no lo comprueban**: ver
+[Defectos conocidos](DEFECTOS-CONOCIDOS.md).
+
+**Quién no puede usarlo:** las cuentas cargadas desde una carpeta de currículums tienen un
+correo inventado (`…@cv-convocatoria.local`) al que no llega nada. Siguen entrando con el
+enlace de acceso o escribiendo a `talento@renaser.pe`, como antes. Y **sin correo de verdad
+no funciona para nadie**: ver «Lo que conviene saber antes de consumirlas», al final.
+
 **El login de desarrollo** (`POST /panel/auth/dev-login`) sigue existiendo para local y para
 las pruebas, y está **apagado por defecto** (`app.seguridad.dev-login-activo: false`): solo
 `application-local.yaml` y las pruebas de integración lo encienden.
@@ -87,7 +125,7 @@ en lenguaje normal.
 | Código | Qué significa |
 |---|---|
 | 400 | La petición incumple una regla: «toda transición manual exige un motivo escrito» |
-| 401 | Falta el token, venció, o el correo y la contraseña no cuadran al entrar |
+| 401 | Falta el token, venció, el correo y la contraseña no cuadran al entrar, o el enlace para elegir una contraseña nueva ya no sirve |
 | 403 | El token vale, pero ese permiso no lo tienes |
 | 404 | No existe, **o no te toca verlo**: el alcance también responde 404 |
 | 409 | El estado actual no lo permite: «ya postulaste a esta vacante» |
@@ -107,6 +145,8 @@ en lenguaje normal.
 | GET `/catalogos/ubigeo` | Dónde se puede decir que uno vive: las **196 provincias** del Perú y «Fuera del Perú», cada una con su departamento, ordenadas por departamento y nombre. Es `{codigo, nombre, departamento}`, y el departamento viene vacío solo en `EXT` | Cualquiera, sin token |
 | POST `/cuentas` | Crear la cuenta y registrar los consentimientos. Desde el 31/08 pide además **la ciudad** (`ciudadUbigeo`), obligatoria: un código que el catálogo no ofrezca es un 400. **Desde el 14/09 la casilla obligatoria se llama `aceptaPlataforma`** y no `aceptaProceso`: es un cambio de contrato, y el portal salió con él | Cualquiera |
 | POST `/auth/login` | Entrar; devuelve el token | Cualquiera |
+| POST `/auth/recuperacion` | Pedir el enlace para elegir una contraseña nueva. **202 vacío siempre**, exista o no la cuenta (22/09). Ver «Cómo entrar» | Cualquiera, sin token |
+| POST `/auth/restablecer` | Elegir la contraseña nueva con el token del enlace. 204 sin sesión; el mismo 401 para cualquier enlace que no sirva; 400 con el error en el campo | Cualquiera, sin token |
 | GET `/auth/sesion` | Cómo se llama quien tiene el token. El portal entra una vez y guarda el token; en la segunda visita nadie le había dicho el nombre (06/09) | Candidato |
 | POST `/postulaciones` | Postular: CV (PDF o Word, máx. 10 MB; **desde el 06/09 opcional si el perfil ya tiene uno**: sin adjuntar se usa el del perfil, copiado a la empresa de la vacante, y adjuntando otro ese vale solo para esa vacante y el del perfil no cambia), enlaces, el resultado del que se siente orgulloso, la confirmación de los requisitos y `aceptaTratamiento` (obligatorio): la aceptación queda firmada con IP y navegador, a nombre de esa postulación, y **con el texto tal como se le enseñó**, con el nombre de la empresa dentro. **Desde el 15/09 el portal ya no pinta una casilla para esto** —enviar la candidatura es el acto—, pero el dato se sigue exigiendo para cortarle el paso a quien llame a la API por su cuenta. **Lleva además `pretensionMonto` y `pretensionMoneda`**: obligatorios si la vacante publica lo que paga —faltando, 400—, e ignorados si no | Candidato |
 | GET `/postulaciones` | Sus postulaciones, con la empresa de cada una, estado, días sin cambio, **qué rendirá en la etapa técnica** (`instrumentoEtapaTecnica`: la prueba del puesto o el cuestionario), lo que paga la vacante hoy (`remuneracion`, con su `actualizadaEn`), lo que él pidió aquí (`miPretension`) y cuántos avisos de ese proceso sigue sin ver (`avisosSinLeer`) | Candidato |
@@ -834,6 +874,12 @@ con las reglas que Swagger no cuenta, está en
 **Los correos no salen todavía.** Cada aviso al candidato queda guardado con su texto exacto en
 la base (`correo_enviado`), pero el envío real espera a que Renaser confirme su dominio de
 correo. Cuando exista, se enchufa el transporte y nada más cambia.
+
+⚠️ **«¿Olvidaste tu contraseña?» depende de eso por completo.** Con el transporte en `log`
+—el valor por defecto— la pantalla dice que el enlace salió y **nadie lo recibe**. En producción
+`CORREO_TRANSPORTE` tiene que ser `smtp`, con `CORREO_REMITENTE` y las credenciales del
+servidor de correo. El envío real de este enlace **no se ha probado todavía**: en las pruebas
+se leyó el enlace de `correo_enviado`.
 
 **Las tres últimas etapas ya viven aquí, pero les falta contenido** (18/08/2026). La mecánica
 está construida y se puede llamar; lo que todavía no existe es lo que va dentro:

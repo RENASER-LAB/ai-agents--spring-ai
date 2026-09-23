@@ -11,7 +11,7 @@ haría falta para arreglarlo**. Sin lo tercero, una lista así solo sirve para p
 > descubrir cada pocos meses, normalmente con un candidato dentro. Lo que **ya está arreglado**
 > no vive aquí: vive en el documento de su tema, en `CLAUDE.MD` o en el javadoc de su clase.
 
-Última revisión: **22/09/2026**.
+Última revisión: **23/09/2026**.
 
 ---
 
@@ -302,6 +302,45 @@ hoy ninguno de los dos la libera. QA lo registró como limitación previa al apr
 **Qué haría falta.** Al cerrar una postulación, marcar no vigente su inscripción y recalcular la
 disponibilidad de la sesión, como ya hace la cancelación. Antes, decidir si vale para cualquier
 cierre o solo para los que decide una persona, y si a quien esperaba fecha se le avisa.
+
+---
+
+## 12 · Crear cuenta o aceptar una invitación con una contraseña muy larga da un error en inglés
+
+**Qué le pasa a alguien.** Quien crea su cuenta en el portal, o acepta la invitación al panel,
+con una contraseña muy larga —o no tan larga, pero con muchas tildes, «ñ» o emojis— recibe un
+error bajo el campo que dice, en inglés, «password cannot be more than 72 bytes». No entiende
+qué pasó ni cuánto tiene que acortarla.
+
+**Por qué pasa.** BCrypt, con el que se guardan las contraseñas, acepta como mucho 72 bytes, y
+una tilde o una «ñ» ocupan dos y un emoji cuatro. Las pantallas de contraseña nueva por enlace
+(22/09/2026) lo comprueban antes con `@CabeEnBcrypt` y dan un motivo en español; crear la
+cuenta (`POST /portal/cuentas`) y aceptar la invitación (`POST /panel/auth/invitacion`) no
+llevan esa validación, y el texto de Spring Security llega tal cual. QA lo registró como fuera
+del alcance de esa entrega.
+
+**Qué haría falta.** Poner `@CabeEnBcrypt` en la contraseña de esos dos cuerpos, y en el
+frontend la misma comprobación que ya usan las pantallas de contraseña nueva, con el mismo
+mensaje: «La contraseña es demasiado larga. Usa como máximo 72 caracteres; las letras con
+tilde, la ñ y los emojis cuentan por más de uno.».
+
+---
+
+## 13 · Un texto de consentimiento puede decir «S.A.C..»
+
+**Qué le pasa a alguien.** En un texto de consentimiento donde el nombre de la empresa cierra
+la frase, cuando esa empresa es la plataforma se lee «RENASER CONSULTING S.A.C..», con el punto
+repetido. No cambia lo que se acepta, pero es un texto legal y se nota.
+
+**Por qué pasa.** El nombre de la plataforma ya acaba en punto («RENASER CONSULTING S.A.C.»,
+desde la `V54`), y el texto pone el punto de la frase justo después. Los dos correos de la
+contraseña olvidada (`V61`) se escribieron para que ninguna frase termine en el nombre; los
+consentimientos de la `V54` no. QA lo vio el 22/09/2026 y quedó fuera de esa entrega.
+
+**Qué haría falta.** Localizar las frases que terminan en el nombre de la empresa y
+reescribirlas en una versión nueva del texto —los textos publicados no se editan—, o que quien
+compone el texto no añada un punto si el nombre ya acaba en uno. Lo primero pasa por el
+abogado que tiene que firmar los textos.
 
 ---
 
