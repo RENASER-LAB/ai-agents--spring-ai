@@ -102,6 +102,10 @@ class ServicioPostulacionPortalImplTest {
     @Mock
     private com.renaser.ai.ai_engine.notificacion.service.ServicioAvisosPortal avisos;
 
+    // El catálogo de ciudades del tablón (V62): aquí ninguna vacante tiene ciudad, así que
+    // no se le pregunta nada; es un doble para poder construirlo.
+    @Mock private com.renaser.ai.ai_engine.perfil.service.CatalogosDelPerfil catalogos;
+
     private ServicioPostulacionPortalImpl servicio;
     // El tablón, armado sobre los mismos dobles: la prueba de la suspendida vigila una
     // sola invariante —lo que el tablón esconde, postular tampoco lo acepta— y esa
@@ -118,7 +122,8 @@ class ServicioPostulacionPortalImplTest {
                 consentimientos, vacantes, puestos, requisitos, evaluaciones, postulaciones,
                 transiciones, estados, cvs, enlaces, maquina, propuestaPerfil, lecturaCv,
                 colaIa, almacen, archivos, perfiles, correo, textoProceso, avisos);
-        tablon = new ServicioTablonPortalImpl(vacantes, organizaciones, requisitos, textoProceso);
+        tablon = new ServicioTablonPortalImpl(vacantes, organizaciones, requisitos, textoProceso,
+                catalogos);
     }
 
     /**

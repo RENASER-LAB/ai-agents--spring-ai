@@ -28,7 +28,21 @@ public class Vacante {
     private String requisitos;
     private String modalidad;
     private String horario;
+    /**
+     * La zona o referencia del puesto: el barrio, el distrito o la dirección (V62).
+     *
+     * <p>Hasta la V62 era «la ubicación» a secas y texto libre —«Lima», «LIMA», «Selva
+     * Alegre»—. La ciudad de verdad vive ahora en {@link #ciudadUbigeo}; esta columna no
+     * cambia de nombre ni de contenido, solo de papel: es lo que se ve en la ficha detrás de
+     * la ciudad, y no se filtra.
+     */
     private String ubicacion;
+    /**
+     * La ciudad del puesto: un código del catálogo {@code ubigeo} —una provincia o
+     * {@code EXT}—, el mismo tipo que {@code persona.ciudad_ubigeo} (V62). Vacío = sin
+     * ciudad, que es como quedan las vacantes viejas cuyo texto no la nombraba exactamente.
+     */
+    private String ciudadUbigeo;
     // RETIRADA (V55): el sueldo vive en los campos de remuneración de abajo. Se mantiene
     // mapeada porque la columna sigue existiendo con los datos de las vacantes viejas, pero
     // ninguna pantalla la lee ni la escribe.

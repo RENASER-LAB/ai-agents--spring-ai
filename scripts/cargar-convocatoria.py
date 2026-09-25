@@ -292,6 +292,9 @@ def montar_convocatoria(api, yo, c):
     sol = c["solicitud"]
     solicitud = api.post("/panel/solicitudes", {
         "areaId": area_id,
+        # La solicitud nace con su puesto desde el PR #80 (V45): sin `puestoId` el
+        # backend responde 400 «puestoId: no debe ser nulo» y la carga se corta aquí.
+        "puestoId": puesto_id,
         "urgencia": sol["urgencia"],
         "nivelPuestoCodigo": puesto["nivelPuestoCodigo"],
         "familiaCodigo": puesto["familiaCodigo"],

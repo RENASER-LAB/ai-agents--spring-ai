@@ -4,6 +4,9 @@ import com.renaser.ai.ai_engine.ai.exception.ResourceNotFoundException;
 import com.renaser.ai.ai_engine.consentimiento.service.TextosDeConsentimiento;
 import com.renaser.ai.ai_engine.organizacion.entity.Organizacion;
 import com.renaser.ai.ai_engine.organizacion.repository.OrganizacionRepository;
+import com.renaser.ai.ai_engine.perfil.dto.DtosPerfil.OpcionUbigeo;
+import com.renaser.ai.ai_engine.perfil.service.CatalogosDelPerfil;
+import com.renaser.ai.ai_engine.portal.dto.DtosPortal.CiudadPublica;
 import com.renaser.ai.ai_engine.portal.dto.DtosPortal.ConsentimientoDeVacante;
 import com.renaser.ai.ai_engine.portal.dto.DtosPortal.RequisitoPublico;
 import com.renaser.ai.ai_engine.portal.dto.DtosPortal.VacantePublica;
@@ -34,6 +37,9 @@ public class ServicioTablonPortalImpl implements ServicioTablonPortal {
     private final OrganizacionRepository organizaciones;
     private final RequisitoObjetivoRepository requisitos;
     private final TextosDeConsentimiento textos;
+    // Pone nombre y departamento a la ciudad de cada vacante (V62). El mismo catálogo del
+    // registro, con las desactivadas incluidas: lo que una vacante tiene guardado se enseña.
+    private final CatalogosDelPerfil catalogos;
 
     @Override
     public List<VacantePublica> vacantesPublicadas() {
@@ -62,10 +68,13 @@ public class ServicioTablonPortalImpl implements ServicioTablonPortal {
         // por vacante aquí no la paga un candidato, la paga cada visita.
         Map<Long, List<RequisitoObjetivo>> porVacante = requisitosDe(
                 publicadas.stream().map(Vacante::getId).toList());
+        // Y el catálogo de ciudades una sola vez, por lo mismo; y ninguna si ninguna la tiene.
+        Map<String, OpcionUbigeo> ciudades = ciudadesDe(publicadas);
 
         return publicadas.stream()
                 .map(v -> comoPublica(v, porVacante.getOrDefault(v.getId(), List.of()),
-                        organizacionesActivas.get(v.getOrganizacionId()).getNombre()))
+                        organizacionesActivas.get(v.getOrganizacionId()).getNombre(),
+                        ciudades))
                 .toList();
     }
 
@@ -86,7 +95,7 @@ public class ServicioTablonPortalImpl implements ServicioTablonPortal {
                 .filter(Organizacion::isEsActiva)
                 .orElseThrow(() -> new ResourceNotFoundException("Vacante", "id", id));
         return comoPublica(vacante, requisitos.findByVacanteIdAndEsActivoTrue(vacante.getId()),
-                empresa.getNombre());
+                empresa.getNombre(), ciudadesDe(List.of(vacante)));
     }
 
     @Override
@@ -131,12 +140,37 @@ public class ServicioTablonPortalImpl implements ServicioTablonPortal {
                 .collect(Collectors.groupingBy(RequisitoObjetivo::getVacanteId));
     }
 
-    private VacantePublica comoPublica(Vacante v, List<RequisitoObjetivo> suyos, String nombreEmpresa) {
+    /** Las ciudades del catálogo por código, solo si alguna vacante del lote tiene una. */
+    private Map<String, OpcionUbigeo> ciudadesDe(List<Vacante> deVacantes) {
+        boolean hayAlguna = deVacantes.stream().anyMatch(v -> v.getCiudadUbigeo() != null);
+        return hayAlguna ? catalogos.ciudadesPorCodigo() : Map.of();
+    }
+
+    /**
+     * La ciudad de una vacante, con su nombre, o nulo si no tiene.
+     *
+     * <p>Si el código no está en el catálogo —no debería pasar: hay clave foránea— sale con el
+     * código como nombre antes que perderse: un hueco donde iba la ciudad se lee como un
+     * fallo de carga.
+     */
+    private static CiudadPublica ciudadDe(Vacante v, Map<String, OpcionUbigeo> ciudades) {
+        if (v.getCiudadUbigeo() == null) {
+            return null;
+        }
+        OpcionUbigeo opcion = ciudades.get(v.getCiudadUbigeo());
+        return opcion == null
+                ? new CiudadPublica(v.getCiudadUbigeo(), v.getCiudadUbigeo(), null)
+                : new CiudadPublica(opcion.codigo(), opcion.nombre(), opcion.departamento());
+    }
+
+    private VacantePublica comoPublica(Vacante v, List<RequisitoObjetivo> suyos,
+                                       String nombreEmpresa, Map<String, OpcionUbigeo> ciudades) {
         List<RequisitoPublico> reqs = suyos.stream()
                 .map(r -> new RequisitoPublico(r.getId(), r.getDescripcion()))
                 .toList();
         return new VacantePublica(v.getId(), v.getTitulo(), nombreEmpresa, v.getDescripcion(),
                 v.getProposito(), v.getResponsabilidades(), v.getRequisitos(), v.getModalidad(),
-                v.getHorario(), v.getUbicacion(), RemuneracionQueVeElCandidato.de(v), reqs);
+                v.getHorario(), v.getUbicacion(), ciudadDe(v, ciudades), v.getPublicadaEn(),
+                RemuneracionQueVeElCandidato.de(v), reqs);
     }
 }

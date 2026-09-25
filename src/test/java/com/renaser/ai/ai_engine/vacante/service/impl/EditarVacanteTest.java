@@ -105,6 +105,7 @@ class EditarVacanteTest {
     @Mock private ServicioAvisosPortal avisos;
     @Mock private AlcanceSobreLaVacante alcance;
     @Mock private Permisos permisos;
+    @Mock private com.renaser.ai.ai_engine.perfil.service.CatalogosDelPerfil catalogos;
 
     private ServicioVacantesPanelImpl servicio;
 
@@ -113,7 +114,7 @@ class EditarVacanteTest {
         servicio = new ServicioVacantesPanelImpl(vacantes, puestos, requisitos, solicitudes,
                 versionesPesos, plantillas, versionesPrueba, plantillasPrueba, plantillasCorreo,
                 plantillasPorVacante, intentos, evaluaciones, versionesBanco,
-                auditoria, dueno, postulaciones, enCarrera, maquina, avisos, alcance, permisos);
+                auditoria, dueno, postulaciones, enCarrera, maquina, avisos, alcance, permisos, catalogos);
     }
 
     // ---------- el escenario ----------
@@ -150,7 +151,7 @@ class EditarVacanteTest {
     private GuardarVacante formulario(String titulo, String descripcion, String horario,
                                       String ubicacion) {
         return new GuardarVacante(30L, 5L, titulo, descripcion, null, null, null, null,
-                horario, ubicacion,
+                horario, ubicacion, null,
                 new RemuneracionDeLaVacante("FIJA", new BigDecimal("3000"), null, "PEN"),
                 "PERMANENTE", null, null, null, 7L, null);
     }
@@ -228,7 +229,7 @@ class EditarVacanteTest {
 
         GuardarVacante comoLoMandaElPanel = new GuardarVacante(30L, 5L, "Coordinador de sede",
                 "Lleva la operación de la sede", null, null, null, null, "L-V de 9 a 6",
-                "Lima", new RemuneracionDeLaVacante("FIJA", new BigDecimal("3000"), null, "PEN"),
+                "Lima", null, new RemuneracionDeLaVacante("FIJA", new BigDecimal("3000"), null, "PEN"),
                 "FECHA", null, null, Instant.parse("2026-12-01T00:00:00Z"), 7L, null);
 
         VacanteActualizadaResponse respuesta = servicio.editar(QUIEN, VACANTE, comoLoMandaElPanel);
@@ -249,7 +250,7 @@ class EditarVacanteTest {
 
         GuardarVacante otroDia = new GuardarVacante(30L, 5L, "Coordinador de sede",
                 "Lleva la operación de la sede", null, null, null, null, "L-V de 9 a 6",
-                "Lima", new RemuneracionDeLaVacante("FIJA", new BigDecimal("3000"), null, "PEN"),
+                "Lima", null, new RemuneracionDeLaVacante("FIJA", new BigDecimal("3000"), null, "PEN"),
                 "FECHA", null, null, Instant.parse("2026-12-15T00:00:00Z"), 7L, null);
 
         VacanteActualizadaResponse respuesta = servicio.editar(QUIEN, VACANTE, otroDia);
@@ -272,7 +273,7 @@ class EditarVacanteTest {
 
         GuardarVacante aPermanente = new GuardarVacante(30L, 5L, "Coordinador de sede",
                 "Lleva la operación de la sede", null, null, null, null, "L-V de 9 a 6",
-                "Lima", new RemuneracionDeLaVacante("FIJA", new BigDecimal("3000"), null, "PEN"),
+                "Lima", null, new RemuneracionDeLaVacante("FIJA", new BigDecimal("3000"), null, "PEN"),
                 "PERMANENTE", null, null, null, 7L, null);
 
         VacanteActualizadaResponse respuesta = servicio.editar(QUIEN, VACANTE, aPermanente);
@@ -332,7 +333,7 @@ class EditarVacanteTest {
 
         GuardarVacante datos = new GuardarVacante(30L, 5L, "Coordinador de sede",
                 "Lleva la operación de la sede", null, null, null, null, "L-V de 9 a 6",
-                "Arequipa",
+                "Arequipa", null,
                 new RemuneracionDeLaVacante("FIJA", new BigDecimal("3500"), null, "PEN"),
                 "PERMANENTE", null, null, null, 7L, "Se ajustó la banda");
 
@@ -343,7 +344,7 @@ class EditarVacanteTest {
         verify(avisos).publicar(anyLong(), anyLong(), eq(AvisoPortal.VACANTE_ACTUALIZADA),
                 anyString(), cuerpo.capture(), anyLong(), anyLong());
         assertThat(cuerpo.getValue())
-                .contains("Ubicación: Lima → Arequipa")
+                .contains("Zona o referencia: Lima → Arequipa")
                 .contains("Remuneración: S/ 3 000 → S/ 3 500");
 
         assertThat(v.getRemuneracionMin()).isEqualByComparingTo("3500");
@@ -360,7 +361,7 @@ class EditarVacanteTest {
         hayEnCarrera(2);
 
         GuardarVacante datos = new GuardarVacante(30L, 5L, "Coordinador de sede",
-                "Lleva la operación de la sede", null, null, null, null, "L-V de 9 a 6", "Lima",
+                "Lleva la operación de la sede", null, null, null, null, "L-V de 9 a 6", "Lima", null,
                 new RemuneracionDeLaVacante("FIJA", new BigDecimal("3000"), null, "PEN"),
                 "PLAZAS", 3, null, null, 9L, null);
 
@@ -429,7 +430,7 @@ class EditarVacanteTest {
         Vacante v = laVacante("PUBLICADA");
 
         GuardarVacante datos = new GuardarVacante(30L, 5L, "Coordinador de sede senior",
-                "Lleva la operación de la sede", null, null, null, null, "L-V de 9 a 6", "Lima",
+                "Lleva la operación de la sede", null, null, null, null, "L-V de 9 a 6", "Lima", null,
                 new RemuneracionDeLaVacante("RANGO", new BigDecimal("4000"),
                         new BigDecimal("3000"), "PEN"),
                 "PERMANENTE", null, null, null, 7L, "Se abre la banda");
@@ -448,7 +449,7 @@ class EditarVacanteTest {
         Vacante v = laVacante("PUBLICADA");
 
         GuardarVacante datos = new GuardarVacante(30L, 5L, "Otro título",
-                "Lleva la operación de la sede", null, null, null, null, "L-V de 9 a 6", "Lima",
+                "Lleva la operación de la sede", null, null, null, null, "L-V de 9 a 6", "Lima", null,
                 RemuneracionDeLaVacante.OCULTA, "PERMANENTE", null, null, null, 7L, "Lo ocultamos");
 
         assertThatThrownBy(() -> servicio.editar(QUIEN, VACANTE, datos))
@@ -466,7 +467,7 @@ class EditarVacanteTest {
         laVacante("PUBLICADA");
 
         GuardarVacante datos = new GuardarVacante(30L, 5L, "Coordinador de sede",
-                "Lleva la operación de la sede", null, null, null, null, "L-V de 9 a 6", "Lima",
+                "Lleva la operación de la sede", null, null, null, null, "L-V de 9 a 6", "Lima", null,
                 new RemuneracionDeLaVacante("FIJA", new BigDecimal("3500"), null, "PEN"),
                 "PERMANENTE", null, null, null, 7L, "   ");
 
@@ -484,7 +485,7 @@ class EditarVacanteTest {
         Vacante v = laVacante("BORRADOR");
 
         GuardarVacante datos = new GuardarVacante(30L, 5L, "Coordinador de sede",
-                "Lleva la operación de la sede", null, null, null, null, "L-V de 9 a 6", "Lima",
+                "Lleva la operación de la sede", null, null, null, null, "L-V de 9 a 6", "Lima", null,
                 new RemuneracionDeLaVacante("FIJA", new BigDecimal("3500"), null, "PEN"),
                 "PERMANENTE", null, null, null, 7L, null);
 

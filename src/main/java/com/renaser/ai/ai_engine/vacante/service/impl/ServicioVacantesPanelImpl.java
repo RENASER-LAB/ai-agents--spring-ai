@@ -29,6 +29,8 @@ import com.renaser.ai.ai_engine.prueba.repository.IntentoPruebaRepository;
 import com.renaser.ai.ai_engine.prueba.repository.PlantillaPruebaRepository;
 import com.renaser.ai.ai_engine.prueba.repository.VersionPlantillaPruebaRepository;
 import com.renaser.ai.ai_engine.organizacion.service.DuenoDelInstrumento;
+import com.renaser.ai.ai_engine.perfil.dto.DtosPerfil.OpcionUbigeo;
+import com.renaser.ai.ai_engine.perfil.service.CatalogosDelPerfil;
 import com.renaser.ai.ai_engine.organizacion.service.Instrumento;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
 import com.renaser.ai.ai_engine.seguridad.dto.FiltroAlcance;
@@ -140,6 +142,12 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
     // Qué filas alcanza quien pregunta: el mismo guardián que usa el resto del panel.
     private final AlcanceSobreLaVacante alcance;
     private final Permisos permisos;
+    // El catálogo de ciudades (V62): valida el código que llega y pone nombre al guardado. Es
+    // el mismo que usa el registro del candidato, a propósito: una sola lista de ciudades.
+    private final CatalogosDelPerfil catalogos;
+
+    /** Lo que contesta la API a un código de ciudad que el catálogo no ofrece (V62). */
+    static final String CIUDAD_FUERA_DEL_CATALOGO = "Esa ciudad no está en el catálogo";
 
     // ============ Puestos ============
 
@@ -229,6 +237,9 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
         String monedaSueldo = Remuneracion.validar(sueldo.tipo(), sueldo.min(), sueldo.max(),
                 sueldo.moneda());
         boolean sueldoOculto = Remuneracion.OCULTA.equals(sueldo.tipo());
+        // La ciudad, también antes de construir nada: un código que no es del catálogo no
+        // deja ni media vacante guardada (V62).
+        String ciudad = ciudadValidada(opcional(datos.ciudadUbigeo()), null);
 
         Vacante vacante = vacantes.save(Vacante.builder()
                 .organizacionId(quien.organizacionId())
@@ -242,6 +253,7 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                 .modalidad(datos.modalidad())
                 .horario(datos.horario())
                 .ubicacion(datos.ubicacion())
+                .ciudadUbigeo(ciudad)
                 .remuneracionTipo(sueldo.tipo())
                 .remuneracionMin(sueldoOculto ? null : sueldo.min())
                 .remuneracionMax(sueldoOculto || Remuneracion.FIJA.equals(sueldo.tipo())
@@ -336,8 +348,15 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
         String sueldoAntes = Remuneracion.escribir(vacante);
         String sueldoAhora = Remuneracion.escribir(sueldo.tipo(), sueldo.min(), sueldo.max(),
                 monedaSueldo);
-        CambiosDeLaVacante cambios =
-                CambiosDeLaVacante.entre(vacante, datos, sueldoAntes, sueldoAhora);
+        // La ciudad (V62): el código se valida contra el catálogo salvo que sea el que ya
+        // estaba —una ciudad desactivada después de guardarse se puede volver a guardar tal
+        // cual, que es lo que pasa cuando el formulario se manda sin tocar el desplegable—.
+        // Los nombres son lo que el aviso escribe: «Ciudad: — → Arequipa».
+        String ciudad = ciudadValidada(opcional(datos.ciudadUbigeo()), vacante.getCiudadUbigeo());
+        Map<String, OpcionUbigeo> ciudades = ciudadesDe(vacante.getCiudadUbigeo(), ciudad);
+        CambiosDeLaVacante cambios = CambiosDeLaVacante.entre(vacante, datos, sueldoAntes,
+                sueldoAhora, nombreDeCiudad(vacante.getCiudadUbigeo(), ciudades),
+                nombreDeCiudad(ciudad, ciudades));
 
         if (!cambios.hayCambios()) {
             return new VacanteActualizadaResponse(false, 0);
@@ -352,6 +371,7 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
         vacante.setModalidad(opcional(datos.modalidad()));
         vacante.setHorario(opcional(datos.horario()));
         vacante.setUbicacion(opcional(datos.ubicacion()));
+        vacante.setCiudadUbigeo(ciudad);
         if (cambios.cambioElSueldo()) {
             // La marca de «actualizada» solo se mueve si el sueldo cambió de verdad: el
             // portal la pinta como «actualizado el …» junto al monto, y ponerla en cada
@@ -407,6 +427,53 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
         return limpio.isEmpty() ? null : limpio;
     }
 
+    /**
+     * El código de ciudad que se va a guardar, o el 400 de la V62.
+     *
+     * <p>Sin ciudad se acepta: la exigencia de elegirla es del formulario del panel, no de la
+     * API, y los scripts pueden seguir creando vacantes sin ella. Con ciudad, tiene que ser
+     * una de las que el catálogo ofrece —{@code esCiudadElegible}: provincias vivas y
+     * {@code EXT}—, salvo que sea exactamente la que ya estaba guardada: una ciudad que el
+     * catálogo desactivó después no puede impedir corregir el horario de esa vacante.
+     */
+    private String ciudadValidada(String codigo, String guardado) {
+        if (codigo == null || codigo.equals(guardado)) {
+            return codigo;
+        }
+        if (!catalogos.esCiudadElegible(codigo)) {
+            throw new IllegalArgumentException(CIUDAD_FUERA_DEL_CATALOGO);
+        }
+        return codigo;
+    }
+
+    /**
+     * El catálogo por código, pedido una sola vez por lote y solo si hace falta.
+     *
+     * <p>Vacío si ninguna de las vacantes tiene ciudad: es el caso de casi todas las viejas y
+     * no vale la pena una consulta para no nombrar nada.
+     */
+    private Map<String, OpcionUbigeo> ciudadesDe(String... codigos) {
+        boolean hayAlguna = java.util.Arrays.stream(codigos).anyMatch(Objects::nonNull);
+        return hayAlguna ? catalogos.ciudadesPorCodigo() : Map.of();
+    }
+
+    /** El nombre de una ciudad guardada, o vacío. Si el catálogo no la conoce, su código. */
+    private static String nombreDeCiudad(String codigo, Map<String, OpcionUbigeo> ciudades) {
+        if (codigo == null) {
+            return "";
+        }
+        OpcionUbigeo opcion = ciudades.get(codigo);
+        return opcion == null ? codigo : opcion.nombre();
+    }
+
+    private static CiudadDeLaVacante ciudadDe(Vacante v, Map<String, OpcionUbigeo> ciudades) {
+        if (v.getCiudadUbigeo() == null) {
+            return null;
+        }
+        return new CiudadDeLaVacante(v.getCiudadUbigeo(),
+                nombreDeCiudad(v.getCiudadUbigeo(), ciudades));
+    }
+
     @Override
     public List<VacantePanel> listar(ContextoUsuario quien, boolean archivadas) {
         // Un solo conteo para toda la lista: preguntar por fila multiplicaría las consultas
@@ -428,6 +495,9 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                     .findByOrganizacionIdAndArchivadaEnIsNullAndEliminadaEnIsNullOrderByCreadoEnDesc(
                         quien.organizacionId());
         FiltroAlcance alcanceDeEliminacion = alcanceDeEliminacionDe(quien);
+        // El catálogo de ciudades una vez para toda la lista, y solo si alguna la tiene.
+        Map<String, OpcionUbigeo> ciudades =
+                ciudadesDe(filas.stream().map(Vacante::getCiudadUbigeo).toArray(String[]::new));
         return filas.stream()
                 // ⚠️ Sin el plazo vigente, y es deliberado: resolverlo pide la versión de la
                 // plantilla y los intentos abiertos de CADA vacante, o sea dos consultas por
@@ -437,7 +507,7 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                 .map(v -> comoPanel(v, porVacante.getOrDefault(v.getId(), 0),
                         puedeEditar(quien, alcanceDeEdicion, v),
                         alcanceDeArchivo, alcanceDeEliminacion, quien,
-                        PlazoDeLaPrueba.SIN_DATO))
+                        PlazoDeLaPrueba.SIN_DATO, ciudadDe(v, ciudades)))
                 .toList();
     }
 
@@ -466,7 +536,8 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
         return comoPanel(vacante, enCarrera.cuantasEnLaVacante(id),
                 puedeEditar(quien, alcanceDeEdicionDe(quien), vacante),
                 alcanceDeArchivoDe(quien), alcanceDeEliminacionDe(quien), quien,
-                loQueRigeHoy(quien, vacante));
+                loQueRigeHoy(quien, vacante),
+                ciudadDe(vacante, ciudadesDe(vacante.getCiudadUbigeo())));
     }
 
     /**
@@ -1449,7 +1520,7 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
     private VacantePanel comoPanel(Vacante v, int postulantesEnCarrera, boolean puedeEditar,
                                    FiltroAlcance alcanceDeArchivo,
                                    FiltroAlcance alcanceDeEliminacion, ContextoUsuario quien,
-                                   PlazoDeLaPrueba plazo) {
+                                   PlazoDeLaPrueba plazo, CiudadDeLaVacante ciudad) {
         boolean alcanzaParaArchivar = alcanceDeArchivo != null
                 && alcance.alcanzaALaVacante(quien, alcanceDeArchivo, v);
         // ⚠️ `puedeArchivar` NO mira cuánta gente sigue en carrera. El icono tiene que estar
@@ -1477,7 +1548,7 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                 v.getRemuneracionActualizadaEn(),
                 v.getDescripcion(), v.getProposito(), v.getResponsabilidades(),
                 v.getRequisitos(), v.getModalidad(), v.getHorario(), v.getUbicacion(),
-                v.getPlazas(), v.getAbreEn(), v.getCierraEn(),
+                ciudad, v.getPlazas(), v.getAbreEn(), v.getCierraEn(),
                 postulantesEnCarrera, v.getArchivadaEn(), puedeEditar,
                 puedeArchivar, puedeDesarchivar, puedeEliminar,
                 v.getPruebaCierraEn(), plazo.modalidad(), plazo.minutos(), plazo.dias(),
