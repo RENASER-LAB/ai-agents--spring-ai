@@ -61,11 +61,23 @@ public final class DtosPortal {
 
     // nombreEmpresa existe porque el tablón mezcla vacantes de todas las empresas: sin
     // él, el candidato no sabría a quién le está mandando su currículum.
+    //
+    // publicadaEn y ciudad llegaron con la pantalla de búsqueda (V62). La fecha puede venir
+    // vacía —se fija al publicar y las viejas pueden no tenerla—; la ciudad es la del catálogo
+    // o nulo, y `ubicacion` sigue viajando con lo que ahora es la zona o referencia.
     public record VacantePublica(Long id, String titulo, String nombreEmpresa, String descripcion,
                                  String proposito, String responsabilidades, String requisitos,
                                  String modalidad, String horario, String ubicacion,
+                                 CiudadPublica ciudad, Instant publicadaEn,
                                  RemuneracionPublica remuneracion,
                                  List<RequisitoPublico> requisitosObjetivos) {}
+
+    /**
+     * La ciudad de una vacante, como la lee el portal: el código —que es lo que viaja en la
+     * dirección al filtrar—, el nombre y su departamento, por si dos ciudades se llamaran
+     * igual. {@code EXT} sale con el departamento vacío.
+     */
+    public record CiudadPublica(String codigo, String nombre, String departamento) {}
 
     /**
      * Lo que esta vacante paga, tal como el candidato puede verlo (V55).

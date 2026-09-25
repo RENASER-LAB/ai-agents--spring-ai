@@ -89,6 +89,33 @@ public class CatalogosDelPerfil {
                 .isPresent();
     }
 
+    /**
+     * Las ciudades por su código, para poner nombre a lo que ya está guardado.
+     *
+     * <p>Al revés que {@link #ubigeo()}, <b>trae también las desactivadas</b>. Existe para
+     * la vacante (V62): una ciudad que el catálogo retire después de guardarse tiene que
+     * seguir leyéndose en la vacante, en el filtro del portal y marcada en el panel. Lo que
+     * no se ofrece para elegir es cosa de {@link #ubigeo()} y de {@link #esCiudadElegible};
+     * lo que ya se eligió se enseña.
+     *
+     * <p>Una consulta con las 222 filas, sea cual sea el lote que se vaya a nombrar: el
+     * catálogo no crece entre despliegues y una consulta por vacante en el tablón la pagaría
+     * cada visita.
+     */
+    public Map<String, OpcionUbigeo> ciudadesPorCodigo() {
+        List<Ubigeo> catalogo = ubigeo.findAll();
+        Map<String, String> departamentos = catalogo.stream()
+                .filter(u -> u.getNivel() != null && u.getNivel() == DEPARTAMENTO)
+                .collect(Collectors.toMap(Ubigeo::getCodigo, Ubigeo::getNombre, (a, b) -> a));
+        return catalogo.stream()
+                .filter(u -> FUERA_DEL_PERU.equals(u.getCodigo())
+                        || (u.getNivel() != null && u.getNivel() == PROVINCIA))
+                .collect(Collectors.toMap(Ubigeo::getCodigo,
+                        u -> new OpcionUbigeo(u.getCodigo(), u.getNombre(),
+                                u.getPadre() == null ? null : departamentos.get(u.getPadre())),
+                        (a, b) -> a));
+    }
+
     /** Las provincias vivas y «fuera del Perú»: exactamente lo que sale por el catálogo. */
     private static boolean seOfrece(Ubigeo u) {
         return u.isActivo()

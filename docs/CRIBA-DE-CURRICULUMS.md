@@ -142,7 +142,10 @@ mirarlo otra vez.
    ```
 
 5. **Elige la convocatoria.** Están en `scripts/convocatorias.json`, una por clave. Hoy hay
-   dos: `talento` y `asistente-admin`. Se añaden ahí, sin tocar código.
+   cinco: `talento`, `asistente-admin`, `administrador`, `arquitecto` y `civil`. Se añaden ahí,
+   sin tocar código. Desde el 25/09/2026 cada una puede llevar `modalidad` —escrita igual que en
+   el desplegable del panel— y `ciudadUbigeo` (`0401` Arequipa, `1501` Lima); `ubicacion` es solo
+   la zona o referencia. Lo explica el `_lea_esto` del mismo archivo.
 
    Para dejar la vacante montada antes de tener los currículums:
    ```bash

@@ -62,12 +62,12 @@ class CambiosDeLaVacanteTest {
         }
         return new GuardarVacante(30L, 5L, titulo, descripcion, v.getProposito(),
                 v.getResponsabilidades(), v.getRequisitos(), v.getModalidad(), horario,
-                ubicacion, null, v.getTipoCierre(), v.getPlazas(), v.getAbreEn(),
+                ubicacion, null, null, v.getTipoCierre(), v.getPlazas(), v.getAbreEn(),
                 v.getCierraEn(), v.getResponsableUsuarioId(), null);
     }
 
     private CambiosDeLaVacante comparar(GuardarVacante datos) {
-        return CambiosDeLaVacante.entre(laVacante(), datos, "S/ 3 000", "S/ 3 000");
+        return CambiosDeLaVacante.entre(laVacante(), datos, "S/ 3 000", "S/ 3 000", "", "");
     }
 
     @Nested
@@ -100,7 +100,7 @@ class CambiosDeLaVacanteTest {
             v.setUbicacion("   ");
             GuardarVacante datos = comoEsta("ubicacion", null);
 
-            assertThat(CambiosDeLaVacante.entre(v, datos, "S/ 3 000", "S/ 3 000").hayCambios())
+            assertThat(CambiosDeLaVacante.entre(v, datos, "S/ 3 000", "S/ 3 000", "", "").hayCambios())
                     .isFalse();
         }
 
@@ -108,7 +108,7 @@ class CambiosDeLaVacanteTest {
         @DisplayName("cambiar el sueldo es un cambio visible, aunque el formulario esté igual")
         void elSueldoEsUnCambioVisible() {
             CambiosDeLaVacante cambios =
-                    CambiosDeLaVacante.entre(laVacante(), comoEsta(), "S/ 3 000", "S/ 3 500");
+                    CambiosDeLaVacante.entre(laVacante(), comoEsta(), "S/ 3 000", "S/ 3 500", "", "");
 
             assertThat(cambios.hayCambios()).isTrue();
             assertThat(cambios.cambioElSueldo()).isTrue();
@@ -138,10 +138,12 @@ class CambiosDeLaVacanteTest {
             v.setUbicacion(null);
 
             CambiosDeLaVacante cambios = CambiosDeLaVacante.entre(v,
-                    comoEsta("ubicacion", "Arequipa"), "S/ 3 000", "S/ 3 000");
+                    comoEsta("ubicacion", "Arequipa"), "S/ 3 000", "S/ 3 000", "", "");
 
-            // «Ubicación:  → Arequipa» se lee como un fallo de la pantalla.
-            assertThat(cambios.cuerpoDelAviso()).contains("Ubicación: sin indicar → Arequipa");
+            // «Zona o referencia:  → Arequipa» se lee como un fallo de la pantalla. Y desde la
+            // V62 el campo se llama por lo que es: la ciudad ya no vive aquí.
+            assertThat(cambios.cuerpoDelAviso())
+                    .contains("Zona o referencia: sin indicar → Arequipa");
         }
 
         @Test
@@ -161,7 +163,7 @@ class CambiosDeLaVacanteTest {
         void variosLargosSeEnumeran() {
             GuardarVacante datos = new GuardarVacante(30L, 5L, "Coordinador de sede",
                     "Otra descripción", "Sostener el servicio", "Coordinar al equipo",
-                    "Cinco años de experiencia", "Presencial", "L-V de 9 a 6", "Lima", null,
+                    "Cinco años de experiencia", "Presencial", "L-V de 9 a 6", "Lima", null, null,
                     "PERMANENTE", null, null, null, 3L, null);
 
             assertThat(comparar(datos).cuerpoDelAviso())
@@ -188,6 +190,88 @@ class CambiosDeLaVacanteTest {
         }
     }
 
+    /**
+     * La ciudad del catálogo (V62): se compara por su código y se cuenta por su nombre.
+     *
+     * <p>Los nombres los pone el servicio, que es quien tiene el catálogo; aquí llegan como
+     * dos cadenas más, igual que el sueldo. Lo que se protege es que un cambio de código con
+     * el mismo nombre siga siendo un cambio, que el aviso escriba el nombre y no el código, y
+     * que la ciudad vacía se escriba «—», que es lo que fija la spec.
+     */
+    @Nested
+    @DisplayName("La ciudad del catálogo")
+    class LaCiudad {
+
+        private GuardarVacante conCiudad(String codigo) {
+            Vacante v = laVacante();
+            return new GuardarVacante(30L, 5L, v.getTitulo(), v.getDescripcion(),
+                    v.getProposito(), v.getResponsabilidades(), v.getRequisitos(),
+                    v.getModalidad(), v.getHorario(), v.getUbicacion(), codigo, null,
+                    v.getTipoCierre(), v.getPlazas(), v.getAbreEn(), v.getCierraEn(),
+                    v.getResponsableUsuarioId(), null);
+        }
+
+        @Test
+        @DisplayName("ponerle ciudad a una vacante que no tenía es un cambio visible con «—» delante")
+        void deNadaAArequipa() {
+            CambiosDeLaVacante cambios = CambiosDeLaVacante.entre(laVacante(),
+                    conCiudad("0401"), "S/ 3 000", "S/ 3 000", "", "Arequipa");
+
+            assertThat(cambios.hayVisibles()).isTrue();
+            assertThat(cambios.cuerpoDelAviso())
+                    .isEqualTo("Ciudad: — → Arequipa. "
+                            + "Tu postulación sigue su curso y no tienes que hacer nada.");
+            assertThat(cambios.anterior()).containsEntry("ciudadUbigeo", "");
+            assertThat(cambios.nuevo()).containsEntry("ciudadUbigeo", "Arequipa");
+        }
+
+        @Test
+        @DisplayName("la misma ciudad, con o sin espacios alrededor del código, no es un cambio")
+        void laMismaCiudadNoCambia() {
+            Vacante v = laVacante();
+            v.setCiudadUbigeo("1501");
+
+            CambiosDeLaVacante cambios = CambiosDeLaVacante.entre(v, conCiudad(" 1501 "),
+                    "S/ 3 000", "S/ 3 000", "Lima", "Lima");
+
+            assertThat(cambios.hayCambios()).isFalse();
+        }
+
+        @Test
+        @DisplayName("se compara el código, no el nombre: dos ciudades homónimas son dos ciudades")
+        void seComparaElCodigo() {
+            Vacante v = laVacante();
+            v.setCiudadUbigeo("1501");
+
+            CambiosDeLaVacante cambios = CambiosDeLaVacante.entre(v, conCiudad("9901"),
+                    "S/ 3 000", "S/ 3 000", "Lima", "Lima");
+
+            assertThat(cambios.hayCambios()).isTrue();
+            assertThat(cambios.cuerpoDelAviso()).contains("Ciudad: Lima → Lima");
+        }
+
+        @Test
+        @DisplayName("quitar la ciudad también se cuenta, y la zona se llama por su nombre nuevo")
+        void quitarLaCiudadYCambiarLaZona() {
+            Vacante v = laVacante();
+            v.setCiudadUbigeo("0401");
+            v.setUbicacion(null);
+            GuardarVacante datos = new GuardarVacante(30L, 5L, v.getTitulo(),
+                    v.getDescripcion(), v.getProposito(), v.getResponsabilidades(),
+                    v.getRequisitos(), v.getModalidad(), v.getHorario(), "Selva Alegre", null,
+                    null, v.getTipoCierre(), v.getPlazas(), v.getAbreEn(), v.getCierraEn(),
+                    v.getResponsableUsuarioId(), null);
+
+            CambiosDeLaVacante cambios = CambiosDeLaVacante.entre(v, datos,
+                    "S/ 3 000", "S/ 3 000", "Arequipa", "");
+
+            assertThat(cambios.cuerpoDelAviso())
+                    .isEqualTo("Ciudad: Arequipa → — · "
+                            + "Zona o referencia: sin indicar → Selva Alegre. "
+                            + "Tu postulación sigue su curso y no tienes que hacer nada.");
+        }
+    }
+
     @Nested
     @DisplayName("Lo que el formulario no enseña")
     class LoQueElFormularioNoEnsena {
@@ -210,7 +294,7 @@ class CambiosDeLaVacanteTest {
 
             // El cuerpo exacto del panel: PERMANENTE, sin plazas, sin fechas.
             CambiosDeLaVacante cambios =
-                    CambiosDeLaVacante.entre(v, comoEsta(), "S/ 3 000", "S/ 3 000");
+                    CambiosDeLaVacante.entre(v, comoEsta(), "S/ 3 000", "S/ 3 000", "", "");
 
             assertThat(cambios.hayCambios()).isFalse();
             assertThat(cambios.plazasQueQuedan()).isEqualTo(5);
@@ -227,11 +311,11 @@ class CambiosDeLaVacanteTest {
 
             GuardarVacante aPermanente = new GuardarVacante(30L, 5L, v.getTitulo(),
                     v.getDescripcion(), v.getProposito(), v.getResponsabilidades(),
-                    v.getRequisitos(), v.getModalidad(), v.getHorario(), v.getUbicacion(),
+                    v.getRequisitos(), v.getModalidad(), v.getHorario(), v.getUbicacion(), null,
                     null, "PERMANENTE", null, null, null, v.getResponsableUsuarioId(), null);
 
             CambiosDeLaVacante cambios =
-                    CambiosDeLaVacante.entre(v, aPermanente, "S/ 3 000", "S/ 3 000");
+                    CambiosDeLaVacante.entre(v, aPermanente, "S/ 3 000", "S/ 3 000", "", "");
 
             assertThat(cambios.plazasQueQuedan()).isNull();
             assertThat(cambios.hayVisibles()).as("la forma de cierre es interna").isFalse();
@@ -254,7 +338,7 @@ class CambiosDeLaVacanteTest {
             v.setCierraEn(Instant.parse("2026-12-01T18:30:00Z"));
 
             CambiosDeLaVacante cambios = CambiosDeLaVacante.entre(v,
-                    porFecha("2026-12-01T00:00:00Z"), "S/ 3 000", "S/ 3 000");
+                    porFecha("2026-12-01T00:00:00Z"), "S/ 3 000", "S/ 3 000", "", "");
 
             assertThat(cambios.hayCambios()).isFalse();
             assertThat(cambios.cierreQueQueda()).isEqualTo(Instant.parse("2026-12-01T18:30:00Z"));
@@ -268,7 +352,7 @@ class CambiosDeLaVacanteTest {
             v.setCierraEn(Instant.parse("2026-12-01T18:30:00Z"));
 
             CambiosDeLaVacante cambios = CambiosDeLaVacante.entre(v,
-                    porFecha("2026-12-15T00:00:00Z"), "S/ 3 000", "S/ 3 000");
+                    porFecha("2026-12-15T00:00:00Z"), "S/ 3 000", "S/ 3 000", "", "");
 
             assertThat(cambios.hayCambios()).isTrue();
             assertThat(cambios.hayVisibles()).as("la fecha de cierre es interna").isFalse();
@@ -281,7 +365,7 @@ class CambiosDeLaVacanteTest {
             Vacante v = laVacante();
             return new GuardarVacante(30L, 5L, v.getTitulo(), v.getDescripcion(),
                     v.getProposito(), v.getResponsabilidades(), v.getRequisitos(),
-                    v.getModalidad(), v.getHorario(), v.getUbicacion(), null, "FECHA", null,
+                    v.getModalidad(), v.getHorario(), v.getUbicacion(), null, null, "FECHA", null,
                     null, Instant.parse(instante), v.getResponsableUsuarioId(), null);
         }
 
@@ -294,11 +378,11 @@ class CambiosDeLaVacanteTest {
 
             GuardarVacante sinPlazas = new GuardarVacante(30L, 5L, v.getTitulo(),
                     v.getDescripcion(), v.getProposito(), v.getResponsabilidades(),
-                    v.getRequisitos(), v.getModalidad(), v.getHorario(), v.getUbicacion(),
+                    v.getRequisitos(), v.getModalidad(), v.getHorario(), v.getUbicacion(), null,
                     null, "PLAZAS", null, null, null, v.getResponsableUsuarioId(), null);
 
             CambiosDeLaVacante cambios =
-                    CambiosDeLaVacante.entre(v, sinPlazas, "S/ 3 000", "S/ 3 000");
+                    CambiosDeLaVacante.entre(v, sinPlazas, "S/ 3 000", "S/ 3 000", "", "");
 
             assertThat(cambios.plazasQueQuedan()).isNull();
             assertThat(cambios.hayCambios()).isTrue();
@@ -315,7 +399,7 @@ class CambiosDeLaVacanteTest {
             GuardarVacante datos = new GuardarVacante(30L, 5L, "Coordinador de sede",
                     "Lleva la operación de la sede", "Sostener el servicio",
                     "Coordinar al equipo", "Tres años de experiencia", "Presencial",
-                    "L-V de 9 a 6", "Lima", null, "PLAZAS", 4,
+                    "L-V de 9 a 6", "Lima", null, null, "PLAZAS", 4,
                     null, null, 9L, null);
 
             CambiosDeLaVacante cambios = comparar(datos);

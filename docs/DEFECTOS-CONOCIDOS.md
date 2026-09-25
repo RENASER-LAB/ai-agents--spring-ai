@@ -11,7 +11,7 @@ haría falta para arreglarlo**. Sin lo tercero, una lista así solo sirve para p
 > descubrir cada pocos meses, normalmente con un candidato dentro. Lo que **ya está arreglado**
 > no vive aquí: vive en el documento de su tema, en `CLAUDE.MD` o en el javadoc de su clase.
 
-Última revisión: **23/09/2026**.
+Última revisión: **25/09/2026**.
 
 ---
 
@@ -171,6 +171,10 @@ backend escribe una sola, «Datos».
 El 23/09/2026, en la entrega de los filtros del ranking, una corrida amplia (no completa) dio
 **16 fallos**, los mismos de las corridas anteriores, en `04-filtros`, `05-excel`, `07-movil` y
 `08-teclado`. No sustituye a la referencia de 19, que sí sale de una corrida completa.
+
+El 25/09/2026, en la entrega de la búsqueda de vacantes, `14-vacante` falló en su tramo «poner en
+automático». Esa entrega no toca ese tramo y no se encontró la causa; `14-vacante` ya estaba en
+la lista de arriba.
 
 **Qué haría falta.** Decidir cuál de las dos, y no a medias: que el sembrador produzca los valores
 que los specs esperan, o que los specs dejen de esperar cifras exactas y comprueben la forma —que

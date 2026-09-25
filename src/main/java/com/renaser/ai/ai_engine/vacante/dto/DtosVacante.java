@@ -22,7 +22,18 @@ public final class DtosVacante {
             String requisitos,
             String modalidad,
             String horario,
+            /** La zona o referencia: barrio, distrito o dirección. Texto libre y opcional. */
             String ubicacion,
+            /**
+             * La ciudad del puesto, por su código del catálogo {@code ubigeo} (V62): una
+             * provincia o {@code EXT}. El mismo nombre que usa el registro del candidato.
+             *
+             * <p>Opcional a propósito: la exigencia de elegirla es del formulario del panel,
+             * no de la API. Lo que la API sí hace es rechazar un código que el catálogo no
+             * ofrezca —un departamento, un distrito, uno inventado— con «Esa ciudad no está
+             * en el catálogo», sin guardar nada.
+             */
+            String ciudadUbigeo,
             /**
              * Lo que paga, si lo dice (V55).
              *
@@ -85,7 +96,14 @@ public final class DtosVacante {
                                // lo que no viajó: el cuerpo del PUT es el formulario completo.
                                String descripcion, String proposito, String responsabilidades,
                                String requisitos, String modalidad, String horario,
-                               String ubicacion, Integer plazas, Instant abreEn,
+                               String ubicacion,
+                               /**
+                                * La ciudad guardada, con su nombre, o vacío (V62). Es lo
+                                * que marca el desplegable al editar; el código viaja para
+                                * que el formulario lo devuelva tal cual si nadie lo toca.
+                                */
+                               CiudadDeLaVacante ciudad,
+                               Integer plazas, Instant abreEn,
                                Instant cierraEn,
                                /**
                                 * Cuánta gente sigue en carrera en esta vacante.
@@ -178,6 +196,13 @@ public final class DtosVacante {
                                Integer intentosAbiertosSinPlazoPropio,
                                /** Y cuántos se quedarían como están por tener fecha propia. */
                                Integer intentosAbiertosConPlazoPropio) {}
+
+    /**
+     * Una ciudad del catálogo, como la ve el panel: el código que se guarda y el nombre que
+     * se lee (V62). Sale con nombre aunque el catálogo la haya desactivado después: lo que
+     * una vacante tiene guardado se sigue viendo.
+     */
+    public record CiudadDeLaVacante(String codigo, String nombre) {}
 
     /**
      * Cuántas vacantes archivadas hay, para el botón «Archivadas (N)» de la cabecera.

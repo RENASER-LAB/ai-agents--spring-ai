@@ -99,6 +99,7 @@ class RemuneracionDeLaVacanteTest {
     @Mock private ServicioAvisosPortal avisos;
     @Mock private AlcanceSobreLaVacante alcance;
     @Mock private Permisos permisos;
+    @Mock private com.renaser.ai.ai_engine.perfil.service.CatalogosDelPerfil catalogos;
 
     private ServicioVacantesPanelImpl servicio;
 
@@ -107,7 +108,7 @@ class RemuneracionDeLaVacanteTest {
         servicio = new ServicioVacantesPanelImpl(vacantes, puestos, requisitos, solicitudes,
                 versionesPesos, plantillas, versionesPrueba, plantillasPrueba, plantillasCorreo,
                 plantillasPorVacante, intentos, evaluaciones, versionesBanco,
-                auditoria, dueno, postulaciones, enCarrera, maquina, avisos, alcance, permisos);
+                auditoria, dueno, postulaciones, enCarrera, maquina, avisos, alcance, permisos, catalogos);
     }
 
     // ---------- el escenario ----------
