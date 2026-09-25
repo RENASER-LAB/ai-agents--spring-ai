@@ -698,7 +698,7 @@ public class FlujoRemuneracionIT {
                  order by id desc limit 1
                 """, String.class, vacanteConBanda);
         assertThat(cuerpo)
-                .contains("Ubicación: sin indicar → Lima, San Isidro")
+                .contains("Zona o referencia: sin indicar → Lima, San Isidro")
                 .contains("Remuneración: S/ 5 200 → S/ 5 600");
 
         assertThat(contar("select count(*) from correo_enviado")).isEqualTo(correosAntes);

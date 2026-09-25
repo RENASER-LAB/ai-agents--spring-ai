@@ -20,8 +20,9 @@ import java.util.Objects;
  * campo, y tiene tres respuestas distintas según el campo:
  *
  * <ul>
- *   <li><b>Visibles cortos</b> —título, modalidad, horario, ubicación y remuneración—: caben
- *       en una línea, así que el aviso dice el antes y el ahora. Es la información completa.
+ *   <li><b>Visibles cortos</b> —título, modalidad, horario, ciudad, zona o referencia y
+ *       remuneración—: caben en una línea, así que el aviso dice el antes y el ahora. Es la
+ *       información completa.
  *   <li><b>Visibles largos</b> —descripción, propósito, responsabilidades y requisitos—: solo
  *       se nombran. Pegar dos párrafos enteros en una campana no informa, tapa; quien quiera
  *       leerlos entra a la vacante, que es a donde lleva el aviso.
@@ -82,11 +83,26 @@ public final class CambiosDeLaVacante {
     /** El campo de la remuneración, que llega ya escrito en una frase por {@link Remuneracion}. */
     public static final String REMUNERACION = "remuneracion";
 
+    /**
+     * El campo de la ciudad (V62). Se compara por su código —dos ciudades con el mismo nombre
+     * son dos ciudades— y se cuenta por su nombre, que es lo que el candidato entiende.
+     */
+    public static final String CIUDAD = "ciudadUbigeo";
+
     /** Las dos formas de cierre que traen un dato detrás. La tercera, PERMANENTE, no. */
     private static final String CIERRE_POR_PLAZAS = "PLAZAS";
     private static final String CIERRE_POR_FECHA = "FECHA";
 
     private static final String SIN_INDICAR = "sin indicar";
+
+    /**
+     * Cómo se escribe la ciudad cuando no había: «Ciudad: — → Arequipa».
+     *
+     * <p>Un guion y no «sin indicar», al revés que los campos de texto, porque así lo fija la
+     * spec de la ciudad (V62) y es lo que sus pruebas buscan; los de texto conservan lo que
+     * ya decían, que es lo que buscan las suyas. Ninguno de los dos deja un hueco.
+     */
+    private static final String SIN_CIUDAD = "—";
 
     private final List<Cambio> cambios;
     private final Integer plazas;
@@ -105,9 +121,14 @@ public final class CambiosDeLaVacante {
      * cuatro campos sueltos: quien decide cómo se escribe el dinero es {@link Remuneracion},
      * y compararla aquí por sus partes obligaría a repetir ese formato —y a equivocarse en
      * él— en el único sitio donde el candidato lo va a leer.
+     *
+     * <p>La ciudad entra por las dos puntas (V62): el código va en la vacante y en el
+     * formulario, y es lo que se compara; los nombres los pone el servicio, que es quien
+     * tiene el catálogo, y son lo que el aviso escribe. Sin ciudad, el nombre llega vacío.
      */
     public static CambiosDeLaVacante entre(Vacante vacante, GuardarVacante datos,
-                                           String sueldoAntes, String sueldoAhora) {
+                                           String sueldoAntes, String sueldoAhora,
+                                           String ciudadAntes, String ciudadAhora) {
         List<Cambio> encontrados = new ArrayList<>();
 
         texto(encontrados, "titulo", "Título", vacante.getTitulo(), datos.titulo(),
@@ -116,8 +137,14 @@ public final class CambiosDeLaVacante {
                 Clase.VISIBLE_CORTO);
         texto(encontrados, "horario", "Horario", vacante.getHorario(), datos.horario(),
                 Clase.VISIBLE_CORTO);
-        texto(encontrados, "ubicacion", "Ubicación", vacante.getUbicacion(), datos.ubicacion(),
-                Clase.VISIBLE_CORTO);
+        if (!limpio(vacante.getCiudadUbigeo()).equals(limpio(datos.ciudadUbigeo()))) {
+            encontrados.add(new Cambio(CIUDAD, "Ciudad", limpio(ciudadAntes),
+                    limpio(ciudadAhora), Clase.VISIBLE_CORTO));
+        }
+        // «Zona o referencia» y no «Ubicación» desde la V62: el nombre de la ciudad ya no vive
+        // aquí. El campo de la auditoría sigue siendo `ubicacion`, que es la columna.
+        texto(encontrados, "ubicacion", "Zona o referencia", vacante.getUbicacion(),
+                datos.ubicacion(), Clase.VISIBLE_CORTO);
         texto(encontrados, REMUNERACION, "Remuneración", sueldoAntes, sueldoAhora,
                 Clase.VISIBLE_CORTO);
 
@@ -297,8 +324,8 @@ public final class CambiosDeLaVacante {
         List<String> partes = new ArrayList<>();
         for (Cambio cambio : cambios) {
             if (cambio.clase() == Clase.VISIBLE_CORTO) {
-                partes.add(cambio.etiqueta() + ": " + conNombre(cambio.antes()) + " → "
-                        + conNombre(cambio.ahora()));
+                partes.add(cambio.etiqueta() + ": " + conNombre(cambio) + " → "
+                        + conNombre(cambio.ahora(), cambio.campo()));
             }
         }
         List<String> largos = cambios.stream()
@@ -315,11 +342,18 @@ public final class CambiosDeLaVacante {
     /**
      * Un campo vacío se dice, no se deja en blanco.
      *
-     * <p>«Ubicación:  → Lima» parece un fallo de la pantalla. «Ubicación: sin indicar → Lima»
-     * cuenta lo que de verdad pasó: que antes no lo decía.
+     * <p>«Ciudad:  → Arequipa» parece un fallo de la pantalla. «Ciudad: — → Arequipa» cuenta
+     * lo que de verdad pasó: que antes no lo decía.
      */
-    private static String conNombre(String valor) {
-        return valor.isBlank() ? SIN_INDICAR : valor;
+    private static String conNombre(Cambio cambio) {
+        return conNombre(cambio.antes(), cambio.campo());
+    }
+
+    private static String conNombre(String valor, String campo) {
+        if (!valor.isBlank()) {
+            return valor;
+        }
+        return CIUDAD.equals(campo) ? SIN_CIUDAD : SIN_INDICAR;
     }
 
     /** «la descripción y los requisitos», «el propósito, la descripción y los requisitos». */

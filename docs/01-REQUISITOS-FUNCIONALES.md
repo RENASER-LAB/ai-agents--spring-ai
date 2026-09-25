@@ -343,7 +343,9 @@ evaluación ya cargadas, y puede crear una variante propia de esa vacante **sin 
 plantillas publicadas**.
 
 **RF-12** La vacante pública incluye: puesto, propósito, responsabilidades, capacidades
-esperadas, requisitos indispensables, modalidad, horario, ubicación, cultura de trabajo, y **la
+esperadas, requisitos indispensables, modalidad, horario, ubicación —desde el 25/09/2026, **la
+ciudad elegida del mismo catálogo que la del candidato** y, aparte, una zona o referencia
+opcional escrita a mano—, cultura de trabajo, y **la
 remuneración, que se declara de una de tres formas** (ver «El sueldo, y el trato que lo
 acompaña»). Publicarla o no **no es solo una decisión de presentación**: es lo que decide si a
 quien postula se le exige declarar cuánto quiere ganar.
@@ -360,7 +362,7 @@ a quienes siguen en carrera (RF-14d).
 (19/09/2026), con el mismo formulario con que se creó. Una cerrada no se edita. La solicitud y el
 puesto no se cambian: el puesto decide el nivel y la familia de la evaluación, y para cambiarlo se
 crea otra vacante. Si la vacante está publicada y cambió algo que ve quien postula —título,
-descripción, propósito, responsabilidades, requisitos, modalidad, horario, ubicación o sueldo—,
+descripción, propósito, responsabilidades, requisitos, modalidad, horario, ciudad, zona o sueldo—,
 cada postulante **en carrera** recibe **un solo aviso en la campana de su portal, sin correo**, con
 lo que cambió. En carrera es toda postulación que no esté contratada, cerrada ni en «no
 continúa». Lo interno —responsable, forma de cierre, plazas y fecha de cierre— se guarda sin
@@ -445,7 +447,9 @@ encajar, **sin impedir que se publique**.
 
 # 4. Portal del candidato
 
-**RF-21** Cualquier persona puede ver las vacantes abiertas sin registrarse.
+**RF-21** Cualquier persona puede ver las vacantes abiertas sin registrarse. Desde el
+25/09/2026 también **buscarlas**: escribir lo que busca, filtrar por ciudad, modalidad, fecha de
+publicación y, si hay más de una, empresa, y ordenarlas por relevancia o por las más recientes.
 
 **RF-22** Para postular hay que crear una cuenta. Los candidatos no son usuarios de RENASER OS:
 su cuenta vive en este sistema.

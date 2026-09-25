@@ -1,7 +1,7 @@
 # Diccionario de datos
 
 Sistema de selección de personal — Renaser Consulting
-Versión 3.0 · 2026-09-23 · Puesto al día con las migraciones hasta la `V61` (la V49 y la V50 solo siembran pesos; la V51 trae la tabla `lectura_cv_perfil` y los archivos del perfil; la V52 y la V53 no crean tablas; la V55 pone el sueldo en la vacante y la pretensión en la postulación; la V56 trae la tabla `aviso_portal`; la V57 no crea tablas, solo siembra los precios de los dos modelos de DeepSeek; la V58 no crea tablas: suma el aviso `VACANTE_ACTUALIZADA` y apaga el correo `REMUNERACION_ACTUALIZADA`; la V59 añade `vacante.archivada_en`; la V60 añade `vacante.eliminada_en` —el borrado lógico—, el motivo de cierre y el tipo de aviso `VACANTE_ELIMINADA`, y el permiso `eliminar_vacante`; la V61 trae la tabla `recuperacion_clave`, tres parámetros y los dos correos de «¿Olvidaste tu contraseña?»)
+Versión 3.1 · 2026-09-25 · Puesto al día con las migraciones hasta la `V62` (la V49 y la V50 solo siembran pesos; la V51 trae la tabla `lectura_cv_perfil` y los archivos del perfil; la V52 y la V53 no crean tablas; la V55 pone el sueldo en la vacante y la pretensión en la postulación; la V56 trae la tabla `aviso_portal`; la V57 no crea tablas, solo siembra los precios de los dos modelos de DeepSeek; la V58 no crea tablas: suma el aviso `VACANTE_ACTUALIZADA` y apaga el correo `REMUNERACION_ACTUALIZADA`; la V59 añade `vacante.archivada_en`; la V60 añade `vacante.eliminada_en` —el borrado lógico—, el motivo de cierre y el tipo de aviso `VACANTE_ELIMINADA`, y el permiso `eliminar_vacante`; la V61 trae la tabla `recuperacion_clave`, tres parámetros y los dos correos de «¿Olvidaste tu contraseña?»; la V62 añade `vacante.ciudad_ubigeo`)
 
 Cada tabla con todas sus columnas, tipos y claves. **Este documento se consulta**, no se lee de
 corrido: es la base para escribir las migraciones de Flyway.
@@ -107,7 +107,8 @@ cuando la única fila que existe de esa persona es esta.
 
 ## `ubigeo`
 
-El catálogo geográfico del Perú, del INEI: dónde se puede decir que uno vive.
+El catálogo geográfico del Perú, del INEI: dónde se puede decir que uno vive. Desde la `V62`
+también dice dónde está el puesto (`vacante.ciudad_ubigeo`).
 
 | Columna | Tipo | Oblig. | Qué guarda |
 |---|---|---|---|
@@ -664,9 +665,10 @@ Una convocatoria concreta.
 | `proposito` | text | no | |
 | `responsabilidades` | text | no | |
 | `requisitos` | text | no | Los que se publican |
-| `modalidad` | text | no | |
+| `modalidad` | text | no | Texto libre. El panel ofrece tres —Presencial, Híbrido y Remoto— y la exige al crear; las viejas pueden traer otra forma («PRESENCIAL») o nada |
 | `horario` | text | no | |
-| `ubicacion` | text | no | |
+| `ubicacion` | text | no | **La zona o referencia** desde la `V62`: barrio, distrito o dirección, texto libre y opcional. Se ve en la ficha y no se filtra. Antes era el único dato de dónde estaba el puesto |
+| `ciudad_ubigeo` | varchar(6) | no | (`V62`) La ciudad del puesto, como código de `ubigeo`: una provincia o `EXT`. Vacío = sin ciudad. Es lo que filtra el portal |
 | `compensacion_publica` | text | no | **RETIRADA (`V55`).** Era el sueldo en prosa: «S/ 3500», «a convenir», «según experiencia» o nada. Se conserva por las vacantes creadas antes, pero **ninguna pantalla la lee ni la escribe**, y no viaja en ningún contrato. El sueldo vive en las cuatro columnas de abajo |
 | `remuneracion_tipo` | text | sí | (`V55`) `OCULTA`, `FIJA` o `RANGO`. Por defecto `OCULTA`. **Es lo que decide si declarar pretensión al postular es obligatorio** |
 | `remuneracion_min` | numeric(12,2) | no | (`V55`) Con `FIJA`, el monto; con `RANGO`, el mínimo. Vacío con `OCULTA` |
@@ -693,7 +695,16 @@ Una convocatoria concreta.
 
 **Clave primaria:** `id`
 **Apunta a:** `organizacion`, `solicitud_talento`, `puesto`, `version_pesos`,
-`version_plantilla_prueba`, `plantilla_evaluacion`, `usuario`
+`version_plantilla_prueba`, `plantilla_evaluacion`, `usuario`, `ubigeo` (`ciudad_ubigeo`)
+**Índice parcial (`V62`):** `vacante_ciudad_idx` sobre `ciudad_ubigeo`, solo donde no es nulo
+
+**La ciudad y la zona son dos columnas** desde la `V62`. Con el texto libre de `ubicacion`,
+«Lima», «LIMA» y «Selva Alegre» convivían y el portal no podía filtrar por ciudad. La migración
+**rescató la ciudad solo cuando el texto era exactamente el nombre de una sola provincia**, sin
+mirar mayúsculas, tildes ni espacios de los bordes: «Lima» y «LIMA» quedaron en Lima; «Arequipa,
+Perú», «Selva Alegre» o «test» quedaron sin ciudad, y la elige el equipo desde el panel. No
+adivina de más a propósito: una ciudad equivocada se filtra mal para cada persona que busca.
+`ubicacion` no se tocó: sigue guardando lo que el equipo escribió.
 
 **Restricción `vacante_remuneracion_coherente` (`V55`).** La base hace cumplir las tres formas, no
 solo el código: con `OCULTA` los cuatro campos van vacíos; con `FIJA` hay monto en

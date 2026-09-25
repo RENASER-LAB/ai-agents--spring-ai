@@ -23,7 +23,7 @@ Sirve para tres cosas:
 - **Entender el sistema.** Un modelo de datos bien contado explica el negocio mejor que
   cualquier otro documento.
 
-**La base ya está construida.** Las migraciones `V1` a `V61` viven en
+**La base ya está construida.** Las migraciones `V1` a `V62` viven en
 `src/main/resources/db/migration` —**105 tablas de este módulo**, 108 en la base contando la de
 Flyway y las dos del motor de agentes— y Flyway es el dueño del esquema. Cambiar algo de aquí
 ya cuesta una migración nueva, y **una migración aplicada no se edita nunca**: se escribe otra
@@ -122,6 +122,14 @@ borran, se anonimizan—. Siembra además tres parámetros de la plataforma
 `max_recuperaciones_por_ip_hora`, 30) y los dos correos, `RECUPERAR_CLAVE_CANDIDATO` y
 `RECUPERAR_CLAVE_EQUIPO`, solo para la plataforma: las empresas que ya existían no tienen copia y
 el envío usa el de la plataforma. Ver `recuperacion_clave` en el
+[diccionario de datos](07-DICCIONARIO-DE-DATOS.md).
+
+La `V62` (25/09/2026) le da **ciudad a la vacante**: una columna, `vacante.ciudad_ubigeo`, que
+apunta al mismo catálogo `ubigeo` que la ciudad del candidato, con su índice parcial. Es lo que
+deja al portal filtrar por ciudad. El texto libre `ubicacion` no cambia de nombre ni de
+contenido: pasa a ser la **zona o referencia** (barrio, distrito o dirección). La migración solo
+rescata la ciudad cuando ese texto es exactamente el nombre de una provincia, sin mirar
+mayúsculas ni tildes; las demás quedan sin ciudad para que el equipo la elija. Ver `vacante` en el
 [diccionario de datos](07-DICCIONARIO-DE-DATOS.md).
 
 La `V54` (14/09/2026) **no añade ninguna tabla y cambia quién firma qué**. Hasta ella había dos
@@ -434,7 +442,8 @@ error del modelo de un cambio en las instrucciones que le dimos nosotros.
    PERSONAS Y ACCESO              CONFIGURACION
   persona · usuario · rol       versiones de pesos
      permiso · area              parametros · correos
-     ubigeo (donde vive)
+     ubigeo (donde vive, y
+       donde esta el puesto)
          |                              |
          | (identidad del equipo        | (toda nota apunta
          |  viene de RENASER OS)        |  a una version)
@@ -521,7 +530,7 @@ código. El Administrador puede crear roles nuevos y repartir permisos sin que n
 | Tabla | Para qué existe | Columnas que importan |
 |---|---|---|
 | `persona` | Quién es alguien. Vale para el equipo y para quien postula | nombre, apellidos, telefono, documento, fecha_nacimiento, ciudad_ubigeo, anonimizado_en |
-| `ubigeo` | El catálogo geográfico del Perú (INEI): dónde se puede decir que uno vive. Es el único catálogo con padre, porque el país es un árbol | codigo, nivel, padre, nombre, activo |
+| `ubigeo` | El catálogo geográfico del Perú (INEI): dónde se puede decir que uno vive y, desde la `V62`, dónde está el puesto de una vacante. Es el único catálogo con padre, porque el país es un árbol | codigo, nivel, padre, nombre, activo |
 | `usuario` | Cómo entra al sistema | organizacion_id, persona_id, correo, contrasena_hash, usuario_renaser_os_id, area_id, es_activo |
 | `area` | El departamento que contrata. Hace falta para saber qué ve un responsable y para impedir que alguien sea Evaluador de Estándar de su propia área | organizacion_id, nombre |
 | `rol` | Un nombre y una lista de permisos | organizacion_id, codigo, nombre, descripcion |
@@ -637,7 +646,7 @@ agente que la produjo.
 | `familia` | Las siete familias de trabajo | codigo, nombre |
 | `familia_afin` | Qué familias se parecen lo bastante para reutilizar evaluaciones | familia_codigo, familia_afin_codigo |
 | `puesto` | El catálogo de puestos, con su nivel y su familia | organizacion_id, codigo, nombre, nivel_puesto_codigo, familia_codigo |
-| `vacante` | Una convocatoria concreta | organizacion_id, solicitud_talento_id, puesto_id, titulo, descripcion, tipo_cierre, plazas, cierra_en, estado, version_pesos_id, version_plantilla_prueba_id, plantilla_evaluacion_id, responsable_usuario_id, remuneracion_tipo, remuneracion_min, remuneracion_max, remuneracion_moneda, remuneracion_actualizada_en, archivada_en, eliminada_en |
+| `vacante` | Una convocatoria concreta | organizacion_id, solicitud_talento_id, puesto_id, titulo, descripcion, modalidad, ciudad_ubigeo, ubicacion, tipo_cierre, plazas, cierra_en, estado, version_pesos_id, version_plantilla_prueba_id, plantilla_evaluacion_id, responsable_usuario_id, remuneracion_tipo, remuneracion_min, remuneracion_max, remuneracion_moneda, remuneracion_actualizada_en, archivada_en, eliminada_en |
 | `requisito_objetivo` | Lo único que puede detener una postulación sin que intervenga nadie | vacante_id, descripcion, regla, es_activo |
 | `barrera_critica` | Lo que ningún promedio alto compensa, definido por vacante | vacante_id, descripcion, es_activa |
 | `evaluador_estandar` | Quién revisa que la urgencia no baje el nivel, en esta vacante | vacante_id, usuario_id, puede_bloquear, asignado_por_usuario_id |

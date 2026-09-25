@@ -100,6 +100,7 @@ class ServicioVacantesPanelImplTest {
     @Mock private com.renaser.ai.ai_engine.notificacion.service.ServicioAvisosPortal avisos;
     @Mock private com.renaser.ai.ai_engine.vacante.service.AlcanceSobreLaVacante alcance;
     @Mock private com.renaser.ai.ai_engine.seguridad.service.Permisos permisos;
+    @Mock private com.renaser.ai.ai_engine.perfil.service.CatalogosDelPerfil catalogos;
 
     private ServicioVacantesPanelImpl servicio;
 
@@ -108,7 +109,7 @@ class ServicioVacantesPanelImplTest {
         servicio = new ServicioVacantesPanelImpl(vacantes, puestos, requisitos, solicitudes,
                 versionesPesos, plantillas, versionesPrueba, plantillasPrueba, plantillasCorreo,
                 plantillasPorVacante, intentos, evaluaciones, versionesBanco,
-                auditoria, dueno, postulaciones, enCarrera, maquina, avisos, alcance, permisos);
+                auditoria, dueno, postulaciones, enCarrera, maquina, avisos, alcance, permisos, catalogos);
         // En estas pruebas la organizacion no personaliza nada: el resolutor contesta
         // que el dueño de todo instrumento es ella misma (aqui hace de plataforma).
         org.mockito.Mockito.lenient()
@@ -246,7 +247,7 @@ class ServicioVacantesPanelImplTest {
 
     private GuardarVacante guardar(Long puestoId) {
         return new GuardarVacante(30L, puestoId, "Coordinador de sede", "Descripción",
-                null, null, null, null, null, null, null, "MANUAL", 1,
+                null, null, null, null, null, null, null, null, "MANUAL", 1,
                 null, null, QUIEN.usuarioId(), null);
     }
 
