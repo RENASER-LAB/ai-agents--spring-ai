@@ -11,7 +11,7 @@ haría falta para arreglarlo**. Sin lo tercero, una lista así solo sirve para p
 > descubrir cada pocos meses, normalmente con un candidato dentro. Lo que **ya está arreglado**
 > no vive aquí: vive en el documento de su tema, en `CLAUDE.MD` o en el javadoc de su clase.
 
-Última revisión: **25/09/2026**.
+Última revisión: **26/09/2026**.
 
 ---
 
@@ -152,37 +152,13 @@ fuzzing, porque hasta entonces su cifra no dice casi nada.
 
 ---
 
-## 6 · La suite de extremo a extremo sale con 19 fallos de fondo
+## 6 · La suite de extremo a extremo sale con 19 fallos de fondo — resuelto el 25/09/2026
 
-**Qué le pasa a alguien.** Quien corre la suite contra una base recién sembrada la ve terminar en
-rojo, y **no puede saber si rompió algo**. Sin una cifra de referencia, el rojo no dice nada: ni
-«esto estaba así», ni «esto lo rompiste tú».
-
-**La medida, del 15/09/2026: 19 fallan, 153 pasan.** Es un recuento de una corrida completa contra
-base recién sembrada, no una suma de lo que fue arrastrando cada rama.
-
-**Por qué pasa.** No son regresiones. Los specs de `03-orden`, `04-filtros`, `05-excel`,
-`06-sin-ciudad`, `07-movil`, `08-teclado`, `14-vacante`, `18-ranking-contra-api` y
-`20-prueba-y-empresas` **esperan notas y cifras concretas que el sembrador de datos de prueba no
-produce**. Se escribieron contra una base que tenía otros datos, y el sembrador siguió su camino.
-Además, `05-excel` sigue buscando las hojas «Resumen» y «Detalle», y desde el 16/09/2026 el
-backend escribe una sola, «Datos».
-
-El 23/09/2026, en la entrega de los filtros del ranking, una corrida amplia (no completa) dio
-**16 fallos**, los mismos de las corridas anteriores, en `04-filtros`, `05-excel`, `07-movil` y
-`08-teclado`. No sustituye a la referencia de 19, que sí sale de una corrida completa.
-
-El 25/09/2026, en la entrega de la búsqueda de vacantes, `14-vacante` falló en su tramo «poner en
-automático». Esa entrega no toca ese tramo y no se encontró la causa; `14-vacante` ya estaba en
-la lista de arriba.
-
-**Qué haría falta.** Decidir cuál de las dos, y no a medias: que el sembrador produzca los valores
-que los specs esperan, o que los specs dejen de esperar cifras exactas y comprueben la forma —que
-el orden sea descendente, que la columna exista, que el Excel traiga su hoja «Datos»— en vez del
-número.
-Lo segundo es más barato y más duradero; lo primero conserva la capacidad de comprobar que una
-cuenta da lo que tiene que dar. Mientras no se haga, **la cifra de arriba es la referencia**: 19
-es el rojo esperado, y cualquier número mayor sí es una regresión.
+Se conserva el número para que no se reutilice. Las pruebas del ranking ahora ponen su
+escenario en el navegador en vez de esperarlo de la base, `scripts/sembrar-escenario-e2e.py` se
+retiró, y la suite corre en verde, sin fallos de fondo (294 pasan, 0 fallan y 8 se saltan, las de
+IA real). El detalle está en el documento de clasificación del frontend,
+`~/Documentos/RenaserOsPostulantes/docs/SUITE-E2E-CLASIFICACION-2026-09-25.md`.
 
 ---
 

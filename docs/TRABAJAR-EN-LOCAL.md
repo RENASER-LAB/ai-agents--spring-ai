@@ -182,9 +182,13 @@ ayudante de limpieza busca un contenedor llamado `renaser-verifica` —el de la 
 No sale ningún error: lo único que se ve es que la corrida siguiente arranca con basura de la
 anterior.
 
-⚠️ **Su rojo de fondo son 19 fallos** contra una base recién sembrada, y no son regresiones.
-Medido el 15/09/2026: **19 fallan, 153 pasan**. Sin esa cifra de referencia, el rojo no dice nada.
-Los nueve specs y el porqué están en [Defectos conocidos](DEFECTOS-CONOCIDOS.md).
+**Desde el 25/09/2026 ya no hay rojo de fondo.** En el clon del harness la suite da **294 pasan,
+0 fallan y 8 se saltan**: si algo sale en rojo, hay que mirarlo. Las 8 saltadas son las que le
+piden algo a DeepSeek de verdad y solo corren a mano, con `E2E_IA_REAL=1` y el backend con la
+clave real. El guion que les escribía en la base los datos del ranking de «Desarrollador web»,
+`scripts/sembrar-escenario-e2e.py`, se retiró: ahora las pruebas los ponen en el navegador. Qué
+hace cada prueba y cómo se corre cada parte, en el documento de clasificación del frontend:
+`~/Documentos/RenaserOsPostulantes/docs/SUITE-E2E-CLASIFICACION-2026-09-25.md`.
 
 ⚠️ **Recrear la base para «empezar limpio» deja el backend inservible** hasta volver a sembrarla:
 las pruebas no traen consigo los datos que dan por hechos (vacantes publicadas, pesos, plantillas).
