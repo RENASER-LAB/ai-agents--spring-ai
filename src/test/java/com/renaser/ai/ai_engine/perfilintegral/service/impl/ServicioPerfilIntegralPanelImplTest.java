@@ -6,6 +6,7 @@ import com.renaser.ai.ai_engine.archivo.repository.ArchivoRepository;
 import com.renaser.ai.ai_engine.archivo.service.AlmacenArchivos;
 import com.renaser.ai.ai_engine.auditoria.service.ServicioAuditoria;
 import com.renaser.ai.ai_engine.parametro.service.ServicioParametros;
+import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.CriterioDeLaRubrica;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.FilaRanking;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.NotaCriterioResponse;
 import com.renaser.ai.ai_engine.perfilintegral.entity.Criterio;
@@ -174,6 +175,59 @@ class ServicioPerfilIntegralPanelImplTest {
         lenient().when(maquina.sigueEnLaEtapa(
                         org.mockito.ArgumentMatchers.any(), eq("PERFIL_INTEGRAL")))
                 .thenReturn(true);
+    }
+
+    // ============ La rúbrica vigente, para el Excel de la prueba ============
+
+    @Test
+    @DisplayName("la rúbrica vigente es la de la versión que la vacante tiene puesta, en su orden y por el guardián de ver_embudo")
+    void laRubricaVigenteEsLaDeLaFicha() {
+        when(alcanceVacante.laVacanteVisible(any(), eq(VACANTE), eq("ver_embudo")))
+                .thenReturn(Vacante.builder().id(VACANTE).organizacionId(ORGANIZACION)
+                        .versionPlantillaPruebaId(VERSION_PRUEBA).build());
+        when(criterios.findByVersionPlantillaPruebaIdOrderByOrden(VERSION_PRUEBA)).thenReturn(List.of(
+                criterioDePrueba(71L, "CAJA", "Manejo y control de caja", "20"),
+                criterioDePrueba(72L, "DIVISAS", "Conocimiento del negocio de divisas", "15")));
+
+        List<CriterioDeLaRubrica> rubrica = servicio.rubricaVigente(quien, VACANTE);
+
+        assertThat(rubrica).containsExactly(
+                new CriterioDeLaRubrica("Manejo y control de caja", "CAJA", new BigDecimal("20")),
+                new CriterioDeLaRubrica("Conocimiento del negocio de divisas", "DIVISAS",
+                        new BigDecimal("15")));
+        // Nada de la tanda: ni intentos ni notas. Es la rúbrica, la haya rendido alguien o no.
+        verifyNoInteractions(intentos, notasCriterio, postulaciones);
+    }
+
+    @Test
+    @DisplayName("con el cuestionario técnico no hay rúbrica vigente, aunque quede una versión puesta")
+    void elCuestionarioNoTieneRubricaVigente() {
+        when(alcanceVacante.laVacanteVisible(any(), eq(VACANTE), eq("ver_embudo")))
+                .thenReturn(Vacante.builder().id(VACANTE).organizacionId(ORGANIZACION)
+                        .versionPlantillaPruebaId(VERSION_PRUEBA)
+                        .instrumentoEtapaTecnica("CUESTIONARIO_TECNICO").build());
+
+        assertThat(servicio.rubricaVigente(quien, VACANTE)).isEmpty();
+        verifyNoInteractions(criterios);
+    }
+
+    @Test
+    @DisplayName("sin prueba puesta no hay rúbrica vigente")
+    void sinPruebaPuestaNoHayRubricaVigente() {
+        // El guardián por defecto devuelve una vacante sin versión de prueba.
+        assertThat(servicio.rubricaVigente(quien, VACANTE)).isEmpty();
+        verifyNoInteractions(criterios);
+    }
+
+    @Test
+    @DisplayName("quien no ve la vacante no ve su rúbrica")
+    void laRubricaPasaPorElGuardian() {
+        when(alcanceVacante.laVacanteVisible(any(), eq(VACANTE), eq("ver_embudo")))
+                .thenThrow(new ResourceNotFoundException("Vacante", "id", VACANTE));
+
+        assertThatThrownBy(() -> servicio.rubricaVigente(quien, VACANTE))
+                .isInstanceOf(ResourceNotFoundException.class);
+        verifyNoInteractions(criterios);
     }
 
     // ============ El ranking de otra etapa ============

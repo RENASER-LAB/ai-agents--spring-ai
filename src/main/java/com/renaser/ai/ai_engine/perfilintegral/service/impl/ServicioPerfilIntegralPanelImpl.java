@@ -14,6 +14,7 @@ import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.AlertaResp
 import com.renaser.ai.ai_engine.pesos.entity.Etapa;
 import com.renaser.ai.ai_engine.pesos.entity.PesoEtapa;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.CalificacionEncoladaResponse;
+import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.CriterioDeLaRubrica;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.FilaRanking;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.HallazgoResponse;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.DatosCandidato;
@@ -734,6 +735,37 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
                 quien.tiene("ver_pretension"), quien.tiene("mover_postulacion"),
                 laVacanteEnsenaSuSueldo,
                 numeradas);
+    }
+
+    /**
+     * La rúbrica de la prueba que la vacante tiene puesta hoy.
+     *
+     * <p>⚠️ <b>En transacción PROPIA ({@code REQUIRES_NEW}), y es lo que permite que quien la
+     * pide sobreviva a un fallo.</b> El Excel de la prueba la pide dentro de su propia
+     * transacción de lectura y, si esto falla, sigue sin columnas de criterio. Pero en una
+     * transacción compartida no hay «seguir»: la excepción marca la transacción entera para
+     * deshacer al cruzar este método, el Excel ya no puede confirmarla y la descarga acaba
+     * en un 500 por un detalle que no la necesitaba. Con la suya, lo que falla se deshace
+     * aquí solo. El precio es una conexión más durante una consulta corta, y solo en esa
+     * descarga: el ranking del panel no pasa por aquí.
+     *
+     * <p>El guardián es el mismo que el del ranking ({@code ver_embudo}, con su alcance), y
+     * no escribe nada.
+     */
+    @Override
+    @Transactional(readOnly = true,
+            propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+    public List<CriterioDeLaRubrica> rubricaVigente(ContextoUsuario quien, Long vacanteId) {
+        Vacante vacante = vacanteVisible(quien, vacanteId, "ver_embudo");
+        Long vigente = vacante.getVersionPlantillaPruebaId();
+        // El cuestionario técnico no reparte puntos entre criterios, así que no tiene rúbrica
+        // que enseñar aunque la vacante conserve una versión puesta de antes (V43).
+        if (vigente == null || CUESTIONARIO_TECNICO.equals(vacante.getInstrumentoEtapaTecnica())) {
+            return List.of();
+        }
+        return criterios.findByVersionPlantillaPruebaIdOrderByOrden(vigente).stream()
+                .map(c -> new CriterioDeLaRubrica(c.getNombre(), c.getCodigo(), c.getPuntos()))
+                .toList();
     }
 
     /**

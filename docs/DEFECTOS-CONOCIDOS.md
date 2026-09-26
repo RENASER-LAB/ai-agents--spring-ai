@@ -349,6 +349,39 @@ reglas del sueldo están en [El sueldo, de los dos lados](EL-SUELDO-DE-LOS-DOS-L
 
 ---
 
+## 15 · En una vacante que cambió de prueba con gente dentro, la tabla y el Excel no cuentan lo mismo
+
+**Qué le pasa a alguien.** En la vacante 13, quien enciende «Ver los criterios en la tabla» en la
+pestaña «Prueba del puesto» ve, detrás de los 7 criterios de la prueba de Administrador, las 4
+columnas de la prueba demo —«Criterio de priorización», «Qué deja fuera», «Claridad» y «Reacción
+al cambio»—, vacías para casi todos. El Excel de esa pestaña, desde el 26/09/2026, ya solo trae
+las 7 de Administrador: pantalla y hoja tienen columnas distintas. Y en la hoja quedan dos
+límites aceptados:
+
+- quien rindió la demo y tiene nota de etapa sigue mostrando esa cifra, que es de otra prueba,
+  en «Nota Examen Técnico» y «Nota Combinada», al lado de quienes rindieron la vigente. En las
+  20 filas descargadas el 24/09 no hay ninguna nota en los criterios de la demo; del resto de la
+  tanda no se sabe;
+- un criterio de la demo con el mismo nombre, código y techo que uno de Administrador llenaría
+  la celda de este. En la vacante 13 no pasa: ninguno coincide.
+
+**Por qué pasa.** La vacante tenía puesta la demo y se cambió a la de Administrador cuando al
+menos dos candidatos ya la habían abierto. Cada uno queda atado a la versión con la que abrió su
+prueba (RF-90). La tabla arma sus columnas juntando las rúbricas de todas las filas; la hoja las
+saca de la prueba vigente de la vacante, y las notas de la demo van en su «Justificación
+detallada». Las celdas se emparejan por nombre, código y techo desde el 16/09. No aparecerán
+casos nuevos: desde el 27/08 una vacante con postulantes no puede cambiar de prueba.
+
+**No es un olvido, es el alcance que se decidió** el 25/09/2026 para mantener mínimo el arreglo
+del Excel: la tabla, marcar a quien rindió otra prueba y su nota combinada o su lugar en el orden
+quedaron fuera. Ninguna nota se pierde ni se recalcula.
+
+**Qué haría falta.** Que la tabla del panel saque también las columnas de la prueba vigente, y
+decidir qué se hace con quien rindió la anterior: marcarlo, apartar su nota del orden o dejarlo
+como está. Es otra spec.
+
+---
+
 ## Documentos relacionados
 
 - [El modelo cambió de nombre](EL-MODELO-CAMBIO-DE-NOMBRE.md) — de dónde salen el 8 y el 9

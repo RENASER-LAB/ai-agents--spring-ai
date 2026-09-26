@@ -91,6 +91,7 @@ verdad de las nuevas y conviene saber dónde vive:
 | El reloj de la etapa técnica y sus dos instrumentos | `ServicioPruebaImplTest` · `ServicioEvaluacionImplTest` · `RelojDeLaEtapaTecnicaQaTest` |
 | Que la guía de calificación no pueda mandar sobre la rúbrica | `AgentePruebaPuestoGuiaHostilTest` |
 | Corregir una vacante (19/09): qué cambió, quién sigue en carrera, un solo aviso sin correo, el alcance del rol y el sueldo por sus dos puertas | `CambiosDeLaVacanteTest` · `PostulacionesEnCarreraTest` · `EditarVacanteTest` · `FlujoRemuneracionIT` |
+| El Excel del ranking (26/09): las columnas de la prueba vigente, las notas de otra versión en la justificación, la descarga que sigue si la rúbrica no se lee y la altura de la cabecera. La vacante con dos versiones se siembra por SQL, porque la API ya no deja fabricarla | `ServicioExcelRankingImplTest` · `LineasDeRotuloTest` · `FlujoExcelDelRankingIT` |
 
 ⚠️ **Uno de esos tests está saltado a propósito y señala un defecto abierto**: el método
 `elCambioInesperadoCabeDentroDelReloj` de `RelojDeLaEtapaTecnicaQaTest`. La clase **no** está

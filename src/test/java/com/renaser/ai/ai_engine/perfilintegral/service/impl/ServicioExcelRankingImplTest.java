@@ -2,6 +2,7 @@ package com.renaser.ai.ai_engine.perfilintegral.service.impl;
 
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosExcelRanking.ExcelDeRanking;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosExcelRanking.PedidoExcelRanking;
+import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.CriterioDeLaRubrica;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.DatosCandidato;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.FilaRanking;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.Ponderado;
@@ -47,6 +48,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -217,6 +220,7 @@ class ServicioExcelRankingImplTest {
         when(tandas.ranking(any(), eq(13L), eq("PRUEBA_PUESTO"))).thenReturn(tanda(
                 deLaPrueba(427L, "Ana Quispe", rubrica("Divisas", "12", "15"))));
 
+        laVigenteEs(rubrica("Divisas", "12", "15"));
         byte[] libro = servicio.generar(quien("ver_embudo"), 13L,
                 new PedidoExcelRanking("PRUEBA_PUESTO", List.of(427L), null)).contenido();
 
@@ -256,6 +260,7 @@ class ServicioExcelRankingImplTest {
         when(tandas.ranking(any(), eq(13L), eq("PRUEBA_PUESTO"))).thenReturn(tanda(
                 sinPonderado(deLaPrueba(427L, "Ana Quispe", rubrica("Divisas", "12", "15")))));
 
+        laVigenteEs(rubrica("Divisas", "12", "15"));
         byte[] libro = servicio.generar(quien("ver_embudo"), 13L,
                 new PedidoExcelRanking("PRUEBA_PUESTO", List.of(427L), null)).contenido();
 
@@ -295,6 +300,8 @@ class ServicioExcelRankingImplTest {
                         rubrica("Conocimiento del negocio de divisas", "14", "15"),
                         rubrica("Control de caja", "19", "20"))));
 
+        laVigenteEs(rubrica("Conocimiento del negocio de divisas", "14", "15"),
+                rubrica("Control de caja", "19", "20"));
         byte[] libro = servicio.generar(quien("ver_embudo"), 13L,
                 new PedidoExcelRanking("PRUEBA_PUESTO", List.of(427L), null)).contenido();
 
@@ -306,9 +313,9 @@ class ServicioExcelRankingImplTest {
     }
 
     /*
-     * Las columnas salen de las FILAS y no de un catálogo: en la prueba del puesto la rúbrica
-     * es la de esa vacante. Con un candidato que no rindió un criterio, la columna tiene que
-     * seguir existiendo —la trae el otro— y su celda quedarse vacía.
+     * En la prueba del puesto las columnas salen de la rúbrica vigente de la vacante. Con un
+     * candidato que no tiene nota en un criterio, la columna sigue existiendo —es de la
+     * rúbrica— y su celda se queda vacía.
      */
     @Test
     @DisplayName("quien no tiene un criterio deja esa celda VACÍA, no «rúbrica incompleta»")
@@ -318,6 +325,7 @@ class ServicioExcelRankingImplTest {
                         rubrica("Divisas", "14", "15"), rubrica("Control de caja", "19", "20")),
                 deLaPrueba(422L, "Bruno Diaz", rubrica("Divisas", "8", "15"))));
 
+        laVigenteEs(rubrica("Divisas", "14", "15"), rubrica("Control de caja", "19", "20"));
         byte[] libro = servicio.generar(quien("ver_embudo"), 13L,
                 new PedidoExcelRanking("PRUEBA_PUESTO", List.of(427L, 422L), null)).contenido();
 
@@ -332,6 +340,7 @@ class ServicioExcelRankingImplTest {
                 deLaPrueba(427L, "Ana Quispe", rubrica("Divisas", "14", "15")),
                 sinCriterios(deLaPrueba(422L, "Bruno Diaz"))));
 
+        laVigenteEs(rubrica("Divisas", "14", "15"));
         byte[] libro = servicio.generar(quien("ver_embudo"), 13L,
                 new PedidoExcelRanking("PRUEBA_PUESTO", List.of(427L, 422L), null)).contenido();
 
@@ -350,20 +359,124 @@ class ServicioExcelRankingImplTest {
     @Test
     @DisplayName("el mismo criterio con dos techos son DOS columnas, cada una con el suyo")
     void dosTechosSonDosColumnas() {
+        // En el perfil integral, que es donde las columnas siguen saliendo de juntar las de
+        // las filas. En la prueba mandan las de la vigente: ver la siguiente.
+        when(tandas.ranking(any(), eq(13L), eq("PERFIL_INTEGRAL"))).thenReturn(tanda(
+                delPerfil(427L, "Ana Quispe", rubrica("Divisas", "14", "15")),
+                delPerfil(422L, "Bruno Diaz", rubrica("Divisas", "18", "20"))));
+
+        byte[] libro = servicio.generar(quien("ver_embudo"), 13L,
+                new PedidoExcelRanking("PERFIL_INTEGRAL", List.of(427L, 422L), null)).contenido();
+
+        assertThat(celda(libro, 0, 6)).isEqualTo("Divisas (pts /15)");
+        assertThat(celda(libro, 0, 7)).isEqualTo("Divisas (pts /20)");
+        // Y cada puntaje cae bajo SU techo, no bajo el del otro.
+        assertThat(celda(libro, 1, 6)).isEqualTo("14");
+        assertThat(celda(libro, 1, 7)).isEmpty();
+        assertThat(celda(libro, 2, 6)).isEmpty();
+        assertThat(celda(libro, 2, 7)).isEqualTo("18");
+    }
+
+    /*
+     * ⚠️ **La vacante 13, en pequeño.** Cambió de prueba cuando ya había gente dentro: cada
+     * quien quedó atado a la versión que abrió, y juntar las rúbricas de las filas añadía al
+     * archivo las columnas de la anterior, vacías para todos los demás. Ahora mandan las de la
+     * vigente, y lo de la anterior sigue en la justificación de quien la rindió.
+     */
+    @Test
+    @DisplayName("en la prueba solo salen las columnas de la vigente; lo de la anterior va a la justificación")
+    void enLaPruebaSoloSalenLasDeLaVigente() {
+        NotaCriterioResponse deLaAnterior = new NotaCriterioResponse("Criterio de priorización",
+                "CRITERIO", new BigDecimal("30"), new BigDecimal("40"), new BigDecimal("40"),
+                "ordenó con motivo", "AGENTE", null, null);
         when(tandas.ranking(any(), eq(13L), eq("PRUEBA_PUESTO"))).thenReturn(tanda(
-                deLaPrueba(427L, "Ana Quispe", rubrica("Divisas", "14", "15")),
-                deLaPrueba(422L, "Bruno Diaz", rubrica("Divisas", "18", "20"))));
+                deLaPrueba(427L, "Ana Quispe", rubrica("Divisas", "14", "15"),
+                        rubrica("Control de caja", "19", "20")),
+                deLaPrueba(422L, "Bruno Diaz", deLaAnterior)));
+        laVigenteEs(rubrica("Divisas", "0", "15"), rubrica("Control de caja", "0", "20"));
 
         byte[] libro = servicio.generar(quien("ver_embudo"), 13L,
                 new PedidoExcelRanking("PRUEBA_PUESTO", List.of(427L, 422L), null)).contenido();
 
-        assertThat(celda(libro, 0, 7)).isEqualTo("Divisas (pts /15)");
-        assertThat(celda(libro, 0, 8)).isEqualTo("Divisas (pts /20)");
-        // Y cada puntaje cae bajo SU techo, no bajo el del otro.
-        assertThat(celda(libro, 1, 7)).isEqualTo("14");
-        assertThat(celda(libro, 1, 8)).isEmpty();
-        assertThat(celda(libro, 2, 7)).isEmpty();
-        assertThat(celda(libro, 2, 8)).isEqualTo("18");
+        assertThat(cabeceras(libro)).containsExactly(
+                "#", "Candidato", "Correo", "CV", "Teléfono",
+                "Nota Examen Técnico /100", "Nota Perfil Integral /100",
+                "Divisas (pts /15)", "Control de caja (pts /20)",
+                "Nota Combinada /100", "Justificación resumida", "Justificación detallada");
+        assertThat(celdas(libro).get(1).subList(7, 9)).containsExactly("14", "19");
+        // Bruno rindió la anterior: sus celdas de criterio en blanco, porque sus criterios
+        // son otros, y su nota entera en la justificación.
+        assertThat(celdas(libro).get(2).subList(7, 9)).containsExactly("", "");
+        assertThat(celda(libro, 2, 11)).contains("Criterio de priorización (30/40): ordenó con motivo");
+    }
+
+    @Test
+    @DisplayName("en la prueba, las columnas salen aunque el filtro deje fuera a todos los de la vigente")
+    void lasDeLaVigenteSobrevivenAlFiltro() {
+        NotaCriterioResponse deLaAnterior = new NotaCriterioResponse("Claridad", "CLARIDAD",
+                new BigDecimal("12"), new BigDecimal("20"), new BigDecimal("20"),
+                "se entiende", "AGENTE", null, null);
+        when(tandas.ranking(any(), eq(13L), eq("PRUEBA_PUESTO"))).thenReturn(tanda(
+                deLaPrueba(427L, "Ana Quispe", rubrica("Divisas", "14", "15")),
+                deLaPrueba(422L, "Bruno Diaz", deLaAnterior)));
+        laVigenteEs(rubrica("Divisas", "0", "15"));
+
+        // Solo se pide a Bruno, que rindió la anterior.
+        byte[] libro = servicio.generar(quien("ver_embudo"), 13L,
+                new PedidoExcelRanking("PRUEBA_PUESTO", List.of(422L), null)).contenido();
+
+        assertThat(cabeceras(libro)).contains("Divisas (pts /15)")
+                .doesNotContain("Claridad (pts /20)");
+        assertThat(celda(libro, 1, 7)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("en la prueba, sin nadie con nota salen igual las columnas de la vigente, vacías")
+    void laVigenteSaleAunqueNadieHayaRendido() {
+        when(tandas.ranking(any(), eq(13L), eq("PRUEBA_PUESTO"))).thenReturn(tanda(
+                sinCriterios(deLaPrueba(427L, "Ana Quispe"))));
+        laVigenteEs(rubrica("Divisas", "0", "15"), rubrica("Control de caja", "0", "20"));
+
+        byte[] libro = servicio.generar(quien("ver_embudo"), 13L,
+                new PedidoExcelRanking("PRUEBA_PUESTO", List.of(427L), null)).contenido();
+
+        assertThat(cabeceras(libro).subList(7, 9))
+                .containsExactly("Divisas (pts /15)", "Control de caja (pts /20)");
+        assertThat(celdas(libro).get(1).subList(7, 9)).containsExactly("", "");
+    }
+
+    /*
+     * ⚠️ Un fallo al leer la vigente no puede dejar a nadie sin su hoja: las notas siguen en
+     * la justificación y la rejilla es lo único que se pierde.
+     */
+    @Test
+    @DisplayName("si la vigente no se puede leer, el Excel sale sin columnas de criterio y sin error")
+    void siLaVigenteFallaLaHojaSaleIgual() {
+        when(tandas.ranking(any(), eq(13L), eq("PRUEBA_PUESTO"))).thenReturn(tanda(
+                deLaPrueba(427L, "Ana Quispe", rubrica("Divisas", "14", "15"))));
+        when(tandas.rubricaVigente(any(), eq(13L)))
+                .thenThrow(new IllegalStateException("la base no contestó"));
+
+        byte[] libro = servicio.generar(quien("ver_embudo"), 13L,
+                new PedidoExcelRanking("PRUEBA_PUESTO", List.of(427L), null)).contenido();
+
+        assertThat(cabeceras(libro)).containsExactly(
+                "#", "Candidato", "Correo", "CV", "Teléfono",
+                "Nota Examen Técnico /100", "Nota Perfil Integral /100",
+                "Nota Combinada /100", "Justificación resumida", "Justificación detallada");
+        assertThat(celda(libro, 1, 9)).contains("Divisas (14/15): lo explicó bien");
+    }
+
+    @Test
+    @DisplayName("el perfil integral no pregunta por la prueba vigente")
+    void elPerfilNoPreguntaPorLaVigente() {
+        when(tandas.ranking(any(), eq(13L), eq("PERFIL_INTEGRAL"))).thenReturn(tanda(
+                delPerfil(427L, "Ana Quispe", nota("90"))));
+
+        servicio.generar(quien("ver_embudo"), 13L,
+                new PedidoExcelRanking("PERFIL_INTEGRAL", List.of(427L), null));
+
+        verify(tandas, never()).rubricaVigente(any(), any());
     }
 
     /*
@@ -378,6 +491,7 @@ class ServicioExcelRankingImplTest {
                 deLaPrueba(427L, "Ana Quispe", rubrica("Divisas", "14", "15")),
                 deLaPrueba(422L, "Bruno Diaz", rubrica("  divisas ", "9", "15"))));
 
+        laVigenteEs(rubrica("Divisas", "14", "15"));
         byte[] libro = servicio.generar(quien("ver_embudo"), 13L,
                 new PedidoExcelRanking("PRUEBA_PUESTO", List.of(427L, 422L), null)).contenido();
 
@@ -396,6 +510,7 @@ class ServicioExcelRankingImplTest {
         when(tandas.ranking(any(), eq(13L), eq("PRUEBA_PUESTO"))).thenReturn(tanda(
                 deLaPrueba(427L, "Ana Quispe", rubrica("   ", "1", "5"))));
 
+        laVigenteEs(rubrica("   ", "1", "5"));
         byte[] libro = servicio.generar(quien("ver_embudo"), 13L,
                 new PedidoExcelRanking("PRUEBA_PUESTO", List.of(427L), null)).contenido();
 
@@ -414,15 +529,17 @@ class ServicioExcelRankingImplTest {
     @Test
     @DisplayName("las columnas no cambian de sitio al pedir las filas en otro orden")
     void elOrdenDeLasColumnasNoDependeDelDeLasFilas() {
+        // En el perfil integral, donde las columnas salen de las filas. En la prueba salen
+        // de la rúbrica vigente y el orden de las filas no puede tocarlas.
         RankingVacante laTanda = tanda(
-                deLaPrueba(427L, "Ana Quispe", rubrica("Divisas", "14", "15")),
-                deLaPrueba(422L, "Bruno Diaz", rubrica("Caja", "18", "20")));
-        when(tandas.ranking(any(), eq(13L), eq("PRUEBA_PUESTO"))).thenReturn(laTanda);
+                delPerfil(427L, "Ana Quispe", rubrica("Divisas", "14", "15")),
+                delPerfil(422L, "Bruno Diaz", rubrica("Caja", "18", "20")));
+        when(tandas.ranking(any(), eq(13L), eq("PERFIL_INTEGRAL"))).thenReturn(laTanda);
 
         byte[] enUnOrden = servicio.generar(quien("ver_embudo"), 13L,
-                new PedidoExcelRanking("PRUEBA_PUESTO", List.of(427L, 422L), null)).contenido();
+                new PedidoExcelRanking("PERFIL_INTEGRAL", List.of(427L, 422L), null)).contenido();
         byte[] enElOtro = servicio.generar(quien("ver_embudo"), 13L,
-                new PedidoExcelRanking("PRUEBA_PUESTO", List.of(422L, 427L), null)).contenido();
+                new PedidoExcelRanking("PERFIL_INTEGRAL", List.of(422L, 427L), null)).contenido();
 
         assertThat(cabeceras(enUnOrden)).isEqualTo(cabeceras(enElOtro));
     }
@@ -435,8 +552,24 @@ class ServicioExcelRankingImplTest {
                 deLaPrueba(422L, "Bruno Diaz", rubrica("Caja", "18", "20"))));
 
         // Solo se pide a Ana; Bruno, el único con «Caja», se queda fuera del recorte.
+        laVigenteEs(rubrica("Divisas", "14", "15"), rubrica("Caja", "18", "20"));
         byte[] libro = servicio.generar(quien("ver_embudo"), 13L,
                 new PedidoExcelRanking("PRUEBA_PUESTO", List.of(427L), null)).contenido();
+
+        assertThat(cabeceras(libro)).contains("Caja (pts /20)");
+        assertThat(columna(libro, CANDIDATO).subList(1, 2)).containsExactly("Ana Quispe");
+    }
+
+    @Test
+    @DisplayName("en el perfil, la columna que solo trae alguien filtrado sigue en la hoja")
+    void enElPerfilLaColumnaSobreviveAlFiltro() {
+        when(tandas.ranking(any(), eq(13L), eq("PERFIL_INTEGRAL"))).thenReturn(tanda(
+                delPerfil(427L, "Ana Quispe", rubrica("Divisas", "14", "15")),
+                delPerfil(422L, "Bruno Diaz", rubrica("Caja", "18", "20"))));
+
+        // Solo se pide a Ana; Bruno, el único con «Caja», se queda fuera del recorte.
+        byte[] libro = servicio.generar(quien("ver_embudo"), 13L,
+                new PedidoExcelRanking("PERFIL_INTEGRAL", List.of(427L), null)).contenido();
 
         assertThat(cabeceras(libro)).contains("Caja (pts /20)");
         assertThat(columna(libro, CANDIDATO).subList(1, 2)).containsExactly("Ana Quispe");
@@ -453,6 +586,7 @@ class ServicioExcelRankingImplTest {
                 deLaPrueba(427L, "Ana Quispe",
                         rubrica("Divisas", "14", "15"), rubrica("Control de caja", "19", "20"))));
 
+        laVigenteEs(rubrica("Divisas", "14", "15"), rubrica("Control de caja", "19", "20"));
         byte[] libro = servicio.generar(quien("ver_embudo"), 13L,
                 new PedidoExcelRanking("PRUEBA_PUESTO", List.of(427L), null)).contenido();
 
@@ -479,6 +613,7 @@ class ServicioExcelRankingImplTest {
         when(tandas.ranking(any(), eq(13L), eq("PRUEBA_PUESTO"))).thenReturn(tanda(
                 deLaPrueba(427L, "Ana Quispe", corregida)));
 
+        laVigenteEs(corregida);
         byte[] libro = servicio.generar(quien("ver_embudo"), 13L,
                 new PedidoExcelRanking("PRUEBA_PUESTO", List.of(427L), null)).contenido();
 
@@ -1092,6 +1227,7 @@ class ServicioExcelRankingImplTest {
                 deLaPrueba(427L, "Ana Quispe",
                         rubrica("Divisas", "14", "15"), rubrica("Control de caja", "19", "20"))));
 
+        laVigenteEs(rubrica("Divisas", "14", "15"), rubrica("Control de caja", "19", "20"));
         byte[] libro = servicio.generar(quien("ver_embudo"), 13L,
                 new PedidoExcelRanking("PRUEBA_PUESTO", List.of(427L), null)).contenido();
 
@@ -1150,6 +1286,7 @@ class ServicioExcelRankingImplTest {
         when(tandas.ranking(any(), eq(13L), eq("PRUEBA_PUESTO"))).thenReturn(tanda(
                 deLaPrueba(427L, "Ana Quispe", kilometrica)));
 
+        laVigenteEs(kilometrica);
         byte[] libro = servicio.generar(quien("ver_embudo"), 13L,
                 new PedidoExcelRanking("PRUEBA_PUESTO", List.of(427L), null)).contenido();
 
@@ -1178,6 +1315,7 @@ class ServicioExcelRankingImplTest {
             when(tandas.ranking(any(), eq(13L), eq("PRUEBA_PUESTO"))).thenReturn(tanda(
                     deLaPrueba(427L, "Ana Quispe", conEmojis)));
 
+            laVigenteEs(conEmojis);
             byte[] libro = servicio.generar(quien("ver_embudo"), 13L,
                     new PedidoExcelRanking("PRUEBA_PUESTO", List.of(427L), null)).contenido();
 
@@ -1205,6 +1343,7 @@ class ServicioExcelRankingImplTest {
                 deLaPrueba(427L, "Ana Quispe", rubrica("Divisas", "14", "15")),
                 deLaPrueba(422L, "Bruno Diaz", conEscala)));
 
+        laVigenteEs(rubrica("Divisas", "14", "15"));
         byte[] libro = servicio.generar(quien("ver_embudo"), 13L,
                 new PedidoExcelRanking("PRUEBA_PUESTO", List.of(427L, 422L), null)).contenido();
 
@@ -1285,6 +1424,7 @@ class ServicioExcelRankingImplTest {
         when(tandas.ranking(any(), eq(13L), eq("PRUEBA_PUESTO"))).thenReturn(tanda(
                 deLaPrueba(427L, "Ana Quispe", conNombrazo)));
 
+        laVigenteEs(conNombrazo);
         byte[] libro = servicio.generar(quien("ver_embudo"), 13L,
                 new PedidoExcelRanking("PRUEBA_PUESTO", List.of(427L), null)).contenido();
 
@@ -1347,6 +1487,7 @@ class ServicioExcelRankingImplTest {
         when(tandas.ranking(any(), eq(13L), eq("PRUEBA_PUESTO"))).thenReturn(tanda(
                 deLaPrueba(427L, "Ana Quispe", oral, escrita)));
 
+        laVigenteEs(oral, escrita);
         byte[] libro = servicio.generar(quien("ver_embudo"), 13L,
                 new PedidoExcelRanking("PRUEBA_PUESTO", List.of(427L), null)).contenido();
 
@@ -1377,6 +1518,7 @@ class ServicioExcelRankingImplTest {
         when(tandas.ranking(any(), eq(13L), eq("PRUEBA_PUESTO"))).thenReturn(tanda(
                 deLaPrueba(427L, "Ana Quispe", muda1, muda2)));
 
+        laVigenteEs(muda1, muda2);
         byte[] libro = servicio.generar(quien("ver_embudo"), 13L,
                 new PedidoExcelRanking("PRUEBA_PUESTO", List.of(427L), null)).contenido();
 
@@ -1410,19 +1552,49 @@ class ServicioExcelRankingImplTest {
         NotaCriterioResponse deLaV2 = new NotaCriterioResponse("Control de caja", "C2",
                 new BigDecimal("5"), new BigDecimal("20"), new BigDecimal("20"),
                 "flojo", "AGENTE", null, null);
+        // En el perfil integral, que es donde las columnas siguen juntándose de las filas.
+        when(tandas.ranking(any(), eq(13L), eq("PERFIL_INTEGRAL"))).thenReturn(tanda(
+                delPerfil(427L, "Ana Quispe", deLaV1),
+                delPerfil(422L, "Bruno Diaz", deLaV2)));
+
+        byte[] libro = servicio.generar(quien("ver_embudo"), 13L,
+                new PedidoExcelRanking("PERFIL_INTEGRAL", List.of(427L, 422L), null)).contenido();
+
+        assertThat(cabeceras(libro)).contains("Comunicación (pts /20)", "Control de caja (pts /20)");
+        // Y cada puntaje bajo el nombre de SU criterio, con el hueco del otro.
+        assertThat(celda(libro, 1, 6)).isEqualTo("18");
+        assertThat(celda(libro, 1, 7)).isEmpty();
+        assertThat(celda(libro, 2, 6)).isEmpty();
+        assertThat(celda(libro, 2, 7)).isEqualTo("5");
+    }
+
+    /*
+     * Lo mismo en la prueba, contra la vigente: el «C2» de la versión anterior no llena la
+     * columna del «C2» de la vigente, porque el nombre no coincide. Su nota no se pierde: va a
+     * la justificación.
+     */
+    @Test
+    @DisplayName("en la prueba, el mismo código de la versión anterior no llena la columna de la vigente")
+    void elCodigoDeLaAnteriorNoLlenaLaVigente() {
+        NotaCriterioResponse deLaV1 = new NotaCriterioResponse("Comunicación", "C2",
+                new BigDecimal("18"), new BigDecimal("20"), new BigDecimal("20"),
+                "clara", "AGENTE", null, null);
+        NotaCriterioResponse deLaV2 = new NotaCriterioResponse("Control de caja", "C2",
+                new BigDecimal("5"), new BigDecimal("20"), new BigDecimal("20"),
+                "flojo", "AGENTE", null, null);
         when(tandas.ranking(any(), eq(13L), eq("PRUEBA_PUESTO"))).thenReturn(tanda(
                 deLaPrueba(427L, "Ana Quispe", deLaV1),
                 deLaPrueba(422L, "Bruno Diaz", deLaV2)));
+        laVigenteEs(deLaV2);
 
         byte[] libro = servicio.generar(quien("ver_embudo"), 13L,
                 new PedidoExcelRanking("PRUEBA_PUESTO", List.of(427L, 422L), null)).contenido();
 
-        assertThat(cabeceras(libro)).contains("Comunicación (pts /20)", "Control de caja (pts /20)");
-        // Y cada puntaje bajo el nombre de SU criterio, con el hueco del otro.
-        assertThat(celda(libro, 1, 7)).isEqualTo("18");
-        assertThat(celda(libro, 1, 8)).isEmpty();
-        assertThat(celda(libro, 2, 7)).isEmpty();
-        assertThat(celda(libro, 2, 8)).isEqualTo("5");
+        assertThat(cabeceras(libro)).contains("Control de caja (pts /20)")
+                .doesNotContain("Comunicación (pts /20)");
+        assertThat(celda(libro, 1, 7)).isEmpty();
+        assertThat(celda(libro, 2, 7)).isEqualTo("5");
+        assertThat(celda(libro, 1, 10)).contains("Comunicación (18/20): clara");
     }
 
     /*
@@ -1444,6 +1616,7 @@ class ServicioExcelRankingImplTest {
                 deLaPrueba(427L, "Ana Quispe", normal),
                 deLaPrueba(422L, "Bruno Diaz", conRotuloPegado)));
 
+        laVigenteEs(normal, conRotuloPegado);
         byte[] libro = servicio.generar(quien("ver_embudo"), 13L,
                 new PedidoExcelRanking("PRUEBA_PUESTO", List.of(427L, 422L), null)).contenido();
 
@@ -1493,6 +1666,7 @@ class ServicioExcelRankingImplTest {
         when(tandas.ranking(any(), eq(13L), eq("PRUEBA_PUESTO"))).thenReturn(tanda(
                 deLaPrueba(427L, "Ana Quispe", sinCodigo1, sinCodigo2)));
 
+        laVigenteEs(sinCodigo1, sinCodigo2);
         byte[] libro = servicio.generar(quien("ver_embudo"), 13L,
                 new PedidoExcelRanking("PRUEBA_PUESTO", List.of(427L), null)).contenido();
 
@@ -1574,6 +1748,151 @@ class ServicioExcelRankingImplTest {
     }
 
     // ========================================================================
+    // La cabecera se lee entera
+    // ========================================================================
+
+    /** La rúbrica de Administrador de la vacante 13, tal como está en producción. */
+    private static final NotaCriterioResponse[] ADMINISTRADOR = {
+            rubrica("Experiencia y magnitud de lo administrado", "0", "15"),
+            rubrica("Manejo y control de caja", "0", "20"),
+            rubrica("Conocimiento del negocio de divisas", "0", "15"),
+            rubrica("Supervisión de múltiples sedes", "0", "15"),
+            rubrica("Gestión de personal", "0", "15"),
+            rubrica("Coordinación contable y financiera", "0", "10"),
+            rubrica("Orientación a resultados y plan de crecimiento", "0", "10")};
+
+    /*
+     * ⚠️ El ajuste de texto ya estaba encendido y no bastaba: una fila sin altura se abre con
+     * la de una línea en Excel y en LibreOffice. La altura tiene que ir ESCRITA en el archivo
+     * —`customHeight`—, no depender de que el programa la recalcule al abrir.
+     */
+    @Test
+    @DisplayName("la cabecera de la prueba lleva su altura escrita, suficiente para el rótulo más largo")
+    void laCabeceraDeLaPruebaLlevaSuAltura() {
+        when(tandas.ranking(any(), eq(13L), eq("PRUEBA_PUESTO"))).thenReturn(tanda(
+                sinCriterios(deLaPrueba(427L, "Ana Quispe"))));
+        laVigenteEs(ADMINISTRADOR);
+
+        byte[] contenido = servicio.generar(quien("ver_embudo"), 13L,
+                new PedidoExcelRanking("PRUEBA_PUESTO", List.of(427L), null)).contenido();
+
+        leyendo(contenido, libro -> {
+            org.apache.poi.xssf.usermodel.XSSFRow cabecera = libro.getSheet(DATOS).getRow(0);
+            assertThat(cabecera.getCTRow().getCustomHeight()).isTrue();
+            // «Orientación a resultados y plan de crecimiento (pts /10)» en 14 caracteres de
+            // ancho son cinco líneas: «Orientación a / resultados y / plan de / crecimiento /
+            // (pts /10)». Quince puntos cada una, la línea de Calibri 11.
+            assertThat(cabecera.getHeightInPoints()).isEqualTo(5 * 15f);
+            return null;
+        });
+    }
+
+    @Test
+    @DisplayName("la cabecera del perfil integral también lleva su altura escrita")
+    void laCabeceraDelPerfilLlevaSuAltura() {
+        when(tandas.ranking(any(), eq(13L), eq("PERFIL_INTEGRAL"))).thenReturn(tanda(
+                delPerfil(427L, "Ana Quispe", new NotaCriterioResponse("Sistemas o procesos creados",
+                        "CV_SISTEMAS", new BigDecimal("70"), null, null, "dejó un proceso",
+                        "AGENTE", null, null))));
+
+        byte[] contenido = servicio.generar(quien("ver_embudo"), 13L,
+                new PedidoExcelRanking("PERFIL_INTEGRAL", List.of(427L), null)).contenido();
+
+        leyendo(contenido, libro -> {
+            org.apache.poi.xssf.usermodel.XSSFRow cabecera = libro.getSheet(DATOS).getRow(0);
+            assertThat(cabecera.getCTRow().getCustomHeight()).isTrue();
+            // «Sistemas o / procesos / creados» son tres líneas en 14 de ancho.
+            assertThat(cabecera.getHeightInPoints()).isEqualTo(3 * 15f);
+            return null;
+        });
+    }
+
+    @Test
+    @DisplayName("la altura sale de los rótulos: nombres cortos dan una cabecera más baja que los largos")
+    void laAlturaSaleDeLosRotulos() {
+        when(tandas.ranking(any(), eq(13L), eq("PRUEBA_PUESTO"))).thenReturn(tanda(
+                sinCriterios(deLaPrueba(427L, "Ana Quispe"))));
+
+        laVigenteEs(rubrica("Caja", "0", "50"), rubrica("Trato", "0", "50"));
+        float corta = altoDeLaCabecera(servicio.generar(quien("ver_embudo"), 13L,
+                new PedidoExcelRanking("PRUEBA_PUESTO", List.of(427L), null)).contenido());
+        laVigenteEs(ADMINISTRADOR);
+        float larga = altoDeLaCabecera(servicio.generar(quien("ver_embudo"), 13L,
+                new PedidoExcelRanking("PRUEBA_PUESTO", List.of(427L), null)).contenido());
+
+        // La corta la deciden las cabeceras fijas: «Nota Examen / Técnico /100» son dos.
+        assertThat(corta).isEqualTo(2 * 15f);
+        assertThat(larga).isGreaterThan(corta);
+    }
+
+    @Test
+    @DisplayName("un rótulo desmesurado deja la cabecera en 8 líneas, con el texto entero en la celda")
+    void elTopeDeOchoLineas() {
+        String desmesurado = "Capacidad demostrada para ".repeat(20).trim();
+        when(tandas.ranking(any(), eq(13L), eq("PRUEBA_PUESTO"))).thenReturn(tanda(
+                sinCriterios(deLaPrueba(427L, "Ana Quispe"))));
+        laVigenteEs(rubrica(desmesurado, "0", "100"));
+
+        byte[] contenido = servicio.generar(quien("ver_embudo"), 13L,
+                new PedidoExcelRanking("PRUEBA_PUESTO", List.of(427L), null)).contenido();
+
+        assertThat(altoDeLaCabecera(contenido)).isEqualTo(8 * 15f);
+        assertThat(celda(contenido, 0, 7)).isEqualTo(desmesurado + " (pts /100)");
+    }
+
+    /*
+     * La altura es lo ÚNICO que cambia en la cabecera: los anchos de las columnas son los de
+     * siempre y la primera fila sigue fija al desplazarse. Se comprueba columna a columna en
+     * las dos etapas, contra los números de antes escritos aquí.
+     */
+    @Test
+    @DisplayName("los anchos de columna son los de siempre y la cabecera sigue fija, en las dos etapas")
+    void losAnchosNoCambianYLaCabeceraSigueFija() {
+        when(tandas.ranking(any(), eq(13L), eq("PRUEBA_PUESTO"))).thenReturn(tanda(
+                deLaPrueba(427L, "Ana Quispe", rubrica("Divisas", "14", "15"),
+                        rubrica("Control de caja", "19", "20"))));
+        when(tandas.ranking(any(), eq(13L), eq("PERFIL_INTEGRAL"))).thenReturn(tanda(
+                delPerfil(427L, "Ana Quispe", nota("90"))));
+        laVigenteEs(rubrica("Divisas", "14", "15"), rubrica("Control de caja", "19", "20"));
+
+        byte[] prueba = servicio.generar(quien("ver_embudo"), 13L,
+                new PedidoExcelRanking("PRUEBA_PUESTO", List.of(427L), null)).contenido();
+        byte[] perfil = servicio.generar(quien("ver_embudo"), 13L,
+                new PedidoExcelRanking("PERFIL_INTEGRAL", List.of(427L), null)).contenido();
+
+        assertThat(anchos(prueba)).containsExactly(5, 34, 32, 30, 18, 15, 16, 14, 14, 17, 48, 90);
+        assertThat(anchos(perfil)).containsExactly(5, 34, 32, 30, 18, 15, 14, 48, 90);
+        for (byte[] contenido : List.of(prueba, perfil)) {
+            leyendo(contenido, libro -> {
+                PaneInformation panel = libro.getSheet(DATOS).getPaneInformation();
+                assertThat(panel).isNotNull();
+                assertThat(panel.isFreezePane()).isTrue();
+                assertThat(panel.getHorizontalSplitPosition()).isEqualTo((short) 1);
+                assertThat(panel.getVerticalSplitPosition()).isZero();
+                return null;
+            });
+        }
+    }
+
+    /** La altura de la fila 1, en puntos. */
+    private static float altoDeLaCabecera(byte[] contenido) {
+        return leyendo(contenido, libro -> libro.getSheet(DATOS).getRow(0).getHeightInPoints());
+    }
+
+    /** El ancho de cada columna con cabecera, en caracteres (el número sin el ×256). */
+    private static List<Integer> anchos(byte[] contenido) {
+        int columnas = cabeceras(contenido).size();
+        return leyendo(contenido, libro -> {
+            Sheet hoja = libro.getSheet(DATOS);
+            List<Integer> suyos = new ArrayList<>();
+            for (int c = 0; c < columnas; c++) {
+                suyos.add(hoja.getColumnWidth(c) / 256);
+            }
+            return suyos;
+        });
+    }
+
+    // ========================================================================
     // Andamio
     // ========================================================================
 
@@ -1589,6 +1908,17 @@ class ServicioExcelRankingImplTest {
         return new RankingVacante(13L, "Analista de datos", "Analista", "JUNIOR",
                 filas.length, filas.length, filas.length, 0, 0, true, true, true,
                 List.of(filas));
+    }
+
+    /**
+     * La rúbrica que la vacante tiene puesta hoy, que es lo que decide las columnas de la
+     * prueba. Se arma con los mismos fixtures que las notas para que nombre, código y techo
+     * casen exactamente: el puntaje de cada uno no se usa.
+     */
+    private void laVigenteEs(NotaCriterioResponse... criterios) {
+        when(tandas.rubricaVigente(any(), eq(13L))).thenReturn(java.util.Arrays.stream(criterios)
+                .map(c -> new CriterioDeLaRubrica(c.criterio(), c.codigo(), c.maximo()))
+                .toList());
     }
 
     /** Un criterio del currículum: los ocho globales, que valen sobre 100. */
