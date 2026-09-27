@@ -270,9 +270,12 @@ Dos endpoints más en `PostulacionesPanelController`:
   pestañas. Sin el parámetro el camino es el de antes, sin una consulta de más.
 - **Lo que se descarga es una hoja, no dos** (16/09/2026). El botón «Descargar Excel», encima de
   la tabla, baja un `.xlsx` con **una sola hoja, «Datos»**, en el formato corto que pidió el
-  cliente: una fila por candidato, **una columna por cada criterio** de la rúbrica que se le
-  aplicó —las mismas que enseña la tabla— y, al final, el resumen de la IA y todas las
-  explicaciones juntas. Antes eran
+  cliente: una fila por candidato, **una columna por cada criterio** y, al final, el resumen de
+  la IA y todas las explicaciones juntas. En el Perfil Integral los criterios son los mismos que
+  enseña la tabla; en la prueba del puesto, desde el 26/09/2026, son los de la prueba que la
+  vacante tiene puesta hoy, y en una vacante que cambió de prueba con gente dentro la tabla
+  enseña además los de la anterior. La fila de cabeceras se abre con altura para leerse entera.
+  Antes eran
   «Resumen» y «Detalle», y la segunda ponía una línea por criterio y por candidato: una tanda de
   ochenta con ocho criterios eran seiscientas cuarenta filas que nadie leía. **La columna «CV»
   lleva un enlace que abre el currículum sin pedir sesión y caduca en unas horas**: quien reciba

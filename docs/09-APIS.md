@@ -375,7 +375,7 @@ panel lleve ya a ellas.
 | GET `/bandeja?espera_a=` | La bandeja: todo lo que espera a `CANDIDATO`, `SISTEMA`, `TALENTO` o `AREA` | `ver_candidatos` |
 | GET `/vacantes/{id}/embudo` | Cuántas postulaciones hay en cada estado | `ver_embudo` |
 | GET `/vacantes/{id}/ranking?etapa=` | La tanda ordenada de más apto a menos, con las ocho notas del currículum de cada uno. **Incluye a quien todavía no tiene nota**. Sin `etapa` ordena por la del Perfil Integral; con ella, por la nota de esa etapa. Cada fila trae además **dónde vive** (`ciudad`, ya escrito «Departamento — Provincia», y `ciudadCodigo`), **su pretensión salarial**, que pide **dos llaves** —`ver_pretension` y que esta vacante publique lo que paga—, y el **`ponderado`** de lo ya rendido (ver la nota de abajo). Desde el 23/09/2026 cada fila, en todas las etapas, trae también **`postuladoEn`**: cuándo se postuló (`postulacion.creado_en`, tal cual). Es lo que deja al panel filtrar por fecha sin pedir nada más; **puede venir nulo** en registros antiguos y no se le inventa fecha. La respuesta trae además **`puedeMoverPostulacion`**, por lo mismo que la ficha: es el único modo que tiene el panel de saber si ofrecer el descarte en lote, porque no hay endpoint de «mis permisos». Con `etapa=PRUEBA_PUESTO` cada fila trae además **`estadoPrueba`** —`CALIFICADA`, `PENDIENTE_CALIFICACION`, `INCOMPLETA` o `NO_APLICA`—, que es lo que deja distinguir una prueba que nadie terminó (o que cerró el sistema al vencer el plazo) de una entregada a mano que espera calificación; en las otras etapas viaja vacío | `ver_embudo` |
-| POST `/vacantes/{id}/ranking/excel` | La tanda seleccionada, en un `.xlsx` de **una sola hoja, llamada «Datos»**, que se descarga como adjunto. Se le pasan `etapa`, los `postulacionIds` **ya ordenados por quien llama** y `filtroDescrito`, la frase que se pintó encima de la tabla. Solo hay columnas para `PERFIL_INTEGRAL` y `PRUEBA_PUESTO`; otra etapa es un 400. **Cada criterio de la rúbrica es una columna** y las explicaciones viajan juntas en la última. ⚠️ La columna «CV» lleva un **enlace firmado que abre el currículum sin pedir sesión** durante unas horas; pide además `descargar_entregables` y, sin ese permiso, va solo el nombre del archivo | `ver_embudo` |
+| POST `/vacantes/{id}/ranking/excel` | La tanda seleccionada, en un `.xlsx` de **una sola hoja, llamada «Datos»**, que se descarga como adjunto. Se le pasan `etapa`, los `postulacionIds` **ya ordenados por quien llama** y `filtroDescrito`, la frase que se pintó encima de la tabla. Solo hay columnas para `PERFIL_INTEGRAL` y `PRUEBA_PUESTO`; otra etapa es un 400. **Cada criterio de la rúbrica es una columna** —en `PRUEBA_PUESTO`, los de la prueba que la vacante tiene puesta hoy (26/09/2026)— y las explicaciones viajan juntas en la última. ⚠️ La columna «CV» lleva un **enlace firmado que abre el currículum sin pedir sesión** durante unas horas; pide además `descargar_entregables` y, sin ese permiso, va solo el nombre del archivo | `ver_embudo` |
 | GET `/postulaciones/{id}` · `/historial` | La ficha completa y el recorrido. La ficha trae además **`puedeMoverPostulacion`**: si quien pregunta tiene `mover_postulacion`. No es un dato del candidato sino una facultad de quien mira —igual que `puedeVerPretension` en el ranking— y existe porque el login solo devuelve token e id, así que el panel no tiene otra forma de saber si pintar el botón de descartar. ⚠️ Dice si el permiso **está**, no hasta dónde llega su alcance: quien pueda abrir fichas de todos y mover solo las suyas verá el botón y recibirá un **404** al pulsarlo. Desde el 14/09 trae también **lo que esa persona pidió ganar al postular aquí**, con las dos llaves de siempre, y cuando no hay nada **dice cuál de los tres motivos es**. ⚠️ Con un fallo abierto: a quien sí tiene el permiso, en una vacante que no publica su sueldo, le dice que su rol no puede verla (ver [Defectos conocidos](DEFECTOS-CONOCIDOS.md), el 14) | `abrir_ficha_candidato` |
 | POST `/postulaciones/{id}/transiciones` | Mover a cualquier estado. **El motivo es obligatorio, sin excepción**. Es también lo que usan **«Descartar»** de la ficha del panel y **«Descartar…»** de la barra que aparece al marcar filas en la tabla: mandan `NO_CONTINUA` y el servicio rellena solo `motivoCierre = DECISION_PERSONA` (para `CERRADA` sería `CIERRE_MANUAL`). ⚠️ Hacia un estado final **esto avisa al candidato por correo** — `NO_CONTINUA` dispara la plantilla `POSTULACION_NO_CONTINUA` en la misma transacción—, y el motivo escrito **no viaja en ese correo**: queda en el historial y la auditoría. **`avisar: false` calla ese correo y solo eso**: el estado cambia, la transición se guarda y la auditoría se escribe igual. Nulo o ausente = avisar, que es lo de siempre. ⚠️ Que no se avisó **queda escrito en los dos sitios donde alguien lo va a buscar**: el motivo guardado termina en « · sin avisar al candidato» —es lo único de la transición que pinta el historial de la ficha— y la auditoría lleva `avisoAlCandidato: NO_ENVIADO`. Sin eso, un descarte silencioso y uno normal se leen igual seis meses después, y si el candidato llama preguntando nadie sabría que nunca se le dijo | `mover_postulacion` |
 | POST `/postulaciones/{id}/confirmacion-avance` | Confirmar que avanza: el sistema calcula el estado siguiente | `confirmar_avance` |
@@ -465,20 +465,45 @@ panel lleve ya a ellas.
 > resumida` y `Justificación detallada`. En la pestaña del Perfil Integral son **las mismas menos
 > la nota técnica y la combinada**: a esas alturas del embudo la prueba todavía no existe para
 > nadie, y esas dos columnas saldrían huecas para casi toda la tanda; ahí las columnas de criterio
-> son las del currículum, que son las notas que esa etapa produce. Las columnas de criterio se
-> arman con **la tanda entera y no con el recorte pedido**, igual que las de la tabla: así el
-> mismo ranking descargado con dos ordenaciones distintas sale con las mismas columnas y en el
-> mismo sitio.
+> son las del currículum, que son las notas que esa etapa produce.
+>
+> **De dónde salen las columnas de criterio.** Nunca del recorte pedido, y cada pestaña a su
+> manera:
+>
+> - **Prueba del puesto** (desde el 26/09/2026): de la **rúbrica que la vacante tiene puesta
+>   hoy**, en su orden y con su rótulo de hoy. Salen siempre, aunque nadie tenga nota todavía y
+>   aunque el filtro deje fuera a todos los que la tienen. Quien rindió una prueba anterior —cada
+>   uno queda atado a la versión con la que abrió la suya (RF-90)— sale con esas celdas en blanco,
+>   y **sus notas siguen enteras en «Justificación detallada»**, criterio a criterio. Sin prueba
+>   puesta, o con el cuestionario técnico, no hay columnas de criterio. Si la rúbrica vigente no se
+>   puede leer, el archivo sale igual sin esas columnas y el fallo queda en el registro: la descarga
+>   no falla por eso. Se lee con el mismo permiso y el mismo alcance que el ranking, y no escribe
+>   nada.
+> - **Perfil Integral**: de **la tanda entera**, igual que la tabla. Así el mismo ranking
+>   descargado con dos ordenaciones distintas sale con las mismas columnas y en el mismo sitio.
+>
+> ⚠️ **En la prueba del puesto la hoja y la tabla pueden no tener las mismas columnas de
+> criterio.** La tabla del panel sigue juntando las rúbricas de sus filas, así que en una vacante
+> que cambió de prueba con gente dentro enseña también las de la anterior, y la hoja no. Es lo
+> decidido; ver [Defectos conocidos](DEFECTOS-CONOCIDOS.md), el 15.
+>
+> **La fila de cabeceras se abre con la altura justa para leerla entera** (26/09/2026), en los dos
+> Excel. La altura va escrita en el archivo —no se deja a Excel o LibreOffice, que la abrían con
+> una sola línea—, y se calcula con los rótulos de ese archivo y los anchos de siempre: una rúbrica
+> de nombres cortos da una cabecera baja, y una de nombres largos, una más alta. Tiene un tope de 8
+> líneas; un rótulo más largo se lee entero al seleccionar su celda. Los anchos de columna no
+> cambian y la cabecera sigue fija al bajar.
 >
 > ⚠️ **Dos columnas nunca llevan el mismo rótulo encima**, y hace falta decirlo porque es fácil
-> que coincidan: una rúbrica puede tener «Comunicación» oral y «Comunicación» escrita, y una tanda
-> que mezcle dos versiones de la misma plantilla puede traer el mismo criterio con distinto techo.
+> que coincidan: una rúbrica puede tener «Comunicación» oral y «Comunicación» escrita.
 > Cuando dos columnas coincidirían en su rótulo, **todas las que coincidan llevan su código entre
 > corchetes** —«Comunicación [COM_ORAL] (pts /20)»—, y si ni con el código se distinguen, un
-> ordinal. Lo que decide si dos notas van a la misma columna son las tres cosas juntas: el nombre,
+> ordinal. Lo que decide si una nota va a una columna son las tres cosas juntas: el nombre,
 > el código y el techo. ⚠️ Las tres hacen falta: **el código de un criterio solo es único dentro de
 > una versión de plantilla**, así que el mismo «C2» puede ser dos criterios distintos en dos
-> versiones, y sin el nombre una nota acabaría leyéndose bajo el criterio equivocado.
+> versiones, y sin el nombre una nota acabaría leyéndose bajo el criterio equivocado. Aun así, un
+> criterio de una prueba anterior que coincida en las tres cosas con uno de la vigente llenaría su
+> celda. Es una limitación aceptada: en la vacante 13 no pasa.
 >
 > **De dónde sale cada justificación.** «Justificación resumida» es el resumen que la IA escribió
 > del candidato. «Justificación detallada» son las explicaciones de cada criterio unidas en una

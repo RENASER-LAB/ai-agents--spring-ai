@@ -1,11 +1,14 @@
 package com.renaser.ai.ai_engine.perfilintegral.service;
 
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.CalificacionEncoladaResponse;
+import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.CriterioDeLaRubrica;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.PerfilIntegralResponse;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.PasadaEncolada;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.EvaluacionReabierta;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.RankingVacante;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
+
+import java.util.List;
 
 /**
  * El Perfil Integral visto desde el panel del equipo.
@@ -94,6 +97,23 @@ public interface ServicioPerfilIntegralPanel {
      * la etapa pedida — quien no la tiene queda al final, como hasta ahora.
      */
     RankingVacante ranking(ContextoUsuario quien, Long vacanteId, String etapaCodigo);
+
+    /**
+     * La rúbrica de la prueba que la vacante tiene puesta HOY, en el orden en que se
+     * escribió.
+     *
+     * <p>No es la de cada candidato: quien abrió su prueba antes de que la vacante cambiara
+     * de versión sigue atado a la suya (RF-90), y el ranking le pinta esa. Esta es la de la
+     * ficha de la vacante, y la usa el Excel de la prueba del puesto para decidir sus
+     * columnas de criterio.
+     *
+     * <p>Pasa por el mismo guardián que el ranking —organización y alcance de
+     * {@code ver_embudo}—: una rúbrica no se le enseña a quien no puede ver la vacante.
+     *
+     * <p>Vacía, y no es un error, cuando la vacante no tiene prueba puesta o rinde el
+     * cuestionario técnico, que no reparte puntos entre criterios. <b>No escribe nada.</b>
+     */
+    List<CriterioDeLaRubrica> rubricaVigente(ContextoUsuario quien, Long vacanteId);
 
     /**
      * Calificar a todos los de la tanda a los que todavía les falta su nota.

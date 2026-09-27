@@ -2,6 +2,7 @@ package com.renaser.ai.ai_engine.perfilintegral.service.impl;
 
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosExcelRanking.ExcelDeRanking;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosExcelRanking.PedidoExcelRanking;
+import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.CriterioDeLaRubrica;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.DatosCandidato;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.FilaRanking;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.Ponderado;
@@ -57,9 +58,19 @@ import java.util.stream.Collectors;
  * El volcado del ranking a un .xlsx de <b>una sola hoja</b>, llamada {@code Datos}.
  *
  * <p><b>De dónde salen los datos.</b> De la misma tanda que pinta la pantalla
- * ({@link ServicioPerfilIntegralPanel#ranking}). No se toca ningún repositorio: así el filtro
- * por organización y el alcance del permiso los sigue aplicando el mismo guardián de siempre,
- * y este volcado no puede enseñar una fila que la pantalla no enseñaría.
+ * ({@link ServicioPerfilIntegralPanel#ranking}) y, en la prueba del puesto, de la rúbrica que
+ * la vacante tiene puesta hoy ({@link ServicioPerfilIntegralPanel#rubricaVigente}). No se
+ * toca ningún repositorio: así el filtro por organización y el alcance del permiso los sigue
+ * aplicando el mismo guardián de siempre, y este volcado no puede enseñar una fila que la
+ * pantalla no enseñaría.
+ *
+ * <p>⚠️ <b>Las columnas de criterio de la prueba del puesto NO son las de la pantalla.</b>
+ * La tabla del panel junta las rúbricas de todas las filas, y en una vacante que cambió de
+ * prueba cuando ya había gente dentro eso le añade las columnas de la prueba anterior, vacías
+ * para todos los demás. Este archivo saca solo las de la prueba vigente
+ * ({@link #criteriosDeLaPruebaVigente}); las notas de la anterior siguen en «Justificación
+ * detallada». En el perfil integral sí coinciden: sus criterios son los ocho globales del
+ * currículum y salen de las filas, como en la tabla.
  *
  * <p><b>Por qué una hoja y no dos.</b> Hasta la plantilla nueva eran {@code Resumen} y
  * {@code Detalle}: la segunda ponía una línea por criterio y por candidato, así que una tanda
@@ -177,20 +188,25 @@ public class ServicioExcelRankingImpl implements ServicioExcelRanking {
         }
 
         /*
-          ⚠️ **Las columnas de criterio salen de la TANDA ENTERA y las filas del recorte
-          pedido.** Son dos listas distintas a propósito, y confundirlas rompe dos cosas:
+          ⚠️ **Las columnas de criterio NUNCA salen del recorte pedido**, y las filas sí. Son
+          dos listas distintas a propósito:
 
           <ul>
-            <li>Con el recorte, el orden de las columnas lo decidiría el orden de las FILAS,
-                así que la misma tanda descargada dos veces con distinta ordenación saldría
-                con las columnas cambiadas de sitio.
-            <li>Y la tabla del panel arma sus columnas de criterio con las filas SIN filtrar
-                —a propósito, y está escrito allí—. Si un filtro deja fuera a la única persona
-                que tiene puntuado un criterio, la pantalla sigue enseñando esa columna; con
-                el recorte, el archivo se la comería y dejaría de parecerse a la pantalla.
+            <li>En la prueba del puesto salen de la rúbrica VIGENTE de la vacante. Así salen
+                aunque nadie tenga nota todavía y aunque el filtro deje fuera a todos los que
+                la tienen, y no sale ninguna de una prueba anterior que alguien rindió antes
+                del cambio.
+            <li>En el perfil integral salen de la TANDA ENTERA, como en la tabla del panel.
+                Con el recorte, el orden de las columnas lo decidiría el orden de las FILAS
+                —la misma tanda descargada dos veces con distinta ordenación saldría con las
+                columnas cambiadas de sitio— y un filtro que dejara fuera a la única persona
+                con un criterio puntuado se comería esa columna.
           </ul>
         */
-        byte[] contenido = escribir(quien, etapa, enElOrdenPedido, tanda.filas(), ajenas,
+        List<Criterio> criterios = PRUEBA_PUESTO.equals(etapa)
+                ? criteriosDeLaPruebaVigente(quien, vacanteId)
+                : criteriosDeLaTanda(tanda.filas());
+        byte[] contenido = escribir(quien, etapa, enElOrdenPedido, criterios, ajenas,
                 pedido.filtroDescrito());
         return new ExcelDeRanking(nombreDelArchivo(etapa, vacanteId), contenido);
     }
@@ -206,7 +222,7 @@ public class ServicioExcelRankingImpl implements ServicioExcelRanking {
     // ========================================================================
 
     private byte[] escribir(ContextoUsuario quien, String etapa, List<FilaRanking> filas,
-                            List<FilaRanking> laTandaEntera, List<Long> ajenas,
+                            List<Criterio> criterios, List<Long> ajenas,
                             String filtroDescrito) {
         try (XSSFWorkbook libro = new XSSFWorkbook();
              ByteArrayOutputStream salida = new ByteArrayOutputStream()) {
@@ -214,7 +230,6 @@ public class ServicioExcelRankingImpl implements ServicioExcelRanking {
             Sheet hoja = libro.createSheet(HOJA);
 
             boolean deLaPrueba = PRUEBA_PUESTO.equals(etapa);
-            List<Criterio> criterios = criteriosDeLaTanda(laTandaEntera);
             boolean veElCv = quien.tiene(PERMISO_CV);
             Map<Long, EnlaceArchivo> enlaces = veElCv ? enlacesDelCv(quien, filas) : Map.of();
 
@@ -291,15 +306,16 @@ public class ServicioExcelRankingImpl implements ServicioExcelRanking {
     }
 
     /**
-     * Los criterios que se pintan, uno por columna, en el orden en que aparecen.
+     * Los criterios del perfil integral, uno por columna, en el orden en que aparecen.
      *
-     * <p>Salen de las propias filas y no de un catálogo: en la prueba del puesto la rúbrica
-     * es la de ESA vacante, así que dos vacantes traen columnas distintas y no hay lista fija
-     * que consultar. Es la misma regla que sigue la tabla del panel, y por eso el archivo
-     * sale con las mismas columnas que la pantalla desde la que se pidió.
+     * <p>Salen de las propias filas y no de un catálogo, que es la misma regla que sigue la
+     * tabla del panel: en esta etapa el archivo sale con las mismas columnas que la pantalla
+     * desde la que se pidió. ⚠️ <b>En la prueba del puesto ya no</b>: allí mandan los de la
+     * rúbrica vigente ({@link #criteriosDeLaPruebaVigente}), porque juntar los de las filas
+     * arrastra las columnas de una prueba que la vacante ya no tiene puesta.
      *
-     * <p>Se indexan por {@link Clave} —el código de la rúbrica cuando lo hay— y gana el
-     * primero que aparece. Después se desambiguan los rótulos que hayan quedado repetidos.
+     * <p>Se indexan por {@link Clave} —nombre, código y techo— y gana el primero que
+     * aparece. Después se desambiguan los rótulos que hayan quedado repetidos.
      */
     private List<Criterio> criteriosDeLaTanda(List<FilaRanking> filas) {
         Map<Clave, Criterio> porClave = new LinkedHashMap<>();
@@ -314,6 +330,54 @@ public class ServicioExcelRankingImpl implements ServicioExcelRanking {
             }
         }
         return desambiguados(List.copyOf(porClave.values()));
+    }
+
+    /**
+     * Los criterios de la prueba del puesto: los de la rúbrica que la vacante tiene puesta
+     * HOY, en el orden de la rúbrica y con el rótulo de hoy.
+     *
+     * <p>No se juntan los de las filas. Cada candidato queda atado a la versión con la que
+     * abrió su prueba (RF-90), así que en una vacante que cambió de prueba con gente dentro
+     * las filas traen dos rúbricas, y juntarlas añadía al archivo las columnas de la anterior
+     * —vacías para todos los que rindieron la nueva—. Con la vigente:
+     *
+     * <ul>
+     *   <li>las columnas salen aunque nadie tenga nota y aunque el filtro deje fuera a todos
+     *       los que la tienen;
+     *   <li>quien rindió la anterior sale con esas celdas en blanco, porque sus criterios son
+     *       otros, y sus notas siguen enteras en «Justificación detallada»;
+     *   <li>sin prueba puesta, o con el cuestionario técnico, no hay columnas de criterio.
+     * </ul>
+     *
+     * <p>⚠️ <b>Las celdas se emparejan con la misma {@link Clave} que siempre</b> —nombre,
+     * código y techo—, así que un criterio de la anterior idéntico en las tres cosas a uno de
+     * la vigente llena su celda. Es una limitación aceptada: ninguna vacante real la cumple.
+     *
+     * <p><b>Si la rúbrica no se puede leer, el archivo sale igual, sin columnas de
+     * criterio</b>, y el fallo queda en el registro: las notas siguen en la justificación y
+     * perder la rejilla no justifica dejar a nadie sin su hoja. La lectura va en transacción
+     * propia precisamente para que su fallo no arrastre a esta.
+     */
+    private List<Criterio> criteriosDeLaPruebaVigente(ContextoUsuario quien, Long vacanteId) {
+        try {
+            List<CriterioDeLaRubrica> rubrica = tandas.rubricaVigente(quien, vacanteId);
+            Map<Clave, Criterio> porClave = new LinkedHashMap<>();
+            if (rubrica != null) {
+                for (CriterioDeLaRubrica suyo : rubrica) {
+                    if (suyo == null) {
+                        continue;
+                    }
+                    Criterio criterio = Criterio.de(suyo.nombre(), suyo.codigo(), suyo.puntos());
+                    porClave.putIfAbsent(criterio.clave(), criterio);
+                }
+            }
+            return desambiguados(List.copyOf(porClave.values()));
+        } catch (RuntimeException noSePudo) {
+            log.warn("No se pudo leer la prueba vigente de la vacante {}: el Excel de la prueba "
+                    + "sale sin columnas de criterio y las notas siguen en «Justificación "
+                    + "detallada»", vacanteId, noSePudo);
+            return List.of();
+        }
     }
 
     /**
@@ -418,10 +482,17 @@ public class ServicioExcelRankingImpl implements ServicioExcelRanking {
         private static final String SIN_NOMBRE = "(criterio sin nombre)";
 
         static Criterio de(NotaCriterioResponse nota) {
-            String suyo = nota.criterio() == null ? "" : nota.criterio().trim();
-            String suCodigo = nota.codigo() == null ? "" : nota.codigo().trim();
-            return new Criterio(suyo.isEmpty() ? SIN_NOMBRE : suyo, suCodigo, nota.maximo(),
-                    false, 0);
+            return de(nota.criterio(), nota.codigo(), nota.maximo());
+        }
+
+        /**
+         * El mismo criterio escrito igual venga de una nota o de la rúbrica: si las dos
+         * formas limpiaran distinto, la cabecera y la celda dejarían de casar.
+         */
+        static Criterio de(String nombre, String codigo, BigDecimal maximo) {
+            String suyo = nombre == null ? "" : nombre.trim();
+            String suCodigo = codigo == null ? "" : codigo.trim();
+            return new Criterio(suyo.isEmpty() ? SIN_NOMBRE : suyo, suCodigo, maximo, false, 0);
         }
 
         Clave clave() {
@@ -564,8 +635,10 @@ public class ServicioExcelRankingImpl implements ServicioExcelRanking {
         }
         StringBuilder linea = new StringBuilder();
         // El nombre TAL COMO LO TRAJO LA FILA, recortado, más el de reserva cuando llegó en
-        // blanco. ⚠️ No es exactamente el rótulo de su columna: ese sale del primer criterio
-        // que apareció en la tanda y puede llevar el código detrás para desambiguar. Se deja
+        // blanco. ⚠️ No es exactamente el rótulo de su columna: ese sale de la rúbrica vigente
+        // —en la prueba— o del primer criterio que apareció en la tanda —en el perfil—, y
+        // puede llevar el código detrás para desambiguar. Y en la prueba, la nota de quien
+        // rindió otra versión no tiene columna: esta línea es el único sitio donde está. Se deja
         // así a propósito — aquí se explica lo que dice ESTA fila, no lo que rotula la
         // columna, y forzarlo a coincidir escondería que la rúbrica los escribe distinto.
         linea.append(Criterio.de(nota).nombre());
@@ -965,17 +1038,47 @@ public class ServicioExcelRankingImpl implements ServicioExcelRanking {
     // Celdas
     // ========================================================================
 
+    /**
+     * Lo que mide una línea de la cabecera, en puntos: la de Calibri 11, la letra de la hoja.
+     *
+     * <p>Es la altura que Excel le da a cada línea de una fila con esa letra; LibreOffice la
+     * pinta con Carlito, que mide lo mismo de ancho y algo menos de alto, así que ahí cabe
+     * holgada.
+     */
+    static final float PUNTOS_POR_LINEA = 15f;
+
+    /**
+     * El tope de la cabecera, en líneas.
+     *
+     * <p>Sin tope, un nombre de criterio desmesurado dejaría una cabecera que ocupa media
+     * pantalla y taparía la tabla. Con él, un rótulo que no cabe se sigue leyendo entero al
+     * seleccionar la celda: el texto va completo, solo la fila deja de crecer.
+     */
+    static final int LINEAS_COMO_MUCHO = 8;
+
     private void encabezar(Sheet hoja, Pinceles pinceles, List<String> titulos, int[] anchos) {
         Row cabecera = hoja.createRow(0);
+        int lineas = 1;
         for (int i = 0; i < titulos.size(); i++) {
             Cell celda = cabecera.createCell(i);
             // ⚠️ También aquí: el nombre de un criterio es `text` en la base y lo escribe
             // quien redacta la rúbrica, así que una cabecera puede pasarse del tope igual
             // que una celda. Sin esto, un solo criterio mal escrito tumba la descarga entera.
-            celda.setCellValue(loQueCabe(titulos.get(i)));
+            String rotulo = loQueCabe(titulos.get(i));
+            celda.setCellValue(rotulo);
             celda.setCellStyle(pinceles.cabecera);
             hoja.setColumnWidth(i, anchos[i] * 256);
+            lineas = Math.max(lineas, LineasDeRotulo.cuantas(rotulo, anchos[i], LINEAS_COMO_MUCHO));
         }
+        /*
+          ⚠️ **La altura se ESCRIBE en el archivo, no se deja a quien lo abra.** El ajuste de
+          texto ya estaba encendido, pero una fila sin altura se abre con la de una línea en
+          Excel y en LibreOffice, y los rótulos largos se quedaban cortados hasta que alguien
+          la agrandaba a mano. Sale de los rótulos de ESTE archivo y de los anchos de siempre
+          —que no cambian—: una rúbrica de nombres cortos da una cabecera baja, y una de
+          nombres largos, una más alta, hasta el tope.
+        */
+        cabecera.setHeightInPoints(lineas * PUNTOS_POR_LINEA);
         hoja.createFreezePane(0, 1);
     }
 

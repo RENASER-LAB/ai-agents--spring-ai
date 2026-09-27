@@ -201,10 +201,13 @@ al modelo cuesta dinero y a quién se califica lo decide quien lleva la vacante.
   escribir sigue pidiendo `ajustar_nota`. ⚠️ Cuando dos sitios enseñan lo mismo tienen que pedir
   el mismo permiso: mientras divergieron, el Excel del ranking negaba un detalle que la pantalla
   sí enseñaba.
-- **El Excel del ranking ya no lee la rúbrica por su cuenta** (16/09/2026). Saca los criterios de
-  la misma tanda que pinta la tabla, así que enseña exactamente las mismas columnas que la
-  pantalla desde la que se descargó y no puede volver a contradecirla. Lo que decide qué filas
-  salen sigue siendo `ver_embudo`, con el alcance de quien descarga.
+- **El Excel del ranking pasa por el mismo guardián que la pantalla** (16/09/2026): lo que decide
+  qué filas salen es `ver_embudo`, con el alcance de quien descarga. **Sus columnas de criterio,
+  en cambio, son las de la prueba que la vacante tiene puesta hoy** (26/09/2026), pedidas con ese
+  mismo permiso. En una vacante que cambió de prueba cuando ya había gente dentro —la 13—, la
+  tabla del panel, que junta las rúbricas de sus filas, enseña además las de la prueba anterior y
+  la hoja no; las notas de esa prueba van en «Justificación detallada». Ver
+  [Las APIs](09-APIS.md) y el 15 de [Defectos conocidos](DEFECTOS-CONOCIDOS.md).
 - **La rúbrica se lee siempre ordenada** (`findByVersionPlantillaPruebaIdOrderByOrden`): acaba
   en una pantalla y en las columnas del ranking, y sin `orden` salía como la devolviera la base.
   La pestaña «Prueba del puesto» del ranking enseña esos criterios por candidato: ver

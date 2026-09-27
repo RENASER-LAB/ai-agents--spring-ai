@@ -72,6 +72,17 @@ public final class DtosPerfilIntegral {
                                        String explicacion, String origen,
                                        BigDecimal confianza, String motivoAjuste) {}
 
+    /**
+     * Un criterio de la rúbrica que la vacante tiene puesta HOY, sin la nota de nadie.
+     *
+     * <p>Es lo que el Excel de la prueba del puesto necesita para decidir sus columnas: el
+     * nombre y el código con que se rotulan, y los puntos, que son el techo que va en la
+     * cabecera («Manejo y control de caja (pts /20)»). No es lo mismo que
+     * {@link NotaCriterioResponse}: aquello es la nota de UN candidato contra la rúbrica con
+     * la que se le midió, y esto es la rúbrica vigente, la haya rendido alguien o no.
+     */
+    public record CriterioDeLaRubrica(String nombre, String codigo, BigDecimal puntos) {}
+
     // Una alerta no descarta a nadie: es una pregunta para la conversación final.
     public record AlertaResponse(String tipo, String descripcion, Instant creadoEn) {}
 
