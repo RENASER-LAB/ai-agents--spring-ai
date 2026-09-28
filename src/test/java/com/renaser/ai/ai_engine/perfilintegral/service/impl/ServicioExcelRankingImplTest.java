@@ -1907,6 +1907,9 @@ class ServicioExcelRankingImplTest {
     private static RankingVacante tanda(FilaRanking... filas) {
         return new RankingVacante(13L, "Analista de datos", "Analista", "JUNIOR",
                 filas.length, filas.length, filas.length, 0, 0, true, true, true,
+                // Con las reseñas a la vista a propósito: el Excel no cambia aunque quien
+                // descarga pueda verlas (V63).
+                true,
                 List.of(filas));
     }
 
@@ -1970,7 +1973,11 @@ class ServicioExcelRankingImplTest {
                 // de una celda de la TABLA cuando no hay nota, y aquí siempre la hay.
                 null,
                 // La fecha de postulación tampoco: filtra la tabla del panel, no el Excel.
-                Instant.parse("2026-08-12T15:00:00Z"));
+                Instant.parse("2026-08-12T15:00:00Z"),
+                // Y las reseñas de empresas tampoco (V63): cada fila las trae y la hoja las
+                // ignora. Las pruebas que comparan la cabecera ENTERA lo vigilan.
+                new com.renaser.ai.ai_engine.resena.dto.DtosResena.PromedioResenas(
+                        new BigDecimal("4.5"), 3));
     }
 
     /**
@@ -2034,7 +2041,7 @@ class ServicioExcelRankingImplTest {
                 f.resumen(), f.riesgosCriticos(), f.fortalezas(), f.alertas(), f.actualizadoEn(),
                 notas, f.ciudad(), f.ciudadCodigo(), f.pretensionMin(), f.pretensionMax(),
                 f.pretensionMoneda(), f.pretensionDeclarada(), f.pretensionDeclaradaMoneda(),
-                ponderado, f.estadoPrueba(), f.postuladoEn());
+                ponderado, f.estadoPrueba(), f.postuladoEn(), f.resenas());
     }
 
     // ---- Leer el libro que se acaba de escribir ----

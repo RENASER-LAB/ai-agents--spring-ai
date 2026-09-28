@@ -47,6 +47,24 @@ public class AvisoPortal {
      */
     public static final String VACANTE_ELIMINADA = "VACANTE_ELIMINADA";
 
+    /*
+     * Los cuatro de las reseñas de empresas (V63). No cuelgan de ninguna postulación —la
+     * reseña es de la persona, no del proceso— y el portal los lleva a la sección de reseñas
+     * del perfil. Sin correo: solo campana.
+     */
+
+    /** Una empresa que la contrató le dejó una reseña. */
+    public static final String RESENA_PUBLICADA = "RESENA_PUBLICADA";
+
+    /** La empresa editó una reseña que ella ya había respondido: tiene otro mes para ajustarla. */
+    public static final String RESENA_EDITADA = "RESENA_EDITADA";
+
+    /** La plataforma resolvió su reporte: la ocultó o la mantuvo. */
+    public static final String REPORTE_RESENA_RESUELTO = "REPORTE_RESENA_RESUELTO";
+
+    /** La plataforma ocultó su respuesta, a pedido de la empresa autora. */
+    public static final String RESPUESTA_RESENA_OCULTADA = "RESPUESTA_RESENA_OCULTADA";
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;

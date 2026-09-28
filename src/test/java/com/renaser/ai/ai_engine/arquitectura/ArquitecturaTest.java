@@ -287,7 +287,13 @@ class ArquitecturaTest {
             RAIZ + ".simulacion.repository.InscripcionSesionRepository",
             RAIZ + ".decision.repository.BarreraCriticaRepository",
             RAIZ + ".consentimiento.repository.SolicitudBorradoRepository",
-            RAIZ + ".usuario.repository.InvitacionRepository");
+            RAIZ + ".usuario.repository.InvitacionRepository",
+            // Las reseñas (V63) son de la empresa autora; sus respuestas y reportes cuelgan
+            // de ellas. El panel entra por la contratación de su empresa y el portal por la
+            // persona que pregunta: ninguno busca por id suelto.
+            RAIZ + ".resena.repository.ResenaRepository",
+            RAIZ + ".resena.repository.RespuestaResenaRepository",
+            RAIZ + ".resena.repository.ReporteResenaRepository");
 
     /**
      * Las llamadas {@code findById} sobre esos repositorios que SÍ están bien, una por una
@@ -413,7 +419,12 @@ class ArquitecturaTest {
             "ServicioTablonPortalImpl#consentimientoDeVacante",
             // El borrado 29733 es de la plataforma: exigirPlataforma ya cerró la puerta
             // antes de estas búsquedas, y la solicitud cruza empresas a propósito.
-            "ServicioBorradoDatosImpl#ejecutarBorrado");
+            "ServicioBorradoDatosImpl#ejecutarBorrado",
+            // La moderación de las reseñas (V63) es de la plataforma y cruza empresas por
+            // diseño, como el borrado de aquí arriba: exigirPlataforma cierra la puerta antes.
+            // El reporte se busca por su id, y su reseña y su respuesta derivan de él.
+            "ServicioModeracionResenasImpl#resolver",
+            "ServicioModeracionResenasImpl#laResenaDelReporte");
 
     /**
      * Ningún servicio del panel busca por id suelto en un agregado con dueño.

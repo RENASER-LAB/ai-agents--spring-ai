@@ -36,6 +36,15 @@ signifique algo.
   información valiosa que no le pertenece.
 - Entre empresas viaja **solo el perfil** (que es del candidato). Jamás notas, alertas ni
   decisiones de otro proceso.
+- **Excepción, decidida por el usuario el 28/09/2026: las reseñas de empresas (V63).** La
+  empresa que contrató a alguien por EX puede dejarle, a partir del primer mes, de 1 a 5
+  estrellas y una opinión, y **las demás empresas donde esa persona se postula ven el
+  promedio y los textos, con el nombre de la empresa autora** (permiso
+  `ver_resenas_candidato`). La persona las ve en su perfil, puede responderlas y
+  reportarlas; la plataforma modera. Lo que se comparte es solo eso: ni la nota, ni la
+  decisión, ni nada más de aquel proceso. **Las reseñas no puntúan**: no entran en notas,
+  ranking, pase automático ni IA. El detalle, en
+  [la spec de las reseñas](../../../specs/resenas-de-empresas-a-contratados.md).
 
 ## 3 · El currículum: transcripción compartida, evaluación por puesto
 

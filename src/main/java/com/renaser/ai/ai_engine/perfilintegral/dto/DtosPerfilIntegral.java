@@ -177,6 +177,14 @@ public final class DtosPerfilIntegral {
              * significa que el trato funcionó — no que la tanda sea de gente reservada.
              */
             boolean vacanteMuestraSueldo,
+            /**
+             * Si quien mira puede ver las reseñas de empresas de esta tanda (V63): el
+             * permiso {@code ver_resenas_candidato} con alcance sobre ESTA vacante.
+             *
+             * <p>Es lo que ofrece la columna «Reseñas» en el menú «Columnas». Sin él, la
+             * columna no se ofrece y ninguna fila trae el dato.
+             */
+            boolean puedeVerResenas,
             List<FilaRanking> filas) {}
 
     /**
@@ -320,7 +328,18 @@ public final class DtosPerfilIntegral {
              * {@code Instant}, y vecinos se podrían intercambiar al copiar la fila sin que el
              * compilador diga nada.
              */
-            Instant postuladoEn) {}
+            Instant postuladoEn,
+            /**
+             * El promedio de sus reseñas de empresas y cuántas son (V63), para la columna
+             * «Reseñas»: «★ 4,5 (3)».
+             *
+             * <p>Nulo sin {@code puedeVerResenas} —sin permiso el dato no viaja— y nulo
+             * también cuando la persona no tiene reseñas visibles, que la tabla pinta «—».
+             *
+             * <p>⚠️ <b>No ordena nada en el servidor ni pesa en ninguna nota.</b> El orden de
+             * la tanda, el Excel y el pase automático no lo leen: es para mirar.
+             */
+            com.renaser.ai.ai_engine.resena.dto.DtosResena.PromedioResenas resenas) {}
 
     // ============ El desglose de la evaluación del banco ============
 

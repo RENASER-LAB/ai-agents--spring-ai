@@ -58,6 +58,7 @@ public class ServicioBorradoDatosImpl implements ServicioBorradoDatos {
     private final ArchivoRepository archivos;
     private final CorreoEnviadoRepository correosEnviados;
     private final com.renaser.ai.ai_engine.notificacion.repository.AvisoPortalRepository avisosPortal;
+    private final com.renaser.ai.ai_engine.resena.service.ServicioResenasPortal resenas;
     private final AlmacenArchivos almacen;
     private final MaquinaEstados maquina;
     private final ServicioCorreo correo;
@@ -165,6 +166,19 @@ public class ServicioBorradoDatosImpl implements ServicioBorradoDatos {
             // hay nada que probar. `correo_enviado` conserva su fila porque demuestra que se
             // avisó; un aviso del portal no es prueba de nada frente a nadie.
             avisosPortal.deleteByUsuarioId(usuario.getId());
+        }
+
+        /*
+         * 5a · Sus reseñas de empresas (V63), con sus respuestas y los reportes, dejan de
+         * existir: son opiniones sobre una persona concreta y, con su nombre fuera, el texto
+         * seguiría señalándola. Se borran de verdad, no se vacían. Lo que queda es la
+         * auditoría de cada publicación —sin texto, que nunca se copió allí— y esta fila con
+         * cuántas había.
+         */
+        Map<String, Integer> sinResenas = resenas.borrarDeLaPersona(persona.getId());
+        if (sinResenas.values().stream().anyMatch(n -> n > 0)) {
+            auditoria.registrar(quien.organizacionId(), quien, "borrar_resenas_por_borrado_datos",
+                    "persona", persona.getId(), sinResenas, null, solicitud.getMotivo());
         }
 
         // 5b · El perfil del candidato se borra entero, y de verdad — no se anonimiza.

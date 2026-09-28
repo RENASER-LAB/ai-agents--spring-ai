@@ -127,6 +127,19 @@ public class FlujoDosEmpresasIT {
                   join rol r on r.id = rp.rol_id and r.organizacion_id = %d
                   join permiso p on p.id = rp.permiso_id and p.codigo = 'administrar_plataforma'"""
                 .formatted(acmeId))).isZero();
+        // Moderar las reseñas reportadas tampoco viaja (V63): es de la plataforma. Escribir y
+        // leer reseñas sí, con el mismo reparto que en la plataforma.
+        assertThat(contar("""
+                select count(*) from rol_permiso rp
+                  join rol r on r.id = rp.rol_id and r.organizacion_id = %d
+                  join permiso p on p.id = rp.permiso_id and p.codigo = 'moderar_resenas'"""
+                .formatted(acmeId))).isZero();
+        assertThat(contar("""
+                select count(*) from rol_permiso rp
+                  join rol r on r.id = rp.rol_id and r.organizacion_id = %d
+                  join permiso p on p.id = rp.permiso_id
+                 where p.codigo in ('resenar_contratado', 'ver_resenas_candidato')"""
+                .formatted(acmeId))).isEqualTo(6);
         assertThat(contar("select count(*) from parametro where organizacion_id = " + acmeId))
                 .isEqualTo(contar("select count(*) from parametro where organizacion_id = " + plataformaId));
         // NINGUNO: desde la V54 el texto de PROCESO es uno solo para todas, de la

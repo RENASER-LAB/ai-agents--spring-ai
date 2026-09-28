@@ -210,15 +210,17 @@ public class ServicioPlataformaImpl implements ServicioPlataforma {
                                   WHERE ya.organizacion_id = ? AND ya.codigo = r.codigo)""",
                 empresaId, plataformaId, empresaId);
 
-        // La matriz permiso-alcance completa, salvo administrar_plataforma: dar de alta
-        // empresas es de la dueña de la plataforma, no una función de cualquier panel.
+        // La matriz permiso-alcance completa, salvo los dos que son de la dueña de la
+        // plataforma y no una función de cualquier panel: administrar_plataforma (dar de alta
+        // empresas) y moderar_resenas (revisar las reseñas reportadas de todas, V63).
         jdbc.update("""
                 INSERT INTO rol_permiso (rol_id, permiso_id, alcance, creado_en)
                 SELECT nuevo.id, rp.permiso_id, rp.alcance, now()
                 FROM rol_permiso rp
                 JOIN rol origen ON origen.id = rp.rol_id AND origen.organizacion_id = ?
                 JOIN rol nuevo  ON nuevo.organizacion_id = ? AND nuevo.codigo = origen.codigo
-                JOIN permiso p  ON p.id = rp.permiso_id AND p.codigo <> 'administrar_plataforma'
+                JOIN permiso p  ON p.id = rp.permiso_id
+                               AND p.codigo NOT IN ('administrar_plataforma', 'moderar_resenas')
                 WHERE NOT EXISTS (SELECT 1 FROM rol_permiso ya
                                   WHERE ya.rol_id = nuevo.id AND ya.permiso_id = rp.permiso_id)""",
                 plataformaId, empresaId);

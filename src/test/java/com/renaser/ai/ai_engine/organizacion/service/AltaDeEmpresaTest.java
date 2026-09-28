@@ -90,8 +90,10 @@ class AltaDeEmpresaTest {
         List<String> sentencias = sql.getAllValues();
         assertThat(sentencias.get(0)).contains("INSERT INTO rol ");
         assertThat(sentencias.get(1)).contains("INSERT INTO rol_permiso")
-                // La excepción deliberada: el permiso de la dueña no viaja con la copia
-                .contains("administrar_plataforma");
+                // Las dos excepciones deliberadas: los permisos de la dueña no viajan con la
+                // copia. Moderar las reseñas reportadas (V63) es de la plataforma, igual que
+                // dar de alta empresas.
+                .contains("NOT IN ('administrar_plataforma', 'moderar_resenas')");
         assertThat(sentencias.get(2)).contains("INSERT INTO parametro");
         // Los correos nacen activos: los avisos de sus vacantes tienen que salir
         assertThat(sentencias.get(3)).contains("INSERT INTO plantilla_correo").contains("true");

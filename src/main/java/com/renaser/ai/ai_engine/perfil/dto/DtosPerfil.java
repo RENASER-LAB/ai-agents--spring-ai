@@ -51,7 +51,53 @@ public final class DtosPerfil {
             // y no de quien decide (RF-41, decision del 05/09/2026).
             boolean tieneFoto,
             Portada portada,
-            CurriculumDelPerfil cv) {
+            CurriculumDelPerfil cv,
+            /*
+             * El resumen de sus reseñas de empresas (V63), para la línea «★ 4,5 · 3 reseñas»
+             * de la cabecera. SOLO del portal: el panel lee las reseñas por su propia ruta y
+             * con su permiso, y aquí le llegan vacías y sin el nombre del campo.
+             */
+            @com.fasterxml.jackson.annotation.JsonInclude(
+                    com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+            com.renaser.ai.ai_engine.resena.dto.DtosResena.ResumenResenas resenas,
+            /*
+             * Sus reseñas, respuestas y reportes, SOLO en la descarga de sus datos: el derecho
+             * de acceso también alcanza a lo que las empresas opinan de ella.
+             */
+            @com.fasterxml.jackson.annotation.JsonInclude(
+                    com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+            com.renaser.ai.ai_engine.resena.dto.DtosResena.ResenasEnLaDescarga misResenas) {
+
+        /** El perfil sin nada de las reseñas: lo que pinta {@code PintorDePerfil}. */
+        public PerfilCompleto(String titular, String resumen, List<String> habilidades,
+                              Integer experienciaMeses, String ubicacion, String disponibilidad,
+                              Pretension pretension, List<ExperienciaItem> experiencia,
+                              List<EducacionItem> educacion, List<IdiomaItem> idiomas,
+                              List<CertificacionItem> certificaciones, List<EnlaceItem> enlaces,
+                              LecturaCv lecturaCv, boolean tieneFoto, Portada portada,
+                              CurriculumDelPerfil cv) {
+            this(titular, resumen, habilidades, experienciaMeses, ubicacion, disponibilidad,
+                    pretension, experiencia, educacion, idiomas, certificaciones, enlaces,
+                    lecturaCv, tieneFoto, portada, cv, null, null);
+        }
+
+        /** El mismo perfil con el resumen de sus reseñas, para la cabecera del portal. */
+        public PerfilCompleto conResenas(
+                com.renaser.ai.ai_engine.resena.dto.DtosResena.ResumenResenas resumenResenas) {
+            return new PerfilCompleto(titular, resumen, habilidades, experienciaMeses,
+                    ubicacion, disponibilidad, pretension, experiencia, educacion, idiomas,
+                    certificaciones, enlaces, lecturaCv, tieneFoto, portada, cv, resumenResenas,
+                    misResenas);
+        }
+
+        /** El mismo perfil con sus reseñas enteras, para la descarga de sus datos. */
+        public PerfilCompleto conMisResenas(
+                com.renaser.ai.ai_engine.resena.dto.DtosResena.ResenasEnLaDescarga descarga) {
+            return new PerfilCompleto(titular, resumen, habilidades, experienciaMeses,
+                    ubicacion, disponibilidad, pretension, experiencia, educacion, idiomas,
+                    certificaciones, enlaces, lecturaCv, tieneFoto, portada, cv, resenas,
+                    descarga);
+        }
     }
 
     /**

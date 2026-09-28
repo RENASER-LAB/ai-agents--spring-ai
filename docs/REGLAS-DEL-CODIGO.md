@@ -55,6 +55,7 @@ com.renaser.ai.ai_engine.<dominio>
 | `simulacion` | Sesiones, inscripciones, eventos observables y conversación final |
 | `validacion` | El periodo de validación práctica y sus métricas |
 | `perfil` | El perfil del candidato, único por persona y transversal a organizaciones |
+| `resena` | Las reseñas de empresas a quien contrataron, sus respuestas y la moderación de reportes (V63). No puntúan |
 
 Dos clases marcan la frontera con el motor de agentes y **hay que actualizarlas al añadir un
 controlador nuevo**, porque enumeran los nuestros: `comun/exception/ManejadorErrores` (para que

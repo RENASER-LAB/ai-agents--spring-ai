@@ -140,6 +140,7 @@ class ServicioPerfilIntegralPanelImplTest {
     @Mock private com.renaser.ai.ai_engine.perfil.repository.PerfilCandidatoRepository perfilesCandidato;
     @Mock private com.renaser.ai.ai_engine.prueba.repository.IntentoPruebaRepository intentos;
     @Mock private com.renaser.ai.ai_engine.pesos.repository.PesoEtapaRepository pesosEtapa;
+    @Mock private com.renaser.ai.ai_engine.resena.service.LectorDeResenas lectorResenas;
 
     @InjectMocks
     private ServicioPerfilIntegralPanelImpl servicio;
@@ -695,6 +696,83 @@ class ServicioPerfilIntegralPanelImplTest {
         assertThat(fila.ciudad()).isNull();
         assertThat(fila.ciudadCodigo()).isNull();
         verifyNoInteractions(ubigeos);
+    }
+
+    // ============ Las reseñas de empresas (V63) ============
+
+    @Test
+    @DisplayName("Con ver_resenas_candidato sobre la vacante, cada fila trae su promedio, también ya numerada")
+    void conPermisoLaFilaTraeSuPromedio() {
+        candidatos(conNombre(candidato(1L, "ALTA", "90"), "Camila", "Reyes"),
+                conNombre(candidato(2L, "ALTA", "80"), "Bruno", "Diaz"));
+        lenient().when(alcanceVacante.alcanzaALaVacante(any(), any(), any())).thenReturn(true);
+        when(lectorResenas.promediosDe(anyCollection())).thenReturn(Map.of(
+                201L, new com.renaser.ai.ai_engine.resena.dto.DtosResena.PromedioResenas(
+                        new BigDecimal("4.7"), 3)));
+
+        var ranking = servicio.ranking(quienVeResenas(), VACANTE);
+
+        assertThat(ranking.puedeVerResenas()).isTrue();
+        // Sobre la lista que DEVUELVE el ranking: numerar copia el record campo a campo, y
+        // un campo olvidado en la copia sale nulo sin que el compilador diga nada.
+        assertThat(ranking.filas().get(0).resenas().promedio()).isEqualByComparingTo("4.7");
+        assertThat(ranking.filas().get(0).resenas().cantidad()).isEqualTo(3);
+        // Sin reseñas visibles, la fila va vacía: la tabla pinta «—».
+        assertThat(ranking.filas().get(1).resenas()).isNull();
+    }
+
+    @Test
+    @DisplayName("Sin ver_resenas_candidato, ni la columna se ofrece ni el dato viaja")
+    void sinPermisoNoViajaNada() {
+        candidatos(conNombre(candidato(1L, "ALTA", "90"), "Camila", "Reyes"));
+
+        var ranking = servicio.ranking(quien, VACANTE);
+
+        assertThat(ranking.puedeVerResenas()).isFalse();
+        assertThat(ranking.filas().get(0).resenas()).isNull();
+        verifyNoInteractions(lectorResenas);
+    }
+
+    @Test
+    @DisplayName("Con el permiso acotado a sus vacantes y esta ajena, tampoco viaja")
+    void conElAlcanceQueNoLlegaNoViaja() {
+        candidatos(conNombre(candidato(1L, "ALTA", "90"), "Camila", "Reyes"));
+        when(alcanceVacante.alcanzaALaVacante(any(), any(), any())).thenReturn(false);
+
+        var ranking = servicio.ranking(new ContextoUsuario(10L, 20L, ORGANIZACION, "EQUIPO",
+                List.of(1L), Map.of("ver_embudo", "TODO",
+                        "ver_resenas_candidato", "SUS_VACANTES")), VACANTE);
+
+        assertThat(ranking.puedeVerResenas()).isFalse();
+        assertThat(ranking.filas().get(0).resenas()).isNull();
+        verifyNoInteractions(lectorResenas);
+    }
+
+    @Test
+    @DisplayName("Las reseñas no mueven el orden: cinco estrellas no adelantan a quien tiene menos nota")
+    void lasResenasNoOrdenanNada() {
+        // AC-28: la nota, el orden y el pase automático son idénticos con o sin reseñas.
+        candidatos(conNombre(candidato(1L, "ALTA", "90"), "Ana", "Quispe"),
+                conNombre(candidato(2L, "ALTA", "40"), "Bruno", "Diaz"));
+        lenient().when(alcanceVacante.alcanzaALaVacante(any(), any(), any())).thenReturn(true);
+        when(lectorResenas.promediosDe(anyCollection())).thenReturn(Map.of(
+                202L, new com.renaser.ai.ai_engine.resena.dto.DtosResena.PromedioResenas(
+                        new BigDecimal("5.0"), 9)));
+
+        List<FilaRanking> conResenas = servicio.ranking(quienVeResenas(), VACANTE).filas();
+        List<FilaRanking> sinResenas = servicio.ranking(quien, VACANTE).filas();
+
+        assertThat(conResenas).extracting(FilaRanking::postulacionId).containsExactly(1L, 2L);
+        assertThat(conResenas).extracting(FilaRanking::postulacionId)
+                .isEqualTo(sinResenas.stream().map(FilaRanking::postulacionId).toList());
+        assertThat(conResenas).extracting(FilaRanking::notaEtapa)
+                .isEqualTo(sinResenas.stream().map(FilaRanking::notaEtapa).toList());
+    }
+
+    private ContextoUsuario quienVeResenas() {
+        return new ContextoUsuario(10L, 20L, ORGANIZACION, "EQUIPO", List.of(1L),
+                Map.of("ver_embudo", "TODO", "ajustar_nota", "TODO",
+                        "ver_resenas_candidato", "TODO"));
     }
 
     // ============ La fecha de postulación ============

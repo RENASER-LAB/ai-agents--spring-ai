@@ -57,13 +57,14 @@ class ServicioPerfilPortalImplTest {
     @Mock private NivelEducativoRepository nivelesEducativos;
     @Mock private NivelIdiomaRepository nivelesIdioma;
     @Mock private PintorDePerfil pintor;
+    @Mock private com.renaser.ai.ai_engine.resena.service.ServicioResenasPortal resenas;
 
     private ServicioPerfilPortalImpl servicio;
 
     @BeforeEach
     void crearElServicio() {
         servicio = new ServicioPerfilPortalImpl(perfiles, experiencias, educaciones, idiomas,
-                certificaciones, enlaces, nivelesEducativos, nivelesIdioma, pintor);
+                certificaciones, enlaces, nivelesEducativos, nivelesIdioma, pintor, resenas);
         lenient().when(perfiles.findByPersonaId(PERSONA)).thenReturn(Optional.of(perfil()));
         lenient().when(perfiles.save(any())).thenAnswer(i -> i.getArgument(0));
     }
