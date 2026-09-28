@@ -144,6 +144,8 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
     private final PerfilCandidatoRepository perfilesCandidato;
     private final com.renaser.ai.ai_engine.prueba.repository.IntentoPruebaRepository intentos;
     private final com.renaser.ai.ai_engine.pesos.repository.PesoEtapaRepository pesosEtapa;
+    // Solo para pintar la columna «Reseñas» (V63). No entra en ninguna nota ni en el orden.
+    private final com.renaser.ai.ai_engine.resena.service.LectorDeResenas resenas;
 
     // El orden de la tanda. Manda el grupo, no la nota: quien llega a la nota arrastrando un
     // riesgo crítico no va por delante de quien llega sin ninguno, y ordenar por número
@@ -583,6 +585,18 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
                                 Function.identity(), (a, b) -> a))
                 : Map.of();
 
+        /*
+         * Las reseñas de empresas (V63), en bloque y en la misma petición que todo lo demás:
+         * el promedio de toda la tanda en una consulta, nunca una por fila.
+         *
+         * ⚠️ Solo se consultan con `ver_resenas_candidato` Y alcance sobre ESTA vacante: sin
+         * permiso, el dato no llega a existir en esta respuesta. Y solo se pintan: el orden
+         * de abajo, las notas, el Excel y el pase automático no las leen.
+         */
+        boolean puedeVerResenas = puedeVerResenasDe(quien, vacante);
+        Map<Long, com.renaser.ai.ai_engine.resena.dto.DtosResena.PromedioResenas> resenasPorPersona =
+                puedeVerResenas ? resenas.promediosDe(personasPorId.keySet()) : Map.of();
+
         List<FilaRanking> filas = new ArrayList<>();
         int calificados = 0, enCurso = 0, fallidos = 0, conFina = 0;
 
@@ -692,7 +706,10 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
                             intentoPorPostulacion.get(p.getId())) : null,
                     // Cuándo se postuló, para el filtro de fecha del panel. Nulo en registros
                     // antiguos: el panel los deja fuera de ese filtro y lo avisa.
-                    p.getCreadoEn()));
+                    p.getCreadoEn(),
+                    // El nulo se pregunta aquí y no dentro del mapa: Map.of() revienta al
+                    // buscarle una clave nula, y una fila sin persona es posible.
+                    persona == null ? null : resenasPorPersona.get(persona.getId())));
         }
 
         filas.sort(Comparator
@@ -722,7 +739,7 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
                     f.ciudad(), f.ciudadCodigo(),
                     f.pretensionMin(), f.pretensionMax(), f.pretensionMoneda(),
                     f.pretensionDeclarada(), f.pretensionDeclaradaMoneda(),
-                    f.ponderado(), f.estadoPrueba(), f.postuladoEn()));
+                    f.ponderado(), f.estadoPrueba(), f.postuladoEn(), f.resenas()));
         }
 
         return new RankingVacante(vacanteId, vacante.getTitulo(),
@@ -734,7 +751,20 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
                 // para los dos casos diría «tu rol no puede verla» a quien sí puede.
                 quien.tiene("ver_pretension"), quien.tiene("mover_postulacion"),
                 laVacanteEnsenaSuSueldo,
+                puedeVerResenas,
                 numeradas);
+    }
+
+    /**
+     * Si quien mira puede leer las reseñas de esta tanda: el permiso y su alcance sobre ESTA
+     * vacante. Quién alcanza qué lo decide el guardián de siempre.
+     */
+    private boolean puedeVerResenasDe(ContextoUsuario quien, Vacante vacante) {
+        String permiso = com.renaser.ai.ai_engine.resena.service.ReglasDeLaResena.VER;
+        return quien.tiene(permiso) && alcanceVacante.alcanzaALaVacante(quien,
+                com.renaser.ai.ai_engine.seguridad.dto.FiltroAlcance.desde(
+                        quien.alcance(permiso), quien.usuarioId()),
+                vacante);
     }
 
     /**

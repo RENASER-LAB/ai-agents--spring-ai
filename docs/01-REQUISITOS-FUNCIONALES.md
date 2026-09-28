@@ -57,8 +57,9 @@ Tiene **dos caras**, las dos en el frontend `RenaserOsPostulantes`:
 
 Desde el 26/08/2026 es una **plataforma**: Renaser es la dueña, cada empresa se registra por
 invitación de Renaser, publica sus vacantes y ve solo a sus candidatos (ver «Multiempresa» en
-[Las APIs](APIS-MULTIEMPRESA.md)). El único sitio donde se mezclan empresas es el tablón
-público de vacantes.
+[Las APIs](APIS-MULTIEMPRESA.md)). Se mezclan empresas en dos sitios, y los dos a propósito: el
+tablón público de vacantes y, desde el 28/09/2026, las reseñas que la empresa que contrató deja a
+esa persona, que leen las demás empresas donde postula (RF-171 a RF-179).
 
 **El equipo entra con correo y contraseña propios**, con cuentas que nacen solo por invitación;
 los candidatos tienen su cuenta aparte, y también pueden entrar con un enlace de un solo uso que
@@ -1381,10 +1382,69 @@ también viaja en dólares: lo que se para es el error de magnitud, no la oferta
 dentro, con su marca de leído. **Complementa al correo, no lo sustituye** — el correo cae en
 promociones, se marca leído sin abrir, o llega a una dirección que el cargador de currículums
 inventó y que nadie mira. **Lo que cambia en una vacante es la excepción**: desde el 19/09/2026
-se cuenta **solo** por la campana (RF-14b y RF-159). Hoy tiene dos tipos de aviso —el cambio de
-sueldo hecho desde su tarjeta y la vacante corregida— y está hecha para los que vengan. El aviso
+se cuenta **solo** por la campana (RF-14b y RF-159), igual que lo de las reseñas (RF-178). Hoy
+tiene siete tipos de aviso —de la vacante, el cambio de sueldo hecho desde su tarjeta, la vacante
+corregida y la vacante eliminada; y los cuatro de las reseñas— y está hecha para los que vengan. El aviso
 se marca leído **al pulsarlo**, o todos a la vez con el botón de la cabecera: abrir la campana no
 es haber leído nada.
+
+---
+
+# 17. Reseñas de empresas a quien contrataron
+
+Desde el 28/09/2026 (`V63`). La empresa que contrató a alguien por EX le deja su opinión, y esa
+persona reúne una reputación que se puede creer, porque solo opina quien de verdad la contrató.
+**Rompe a propósito una regla del multiempresa** —entre empresas viajaba solo el perfil, nunca
+nada de un proceso—: lo decidió el usuario el 28/09/2026, y la excepción está escrita en el
+[diseño del candidato ante varias empresas](superpowers/specs/2026-08-25-el-candidato-ante-varias-empresas-design.md).
+
+**RF-171** **Una reseña por contratación**: de 1 a 5 estrellas enteras (Muy mala, Mala,
+Aceptable, Buena, Excelente) y una opinión obligatoria de 30 a 1000 caracteres, sin contar los
+espacios de los extremos. Solo sobre una postulación **`CONTRATADO` de la propia empresa**, y
+**desde que se cumplen 30 días** de su paso a `CONTRATADO` en el historial, llegue por la
+decisión en verde o por la transición manual. Las contrataciones anteriores a esta función
+cuentan igual. Quien contrató dos veces a la misma persona deja dos reseñas. **La firma la
+empresa**, no quien la escribe: esa persona queda guardada solo para la auditoría. Contratar
+sigue haciéndose por la API: el panel todavía no tiene la pantalla.
+
+**RF-172** La empresa puede **editarla o borrarla durante 30 días desde la primera
+publicación**; editarla la marca «Editada» y no alarga el plazo. Borrarla deja la contratación
+libre para otra reseña, con un plazo nuevo. Pasados los 30 días queda fija.
+
+**RF-173** **La persona reseñada no acepta ni rechaza reseñas, pero puede responder a cada
+una**: una sola respuesta por reseña, de 30 a 500 caracteres, que puede editar o borrar durante
+30 días. Si la empresa edita una reseña ya respondida, se le avisa y **su plazo vuelve a empezar
+desde esa edición**, para que pueda ajustar lo que dijo. No hay hilo: la empresa no contesta a
+la respuesta. La respuesta va con su reseña: si la empresa la borra, se borra con ella; si la
+plataforma la oculta, deja de verse con ella.
+
+**RF-174** **Las demás empresas leen las reseñas cuando esa persona postula a sus vacantes**:
+el promedio y los textos, con el nombre de la empresa autora y la respuesta debajo, en la ficha
+del postulante y en una columna «Reseñas» de la tabla que **arranca apagada**. Se comparten
+desde el primer día; el texto de consentimiento que las mencione lo prepara el usuario aparte.
+
+**RF-175** **Las reseñas no puntúan.** No entran en ninguna nota, ni en el orden del ranking, ni
+en el pase automático, ni en el Excel, ni en lo que lee la IA. Se leen, y nada más.
+
+**RF-176** **El promedio es el de las reseñas visibles**, con un decimal y coma —«4,5»— y
+**siempre con cuántas son**: con una sola se lee «★ 5,0 · 1 reseña». No hay un mínimo para
+enseñarlo.
+
+**RF-177** **Reportar y moderar.** La persona puede reportar una reseña suya, y la empresa
+autora la respuesta a su reseña, con motivo (ofensiva, datos personales o de salud,
+discriminatoria, falsa u otro, que exige explicarlo). Una vez cada una, y otra más solo si la
+plataforma la mantuvo y después se editó. Mientras se revisa, lo reportado
+**sigue visible y contando**: reportar no sirve para esconder a voluntad. Decide **solo el
+Administrador de la plataforma**: mantener u ocultar, siempre con una nota. **Ocultar es
+definitivo** y no se apela.
+
+**RF-178** **Los avisos van solo por la campana** (RF-164), sin correo: la reseña nueva, la
+edición de una reseña ya respondida, el reporte resuelto y la respuesta ocultada. La empresa no
+recibe aviso de las respuestas, porque el panel no tiene campana: la ve al abrir la ficha.
+
+**RF-179** Las reseñas, las respuestas y los reportes de la persona **entran en la descarga de
+sus datos**, y el borrado de datos los borra de verdad. La auditoría conserva que existieron,
+pero nunca su texto.
 
 ---
 

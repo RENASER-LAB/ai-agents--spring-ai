@@ -117,6 +117,11 @@ la organización plataforma:
 - `POST …/{id}/suspension` y `…/reactivacion` (con motivo), `PUT …/{id}/tope-ia`,
   `POST/DELETE …/{id}/personalizacion/{instrumento}`.
 - `GET /panel/plataforma/consumo?mes=YYYY-MM` — el gasto de IA por empresa y agente.
+- `GET /panel/resenas-reportadas` y `POST …/{id}/resolucion` — **«Reseñas reportadas»** (28/09/2026),
+  en Configuración: lo que la persona reporta de una reseña y lo que la empresa autora reporta
+  de una respuesta, para mantenerlo u ocultarlo con una nota. Pide `moderar_resenas`, que tiene
+  solo el Administrador de la plataforma, **y** ser la plataforma. Es lo único de otra empresa
+  que la plataforma lee, y solo lo reportado: sigue sin haber una vista de sus candidatos.
 
 ## Reglas transversales que la pantalla debe respetar
 
@@ -150,8 +155,15 @@ que hay que saber antes de escribir una línea:
   postulación nace en la organización de la vacante**.
 - **El aislamiento tiene dos vigilantes**: la regla de ArchUnit que prohíbe `findById` suelto
   sobre repositorios de agregados con dueño (lista `LLAMADAS_SIN_DUENO_ACORDADAS` en
-  `ArquitecturaTest`) y `FlujoDosEmpresasIT`. La única pantalla que mezcla empresas es el tablón
-  público de vacantes, a propósito.
+  `ArquitecturaTest`) y `FlujoDosEmpresasIT`. Mezclan empresas, a propósito, el tablón público
+  de vacantes y, desde el 28/09/2026 (`V63`), **las reseñas de empresas**: la empresa B lee las
+  que la A dejó a quien contrató, cuando esa persona postula a una vacante de B. Entra por la
+  persona de una postulación que B ya ve, nunca por un id suelto, y solo trae la reseña y su
+  respuesta; lo cubre `FlujoResenasIT`. La excepción está escrita en
+  [el diseño del candidato ante varias empresas](superpowers/specs/2026-08-25-el-candidato-ante-varias-empresas-design.md).
+- **El alta de una empresa no copia `moderar_resenas`**, igual que `administrar_plataforma`: el
+  Administrador de un cliente no modera las reseñas de los demás. Sí copia `resenar_contratado`
+  y `ver_resenas_candidato`.
 - **El borrado 29733 es de la plataforma**: los candidatos son cuentas de plataforma y la
   anonimización cruza empresas. Desde una empresa responde 403.
 - **El consentimiento se firma con cada empresa** (V38): al crear la cuenta se consiente con la

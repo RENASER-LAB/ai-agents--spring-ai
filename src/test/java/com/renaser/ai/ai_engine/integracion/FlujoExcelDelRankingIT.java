@@ -208,11 +208,13 @@ public class FlujoExcelDelRankingIT {
         assertThat(nombresDeCriterio(ranking, m.bruno())).containsExactlyElementsOf(nombres(DEMO));
         assertThat(nombresDeCriterio(ranking, m.ana())).containsExactlyElementsOf(nombres(ADMINISTRADOR));
         // La rúbrica vigente no viaja en la respuesta del panel: la pide solo el Excel.
+        // «puedeVerResenas» es el permiso de la columna de reseñas, no de la rúbrica.
         List<String> campos = new ArrayList<>();
         ranking.fieldNames().forEachRemaining(campos::add);
         assertThat(campos).containsExactlyInAnyOrder("vacanteId", "vacante", "puesto",
                 "nivelPuesto", "total", "conPasadaFina", "calificados", "enCurso", "fallidos",
-                "puedeVerPretension", "puedeMoverPostulacion", "vacanteMuestraSueldo", "filas");
+                "puedeVerPretension", "puedeMoverPostulacion", "vacanteMuestraSueldo",
+                "puedeVerResenas", "filas");
     }
 
     @Test

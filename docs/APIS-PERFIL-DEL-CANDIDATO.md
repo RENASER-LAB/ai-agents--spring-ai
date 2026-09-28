@@ -106,6 +106,12 @@ pantalla siempre tiene algo que pintar.
 
 **`hasta: null` significa «sigo aquí»**, no que falte el dato. Píntalo como «Actualidad».
 
+**Desde el 28/09/2026 trae también `resenas`**: el resumen de sus reseñas de empresas visibles,
+para la línea «★ 4,5 · 3 reseñas» de la cabecera —`promedio` con un decimal, `cantidad` y
+`reparto`, las cinco barras de 5★ a 1★—. Sin reseñas llega con `cantidad: 0` y el promedio nulo,
+y la cabecera no pinta la línea. La lista entera va por su propia ruta: ver «Mis reseñas de
+empresas».
+
 ### Editar la parte de arriba
 
 ```
@@ -190,6 +196,11 @@ GET /api/v1/portal/perfil/descarga
 Un JSON con todo, para el derecho de acceso de la ley 29733. La pantalla lo ofrece como
 descarga de archivo.
 
+**Desde el 28/09/2026 lleva además `misResenas`**: sus reseñas de empresas, sus respuestas y sus
+reportes con el resultado. Lo que las empresas opinan de ella también es suyo. Una respuesta a
+una reseña que la plataforma ocultó va igual —deja de verse, pero no se borra—, y esa reseña
+viaja sin su texto, solo para dar contexto.
+
 ---
 
 ### Foto, portada, currículum y diplomas (V51 · 05/09/2026)
@@ -207,6 +218,24 @@ descarga de archivo.
 **Nada de esto llega al panel ni a la IA.** El RF-41 esconde la cara a la IA para no sesgar por
 aspecto; enseñársela a quien decide desharía la regla. Decidido con Renaser el 05/09/2026:
 cambiarlo pide un RF nuevo y otro texto de consentimiento.
+
+---
+
+### Mis reseñas de empresas (V63 · 28/09/2026)
+
+Lo que opinan de la persona las empresas que la contrataron por EX (RF-171 a RF-179 de los
+[requisitos funcionales](01-REQUISITOS-FUNCIONALES.md)). No las acepta ni las rechaza: puede
+**responder** a cada una y **reportar** la que incumpla las normas.
+
+| Qué | Ruta | Reglas |
+|---|---|---|
+| Verlas | `GET /api/v1/portal/resenas` | Las visibles, las más recientes arriba, con el `resumen`, su respuesta y lo que puede hacer con cada una: `puedeResponder`, `puedeReportar` y `reportadaEnRevision`. Filtrar y ordenar lo hace la pantalla: se traen todas de una vez |
+| Reportar una | `POST /api/v1/portal/resenas/{id}/reporte` | `motivo` y `comentario` (obligatorio con `OTRO`, hasta 500). Sigue visible y contando mientras se revisa. **409** si ya está reportada, o si la plataforma la mantuvo y la empresa no la editó después |
+| Responder, editar, borrar | `POST` / `PUT` / `DELETE /api/v1/portal/resenas/{id}/respuesta` | De 30 a 500 caracteres, una por reseña, y 30 días para cambiarla —que vuelven a empezar si la empresa edita la reseña—. **409** fuera de plazo, repetida o con la suya ocultada por la plataforma; **404** si la reseña ya no está |
+
+**Ninguna de estas rutas lleva permiso**, como el resto del perfil: lo que decide es de quién es la
+reseña, y la ajena responde 404. **Las reseñas no puntúan**: no entran en notas, ranking, pase
+automático ni IA.
 
 ---
 
@@ -291,6 +320,10 @@ eso.
 perfil, ni los diplomas (se recortan en `PintorDePerfil.sinLoDelCandidato`, con test). Ver arriba
 por qué.
 
+**Tampoco el resumen de sus reseñas**, que aquí no viaja ni como nombre de campo. El panel las lee
+por su propia ruta, `GET /api/v1/panel/postulaciones/{id}/resenas`, con el permiso
+`ver_resenas_candidato`: ver [09-APIS.md](09-APIS.md), «Postulaciones».
+
 ---
 
 ## Los catálogos
@@ -321,6 +354,7 @@ este proyecto. (La excepción es el `tipo` de los enlaces, que no tiene catálog
 | **403** | Sin permiso (panel) | No pintar la sección |
 | **404** | El elemento de la lista no existe o no es suyo | Refrescar |
 | **409** | Enlace repetido del mismo tipo | Decir que ya lo tiene |
+| **409** | Reseñas: ya reportada, respuesta repetida, fuera de plazo u ocultada | Enseñar el `detail`, que dice el porqué, y refrescar la sección |
 
 ---
 

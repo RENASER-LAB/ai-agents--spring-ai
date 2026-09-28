@@ -76,7 +76,11 @@ import java.util.regex.Pattern;
         SimulacionPortalController.class,
         ValidacionPanelController.class,
         com.renaser.ai.ai_engine.perfil.controller.PerfilPortalController.class,
-        com.renaser.ai.ai_engine.organizacion.controller.PlataformaController.class})
+        com.renaser.ai.ai_engine.organizacion.controller.PlataformaController.class,
+        // Las reseñas de empresas (V63): panel, portal y moderación viven en el mismo paquete.
+        com.renaser.ai.ai_engine.resena.controller.ResenasPanelController.class,
+        com.renaser.ai.ai_engine.resena.controller.ResenasPortalController.class,
+        com.renaser.ai.ai_engine.resena.controller.ModeracionResenasController.class})
 @Order(Ordered.HIGHEST_PRECEDENCE)
 @Slf4j
 public class ManejadorErrores {

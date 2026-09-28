@@ -184,6 +184,12 @@ con datos.
 | `NO_CONTINUA` | ⬛ | No sigue en esta vacante |
 | `CERRADA` | ⬛ | Terminó sin llegar a una decisión de fondo |
 
+**`CONTRATADO` abre la reseña de la empresa a los 30 días** (`V63`, 28/09/2026). Cuenta la fecha
+de la transición a `CONTRATADO` en el historial, llegue por la decisión en verde o por una
+transición manual, y también en las contrataciones anteriores a la función. No hay estado nuevo
+ni la postulación se mueve: la reseña cuelga de ella y no cambia nada del proceso. Ver
+RF-171 a RF-179 en los [requisitos funcionales](01-REQUISITOS-FUNCIONALES.md).
+
 ---
 
 ## Por qué solo dos estados finales de cierre

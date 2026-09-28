@@ -23,8 +23,8 @@ Sirve para tres cosas:
 - **Entender el sistema.** Un modelo de datos bien contado explica el negocio mejor que
   cualquier otro documento.
 
-**La base ya está construida.** Las migraciones `V1` a `V62` viven en
-`src/main/resources/db/migration` —**105 tablas de este módulo**, 108 en la base contando la de
+**La base ya está construida.** Las migraciones `V1` a `V63` viven en
+`src/main/resources/db/migration` —**108 tablas de este módulo**, 111 en la base contando la de
 Flyway y las dos del motor de agentes— y Flyway es el dueño del esquema. Cambiar algo de aquí
 ya cuesta una migración nueva, y **una migración aplicada no se edita nunca**: se escribe otra
 encima.
@@ -51,7 +51,8 @@ lados](EL-SUELDO-DE-LOS-DOS-LADOS.md).
 
 La `V56` (14/09/2026) le da al portal **una campana**: la tabla `aviso_portal` guarda lo que pasó
 mientras el candidato no estaba, con su estado de leído. Nace con un solo tipo de aviso —el cambio
-de sueldo de la V55— y está hecha para los que vengan; la V58 suma el segundo y la V60 el tercero.
+de sueldo de la V55— y está hecha para los que vengan; la V58 suma el segundo, la V60 el tercero y
+la V63 los cuatro de las reseñas de empresas.
 
 La `V37` convierte el esquema en **multiempresa**: `organizacion.es_plataforma` marca a la
 dueña de la plataforma (solo una puede serlo) y reemplaza al código `'RENASER'` que estaba
@@ -131,6 +132,16 @@ contenido: pasa a ser la **zona o referencia** (barrio, distrito o dirección). 
 rescata la ciudad cuando ese texto es exactamente el nombre de una provincia, sin mirar
 mayúsculas ni tildes; las demás quedan sin ciudad para que el equipo la elija. Ver `vacante` en el
 [diccionario de datos](07-DICCIONARIO-DE-DATOS.md).
+
+La `V63` (28/09/2026) trae **las reseñas de empresas a quien contrataron**: tres tablas nuevas
+—`resena`, `respuesta_resena` y `reporte_resena`— y tres permisos, `resenar_contratado` y
+`ver_resenas_candidato` para Talento, responsable del área y Dirección de **todas** las
+organizaciones que ya existían, y `moderar_resenas` solo para el Administrador de la plataforma.
+La reseña cuelga de la **postulación** (una viva por contratación) y apunta también a la
+**persona**, porque es su reputación y la leen todas las empresas donde postula: es la única
+información de un proceso que cruza de una empresa a otra, y **no puntúa**. Los cuatro avisos
+nuevos de la campana van solo en el comentario de `aviso_portal.tipo`, que es texto libre. Ver
+«Reseñas de empresas» más abajo y en el [diccionario de datos](07-DICCIONARIO-DE-DATOS.md).
 
 La `V54` (14/09/2026) **no añade ninguna tabla y cambia quién firma qué**. Hasta ella había dos
 tipos de texto —`PROCESO` y `FUTUROS_CONTACTOS`— y el de la cuenta usaba el primero, que habla de
@@ -502,7 +513,7 @@ Hay una versión dibujada de este mismo mapa en
 
 ## Las tablas
 
-Ciento cinco en total, agrupadas por área para poder leerlas de a poco. En cada una se nombran
+Ciento ocho en total, agrupadas por área para poder leerlas de a poco. En cada una se nombran
 las columnas que importan para entender qué hace, no todas.
 
 **Para verlas todas, con tipo y clave, está el [Diccionario de datos](07-DICCIONARIO-DE-DATOS.md).**
@@ -1128,7 +1139,9 @@ lo que cambia en una vacante**, con dos tipos: `REMUNERACION_ACTUALIZADA` (el su
 desde su tarjeta) y `VACANTE_ACTUALIZADA` (la vacante corregida con el formulario, un solo aviso
 por guardado). La `V60` suma `VACANTE_ELIMINADA`: la empresa retiró la vacante y la postulación
 quedó cerrada; es el único que **no enlaza** a ninguna parte, y los avisos anteriores de una
-vacante eliminada se siguen enseñando, sin enlace. La tabla está hecha para los que vengan —«avanzaste de etapa», «tienes una prueba
+vacante eliminada se siguen enseñando, sin enlace. La `V63` suma los cuatro de las reseñas
+—`RESENA_PUBLICADA`, `RESENA_EDITADA`, `REPORTE_RESENA_RESUELTO` y `RESPUESTA_RESENA_OCULTADA`—,
+que no cuelgan de ninguna postulación y llevan a la sección de reseñas del perfil. La tabla está hecha para los que vengan —«avanzaste de etapa», «tienes una prueba
 por rendir», «te queda un día»—, que hoy existen solo como correos que salen y no vuelven.
 
 La base guarda la ruta del archivo, nunca el archivo. Así los entregables pesados —vídeos,
@@ -1140,6 +1153,36 @@ El seguimiento de desempeño **sigue sin alimentarse solo**: la integración con
 traería objetivos, tareas, plazos, retrabajo y resultados no está construida. Hoy los valores los
 pone una persona, y `metrica_desempeno.origen` deja dicho si llegó solo o lo puso alguien, para
 que el día que se conecte no haga falta cambiar el modelo.
+
+---
+
+### Reseñas de empresas · 3 tablas
+
+Desde la `V63` (28/09/2026). La empresa que contrató a alguien le deja de 1 a 5 estrellas y una
+opinión; la persona puede responder, y las dos partes pueden reportar lo de la otra.
+
+| Tabla | Para qué existe | Columnas que importan |
+|---|---|---|
+| `resena` | La opinión de la empresa sobre quien contrató. Una viva por contratación | postulacion_id, organizacion_id, persona_id, estrellas, texto, escrita_por_usuario_id, publicada_en, editada_en, ocultada_en, nota_ocultacion, borrada_en |
+| `respuesta_resena` | La versión de la persona, debajo de la reseña. Una viva por reseña | resena_id, usuario_id, texto, publicada_en, editada_en, editable_hasta, ocultada_en, nota_ocultacion, borrada_en |
+| `reporte_resena` | Lo que la persona reporta de una reseña, o la empresa autora de una respuesta, y lo que decidió la plataforma | resena_id, respuesta_id, objeto, reportado_por_usuario_id, organizacion_reportante_id, motivo, comentario, estado, resuelto_por_usuario_id, resuelto_en, nota_revision |
+
+**La reseña cuelga de la postulación y apunta a la persona.** De la postulación, porque se reseña
+una contratación y no a alguien en abstracto: dos contrataciones son dos reseñas. De la persona,
+porque es su reputación, la misma en todas sus cuentas y en todas las empresas donde postula; es
+lo que deja leerlas desde la ficha de otra empresa sin buscar por ids ajenos. La firma es
+`organizacion_id`: quién la escribió queda en `escrita_por_usuario_id`, solo para la auditoría.
+
+**Borrar la reseña o la respuesta no borra la fila**: pone `borrada_en`, que deja libre la
+contratación —o la reseña— para otra y permite cerrar como «retirado» el reporte que tuviera
+pendiente. La unicidad es de las vivas, con índices parciales. **Ocultar tampoco borra**:
+`ocultada_en` con su nota, y es definitivo.
+
+`editable_hasta` de la respuesta **se guarda y no se calcula** porque se mueve: cada vez que la
+empresa edita una reseña ya respondida, vuelve a 30 días desde esa edición. El plazo de la
+reseña sí se calcula —publicación más 30 días— porque editarla no lo alarga.
+
+⚠️ **Ninguna de las tres entra en notas, ranking, pase automático ni IA.** Se leen, y nada más.
 
 ---
 
@@ -1168,6 +1211,11 @@ cuáles sí, porque las que no, hay que probarlas en el código.
   los tres o ninguno.
 - **Una cuenta tiene como mucho un enlace de contraseña nueva vivo** (`V61`): si dos solicitudes
   llegaran a la vez, la base rechaza la segunda en vez de dejar dos enlaces que sirvan.
+- **Una reseña viva por contratación y una respuesta viva por reseña** (`V63`), y un solo
+  reporte pendiente de cada una: dos personas de la misma empresa pulsando «Publicar» a la vez no
+  dejan dos reseñas. Las estrellas van de 1 a 5, los textos tienen sus largos (30 a 1000 la
+  reseña, 30 a 500 la respuesta, hasta 500 el comentario del reporte), «Otro motivo» exige
+  comentario, y resolver un reporte exige quién lo resolvió y una nota.
 
 ### Tienen que vivir en el código
 
@@ -1197,6 +1245,11 @@ cuáles sí, porque las que no, hay que probarlas en el código.
   trato con gente que ya postuló.
 - **Que una vacante que esconde su sueldo no vea ninguna pretensión.** Son dos llaves distintas
   —el permiso y lo que publica esta vacante— y ninguna de las dos cabe en una restricción.
+- **Los plazos de las reseñas** (`V63`): que solo se reseñe una postulación `CONTRATADO` a partir
+  de los 30 días de su paso a ese estado, y que la reseña y la respuesta solo se cambien dentro de
+  sus 30 días. Dependen de la hora, que manda el servidor, y de la fecha de una transición.
+- **Que solo modere la plataforma.** Además del permiso `moderar_resenas`, el servicio exige ser
+  la organización plataforma; es la misma doble llave del alta de empresas.
 
 ### Nunca existen, ni siquiera como opción
 
@@ -1209,6 +1262,11 @@ marcar algún día:
 4. Que se pueda saltar el consentimiento
 5. Que la máquina contrate a alguien sin que intervenga una persona
 6. Que alguien vea datos de otra organización
+
+⚠️ **La sexta tiene una excepción escrita, y no es una casilla**: las reseñas de empresas
+(`V63`). Una empresa lee las que otras dejaron a la persona que se postula a su vacante, y la
+plataforma lee las reportadas para moderarlas. Lo decidió el usuario el 28/09/2026; fuera de
+eso, la regla sigue igual.
 
 ---
 
@@ -1229,9 +1287,12 @@ una sola tabla.
    ranking de cada empresa mientras desaparece la del perfil no tiene defensa.
 7. **Se borran enteros sus avisos del portal**, no se vacían. A diferencia del correo, que conserva
    su fila porque demuestra que se avisó, un aviso del portal no es prueba de nada frente a nadie.
-8. Si era prospecto del Radar, deja de estar activo.
-9. **Se conserva todo lo demás**: puntajes, historial de estados, auditoría, métricas.
-10. Sus postulaciones abiertas pasan a cerradas, con motivo «pidió borrar sus datos».
+8. **Se borran enteras sus reseñas de empresas** (`V63`), con sus respuestas y sus reportes. Son
+   opiniones sobre una persona concreta y, con su nombre fuera, el texto seguiría señalándola. La
+   auditoría conserva que existieron —el texto nunca se copió allí— y una fila con cuántas había.
+9. Si era prospecto del Radar, deja de estar activo.
+10. **Se conserva todo lo demás**: puntajes, historial de estados, auditoría, métricas.
+11. Sus postulaciones abiertas pasan a cerradas, con motivo «pidió borrar sus datos».
 
 El resultado es que el embudo de esa vacante sigue cuadrando y la auditoría sigue completa, pero
 ya no hay forma de saber de quién se trataba.
@@ -1248,11 +1309,13 @@ Datos que se cargan con la primera migración, no a mano:
 
 - La **organización** Renaser, marcada como **dueña de la plataforma** (`es_plataforma`)
 - Los **18 estados** de la postulación, con su etapa y su momento
-- Los **71 permisos** que las migraciones siembran, con su etiqueta y su grupo — contados
-  de las migraciones, no de los documentos de diseño. Cuatro son recientes: de la V37,
+- Los **75 permisos** que las migraciones siembran, con su etiqueta y su grupo — contados
+  de las migraciones, no de los documentos de diseño. Los más recientes: de la V37,
   `personalizar_instrumentos` para el administrador de cada empresa y
   `administrar_plataforma` solo para el de la plataforma; de la V40,
-  `ver_inscritos_simulacion` y `administrar_permisos`
+  `ver_inscritos_simulacion` y `administrar_permisos`; de la V60, `eliminar_vacante`; y de la
+  V63, `resenar_contratado`, `ver_resenas_candidato` y `moderar_resenas`, este último solo para
+  el administrador de la plataforma
 - Los **cinco roles** iniciales con sus permisos: candidato, equipo de talento, responsable del
   área, dirección y administrador. Es como arranca el sistema, no cómo queda para siempre
 - Las **22 dimensiones**, con cuáles de ellas son obligatorias

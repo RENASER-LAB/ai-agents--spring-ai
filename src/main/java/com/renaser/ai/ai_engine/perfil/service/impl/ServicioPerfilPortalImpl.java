@@ -61,18 +61,23 @@ public class ServicioPerfilPortalImpl implements ServicioPerfilPortal {
     private final NivelEducativoRepository nivelesEducativos;
     private final NivelIdiomaRepository nivelesIdioma;
     private final PintorDePerfil pintor;
+    // Las reseñas de empresas (V63): el resumen de la cabecera y lo que lleva la descarga.
+    private final com.renaser.ai.ai_engine.resena.service.ServicioResenasPortal resenas;
 
     // ==================== Ver ====================
 
     @Override
     public PerfilCompleto ver(ContextoUsuario quien) {
-        return pintor.pintar(quien.personaId());
+        return pintor.pintar(quien.personaId())
+                .conResenas(resenas.resumen(quien.personaId()));
     }
 
     @Override
     public PerfilCompleto descargar(ContextoUsuario quien) {
         // El mismo contenido que ver: el derecho de acceso es sobre lo que hay, ni mas ni menos.
-        return pintor.pintar(quien.personaId());
+        // Y lo que las empresas opinan de ella tambien es suyo: sus reseñas, sus respuestas y
+        // sus reportes con el resultado van enteros (V63).
+        return ver(quien).conMisResenas(resenas.paraLaDescarga(quien.personaId()));
     }
 
     // ==================== La cabecera ====================

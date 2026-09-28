@@ -102,12 +102,14 @@ public class PintorDePerfil {
                 completo.habilidades(), completo.experienciaMeses(), completo.ubicacion(),
                 completo.disponibilidad(), null, completo.experiencia(), completo.educacion(),
                 completo.idiomas(), completo.certificaciones(), completo.enlaces(),
-                completo.lecturaCv(), completo.tieneFoto(), completo.portada(), completo.cv());
+                completo.lecturaCv(), completo.tieneFoto(), completo.portada(), completo.cv(),
+                completo.resenas(), completo.misResenas());
     }
 
     /**
      * El mismo perfil sin lo que es del candidato y de nadie más: la foto, la portada, su
-     * currículum y los diplomas.
+     * currículum y los diplomas. Y sin el resumen de sus reseñas (V63): el panel las lee por
+     * su propia ruta, con el permiso {@code ver_resenas_candidato}.
      *
      * <p>⚠️ <b>No es cosmética, es la regla que sostiene el producto.</b> El RF-41 esconde
      * foto, edad, sexo y estado civil antes de que la IA lea el currículum, para no sesgar

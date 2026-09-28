@@ -1,7 +1,7 @@
 # Diccionario de datos
 
 Sistema de selección de personal — Renaser Consulting
-Versión 3.1 · 2026-09-25 · Puesto al día con las migraciones hasta la `V62` (la V49 y la V50 solo siembran pesos; la V51 trae la tabla `lectura_cv_perfil` y los archivos del perfil; la V52 y la V53 no crean tablas; la V55 pone el sueldo en la vacante y la pretensión en la postulación; la V56 trae la tabla `aviso_portal`; la V57 no crea tablas, solo siembra los precios de los dos modelos de DeepSeek; la V58 no crea tablas: suma el aviso `VACANTE_ACTUALIZADA` y apaga el correo `REMUNERACION_ACTUALIZADA`; la V59 añade `vacante.archivada_en`; la V60 añade `vacante.eliminada_en` —el borrado lógico—, el motivo de cierre y el tipo de aviso `VACANTE_ELIMINADA`, y el permiso `eliminar_vacante`; la V61 trae la tabla `recuperacion_clave`, tres parámetros y los dos correos de «¿Olvidaste tu contraseña?»; la V62 añade `vacante.ciudad_ubigeo`)
+Versión 3.2 · 2026-09-28 · Puesto al día con las migraciones hasta la `V63` (la V49 y la V50 solo siembran pesos; la V51 trae la tabla `lectura_cv_perfil` y los archivos del perfil; la V52 y la V53 no crean tablas; la V55 pone el sueldo en la vacante y la pretensión en la postulación; la V56 trae la tabla `aviso_portal`; la V57 no crea tablas, solo siembra los precios de los dos modelos de DeepSeek; la V58 no crea tablas: suma el aviso `VACANTE_ACTUALIZADA` y apaga el correo `REMUNERACION_ACTUALIZADA`; la V59 añade `vacante.archivada_en`; la V60 añade `vacante.eliminada_en` —el borrado lógico—, el motivo de cierre y el tipo de aviso `VACANTE_ELIMINADA`, y el permiso `eliminar_vacante`; la V61 trae la tabla `recuperacion_clave`, tres parámetros y los dos correos de «¿Olvidaste tu contraseña?»; la V62 añade `vacante.ciudad_ubigeo`; la V63 trae las tablas `resena`, `respuesta_resena` y `reporte_resena`, los tres permisos de las reseñas de empresas y cuatro tipos de aviso)
 
 Cada tabla con todas sus columnas, tipos y claves. **Este documento se consulta**, no se lee de
 corrido: es la base para escribir las migraciones de Flyway.
@@ -11,8 +11,8 @@ Lo que llegó después de la versión 2.0 va marcado con su migración entre par
 ⚠️ **Tres tablas de la base no tienen ficha aquí.** `agent_run` es del motor de agentes y no de
 selección, así que no la tendrá nunca. `invitacion` (`V37`) y `tarifa_modelo` (`V38`) sí
 deberían tenerla: llegaron con el multiempresa y su ficha está pendiente. Hasta que se
-escriban, para esas dos manda la migración. De las **104 tablas de selección** que existen hoy,
-aquí hay ficha de 102, más otras diez que están solo diseñadas y todavía no existen.
+escriban, para esas dos manda la migración. De las **107 tablas de selección** que existen hoy,
+aquí hay ficha de 105, más otras diez que están solo diseñadas y todavía no existen.
 
 Para entender *por qué* el modelo es así, está el [Modelo de datos](05-MODELO-DE-DATOS.md).
 
@@ -216,7 +216,7 @@ Un nombre y una lista de permisos.
 
 ## `permiso`
 
-Una acción suelta que se puede conceder o no. **Sembrados hay 71**, contados sobre los bloques
+Una acción suelta que se puede conceder o no. **Sembrados hay 75**, contados sobre los bloques
 `INSERT INTO permiso` de las migraciones. La matriz de
 [Roles y permisos](04-ROLES-Y-PERMISOS.md) enumera 77, y **las dos listas no se contienen la
 una a la otra**: allí hay acciones diseñadas que la base todavía no tiene —el Radar entero y
@@ -240,8 +240,11 @@ Los grupos que existen de verdad hoy son nueve —`DECISION` y `RADAR` están so
 la simulación va en `SESIONES`, no en `SIMULACION`.
 
 **No lleva organización:** los permisos son los mismos para todos. Lo que cambia es quién los
-tiene. Solo crece con una migración: los dos últimos, `ver_inscritos_simulacion` y
-`administrar_permisos`, llegaron con la `V40`.
+tiene. Solo crece con una migración: `ver_inscritos_simulacion` y `administrar_permisos`
+llegaron con la `V40`, `eliminar_vacante` con la `V60`, y los tres últimos con la `V63`:
+`resenar_contratado` y `ver_resenas_candidato` (grupo `CANDIDATOS`) y `moderar_resenas` (grupo
+`CONFIGURACION`), este solo para el Administrador de la plataforma y fuera de la copia del alta
+de empresas.
 
 La etiqueta existe porque la pantalla donde se reparten permisos nunca debe mostrar nombres
 técnicos.
@@ -2647,7 +2650,7 @@ leído.
 | `id` | bigint | sí | Clave |
 | `usuario_id` | bigint | sí | A quién. **Del usuario y no de la persona**: la campana es de quien entra al portal, y es el usuario el que tiene sesión |
 | `organizacion_id` | bigint | sí | De qué empresa viene. La misma regla que la postulación: el aviso nace en la organización **de la vacante**, que es la que hizo algo que contar |
-| `tipo` | text | sí | Qué clase de noticia es. `REMUNERACION_ACTUALIZADA` (`V55`): el sueldo cambiado desde la tarjeta del detalle. `VACANTE_ACTUALIZADA` (`V58`): la vacante corregida con el formulario, **uno solo por guardado** con todo lo que cambió, sueldo incluido. `VACANTE_ELIMINADA` (`V60`): la empresa retiró la vacante y la postulación quedó cerrada; **es el único sin enlace**, con `postulacion_id` y `vacante_id` vacíos. Sin CHECK: un tipo nuevo no pide migración |
+| `tipo` | text | sí | Qué clase de noticia es. `REMUNERACION_ACTUALIZADA` (`V55`): el sueldo cambiado desde la tarjeta del detalle. `VACANTE_ACTUALIZADA` (`V58`): la vacante corregida con el formulario, **uno solo por guardado** con todo lo que cambió, sueldo incluido. `VACANTE_ELIMINADA` (`V60`): la empresa retiró la vacante y la postulación quedó cerrada; **es el único sin enlace**, con `postulacion_id` y `vacante_id` vacíos. `RESENA_PUBLICADA`, `RESENA_EDITADA` (la empresa editó una reseña ya respondida), `REPORTE_RESENA_RESUELTO` y `RESPUESTA_RESENA_OCULTADA` (`V63`): las reseñas de empresas; también llegan con `postulacion_id` y `vacante_id` vacíos, y el portal los lleva por su tipo a la sección de reseñas del perfil. Sin CHECK: un tipo nuevo no pide migración |
 | `titulo` | text | sí | El texto **ya armado** |
 | `cuerpo` | text | sí | El texto **ya armado** |
 | `postulacion_id` | bigint | no | A dónde lleva al pulsarlo |
@@ -2670,8 +2673,8 @@ currículums inventó—; el aviso queda esperando dentro.
 Un aviso que se reconstruyera al leerlo diría el sueldo de hoy y no el que cambió aquel día: la
 noticia se volvería un espejo.
 
-`postulacion_id` y `vacante_id` son opcionales porque no todo aviso futuro colgará de una
-postulación: «completa tu perfil» no cuelga de ninguna.
+`postulacion_id` y `vacante_id` son opcionales porque no todo aviso colgará de una postulación:
+«completa tu perfil» no cuelga de ninguna, y los cuatro de las reseñas (`V63`) tampoco.
 
 ⚠️ **Las cuatro claves foráneas no borran en cascada**, como todas las de este sistema. Un candidato
 de prueba con un aviso hace fallar el borrado de su `postulacion` y de su `usuario`, y los guiones
@@ -2926,6 +2929,100 @@ que los UPDATE dentro de la misma transacción.
 
 ---
 
+# 21 · Reseñas de empresas (`V63`)
+
+La empresa que contrató a alguien le deja de 1 a 5 estrellas y una opinión; la persona puede
+responder, y cada parte puede reportar lo de la otra ante la plataforma. **Es lo único de un
+proceso que leen las demás empresas**, y **no puntúa**: ninguna de estas tablas entra en notas,
+ranking, pase automático, Excel ni IA. El porqué del diseño está en el
+[Modelo de datos](05-MODELO-DE-DATOS.md), «Reseñas de empresas».
+
+⚠️ **Las tres son excepción a `creado_en`: no lo llevan.** La fecha que cuenta es
+`publicada_en`, y en el reporte `reportado_en`.
+
+La auditoría registra `publicar_resena`, `editar_resena`, `borrar_resena`, `responder_resena`,
+`editar_respuesta_resena`, `borrar_respuesta_resena`, `reportar_resena`,
+`reportar_respuesta_resena`, `resolver_reporte_resena` y, en el borrado de datos,
+`borrar_resenas_por_borrado_datos` con los recuentos. **Nunca copia el texto** de una reseña ni de
+una respuesta: la auditoría no se puede borrar, y el texto sobreviviría al borrado de datos.
+
+## `resena`
+
+| Columna | Tipo | Oblig. | Qué guarda |
+|---|---|---|---|
+| `id` | bigint | sí | Clave |
+| `postulacion_id` | bigint | sí | La contratación reseñada. Única **mientras la reseña está viva** |
+| `organizacion_id` | bigint | sí | La empresa autora: la firma es suya |
+| `persona_id` | bigint | sí | La persona reseñada. Por persona y no por usuario: es su reputación en todas sus cuentas y empresas |
+| `estrellas` | integer | sí | De 1 a 5 (CHECK) |
+| `texto` | text | sí | De 30 a 1000 caracteres sin contar los espacios de los extremos (CHECK con `btrim`) |
+| `escrita_por_usuario_id` | bigint | sí | Quién la escribió. Solo para la auditoría: no se enseña en ninguna pantalla |
+| `publicada_en` | timestamptz | sí | La primera publicación. El plazo de 30 días para cambiarla cuenta desde aquí, y editar no lo alarga |
+| `editada_en` | timestamptz | no | Lleva la marca «Editada» |
+| `ocultada_en` | timestamptz | no | La plataforma la ocultó tras un reporte. Definitivo: deja de verse y de contar |
+| `nota_ocultacion` | text | no | Lo que lee la empresa autora. Va con `ocultada_en`: los dos o ninguno (CHECK) |
+| `borrada_en` | timestamptz | no | La empresa la borró dentro de su plazo. La fila se queda para cerrar como `RETIRADA` el reporte pendiente |
+
+**Clave primaria:** `id` · **Apunta a:** `postulacion`, `organizacion`, `persona`, `usuario`
+**Índices parciales:** `resena_una_viva_por_contratacion` (único, `postulacion_id` sin borrar) y
+`resena_de_la_persona` (`persona_id` sin borrar), que es lo que piden el perfil, la ficha y la
+tabla.
+
+## `respuesta_resena`
+
+| Columna | Tipo | Oblig. | Qué guarda |
+|---|---|---|---|
+| `id` | bigint | sí | Clave |
+| `resena_id` | bigint | sí | La reseña a la que responde. Única **mientras la respuesta está viva** |
+| `usuario_id` | bigint | sí | La cuenta del portal que respondió |
+| `texto` | text | sí | De 30 a 500 caracteres sin contar los espacios de los extremos (CHECK) |
+| `publicada_en` | timestamptz | sí | |
+| `editada_en` | timestamptz | no | Lleva la marca «Editada» |
+| `editable_hasta` | timestamptz | sí | Hasta cuándo la persona puede editarla o borrarla. Nace a 30 días y **vuelve a 30 días** cada vez que la empresa edita la reseña ya respondida: por eso se guarda y no se calcula |
+| `ocultada_en` | timestamptz | no | La plataforma la ocultó tras un reporte de la empresa autora. Definitivo: la persona no puede editarla, borrarla ni responder otra vez a esa reseña |
+| `nota_ocultacion` | text | no | Va con `ocultada_en` (CHECK) |
+| `borrada_en` | timestamptz | no | La persona la borró dentro de su plazo, o se fue con su reseña |
+
+**Clave primaria:** `id` · **Apunta a:** `resena`, `usuario`
+**Índice parcial:** `respuesta_una_viva_por_resena` (único, `resena_id` sin borrar). Sin hilo: la
+empresa no contesta a la respuesta.
+
+Va con su reseña: si la plataforma oculta la reseña, la respuesta deja de verse con ella **pero no
+se borra**, y sigue en la descarga de datos de la persona.
+
+## `reporte_resena`
+
+| Columna | Tipo | Oblig. | Qué guarda |
+|---|---|---|---|
+| `id` | bigint | sí | Clave |
+| `resena_id` | bigint | sí | La reseña. Cuando se reporta la respuesta, va de contexto |
+| `respuesta_id` | bigint | no | Solo si lo reportado es la respuesta |
+| `objeto` | text | sí | `RESENA` o `RESPUESTA`. Un CHECK ata `RESENA` a `respuesta_id` vacío |
+| `reportado_por_usuario_id` | bigint | sí | La persona reseñada, o el usuario de la empresa autora |
+| `organizacion_reportante_id` | bigint | no | La empresa autora cuando reporta ella. Llena si y solo si `objeto = RESPUESTA` (CHECK) |
+| `motivo` | text | sí | `OFENSIVA`, `DATOS_PERSONALES`, `DISCRIMINATORIA`, `FALSA` u `OTRO` |
+| `comentario` | text | no | Hasta 500. **Obligatorio con `OTRO`** (CHECK) |
+| `reportado_en` | timestamptz | sí | |
+| `estado` | text | sí | `PENDIENTE` (por defecto), `MANTENIDA`, `OCULTADA` o `RETIRADA` —la empresa borró la reseña, o la persona su respuesta, antes de que se revisara— |
+| `resuelto_por_usuario_id` | bigint | no | Obligatorio al mantener u ocultar |
+| `resuelto_en` | timestamptz | no | Vacío si y solo si sigue `PENDIENTE` (CHECK) |
+| `nota_revision` | text | no | **Obligatoria al mantener u ocultar** (CHECK): es lo que leen la empresa autora o la persona |
+
+**Clave primaria:** `id` · **Apunta a:** `resena`, `respuesta_resena`, `usuario`, `organizacion`
+**Índices:** `reporte_uno_pendiente_por_resena` y `reporte_uno_pendiente_por_respuesta` (únicos y
+parciales: un solo reporte pendiente de cada cosa), `reporte_resena_pendientes` (`reportado_en`,
+solo pendientes: la lista de la moderación, de la más antigua a la más reciente) y
+`reporte_resena_de_la_resena` (`resena_id`).
+
+Volver a reportar lo que la plataforma mantuvo, después de que se editara, lo decide el servicio:
+la base solo impide dos pendientes a la vez. Mientras un reporte está pendiente, lo reportado
+**sigue visible y contando**.
+
+**Al ejecutar un borrado de datos, las tres se borran de verdad** para esa persona: sus reseñas,
+sus respuestas y los reportes. No se vacían: con el nombre fuera, el texto seguiría señalándola.
+
+---
+
 # Índices
 
 PostgreSQL crea un índice para cada clave primaria y cada restricción de unicidad. Estos hay que
@@ -2958,6 +3055,8 @@ caro sale: cada consulta que filtra por el padre acaba leyendo la tabla entera.
 | `vacante (organizacion_id, estado)` | Las vacantes publicadas |
 | `evaluacion (usuario_id, vigente_hasta)` | Qué se le puede reutilizar a alguien |
 | `prospecto_familia (familia_codigo)` | Buscar prospectos compatibles con una vacante nueva |
+| `resena (persona_id) WHERE borrada_en IS NULL` | **Índice parcial.** Las reseñas de una persona: el perfil, la ficha y la columna de la tabla, en bloque (`V63`) |
+| `reporte_resena (reportado_en) WHERE estado = 'PENDIENTE'` | **Índice parcial.** La lista de pendientes de la moderación (`V63`) |
 
 Los índices de `organizacion_id` sueltos **no hacen falta**: van dentro de los compuestos de
 arriba, porque toda consulta filtra primero por organización.
@@ -2983,6 +3082,10 @@ Resumen de las restricciones que están repartidas por el documento:
 - Un entregable tiene archivo o enlace.
 - El minuto en que empieza el rango del cambio inesperado no pasa del minuto en que acaba.
 - La guía de calificación de una prueba no pasa de 2000 caracteres.
+- Una reseña viva por contratación, una respuesta viva por reseña y un solo reporte pendiente de
+  cada una; estrellas de 1 a 5, y cada texto con su largo (`V63`).
+- Un reporte con «Otro motivo» lleva comentario, y uno mantenido u ocultado lleva quién lo
+  resolvió y su nota (`V63`).
 
 ⚠️ Aquí decía «el rango del cambio inesperado cabe dentro de la duración de la prueba». **Eso no
 lo impide nada**: no hay CHECK que lo diga ni comprobación en el código. Ver
