@@ -76,10 +76,11 @@ Perfil Integral → prueba del puesto → simulación → validación → decisi
   servidor (imagen 2 MB, PDF 10 MB); y el código muerto de reordenar se borró. **Queda pendiente y
   pide migración**: guardar en `lectura_cv_perfil` el resultado crudo de la lectura para no pagar
   dos veces el mismo currículum al pasar del perfil a una postulación. Siguen abiertos, a la espera
-  de la columna DECISIÓN: el CV del candidato no se puede abrir desde su ficha del panel; el Excel
+  de la columna DECISIÓN: el CV del candidato no se puede abrir desde su ficha del panel; y el Excel
   de la prueba escribe «falta una nota de etapa» donde lo que falta es la nota del currículum o el
-  reparto de pesos; y el párrafo que explica la columna Ponderado se cuela como nombre de la
-  columna en el menú «Columnas».
+  reparto de pesos. El párrafo que explica la columna Ponderado ya no se cuela como nombre de la
+  columna en el menú «Columnas»: el panel lo corrigió el 28/09/2026, sin tocar el backend, y la
+  explicación sale al pasar el cursor por la cabecera de la tabla.
 
 ---
 
