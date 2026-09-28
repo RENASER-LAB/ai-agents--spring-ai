@@ -30,11 +30,11 @@ requisitos nuevos el 14 de agosto y cambian bastante.
 | Documento | Qué contiene |
 |---|---|
 | [00 · Qué hace el sistema](00-QUE-HACE-EL-SISTEMA.md) | El sistema entero sin nada técnico. Cinco minutos |
-| [01 · Requisitos funcionales](01-REQUISITOS-FUNCIONALES.md) | RF-01 a RF-164. Qué hace el sistema |
+| [01 · Requisitos funcionales](01-REQUISITOS-FUNCIONALES.md) | RF-01 a RF-179. Qué hace el sistema |
 | [02 · Requisitos no funcionales](02-REQUISITOS-NO-FUNCIONALES.md) | RNF-01 a RNF-66. Tecnología, seguridad, rendimiento |
 | [03 · Estados de la postulación](03-ESTADOS-POSTULACION.md) | Los 18 estados de una postulación y sus transiciones |
-| [04 · Roles y permisos](04-ROLES-Y-PERMISOS.md) | Los 77 permisos, acción por acción. En la base hay 71 sembrados |
-| [05 · Modelo de datos](05-MODELO-DE-DATOS.md) | Las 108 tablas (V1-V61) por área y por qué el modelo es así. Se lee |
+| [04 · Roles y permisos](04-ROLES-Y-PERMISOS.md) | Los 77 permisos, acción por acción. En la base hay 75 sembrados |
+| [05 · Modelo de datos](05-MODELO-DE-DATOS.md) | Las 108 tablas del módulo (V1-V63) por área y por qué el modelo es así. Se lee |
 | [06 · Inventario de pantallas](06-INVENTARIO-DE-PANTALLAS-MOCKUPS.md) | Las 21 pantallas base, estados, ventanas, campos y datos de los mockups |
 | [07 · Diccionario de datos](07-DICCIONARIO-DE-DATOS.md) | Cada tabla con todas sus columnas, tipos y claves. Se consulta |
 | [08 · Alcance del MVP](08-ALCANCE-DEL-MVP.md) | Qué se construye primero, en tres hitos, y qué queda fuera |
@@ -116,7 +116,7 @@ Material de origen. Solo se consulta:
 | `Sistema_RENASER_Talent_Intelligence...docx` | Versión anterior del vigente. Descartada |
 | `CAMBIOS-DEL-DOCUMENTO-NUEVO.md` | Qué cambió con el documento nuevo y qué se decidió |
 | `ANALISIS-DOCUMENTOS.md` | Qué documento manda sobre cuál y por qué |
-| [`COMPROBACION-SIN-TECNICA.md`](insumos/COMPROBACION-SIN-TECNICA.md) | El sistema en dos páginas sin nada técnico, y las 93 tablas de entonces rastreadas contra él (hoy son 105). **Su primera parte se lee sola** |
+| [`COMPROBACION-SIN-TECNICA.md`](insumos/COMPROBACION-SIN-TECNICA.md) | El sistema en dos páginas sin nada técnico, y las 93 tablas de entonces rastreadas contra él (hoy son 108). **Su primera parte se lee sola** |
 | [`CAZATALENTOS-sistema-de-filtro.md`](insumos/CAZATALENTOS-sistema-de-filtro.md) | El método CAZATALENTOS tal como lo describió la clienta: los bancos por nivel y su filtro |
 | `NOTAS-TEMPORALES.md` | Lo que sigue pendiente |
 | `entrevista-cliente-2026-08-08.md` | Transcripción de la reunión |

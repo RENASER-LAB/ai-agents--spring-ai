@@ -71,7 +71,8 @@ volver a entrar**.
 
 Lo que **sí** hace falta desplegar es un permiso nuevo: el catálogo solo crece con una
 migración, y por eso este documento y la base no dicen el mismo número. Aquí se enumeran **77
-permisos**, que es el sistema completo; en la base hay **71 sembrados** (ver
+permisos**, que es el sistema completo; en la base hay **75 sembrados** —71 hasta la `V40`,
+`eliminar_vacante` de la `V60` y los tres de las reseñas de la `V63`— (ver
 [07-DICCIONARIO-DE-DATOS.md](07-DICCIONARIO-DE-DATOS.md), que sigue al código). La diferencia
 son sobre todo el Radar y las métricas, todavía sin construir. En sentido contrario también
 falta algo: cuatro permisos que existen en la base —`ver_banco_preguntas`,
@@ -222,6 +223,32 @@ no publica su remuneración, así que a nadie se le pidió la suya». Hasta ahor
 con una columna que sí traía cifras. Ver [El sueldo, de los dos
 lados](EL-SUELDO-DE-LOS-DOS-LADOS.md).
 
+### Reseñas de empresas
+
+Desde el 28/09/2026 (`V63`, RF-171 a RF-179 de los requisitos funcionales).
+
+| Acción | Candidato | Talento | Resp. área | Dirección | Admin |
+|---|:--:|:--:|:--:|:--:|:--:|
+| Escribir, editar o borrar la reseña de una persona contratada, y reportar la respuesta a esa reseña (`resenar_contratado`) | ○ | ● | ◐ | ● | ○ |
+| Ver las reseñas de empresas de un postulante, en su ficha y en la columna de la tabla (`ver_resenas_candidato`) | ○ | ● | ◐ | ● | ○ |
+| Leer sus reseñas, responderlas y reportarlas | ◐ | ○ | ○ | ○ | ○ |
+
+La `V63` los concedió **en todas las organizaciones que ya existían**, no solo en la plataforma:
+Talento y Dirección con alcance `TODO` y el responsable del área con `SUS_VACANTES`. Las empresas
+que se den de alta después los reciben al copiarse la matriz. Una contratación de otra vacante de
+su empresa que su alcance no cubre es **404**, con un texto que dice que queda fuera de su
+alcance; la de otra empresa, el 404 de siempre, que no confirma nada. Sin el permiso, **403**.
+
+El candidato no tiene casilla: lo decide que la reseña sea **suya**, y la ajena es 404, como el
+resto del portal. Revisar lo reportado (`moderar_resenas`) es de la plataforma: ver
+«Configuración».
+
+⚠️ **Leer el bloque de la ficha pide cualquiera de los dos permisos, pero los datos de las demás
+empresas solo viajan con `ver_resenas_candidato`.** Quien solo puede escribir ve su propio bloque
+y nada más. El panel no sabe sus permisos, así que la respuesta lleva `puedeResenar` y
+`puedeVerResenas`, y el ranking `puedeVerResenas`: son pistas para pintar, y quien decide es el
+backend en cada llamada.
+
 ### Evaluación y notas
 
 | Acción | Candidato | Talento | Resp. área | Dirección | Admin |
@@ -355,6 +382,7 @@ botón se ve y la acción se rechaza: quien reparte los permisos tiene que mirar
 | **Cambiar qué puede cada rol y con qué alcance** | ○ | ○ | ○ | ○ | ● |
 | **Personalizar los instrumentos de evaluación** | ○ | ○ | ○ | ○ | ● |
 | **Dar de alta y administrar empresas** | ○ | ○ | ○ | ○ | ● ‡ |
+| **Revisar las reseñas y respuestas reportadas** (`moderar_resenas`) | ○ | ○ | ○ | ○ | ● ‡ |
 | **Editar parámetros del sistema** | ○ | ○ | ○ | ● | ● |
 | **Ver el registro de auditoría** | ○ | ○ | ○ | ● | ● |
 
@@ -366,6 +394,12 @@ alta empresas** lo tiene **solo el Administrador de la empresa dueña de la plat
 Renaser—: es la operación de Renaser como dueña del producto, no una función del panel de un
 cliente. El alta de una empresa copia los roles de la plataforma y ese permiso lo excluye a
 propósito, o cada cliente nuevo nacería pudiendo dar de alta a los demás.
+
+**Revisar las reseñas reportadas** (`moderar_resenas`, `V63`) sigue la misma regla: lo tiene
+**solo el Administrador de la plataforma** y **el alta de empresas no lo copia**. Tiene además
+una segunda llave en el servicio: hay que ser la plataforma. Una empresa que se lo concediera a
+sí misma en «Permisos» seguiría recibiendo **403**, porque moderar es juzgar lo que escribieron
+otras empresas.
 
 La división es simple: **Talento prepara, Dirección aprueba, Administrador administra.**
 
@@ -412,6 +446,14 @@ de datos se lee esa palabra; en el producto y en las pantallas, «empresa». Es 
 «todo». Un permiso concedido en `TODO` a un rol de ACME no le enseña ni una fila de Renaser, y
 por eso el candado del último `administrar_permisos` cuenta dentro de cada empresa: si contara
 en toda la base, la primera en quedarse sin él dependería de que otra lo conservara.
+
+⚠️ **Una excepción escrita: las reseñas de empresas** (`V63`, 28/09/2026). La empresa B lee las
+reseñas que la empresa A dejó a la persona que A contrató, con el nombre de A, cuando esa persona
+postula a una vacante de B. Entra **por la persona de una postulación que B ya puede ver**, nunca
+por un id suelto, y no trae nada más de aquel proceso: ni notas, ni decisión, ni alertas. La
+plataforma, al moderar, lee también las reportadas de todas las empresas. Lo decidió el usuario y
+está escrito en el
+[diseño del candidato ante varias empresas](superpowers/specs/2026-08-25-el-candidato-ante-varias-empresas-design.md).
 
 ---
 

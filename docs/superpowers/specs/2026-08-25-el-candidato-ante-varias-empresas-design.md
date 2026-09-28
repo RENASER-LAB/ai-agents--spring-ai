@@ -43,8 +43,8 @@ signifique algo.
   `ver_resenas_candidato`). La persona las ve en su perfil, puede responderlas y
   reportarlas; la plataforma modera. Lo que se comparte es solo eso: ni la nota, ni la
   decisión, ni nada más de aquel proceso. **Las reseñas no puntúan**: no entran en notas,
-  ranking, pase automático ni IA. El detalle, en
-  [la spec de las reseñas](../../../specs/resenas-de-empresas-a-contratados.md).
+  ranking, pase automático ni IA. El detalle, en los
+  [requisitos funcionales](../../01-REQUISITOS-FUNCIONALES.md), RF-171 a RF-179.
 
 ## 3 · El currículum: transcripción compartida, evaluación por puesto
 

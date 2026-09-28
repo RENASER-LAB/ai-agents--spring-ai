@@ -190,6 +190,11 @@ no existe: no se guarda.
 Pasado un tiempo se mira si la contratación funcionó. **Eso es lo único que dice si el proceso
 está acertando.** Todo lo anterior son medios; esto es el resultado.
 
+Aparte de eso, **al mes de contratar, la empresa puede dejarle una reseña a esa persona**: de una
+a cinco estrellas y una opinión. La persona la lee en su perfil y puede responderla o reportarla,
+y las demás empresas donde se postule la leen junto a su candidatura. No cambia ninguna nota ni
+el orden de nadie: sirve para que quien trabajó bien lo pueda demostrar.
+
 ---
 
 ## Tres cosas que valen para todo el recorrido
