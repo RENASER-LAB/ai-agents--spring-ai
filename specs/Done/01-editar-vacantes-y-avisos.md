@@ -1,6 +1,8 @@
 # 01 · Editar vacantes y unificar avisos del portal
 
-Estado: lista para implementar. Primera entrega de tres; no depende de las entregas 02 y 03.
+Estado: TERMINADO
+
+Estado previo (referencia histórica): lista para implementar. Primera entrega de tres; no depende de las entregas 02 y 03.
 
 ## Objetivo
 Corregir una vacante desde `/admin` reutilizando el formulario de alta y avisar en el portal a quienes siguen en carrera cuando cambia información visible, incluido el sueldo.
@@ -76,7 +78,7 @@ QA explora teclado, nombres accesibles, móvil, alternancia alta/edición, datos
 Revisión humana: editar una publicada con el lápiz y ver los datos nuevos y su aviso desde la cuenta del candidato.
 
 ## Documentación y dependencias
-Después de la aprobación, actualiza RF-159, las APIs afectadas, auditoría y [el sueldo de los dos lados](../docs/EL-SUELDO-DE-LOS-DOS-LADOS.md); roles solo si necesita describir el uso del permiso existente. Conserva referencias de CLAUDE.md pertinentes, sin documentación nueva redundante.
+Después de la aprobación, actualiza RF-159, las APIs afectadas, auditoría y [el sueldo de los dos lados](../../docs/EL-SUELDO-DE-LOS-DOS-LADOS.md); roles solo si necesita describir el uso del permiso existente. Conserva referencias de CLAUDE.md pertinentes, sin documentación nueva redundante.
 
 Decisiones de negocio de esta entrega confirmadas en la spec original: avisar cambios visibles solo por campana y mantener los campos internos sin aviso. Las reglas de archivo/eliminación se confirmaron el 19/09/2026 y pertenecen a sus entregas. Integrar sus PR antes de lanzar la [entrega 02](02-archivar-desarchivar-vacantes.md).
 
@@ -90,6 +92,6 @@ Decisiones de negocio de esta entrega confirmadas en la spec original: avisar ca
 
 ## Referencias
 - [Índice de las tres entregas](editar-archivar-eliminar-vacantes.md).
-- [Controlador de vacantes](../src/main/java/com/renaser/ai/ai_engine/vacante/controller/VacantesPanelController.java) y [servicio de vacantes](../src/main/java/com/renaser/ai/ai_engine/vacante/service/impl/ServicioVacantesPanelImpl.java).
-- [Requisitos funcionales](../docs/01-REQUISITOS-FUNCIONALES.md), [roles y permisos](../docs/04-ROLES-Y-PERMISOS.md) y [APIs](../docs/09-APIS.md).
-- [Campana del portal](../src/main/resources/db/migration/V56__el_portal_tiene_campana.sql) y [RNF-13b](../docs/02-REQUISITOS-NO-FUNCIONALES.md).
+- [Controlador de vacantes](../../src/main/java/com/renaser/ai/ai_engine/vacante/controller/VacantesPanelController.java) y [servicio de vacantes](../../src/main/java/com/renaser/ai/ai_engine/vacante/service/impl/ServicioVacantesPanelImpl.java).
+- [Requisitos funcionales](../../docs/01-REQUISITOS-FUNCIONALES.md), [roles y permisos](../../docs/04-ROLES-Y-PERMISOS.md) y [APIs](../../docs/09-APIS.md).
+- [Campana del portal](../../src/main/resources/db/migration/V56__el_portal_tiene_campana.sql) y [RNF-13b](../../docs/02-REQUISITOS-NO-FUNCIONALES.md).

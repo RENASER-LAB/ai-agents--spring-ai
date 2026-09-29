@@ -93,7 +93,7 @@ dormida**: no emite tokens ni alimenta ningún dato hoy.
 | Buscar candidatos en bolsas externas | Renaser quiere su propio portal. El Radar admitirá esas fuentes después |
 | Detectar si el candidato usó inteligencia artificial | Usarla no está prohibido; se evalúa si entiende lo que produjo |
 | Vigilancia por cámara durante las pruebas | No se pide y es invasivo |
-| Nómina, contratos, vacaciones | Es otro módulo de RENASER OS |
+| Nómina, contratos, vacaciones | No entraba en la primera versión. Desde el 26/09/2026 se construye en este mismo sistema: ver [la ampliación](AMPLIACION-RRHH.md) |
 | Un modelo de IA entrenado desde cero | El valor está en las reglas, los bancos y la evidencia, no en el modelo |
 | Una pantalla para que Renaser administre la plataforma | El backend del multiempresa está entero (alta de empresas, aislamiento, tope de IA, suspensión); la pantalla de esa administración no se ha construido y hoy se opera por la API |
 
