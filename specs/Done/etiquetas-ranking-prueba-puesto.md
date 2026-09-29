@@ -1,6 +1,8 @@
 # Etiquetas del ranking y estado de la prueba del puesto
 
-Estado: lista para implementar
+Estado: TERMINADO
+
+Estado previo (referencia histórica): lista para implementar
 
 ## Objetivo
 
@@ -23,7 +25,7 @@ no tiene su calificación completa.
   debe distinguirse de una entrega manual pendiente de calificación.
 - Pantallas o procesos afectados: filtros y encabezados de los rankings del panel, ranking de
   la etapa «Prueba del puesto», y textos descriptivos de la exportación del ranking a Excel.
-- Referencias existentes: [plantilla de spec](plantilla-spec.md), [prueba del puesto](../docs/PRUEBA-DEL-PUESTO.md), [estados de postulación](../docs/03-ESTADOS-POSTULACION.md), y las imágenes adjuntas del ranking.
+- Referencias existentes: [plantilla de spec](../plantilla-spec.md), [prueba del puesto](../../docs/PRUEBA-DEL-PUESTO.md), [estados de postulación](../../docs/03-ESTADOS-POSTULACION.md), y las imágenes adjuntas del ranking.
 
 ## Alcance
 

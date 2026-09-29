@@ -3,6 +3,10 @@
 Sistema de selección de personal — Renaser Consulting
 Versión 1.0 · 2026-08-15
 
+> **Terminado · 26/09/2026.** El MVP se da por cerrado. Lo que este documento deja fuera sigue
+> sin construirse, salvo lo que recoja la ampliación. El trabajo nuevo va en
+> [Ampliación: de la selección a la gestión de personas](AMPLIACION-RRHH.md).
+
 Renaser no quiere el sistema completo todavía. Quiere **algo que pueda usar**, y quiere saber
 **si esto va a funcionar** antes de construirlo entero. Este documento dice qué se construye
 primero, en qué orden, y qué pregunta responde cada parte.
