@@ -190,6 +190,13 @@ transición manual, y también en las contrataciones anteriores a la función. N
 ni la postulación se mueve: la reseña cuelga de ella y no cambia nada del proceso. Ver
 RF-171 a RF-179 en los [requisitos funcionales](01-REQUISITOS-FUNCIONALES.md).
 
+**Desde el 29/09/2026 (`V64`) se contrata también desde el panel**, con «Contratar» en la ficha
+del postulante: registra la decisión en verde, por el mismo camino que la API, desde cualquier
+estado no final. No hay estado nuevo ni transición nueva. **`CONTRATADO` sigue siendo el final
+de la postulación**; dar de alta a esa persona como colaborador es un paso aparte, que crea su
+ficha en la gestión de personas y no mueve la postulación (ver la
+[ampliación de RR.HH.](AMPLIACION-RRHH.md)).
+
 ---
 
 ## Por qué solo dos estados finales de cierre

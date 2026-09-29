@@ -60,7 +60,20 @@ public final class DtosPostulacion {
                                     * hueco a secas se lee siempre como el tercero, que es el
                                     * único que acusa al candidato.
                                     */
-                                   String porQueSinPretension) {}
+                                   String porQueSinPretension,
+                                   /**
+                                    * Si quien mira puede contratar desde aquí (V64): la decisión
+                                    * en verde, con decidir_contratacion la primera vez o
+                                    * cambiar_decision si ya hubo una, y la postulación sin
+                                    * terminar. Una pista para pintar, como los demás.
+                                    */
+                                   boolean puedeContratar,
+                                   /** La ficha de colaborador que salió de aquí, para quien puede verla. */
+                                   Long colaboradorId,
+                                   /** Contratado, sin ficha todavía, y quien mira puede darla de alta. */
+                                   boolean puedeDarDeAlta,
+                                   /** Ya tiene ficha y quien mira puede abrirla. */
+                                   boolean puedeVerColaborador) {}
 
     public record PasoHistorial(String estadoAnterior, String estadoNuevo, Long usuarioId,
                                 boolean fueElSistema, boolean fuePorLote, String motivo,

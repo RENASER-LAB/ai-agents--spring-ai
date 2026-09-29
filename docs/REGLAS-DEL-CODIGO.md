@@ -56,6 +56,7 @@ com.renaser.ai.ai_engine.<dominio>
 | `validacion` | El periodo de validación práctica y sus métricas |
 | `perfil` | El perfil del candidato, único por persona y transversal a organizaciones |
 | `resena` | Las reseñas de empresas a quien contrataron, sus respuestas y la moderación de reportes (V63). No puntúan |
+| `colaborador` | La gestión de personas (V64): la ficha del colaborador, sus periodos y su situación laboral, el alta, la carga por Excel, los cambios, el cese y el reingreso. Las sedes y los cargos viven en `organizacion` (`EstructuraController`) y la sesión del panel en `seguridad` |
 
 Dos clases marcan la frontera con el motor de agentes y **hay que actualizarlas al añadir un
 controlador nuevo**, porque enumeran los nuestros: `comun/exception/ManejadorErrores` (para que
@@ -106,6 +107,13 @@ salgan con candado). Está escrito en el javadoc de ambas.
   esquema real.
 - **Archivar y crear en la misma transacción pide `saveAndFlush`.** Hibernate inserta antes de
   actualizar; sin el flush, el índice parcial de «solo uno vivo» revienta.
+- **Cada escritura sobre una ficha de colaborador empieza bloqueando su fila**
+  (`laFichaParaEscribir` → `ColaboradorRepository.bloquear`, `PESSIMISTIC_WRITE`) y lee después. Dos anulaciones o dos ceses a la
+  vez pasan de uno en uno: la segunda ve lo que dejó la primera y responde 409 en vez de
+  repetirlo. Un método nuevo que escriba en la ficha, sus periodos o su situación tiene que
+  entrar por el mismo sitio.
+- **El sueldo del colaborador no sale de un servicio sin mirar `ver_sueldos`**, y nunca va a la
+  auditoría: ahí van los nombres de los campos que cambiaron. `ver_auditoria` no es `ver_sueldos`.
 
 ---
 

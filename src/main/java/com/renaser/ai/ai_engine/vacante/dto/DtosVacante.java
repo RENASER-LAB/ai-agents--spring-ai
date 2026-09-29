@@ -299,7 +299,9 @@ public final class DtosVacante {
     // lleva `id`. Sin el id, quien consulte el catálogo no puede crear una vacante, que
     // pide `puestoId`. Es un contrato de salida y por eso es un record aparte.
     public record PuestoResponse(Long id, String codigo, String nombre,
-                                 String nivelPuestoCodigo, String familiaCodigo) {}
+                                 String nivelPuestoCodigo, String familiaCodigo,
+                                 /** Desactivado desde Configuración (V64): se conserva, no se elige. */
+                                 boolean esActivo) {}
 
     // El cuerpo de cerrar una vacante: el mismo {"motivo": "..."} de siempre. Tiene su propio
     // record y no comparte el de solicitudes para que cada dominio sea dueño de sus contratos.

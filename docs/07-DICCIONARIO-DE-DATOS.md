@@ -1,7 +1,7 @@
 # Diccionario de datos
 
 Sistema de selección de personal — Renaser Consulting
-Versión 3.2 · 2026-09-28 · Puesto al día con las migraciones hasta la `V63` (la V49 y la V50 solo siembran pesos; la V51 trae la tabla `lectura_cv_perfil` y los archivos del perfil; la V52 y la V53 no crean tablas; la V55 pone el sueldo en la vacante y la pretensión en la postulación; la V56 trae la tabla `aviso_portal`; la V57 no crea tablas, solo siembra los precios de los dos modelos de DeepSeek; la V58 no crea tablas: suma el aviso `VACANTE_ACTUALIZADA` y apaga el correo `REMUNERACION_ACTUALIZADA`; la V59 añade `vacante.archivada_en`; la V60 añade `vacante.eliminada_en` —el borrado lógico—, el motivo de cierre y el tipo de aviso `VACANTE_ELIMINADA`, y el permiso `eliminar_vacante`; la V61 trae la tabla `recuperacion_clave`, tres parámetros y los dos correos de «¿Olvidaste tu contraseña?»; la V62 añade `vacante.ciudad_ubigeo`; la V63 trae las tablas `resena`, `respuesta_resena` y `reporte_resena`, los tres permisos de las reseñas de empresas y cuatro tipos de aviso)
+Versión 3.3 · 2026-09-29 · Puesto al día con las migraciones hasta la `V65` (la V64 trae la gestión de personas —`sede`, `colaborador`, `periodo_laboral`, `situacion_laboral`, `cese_anulado` y `contratado_sin_alta`— y sus cuatro permisos; la V65 añade las columnas `antes_*` de `situacion_laboral`; la V49 y la V50 solo siembran pesos; la V51 trae la tabla `lectura_cv_perfil` y los archivos del perfil; la V52 y la V53 no crean tablas; la V55 pone el sueldo en la vacante y la pretensión en la postulación; la V56 trae la tabla `aviso_portal`; la V57 no crea tablas, solo siembra los precios de los dos modelos de DeepSeek; la V58 no crea tablas: suma el aviso `VACANTE_ACTUALIZADA` y apaga el correo `REMUNERACION_ACTUALIZADA`; la V59 añade `vacante.archivada_en`; la V60 añade `vacante.eliminada_en` —el borrado lógico—, el motivo de cierre y el tipo de aviso `VACANTE_ELIMINADA`, y el permiso `eliminar_vacante`; la V61 trae la tabla `recuperacion_clave`, tres parámetros y los dos correos de «¿Olvidaste tu contraseña?»; la V62 añade `vacante.ciudad_ubigeo`; la V63 trae las tablas `resena`, `respuesta_resena` y `reporte_resena`, los tres permisos de las reseñas de empresas y cuatro tipos de aviso)
 
 Cada tabla con todas sus columnas, tipos y claves. **Este documento se consulta**, no se lee de
 corrido: es la base para escribir las migraciones de Flyway.
@@ -11,8 +11,9 @@ Lo que llegó después de la versión 2.0 va marcado con su migración entre par
 ⚠️ **Tres tablas de la base no tienen ficha aquí.** `agent_run` es del motor de agentes y no de
 selección, así que no la tendrá nunca. `invitacion` (`V37`) y `tarifa_modelo` (`V38`) sí
 deberían tenerla: llegaron con el multiempresa y su ficha está pendiente. Hasta que se
-escriban, para esas dos manda la migración. De las **107 tablas de selección** que existen hoy,
-aquí hay ficha de 105, más otras diez que están solo diseñadas y todavía no existen.
+escriban, para esas dos manda la migración. De las **113 tablas de selección y de gestión de
+personas** que existen hoy, aquí hay ficha de 111, más otras diez que están solo diseñadas y
+todavía no existen.
 
 Para entender *por qué* el modelo es así, está el [Modelo de datos](05-MODELO-DE-DATOS.md).
 
@@ -216,9 +217,9 @@ Un nombre y una lista de permisos.
 
 ## `permiso`
 
-Una acción suelta que se puede conceder o no. **Sembrados hay 75**, contados sobre los bloques
+Una acción suelta que se puede conceder o no. **Sembrados hay 79**, contados sobre los bloques
 `INSERT INTO permiso` de las migraciones. La matriz de
-[Roles y permisos](04-ROLES-Y-PERMISOS.md) enumera 77, y **las dos listas no se contienen la
+[Roles y permisos](04-ROLES-Y-PERMISOS.md) enumera 81, y **las dos listas no se contienen la
 una a la otra**: allí hay acciones diseñadas que la base todavía no tiene —el Radar entero y
 casi todas las métricas—, y aquí hay cuatro permisos sembrados que aquella matriz no enumera,
 porque llegaron con una función o un arreglo concreto y nadie volvió a la tabla a añadir la
@@ -231,20 +232,22 @@ completo; este sigue al código.
 | `id` | bigint | sí | Clave |
 | `codigo` | text | sí | `cerrar_vacante` |
 | `etiqueta` | text | sí | «Cerrar una vacante». En lenguaje normal |
-| `grupo` | text | sí | `SOLICITUDES`, `VACANTES`, `CANDIDATOS`, `EVALUACION`, `SESIONES`, `VALIDACION`, `DECISION`, `CIERRE`, `RADAR`, `METRICAS`, `CONFIGURACION` |
+| `grupo` | text | sí | `SOLICITUDES`, `VACANTES`, `CANDIDATOS`, `EVALUACION`, `SESIONES`, `VALIDACION`, `DECISION`, `CIERRE`, `RADAR`, `METRICAS`, `CONFIGURACION`, `PERSONAS` |
 | `orden` | integer | sí | Dentro de su grupo |
 
 **Clave primaria:** `id` · **Único:** `codigo`
 
-Los grupos que existen de verdad hoy son nueve —`DECISION` y `RADAR` están solo diseñados—, y
-la simulación va en `SESIONES`, no en `SIMULACION`.
+Los grupos que existen de verdad hoy son diez —`DECISION` y `RADAR` están solo diseñados, y
+`PERSONAS` llegó con la `V64`—, y la simulación va en `SESIONES`, no en `SIMULACION`.
 
 **No lleva organización:** los permisos son los mismos para todos. Lo que cambia es quién los
 tiene. Solo crece con una migración: `ver_inscritos_simulacion` y `administrar_permisos`
 llegaron con la `V40`, `eliminar_vacante` con la `V60`, y los tres últimos con la `V63`:
 `resenar_contratado` y `ver_resenas_candidato` (grupo `CANDIDATOS`) y `moderar_resenas` (grupo
 `CONFIGURACION`), este solo para el Administrador de la plataforma y fuera de la copia del alta
-de empresas.
+de empresas. La `V64` suma los cuatro del grupo `PERSONAS` —`ver_colaboradores`,
+`editar_colaboradores`, `ver_sueldos` y `editar_estructura`— para Talento y Dirección de todas
+las organizaciones, con alcance `TODO`; `ver_sueldos`, solo para Dirección.
 
 La etiqueta existe porque la pantalla donde se reparten permisos nunca debe mostrar nombres
 técnicos.
@@ -649,9 +652,13 @@ El catálogo de puestos, con su nivel y su familia.
 | `nombre` | text | sí | |
 | `nivel_puesto_codigo` | text | sí | |
 | `familia_codigo` | text | sí | |
-| `es_activo` | boolean | sí | |
+| `es_activo` | boolean | sí | Por defecto verdadero. Desde la `V64` se cambia en Configuración › «Cargos»: desactivado, no se elige en solicitudes, vacantes, altas, cambios ni cargas, y lo que ya lo usa lo conserva |
 
 **Clave primaria:** `id` · **Único:** `organizacion_id` + `codigo`
+
+**Desde la `V64` es también el catálogo de cargos** de la gestión de personas, sin tabla aparte:
+`situacion_laboral.puesto_id` apunta aquí. Renombrarlo cambia el nombre en todas partes, vacantes
+incluidas.
 
 ## `vacante`
 
@@ -3023,6 +3030,155 @@ sus respuestas y los reportes. No se vacían: con el nombre fuera, el texto segu
 
 ---
 
+# 22 · Gestión de personas (`V64`, `V65`)
+
+La ficha de quien trabaja en la empresa y el mapa de la empresa. **Ninguna de estas tablas
+apunta a `persona`**: el borrado de datos del portal y la retención de 2 años no las tocan
+(Ley 29733, art. 14.5, pendiente de validar con el abogado). El porqué del diseño está en el
+[Modelo de datos](05-MODELO-DE-DATOS.md), «Gestión de personas».
+
+Los códigos son los de SUNAT —tabla 3 para el documento, 12 para el contrato, 17 para el motivo
+de cese, 33 para el régimen—, salvo dos propios: el contrato `PRACTICAS` y el motivo de cese
+`99`. La pantalla enseña el texto; la traducción vive en `CatalogosDePersonas`.
+
+⚠️ **`situacion_laboral`, `cese_anulado` y `contratado_sin_alta` son excepción a `creado_en`**: la
+fecha que cuenta es `registrado_en` (o `anulado_en`).
+
+La auditoría registra `alta_colaborador`, `editar_perfil_colaborador` (valor anterior y nuevo),
+`registrar_cambio_colaborador` y `anular_cambio_colaborador` —con los **nombres** de los campos
+que cambiaron, nunca el importe del sueldo, y con `situacionesQueLoHeredan` o
+`situacionesQueLoPierden` cuando arrastran ajustes de solo sueldo—, `registrar_cese_colaborador`,
+`anular_cese_colaborador`, `reingresar_colaborador`, `no_dar_de_alta_contratado`,
+`cargar_colaboradores_excel` (nombre del archivo y los dos recuentos), `crear_sede`, `editar_sede`,
+`desactivar_sede`, `reactivar_sede`, `crear_puesto`, `renombrar_puesto`, `desactivar_puesto` y
+`reactivar_puesto`.
+
+## `sede`
+
+| Columna | Tipo | Oblig. | Qué guarda |
+|---|---|---|---|
+| `id` | bigint | sí | Clave |
+| `organizacion_id` | bigint | sí | |
+| `nombre` | text | sí | No vacío (CHECK). Único en la empresa **sin distinguir mayúsculas**, porque la carga por Excel la busca así |
+| `direccion` | text | no | |
+| `provincia_ubigeo` | varchar(6) | no | → `ubigeo` |
+| `codigo_sunat` | varchar(4) | no | El código de establecimiento anexo: cuatro cifras (CHECK) |
+| `es_activa` | boolean | sí | Por defecto verdadero. Desactivada no se elige; quien ya está en ella la conserva |
+
+**Clave primaria:** `id` · **Apunta a:** `organizacion`, `ubigeo`
+**Índice único:** `sede_nombre_unico_por_org` (`organizacion_id`, `lower(btrim(nombre))`). No se borra.
+
+## `colaborador`
+
+| Columna | Tipo | Oblig. | Qué guarda |
+|---|---|---|---|
+| `id` | bigint | sí | Clave |
+| `organizacion_id` | bigint | sí | |
+| `tipo_documento` | varchar(2) | sí | Tabla 3: `01` DNI, `04` carné de extranjería, `07` pasaporte, `23` PTP, `26` CPP (CHECK) |
+| `numero_documento` | text | sí | De 4 a 15 letras mayúsculas o cifras, ya limpio (CHECK). El DNI, 8 cifras, lo exige el servicio |
+| `nombres` · `apellido_paterno` | text | sí | No vacíos (CHECK). Quien viene de selección trae los apellidos enteros en el paterno |
+| `apellido_materno` | text | no | |
+| `fecha_nacimiento` | date | sí | No futura y al menos 14 años: lo exige el servicio |
+| `sexo` | varchar(1) | sí | `M` o `F` |
+| `estado_civil` | text | no | `SOLTERO`, `CASADO`, `VIUDO`, `DIVORCIADO` o `CONVIVIENTE` |
+| `nacionalidad` · `celular` · `correo_personal` · `correo_corporativo` · `direccion` | text | no | |
+| `provincia_ubigeo` | varchar(6) | no | → `ubigeo` |
+| `nivel_educativo_codigo` | text | no | → `nivel_educativo`, el catálogo del perfil del candidato |
+| `postulacion_id` | bigint | no | La contratación de la que salió el alta, si vino de selección |
+| `creado_por_usuario_id` | bigint | no | |
+| `actualizado_en` | timestamptz | sí | La última corrección del perfil |
+
+**Clave primaria:** `id` · **Único:** `organizacion_id` + `tipo_documento` + `numero_documento`
+(en otra empresa, el mismo documento sí puede tener ficha) · **Apunta a:** `organizacion`,
+`ubigeo`, `nivel_educativo`, `postulacion`, `usuario`
+**Índice:** `colaborador_orden_idx` (`organizacion_id`, apellidos, nombres), el orden de la lista.
+
+Corregir estos datos no deja historial: deja una fila de auditoría.
+
+## `periodo_laboral`
+
+| Columna | Tipo | Oblig. | Qué guarda |
+|---|---|---|---|
+| `id` | bigint | sí | Clave |
+| `colaborador_id` | bigint | sí | |
+| `fecha_ingreso` | date | sí | |
+| `fecha_cese` | date | no | El último día trabajado: hasta ese día inclusive la persona sigue activa. No anterior al ingreso (CHECK) |
+| `motivo_cese` | varchar(2) | no | Tabla 17: `01` renuncia, `02` renuncia con incentivos, `03` despido, `04` cese colectivo, `05` jubilación, `06` invalidez, `07` fin del contrato o de la obra, `08` mutuo disenso, `09` fallecimiento, `17` no se inició la relación laboral, y `99` otro (propio). **Va con `fecha_cese`: las dos o ninguna** (CHECK) |
+| `observacion_cese` | text | no | |
+| `cese_registrado_por_usuario_id` · `cese_registrado_en` | bigint · timestamptz | no | |
+| `postulacion_id` | bigint | no | La contratación que abrió este periodo. **Única entre los que la tienen**: una contratación da como mucho un alta o un reingreso |
+| `creado_por_usuario_id` | bigint | no | |
+
+**Clave primaria:** `id` · **Apunta a:** `colaborador`, `postulacion`, `usuario`
+**Índices:** `periodo_laboral_colaborador_idx` (`colaborador_id`, `fecha_ingreso DESC`) y
+`periodo_laboral_una_alta_por_postulacion` (único y parcial).
+
+El estado —Por ingresar, Activo, Cesado— no se guarda: sale de estas dos fechas en hora de Lima.
+
+## `situacion_laboral`
+
+| Columna | Tipo | Oblig. | Qué guarda |
+|---|---|---|---|
+| `id` | bigint | sí | Clave |
+| `colaborador_id` · `periodo_id` | bigint | sí | |
+| `vigente_desde` | date | sí | Puede ser futura: entonces el cambio está programado |
+| `vigente_hasta` | date | no | Vacía = abierta. La cierra el cambio siguiente, el día antes. Un cambio el mismo día que el anterior la deja en `desde - 1`: un tramo vacío que sigue en el historial y que ninguna consulta de «hoy» encuentra (CHECK `>= vigente_desde - 1`) |
+| `sede_id` · `area_id` · `puesto_id` | bigint | sí | → `sede`, `area`, `puesto` (el cargo) |
+| `jefe_colaborador_id` | bigint | no | → `colaborador`. Nunca la propia persona (CHECK); sin círculos, lo exige el servicio |
+| `tipo_contrato` | varchar(9) | sí | Tabla 12: `01` a `11` y `99`, más `PRACTICAS` (propio) |
+| `fin_contrato` | date | no | Obligatorio a plazo o de temporada, no admitido en el indeterminado: lo exige el servicio |
+| `fin_periodo_prueba` | date | no | |
+| `regimen_laboral` | varchar(2) | sí | Tabla 33: `01` general, `16` micro, `17` pequeña, `18` agrario (Ley 27360), `20` minero, `21` construcción civil, `26` agrario (Ley 31110), `99` otros |
+| `sueldo_base` | numeric(12,2) | no | ⚠️ **Solo lo ve y lo escribe quien tiene `ver_sueldos`**. No negativo, y con moneda (CHECK) |
+| `moneda` | varchar(3) | no | `PEN` o `USD` |
+| `tipo_motivo` | text | sí | `INGRESO`, `CARGA_INICIAL`, `REINGRESO` —los que abren un periodo— y `PROMOCION`, `TRASLADO`, `CAMBIO_JEFE`, `RENOVACION_CONTRATO`, `AJUSTE_REMUNERACION`, `CORRECCION`, `OTRO` |
+| `detalle_motivo` | text | no | **Obligatorio con `OTRO`** (CHECK) |
+| `registrado_por_usuario_id` · `registrado_en` | bigint · timestamptz | sí (la fecha) | |
+| `anulada_en` · `anulada_por_usuario_id` · `motivo_anulacion` | timestamptz · bigint · text | no | Un cambio programado anulado, a mano o por un cese. El motivo es obligatorio al anular (CHECK) |
+| `antes_sede_id`, `antes_area_id`, `antes_puesto_id`, `antes_jefe_colaborador_id`, `antes_tipo_contrato`, `antes_fin_contrato`, `antes_fin_periodo_prueba`, `antes_regimen_laboral`, `antes_sueldo_base`, `antes_moneda` (`V65`) | como sus pares | no | **La situación viva que este cambio tenía detrás al anularlo.** Solo las llevan las anuladas (CHECK) y el historial compara con ellas para siempre. `antes_sueldo_base` va con su moneda (CHECK) y, como `sueldo_base`, solo lo ve quien tiene `ver_sueldos`. La `V65` las rellenó para lo que ya estaba anulado |
+
+**Clave primaria:** `id` · **Apunta a:** `colaborador`, `periodo_laboral`, `sede`, `area`,
+`puesto`, `usuario`
+**Índices:** por `(periodo_id, vigente_desde)`, `colaborador_id`, `puesto_id`, `sede_id` y
+`jefe_colaborador_id` (parcial, solo con jefe).
+
+**Cada fila es una foto completa**, no una diferencia: por eso anular un programado en medio de
+una cadena hace que el siguiente traiga igualmente, en su fecha, los datos que el anulado había
+cambiado. Ninguna fila se borra: un cambio ya vigente se corrige con otro de tipo `CORRECCION`.
+
+## `cese_anulado`
+
+Un cese deshecho, copiado aquí antes de dejar el periodo abierto otra vez.
+
+| Columna | Tipo | Oblig. | Qué guarda |
+|---|---|---|---|
+| `id` | bigint | sí | Clave |
+| `periodo_id` | bigint | sí | |
+| `fecha_cese` · `motivo_cese` | date · varchar(2) | sí | Lo que decía el cese |
+| `observacion_cese` | text | no | |
+| `registrado_por_usuario_id` · `registrado_en` | bigint · timestamptz | no | Quién lo había registrado |
+| `anulado_por_usuario_id` | bigint | no | |
+| `anulado_en` | timestamptz | sí | Por defecto, ahora |
+| `motivo_anulacion` | text | sí | No vacío (CHECK) |
+
+**Clave primaria:** `id` · **Apunta a:** `periodo_laboral`, `usuario` · **Índice:** `periodo_id`.
+
+## `contratado_sin_alta`
+
+| Columna | Tipo | Oblig. | Qué guarda |
+|---|---|---|---|
+| `id` | bigint | sí | Clave |
+| `organizacion_id` | bigint | sí | |
+| `postulacion_id` | bigint | sí | **Única.** La contratación que RR.HH. decidió no convertir en ficha |
+| `motivo` | text | sí | No vacío (CHECK), p. ej. «ya no trabaja aquí» |
+| `registrado_por_usuario_id` · `registrado_en` | bigint · timestamptz | sí (la fecha) | |
+
+**Clave primaria:** `id` · **Apunta a:** `organizacion`, `postulacion`, `usuario`
+
+Solo la saca del aviso de contratados pendientes de alta: la postulación sigue `CONTRATADO`.
+
+---
+
 # Índices
 
 PostgreSQL crea un índice para cada clave primaria y cada restricción de unicidad. Estos hay que
@@ -3057,6 +3213,10 @@ caro sale: cada consulta que filtra por el padre acaba leyendo la tabla entera.
 | `prospecto_familia (familia_codigo)` | Buscar prospectos compatibles con una vacante nueva |
 | `resena (persona_id) WHERE borrada_en IS NULL` | **Índice parcial.** Las reseñas de una persona: el perfil, la ficha y la columna de la tabla, en bloque (`V63`) |
 | `reporte_resena (reportado_en) WHERE estado = 'PENDIENTE'` | **Índice parcial.** La lista de pendientes de la moderación (`V63`) |
+| `colaborador (organizacion_id, apellido_paterno, apellido_materno, nombres)` | La lista de colaboradores, ordenada por apellidos (`V64`) |
+| `situacion_laboral (periodo_id, vigente_desde)` | La línea de tiempo de un periodo y la situación vigente hoy (`V64`) |
+| `situacion_laboral (jefe_colaborador_id) WHERE jefe_colaborador_id IS NOT NULL` | **Índice parcial.** Quién reporta a quién: el aviso del cese y los círculos de jefes (`V64`) |
+| `periodo_laboral (postulacion_id) WHERE postulacion_id IS NOT NULL` | **Único y parcial.** Una contratación da como mucho un alta (`V64`) |
 
 Los índices de `organizacion_id` sueltos **no hacen falta**: van dentro de los compuestos de
 arriba, porque toda consulta filtra primero por organización.
@@ -3086,6 +3246,11 @@ Resumen de las restricciones que están repartidas por el documento:
   cada una; estrellas de 1 a 5, y cada texto con su largo (`V63`).
 - Un reporte con «Otro motivo» lleva comentario, y uno mantenido u ocultado lleva quién lo
   resolvió y su nota (`V63`).
+- Nunca dos fichas de colaborador del mismo documento en la misma empresa, y una contratación da
+  como mucho un alta (`V64`).
+- Un cese no es anterior al ingreso y va con su motivo; un cambio con motivo «otro», una
+  anulación y un «No dar de alta» llevan texto; un sueldo lleva moneda; nadie es su propio jefe
+  (`V64`). Solo una situación anulada lleva las columnas `antes_*` (`V65`).
 
 ⚠️ Aquí decía «el rango del cambio inesperado cabe dentro de la duración de la prueba». **Eso no
 lo impide nada**: no hay CHECK que lo diga ni comprobación en el código. Ver
@@ -3103,7 +3268,7 @@ Lo que **no** cabe en una restricción y hay que probar en el código está en
 - [Alcance del MVP](08-ALCANCE-DEL-MVP.md) — qué tablas entran en cada hito
 - [Requisitos funcionales](01-REQUISITOS-FUNCIONALES.md) — qué hace el sistema
 - [Estados de la postulación](03-ESTADOS-POSTULACION.md) — los 18 estados y sus transiciones
-- [Roles y permisos](04-ROLES-Y-PERMISOS.md) — los 77 permisos
+- [Roles y permisos](04-ROLES-Y-PERMISOS.md) — los 81 permisos
 - [Diagrama del modelo](diagramas/modelo-de-datos.html) — se abre en el navegador
 
 

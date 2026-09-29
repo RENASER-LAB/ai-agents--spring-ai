@@ -190,10 +190,16 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
     }
 
     @Override
-    public List<PuestoResponse> listarPuestos(ContextoUsuario quien) {
-        return puestos.findByOrganizacionIdAndEsActivoTrueOrderByNombre(quien.organizacionId()).stream()
+    public List<PuestoResponse> listarPuestos(ContextoUsuario quien, boolean todos) {
+        // Por defecto solo los activos: la lista alimenta los desplegables de la solicitud y de
+        // la vacante, y un cargo desactivado no se elige (V64). Con todos=true salen también
+        // los desactivados, para nombrar el de una vacante que ya lo tenía.
+        List<Puesto> lista = todos
+                ? puestos.findByOrganizacionIdOrderByNombre(quien.organizacionId())
+                : puestos.findByOrganizacionIdAndEsActivoTrueOrderByNombre(quien.organizacionId());
+        return lista.stream()
                 .map(p -> new PuestoResponse(p.getId(), p.getCodigo(), p.getNombre(),
-                        p.getNivelPuestoCodigo(), p.getFamiliaCodigo()))
+                        p.getNivelPuestoCodigo(), p.getFamiliaCodigo(), p.isEsActivo()))
                 .toList();
     }
 

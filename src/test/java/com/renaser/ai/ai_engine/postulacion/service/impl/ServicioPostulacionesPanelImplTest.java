@@ -86,6 +86,8 @@ class ServicioPostulacionesPanelImplTest {
     @Mock private com.renaser.ai.ai_engine.postulacion.repository.DatoCvRepository datosCv;
     @Mock private com.renaser.ai.ai_engine.auditoria.service.ServicioAuditoria auditoria;
     @Mock private com.renaser.ai.ai_engine.postulacion.service.ServicioEnlaceAcceso enlacesDeAcceso;
+    @Mock private com.renaser.ai.ai_engine.decision.service.QuienPuedeContratar quienPuedeContratar;
+    @Mock private com.renaser.ai.ai_engine.colaborador.service.ContratacionEnLaFicha contratacion;
 
     @InjectMocks
     private ServicioPostulacionesPanelImpl servicio;
@@ -102,6 +104,9 @@ class ServicioPostulacionesPanelImplTest {
         // mira en la bandeja es cuántas consultas cuesta, no a quién deja ver.
         lenient().when(permisos.alcanceDe("ver_candidatos"))
                 .thenReturn(new FiltroAlcance(FiltroAlcance.Tipo.TODO, 10L));
+        // La ficha pregunta por la ficha de colaborador (V64); aquí no hay ninguna.
+        lenient().when(contratacion.de(any(), any())).thenReturn(
+                new com.renaser.ai.ai_engine.colaborador.service.ContratacionEnLaFicha.Vinculo(null, false, false));
     }
 
     @Test
