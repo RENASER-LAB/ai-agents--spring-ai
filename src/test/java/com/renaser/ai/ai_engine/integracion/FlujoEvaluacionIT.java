@@ -407,6 +407,10 @@ public class FlujoEvaluacionIT {
                  "tipoCierre": "PERMANENTE", "responsableUsuarioId": 1}"""
                 .formatted(solicitudId, puestoId))
                 .andReturn().getResponse().getContentAsString(), "id"));
+        // Rinde el banco del nivel: desde el 30/09/2026 toda vacante nueva nace con sus
+        // preguntas propias, y el banco se elige a mano.
+        conToken(post("/api/v1/panel/vacantes/" + id + "/origen-preguntas"), tokenEquipo,
+                "{\"origen\":\"NIVEL\"}").andExpect(status().isOk());
 
         Long plantillaId = jdbc.queryForObject(
                 "select id from plantilla_evaluacion where nivel_puesto_codigo = 'EJECUCION'", Long.class);

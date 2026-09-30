@@ -23,8 +23,8 @@ Sirve para tres cosas:
 - **Entender el sistema.** Un modelo de datos bien contado explica el negocio mejor que
   cualquier otro documento.
 
-**La base ya está construida.** Las migraciones `V1` a `V65` viven en
-`src/main/resources/db/migration` —**114 tablas de este módulo**, 117 en la base contando la de
+**La base ya está construida.** Las migraciones `V1` a `V66` viven en
+`src/main/resources/db/migration` —**116 tablas de este módulo**, 119 en la base contando la de
 Flyway y las dos del motor de agentes— y Flyway es el dueño del esquema. Cambiar algo de aquí
 ya cuesta una migración nueva, y **una migración aplicada no se edita nunca**: se escribe otra
 encima.
@@ -155,6 +155,23 @@ borre. Los cargos son el `puesto` que ya existía, que desde aquí se renombra y
 (`es_activo` existía desde la `V5` y ninguna pantalla lo cambiaba). La `V65`, el mismo día, añade a
 `situacion_laboral` diez columnas `antes_*`: la situación viva que un cambio tenía detrás en el
 momento de anularlo, para que el historial lo compare siempre con eso. Ver «Gestión de personas»
+más abajo y en el [diccionario de datos](07-DICCIONARIO-DE-DATOS.md).
+
+La `V66` (30/09/2026) trae **las preguntas propias de cada vacante**: hasta ella, para que un
+candidato respondiera preguntas alguien tenía que llenar un Excel con los 15 formatos del método
+de RENASER. Desde aquí cualquier empresa escribe, desde el panel y para cada vacante, las
+preguntas de su Perfil Integral: cuatro tipos, agrupados en criterios con nombre que suman 100
+puntos. **Vive al lado del banco por nivel, sin tocarlo.** Dos tablas nuevas —`criterio_banco`,
+los criterios de un banco de vacante, y `propuesta_preguntas`, lo que propone la IA— y columnas
+nuevas en cinco viejas: `vacante.origen_preguntas` dice si la vacante rinde el banco del nivel
+(`NIVEL`) o sus propias preguntas (`VACANTE`); `version_banco` gana `proposito` —un banco de
+vacante es su cuestionario técnico o sus preguntas propias, y cada uno tiene su borrador y su
+publicada—, el método `PUNTOS`, su guía de calificación y el número de esa guía; `pregunta` gana
+tres tipos, sus puntos, su criterio y «qué debe tener una buena respuesta»; `opcion`, un orden
+explícito; y `nota_respuesta` pasa de 0–4 a 0–100 y guarda aparte la nota que puso la IA. Siembra
+el agente `RECOMENDADOR` con su instrucción, publica una instrucción del `EVALUADOR` que vale para
+los tres métodos, y abre en `trabajo_ia` el modo `RECALIFICA`. **Las vacantes que ya existían
+siguen con el banco del nivel**; las nuevas nacen con preguntas propias. Ver «Banco de preguntas»
 más abajo y en el [diccionario de datos](07-DICCIONARIO-DE-DATOS.md).
 
 La `V54` (14/09/2026) **no añade ninguna tabla y cambia quién firma qué**. Hasta ella había dos
@@ -536,7 +553,7 @@ Hay una versión dibujada de este mismo mapa en
 
 ## Las tablas
 
-Ciento catorce en total, agrupadas por área para poder leerlas de a poco. En cada una se nombran
+Ciento dieciséis en total, agrupadas por área para poder leerlas de a poco. En cada una se nombran
 las columnas que importan para entender qué hace, no todas.
 
 **Para verlas todas, con tipo y clave, está el [Diccionario de datos](07-DICCIONARIO-DE-DATOS.md).**
@@ -680,7 +697,7 @@ agente que la produjo.
 | `familia` | Las siete familias de trabajo | codigo, nombre |
 | `familia_afin` | Qué familias se parecen lo bastante para reutilizar evaluaciones | familia_codigo, familia_afin_codigo |
 | `puesto` | El catálogo de puestos, con su nivel y su familia. Desde la `V64` es también el catálogo de **cargos** de la gestión de personas, y se renombra y desactiva desde Configuración | organizacion_id, codigo, nombre, nivel_puesto_codigo, familia_codigo, es_activo |
-| `vacante` | Una convocatoria concreta | organizacion_id, solicitud_talento_id, puesto_id, titulo, descripcion, modalidad, ciudad_ubigeo, ubicacion, tipo_cierre, plazas, cierra_en, estado, version_pesos_id, version_plantilla_prueba_id, plantilla_evaluacion_id, responsable_usuario_id, remuneracion_tipo, remuneracion_min, remuneracion_max, remuneracion_moneda, remuneracion_actualizada_en, archivada_en, eliminada_en |
+| `vacante` | Una convocatoria concreta | organizacion_id, solicitud_talento_id, puesto_id, titulo, descripcion, modalidad, ciudad_ubigeo, ubicacion, tipo_cierre, plazas, cierra_en, estado, version_pesos_id, version_plantilla_prueba_id, plantilla_evaluacion_id, responsable_usuario_id, remuneracion_tipo, remuneracion_min, remuneracion_max, remuneracion_moneda, remuneracion_actualizada_en, archivada_en, eliminada_en, aplica_evaluacion, origen_preguntas |
 | `requisito_objetivo` | Lo único que puede detener una postulación sin que intervenga nadie | vacante_id, descripcion, regla, es_activo |
 | `barrera_critica` | Lo que ningún promedio alto compensa, definido por vacante | vacante_id, descripcion, es_activa |
 | `evaluador_estandar` | Quién revisa que la urgencia no baje el nivel, en esta vacante | vacante_id, usuario_id, puede_bloquear, asignado_por_usuario_id |
@@ -709,6 +726,12 @@ lados](EL-SUELDO-DE-LOS-DOS-LADOS.md).
 `compensacion_publica` —el sueldo en prosa— **queda retirada**: los datos se conservan por las
 vacantes viejas, pero ninguna pantalla la lee ni la escribe. Dos sitios donde decir el sueldo son
 dos sitios donde contradecirse, y el trato necesita un número comparable, no una frase.
+
+**Qué responde quien postula lo deciden dos columnas** (`V66`): `aplica_evaluacion`, el
+interruptor de siempre, y `origen_preguntas` —el banco de la empresa para el nivel del puesto, o
+las preguntas propias de la vacante—. Toda vacante nueva nace con las propias, también en
+RENASER; el banco del nivel se elige a mano y solo si la empresa tiene uno **suyo**. **Desde la
+primera postulación, el origen no cambia**: todos sus candidatos se miden con la misma vara.
 
 ---
 
@@ -817,17 +840,35 @@ hace falta repreguntar.
 
 ---
 
-### Banco de preguntas · 7 tablas
+### Banco de preguntas · 9 tablas
 
 | Tabla | Para qué existe | Columnas que importan |
 |---|---|---|
 | `dimension` | Las 22 cosas que se miden: integridad, priorización, calidad, autonomía… | codigo, nombre, definicion, es_obligatoria |
-| `version_banco` | Una versión del banco, en borrador o publicada | organizacion_id, tipo_banco, nivel_puesto_codigo, etiqueta, estado, publicada_por_usuario_id, publicada_en |
-| `pregunta` | Una pregunta dentro de una versión | version_banco_id, codigo, bloque, tipo, enunciado, situacion, logica_interna, es_puntuable |
-| `opcion` | Las opciones de respuesta | pregunta_id, letra, texto, puntaje |
+| `version_banco` | Una versión del banco, en borrador o publicada. Desde la `V66`, también las preguntas propias de una vacante | organizacion_id, tipo_banco, nivel_puesto_codigo, vacante_id, proposito, metodo_calificacion, guia_calificacion, version_guia, etiqueta, estado, publicada_por_usuario_id, publicada_en |
+| `pregunta` | Una pregunta dentro de una versión | version_banco_id, codigo, bloque, tipo, enunciado, situacion, logica_interna, es_puntuable, puntos, criterio_banco_id, que_debe_tener |
+| `opcion` | Las opciones de respuesta | pregunta_id, letra, texto, puntaje, orden |
 | `opcion_dimension` | Cuánto suma cada opción a cada dimensión | opcion_id, dimension_codigo, incremento |
 | `pregunta_dimension` | Qué dimensiones evalúa una pregunta abierta, que no tiene opciones | pregunta_id, dimension_codigo |
 | `par_consistencia` | Dos preguntas que miden lo mismo y deberían responderse parecido | version_banco_id, pregunta_a_id, pregunta_b_id, diferencia_maxima |
+| `criterio_banco` | Los criterios de las preguntas propias de una vacante: lo que se califica y lo que se ve como columna (`V66`) | version_banco_id, nombre, que_evalua, orden |
+| `propuesta_preguntas` | Lo que propone la IA para completar el borrador de una vacante; no toca el borrador hasta que una persona lo agrega (`V66`) | organizacion_id, vacante_id, indicacion, puntos_que_faltan, estado, contenido, motivo_fallo, pedida_por_usuario_id |
+
+**Las preguntas propias de una vacante son un banco más** (`V66`), del tipo `VACANTE` y con
+propósito `PERFIL_INTEGRAL`, al lado de su cuestionario técnico (propósito
+`CUESTIONARIO_TECNICO`). Se califican con el método `PUNTOS`: cada pregunta vale sus puntos y
+todas suman 100. **Los puntos de un criterio no se guardan**: son la suma de sus preguntas, así
+que no hay dos cifras que puedan contradecirse. Y **no se reutiliza la tabla `criterio`**, que ya
+mezcla los ocho del currículum con los de la rúbrica de la prueba: una lectura de «los criterios
+del Perfil Integral» juntaría estos con los del currículum. Los criterios se identifican por id,
+nunca por nombre: con criterios por vacante habrá muchos llamados igual.
+
+⚠️ **`puntos` y `peso` son dos columnas a propósito.** `peso` es el multiplicador 0–2 del banco
+v3; `puntos`, lo que vale una pregunta propia de 0 a 100. En el método `PUNTOS` decide `puntos`, y
+`es_puntuable` se guarda como `puntos > 0` solo para que no quede incoherente.
+
+Lo que la IA propone se guarda **aparte, en `propuesta_preguntas`**, y el borrador no cambia
+hasta que alguien agrega lo que quiere: criterios enteros o preguntas sueltas.
 
 Son 236 preguntas: 90 para Dirección, 60 para Coordinación, 50 para Ejecución, y 36 de
 alineación personal. **El banco no es el examen**: de ahí se selecciona lo que aplique.
@@ -873,7 +914,7 @@ Esta área es la que cuelga del usuario y no de la postulación.
 | `evaluacion` | Las respuestas de un usuario a una plantilla concreta | organizacion_id, usuario_id, plantilla_evaluacion_id, version_banco_nivel_id, version_banco_alineacion_id, reutiliza_de_evaluacion_id, estado, vence_en, iniciada_en, terminada_en, vigente_hasta |
 | `orden_pregunta` | En qué orden se le mostró cada pregunta y sus opciones. Sin esto no se puede reproducir el examen | evaluacion_id, pregunta_id, posicion, orden_opciones |
 | `respuesta` | Lo que contestó | evaluacion_id, pregunta_id, opcion_id, texto, segundos, respondida_en |
-| `nota_respuesta` | El puntaje de esa respuesta y **por qué** | respuesta_id, puntaje, explicacion, evidencia_citada, confianza, ejecucion_ia_id, ajustada_por_usuario_id, motivo_ajuste |
+| `nota_respuesta` | El puntaje de esa respuesta y **por qué** | respuesta_id, puntaje, explicacion, evidencia_citada, confianza, ejecucion_ia_id, ajustada_por_usuario_id, motivo_ajuste, puntaje_ia, version_guia |
 | `repregunta` | Lo que el agente vuelve a preguntar cuando la respuesta es superficial | respuesta_id, texto, orden, ejecucion_ia_id |
 | `respuesta_repregunta` | Lo que contestó a esa repregunta | repregunta_id, texto, respondida_en |
 | `resultado_alineacion` | El semáforo de cada uno de los tres bloques | evaluacion_id, bloque, semaforo |
@@ -888,6 +929,14 @@ entrevista interminable.
 
 `evidencia_citada` guarda qué parte de la propia respuesta usó el agente para justificar la
 nota. Es lo que permite discutir una calificación sin releerlo todo.
+
+**En las preguntas propias (`V66`) la nota de una abierta va de 0 a los puntos de la
+pregunta**, y por eso `puntaje` pasó de 0–4 a 0–100; los bancos de siempre siguen en 0–4, y eso
+lo exige ahora el código. Cuando una persona la ajusta, `puntaje` es la que vale y **`puntaje_ia`
+guarda la que había puesto la IA**, para que la ficha enseñe las dos. `version_guia` dice con qué
+guía se calificó: si la empresa corrige la guía con candidatos dentro, las notas de la guía
+anterior se reconocen y se vuelven a pedir. La evaluación de las preguntas propias **no lleva
+plantilla** ni vigencia: su tiempo lo dice la versión y no se reutiliza en otra vacante.
 
 Cada respuesta se guarda al momento, así que si se corta la luz el candidato retoma donde quedó.
 Las preguntas y las opciones se muestran en orden aleatorio, distinto para cada persona, y ese
@@ -1120,6 +1169,12 @@ Los nueve agentes son: Necesidad de Talento, Cazatalentos, Evidencia de Currícu
 Potencial y Riesgo, Prueba del Puesto, Simulación, Desempeño y Aprendizaje. Cada ejecución guarda
 cuál fue, para poder medir por separado si uno se está equivocando.
 
+La `V66` suma el **Recomendador** (`RECOMENDADOR`), que como el Redactor no evalúa a nadie:
+propone preguntas para una vacante y una persona decide qué agrega. Y abre en `trabajo_ia` un
+tercer modo, **`RECALIFICA`**: volver a calificar las abiertas de las preguntas propias cuando la
+empresa corrige su guía. Va por su propio carril a propósito: por la pasada normal, al terminar,
+se rehace el retrato y la persona se mueve de etapa; así solo cambian sus notas.
+
 Se guarda la respuesta **completa**, no solo la nota: si alguien reclama una calificación, hay
 que poder revisar en qué se basó. Y se guarda **con cuánta confianza** la dio, que es lo que
 distingue una nota firme de una que el propio modelo dio con dudas.
@@ -1289,6 +1344,12 @@ cuáles sí, porque las que no, hay que probarlas en el código.
   y nunca antes del ingreso; un cambio con motivo «otro», una anulación y un «No dar de alta»
   exigen texto; un sueldo lleva moneda; y nadie es su propio jefe.
 - **Una situación con `antes_*` está anulada** (`V65`).
+- **Un banco de vacante siempre dice su propósito, y un banco por nivel nunca** (`V66`), y una
+  vacante tiene como mucho un borrador y una publicada **de cada propósito**. Las preguntas
+  propias se califican siempre por puntos; una pregunta vale de 0 a 100, la nota de una respuesta
+  también, y la guía de calificación no pasa de 2000 caracteres. Un banco de vacante que alguien
+  cree sin decir su propósito —un guion viejo, una prueba— se toma por cuestionario técnico: lo
+  pone un trigger, que es lo que eran todos hasta la `V66`.
 
 ### Tienen que vivir en el código
 
@@ -1331,6 +1392,14 @@ cuáles sí, porque las que no, hay que probarlas en el código.
   pasen de uno en uno.
 - **Que el sueldo no viaje a quien no tiene `ver_sueldos`** (`V64`), ni en la auditoría: es un
   permiso, y cambia sin migrar.
+- **Las reglas de las preguntas propias** (`V66`): que una versión publicada sume exactamente 100
+  —en borrador se escribe a medias—, que los puntos de las opciones sean enteros —`opcion.puntaje`
+  es `numeric` y lo comparte el banco v3—, que las notas de los bancos de siempre sigan en 0–4, y
+  que la evaluación del Perfil Integral lleve plantilla salvo cuando sale de las preguntas propias
+  —la `V66` quitó ese CHECK de la `V43` porque la base no sabe de dónde sale cada una—.
+- **De dónde salen las preguntas de una vacante** (`V66`): que el banco del nivel solo se elija
+  si la empresa tiene uno **propio** publicado para ese nivel, y que el origen no cambie desde la
+  primera postulación. Dependen de otras filas y del momento.
 
 ### Nunca existen, ni siquiera como opción
 
@@ -1410,7 +1479,10 @@ Datos que se cargan con la primera migración, no a mano:
 - Los **ocho criterios** del currículum, los **diez** de la simulación y las **nueve métricas**
   de la validación
 - Las **preguntas de la prueba**: las previas, las diez universales y las del puesto
-- Los **nueve agentes**, con su versión inicial
+- Los **nueve agentes**, con su versión inicial. Las migraciones siguientes suman otros: el
+  último, el `RECOMENDADOR` de la `V66`, que nace con su instrucción activa —sin ella el ejecutor
+  no llama al modelo—. La misma `V66` publica una instrucción nueva del `EVALUADOR`, que vale para
+  sus tres escalas, **solo si nadie había reescrito la suya** desde el panel
 - Las **236 preguntas** del banco, como primera versión publicada del banco de la
   plataforma — desde la `V37` no hay filas «globales» sin dueño: compartir es leer las de
   la plataforma

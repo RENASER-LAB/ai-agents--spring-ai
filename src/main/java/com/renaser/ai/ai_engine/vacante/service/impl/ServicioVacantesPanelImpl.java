@@ -18,6 +18,7 @@ import com.renaser.ai.ai_engine.vacante.service.ServicioVacantesPanel;
 import com.renaser.ai.ai_engine.vacante.service.VacanteArchivada;
 import com.renaser.ai.ai_engine.vacante.dto.DtosVacante.*;
 import com.renaser.ai.ai_engine.perfilintegral.entity.PlantillaEvaluacion;
+import com.renaser.ai.ai_engine.perfilintegral.entity.VersionBanco;
 import com.renaser.ai.ai_engine.perfilintegral.repository.EvaluacionRepository;
 import com.renaser.ai.ai_engine.perfilintegral.repository.PlantillaEvaluacionRepository;
 import com.renaser.ai.ai_engine.perfilintegral.repository.VersionBancoRepository;
@@ -47,10 +48,14 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.text.Normalizer;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.function.Function;
 
 @Service
 @RequiredArgsConstructor
@@ -73,6 +78,14 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
     /** Los dos estados que este servicio pregunta por su nombre. */
     private static final String ESTADO_CERRADA = "CERRADA";
     private static final String ESTADO_PUBLICADA = "PUBLICADA";
+
+    /**
+     * En qué punto están las preguntas propias de una fila de la lista: los mismos tres
+     * valores que el resumen del editor ({@code ServicioPreguntasVacanteImpl}).
+     */
+    private static final String PROPIAS_SIN_PREGUNTAS = "SIN_PREGUNTAS";
+    private static final String PROPIAS_BORRADOR = "BORRADOR";
+    private static final String PROPIAS_PUBLICADAS = "PUBLICADAS";
 
     /** El permiso que abre el lápiz de la lista y el PUT de la vacante. */
     private static final String PERMISO_EDITAR = "editar_vacante";
@@ -273,11 +286,11 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                 .cierraEn(datos.cierraEn())
                 .estado("BORRADOR")
                 .versionPesosId(pesos.getId())
-                // De dónde salen sus preguntas (V66): el banco de la empresa para su nivel si
-                // tiene uno PROPIO publicado; si no, las preguntas propias de la vacante. El de
-                // RENASER ya no se presta a las vacantes nuevas de otras empresas.
-                .origenPreguntas(tieneBancoPropioDelNivel(quien.organizacionId(),
-                        puesto.getNivelPuestoCodigo()) ? Vacante.ORIGEN_NIVEL : Vacante.ORIGEN_VACANTE)
+                // De dónde salen sus preguntas (V66): toda vacante nueva nace con sus preguntas
+                // propias, también en una empresa con banco propio publicado para el nivel
+                // (decisión del 30/09/2026). Ese banco se sigue pudiendo elegir después, en
+                // elegirOrigenDePreguntas; el de RENASER ya no se presta a las de otras empresas.
+                .origenPreguntas(Vacante.ORIGEN_VACANTE)
                 .responsableUsuarioId(datos.responsableUsuarioId())
                 .creadoEn(Instant.now())
                 .build());
@@ -511,6 +524,7 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
         // El catálogo de ciudades una vez para toda la lista, y solo si alguna la tiene.
         Map<String, OpcionUbigeo> ciudades =
                 ciudadesDe(filas.stream().map(Vacante::getCiudadUbigeo).toArray(String[]::new));
+        Function<Vacante, PreguntasDeLaFila> preguntas = preguntasDeLaLista(quien.organizacionId());
         return filas.stream()
                 // ⚠️ Sin el plazo vigente, y es deliberado: resolverlo pide la versión de la
                 // plantilla y los intentos abiertos de CADA vacante, o sea dos consultas por
@@ -520,8 +534,48 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                 .map(v -> comoPanel(v, porVacante.getOrDefault(v.getId(), 0),
                         puedeEditar(quien, alcanceDeEdicion, v),
                         alcanceDeArchivo, alcanceDeEliminacion, quien,
-                        PlazoDeLaPrueba.SIN_DATO, ciudadDe(v, ciudades), null))
+                        PlazoDeLaPrueba.SIN_DATO, ciudadDe(v, ciudades), preguntas.apply(v)))
                 .toList();
+    }
+
+    /**
+     * Lo que una fila no lee de la propia vacante para decir de dónde salen sus preguntas: si
+     * su empresa tiene un banco PROPIO publicado para el nivel del puesto y en qué punto están
+     * sus preguntas propias. Vacío = no se miró.
+     */
+    private record PreguntasDeLaFila(Boolean bancoPropio, String estadoPropias) {}
+
+    /**
+     * {@code PreguntasDeLaFila} de cada vacante de la lista, con tres consultas para toda la
+     * lista y no por fila: los puestos de la empresa, los niveles con banco propio publicado y
+     * sus preguntas propias en curso.
+     *
+     * <p>Las reglas son las del detalle y el editor, no otras: el banco propio es el de
+     * {@code tieneBancoPropioDelNivel}, y una versión publicada manda sobre el
+     * borrador como en el resumen del editor. El estado solo se dice de las que rinden
+     * preguntas propias.
+     */
+    private Function<Vacante, PreguntasDeLaFila> preguntasDeLaLista(Long organizacionId) {
+        Map<Long, String> nivelDelPuesto = new HashMap<>();
+        for (Puesto puesto : puestos.findByOrganizacionIdOrderByNombre(organizacionId)) {
+            nivelDelPuesto.put(puesto.getId(), puesto.getNivelPuestoCodigo());
+        }
+        Set<String> nivelesConBanco =
+                new HashSet<>(versionesBanco.nivelesConBancoPublicado(organizacionId));
+        Map<Long, String> estadoDeLasPropias = new HashMap<>();
+        for (VersionBanco version : versionesBanco.propiasEnCursoDe(organizacionId)) {
+            String estado = ESTADO_PUBLICADA.equals(version.getEstado())
+                    ? PROPIAS_PUBLICADAS : PROPIAS_BORRADOR;
+            estadoDeLasPropias.merge(version.getVacanteId(), estado,
+                    (antes, otra) -> PROPIAS_PUBLICADAS.equals(antes) ? antes : otra);
+        }
+        return v -> {
+            String nivel = nivelDelPuesto.get(v.getPuestoId());
+            String estado = Vacante.ORIGEN_VACANTE.equals(v.getOrigenPreguntas())
+                    ? estadoDeLasPropias.getOrDefault(v.getId(), PROPIAS_SIN_PREGUNTAS)
+                    : null;
+            return new PreguntasDeLaFila(nivel != null && nivelesConBanco.contains(nivel), estado);
+        };
     }
 
     /**
@@ -551,7 +605,8 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                 alcanceDeArchivoDe(quien), alcanceDeEliminacionDe(quien), quien,
                 loQueRigeHoy(quien, vacante),
                 ciudadDe(vacante, ciudadesDe(vacante.getCiudadUbigeo())),
-                tieneBancoPropioDelNivel(vacante));
+                // El estado de las propias no: el detalle lo lee del editor, con sus puntos.
+                new PreguntasDeLaFila(tieneBancoPropioDelNivel(vacante), null));
     }
 
     /**
@@ -1670,7 +1725,8 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                                    FiltroAlcance alcanceDeArchivo,
                                    FiltroAlcance alcanceDeEliminacion, ContextoUsuario quien,
                                    PlazoDeLaPrueba plazo, CiudadDeLaVacante ciudad,
-                                   Boolean bancoPropio) {
+                                   PreguntasDeLaFila preguntas) {
+        Boolean bancoPropio = preguntas.bancoPropio();
         boolean alcanzaParaArchivar = alcanceDeArchivo != null
                 && alcance.alcanzaALaVacante(quien, alcanceDeArchivo, v);
         // ⚠️ `puedeArchivar` NO mira cuánta gente sigue en carrera. El icono tiene que estar
@@ -1707,7 +1763,9 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                 // Prestado = rinde el banco del nivel y no es de la empresa: el de RENASER.
                 bancoPropio == null ? null
                         : v.isAplicaEvaluacion()
-                                && Vacante.ORIGEN_NIVEL.equals(v.getOrigenPreguntas()) && !bancoPropio);
+                                && Vacante.ORIGEN_NIVEL.equals(v.getOrigenPreguntas())
+                                && Boolean.FALSE.equals(bancoPropio),
+                preguntas.estadoPropias());
     }
 
     // ============ La remuneración ============

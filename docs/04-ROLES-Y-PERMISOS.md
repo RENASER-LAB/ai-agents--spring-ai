@@ -123,6 +123,16 @@ urgencia la fija Talento o Dirección, para que nadie se salte la cola por decis
 El responsable del área opina sobre **sus** vacantes, pero quien fija la configuración es
 Talento. La versión de pesos es de Dirección: define qué valora Renaser.
 
+**«Elegir qué prueba y qué plantilla de evaluación se aplican» decide también de dónde salen las
+preguntas** (`elegir_plantilla_evaluacion`, `V66`, 30/09/2026): «Preguntas propias de esta
+vacante», «El banco de la empresa para su nivel» o «Sin evaluación». **No hay permiso nuevo**, y
+es deliberado: es la misma decisión de siempre —qué responde quien postula— con una opción más.
+Escribir las preguntas propias es **corregir la vacante**, así que va con `editar_vacante` y su
+alcance; verlas, con `ver_vacantes`. El panel no lo sabe por su cuenta: el editor le dice
+`puedeEditar`. Ajustar a mano la nota de una abierta, o ponerla si la IA no pudo, es **«Ajustar una
+nota de la IA»** (`ajustar_nota`), con su motivo obligatorio de siempre; la ficha se lo dice con
+`puedeAjustar`.
+
 **«Editar una vacante» (`editar_vacante`) es el lápiz de la lista y la tarjeta del sueldo.**
 Desde el 19/09/2026 **respeta su alcance**: con alcance a sus vacantes, solo se corrigen las que
 esa persona dirige; en las demás no sale el lápiz, y pedirlo por la API responde 404, no 403. Sin
@@ -430,7 +440,9 @@ respondían 403. Si la sesión no carga, el menú enseña las cuatro entradas de
 ‡ Las dos filas de los instrumentos y del alta de empresas llegaron con el multiempresa
 (`V37`), y no significan lo mismo. **Personalizar los instrumentos** lo tiene el
 Administrador de cualquier empresa: es
-adaptar a la suya el banco, las plantillas y los pesos que la plataforma le prestó. **Dar de
+adaptar a la suya las plantillas, los pesos y las pruebas que la plataforma le prestó. **El banco
+de preguntas ya no** (`V66`): pedirlo responde 409, porque cada empresa usa solo su banco propio
+y escribe las preguntas en cada vacante. Quien se lo copió antes conserva su copia. **Dar de
 alta empresas** lo tiene **solo el Administrador de la empresa dueña de la plataforma** —hoy,
 Renaser—: es la operación de Renaser como dueña del producto, no una función del panel de un
 cliente. El alta de una empresa copia los roles de la plataforma y ese permiso lo excluye a

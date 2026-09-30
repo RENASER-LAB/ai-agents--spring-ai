@@ -133,13 +133,28 @@ public class FlujoPreguntasPropiasIT {
                 .andReturn().getResponse().getContentAsString(), "id"));
         vacanteId = crearVacante("Asistente contable");
 
-        // RENASER tiene banco propio publicado para el nivel: la vacante nace con él (AC-01b)
+        // RENASER tiene banco propio publicado para el nivel, y aun así la vacante nace con sus
+        // preguntas propias (AC-01b, decisión del 30/09/2026). El banco sigue ofreciéndose:
+        // se elige, se confirma y se vuelve a las propias.
         conTokenGet("/api/v1/panel/vacantes/" + vacanteId, tokenTalento)
-                .andExpect(jsonPath("$.origenPreguntas").value("NIVEL"))
+                .andExpect(jsonPath("$.origenPreguntas").value("VACANTE"))
+                .andExpect(jsonPath("$.aplicaEvaluacion").value(true))
                 .andExpect(jsonPath("$.bancoDelNivelPropio").value(true))
                 .andExpect(jsonPath("$.bancoPrestado").value(false));
         conToken(post("/api/v1/panel/vacantes/" + vacanteId + "/origen-preguntas"), tokenTalento,
+                "{\"origen\":\"NIVEL\"}").andExpect(status().isOk());
+        conTokenGet("/api/v1/panel/vacantes/" + vacanteId, tokenTalento)
+                .andExpect(jsonPath("$.origenPreguntas").value("NIVEL"));
+        // La lista también dice de dónde salen: el banco de la empresa, sin estado de propias
+        JsonNode conElBanco = filaDeLaLista(vacanteId);
+        assertThat(conElBanco.get("origenPreguntas").asText()).isEqualTo("NIVEL");
+        assertThat(conElBanco.get("bancoDelNivelPropio").asBoolean()).isTrue();
+        assertThat(conElBanco.get("bancoPrestado").asBoolean()).isFalse();
+        assertThat(conElBanco.get("estadoPreguntasPropias").isNull()).isTrue();
+        conToken(post("/api/v1/panel/vacantes/" + vacanteId + "/origen-preguntas"), tokenTalento,
                 "{\"origen\":\"VACANTE\"}").andExpect(status().isOk());
+        assertThat(filaDeLaLista(vacanteId).get("estadoPreguntasPropias").asText())
+                .isEqualTo("SIN_PREGUNTAS");
 
         JsonNode editor = json.readTree(conToken(post(base() + "/preguntas"), tokenTalento, """
                 {"tipo":"ABIERTA","enunciado":"Cuéntanos un cierre con un descuadre. ¿Cómo lo hallaste?",
@@ -152,6 +167,7 @@ public class FlujoPreguntasPropiasIT {
         assertThat(editor.at("/borrador/criterios/0/puntos").asInt()).isEqualTo(20);
         criterioGeneralId = editor.at("/borrador/criterios/0/id").asLong();
         pregunta.put("abiertaA", editor.at("/borrador/criterios/0/preguntas/0/id").asLong());
+        assertThat(filaDeLaLista(vacanteId).get("estadoPreguntasPropias").asText()).isEqualTo("BORRADOR");
     }
 
     @DisplayName("Con 95 puntos, un criterio vacío y una clave sin máximo: 400 con las tres faltas")
@@ -235,6 +251,7 @@ public class FlujoPreguntasPropiasIT {
         // El cuestionario técnico no toma las preguntas del Perfil Integral (AC-18)
         assertThat(versionesBanco.cuestionarioTecnicoDe(vacanteId, "PUBLICADA")).isEmpty();
         assertThat(versionesBanco.preguntasPropiasDe(vacanteId, "PUBLICADA")).isPresent();
+        assertThat(filaDeLaLista(vacanteId).get("estadoPreguntasPropias").asText()).isEqualTo("PUBLICADAS");
 
         conToken(post("/api/v1/panel/vacantes/" + vacanteId + "/plantilla-prueba"), tokenTalento,
                 "{\"versionPlantillaPruebaId\": %d}".formatted(unaPruebaPublicada())).andExpect(status().isOk());
@@ -743,6 +760,16 @@ public class FlujoPreguntasPropiasIT {
             if (p.get("enunciado").asText().equals(enunciado)) return p;
         }
         throw new AssertionError("No está: " + enunciado);
+    }
+
+    /** La fila de una vacante en la lista del panel, tal como la recibe la pantalla. */
+    private JsonNode filaDeLaLista(long id) throws Exception {
+        JsonNode lista = json.readTree(conTokenGet("/api/v1/panel/vacantes", tokenTalento)
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        for (JsonNode fila : lista) {
+            if (fila.get("id").asLong() == id) return fila;
+        }
+        throw new AssertionError("La vacante " + id + " no está en la lista");
     }
 
     private static List<JsonNode> listaDe(JsonNode arreglo) {

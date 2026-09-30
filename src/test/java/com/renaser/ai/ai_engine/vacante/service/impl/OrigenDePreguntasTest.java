@@ -14,6 +14,7 @@ import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
 import com.renaser.ai.ai_engine.solicitud.entity.SolicitudTalento;
 import com.renaser.ai.ai_engine.solicitud.repository.SolicitudTalentoRepository;
 import com.renaser.ai.ai_engine.vacante.dto.DtosVacante.GuardarVacante;
+import com.renaser.ai.ai_engine.vacante.dto.DtosVacante.VacantePanel;
 import com.renaser.ai.ai_engine.vacante.entity.Puesto;
 import com.renaser.ai.ai_engine.vacante.entity.Vacante;
 import com.renaser.ai.ai_engine.vacante.repository.PuestoRepository;
@@ -41,8 +42,8 @@ import static org.mockito.Mockito.when;
 
 /**
  * De dónde salen las preguntas de una vacante (V66): el banco PROPIO de la empresa para su
- * nivel, las preguntas propias de la vacante, o ninguna. El de RENASER ya no se presta a las
- * vacantes nuevas de otras empresas.
+ * nivel, las preguntas propias de la vacante, o ninguna. Toda vacante nueva nace con sus
+ * preguntas propias; el de RENASER ya no se presta a las vacantes nuevas de otras empresas.
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("De dónde salen las preguntas de la vacante")
@@ -128,10 +129,25 @@ class OrigenDePreguntasTest {
     }
 
     @Test
-    @DisplayName("Con banco propio publicado para el nivel, nace con el banco del nivel (AC-01b)")
-    void conBancoPropioNaceConElDelNivel() {
+    @DisplayName("Con banco propio publicado para el nivel, también nace con preguntas propias (AC-01b)")
+    void conBancoPropioTambienNaceConPreguntasPropias() {
         conBancoPropio(true);
-        assertThat(crear().getOrigenPreguntas()).isEqualTo(Vacante.ORIGEN_NIVEL);
+        Vacante nueva = crear();
+        assertThat(nueva.getOrigenPreguntas()).isEqualTo(Vacante.ORIGEN_VACANTE);
+        assertThat(nueva.isAplicaEvaluacion()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Con banco propio, el banco del nivel se sigue pudiendo elegir después (AC-01b)")
+    void conBancoPropioSePuedeElegirElDelNivel() {
+        conBancoPropio(true);
+        Vacante v = vacante("BORRADOR", true, Vacante.ORIGEN_VACANTE);
+
+        servicio.elegirOrigenDePreguntas(QUIEN, VACANTE, "NIVEL");
+
+        assertThat(v.getOrigenPreguntas()).isEqualTo(Vacante.ORIGEN_NIVEL);
+        assertThat(v.isAplicaEvaluacion()).isTrue();
+        verify(vacantes).save(v);
     }
 
     @Test
@@ -197,5 +213,80 @@ class OrigenDePreguntasTest {
 
         assertThat(v.getEstado()).isEqualTo("PUBLICADA");
         verify(versionesBanco, never()).laPublicadaDelNivel(any(), any(), any());
+    }
+
+    // ------------------------------------------------------------------ La lista
+
+    private static Vacante deLaLista(Long id, boolean aplica, String origen, Long puestoId) {
+        return Vacante.builder().id(id).organizacionId(ORGANIZACION).estado("BORRADOR")
+                .aplicaEvaluacion(aplica).origenPreguntas(origen).puestoId(puestoId).build();
+    }
+
+    private static VersionBanco propias(Long vacanteId, String estado) {
+        return VersionBanco.builder().vacanteId(vacanteId).estado(estado)
+                .proposito("PERFIL_INTEGRAL").organizacionId(ORGANIZACION).build();
+    }
+
+    private void enLaLista(Vacante... filas) {
+        when(vacantes.findByOrganizacionIdAndArchivadaEnIsNullAndEliminadaEnIsNullOrderByCreadoEnDesc(
+                ORGANIZACION)).thenReturn(List.of(filas));
+    }
+
+    @Test
+    @DisplayName("La lista dice en qué punto están las preguntas propias, sin consultar fila a fila")
+    void laListaDiceElEstadoDeLasPropias() {
+        enLaLista(deLaLista(1L, true, Vacante.ORIGEN_VACANTE, PUESTO),
+                deLaLista(2L, true, Vacante.ORIGEN_VACANTE, PUESTO),
+                deLaLista(3L, true, Vacante.ORIGEN_VACANTE, PUESTO),
+                deLaLista(4L, true, Vacante.ORIGEN_NIVEL, PUESTO),
+                deLaLista(5L, false, Vacante.ORIGEN_VACANTE, PUESTO));
+        // La 1 tiene publicada y un borrador abierto (llega primero): manda la publicada
+        when(versionesBanco.propiasEnCursoDe(ORGANIZACION)).thenReturn(List.of(
+                propias(1L, "BORRADOR"), propias(1L, "PUBLICADA"), propias(2L, "BORRADOR"),
+                propias(5L, "PUBLICADA")));
+
+        var filas = servicio.listar(QUIEN, false);
+
+        assertThat(filas).extracting(VacantePanel::estadoPreguntasPropias)
+                .containsExactly("PUBLICADAS", "BORRADOR", "SIN_PREGUNTAS", null, "PUBLICADAS");
+        verify(versionesBanco, never()).preguntasPropiasDe(any(), any());
+    }
+
+    @Test
+    @DisplayName("La lista dice si el banco del nivel es el de la empresa o el prestado de RENASER")
+    void laListaDiceSiElBancoEsPrestado() {
+        Long sinBanco = 6L;
+        when(puestos.findByOrganizacionIdOrderByNombre(ORGANIZACION)).thenReturn(List.of(
+                Puesto.builder().id(PUESTO).organizacionId(ORGANIZACION).nivelPuestoCodigo(NIVEL).build(),
+                Puesto.builder().id(sinBanco).organizacionId(ORGANIZACION)
+                        .nivelPuestoCodigo("SUPERVISION").build()));
+        when(versionesBanco.nivelesConBancoPublicado(ORGANIZACION)).thenReturn(List.of(NIVEL));
+        enLaLista(deLaLista(1L, true, Vacante.ORIGEN_NIVEL, PUESTO),
+                deLaLista(2L, true, Vacante.ORIGEN_NIVEL, sinBanco),
+                deLaLista(3L, false, Vacante.ORIGEN_NIVEL, sinBanco),
+                deLaLista(4L, true, Vacante.ORIGEN_NIVEL, 99L));
+
+        var filas = servicio.listar(QUIEN, false);
+
+        assertThat(filas).extracting(VacantePanel::bancoDelNivelPropio)
+                .containsExactly(true, false, false, false);
+        // La apagada no rinde ningún banco; un puesto que no es de la empresa no le da uno propio
+        assertThat(filas).extracting(VacantePanel::bancoPrestado)
+                .containsExactly(false, true, false, true);
+        verify(versionesBanco, never()).laPublicadaDelNivel(any(), any(), any());
+        verify(puestos, never()).findByIdAndOrganizacionId(any(), any());
+    }
+
+    @Test
+    @DisplayName("El detalle no trae el estado de las propias: lo lee del editor, con sus puntos")
+    void elDetalleNoTraeElEstadoDeLasPropias() {
+        conBancoPropio(true);
+        vacante("BORRADOR", true, Vacante.ORIGEN_VACANTE);
+
+        var detalle = servicio.detalle(QUIEN, VACANTE);
+
+        assertThat(detalle.estadoPreguntasPropias()).isNull();
+        assertThat(detalle.bancoDelNivelPropio()).isTrue();
+        verify(versionesBanco, never()).propiasEnCursoDe(any());
     }
 }

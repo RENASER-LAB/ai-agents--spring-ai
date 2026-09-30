@@ -205,16 +205,29 @@ public final class DtosVacante {
                                /**
                                 * Si su empresa tiene un banco PROPIO publicado para el nivel
                                 * del puesto: solo entonces se ofrece «El banco de la empresa
-                                * para su nivel». Solo viaja en el detalle (vacío en la lista).
+                                * para su nivel». Viaja en el detalle y en la lista, que lo
+                                * resuelve de una vez para todas las filas.
                                 */
                                Boolean bancoDelNivelPropio,
                                /**
                                 * Si rinde el banco de RENASER prestado (una vacante de antes
                                 * de la V66): se enseña con su nombre real, «El banco de RENASER
-                                * para su nivel», y si se cambia de opción ya no vuelve. Solo
-                                * en el detalle.
+                                * para su nivel», y si se cambia de opción ya no vuelve. En el
+                                * detalle y en la lista.
                                 */
-                               Boolean bancoPrestado) {}
+                               Boolean bancoPrestado,
+                               /**
+                                * En qué punto están sus preguntas propias:
+                                * {@code SIN_PREGUNTAS}, {@code BORRADOR} o {@code PUBLICADAS},
+                                * con la misma regla que el resumen del editor (una publicada
+                                * manda sobre el borrador). Vacío si no rinde preguntas
+                                * propias.
+                                *
+                                * <p>⚠️ <b>Solo viaja en la lista</b>, que lo resuelve de una vez
+                                * para todas las filas; el detalle lo lee del editor, que trae
+                                * además los puntos.
+                                */
+                               String estadoPreguntasPropias) {}
 
     /**
      * Una ciudad del catálogo, como la ve el panel: el código que se guarda y el nombre que
