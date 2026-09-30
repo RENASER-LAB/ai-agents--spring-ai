@@ -33,12 +33,13 @@ requisitos nuevos el 14 de agosto y cambian bastante.
 | [01 · Requisitos funcionales](01-REQUISITOS-FUNCIONALES.md) | RF-01 a RF-179. Qué hace el sistema |
 | [02 · Requisitos no funcionales](02-REQUISITOS-NO-FUNCIONALES.md) | RNF-01 a RNF-66. Tecnología, seguridad, rendimiento |
 | [03 · Estados de la postulación](03-ESTADOS-POSTULACION.md) | Los 18 estados de una postulación y sus transiciones |
-| [04 · Roles y permisos](04-ROLES-Y-PERMISOS.md) | Los 77 permisos, acción por acción. En la base hay 75 sembrados |
-| [05 · Modelo de datos](05-MODELO-DE-DATOS.md) | Las 108 tablas del módulo (V1-V63) por área y por qué el modelo es así. Se lee |
+| [04 · Roles y permisos](04-ROLES-Y-PERMISOS.md) | Los 81 permisos, acción por acción. En la base hay 79 sembrados |
+| [05 · Modelo de datos](05-MODELO-DE-DATOS.md) | Las 114 tablas del módulo (V1-V65) por área y por qué el modelo es así. Se lee |
 | [06 · Inventario de pantallas](06-INVENTARIO-DE-PANTALLAS-MOCKUPS.md) | Las 21 pantallas base, estados, ventanas, campos y datos de los mockups |
 | [07 · Diccionario de datos](07-DICCIONARIO-DE-DATOS.md) | Cada tabla con todas sus columnas, tipos y claves. Se consulta |
 | [08 · Alcance del MVP](08-ALCANCE-DEL-MVP.md) | Qué se construye primero, en tres hitos, y qué queda fuera |
 | [09 · Las APIs](09-APIS.md) | Las dos puertas, cómo entrar y qué hace cada endpoint. La referencia viva es Swagger |
+| [Ampliación de RR.HH.](AMPLIACION-RRHH.md) | Los apartados de RR.HH. que se construyen después de la selección, en orden, con lo que se sabe de cada uno antes de su spec. El 1, la gestión de personas, está construido (V64) |
 | [Estado del proyecto](ESTADO-DEL-PROYECTO.md) | **El presente**: hitos, tests, agentes, lo que falta de código y lo que decide Renaser. Se corrige, no se acumula |
 | [Reglas del código](REGLAS-DEL-CODIGO.md) | Los dos módulos, los paquetes de dominio, la frontera con el motor de agentes, y las reglas que no se negocian (estados, alcance, migraciones, Jackson 3). Qué documento se actualiza con cada cambio |
 | [Trabajar en local](TRABAJAR-EN-LOCAL.md) | Perfiles de configuración, arrancar el backend, correr los tests (y por qué siempre con `clean`), las pruebas de extremo a extremo contra un worktree, un backend propio por rama, dónde están las pantallas, los guiones de `scripts/` |

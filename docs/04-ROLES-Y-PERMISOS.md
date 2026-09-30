@@ -70,9 +70,10 @@ se cambie ahí vale desde la siguiente llamada de cada afectado: **no hace falta
 volver a entrar**.
 
 Lo que **sí** hace falta desplegar es un permiso nuevo: el catálogo solo crece con una
-migración, y por eso este documento y la base no dicen el mismo número. Aquí se enumeran **77
-permisos**, que es el sistema completo; en la base hay **75 sembrados** —71 hasta la `V40`,
-`eliminar_vacante` de la `V60` y los tres de las reseñas de la `V63`— (ver
+migración, y por eso este documento y la base no dicen el mismo número. Aquí se enumeran **81
+permisos**, que es el sistema completo; en la base hay **79 sembrados** —71 hasta la `V40`,
+`eliminar_vacante` de la `V60`, los tres de las reseñas de la `V63` y los cuatro de la gestión
+de personas de la `V64`— (ver
 [07-DICCIONARIO-DE-DATOS.md](07-DICCIONARIO-DE-DATOS.md), que sigue al código). La diferencia
 son sobre todo el Radar y las métricas, todavía sin construir. En sentido contrario también
 falta algo: cuatro permisos que existen en la base —`ver_banco_preguntas`,
@@ -324,6 +325,12 @@ ambos. Arranca con ambos habilitados.
 Talento lleva el proceso, prepara la evidencia y recomienda; pero quien se hace cargo del
 resultado de esa persona es quien la va a tener en su equipo.
 
+**Desde el 29/09/2026 (`V64`) se contrata también desde el panel**, con «Contratar» en la ficha
+del postulante: es la misma decisión en verde, con los mismos permisos —`decidir_contratacion`
+la primera vez, `cambiar_decision` si ya hubo una— y desde cualquier etapa no final. Talento
+sigue sin contratar; lo que sí hace es dar de alta al contratado como colaborador (ver
+«Personas»).
+
 ### Cierre de postulaciones
 
 | Acción | Candidato | Talento | Resp. área | Dirección | Admin |
@@ -362,6 +369,40 @@ botón se ve y la acción se rechaza: quien reparte los permisos tiene que mirar
 | Ver predicción contra desempeño real | ○ | ○ | ○ | ● | ○ |
 | Ver horas humanas ahorradas y tiempo hasta finalista | ○ | ● | ○ | ● | ○ |
 | Exportar datos | ○ | ● | ○ | ● | ● |
+
+### Personas
+
+Desde el 29/09/2026 (`V64`): la ficha de quien trabaja en la empresa, el primer apartado de la
+[ampliación de RR.HH.](AMPLIACION-RRHH.md). Grupo `PERSONAS` en la matriz de Configuración.
+
+| Acción | Candidato | Talento | Resp. área | Dirección | Admin |
+|---|:--:|:--:|:--:|:--:|:--:|
+| Ver los colaboradores y sus fichas (`ver_colaboradores`) | ○ | ● | ○ | ● | ○ |
+| Dar de alta, editar, cesar y reingresar colaboradores, y cargarlos por Excel (`editar_colaboradores`) | ○ | ● | ○ | ● | ○ |
+| **Ver y editar el sueldo de los colaboradores** (`ver_sueldos`) | ○ | ○ | ○ | ● | ○ |
+| Editar las sedes y los cargos (`editar_estructura`) | ○ | ● | ○ | ● | ○ |
+
+La `V64` los concedió con alcance `TODO` **en todas las organizaciones que ya existían**, y las
+que se den de alta después los reciben al copiarse la matriz. **En esta versión solo cuenta
+`TODO`**: con cualquier otro alcance el usuario no alcanza a ningún colaborador —la lista sale
+vacía y una ficha responde 404—, y el menú no le enseña «Colaboradores». Que un RR.HH. alcance
+solo su sede o su área, o que un jefe vea a su equipo, queda para después.
+
+⚠️ **Sin `ver_sueldos` el sueldo no existe**, no solo se oculta: la API no lo envía en la lista,
+la ficha, el historial, la plantilla ni los errores de la carga, y un ajuste que solo toca el
+sueldo no aparece ni se puede anular. La auditoría de un cambio dice qué campos cambiaron, nunca
+el importe, porque `ver_auditoria` no es `ver_sueldos`. Que solo lo tenga Dirección está por
+confirmar con la clienta (ver «Lo que hay que confirmar con el cliente»).
+
+Leer las sedes y los cargos no pide permiso: Configuración se los enseña a todo el equipo, sin
+acciones a quien no tiene `editar_estructura`.
+
+**El menú lateral del panel (`V64`) enseña solo lo que cada uno puede usar**, leyendo los
+permisos de `GET /panel/sesion`, y sigue los permisos que ya exigía cada pantalla: «Vacantes»
+con `ver_vacantes`, «Simulación» con crear sesiones o ver sus inscritos, «Pruebas» con
+`elegir_plantilla_prueba`, «Colaboradores» con `ver_colaboradores` en `TODO`, y «Configuración»
+siempre. **El Administrador no ve «Vacantes»**: no tiene `ver_vacantes` y esas pantallas ya le
+respondían 403. Si la sesión no carga, el menú enseña las cuatro entradas de siempre.
 
 ### Configuración
 
@@ -579,18 +620,18 @@ una que el servidor haga cumplir.
 
 ### 2 · Que la pantalla se vuelva ilegible
 
-Son **77 permisos**. Con una casilla por cada uno y sin agrupar, nadie entiende qué está
+Son **81 permisos**. Con una casilla por cada uno y sin agrupar, nadie entiende qué está
 marcando, y la pantalla se usa mal o se deja de usar.
 
 **Cómo se evita:**
 - Agrupar los permisos por área: solicitudes, vacantes, candidatos, evaluación, sesiones,
-  validación, decisión, radar, métricas y configuración.
+  validación, decisión, radar, métricas, configuración y, desde la `V64`, personas.
 - Escribirlos en lenguaje normal —*"cerrar una vacante"*— y nunca con nombres técnicos como
   `vacancy.close`.
 - Un interruptor por grupo para marcar o desmarcar todo el bloque.
 
 ```
-  ROL · Equipo de Talento              54 de 77 permisos
+  ROL · Equipo de Talento              57 de 81 permisos
 
   Vacantes                                    [8/9] v
      [x] Ver vacantes
@@ -655,7 +696,7 @@ nuevo solo dice que hacen falta capacidades equivalentes a Candidato, Equipo de 
 Responsable del Área, Dirección y Administrador, y que no se duplique el sistema de RENASER OS.
 Lo demás se dedujo del trabajo que hace cada uno.
 
-Conviene validar cuatro cosas:
+Conviene validar cinco cosas:
 
 | Qué decidí | Por qué | Si me equivoqué |
 |---|---|---|
@@ -663,8 +704,9 @@ Conviene validar cuatro cosas:
 | El responsable del área **no** ve las claves | No le hacen falta; menos gente que las conozca, menor riesgo | Se le marca ese permiso |
 | Publicar el banco y cambiar pesos es de **Dirección** | Definen qué valora Renaser al contratar | Se le marcan a Talento |
 | Dirección y Administrador son **dos roles**, no uno | Uno decide qué se valora, el otro maneja el sistema | Se fusionan marcando los permisos de uno en el otro |
+| Solo **Dirección** ve y edita los sueldos de los colaboradores (`V64`) | El sueldo es un dato sensible (Ley 29733) y la pretensión salarial ya era solo suya | Se marca `ver_sueldos` a quien toque |
 
-En los cuatro casos el arreglo es marcar una casilla. Ninguno obliga a tocar código.
+En los cinco casos el arreglo es marcar una casilla. Ninguno obliga a tocar código.
 
 ---
 

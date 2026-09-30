@@ -9,7 +9,8 @@ public interface ServicioVacantesPanel {
 
     Long crearPuesto(ContextoUsuario quien, GuardarPuesto datos);
 
-    List<PuestoResponse> listarPuestos(ContextoUsuario quien);
+    /** @param todos también los desactivados (V64): para nombrar el de una vacante, no para elegir. */
+    List<PuestoResponse> listarPuestos(ContextoUsuario quien, boolean todos);
 
     // Crear exige una solicitud ABIERTA (aprobada por Dirección). Nace en BORRADOR.
     Long crear(ContextoUsuario quien, GuardarVacante datos);

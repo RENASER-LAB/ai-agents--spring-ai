@@ -193,4 +193,12 @@ public interface VacanteRepository extends JpaRepository<Vacante, Long> {
     List<Long> idsEliminadasDe(@Param("ids") List<Long> ids);
 
     boolean existsBySolicitudTalentoId(Long solicitudTalentoId);
+
+    /**
+     * Cuántas vacantes vivas usa cada cargo de la empresa: el aviso de renombrar lo dice antes
+     * de guardar, porque el nombre nuevo sale en todas (V64).
+     */
+    @Query("select v.puestoId, count(v) from Vacante v where v.organizacionId = :organizacionId "
+            + "and v.eliminadaEn is null group by v.puestoId")
+    List<Object[]> vacantesPorPuesto(@Param("organizacionId") Long organizacionId);
 }

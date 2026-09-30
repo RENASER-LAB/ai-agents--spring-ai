@@ -32,9 +32,10 @@ public class VacantesPanelController {
 
     @GetMapping("/puestos")
     @PreAuthorize("@permisos.tiene('ver_vacantes')")
-    @Operation(summary = "El catálogo de puestos activos")
-    public List<PuestoResponse> puestos() {
-        return servicio.listarPuestos(permisos.actual());
+    @Operation(summary = "El catálogo de puestos activos. Con todos=true, también los desactivados "
+            + "(para nombrar el puesto de una vacante que ya lo tenía, no para elegirlo)")
+    public List<PuestoResponse> puestos(@RequestParam(defaultValue = "false") boolean todos) {
+        return servicio.listarPuestos(permisos.actual(), todos);
     }
 
     @PostMapping("/puestos")
