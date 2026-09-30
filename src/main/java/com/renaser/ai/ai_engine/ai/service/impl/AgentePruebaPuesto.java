@@ -9,8 +9,6 @@ import com.renaser.ai.ai_engine.prueba.service.PuentePruebaIa;
 
 import lombok.RequiredArgsConstructor;
 
-import java.math.BigInteger;
-import java.security.SecureRandom;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -97,7 +95,7 @@ public class AgentePruebaPuesto implements AgenteSeleccion {
      * quien escribe la guía —días antes, sin verlo nunca— no puede reproducir el rótulo,
      * y la instrucción puede decir cuál es el único cierre válido.
      */
-    private static final SecureRandom AZAR = new SecureRandom();
+    // El sorteo vive ahora en EnvolturaDeGuia, compartido con el evaluador (V66).
 
     /**
      * Hasta donde se lee la guía al armar el prompt.
@@ -108,7 +106,7 @@ public class AgentePruebaPuesto implements AgenteSeleccion {
      * de una fila que llegara larga por un camino que nadie previó. Recortar es mejor que
      * fallar: una guía larguísima no puede dejar sin calificar una prueba entregada.
      */
-    private static final int MAXIMO_GUIA = 2000;
+    static final int MAXIMO_GUIA = EnvolturaDeGuia.MAXIMO_GUIA;
 
     private final PuentePruebaIa puente;
     private final EjecutorAgenteIa ejecutor;
@@ -185,19 +183,9 @@ public class AgentePruebaPuesto implements AgenteSeleccion {
      * modelo de inventarse una nota global de 500, no habría dónde escribirla.
      */
     static String conLaGuiaDeLaPrueba(String guia) {
-        String limpia = guia == null ? "" : guia.trim();
-        if (limpia.isEmpty()) {
-            // Sin guía, exactamente el mismo prompt de siempre. Ni una línea de más: lo que
-            // se manda se paga, y una prueba sin guía no tiene por qué costar más que ayer.
-            return FORMATO;
-        }
-        if (limpia.length() > MAXIMO_GUIA) {
-            limpia = limpia.substring(0, MAXIMO_GUIA) + "\n[...cortada por lo larga]";
-        }
-        // Ni se recorta ni se sanea el texto: lo que lo acota es el rótulo irrepetible.
-        String marca = new BigInteger(40, AZAR).toString(36);
-        return GUIA_ABRE.formatted(marca) + "\n\n" + limpia + "\n\n"
-                + GUIA_CIERRA.formatted(marca) + "\n\n" + FORMATO;
+        // La envoltura se comparte con el evaluador de las preguntas propias (V66): la
+        // defensa vive en un solo sitio. Sin guía devuelve el FORMATO tal cual.
+        return EnvolturaDeGuia.envolver(guia, GUIA_ABRE, GUIA_CIERRA, FORMATO);
     }
 
     /**

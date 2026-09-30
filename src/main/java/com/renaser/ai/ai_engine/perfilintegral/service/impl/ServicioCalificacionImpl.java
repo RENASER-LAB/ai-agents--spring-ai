@@ -17,6 +17,7 @@ import com.renaser.ai.ai_engine.perfilintegral.repository.OpcionRepository;
 import com.renaser.ai.ai_engine.perfilintegral.repository.ParConsistenciaRepository;
 import com.renaser.ai.ai_engine.perfilintegral.repository.PreguntaRepository;
 import com.renaser.ai.ai_engine.perfilintegral.repository.RespuestaRepository;
+import com.renaser.ai.ai_engine.perfilintegral.service.CalificacionPorPuntos;
 import com.renaser.ai.ai_engine.perfilintegral.service.FormulasBancoV3;
 import com.renaser.ai.ai_engine.perfilintegral.service.ServicioCalificacion;
 import tools.jackson.core.type.TypeReference;
@@ -80,6 +81,7 @@ public class ServicioCalificacionImpl implements ServicioCalificacion {
     private final VersionPesosRepository versionesPesos;
     private final VacanteRepository vacantes;
     private final VersionBancoRepository versionesBanco;
+    private final CalificacionPorPuntos porPuntos;
 
     @Override
     @Transactional
@@ -97,6 +99,17 @@ public class ServicioCalificacionImpl implements ServicioCalificacion {
                 : versionesBanco.findById(evaluacion.getVersionBancoNivelId()).orElse(null);
         if (banco != null && CalificacionCriterios.METODO.equals(banco.getMetodoCalificacion())) {
             return BigDecimal.ZERO;
+        }
+
+        // Las preguntas propias (V66) no escriben aquí la nota de la etapa, y es la regla
+        // que las distingue: la nota del Perfil Integral solo existe cuando TODAS sus
+        // preguntas con puntos tienen nota, y las abiertas todavía no la tienen. Ni con lo
+        // cerrado solo, ni con un cero provisional (AC-09). Si había una de antes —una criba
+        // del currículum a solas—, ya no dice la verdad: la evaluación existe y aún no suma.
+        if (banco != null && CalificacionPorPuntos.METODO.equals(banco.getMetodoCalificacion())) {
+            notasEtapa.findByPostulacionIdAndEtapaCodigo(postulacion.getId(), "PERFIL_INTEGRAL")
+                    .ifPresent(notasEtapa::delete);
+            return porPuntos.calcular(banco.getId(), evaluacion.getId()).cerradasObtenido();
         }
 
         List<Respuesta> suyas = respuestas.findByEvaluacionId(evaluacion.getId());
@@ -125,6 +138,15 @@ public class ServicioCalificacionImpl implements ServicioCalificacion {
         if (postulacion.getEvaluacionId() == null) {
             return new ResumenCerrado(BigDecimal.ZERO, 0);
         }
+        // Las preguntas propias devuelven lo mismo que su rama de calificarLoCerrado: los
+        // puntos sacados en las cerradas (no un porcentaje) y cuántas cerradas con puntos hay.
+        Long versionId = evaluaciones.findById(postulacion.getEvaluacionId())
+                .map(Evaluacion::getVersionBancoNivelId).orElse(null);
+        if (porPuntos.esPorPuntos(versionId)) {
+            CalificacionPorPuntos.Resultado resultado =
+                    porPuntos.calcular(versionId, postulacion.getEvaluacionId());
+            return new ResumenCerrado(resultado.cerradasObtenido(), resultado.cerradasConPuntos());
+        }
         List<Respuesta> suyas = respuestas.findByEvaluacionId(postulacion.getEvaluacionId());
         if (suyas.isEmpty()) {
             return new ResumenCerrado(BigDecimal.ZERO, 0);
@@ -133,6 +155,44 @@ public class ServicioCalificacionImpl implements ServicioCalificacion {
         Map<Long, Pregunta> porId = preguntas.findByIdIn(preguntaIds).stream()
                 .collect(Collectors.toMap(Pregunta::getId, Function.identity()));
         return puntuar(suyas, porId, opcionesDe(preguntaIds));
+    }
+
+    @Override
+    public NotaDelBanco notaDelBancoPorPuntos(Long postulacionId) {
+        Postulacion postulacion = postulaciones.findById(postulacionId)
+                .orElseThrow(() -> new ResourceNotFoundException("Postulación", "id", postulacionId));
+        if (postulacion.getEvaluacionId() == null) {
+            return null;
+        }
+        Long versionId = evaluaciones.findById(postulacion.getEvaluacionId())
+                .map(Evaluacion::getVersionBancoNivelId).orElse(null);
+        if (!porPuntos.esPorPuntos(versionId)) {
+            return null;
+        }
+        CalificacionPorPuntos.Resultado r = porPuntos.calcular(versionId, postulacion.getEvaluacionId());
+
+        int cerradasMaximo = r.cerradasMaximo();
+        BigDecimal cerradas = cerradasMaximo == 0 ? null
+                : r.cerradasObtenido().multiply(CIEN)
+                        .divide(BigDecimal.valueOf(cerradasMaximo), 2, RoundingMode.HALF_UP);
+
+        BigDecimal abiertasObtenido = BigDecimal.ZERO;
+        int abiertasMaximo = 0;
+        Map<Long, BigDecimal> sobreCuatro = new HashMap<>();
+        for (CalificacionPorPuntos.PreguntaCalculada p : r.todas()) {
+            if (!p.vaALaIa() || p.pendiente() || p.obtenido() == null) {
+                continue;
+            }
+            abiertasObtenido = abiertasObtenido.add(p.obtenido());
+            abiertasMaximo += p.maximo();
+            sobreCuatro.put(p.respuesta().getId(), p.obtenido().multiply(BigDecimal.valueOf(4))
+                    .divide(BigDecimal.valueOf(p.maximo()), 2, RoundingMode.HALF_UP));
+        }
+        BigDecimal abiertas = abiertasMaximo == 0 ? null
+                : abiertasObtenido.multiply(CIEN)
+                        .divide(BigDecimal.valueOf(abiertasMaximo), 2, RoundingMode.HALF_UP);
+        return new NotaDelBanco(r.nota(), r.completo(), cerradas, r.cerradasConPuntos(),
+                abiertas, sobreCuatro);
     }
 
     /**

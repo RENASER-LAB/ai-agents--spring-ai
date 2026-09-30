@@ -117,7 +117,7 @@ class PuenteRedactorImplTest {
         conVacante();
         VersionBanco anterior = VersionBanco.builder()
                 .id(30L).vacanteId(VACANTE).estado("BORRADOR").build();
-        when(versionesBanco.findFirstByVacanteIdAndEstado(VACANTE, "BORRADOR"))
+        when(versionesBanco.cuestionarioTecnicoDe(VACANTE, "BORRADOR"))
                 .thenReturn(Optional.of(anterior));
         when(versionesBanco.save(any())).thenAnswer(i -> {
             VersionBanco v = i.getArgument(0);

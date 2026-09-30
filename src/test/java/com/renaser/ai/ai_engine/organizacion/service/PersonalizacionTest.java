@@ -73,13 +73,40 @@ class PersonalizacionTest {
     @Test
     @DisplayName("Si la copia revienta, la bandera no queda encendida a medias")
     void siLaCopiaRevientaLaBanderaNoQueda() {
-        when(copiador.copiarBanco(EMPRESA))
+        when(copiador.copiarPesos(EMPRESA))
                 .thenThrow(new IllegalStateException("nada publicado"));
 
-        assertThatThrownBy(() -> servicio.encender(ADMIN, Instrumento.BANCO))
+        assertThatThrownBy(() -> servicio.encender(ADMIN, Instrumento.PESOS))
                 .isInstanceOf(IllegalStateException.class);
-        assertThat(empresa.isBancoPropio()).isFalse();
+        assertThat(empresa.isPesosPropios()).isFalse();
         verify(organizaciones, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("El banco ya no se personaliza: se rechaza y no se copia nada (AC-01d)")
+    void elBancoYaNoSePersonaliza() {
+        assertThatThrownBy(() -> servicio.encender(ADMIN, Instrumento.BANCO))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("ya no se personaliza");
+        assertThat(empresa.isBancoPropio()).isFalse();
+        verify(copiador, never()).copiarBanco(any());
+        verify(organizaciones, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Tampoco cuando lo pide la plataforma por otra empresa (AC-01d)")
+    void niSiquieraDesdeLaPlataforma() {
+        Organizacion plataforma = Organizacion.builder().id(1L).codigo("RENASER")
+                .esPlataforma(true).build();
+        when(organizaciones.findByEsPlataformaTrue()).thenReturn(Optional.of(plataforma));
+        ContextoUsuario renaser = new ContextoUsuario(
+                11L, 21L, 1L, "EQUIPO", List.of(), Map.of());
+
+        assertThatThrownBy(() -> servicio.encenderPara(renaser, EMPRESA, Instrumento.BANCO, "la pidió"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("ya no se personaliza");
+        verify(copiador, never()).copiarBanco(any());
+        assertThat(empresa.isBancoPropio()).isFalse();
     }
 
     @Test

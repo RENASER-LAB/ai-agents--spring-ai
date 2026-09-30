@@ -78,6 +78,12 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
 
     public static final String RAPIDA = "RAPIDA";
     public static final String FINA = "FINA";
+    /**
+     * La recalificación de las preguntas propias (V66): solo el evaluador, con la guía
+     * nueva. Es un carril aparte a propósito: no entra en la barrera del retrato (que al
+     * terminar movería a la persona de etapa) ni en el «cómo va» del retrato.
+     */
+    public static final String RECALIFICA = "RECALIFICA";
 
     /** Qué hacer con un paso concreto cuando se mira la tanda. */
     private enum Situacion {
@@ -228,6 +234,102 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
                 .orElse("SIN_PEDIR");
     }
 
+    // ==================== Las preguntas propias de la vacante (V66) ====================
+
+    @Override
+    public String porQueNoSePuedeUsarLaIa(Long organizacionId) {
+        if (!habilitada) {
+            return "La IA está apagada en este sistema: ahora no se puede usar.";
+        }
+        if (suspendida(organizacionId)) {
+            return "La empresa está suspendida: la IA no se usa mientras tanto.";
+        }
+        if (tope.sinCupo(organizacionId)) {
+            return "La IA no tiene saldo: la empresa llegó a su tope mensual de IA.";
+        }
+        return null;
+    }
+
+    @Override
+    public boolean recalificar(Long postulacionId) {
+        if (apagada(postulacionId)) {
+            return false;
+        }
+        Long organizacionId = puente.organizacionDe(postulacionId);
+        Optional<TrabajoIa> creado = registro.crearSiNoHayUnoVivo(organizacionId, postulacionId,
+                AgenteEvaluador.CODIGO_AGENTE, RECALIFICA);
+        if (creado.isEmpty()) {
+            return false;
+        }
+        frenarOPublicar(creado.get(), organizacionId);
+        return true;
+    }
+
+    @Override
+    public Map<Long, Seguimiento> recalificacionDe(List<Long> postulacionIds) {
+        if (postulacionIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, TrabajoIa> ultimaDeCada = new HashMap<>();
+        for (TrabajoIa t : trabajos.findByPostulacionIdInOrderByIdAsc(postulacionIds)) {
+            if (AgenteEvaluador.CODIGO_AGENTE.equals(t.getAgenteCodigo())
+                    && RECALIFICA.equals(t.getModo())) {
+                ultimaDeCada.put(t.getPostulacionId(), t);   // en orden: queda la última
+            }
+        }
+        Map<Long, Seguimiento> salida = new HashMap<>();
+        ultimaDeCada.forEach((id, t) -> salida.put(id, seguimientoDe(t)));
+        return salida;
+    }
+
+    @Override
+    public boolean encolarRecomendador(Long organizacionId, Long vacanteId) {
+        if (!habilitada) {
+            log.warn("La IA está apagada por configuración: la recomendación de preguntas de "
+                    + "la vacante {} no se encola", vacanteId);
+            return false;
+        }
+        Optional<TrabajoIa> creado;
+        try {
+            creado = registro.crearParaVacante(
+                    organizacionId, AgenteRecomendador.CODIGO_AGENTE, vacanteId, FINA);
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            log.info("Recomendación duplicada de la vacante {} frenada por el índice: ya hay "
+                    + "una en curso", vacanteId);
+            return false;
+        }
+        if (creado.isEmpty()) {
+            return false;
+        }
+        frenarOPublicar(creado.get(), organizacionId);
+        return true;
+    }
+
+    @Override
+    public Seguimiento comoVaElRecomendador(Long vacanteId) {
+        return trabajos.findFirstByReferenciaTablaAndReferenciaIdAndAgenteCodigoOrderByIdDesc(
+                        "vacante", vacanteId, AgenteRecomendador.CODIGO_AGENTE)
+                .map(this::seguimientoDe)
+                .orElse(new Seguimiento("SIN_PEDIR", null));
+    }
+
+    /**
+     * Un trabajo contado para el panel. EN_ESPERA es «detenida», no «en curso»: se retoma
+     * sola cuando haya cupo, pero mientras tanto no avanza y hay que decir por qué.
+     */
+    private Seguimiento seguimientoDe(TrabajoIa t) {
+        return switch (t.getEstado()) {
+            case "PENDIENTE", "EN_CURSO" -> new Seguimiento("EN_CURSO", null);
+            case "EN_ESPERA" -> new Seguimiento("DETENIDA", suspendida(t.getOrganizacionId())
+                    ? "La empresa está suspendida: se retomará cuando la reactiven."
+                    : "La IA no tiene saldo: la empresa llegó a su tope mensual de IA. Se "
+                            + "retomará sola cuando haya cupo.");
+            case "FALLIDO" -> new Seguimiento("DETENIDA", registro.motivoDelUltimoFallo(t.getId())
+                    .orElse("La IA no pudo terminar después de varios intentos."));
+            default -> new Seguimiento("TERMINADA", null);
+        };
+    }
+
     private boolean apagada(Long postulacionId) {
         if (!habilitada) {
             log.warn("La calificación con IA está apagada por configuración: la postulación {} "
@@ -338,6 +440,9 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
         // «en curso» por un trabajo que no tiene nada que ver con la nota que enseña.
         List<TrabajoIa> suyos = todos.stream()
                 .filter(t -> DEL_RETRATO.contains(t.getAgenteCodigo()))
+                // Una recalificación de la guía no es una pasada del retrato: su nota sigue
+                // valiendo mientras tanto, y contarla aquí dejaría la tanda «en curso» sin fin.
+                .filter(t -> !RECALIFICA.equals(t.getModo()))
                 .toList();
         if (suyos.isEmpty()) {
             return "SIN_EMPEZAR";
@@ -562,6 +667,11 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
      * instancias distintas. Quien contesta es la base, y contesta que sí una sola vez.
      */
     private void intentarElRetrato(TrabajoIa acabado) {
+        // Una recalificación no arma retrato: el retrato ya existe, y rehacerlo movería a la
+        // persona a «por confirmar». Sus notas se recalculan al guardarse (el puente).
+        if (RECALIFICA.equals(acabado.getModo())) {
+            return;
+        }
         if (!aLaVezDe(acabado.getModo()).contains(acabado.getAgenteCodigo())) {
             // El que cierra la etapa y los dos sueltos no tienen a nadie detrás.
             return;

@@ -66,6 +66,18 @@ public class ServicioPersonalizacionImpl implements ServicioPersonalizacion {
             throw new IllegalStateException(
                     "La personalización de " + instrumento + " ya está encendida");
         }
+        /*
+         * ⚠️ El banco ya no se copia (decisión del 29/09/2026). Cada empresa usa solo su
+         * propio banco: el de RENASER es de RENASER, y una empresa sin banco escribe las
+         * preguntas en cada vacante. Se rechaza ANTES de copiar nada, la pida la empresa o
+         * la plataforma. Quien ya lo copió conserva su copia, que es suya; los otros tres
+         * instrumentos siguen como estaban.
+         */
+        if (instrumento == Instrumento.BANCO) {
+            throw new IllegalStateException("El banco de preguntas ya no se personaliza: cada "
+                    + "empresa usa solo su propio banco. Las preguntas se escriben en cada "
+                    + "vacante, en «Preguntas propias de esta vacante».");
+        }
 
         // Copiar y encender van en la misma transacción: una bandera encendida sin copia
         // dejaría a la empresa sin instrumento ninguno, que es peor que cualquiera de los
@@ -105,8 +117,13 @@ public class ServicioPersonalizacionImpl implements ServicioPersonalizacion {
         // estado ARCHIVADA en su esquema; basta con que el resolutor deje de mirarlos.
         int archivadas = 0;
         if (instrumento == Instrumento.BANCO) {
+            // Solo los bancos por nivel. Los de una vacante —su cuestionario técnico y sus
+            // preguntas propias (V66)— no son la copia personalizada: archivarlos dejaría a
+            // esas vacantes sin nada que responder.
             for (VersionBanco version : versionesBanco
-                    .findByOrganizacionIdAndEstado(organizacion.getId(), "PUBLICADA")) {
+                    .findByOrganizacionIdAndEstado(organizacion.getId(), "PUBLICADA").stream()
+                    .filter(v -> v.getVacanteId() == null)
+                    .toList()) {
                 version.setEstado("ARCHIVADA");
                 versionesBanco.save(version);
                 archivadas++;

@@ -31,4 +31,11 @@ public class Opcion {
 
     /** SEC: el lugar que le toca a este paso en el orden correcto. */
     private Short ordenCorrecto;
+
+    /**
+     * El orden en que se enseña, explícito (V66). Los tipos de las preguntas propias se leen
+     * siempre por aquí: por {@code letra} como texto, diez niveles salen 1, 10, 2… En la
+     * escala es además el número del nivel.
+     */
+    private Integer orden;
 }

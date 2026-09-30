@@ -129,6 +129,13 @@ public interface ServicioVacantesPanel {
     void definirAplicacionEvaluacion(ContextoUsuario quien, Long id, boolean aplica);
 
     /**
+     * De dónde salen las preguntas de la vacante (V66): {@code SIN_EVALUACION}, {@code NIVEL}
+     * (solo con un banco PROPIO publicado para su nivel) o {@code VACANTE}. Desde la primera
+     * postulación no se cambia (409).
+     */
+    void elegirOrigenDePreguntas(ContextoUsuario quien, Long id, String origen);
+
+    /**
      * Encender o apagar el recorrido automático de esta vacante.
      *
      * <p>Encendido, la postulación viaja sola: se le califica el currículum al postular —si

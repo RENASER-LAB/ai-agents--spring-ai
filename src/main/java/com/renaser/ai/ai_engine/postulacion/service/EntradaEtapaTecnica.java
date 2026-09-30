@@ -65,7 +65,7 @@ public class EntradaEtapaTecnica {
             // terminaba su retrato: el pase se intentaba, el creador se plantaba dentro, y
             // lo que en realidad pasaba —«falta publicar el cuestionario»— quedaba enterrado
             // bajo un montón de excepciones que parecen una avería.
-            return versionesBanco.findFirstByVacanteIdAndEstado(vacante.getId(), "PUBLICADA")
+            return versionesBanco.cuestionarioTecnicoDe(vacante.getId(), "PUBLICADA")
                     .isPresent();
         }
         return vacante.getVersionPlantillaPruebaId() != null;

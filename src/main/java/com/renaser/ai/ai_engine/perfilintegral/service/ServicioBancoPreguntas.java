@@ -14,6 +14,13 @@ public interface ServicioBancoPreguntas {
 
     Long crearVersion(ContextoUsuario quien, CrearVersionBanco datos);
     List<VersionBancoResponse> listarVersiones(ContextoUsuario quien);
+
+    /**
+     * Si la empresa de quien pregunta tiene banco por nivel PROPIO (V66). Sin él, la
+     * configuración del banco ya no le enseña el de RENASER: sus preguntas se escriben en
+     * cada vacante.
+     */
+    boolean tieneBancoPropio(ContextoUsuario quien);
     void publicarVersion(ContextoUsuario quien, Long id);
     void archivarVersion(ContextoUsuario quien, Long id);
 

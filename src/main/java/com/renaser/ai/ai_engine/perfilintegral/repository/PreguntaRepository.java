@@ -11,6 +11,11 @@ public interface PreguntaRepository extends JpaRepository<Pregunta, Long> {
 
     List<Pregunta> findByIdIn(List<Long> ids);
 
+    /** Cuántas preguntas tiene una versión: el resumen de «Copiar de otra vacante». */
+    long countByVersionBancoId(Long versionBancoId);
+
+    List<Pregunta> findByVersionBancoIdIn(List<Long> versionBancoIds);
+
     // Al descartar un borrador entero, después de borrar sus hijas.
     void deleteByVersionBancoId(Long versionBancoId);
 }

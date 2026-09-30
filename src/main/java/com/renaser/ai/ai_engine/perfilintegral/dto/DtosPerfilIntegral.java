@@ -368,7 +368,55 @@ public final class DtosPerfilIntegral {
              * medía y no hay ningún patrón: las dos cosas se leen igual y está bien, porque
              * el bloque de señales de cada respuesta ya dice cuál de los dos casos es.
              */
-            List<PatronDelCuestionario> patrones) {}
+            List<PatronDelCuestionario> patrones,
+            /**
+             * El desglose por criterios de las preguntas propias de la vacante (V66). Nulo en
+             * los demás bancos, que siguen enseñándose con {@code abiertas} y
+             * {@code cerradas}.
+             */
+            DesglosePorPuntos porPuntos) {}
+
+    /**
+     * Las preguntas propias de una vacante, criterio por criterio (V66).
+     *
+     * @param total           la suma de lo que ya tiene nota
+     * @param completo        si todas las preguntas con puntos tienen nota: solo entonces
+     *                        existe la nota del banco (y la del Perfil Integral)
+     * @param puedeAjustar    si quien mira tiene {@code ajustar_nota} sobre esta postulación:
+     *                        el panel no sabe sus permisos, por eso viaja aquí
+     * @param recalificacion  EN_CURSO (se recalifica con la guía nueva), PENDIENTE (conserva
+     *                        la nota de una guía anterior y no avanza) o nulo
+     */
+    public record DesglosePorPuntos(BigDecimal total, boolean completo, boolean puedeAjustar,
+                                    String recalificacion, String motivoRecalificacion,
+                                    List<CriterioDelDesglose> criterios,
+                                    List<PreguntaDelDesglose> sinCriterio) {}
+
+    /**
+     * Un criterio con su nota y de dónde sale («Sistema 8/10 + IA 16/20»). Con alguna
+     * abierta sin calificar, {@code nota} va vacía y {@code pendiente} en verdadero: un
+     * criterio a medias no enseña una nota parcial.
+     */
+    public record CriterioDelDesglose(Long id, String nombre, String queEvalua, int maximo,
+                                      BigDecimal nota, BigDecimal sistema, int sistemaMaximo,
+                                      BigDecimal ia, int iaMaximo, boolean pendiente,
+                                      List<PreguntaDelDesglose> preguntas) {}
+
+    /**
+     * Una pregunta del desglose: lo que respondió, lo que sacó y, en las abiertas, lo que dijo
+     * la IA y el ajuste de una persona si lo hubo.
+     *
+     * @param opcionesElegidas el texto de lo que marcó, en las cerradas
+     * @param puntajeIa        la nota que puso la IA, cuando una persona la ajustó después
+     * @param sinPuntos        una pregunta de 0 puntos: se guarda y se ve, pero no suma
+     */
+    public record PreguntaDelDesglose(Long preguntaId, Long respuestaId, String tipo,
+                                      String enunciado, int maximo, BigDecimal obtenido,
+                                      boolean pendiente, String respuesta,
+                                      List<String> opcionesElegidas, String explicacion,
+                                      String evidenciaCitada, BigDecimal puntajeIa,
+                                      boolean ajustada, String ajustadaPor, Instant ajustadaEn,
+                                      String motivoAjuste, boolean sinPuntos) {}
 
     /**
      * Un patrón del cuestionario completo.

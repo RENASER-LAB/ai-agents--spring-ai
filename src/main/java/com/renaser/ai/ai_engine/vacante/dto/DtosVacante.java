@@ -195,7 +195,26 @@ public final class DtosVacante {
                                 */
                                Integer intentosAbiertosSinPlazoPropio,
                                /** Y cuántos se quedarían como están por tener fecha propia. */
-                               Integer intentosAbiertosConPlazoPropio) {}
+                               Integer intentosAbiertosConPlazoPropio,
+                               /**
+                                * De dónde salen sus preguntas (V66): {@code NIVEL} o
+                                * {@code VACANTE}. Con la evaluación apagada sigue diciendo el
+                                * último origen; lo que se marca es «Sin evaluación».
+                                */
+                               String origenPreguntas,
+                               /**
+                                * Si su empresa tiene un banco PROPIO publicado para el nivel
+                                * del puesto: solo entonces se ofrece «El banco de la empresa
+                                * para su nivel». Solo viaja en el detalle (vacío en la lista).
+                                */
+                               Boolean bancoDelNivelPropio,
+                               /**
+                                * Si rinde el banco de RENASER prestado (una vacante de antes
+                                * de la V66): se enseña con su nombre real, «El banco de RENASER
+                                * para su nivel», y si se cambia de opción ya no vuelve. Solo
+                                * en el detalle.
+                                */
+                               Boolean bancoPrestado) {}
 
     /**
      * Una ciudad del catálogo, como la ve el panel: el código que se guarda y el nombre que
@@ -331,6 +350,9 @@ public final class DtosVacante {
     // Encender o apagar la evaluación del banco para esta vacante. Apagada, quien postula
     // no recibe cuestionario del banco: la prueba del puesto es su única evaluación.
     public record AplicarEvaluacion(@NotNull Boolean aplica) {}
+
+    /** «Qué responderá quien postule» (V66): SIN_EVALUACION, NIVEL o VACANTE. */
+    public record ElegirOrigenPreguntas(@NotBlank String origen) {}
 
     /**
      * Encender o apagar el recorrido automático de esta vacante.

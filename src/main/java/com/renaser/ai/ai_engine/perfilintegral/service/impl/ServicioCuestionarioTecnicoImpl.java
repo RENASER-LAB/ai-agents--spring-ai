@@ -63,8 +63,8 @@ public class ServicioCuestionarioTecnicoImpl implements ServicioCuestionarioTecn
         // El borrador manda: es la copia de trabajo. La publicada solo se enseña cuando
         // no hay nada en el taller.
         Optional<VersionBanco> version = versionesBanco
-                .findFirstByVacanteIdAndEstado(vacante.getId(), "BORRADOR")
-                .or(() -> versionesBanco.findFirstByVacanteIdAndEstado(vacante.getId(), "PUBLICADA"));
+                .cuestionarioTecnicoDe(vacante.getId(), "BORRADOR")
+                .or(() -> versionesBanco.cuestionarioTecnicoDe(vacante.getId(), "PUBLICADA"));
 
         List<PreguntaDelCuestionario> lasPreguntas = version
                 .map(v -> preguntas.findByVersionBancoIdOrderByOrden(v.getId()).stream()
@@ -94,7 +94,7 @@ public class ServicioCuestionarioTecnicoImpl implements ServicioCuestionarioTecn
                                  CorregirPreguntaTecnica datos) {
         Vacante vacante = laDeLaOrganizacion(quien, vacanteId);
         VersionBanco borrador = versionesBanco
-                .findFirstByVacanteIdAndEstado(vacante.getId(), "BORRADOR")
+                .cuestionarioTecnicoDe(vacante.getId(), "BORRADOR")
                 .orElseThrow(() -> new IllegalStateException(
                         "No hay borrador que corregir: genera el cuestionario primero"));
         Pregunta pregunta = preguntas.findById(preguntaId)
@@ -126,7 +126,7 @@ public class ServicioCuestionarioTecnicoImpl implements ServicioCuestionarioTecn
     public void publicar(ContextoUsuario quien, Long vacanteId) {
         Vacante vacante = laDeLaOrganizacion(quien, vacanteId);
         VersionBanco borrador = versionesBanco
-                .findFirstByVacanteIdAndEstado(vacante.getId(), "BORRADOR")
+                .cuestionarioTecnicoDe(vacante.getId(), "BORRADOR")
                 .orElseThrow(() -> new IllegalStateException(
                         "No hay borrador que publicar: genera el cuestionario primero"));
 
@@ -147,7 +147,7 @@ public class ServicioCuestionarioTecnicoImpl implements ServicioCuestionarioTecn
 
         // Publicar retira a la publicada anterior DE ESTA VACANTE (nada se borra). Los
         // bancos por nivel de la plataforma ni se miran: son mundos distintos.
-        versionesBanco.findFirstByVacanteIdAndEstado(vacante.getId(), "PUBLICADA")
+        versionesBanco.cuestionarioTecnicoDe(vacante.getId(), "PUBLICADA")
                 .ifPresent(saliente -> {
                     saliente.setEstado("ARCHIVADA");
                     // saveAndFlush: el índice parcial único (una PUBLICADA por vacante) no

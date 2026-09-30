@@ -14,6 +14,11 @@ import java.time.Instant;
 @Getter @Setter @Builder @NoArgsConstructor @AllArgsConstructor
 public class Vacante {
 
+    /** Las preguntas salen del banco de la empresa para el nivel del puesto. */
+    public static final String ORIGEN_NIVEL = "NIVEL";
+    /** Las preguntas son propias de la vacante (V66). */
+    public static final String ORIGEN_VACANTE = "VACANTE";
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -96,6 +101,13 @@ public class Vacante {
     // entregarse. La primera persona que hace falta decide quién va a la simulación (V53)
     @Builder.Default
     private boolean calificacionAutomatica = false;
+    /**
+     * De dónde salen las preguntas del Perfil Integral (V66): {@code NIVEL} = el banco de la
+     * empresa para el nivel del puesto, {@code VACANTE} = sus preguntas propias.
+     * {@code aplicaEvaluacion} sigue siendo el interruptor: apagado, no hay preguntas.
+     */
+    @Builder.Default
+    private String origenPreguntas = ORIGEN_NIVEL;
     private Long responsableUsuarioId;
     private Instant publicadaEn;
     private Instant cerradaEn;
@@ -123,4 +135,16 @@ public class Vacante {
      */
     private Instant eliminadaEn;
     private Instant creadoEn;
+
+    @PrePersist
+    void antesDeGuardar() {
+        if (origenPreguntas == null) {
+            origenPreguntas = ORIGEN_NIVEL;
+        }
+    }
+
+    /** Si sus preguntas son las propias de la vacante (y no el banco del nivel). */
+    public boolean tienePreguntasPropias() {
+        return ORIGEN_VACANTE.equals(origenPreguntas);
+    }
 }

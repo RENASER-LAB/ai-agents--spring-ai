@@ -51,6 +51,9 @@ class ArquitecturaTest {
             RAIZ + ".ai.exception.ResourceNotFoundException",
             RAIZ + ".ai.service.ColaCalificacionIa",
             RAIZ + ".ai.service.ColaCalificacionIa$Estado",
+            // Cómo va una recalificación o una recomendación de preguntas propias (V66): la
+            // cola es la única que sabe leer trabajo_ia y ejecucion_ia, y el panel lo pregunta.
+            RAIZ + ".ai.service.ColaCalificacionIa$Seguimiento",
             RAIZ + ".ai.service.AgenteSeleccion",
             RAIZ + ".ai.service.EjecutorAgenteIa",
             RAIZ + ".ai.service.EjecutorAgenteIa$Ejecutado",

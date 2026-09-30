@@ -137,6 +137,53 @@ public final class DtosCalificacionIa {
                                   Boolean c3Dato, Boolean c4Incomodidad) {
     }
 
+    // ==================== EVALUADOR · preguntas propias (método PUNTOS, V66) ====================
+
+    /**
+     * Lo que describe el trabajo de la vacante: lo que se llenó al crearla y el puesto, más lo
+     * que pidió la solicitud de talento si la hay.
+     *
+     * <p>⚠️ <b>Lo administrativo no viaja, y es a propósito</b>: modalidad, horario,
+     * ubicación, ciudad, remuneración, responsable, forma de cierre, plazas, fechas y el
+     * motivo de la solicitud no dicen qué debe saber hacer la persona, y no deben mover una
+     * nota. Un campo nuevo que describa el trabajo se suma aquí; uno administrativo, no.
+     *
+     * <p>Es el mismo conjunto para el evaluador y para las recomendaciones: la IA juzga y
+     * propone contra lo mismo.
+     */
+    public record DatosDeLaVacante(String titulo, String descripcion, String proposito,
+                                   String responsabilidades, String requisitos,
+                                   String puesto, String nivelPuesto, String familia,
+                                   String resultadoPrincipal, String capacidadesIndispensables,
+                                   String capacidadesAprendibles) {
+    }
+
+    /**
+     * Una abierta de las preguntas propias, con todo lo que la IA necesita para ponerle nota
+     * entre 0 y {@code puntosMaximos}. El criterio viaja con su nombre y lo que evalúa: es lo
+     * que la empresa quiere medir con ella.
+     */
+    public record AbiertaPorPuntos(Long respuestaId, String pregunta, int puntosMaximos,
+                                   String queDebeTenerUnaBuenaRespuesta, String criterio,
+                                   String queEvaluaElCriterio, String respuesta) {
+    }
+
+    /**
+     * El insumo entero del evaluador en el método PUNTOS.
+     *
+     * <p>La guía y su número NO viajan en el mensaje de datos: la guía va en el {@code system},
+     * envuelta con la marca sorteada (ver {@link DatosParaCalificar}), y el número es para
+     * descartar un resultado calculado con una guía anterior.
+     */
+    public record InsumoPorPuntos(int versionGuia, String guiaCalificacion,
+                                  DatosDeLaVacante vacante, List<AbiertaPorPuntos> respuestas) {
+    }
+
+    /** Lo que de verdad se le manda al modelo como datos: sin la guía. */
+    public record DatosParaCalificar(DatosDeLaVacante vacante,
+                                     List<AbiertaPorPuntos> respuestas) {
+    }
+
     // ==================== POTENCIAL_RIESGO ====================
 
     public record InsumoPerfil(

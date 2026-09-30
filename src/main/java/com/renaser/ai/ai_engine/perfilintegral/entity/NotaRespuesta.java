@@ -37,4 +37,15 @@ public class NotaRespuesta {
     private Boolean c3Dato;
     private Boolean c4Incomodidad;
     private Boolean cumpleSenalCero;
+
+    // --- Preguntas propias (método PUNTOS, V66) ---
+    /**
+     * La nota que puso la IA, guardada en el primer ajuste a mano y nunca más tocada. Nula
+     * si nadie la ajustó, o si una persona la calificó sin que la IA hubiera podido.
+     * {@code puntaje} es siempre la que vale.
+     */
+    private BigDecimal puntajeIa;
+
+    /** Con qué guía de la versión se calculó ({@code version_banco.version_guia}). */
+    private Integer versionGuia;
 }
