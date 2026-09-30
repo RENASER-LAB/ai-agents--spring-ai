@@ -19,6 +19,19 @@ public final class DtosSeguridad {
 
     public record Sesion(String token, Long usuarioId) {}
 
+    /** Un permiso de quien entró, con su alcance efectivo. */
+    public record PermisoDeLaSesion(String codigo, String alcance) {}
+
+    /**
+     * Quién está en el panel, de qué empresa y qué puede hacer (V64).
+     *
+     * <p>Solo sirve para pintar el menú lateral. No es la defensa: cada endpoint sigue
+     * respondiendo 403 y 404 como antes, y los booleanos {@code puedeX} de cada DTO siguen donde
+     * estaban.
+     */
+    public record SesionDelPanel(Long usuarioId, String nombre, String correo, Long organizacionId,
+                                 String empresa, List<PermisoDeLaSesion> permisos) {}
+
     // La contraseña del panel exige más que la del portal (mínimo 12): una cuenta de
     // equipo ve los datos de muchas personas, no solo los suyos.
     public record AceptarInvitacion(@NotBlank String token,

@@ -71,6 +71,8 @@ public class ServicioPostulacionesPanelImpl implements ServicioPostulacionesPane
     private final DatoCvRepository datosCv;
     private final ServicioAuditoria auditoria;
     private final ServicioEnlaceAcceso enlacesDeAcceso;
+    private final com.renaser.ai.ai_engine.decision.service.QuienPuedeContratar quienPuedeContratar;
+    private final com.renaser.ai.ai_engine.colaborador.service.ContratacionEnLaFicha contratacion;
 
     @Override
     public List<FilaBandeja> bandeja(ContextoUsuario quien, String esperaA) {
@@ -128,8 +130,8 @@ public class ServicioPostulacionesPanelImpl implements ServicioPostulacionesPane
         String candidato = nombres.de(usuario.getId());
         Vacante laVacante = vacantes.findById(p.getVacanteId()).orElse(null);
         String vacante = laVacante == null ? "" : laVacante.getTitulo();
-        String nombreEstado = estados.findById(p.getEstadoCodigo())
-                .map(EstadoPostulacion::getNombre).orElse(p.getEstadoCodigo());
+        EstadoPostulacion suEstado = estados.findById(p.getEstadoCodigo()).orElse(null);
+        String nombreEstado = suEstado == null ? p.getEstadoCodigo() : suEstado.getNombre();
 
         Cv cv = cvs.findByPostulacionId(p.getId()).orElse(null);
         List<String> urls = cv == null ? List.of()
@@ -148,6 +150,7 @@ public class ServicioPostulacionesPanelImpl implements ServicioPostulacionesPane
                 ? Remuneracion.escribirPretension(p.getPretensionMonto(), p.getPretensionMoneda())
                 : null;
         String porQueSin = porQueSinPretension(vePretension, p, laVacante);
+        var vinculo = contratacion.de(quien, p);
 
         return new FichaPostulacion(p.getId(), p.getUuid().toString(), candidato, usuario.getCorreo(),
                 vacante, p.getEstadoCodigo(), nombreEstado, p.getGrupoPrioridad(), p.getMotivoCierre(),
@@ -155,7 +158,11 @@ public class ServicioPostulacionesPanelImpl implements ServicioPostulacionesPane
                 cv == null ? null : cv.getArchivoOriginalId(), p.getCreadoEn(), p.getMovidoEn(),
                 quien.tiene("mover_postulacion"),
                 p.getPretensionMonto() == null ? null : suPretension,
-                porQueSin);
+                porQueSin,
+                // Contratar desde la ficha (V64): la decisión en verde, con el permiso de siempre.
+                laVacante != null && laVacante.getEliminadaEn() == null
+                        && quienPuedeContratar.puede(quien, p, suEstado != null && suEstado.isEsFinal()),
+                vinculo.colaboradorId(), vinculo.puedeDarDeAlta(), vinculo.puedeVerColaborador());
     }
 
     /**

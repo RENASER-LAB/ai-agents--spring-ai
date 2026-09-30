@@ -80,7 +80,10 @@ import java.util.regex.Pattern;
         // Las reseñas de empresas (V63): panel, portal y moderación viven en el mismo paquete.
         com.renaser.ai.ai_engine.resena.controller.ResenasPanelController.class,
         com.renaser.ai.ai_engine.resena.controller.ResenasPortalController.class,
-        com.renaser.ai.ai_engine.resena.controller.ModeracionResenasController.class})
+        com.renaser.ai.ai_engine.resena.controller.ModeracionResenasController.class,
+        // La gestión de personas (V64). Sedes y cargos viven en organizacion.controller y la
+        // sesión del panel en seguridad.controller, que ya están cubiertos.
+        com.renaser.ai.ai_engine.colaborador.controller.ColaboradoresController.class})
 @Order(Ordered.HIGHEST_PRECEDENCE)
 @Slf4j
 public class ManejadorErrores {
@@ -121,6 +124,34 @@ public class ManejadorErrores {
                 "El archivo tiene problemas y no se importó nada",
                 "importacion-invalida", ex.getMessage());
         problema.setProperty("errores", ex.getErrores());
+        return problema;
+    }
+
+    // El Excel de colaboradores (V64), todo o nada: 400 con TODOS los errores {fila, columna,
+    // valor, mensaje}, que la pantalla pinta en una tabla. Sin ver_sueldos, ningún valor de
+    // sueldo viaja aquí: el servicio no lo pone.
+    @ExceptionHandler(com.renaser.ai.ai_engine.colaborador.service.CargaInvalidaException.class)
+    public ProblemDetail cargaInvalida(com.renaser.ai.ai_engine.colaborador.service.CargaInvalidaException ex,
+                                       WebRequest request) {
+        log.warn("Carga de colaboradores inválida - Path: {}, Errores: {}",
+                request.getDescription(false), ex.getErrores().size());
+        ProblemDetail problema = construir(HttpStatus.BAD_REQUEST,
+                "El archivo tiene errores y no se guardó nada", "carga-invalida", ex.getMessage());
+        problema.setProperty("errores", ex.getErrores());
+        return problema;
+    }
+
+    // Ese documento ya tiene ficha en la empresa (V64): 409 con la ficha a la que ir, y si está
+    // cesada, la pantalla ofrece reingresarla desde ahí.
+    @ExceptionHandler(com.renaser.ai.ai_engine.colaborador.service.DocumentoYaRegistradoException.class)
+    public ProblemDetail documentoYaRegistrado(
+            com.renaser.ai.ai_engine.colaborador.service.DocumentoYaRegistradoException ex, WebRequest request) {
+        log.warn("Documento ya registrado - Path: {}, Colaborador: {}",
+                request.getDescription(false), ex.getColaboradorId());
+        ProblemDetail problema = construir(HttpStatus.CONFLICT, "Ese documento ya tiene ficha",
+                "documento-ya-registrado", ex.getMessage());
+        problema.setProperty("colaboradorId", ex.getColaboradorId());
+        problema.setProperty("cesado", ex.isCesado());
         return problema;
     }
 

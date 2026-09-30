@@ -293,7 +293,11 @@ class ArquitecturaTest {
             // persona que pregunta: ninguno busca por id suelto.
             RAIZ + ".resena.repository.ResenaRepository",
             RAIZ + ".resena.repository.RespuestaResenaRepository",
-            RAIZ + ".resena.repository.ReporteResenaRepository");
+            RAIZ + ".resena.repository.ReporteResenaRepository",
+            // La gestión de personas (V64): la ficha y la sede son de la empresa. Se entra por
+            // findByIdAndOrganizacionId; un findById suelto aquí sería la fuga entre empresas.
+            RAIZ + ".colaborador.repository.ColaboradorRepository",
+            RAIZ + ".organizacion.repository.SedeRepository");
 
     /**
      * Las llamadas {@code findById} sobre esos repositorios que SÍ están bien, una por una

@@ -1404,8 +1404,9 @@ espacios de los extremos. Solo sobre una postulación **`CONTRATADO` de la propi
 **desde que se cumplen 30 días** de su paso a `CONTRATADO` en el historial, llegue por la
 decisión en verde o por la transición manual. Las contrataciones anteriores a esta función
 cuentan igual. Quien contrató dos veces a la misma persona deja dos reseñas. **La firma la
-empresa**, no quien la escribe: esa persona queda guardada solo para la auditoría. Contratar
-sigue haciéndose por la API: el panel todavía no tiene la pantalla.
+empresa**, no quien la escribe: esa persona queda guardada solo para la auditoría. Desde el
+29/09/2026 se contrata también con «Contratar» en la ficha del panel, que registra la misma
+decisión en verde.
 
 **RF-172** La empresa puede **editarla o borrarla durante 30 días desde la primera
 publicación**; editarla la marca «Editada» y no alarga el plazo. Borrarla deja la contratación

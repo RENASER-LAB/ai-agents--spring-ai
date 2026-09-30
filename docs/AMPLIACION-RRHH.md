@@ -20,7 +20,7 @@ tiene riesgo legal va al final.
 | # | Apartado | Por qué va ahí |
 |---|---|---|
 | **Fase 1** | **Administración** | |
-| 1 | Gestión de personas, con «contratar desde el panel» y la carga de la plantilla actual | Todo lo demás se aplica a la persona contratada, que hoy no existe. Contratar solo se puede por la API |
+| 1 | Gestión de personas, con «contratar desde el panel» y la carga de la plantilla actual | Todo lo demás se aplica a la persona contratada, que antes no existía, y contratar solo se podía por la API. **Implementado y aprobado el 29/09/2026** |
 | 2 | Documentos laborales | Solo necesita a la persona. RR.HH. le saca provecho sin que nadie más entre |
 | 3 | Portal del Colaborador (Hub) | Abre con los documentos de cada uno ya cargados |
 | 4 | Firma electrónica | Se firma dentro del portal |
@@ -63,13 +63,20 @@ porque le falte algo. Si la clienta necesita la planilla antes, entra justo desp
 | Planes de acción + IA | Va dentro de Clima laboral (9) |
 | Talento IA | Es la IA de Desempeño y de los planes de desarrollo (12 y 15) |
 
+## Pendientes sin apartado asignado
+
+| Qué | Hoy |
+|---|---|
+| **Renovar un contrato**, con avisos de vencimiento, un botón propio, las prórrogas y el tope de 5 años de los contratos encadenados | Anotado por el usuario al aprobar la gestión de personas (29/09/2026). No tiene flujo propio: se registra con «Registrar un cambio» y el motivo «renovación de contrato». La lista marca «vence en N días» y «vencido», y el filtro «Contratos por vencer» los junta, pero nada avisa a nadie |
+
 ---
 
 ## 1 · Gestión de personas
 
-Estado: spec escrita · 28/09/2026, en
+Estado: implementado y aprobado · 29/09/2026 (`V64` y `V65`). Spec en
 [specs/rrhh-01-gestion-de-personas.md](../specs/rrhh-01-gestion-de-personas.md). Incluye el menú
-lateral del panel.
+lateral del panel. Qué se construyó y qué decidió el usuario al aprobarlo está más abajo, en
+«Lo que quedó construido».
 
 ### Qué es
 
@@ -229,7 +236,7 @@ los empleados de ciertas estructuras (por ejemplo, su sede) y puede modificar so
     SUNAT aún no la incluyen.
   - La remuneración mínima y la UIT cambian, así que ningún monto se fija en el código.
 
-### Lo que ya tenemos
+### Lo que ya teníamos antes de la spec
 
 - **Persona:** documento, nombres, apellidos, teléfono, fecha de nacimiento y ciudad.
 - **Empresas separadas entre sí.**
@@ -260,6 +267,43 @@ Resueltas el 28/09/2026:
 3. **Sueldo:** solo lo ve Dirección, a falta de que lo confirme la clienta.
 4. **Aprobación:** los cambios no se aprueban. Quedan en el historial y en la auditoría.
 5. **Carga:** un Excel con nuestra plantilla. Si hay algún error, no se guarda nada.
+
+### Lo que quedó construido (29/09/2026)
+
+- **En el panel:** un menú lateral por familias —Selección y Personas, con Configuración al pie—
+  que sustituye a la barra de pestañas; la lista `/admin/colaboradores` con el aviso de
+  contratados que esperan su alta; la ficha con Perfil, Puesto y contrato, e Historial; el alta
+  manual y la carga por Excel; los cambios, que se pueden programar y anular; el cese y el
+  reingreso; «Sedes» y «Cargos» en Configuración; y **«Contratar» en la ficha del postulante**,
+  que es la decisión en verde de siempre, seguido de «Dar de alta como colaborador».
+- **En la base:** `sede`, `colaborador`, `periodo_laboral`, `situacion_laboral`, `cese_anulado` y
+  `contratado_sin_alta`, sin ninguna FK a `persona`; los cargos son los puestos de siempre. Los
+  códigos son los de SUNAT desde el primer día (tablas 3, 12, 17 y 33). Ver el
+  [modelo de datos](05-MODELO-DE-DATOS.md) y el [diccionario](07-DICCIONARIO-DE-DATOS.md).
+- **Permisos:** `ver_colaboradores`, `editar_colaboradores` y `editar_estructura` para Talento y
+  Dirección, y `ver_sueldos` solo para Dirección, todos con alcance `TODO`, que es el único que
+  cuenta en esta versión. Ver [roles y permisos](04-ROLES-Y-PERMISOS.md) y las
+  [APIs](09-APIS.md).
+
+Decisiones que tomó el usuario al aprobarlo:
+
+- **Administrador no ve «Vacantes»** en el menú: esas pantallas ya le respondían 403.
+- **Motivo de cese:** «otro» lleva el código propio `99`, fuera de la tabla 17; «no se inició la
+  relación laboral» es el `17` de la tabla.
+- **«Contratos por vencer»** incluye los ya vencidos de personas activas.
+- **Auditoría:** dice qué campos cambiaron, nunca el importe del sueldo. Cuando un cambio arrastra
+  ajustes de solo sueldo que quien lo registra no ve, la fila los nombra
+  (`situacionesQueLoHeredan` al registrar, `situacionesQueLoPierden` al anular).
+- **Sin `ver_sueldos`, un ajuste de solo sueldo no existe** para esa persona, programado o
+  vigente, y anularlo —aunque ya esté anulado— responde 404.
+- **Un cambio anulado se compara con la copia de lo que tenía detrás**, tomada al anularlo
+  (`V65`), no con lo que se registró después.
+- **Las sedes y los cargos los lee todo el equipo**; escribirlos pide `editar_estructura`.
+- **Talento puede anular un cambio programado que toca el sueldo y otra cosa**, y con él se
+  deshace también el sueldo. **Anular un programado en medio de una cadena** hace que el
+  siguiente traiga, en su fecha, los datos que el anulado cambiaba, sin aviso.
+- **Renovar un contrato queda pendiente**, sin apartado asignado: ver «Pendientes sin apartado
+  asignado», arriba.
 
 ### Fuentes y cuánto fiarse
 

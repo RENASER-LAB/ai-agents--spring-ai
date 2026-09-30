@@ -23,8 +23,8 @@ Sirve para tres cosas:
 - **Entender el sistema.** Un modelo de datos bien contado explica el negocio mejor que
   cualquier otro documento.
 
-**La base ya está construida.** Las migraciones `V1` a `V63` viven en
-`src/main/resources/db/migration` —**108 tablas de este módulo**, 111 en la base contando la de
+**La base ya está construida.** Las migraciones `V1` a `V65` viven en
+`src/main/resources/db/migration` —**114 tablas de este módulo**, 117 en la base contando la de
 Flyway y las dos del motor de agentes— y Flyway es el dueño del esquema. Cambiar algo de aquí
 ya cuesta una migración nueva, y **una migración aplicada no se edita nunca**: se escribe otra
 encima.
@@ -142,6 +142,20 @@ La reseña cuelga de la **postulación** (una viva por contratación) y apunta t
 información de un proceso que cruza de una empresa a otra, y **no puntúa**. Los cuatro avisos
 nuevos de la campana van solo en el comentario de `aviso_portal.tipo`, que es texto libre. Ver
 «Reseñas de empresas» más abajo y en el [diccionario de datos](07-DICCIONARIO-DE-DATOS.md).
+
+La `V64` (29/09/2026) abre **la gestión de personas**, el primer apartado de la
+[ampliación de RR.HH.](AMPLIACION-RRHH.md): hasta ella el sistema terminaba en `CONTRATADO` y la
+persona que entraba a trabajar no existía. Seis tablas nuevas —`sede`, `colaborador`,
+`periodo_laboral`, `situacion_laboral`, `cese_anulado` y `contratado_sin_alta`—, ninguna columna
+nueva en las viejas y cuatro permisos del grupo `PERSONAS` (`ver_colaboradores`,
+`editar_colaboradores`, `ver_sueldos` y `editar_estructura`) para Talento y Dirección de
+**todas** las organizaciones, `ver_sueldos` solo para Dirección. **Ninguna FK apunta a
+`persona`**, a propósito: la ficha de quien trabaja se conserva aunque la cuenta del portal se
+borre. Los cargos son el `puesto` que ya existía, que desde aquí se renombra y se desactiva
+(`es_activo` existía desde la `V5` y ninguna pantalla lo cambiaba). La `V65`, el mismo día, añade a
+`situacion_laboral` diez columnas `antes_*`: la situación viva que un cambio tenía detrás en el
+momento de anularlo, para que el historial lo compare siempre con eso. Ver «Gestión de personas»
+más abajo y en el [diccionario de datos](07-DICCIONARIO-DE-DATOS.md).
 
 La `V54` (14/09/2026) **no añade ninguna tabla y cambia quién firma qué**. Hasta ella había dos
 tipos de texto —`PROCESO` y `FUTUROS_CONTACTOS`— y el de la cuenta usaba el primero, que habla de
@@ -487,6 +501,15 @@ error del modelo de un cambio en las instrucciones que le dimos nosotros.
                                      SEGUIMIENTO
                                    30 · 90 · 180 dias
 
+   POSTULACION CONTRATADO
+         |  (alta opcional; una por contratacion)
+         v
+   GESTION DE PERSONAS (V64)        ninguna FK a persona: la ficha
+  colaborador · periodo_laboral     sobrevive al borrado del portal
+  situacion_laboral (desde-hasta):
+    sede · area · puesto (= cargo) · jefe (otro colaborador)
+  cese_anulado · contratado_sin_alta
+
 
   AGENTES DE IA                  AUDITORIA
  catalogo · encargo        quien, cuando, que cambio, por que
@@ -513,7 +536,7 @@ Hay una versión dibujada de este mismo mapa en
 
 ## Las tablas
 
-Ciento ocho en total, agrupadas por área para poder leerlas de a poco. En cada una se nombran
+Ciento catorce en total, agrupadas por área para poder leerlas de a poco. En cada una se nombran
 las columnas que importan para entender qué hace, no todas.
 
 **Para verlas todas, con tipo y clave, está el [Diccionario de datos](07-DICCIONARIO-DE-DATOS.md).**
@@ -545,7 +568,7 @@ código. El Administrador puede crear roles nuevos y repartir permisos sin que n
 | `usuario` | Cómo entra al sistema | organizacion_id, persona_id, correo, contrasena_hash, usuario_renaser_os_id, area_id, es_activo |
 | `area` | El departamento que contrata. Hace falta para saber qué ve un responsable y para impedir que alguien sea Evaluador de Estándar de su propia área | organizacion_id, nombre |
 | `rol` | Un nombre y una lista de permisos | organizacion_id, codigo, nombre, descripcion |
-| `permiso` | Una acción suelta que se puede conceder o no. Son 77 diseñados, 71 sembrados | codigo, etiqueta, grupo |
+| `permiso` | Una acción suelta que se puede conceder o no. Son 81 diseñados, 79 sembrados | codigo, etiqueta, grupo |
 | `usuario_rol` | Una persona puede tener varios roles. Puede hacer lo que le permita cualquiera de ellos | usuario_id, rol_id |
 | `rol_permiso` | Qué permisos tiene un rol y **con qué alcance** | rol_id, permiso_id, alcance |
 | `recuperacion_clave` | El enlace de «¿Olvidaste tu contraseña?»: un solo uso, vida corta, y solo vale el último que se pidió (`V61`) | usuario_id, token_hash, vence_en, usado_en, invalidado_en |
@@ -656,7 +679,7 @@ agente que la produjo.
 | `nivel_puesto` | Los tres niveles. Determinan cuántas preguntas se responden y el tiempo objetivo | codigo, nombre, preguntas_banco, minutos_objetivo_min, minutos_objetivo_max |
 | `familia` | Las siete familias de trabajo | codigo, nombre |
 | `familia_afin` | Qué familias se parecen lo bastante para reutilizar evaluaciones | familia_codigo, familia_afin_codigo |
-| `puesto` | El catálogo de puestos, con su nivel y su familia | organizacion_id, codigo, nombre, nivel_puesto_codigo, familia_codigo |
+| `puesto` | El catálogo de puestos, con su nivel y su familia. Desde la `V64` es también el catálogo de **cargos** de la gestión de personas, y se renombra y desactiva desde Configuración | organizacion_id, codigo, nombre, nivel_puesto_codigo, familia_codigo, es_activo |
 | `vacante` | Una convocatoria concreta | organizacion_id, solicitud_talento_id, puesto_id, titulo, descripcion, modalidad, ciudad_ubigeo, ubicacion, tipo_cierre, plazas, cierra_en, estado, version_pesos_id, version_plantilla_prueba_id, plantilla_evaluacion_id, responsable_usuario_id, remuneracion_tipo, remuneracion_min, remuneracion_max, remuneracion_moneda, remuneracion_actualizada_en, archivada_en, eliminada_en |
 | `requisito_objetivo` | Lo único que puede detener una postulación sin que intervenga nadie | vacante_id, descripcion, regla, es_activo |
 | `barrera_critica` | Lo que ningún promedio alto compensa, definido por vacante | vacante_id, descripcion, es_activa |
@@ -1186,6 +1209,51 @@ reseña sí se calcula —publicación más 30 días— porque editarla no lo al
 
 ---
 
+### Gestión de personas · 6 tablas
+
+Desde la `V64` (29/09/2026). La ficha de quien trabaja en la empresa y el mapa de la empresa:
+sedes, áreas, cargos y quién es jefe de quién, todo con su historia.
+
+| Tabla | Para qué existe | Columnas que importan |
+|---|---|---|
+| `sede` | Dónde se trabaja. No se borra: se desactiva, y quien ya estaba en ella la conserva | organizacion_id, nombre, direccion, provincia_ubigeo, codigo_sunat, es_activa |
+| `colaborador` | Quién es: identidad, contacto, domicilio y formación. Una ficha por documento y empresa | organizacion_id, tipo_documento, numero_documento, nombres, apellido_paterno, apellido_materno, fecha_nacimiento, sexo, estado_civil, nacionalidad, celular, correo_personal, correo_corporativo, direccion, provincia_ubigeo, nivel_educativo_codigo, postulacion_id |
+| `periodo_laboral` | Cada tramo entre un ingreso y un cese. Un reingreso abre otro | colaborador_id, fecha_ingreso, fecha_cese, motivo_cese, observacion_cese, postulacion_id |
+| `situacion_laboral` | Dónde está y en qué condiciones, con vigencia desde-hasta. Cada cambio es una fila | colaborador_id, periodo_id, vigente_desde, vigente_hasta, sede_id, area_id, puesto_id, jefe_colaborador_id, tipo_contrato, fin_contrato, fin_periodo_prueba, regimen_laboral, sueldo_base, moneda, tipo_motivo, anulada_en, antes_* |
+| `cese_anulado` | Los ceses que se deshicieron, copiados antes de reabrir el periodo, para que el historial los enseñe tachados | periodo_id, fecha_cese, motivo_cese, anulado_por_usuario_id, motivo_anulacion |
+| `contratado_sin_alta` | La contratación que RR.HH. decidió no convertir en ficha. Solo la saca del aviso de pendientes | organizacion_id, postulacion_id, motivo |
+
+**La ficha no depende de `persona`.** La cuenta del candidato vive en la organización plataforma
+y se borra si lo pide (Ley 29733); la ficha de quien trabaja se conserva porque la ley laboral
+obliga a guardar esos registros (Ley 29733, art. 14.5). Por eso ninguna FK de estas tablas
+apunta a `persona`, editar una no cambia la otra, y el borrado del portal no toca la ficha.
+**Está pendiente de validar con el abogado**: si dice otra cosa, cambia el alcance del borrado, no
+esta estructura. El vínculo con la selección es la postulación, opcional: la del alta en
+`colaborador` y la de cada periodo en `periodo_laboral`, porque un reingreso puede venir de otra.
+
+**Identidad, periodo y situación van separados** porque cambian a ritmos distintos. Corregir el
+perfil no deja historial —una errata no es un cambio de vida— y queda en la auditoría. La
+situación es una **foto completa** con vigencia: un cambio cierra la anterior el día antes y rige
+desde su fecha, que puede ser futura (programado). Nada se borra: un cambio ya vigente se corrige
+con otro de tipo `CORRECCION`, uno programado se anula con motivo, y al anularlo se copian en sus
+columnas `antes_*` (`V65`) los valores de la situación viva que tenía detrás, para que el
+historial lo compare con eso aunque después se registren otros. No basta con apuntar a esa fila:
+los ajustes de solo sueldo se reescriben cuando un cambio anterior los arrastra.
+
+**Los estados no se guardan**: «Por ingresar», «Activo» y «Cesado» salen de las fechas del
+periodo en hora de Lima, y «Cesado» empieza el día siguiente a la fecha de cese.
+
+**Los códigos son los de SUNAT desde el primer día** —tabla 3 para el documento, 12 para el
+contrato, 17 para el motivo de cese y 33 para el régimen—, para que Planillas los lea sin migrar
+valores. Dos códigos son propios: el contrato `PRACTICAS` (convenio de prácticas) y el motivo de
+cese `99` «otro», porque la tabla 17 no tiene un cajón genérico. «No se inició la relación
+laboral» sí es de la tabla, con el `17`. En pantalla se enseña el texto, nunca el código.
+
+⚠️ **`sueldo_base` y `antes_sueldo_base` solo los ve quien tiene `ver_sueldos`.** La base guarda la
+cifra; que no viaje a nadie más lo hace el servicio.
+
+---
+
 ## Lo que la base impide por sí sola, y lo que no
 
 No todas las reglas del sistema caben en una restricción de base de datos. Conviene tener claro
@@ -1216,6 +1284,11 @@ cuáles sí, porque las que no, hay que probarlas en el código.
   dejan dos reseñas. Las estrellas van de 1 a 5, los textos tienen sus largos (30 a 1000 la
   reseña, 30 a 500 la respuesta, hasta 500 el comentario del reporte), «Otro motivo» exige
   comentario, y resolver un reporte exige quién lo resolvió y una nota.
+- **Nunca dos fichas del mismo documento en la misma empresa**, y cada postulación contratada da
+  como mucho un alta (`V64`): dos altas simultáneas dejan una sola ficha. El cese va con su motivo
+  y nunca antes del ingreso; un cambio con motivo «otro», una anulación y un «No dar de alta»
+  exigen texto; un sueldo lleva moneda; y nadie es su propio jefe.
+- **Una situación con `antes_*` está anulada** (`V65`).
 
 ### Tienen que vivir en el código
 
@@ -1250,6 +1323,14 @@ cuáles sí, porque las que no, hay que probarlas en el código.
   sus 30 días. Dependen de la hora, que manda el servidor, y de la fecha de una transición.
 - **Que solo modere la plataforma.** Además del permiso `moderar_resenas`, el servicio exige ser
   la organización plataforma; es la misma doble llave del alta de empresas.
+- **La línea de tiempo de la situación laboral** (`V64`): que los tramos de un periodo no se
+  solapen, que un cambio no rija antes del último ni después del cese, que el jefe sea un
+  colaborador activo o por ingresar de la misma empresa sin formar un círculo, y que una sede o
+  un cargo desactivados no se elijan. Dependen de otras filas y de la fecha de hoy en Lima. Cada
+  escritura sobre una ficha bloquea antes su fila, para que dos anulaciones o dos ceses a la vez
+  pasen de uno en uno.
+- **Que el sueldo no viaje a quien no tiene `ver_sueldos`** (`V64`), ni en la auditoría: es un
+  permiso, y cambia sin migrar.
 
 ### Nunca existen, ni siquiera como opción
 
@@ -1291,7 +1372,9 @@ una sola tabla.
    opiniones sobre una persona concreta y, con su nombre fuera, el texto seguiría señalándola. La
    auditoría conserva que existieron —el texto nunca se copió allí— y una fila con cuántas había.
 9. Si era prospecto del Radar, deja de estar activo.
-10. **Se conserva todo lo demás**: puntajes, historial de estados, auditoría, métricas.
+10. **Se conserva todo lo demás**: puntajes, historial de estados, auditoría, métricas. **Y la
+    ficha de colaborador, si llegó a trabajar en alguna empresa** (`V64`): no cuelga de
+    `persona` y tiene su propia base legal (ver «Gestión de personas»).
 11. Sus postulaciones abiertas pasan a cerradas, con motivo «pidió borrar sus datos».
 
 El resultado es que el embudo de esa vacante sigue cuadrando y la auditoría sigue completa, pero
@@ -1309,13 +1392,14 @@ Datos que se cargan con la primera migración, no a mano:
 
 - La **organización** Renaser, marcada como **dueña de la plataforma** (`es_plataforma`)
 - Los **18 estados** de la postulación, con su etapa y su momento
-- Los **75 permisos** que las migraciones siembran, con su etiqueta y su grupo — contados
+- Los **79 permisos** que las migraciones siembran, con su etiqueta y su grupo — contados
   de las migraciones, no de los documentos de diseño. Los más recientes: de la V37,
   `personalizar_instrumentos` para el administrador de cada empresa y
   `administrar_plataforma` solo para el de la plataforma; de la V40,
-  `ver_inscritos_simulacion` y `administrar_permisos`; de la V60, `eliminar_vacante`; y de la
+  `ver_inscritos_simulacion` y `administrar_permisos`; de la V60, `eliminar_vacante`; de la
   V63, `resenar_contratado`, `ver_resenas_candidato` y `moderar_resenas`, este último solo para
-  el administrador de la plataforma
+  el administrador de la plataforma; y de la V64, `ver_colaboradores`, `editar_colaboradores`,
+  `ver_sueldos` —solo Dirección— y `editar_estructura`
 - Los **cinco roles** iniciales con sus permisos: candidato, equipo de talento, responsable del
   área, dirección y administrador. Es como arranca el sistema, no cómo queda para siempre
 - Las **22 dimensiones**, con cuáles de ellas son obligatorias
@@ -1384,6 +1468,11 @@ fecha de nacimiento, y deja puesto `persona.ciudad_ubigeo`. Nadie ha decidido to
 provincia —que agrupa a miles de personas y por sí sola no señala a ninguna— debe vaciarse
 también. Hasta que se decida, la columna se queda, y conviene saberlo antes de enseñar una tanda
 que mezcle anonimizados con quien no lo está.
+
+**La ficha de colaborador ante el borrado de datos.** Que la ficha sobreviva al borrado del portal
+(`V64`) descansa en el art. 14.5 de la Ley 29733 y en la obligación laboral de conservar
+registros, y **falta que lo valide el abogado**. Si dice otra cosa, cambia el alcance del
+borrado, no la estructura.
 
 ---
 
