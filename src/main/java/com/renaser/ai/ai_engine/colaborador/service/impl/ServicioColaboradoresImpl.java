@@ -761,12 +761,14 @@ public class ServicioColaboradoresImpl implements ServicioColaboradores {
     private PersonaLimpia validarPersona(DatosPersonales d, LocalDate hoy) {
         String tipo = d.tipoDocumento();
         String numero = ReglasDelColaborador.limpiarDocumento(d.numeroDocumento());
-        exigir(ReglasDelColaborador.errorDelDocumento(tipo, numero));
+        String errorDocumento = ReglasDelColaborador.errorDelDocumento(tipo, numero);
+        if (errorDocumento != null) throw new IllegalArgumentException(errorDocumento);
         String nombres = ReglasDelColaborador.texto(d.nombres());
         String paterno = ReglasDelColaborador.texto(d.apellidoPaterno());
         if (nombres == null) throw new IllegalArgumentException("Faltan los nombres");
         if (paterno == null) throw new IllegalArgumentException("Falta el apellido paterno");
-        exigir(ReglasDelColaborador.errorDelNacimiento(d.fechaNacimiento(), hoy));
+        String errorNacimiento = ReglasDelColaborador.errorDelNacimiento(d.fechaNacimiento(), hoy);
+        if (errorNacimiento != null) throw new IllegalArgumentException(errorNacimiento);
         if (!CatalogosDePersonas.SEXOS.containsKey(d.sexo())) {
             throw new IllegalArgumentException("El sexo no es válido");
         }
@@ -776,8 +778,10 @@ public class ServicioColaboradoresImpl implements ServicioColaboradores {
         }
         String correoPersonal = ReglasDelColaborador.texto(d.correoPersonal());
         String correoCorporativo = ReglasDelColaborador.texto(d.correoCorporativo());
-        exigir(ReglasDelColaborador.errorDelCorreo(correoPersonal));
-        exigir(ReglasDelColaborador.errorDelCorreo(correoCorporativo));
+        String errorCorreoPersonal = ReglasDelColaborador.errorDelCorreo(correoPersonal);
+        if (errorCorreoPersonal != null) throw new IllegalArgumentException(errorCorreoPersonal);
+        String errorCorreoCorporativo = ReglasDelColaborador.errorDelCorreo(correoCorporativo);
+        if (errorCorreoCorporativo != null) throw new IllegalArgumentException(errorCorreoCorporativo);
         String provincia = ReglasDelColaborador.texto(d.provinciaUbigeo());
         if (provincia != null && !catalogosDelPerfil.esCiudadElegible(provincia)) {
             throw new IllegalArgumentException("Esa provincia no está en el catálogo");
@@ -880,16 +884,20 @@ public class ServicioColaboradoresImpl implements ServicioColaboradores {
             }
         }
 
-        exigir(ReglasDelColaborador.errorDelContrato(d.tipoContrato(), d.finContrato(), ingreso));
-        exigir(ReglasDelColaborador.errorDelPeriodoDePrueba(d.finPeriodoPrueba(), ingreso));
-        exigir(ReglasDelColaborador.errorDelRegimen(d.regimenLaboral()));
+        String errorContrato = ReglasDelColaborador.errorDelContrato(d.tipoContrato(), d.finContrato(), ingreso);
+        if (errorContrato != null) throw new IllegalArgumentException(errorContrato);
+        String errorPrueba = ReglasDelColaborador.errorDelPeriodoDePrueba(d.finPeriodoPrueba(), ingreso);
+        if (errorPrueba != null) throw new IllegalArgumentException(errorPrueba);
+        String errorRegimen = ReglasDelColaborador.errorDelRegimen(d.regimenLaboral());
+        if (errorRegimen != null) throw new IllegalArgumentException(errorRegimen);
 
         BigDecimal sueldo;
         String moneda;
         if (sueldos) {
             sueldo = d.sueldoBase();
             moneda = sueldo == null ? null : Optional.ofNullable(ReglasDelColaborador.texto(d.moneda())).orElse("PEN");
-            exigir(ReglasDelColaborador.errorDelSueldo(sueldo, moneda));
+            String errorSueldo = ReglasDelColaborador.errorDelSueldo(sueldo, moneda);
+            if (errorSueldo != null) throw new IllegalArgumentException(errorSueldo);
         } else {
             // Sin ver_sueldos el sueldo ni se ve ni se escribe: pasa igual que estaba.
             SituacionLaboral previo = conserva != null ? conserva : sueldoPrevio;
@@ -1205,11 +1213,5 @@ public class ServicioColaboradoresImpl implements ServicioColaboradores {
             throw new IllegalArgumentException("Escribe el motivo");
         }
         return elMotivo;
-    }
-
-    private static void exigir(String error) {
-        if (error != null) {
-            throw new IllegalArgumentException(error);
-        }
     }
 }

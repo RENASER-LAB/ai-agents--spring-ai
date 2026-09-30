@@ -4,9 +4,11 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.LocalDate;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 
 @DisplayName("Las reglas de la ficha del colaborador (V64)")
 class ReglasDelColaboradorTest {
@@ -74,5 +76,33 @@ class ReglasDelColaboradorTest {
         assertThat(ReglasDelColaborador.texto(" Ana ")).isEqualTo("Ana");
         assertThat(ReglasDelColaborador.errorDelCorreo("ana.correo.pe")).isNotNull();
         assertThat(ReglasDelColaborador.errorDelCorreo("ana@correo.pe")).isNull();
+    }
+
+    @Test
+    @DisplayName("el correo admite puntos en el nombre y subdominios, pero no tramos vacíos en el dominio")
+    void formasDelCorreo() {
+        assertThat(ReglasDelColaborador.errorDelCorreo("ana.maria+rrhh@correo.pe")).isNull();
+        assertThat(ReglasDelColaborador.errorDelCorreo("ana@rrhh.empresa.com.pe")).isNull();
+        assertThat(ReglasDelColaborador.errorDelCorreo("ana@correo")).isNotNull();
+        assertThat(ReglasDelColaborador.errorDelCorreo("@correo.pe")).isNotNull();
+        assertThat(ReglasDelColaborador.errorDelCorreo("ana@@correo.pe")).isNotNull();
+        assertThat(ReglasDelColaborador.errorDelCorreo("ana maria@correo.pe")).isNotNull();
+        assertThat(ReglasDelColaborador.errorDelCorreo("ana@.correo.pe")).isNotNull();
+        assertThat(ReglasDelColaborador.errorDelCorreo("ana@correo..pe")).isNotNull();
+        assertThat(ReglasDelColaborador.errorDelCorreo("ana@correo.pe.")).isNotNull();
+        assertThat(ReglasDelColaborador.errorDelCorreo(null)).isNull();
+    }
+
+    @Test
+    @DisplayName("una cadena enorme hecha para atascar la validación del correo se resuelve enseguida")
+    void correoPatologicoNoSeAtasca() {
+        String dominioSinFin = "a@" + ".".repeat(100_000) + "@";
+        String tramosSinFin = "a@" + "b.".repeat(100_000) + " ";
+        String sinArroba = "a".repeat(200_000) + " ";
+        assertTimeoutPreemptively(Duration.ofSeconds(2), () -> {
+            assertThat(ReglasDelColaborador.errorDelCorreo(dominioSinFin)).isNotNull();
+            assertThat(ReglasDelColaborador.errorDelCorreo(tramosSinFin)).isNotNull();
+            assertThat(ReglasDelColaborador.errorDelCorreo(sinArroba)).isNotNull();
+        });
     }
 }

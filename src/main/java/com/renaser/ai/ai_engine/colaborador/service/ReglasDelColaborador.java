@@ -22,7 +22,13 @@ public final class ReglasDelColaborador {
 
     private static final Pattern DNI = Pattern.compile("^[0-9]{8}$");
     private static final Pattern OTRO_DOCUMENTO = Pattern.compile("^[A-Z0-9]{4,15}$");
-    private static final Pattern CORREO = Pattern.compile("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$");
+    /**
+     * Algo, una arroba y un dominio de al menos dos tramos separados por puntos. Los
+     * cuantificadores posesivos no vuelven atrás: el tiempo es lineal aunque llegue una cadena
+     * enorme hecha a propósito. Un tramo del dominio no puede ir vacío, así que «a@.b.c»,
+     * «a@b..c» y «a@b.c.» no pasan.
+     */
+    private static final Pattern CORREO = Pattern.compile("^[^@\\s]++@[^@\\s.]++(?:\\.[^@\\s.]++)++$");
 
     /**
      * El número tal como se guarda: sin espacios, puntos ni guiones, y en mayúsculas. Un DNI

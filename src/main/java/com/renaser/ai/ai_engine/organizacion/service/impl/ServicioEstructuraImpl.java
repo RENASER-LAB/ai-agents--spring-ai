@@ -26,6 +26,7 @@ import com.renaser.ai.ai_engine.vacante.repository.VacanteRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.text.Normalizer;
 import java.time.Instant;
@@ -233,12 +234,11 @@ public class ServicioEstructuraImpl implements ServicioEstructura {
 
     /** El mismo código que pone el alta de puestos desde la vacante: el nombre en mayúsculas. */
     private String codigoDisponible(Long org, String nombre) {
-        String base = Normalizer.normalize(nombre, Normalizer.Form.NFD)
+        String unido = Normalizer.normalize(nombre, Normalizer.Form.NFD)
                 .replaceAll("\\p{M}", "")
                 .toUpperCase(Locale.ROOT)
-                .replaceAll("[^A-Z0-9]+", "_")
-                .replaceAll("^_+", "")
-                .replaceAll("_+$", "");
+                .replaceAll("[^A-Z0-9]+", "_");
+        String base = StringUtils.trimTrailingCharacter(StringUtils.trimLeadingCharacter(unido, '_'), '_');
         if (base.isBlank()) {
             base = "PUESTO";
         }

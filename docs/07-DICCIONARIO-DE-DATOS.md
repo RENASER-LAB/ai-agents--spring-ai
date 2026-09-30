@@ -3081,7 +3081,8 @@ que cambiaron, nunca el importe del sueldo, y con `situacionesQueLoHeredan` o
 | `fecha_nacimiento` | date | sí | No futura y al menos 14 años: lo exige el servicio |
 | `sexo` | varchar(1) | sí | `M` o `F` |
 | `estado_civil` | text | no | `SOLTERO`, `CASADO`, `VIUDO`, `DIVORCIADO` o `CONVIVIENTE` |
-| `nacionalidad` · `celular` · `correo_personal` · `correo_corporativo` · `direccion` | text | no | |
+| `nacionalidad` · `celular` · `direccion` | text | no | |
+| `correo_personal` · `correo_corporativo` | text | no | Lo exige el servicio en el alta, en la corrección del perfil y en la carga por Excel: algo, una arroba y un dominio de al menos dos tramos separados por puntos, **ninguno vacío**. Desde el 30/09/2026 `a@.b.c`, `a@b..c` y `a@b.c.` se rechazan con «El correo «…» no es válido». La comprobación no vuelve atrás (sin *backtracking*), por el aviso `java:S8786` de SonarCloud |
 | `provincia_ubigeo` | varchar(6) | no | → `ubigeo` |
 | `nivel_educativo_codigo` | text | no | → `nivel_educativo`, el catálogo del perfil del candidato |
 | `postulacion_id` | bigint | no | La contratación de la que salió el alta, si vino de selección |
