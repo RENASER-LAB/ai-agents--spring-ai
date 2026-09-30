@@ -26,7 +26,6 @@ import com.renaser.ai.ai_engine.vacante.repository.VacanteRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.StringUtils;
 
 import java.text.Normalizer;
 import java.time.Instant;
@@ -238,7 +237,7 @@ public class ServicioEstructuraImpl implements ServicioEstructura {
                 .replaceAll("\\p{M}", "")
                 .toUpperCase(Locale.ROOT)
                 .replaceAll("[^A-Z0-9]+", "_");
-        String base = StringUtils.trimTrailingCharacter(StringUtils.trimLeadingCharacter(unido, '_'), '_');
+        String base = recortarGuiones(unido);
         if (base.isBlank()) {
             base = "PUESTO";
         }
@@ -248,6 +247,19 @@ public class ServicioEstructuraImpl implements ServicioEstructura {
             candidato = base + "_" + sufijo++;
         }
         return candidato;
+    }
+
+    /** Quita los guiones bajos del principio y del final; nunca devuelve null. */
+    static String recortarGuiones(String unido) {
+        int inicio = 0;
+        int fin = unido.length();
+        while (inicio < fin && unido.charAt(inicio) == '_') {
+            inicio++;
+        }
+        while (fin > inicio && unido.charAt(fin - 1) == '_') {
+            fin--;
+        }
+        return unido.substring(inicio, fin);
     }
 
     private static Map<Long, Long> contar(List<Object[]> filas) {
