@@ -153,6 +153,11 @@ que hay que saber antes de escribir una línea:
   nivel» se decide mirando solo las filas de la propia empresa, **sin pasar por
   `DuenoDelInstrumento`**, porque el resolutor contestaría el de RENASER, que es justo el préstamo
   que se dejó de ofrecer. Las vacantes que ya lo rendían prestado lo conservan.
+  ⚠️ **Desde el 01/10/2026 (`V67`) las banderas del banco y de las pruebas no se mueven**:
+  encenderlas o apagarlas, por la empresa o por la plataforma, responde 400 «Esta personalización
+  ya no existe» y no copia nada. La prueba técnica de una vacante nueva se escribe en su editor.
+  Quien ya las tenía encendidas conserva lo copiado, y el préstamo sigue para las vacantes de
+  antes que lo usan. Pesos y plantillas de evaluación se personalizan como siempre.
 - **Dos logins separados**: el portal del candidato y el panel de empresas
   (`POST /panel/auth/login`), que solo autentica cuentas con `usuario.es_equipo`. Las cuentas
   del panel nacen SOLO por invitación (tabla `invitacion`, token de un solo uso, se guarda el

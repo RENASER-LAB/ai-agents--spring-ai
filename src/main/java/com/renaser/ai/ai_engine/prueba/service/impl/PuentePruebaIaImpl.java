@@ -99,6 +99,13 @@ public class PuentePruebaIaImpl implements PuentePruebaIa {
     private final CalificacionPorCriterio calificacion;
     private final ContextoDeLaVacante contexto;
     private final MaquinaEstados maquina;
+    // La prueba escrita en el editor (V67).
+    private final com.renaser.ai.ai_engine.perfilintegral.repository.VersionBancoRepository versionesBanco;
+    private final com.renaser.ai.ai_engine.vacante.repository.VacanteRepository vacantes;
+    private final com.renaser.ai.ai_engine.perfilintegral.service.DatosDeLaVacanteParaIa datosDeLaVacante;
+    private final com.renaser.ai.ai_engine.prueba.service.CalificacionDeLaPruebaPropia calculo;
+    private final com.renaser.ai.ai_engine.prueba.service.CierreDeLaPruebaPropia cierre;
+    private final com.renaser.ai.ai_engine.prueba.repository.NotaCriterioPruebaRepository notasPropias;
 
     // ==================== Lo que se le manda al agente ====================
 
@@ -472,6 +479,160 @@ public class PuentePruebaIaImpl implements PuentePruebaIa {
         BigDecimal nota = calificacion.calcularNotaEtapa(postulacion, ETAPA, rubrica);
         log.info("La prueba de la postulación {} queda con nota {}: la rúbrica entera ({} "
                 + "criterios) tiene puntaje", postulacion.getId(), nota, rubrica.size());
+    }
+
+    // ==================== La prueba escrita en el editor (V67) ====================
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean esDelEditor(Long postulacionId) {
+        return intentos.findByPostulacionId(postulacionId)
+                .map(IntentoPrueba::esDelEditor).orElse(false);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public com.renaser.ai.ai_engine.prueba.dto.DtosPruebaIa.InsumoPruebaPropia insumoPruebaPropia(Long postulacionId) {
+        Postulacion postulacion = postulacion(postulacionId);
+        IntentoPrueba intento = intentos.findByPostulacionId(postulacionId)
+                .filter(IntentoPrueba::esDelEditor)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Prueba del editor", "postulación", postulacionId));
+        if (intento.getEntregadoEn() == null || intento.isNoCompletada()) {
+            throw new IllegalStateException("La prueba de la postulación " + postulacionId
+                    + " no está entregada: no hay nada que calificar");
+        }
+        var r = calculo.calcular(intento);
+        var version = r.version();
+        var vacante = vacantes.findByIdAndOrganizacionId(postulacion.getVacanteId(),
+                        postulacion.getOrganizacionId())
+                .orElseThrow(() -> new IllegalStateException("La vacante de esta prueba ya no existe"));
+        List<Entregable> subidos = entregables.findByIntentoPruebaId(intento.getId());
+
+        List<com.renaser.ai.ai_engine.prueba.dto.DtosPruebaIa.CriterioParaLaIa> criterios = new ArrayList<>();
+        for (var c : r.criterios()) {
+            // Solo los de IA, y no los que ya ajustó una persona: esos no se vuelven a pagar.
+            if (!c.tieneParteCalificada() || !c.esDeIa()
+                    || (c.nota() != null && c.nota().ajustadaAMano())) {
+                continue;
+            }
+            List<com.renaser.ai.ai_engine.prueba.dto.DtosPruebaIa.AbiertaParaLaIa> abiertas = c.abiertas().stream()
+                    .map(pc -> new com.renaser.ai.ai_engine.prueba.dto.DtosPruebaIa.AbiertaParaLaIa(
+                            pc.pregunta().getEnunciado(), pc.pregunta().getQueDebeTener(),
+                            pc.respuesta() == null || esVacio(pc.respuesta().getTexto())
+                                    ? "(sin respuesta)" : pc.respuesta().getTexto()))
+                    .toList();
+            List<com.renaser.ai.ai_engine.prueba.dto.DtosPruebaIa.EntregaParaLaIa> suyas = c.entregables().stream()
+                    .map(e -> paraLaIa(e, ultimaVersionDe(subidos, e)))
+                    .toList();
+            criterios.add(new com.renaser.ai.ai_engine.prueba.dto.DtosPruebaIa.CriterioParaLaIa(
+                    c.criterio().getId(), c.criterio().getNombre(), c.criterio().getQueEvalua(),
+                    c.calificadaMaximo(), abiertas, suyas));
+        }
+        boolean cronometrada = "CRONOMETRADA".equals(version.getModalidad());
+        Integer minutos = null;
+        Integer dias = null;
+        if (intento.getIniciadoEn() != null && intento.getVenceEn() != null) {
+            long tuvo = java.time.Duration.between(intento.getIniciadoEn(), intento.getVenceEn()).toMinutes();
+            if (cronometrada) {
+                minutos = (int) Math.max(0, tuvo);
+            } else {
+                dias = (int) Math.max(1, (tuvo + 1439) / 1440);
+            }
+        }
+        return new com.renaser.ai.ai_engine.prueba.dto.DtosPruebaIa.InsumoPruebaPropia(
+                datosDeLaVacante.de(vacante), version.getEnunciado(), version.getMateriales(),
+                version.getHerramientasPermitidas(), version.getModalidad(), minutos, dias,
+                intento.isEsEntregaAutomatica(), version.getGuiaCalificacion(),
+                version.getVersionGuia() == null ? 1 : version.getVersionGuia(), criterios);
+    }
+
+    private com.renaser.ai.ai_engine.prueba.dto.DtosPruebaIa.EntregaParaLaIa paraLaIa(
+            EntregableRequerido requerido, Optional<Entregable> entregado) {
+        String contener = esVacio(requerido.getDetalle()) ? null : requerido.getDetalle();
+        EntregaDelCandidato vista = pintarEntrega(requerido, entregado);
+        return new com.renaser.ai.ai_engine.prueba.dto.DtosPruebaIa.EntregaParaLaIa(
+                requerido.getNombre(), contener, requerido.getQueDebeTener(),
+                requerido.getFormato(), vista.loEntrego(), vista.enlace(), vista.archivo(),
+                vista.contenido(), vista.porQueNoSePuedeLeer());
+    }
+
+    @Override
+    @Transactional
+    public void guardarNotasPruebaPropia(Long postulacionId, int versionGuia,
+                                         List<com.renaser.ai.ai_engine.prueba.dto.DtosPruebaIa.TandaCalificada> tandas) {
+        IntentoPrueba intento = intentos.findByPostulacionId(postulacionId)
+                .filter(IntentoPrueba::esDelEditor)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Prueba del editor", "postulación", postulacionId));
+        if (intento.getEntregadoEn() == null || intento.isNoCompletada()) {
+            log.warn("PRUEBA_PUESTO: la prueba de la postulación {} no está entregada; no se "
+                    + "guarda nada", postulacionId);
+            return;
+        }
+        var version = versionesBanco.findById(intento.getVersionBancoId())
+                .orElseThrow(() -> new IllegalStateException("La versión de esta prueba ya no existe"));
+        int vigente = version.getVersionGuia() == null ? 1 : version.getVersionGuia();
+        if (vigente != versionGuia) {
+            // Calculado con una guía que ya no rige: no se guarda NADA (todo o nada) y se lanza
+            // para que el trabajo se vuelva a pedir con la guía nueva.
+            throw new IllegalStateException("La guía de la prueba cambió mientras se calificaba "
+                    + "(guía " + versionGuia + ", vigente " + vigente + "): se vuelve a pedir");
+        }
+        var r = calculo.calcular(intento);
+        Map<Long, com.renaser.ai.ai_engine.prueba.service.CalificacionDeLaPruebaPropia.CriterioDeLaPrueba> porId =
+                r.criterios().stream().collect(Collectors.toMap(c -> c.criterio().getId(), Function.identity()));
+
+        int guardadas = 0;
+        for (var tanda : lista(tandas)) {
+            if (tanda == null || tanda.resultado() == null) {
+                continue;
+            }
+            for (var nota : lista(tanda.resultado().criterios())) {
+                var criterio = nota == null ? null : porId.get(nota.criterioId());
+                if (criterio == null) {
+                    log.warn("PRUEBA_PUESTO devolvió un criterio que no es de esta prueba: {}",
+                            nota == null ? null : nota.criterioId());
+                    continue;
+                }
+                // Aunque el modelo puntúe uno de persona, aquí no entra: lo decidió la empresa.
+                if (!criterio.tieneParteCalificada() || !criterio.esDeIa()) {
+                    log.warn("PRUEBA_PUESTO puntuó «{}», que no es de la IA", criterio.criterio().getNombre());
+                    continue;
+                }
+                if (nota.puntaje() == null || esVacio(nota.explicacion())) {
+                    log.warn("Nota de «{}» descartada: llegó sin puntaje o sin explicación",
+                            criterio.criterio().getNombre());
+                    continue;
+                }
+                var fila = notasPropias.findByIntentoPruebaIdAndCriterioBancoId(intento.getId(),
+                                criterio.criterio().getId())
+                        .orElseGet(() -> com.renaser.ai.ai_engine.prueba.entity.NotaCriterioPrueba.builder()
+                                .intentoPruebaId(intento.getId())
+                                .criterioBancoId(criterio.criterio().getId())
+                                .creadoEn(Instant.now())
+                                .build());
+                // Un ajuste a mano nunca se pisa: el ajuste manda.
+                if (fila.ajustadaAMano()) {
+                    continue;
+                }
+                fila.setPuntaje(acotar(nota.puntaje(), BigDecimal.valueOf(criterio.calificadaMaximo())));
+                fila.setExplicacion(nota.explicacion().strip());
+                fila.setEvidencia(esVacio(nota.evidencia()) ? null : nota.evidencia().strip());
+                fila.setOrigen(com.renaser.ai.ai_engine.prueba.entity.NotaCriterioPrueba.IA);
+                fila.setConfianza(acotar(tanda.resultado().confianza(), CIEN));
+                fila.setEjecucionIaId(tanda.ejecucionIaId());
+                fila.setVersionGuia(vigente);
+                notasPropias.save(fila);
+                guardadas++;
+            }
+        }
+        notasPropias.flush();
+        log.info("PRUEBA_PUESTO: {} criterios de IA guardados para la postulación {}", guardadas,
+                postulacionId);
+        // La nota de la etapa, si ya está entera, y el paso a «por confirmar» si sigue en
+        // «calificando». Una recalificación la recalcula sin mover a nadie: ya no está ahí.
+        cierre.recalcular(intento, true);
     }
 
     // ==================== Apoyo ====================

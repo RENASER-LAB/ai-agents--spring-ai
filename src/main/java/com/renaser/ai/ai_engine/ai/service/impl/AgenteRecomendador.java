@@ -76,6 +76,68 @@ public class AgenteRecomendador implements AgenteSeleccion {
             }
             """;
 
+    /**
+     * El formato de la prueba técnica (V67). Además de lo de siempre: el caso, los
+     * entregables y la parte calificada de cada criterio, con quién la califica y qué mira.
+     */
+    public static final String FORMATO_PRUEBA = """
+            Recibes los datos de la vacante, cuantos puntos tiene que sumar tu propuesta
+            (puntosQueFaltan), una indicacion opcional, el enunciado actual de la prueba (o
+            null), su tiempo, sus entregables y sus criterios, cada uno con los puntos de sus
+            preguntas cerradas, su parte calificada, quien la califica y que entregables mira.
+            Completa lo que falta para una PRUEBA TECNICA: no repitas nada del borrador.
+            Como se puntua una prueba:
+            - Las preguntas cerradas (OPCION_UNICA, OPCION_MULTIPLE, ESCALA) llevan puntos y
+              las cuenta el sistema. Sus reglas: OPCION_UNICA de 2 a 10 opciones, ninguna
+              negativa ni por encima de los puntos, y al menos una da exactamente esos puntos;
+              OPCION_MULTIPLE de 2 a 10 opciones entre -puntos y +puntos, y las positivas
+              llegan a los puntos; ESCALA de 3 a 10 niveles del menor al mayor, ninguno
+              negativo ni por encima de los puntos, y al menos uno da exactamente esos puntos.
+            - Las ABIERTAS NO llevan puntos (pon 0): en queDebeTener di que debe tener una
+              buena respuesta.
+            - Cada criterio nuevo tiene una parteCalificada (entero) que califica alguien
+              mirando sus abiertas y los entregables que mira: calificador "IA" o "PERSONA".
+              Un criterio con abiertas o entregables necesita parteCalificada mayor que 0; uno
+              con parteCalificada mayor que 0 mira al menos una abierta o un entregable.
+            - La IA no abre enlaces: un criterio que solo mira entregables con formato ENLACE,
+              sin abiertas, tiene calificador "PERSONA".
+            - Los puntos de todas tus cerradas mas las parteCalificada de tus criterios nuevos
+              suman exactamente puntosQueFaltan.
+            - Si propones entregables (nombre, detalle = que debe contener, formato ARCHIVO,
+              ENLACE o CUALQUIERA, obligatorio, queDebeTener), cada uno lo mira al menos un
+              criterio tuyo, por su posicion en tu lista (desde 0) en "entregables". Un
+              criterio tuyo tambien puede mirar entregables del borrador por su id, en
+              "entregablesExistentes".
+            - Si la prueba no tiene enunciado y va a tener entregables, propon el caso.
+            - Puedes poner preguntas en un criterio del borrador (criterioExistenteId); entonces
+              no propones su parte calificada.
+            Responde SOLO con un objeto json con esta forma exacta:
+            {
+              "caso": {"enunciado": "<el caso, o null>", "materiales": "<o null>",
+                       "herramientasPermitidas": "<o null>"},
+              "entregables": [{"nombre": "<...>", "detalle": "<que debe contener>",
+                               "formato": "<ARCHIVO | ENLACE | CUALQUIERA>",
+                               "obligatorio": <true | false>,
+                               "queDebeTener": "<que debe tener una buena entrega>"}],
+              "criterios": [
+                {"criterioExistenteId": <id de un criterio del borrador, o null>,
+                 "nombre": "<nombre del criterio nuevo, o null>",
+                 "queEvalua": "<que evalua, o null>",
+                 "parteCalificada": <entero>,
+                 "calificador": "<IA | PERSONA | null>",
+                 "entregables": [<posiciones de tus entregables que mira>],
+                 "entregablesExistentes": [<ids de entregables del borrador que mira>],
+                 "preguntas": [
+                   {"tipo": "<ABIERTA | OPCION_UNICA | OPCION_MULTIPLE | ESCALA>",
+                    "enunciado": "<la pregunta>",
+                    "puntos": <entero; 0 en las abiertas>,
+                    "queDebeTener": "<solo en las abiertas, o null>",
+                    "opciones": [{"texto": "<texto o rotulo>", "puntos": <entero>}]}
+                 ]}
+              ]
+            }
+            """;
+
     private final PuenteRecomendador puente;
     private final EjecutorAgenteIa ejecutor;
 
@@ -86,6 +148,10 @@ public class AgenteRecomendador implements AgenteSeleccion {
 
     @Override
     public void ejecutar(TrabajoIa trabajo) {
+        if (ColaCalificacionIaImpl.REFERENCIA_PRUEBA.equals(trabajo.getReferenciaTabla())) {
+            ejecutarParaLaPrueba(trabajo);
+            return;
+        }
         Long vacanteId = trabajo.getReferenciaId();
         InsumoRecomendador insumo = puente.insumo(vacanteId);
         if (insumo == null) {
@@ -116,6 +182,36 @@ public class AgenteRecomendador implements AgenteSeleccion {
         }
         puente.guardarPropuesta(vacanteId, salida.resultado());
     }
+
+    /** La prueba técnica (V67): misma aduana con sus reglas, y la misma segunda oportunidad. */
+    private void ejecutarParaLaPrueba(TrabajoIa trabajo) {
+        Long vacanteId = trabajo.getReferenciaId();
+        var insumo = puente.insumoPrueba(vacanteId);
+        if (insumo == null) {
+            log.info("RECOMENDADOR: la vacante {} no tiene ninguna propuesta de prueba pedida", vacanteId);
+            return;
+        }
+        var salida = ejecutor.ejecutar(trabajo, OBJETIVO_PRUEBA, FORMATO_PRUEBA, insumo,
+                com.renaser.ai.ai_engine.perfilintegral.dto.DtosRecomendador.ResultadoRecomendadorPrueba.class);
+        List<String> errores = com.renaser.ai.ai_engine.prueba.service.RecetaRecomendacionPrueba
+                .validar(insumo, salida.resultado());
+        if (!errores.isEmpty()) {
+            log.warn("La propuesta de prueba de la vacante {} no pasó la aduana ({} errores); se le "
+                    + "devuelve al modelo una vez", vacanteId, errores.size());
+            salida = ejecutor.ejecutar(trabajo, OBJETIVO_PRUEBA, FORMATO_PRUEBA + conLosErrores(errores),
+                    insumo, com.renaser.ai.ai_engine.perfilintegral.dto.DtosRecomendador.ResultadoRecomendadorPrueba.class);
+            errores = com.renaser.ai.ai_engine.prueba.service.RecetaRecomendacionPrueba
+                    .validar(insumo, salida.resultado());
+        }
+        if (!errores.isEmpty()) {
+            puente.marcarFallidaPrueba(vacanteId, errores);
+            return;
+        }
+        puente.guardarPropuestaPrueba(vacanteId, salida.resultado());
+    }
+
+    private static final String OBJETIVO_PRUEBA = "Proponer el caso, los entregables y los "
+            + "criterios de la prueba técnica de una vacante";
 
     private static String conLosErrores(List<String> errores) {
         return "\nTu intento anterior tuvo estos errores. Corrígelos TODOS y responde de "

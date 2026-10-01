@@ -55,4 +55,30 @@ public interface PuentePruebaIa {
      * decide, en la implementación.
      */
     void guardarNotasPrueba(Long postulacionId, Long ejecucionIaId, ResultadoPrueba resultado);
+
+    // ==================== La prueba escrita en el editor (V67) ====================
+
+    /** Si la prueba de esta postulación se escribió en el editor y no es una plantilla. */
+    boolean esDelEditor(Long postulacionId);
+
+    /**
+     * Lo que el agente necesita para calificar la parte calificada de los criterios de IA de
+     * una prueba del editor. Solo los criterios de IA que no ajustó una persona. Puede venir
+     * sin criterios: entonces no hay nada que pedirle al modelo.
+     *
+     * @throws IllegalStateException si la prueba no está entregada
+     */
+    com.renaser.ai.ai_engine.prueba.dto.DtosPruebaIa.InsumoPruebaPropia insumoPruebaPropia(Long postulacionId);
+
+    /**
+     * Guarda lo que devolvió el modelo, todo o nada para la persona: la red de seguridad por id
+     * de criterio (descarta lo desconocido, lo de persona y lo que no trae explicación; acota
+     * al máximo de la parte calificada; nunca pisa un ajuste a mano) y, si la prueba queda
+     * entera, la nota de la etapa y el paso a «por confirmar».
+     *
+     * @param versionGuia la guía con que se armó el insumo. Si mientras tanto se corrigió, no
+     *                    se guarda nada y se lanza para que el trabajo se vuelva a pedir.
+     */
+    void guardarNotasPruebaPropia(Long postulacionId, int versionGuia,
+                                  java.util.List<com.renaser.ai.ai_engine.prueba.dto.DtosPruebaIa.TandaCalificada> tandas);
 }

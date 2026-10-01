@@ -23,8 +23,8 @@ Sirve para tres cosas:
 - **Entender el sistema.** Un modelo de datos bien contado explica el negocio mejor que
   cualquier otro documento.
 
-**La base ya está construida.** Las migraciones `V1` a `V66` viven en
-`src/main/resources/db/migration` —**116 tablas de este módulo**, 119 en la base contando la de
+**La base ya está construida.** Las migraciones `V1` a `V67` viven en
+`src/main/resources/db/migration` —**118 tablas de este módulo**, 121 en la base contando la de
 Flyway y las dos del motor de agentes— y Flyway es el dueño del esquema. Cambiar algo de aquí
 ya cuesta una migración nueva, y **una migración aplicada no se edita nunca**: se escribe otra
 encima.
@@ -173,6 +173,23 @@ el agente `RECOMENDADOR` con su instrucción, publica una instrucción del `EVAL
 los tres métodos, y abre en `trabajo_ia` el modo `RECALIFICA`. **Las vacantes que ya existían
 siguen con el banco del nivel**; las nuevas nacen con preguntas propias. Ver «Banco de preguntas»
 más abajo y en el [diccionario de datos](07-DICCIONARIO-DE-DATOS.md).
+
+La `V67` (01/10/2026) trae **la prueba técnica escrita en el mismo editor**: hasta ella, la etapa
+técnica salía de una plantilla cargada por guiones o del cuestionario CAZATALENTOS, y ninguno
+servía a una empresa cliente. `vacante.instrumento_etapa_tecnica` gana un tercer valor,
+`PRUEBA_PROPIA`, que es el de toda vacante nueva; `version_banco` gana un tercer propósito,
+`PRUEBA_PUESTO`, con **el caso** (enunciado, adjunto, materiales, herramientas) y **el tiempo**
+(modalidad, minutos o días), sin cambio inesperado; `criterio_banco` gana **la parte calificada**
+—sus puntos y quién la califica, la IA o una persona—. Se reutilizan `entregable_requerido`,
+`intento_prueba` y `respuesta_prueba`, que dejan de exigir una plantilla: cuelgan de una
+plantilla **o** de una versión del editor, nunca de las dos. Dos tablas nuevas:
+`criterio_banco_entregable`, qué entregables mira cada criterio, y `nota_criterio_prueba`, la nota
+de la parte calificada **por id de criterio** —no se usa `nota_criterio`, que apunta a `criterio`
+y mezcla las tres etapas—. El intento distingue además **la prueba no completada** (venció con
+algo sin responder) y las propuestas de la IA llevan propósito, para que las del banco y las de la
+prueba de una misma vacante no se pisen. **Las vacantes que ya existían siguen con su
+instrumento y sus datos.** Ver «Prueba del puesto» más abajo y en el
+[diccionario de datos](07-DICCIONARIO-DE-DATOS.md).
 
 La `V54` (14/09/2026) **no añade ninguna tabla y cambia quién firma qué**. Hasta ella había dos
 tipos de texto —`PROCESO` y `FUTUROS_CONTACTOS`— y el de la cuenta usaba el primero, que habla de
@@ -553,7 +570,7 @@ Hay una versión dibujada de este mismo mapa en
 
 ## Las tablas
 
-Ciento dieciséis en total, agrupadas por área para poder leerlas de a poco. En cada una se nombran
+Ciento dieciocho en total, agrupadas por área para poder leerlas de a poco. En cada una se nombran
 las columnas que importan para entender qué hace, no todas.
 
 **Para verlas todas, con tipo y clave, está el [Diccionario de datos](07-DICCIONARIO-DE-DATOS.md).**
@@ -697,7 +714,7 @@ agente que la produjo.
 | `familia` | Las siete familias de trabajo | codigo, nombre |
 | `familia_afin` | Qué familias se parecen lo bastante para reutilizar evaluaciones | familia_codigo, familia_afin_codigo |
 | `puesto` | El catálogo de puestos, con su nivel y su familia. Desde la `V64` es también el catálogo de **cargos** de la gestión de personas, y se renombra y desactiva desde Configuración | organizacion_id, codigo, nombre, nivel_puesto_codigo, familia_codigo, es_activo |
-| `vacante` | Una convocatoria concreta | organizacion_id, solicitud_talento_id, puesto_id, titulo, descripcion, modalidad, ciudad_ubigeo, ubicacion, tipo_cierre, plazas, cierra_en, estado, version_pesos_id, version_plantilla_prueba_id, plantilla_evaluacion_id, responsable_usuario_id, remuneracion_tipo, remuneracion_min, remuneracion_max, remuneracion_moneda, remuneracion_actualizada_en, archivada_en, eliminada_en, aplica_evaluacion, origen_preguntas |
+| `vacante` | Una convocatoria concreta | organizacion_id, solicitud_talento_id, puesto_id, titulo, descripcion, modalidad, ciudad_ubigeo, ubicacion, tipo_cierre, plazas, cierra_en, estado, version_pesos_id, version_plantilla_prueba_id, plantilla_evaluacion_id, responsable_usuario_id, remuneracion_tipo, remuneracion_min, remuneracion_max, remuneracion_moneda, remuneracion_actualizada_en, archivada_en, eliminada_en, aplica_evaluacion, origen_preguntas, instrumento_etapa_tecnica |
 | `requisito_objetivo` | Lo único que puede detener una postulación sin que intervenga nadie | vacante_id, descripcion, regla, es_activo |
 | `barrera_critica` | Lo que ningún promedio alto compensa, definido por vacante | vacante_id, descripcion, es_activa |
 | `evaluador_estandar` | Quién revisa que la urgencia no baje el nivel, en esta vacante | vacante_id, usuario_id, puede_bloquear, asignado_por_usuario_id |
@@ -732,6 +749,12 @@ interruptor de siempre, y `origen_preguntas` —el banco de la empresa para el n
 las preguntas propias de la vacante—. Toda vacante nueva nace con las propias, también en
 RENASER; el banco del nivel se elige a mano y solo si la empresa tiene uno **suyo**. **Desde la
 primera postulación, el origen no cambia**: todos sus candidatos se miden con la misma vara.
+
+**Qué se rinde en la etapa técnica lo dice `instrumento_etapa_tecnica`** (`V43`, `V67`):
+`PLANTILLA`, `CUESTIONARIO_TECNICO` o `PRUEBA_PROPIA`, la prueba escrita en el editor. Toda
+vacante nueva nace con `PRUEBA_PROPIA`, también en RENASER; las de antes conservan el suyo. El
+valor por defecto de la columna sigue siendo `PLANTILLA`, que es lo que reciben las filas
+insertadas a mano: el tercero lo pone el servicio al crear.
 
 ---
 
@@ -819,6 +842,10 @@ para toda la empresa y su peso vive en la versión de pesos. **Los de la prueba 
 pertenecen a una versión de plantilla y varían por puesto; sus puntos van en la propia fila,
 porque esa versión ya está congelada.
 
+⚠️ **La prueba escrita en el editor (`V67`) no usa ninguna de estas dos tablas.** Sus criterios
+son `criterio_banco` y su nota, `nota_criterio_prueba`. `nota_criterio` mezcla las tres etapas y
+su clave ajena apunta a `criterio`: sumarla sin filtrar ya dio un 675 sobre 100.
+
 ---
 
 ### El currículum · 3 tablas
@@ -840,19 +867,20 @@ hace falta repreguntar.
 
 ---
 
-### Banco de preguntas · 9 tablas
+### Banco de preguntas · 10 tablas
 
 | Tabla | Para qué existe | Columnas que importan |
 |---|---|---|
 | `dimension` | Las 22 cosas que se miden: integridad, priorización, calidad, autonomía… | codigo, nombre, definicion, es_obligatoria |
-| `version_banco` | Una versión del banco, en borrador o publicada. Desde la `V66`, también las preguntas propias de una vacante | organizacion_id, tipo_banco, nivel_puesto_codigo, vacante_id, proposito, metodo_calificacion, guia_calificacion, version_guia, etiqueta, estado, publicada_por_usuario_id, publicada_en |
+| `version_banco` | Una versión del banco, en borrador o publicada. Desde la `V66`, también las preguntas propias de una vacante, y desde la `V67`, su prueba técnica | organizacion_id, tipo_banco, nivel_puesto_codigo, vacante_id, proposito, metodo_calificacion, guia_calificacion, version_guia, etiqueta, estado, publicada_por_usuario_id, publicada_en, enunciado, consigna_archivo_id, materiales, herramientas_permitidas, modalidad, duracion_minutos, plazo_dias |
 | `pregunta` | Una pregunta dentro de una versión | version_banco_id, codigo, bloque, tipo, enunciado, situacion, logica_interna, es_puntuable, puntos, criterio_banco_id, que_debe_tener |
 | `opcion` | Las opciones de respuesta | pregunta_id, letra, texto, puntaje, orden |
 | `opcion_dimension` | Cuánto suma cada opción a cada dimensión | opcion_id, dimension_codigo, incremento |
 | `pregunta_dimension` | Qué dimensiones evalúa una pregunta abierta, que no tiene opciones | pregunta_id, dimension_codigo |
 | `par_consistencia` | Dos preguntas que miden lo mismo y deberían responderse parecido | version_banco_id, pregunta_a_id, pregunta_b_id, diferencia_maxima |
-| `criterio_banco` | Los criterios de las preguntas propias de una vacante: lo que se califica y lo que se ve como columna (`V66`) | version_banco_id, nombre, que_evalua, orden |
-| `propuesta_preguntas` | Lo que propone la IA para completar el borrador de una vacante; no toca el borrador hasta que una persona lo agrega (`V66`) | organizacion_id, vacante_id, indicacion, puntos_que_faltan, estado, contenido, motivo_fallo, pedida_por_usuario_id |
+| `criterio_banco` | Los criterios de las preguntas propias de una vacante y de su prueba técnica: lo que se califica y lo que se ve como columna (`V66`; la parte calificada, `V67`) | version_banco_id, nombre, que_evalua, orden, puntos_calificados, calificador |
+| `criterio_banco_entregable` | Qué entregables mira cada criterio de la prueba técnica (`V67`) | criterio_banco_id, entregable_requerido_id |
+| `propuesta_preguntas` | Lo que propone la IA para completar el borrador de una vacante; no toca el borrador hasta que una persona lo agrega (`V66`). Desde la `V67`, con su propósito | organizacion_id, vacante_id, proposito, indicacion, puntos_que_faltan, estado, contenido, motivo_fallo, pedida_por_usuario_id |
 
 **Las preguntas propias de una vacante son un banco más** (`V66`), del tipo `VACANTE` y con
 propósito `PERFIL_INTEGRAL`, al lado de su cuestionario técnico (propósito
@@ -869,6 +897,16 @@ v3; `puntos`, lo que vale una pregunta propia de 0 a 100. En el método `PUNTOS`
 
 Lo que la IA propone se guarda **aparte, en `propuesta_preguntas`**, y el borrador no cambia
 hasta que alguien agrega lo que quiere: criterios enteros o preguntas sueltas.
+
+**La prueba técnica de una vacante es otro banco de vacante** (`V67`), con propósito
+`PRUEBA_PUESTO` y método `PUNTOS`, al lado de sus preguntas propias. Se reutilizan los mismos
+criterios, preguntas, opciones y guía numerada, para no tener dos editores, con dos diferencias.
+**Las abiertas no llevan puntos**: cada criterio tiene una parte automática —la suma de sus
+cerradas, que no se guarda— y una **parte calificada** (`puntos_calificados` y `calificador`, `IA`
+o `PERSONA`) que califica el criterio entero mirando sus abiertas y los entregables que
+`criterio_banco_entregable` le asigna. Y la versión guarda **el caso y el tiempo**, que una
+pregunta suelta no tiene. **No hay que unificar este camino con el del Perfil Integral**, que
+califica pregunta a pregunta.
 
 Son 236 preguntas: 90 para Dirección, 60 para Coordinación, 50 para Ejecución, y 36 de
 alineación personal. **El banco no es el examen**: de ahí se selecciona lo que aplique.
@@ -980,7 +1018,7 @@ La sugerencia de otro puesto **no mueve nada sola**: es información para que un
 
 ---
 
-### Prueba del puesto · 9 tablas
+### Prueba del puesto · 10 tablas
 
 | Tabla | Para qué existe | Columnas que importan |
 |---|---|---|
@@ -989,10 +1027,30 @@ La sugerencia de otro puesto **no mueve nada sola**: es información para que un
 | `variante_cambio` | Las distintas formas que puede tomar el cambio inesperado | version_plantilla_prueba_id, texto, orden |
 | `pregunta_prueba` | El catálogo de preguntas: previas, universales y del puesto | codigo, enunciado, tipo, puesto_id, revela |
 | `pregunta_version_plantilla` | Cuáles eligió esta plantilla | version_plantilla_prueba_id, pregunta_prueba_id, orden |
-| `entregable_requerido` | Qué cosas distintas hay que entregar, cada una con su regla | version_plantilla_prueba_id, nombre, detalle, formato, es_obligatorio, orden |
-| `intento_prueba` | Cuando un candidato rinde | postulacion_id, version_plantilla_prueba_id, iniciado_en, vence_en, entregado_en, es_entrega_automatica, variante_cambio_id, minuto_cambio, cambio_mostrado_en |
+| `entregable_requerido` | Qué cosas distintas hay que entregar, cada una con su regla. Desde la `V67`, de una plantilla **o** de la prueba del editor | version_plantilla_prueba_id, version_banco_id, nombre, detalle, formato, es_obligatorio, orden, que_debe_tener |
+| `intento_prueba` | Cuando un candidato rinde. Desde la `V67`, una plantilla **o** la prueba del editor | postulacion_id, version_plantilla_prueba_id, version_banco_id, iniciado_en, vence_en, entregado_en, es_entrega_automatica, no_completada, variante_cambio_id, minuto_cambio, cambio_mostrado_en |
 | `entregable` | Lo que sube o el enlace que pega, y **cuál de los pedidos es** | intento_prueba_id, entregable_requerido_id, archivo_id, enlace, version, subido_en |
-| `respuesta_prueba` | Sus respuestas a las preguntas de la prueba | intento_prueba_id, pregunta_prueba_id, texto, respondida_en |
+| `respuesta_prueba` | Sus respuestas a las preguntas de la prueba. Desde la `V67`, también a las del editor, cerradas incluidas | intento_prueba_id, pregunta_prueba_id, pregunta_id, texto, opcion_id, detalle, respondida_en |
+| `nota_criterio_prueba` | La nota de la parte calificada de un criterio de la prueba del editor, por id de criterio (`V67`) | intento_prueba_id, criterio_banco_id, puntaje, puntaje_ia, explicacion, origen, version_guia, ajustada_por_usuario_id, motivo_ajuste |
+
+**Desde la `V67` hay dos clases de prueba en estas tablas.** Las de antes cuelgan de una
+`version_plantilla_prueba`; la de toda vacante nueva, de un `version_banco` con propósito
+`PRUEBA_PUESTO` (ver «Banco de preguntas»). `entregable_requerido`, `intento_prueba` y
+`respuesta_prueba` apuntan a **una de las dos, nunca a las dos**, y lo exige la base. Así se
+reutiliza toda la maquinaria de la rendición —el reloj, las entregas que se reemplazan, el cierre
+por plazo y el plazo propio— sin un segundo intento. **El cambio inesperado no se sortea** para
+la prueba del editor, y sus preguntas son de la vacante, así que **no pasan por el catálogo
+`pregunta_prueba`** y su fuga entre empresas no las alcanza.
+
+**`nota_criterio_prueba` guarda solo la parte calificada.** La automática —las cerradas— se
+calcula al leer con los puntos que tenga la versión, así que corregir una clave mal puesta mueve
+la nota de todos sin reescribir nada. Va por el id del criterio de esa versión, nunca por código
+ni por nombre, y guarda aparte la nota de la IA cuando una persona la ajusta y el número de guía
+con que se calculó.
+
+**`no_completada` distingue «venció con algo sin responder» de «entregada».** Ese intento se
+cierra sin entregar: no se califica, no sale en el ranking y la postulación no cambia de etapa
+sola. Guarda en `entregado_en` cuándo se cerró, para que el barrido no lo vuelva a mirar.
 
 **La prueba nueva es cronometrada, y eso está decidido.** Las cinco pruebas que Renaser ha
 enviado —en `insumos/pruebas-tecnicas/`— son encargos de varios días sin reloj y sin cambio a
@@ -1350,6 +1408,12 @@ cuáles sí, porque las que no, hay que probarlas en el código.
   también, y la guía de calificación no pasa de 2000 caracteres. Un banco de vacante que alguien
   cree sin decir su propósito —un guion viejo, una prueba— se toma por cuestionario técnico: lo
   pone un trigger, que es lo que eran todos hasta la `V66`.
+- **Una pieza de la prueba cuelga de una plantilla o de la prueba del editor, nunca de las dos**
+  (`V67`): `entregable_requerido`, `intento_prueba` y `respuesta_prueba`. La prueba del editor se
+  califica siempre por puntos; su enunciado no pasa de 10 000 caracteres, sus minutos son al
+  menos 5 y sus días al menos 1; una parte calificada va de 0 a 100 y la califica `IA` o
+  `PERSONA`; un intento no completado está cerrado; y un ajuste de la parte calificada lleva
+  motivo.
 
 ### Tienen que vivir en el código
 
@@ -1400,6 +1464,12 @@ cuáles sí, porque las que no, hay que probarlas en el código.
 - **De dónde salen las preguntas de una vacante** (`V66`): que el banco del nivel solo se elija
   si la empresa tiene uno **propio** publicado para ese nivel, y que el origen no cambie desde la
   primera postulación. Dependen de otras filas y del momento.
+- **Las reglas de la prueba del editor** (`V67`): que la publicada sume 100 con la parte
+  automática y la calificada de cada criterio; que el enunciado exista si hay entregables; que
+  todo entregable esté en algún criterio y que un criterio de IA no mire solo enlaces; que no se
+  entregue sin todo respondido; que la vara se congele **en la primera rendición** y no en la
+  primera postulación; y que una vacante no entre ni salga de `PRUEBA_PROPIA` por
+  `/instrumento-tecnico`. Dependen de otras filas y del momento.
 
 ### Nunca existen, ni siquiera como opción
 

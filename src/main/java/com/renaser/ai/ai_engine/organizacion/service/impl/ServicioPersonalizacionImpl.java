@@ -7,8 +7,6 @@ import com.renaser.ai.ai_engine.organizacion.repository.OrganizacionRepository;
 import com.renaser.ai.ai_engine.organizacion.service.CopiadorDeInstrumentos;
 import com.renaser.ai.ai_engine.organizacion.service.Instrumento;
 import com.renaser.ai.ai_engine.organizacion.service.ServicioPersonalizacion;
-import com.renaser.ai.ai_engine.perfilintegral.entity.VersionBanco;
-import com.renaser.ai.ai_engine.perfilintegral.repository.VersionBancoRepository;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
 
 import lombok.RequiredArgsConstructor;
@@ -26,7 +24,6 @@ public class ServicioPersonalizacionImpl implements ServicioPersonalizacion {
 
     private final OrganizacionRepository organizaciones;
     private final CopiadorDeInstrumentos copiador;
-    private final VersionBancoRepository versionesBanco;
     private final ServicioAuditoria auditoria;
 
     @Override
@@ -36,9 +33,25 @@ public class ServicioPersonalizacionImpl implements ServicioPersonalizacion {
                 organizacion.isPlantillasEvaluacionPropias(), organizacion.isPruebasPuestoPropias());
     }
 
+    /**
+     * Personalizar el banco o las pruebas ya no existe (V67, decisión 13): encenderlo o
+     * apagarlo, lo pida la empresa o la plataforma, contesta 400 y no copia ni cambia nada.
+     * Cada empresa escribe sus preguntas y su prueba técnica en cada vacante. Quien ya las
+     * tenía personalizadas conserva lo suyo, y su bandera no se toca.
+     */
+    static final String YA_NO_EXISTE = "Esta personalización ya no existe: cada empresa "
+            + "escribe sus preguntas y su prueba técnica en cada vacante.";
+
+    private static void exigirQueExista(Instrumento instrumento) {
+        if (instrumento == Instrumento.BANCO || instrumento == Instrumento.PRUEBA) {
+            throw new IllegalArgumentException(YA_NO_EXISTE);
+        }
+    }
+
     @Override
     @Transactional
     public void encender(ContextoUsuario quien, Instrumento instrumento) {
+        exigirQueExista(instrumento);
         encender(quien, laDe(quien), instrumento, null);
     }
 
@@ -46,14 +59,18 @@ public class ServicioPersonalizacionImpl implements ServicioPersonalizacion {
     @Transactional
     public void encenderPara(ContextoUsuario quien, Long organizacionId, Instrumento instrumento,
                              String motivo) {
-        encender(quien, laObjetivo(quien, organizacionId), instrumento, motivo);
+        Organizacion objetivo = laObjetivo(quien, organizacionId);
+        exigirQueExista(instrumento);
+        encender(quien, objetivo, instrumento, motivo);
     }
 
     @Override
     @Transactional
     public void apagarPara(ContextoUsuario quien, Long organizacionId, Instrumento instrumento,
                            String motivo) {
-        apagar(quien, laObjetivo(quien, organizacionId), instrumento, motivo);
+        Organizacion objetivo = laObjetivo(quien, organizacionId);
+        exigirQueExista(instrumento);
+        apagar(quien, objetivo, instrumento, motivo);
     }
 
     private void encender(ContextoUsuario quien, Organizacion organizacion,
@@ -66,27 +83,14 @@ public class ServicioPersonalizacionImpl implements ServicioPersonalizacion {
             throw new IllegalStateException(
                     "La personalización de " + instrumento + " ya está encendida");
         }
-        /*
-         * ⚠️ El banco ya no se copia (decisión del 29/09/2026). Cada empresa usa solo su
-         * propio banco: el de RENASER es de RENASER, y una empresa sin banco escribe las
-         * preguntas en cada vacante. Se rechaza ANTES de copiar nada, la pida la empresa o
-         * la plataforma. Quien ya lo copió conserva su copia, que es suya; los otros tres
-         * instrumentos siguen como estaban.
-         */
-        if (instrumento == Instrumento.BANCO) {
-            throw new IllegalStateException("El banco de preguntas ya no se personaliza: cada "
-                    + "empresa usa solo su propio banco. Las preguntas se escriben en cada "
-                    + "vacante, en «Preguntas propias de esta vacante».");
-        }
-
         // Copiar y encender van en la misma transacción: una bandera encendida sin copia
         // dejaría a la empresa sin instrumento ninguno, que es peor que cualquiera de los
         // dos estados estables.
         Map<String, Integer> copiado = switch (instrumento) {
-            case BANCO -> copiador.copiarBanco(organizacion.getId());
             case PESOS -> copiador.copiarPesos(organizacion.getId());
             case PLANTILLA_EVALUACION -> copiador.copiarPlantillasEvaluacion(organizacion.getId());
-            case PRUEBA -> copiador.copiarPruebas(organizacion.getId());
+            // Ya rechazados en exigirQueExista: nunca llegan aquí.
+            case BANCO, PRUEBA -> throw new IllegalArgumentException(YA_NO_EXISTE);
         };
         instrumento.poner(organizacion, true);
         organizaciones.save(organizacion);
@@ -99,6 +103,7 @@ public class ServicioPersonalizacionImpl implements ServicioPersonalizacion {
     @Override
     @Transactional
     public void apagar(ContextoUsuario quien, Instrumento instrumento) {
+        exigirQueExista(instrumento);
         apagar(quien, laDe(quien), instrumento, null);
     }
 
@@ -109,34 +114,14 @@ public class ServicioPersonalizacionImpl implements ServicioPersonalizacion {
                     "La personalización de " + instrumento + " ya está apagada");
         }
 
-        // El banco propio publicado pasa a ARCHIVADA: el selector del candidato elige la
-        // PUBLICADA más reciente del dueño, y aunque el resolutor ya apunte a la
-        // plataforma, dejar la copia como PUBLICADA haría mentir al estado — y el estado
-        // es lo único que el panel ve. Nada se borra (RF-138): quien ya rindió con la
-        // copia conserva sus preguntas y sus claves. Los otros instrumentos no tienen
-        // estado ARCHIVADA en su esquema; basta con que el resolutor deje de mirarlos.
-        int archivadas = 0;
-        if (instrumento == Instrumento.BANCO) {
-            // Solo los bancos por nivel. Los de una vacante —su cuestionario técnico y sus
-            // preguntas propias (V66)— no son la copia personalizada: archivarlos dejaría a
-            // esas vacantes sin nada que responder.
-            for (VersionBanco version : versionesBanco
-                    .findByOrganizacionIdAndEstado(organizacion.getId(), "PUBLICADA").stream()
-                    .filter(v -> v.getVacanteId() == null)
-                    .toList()) {
-                version.setEstado("ARCHIVADA");
-                versionesBanco.save(version);
-                archivadas++;
-            }
-        }
         instrumento.poner(organizacion, false);
         organizaciones.save(organizacion);
 
         auditoria.registrar(quien.organizacionId(), quien, "apagar_personalizacion",
                 "organizacion", organizacion.getId(), null,
-                Map.of("instrumento", instrumento.name(), "versionesArchivadas", archivadas), motivo);
-        log.info("Personalización de {} apagada en la organización {} · {} versiones archivadas",
-                instrumento, organizacion.getId(), archivadas);
+                Map.of("instrumento", instrumento.name()), motivo);
+        log.info("Personalización de {} apagada en la organización {}", instrumento,
+                organizacion.getId());
     }
 
     private Organizacion laDe(ContextoUsuario quien) {

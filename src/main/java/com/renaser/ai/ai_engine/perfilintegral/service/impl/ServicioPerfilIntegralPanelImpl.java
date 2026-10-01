@@ -47,6 +47,7 @@ import com.renaser.ai.ai_engine.postulacion.repository.DatoCvRepository;
 import com.renaser.ai.ai_engine.postulacion.repository.EstadoPostulacionRepository;
 import com.renaser.ai.ai_engine.postulacion.repository.PostulacionRepository;
 import com.renaser.ai.ai_engine.postulacion.service.MaquinaEstados;
+import com.renaser.ai.ai_engine.perfilintegral.service.CalificacionPorPuntos;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
 import com.renaser.ai.ai_engine.seguridad.service.Permisos;
 import com.renaser.ai.ai_engine.usuario.entity.Persona;
@@ -146,6 +147,12 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
     private final com.renaser.ai.ai_engine.pesos.repository.PesoEtapaRepository pesosEtapa;
     // Solo para pintar la columna «Reseñas» (V63). No entra en ninguna nota ni en el orden.
     private final com.renaser.ai.ai_engine.resena.service.LectorDeResenas resenas;
+    // Las columnas por id (V67): los criterios de la prueba escrita en el editor y los de las
+    // preguntas propias del Perfil Integral. Nulos en las pruebas unitarias que no los usan:
+    // entonces esas columnas no salen, y lo demás del ranking sigue igual.
+    private final com.renaser.ai.ai_engine.prueba.service.CalificacionDeLaPruebaPropia calculoPropio;
+    private final com.renaser.ai.ai_engine.perfilintegral.service.CalificacionPorPuntos porPuntos;
+    private final com.renaser.ai.ai_engine.perfilintegral.repository.VersionBancoRepository versionesBanco;
 
     // El orden de la tanda. Manda el grupo, no la nota: quien llega a la nota arrastrando un
     // riesgo crítico no va por delante de quien llega sin ninguno, y ordenar por número
@@ -503,6 +510,27 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
                 laTecnica ? intentosDeLaTanda(vacante, ids) : Map.of();
         Map<Long, List<Criterio>> rubricaPorPostulacion =
                 laTecnica ? rubricasDeLaPrueba(intentoPorPostulacion) : Map.of();
+        /*
+          La prueba escrita en el editor (V67): sus columnas son sus criterios, por id, y la
+          cuenta de toda la tanda va en bloque. Quien la dejó vencer sin completar no sale en
+          esta pestaña: se nombra aparte, en «No completaron la prueba», que el panel pide a
+          /prueba-propia/no-completaron (el contrato de este ranking no cambia de campos).
+        */
+        Map<Long, IntentoPrueba> sinCompletar = !laTecnica ? Map.of()
+                : intentoPorPostulacion.values().stream()
+                        .filter(i -> i.esDelEditor() && i.isNoCompletada())
+                        .collect(Collectors.toMap(IntentoPrueba::getPostulacionId, Function.identity(),
+                                (a, b) -> a));
+        Map<Long, com.renaser.ai.ai_engine.prueba.service.CalificacionDeLaPruebaPropia.Resultado>
+                pruebaDelEditor = laTecnica ? pruebasDelEditor(intentoPorPostulacion) : Map.of();
+        // Las preguntas propias del Perfil Integral (V66), una columna por criterio del banco.
+        Map<Long, CalificacionPorPuntos.Resultado> bancoPorPostulacion =
+                ETAPA.equals(etapa) && vacante.tienePreguntasPropias() ? bancoDeLaTanda(suyas) : Map.of();
+        // «Recalificando con la guía nueva»: la de la prueba en su pestaña, la de las
+        // preguntas propias en la del Perfil Integral.
+        Map<Long, ColaCalificacionIa.Seguimiento> recalificacion = laTecnica
+                ? cola.recalificacionDePrueba(ids)
+                : !bancoPorPostulacion.isEmpty() ? cola.recalificacionDe(ids) : Map.of();
 
         Map<Long, List<NotaCriterio>> notasPorPostulacion = notasCriterio.findByPostulacionIdIn(ids)
                 .stream().collect(Collectors.groupingBy(NotaCriterio::getPostulacionId));
@@ -601,6 +629,9 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
         int calificados = 0, enCurso = 0, fallidos = 0, conFina = 0;
 
         for (Postulacion p : suyas) {
+            if (sinCompletar.containsKey(p.getId())) {
+                continue;
+            }
             ColaCalificacionIa.Estado estado = estados.get(p.getId());
             String comoVa = estado == null ? "SIN_EMPEZAR" : estado.comoVa();
             if ("TERMINADA".equals(comoVa)) calificados++;
@@ -643,10 +674,20 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
               divergieran, la tabla y el párrafo de debajo se contradirían en la misma
               pantalla.
             */
-            List<NotaCriterioResponse> notas = suRubrica.stream()
+            List<NotaCriterioResponse> notas = new ArrayList<>(suRubrica.stream()
                     .map(c -> pintarNota(c, notaPorCriterio.get(c.getId()),
                             laTecnica ? c.getPuntos() : pesos.get(c.getId())))
-                    .toList();
+                    .toList());
+            var delEditor = pruebaDelEditor.get(p.getId());
+            if (delEditor != null) {
+                notas.addAll(notasDelEditor(delEditor, intentoPorPostulacion.get(p.getId())));
+            }
+            CalificacionPorPuntos.Resultado delBanco = bancoPorPostulacion.get(p.getId());
+            if (delBanco != null) {
+                notas.addAll(notasDelBanco(delBanco));
+            }
+            ColaCalificacionIa.Seguimiento suRecalificacion = recalificacion.get(p.getId());
+            boolean recalificando = suRecalificacion != null && "EN_CURSO".equals(suRecalificacion.estado());
 
             Usuario usuario = usuariosPorId.get(p.getUsuarioId());
             Persona persona = usuario == null ? null : personasPorId.get(usuario.getPersonaId());
@@ -709,7 +750,8 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
                     p.getCreadoEn(),
                     // El nulo se pregunta aquí y no dentro del mapa: Map.of() revienta al
                     // buscarle una clave nula, y una fila sin persona es posible.
-                    persona == null ? null : resenasPorPersona.get(persona.getId())));
+                    persona == null ? null : resenasPorPersona.get(persona.getId()),
+                    recalificando));
         }
 
         filas.sort(Comparator
@@ -739,7 +781,8 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
                     f.ciudad(), f.ciudadCodigo(),
                     f.pretensionMin(), f.pretensionMax(), f.pretensionMoneda(),
                     f.pretensionDeclarada(), f.pretensionDeclaradaMoneda(),
-                    f.ponderado(), f.estadoPrueba(), f.postuladoEn(), f.resenas()));
+                    f.ponderado(), f.estadoPrueba(), f.postuladoEn(), f.resenas(),
+                    f.recalificando()));
         }
 
         return new RankingVacante(vacanteId, vacante.getTitulo(),
@@ -753,6 +796,91 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
                 laVacanteEnsenaSuSueldo,
                 puedeVerResenas,
                 numeradas);
+    }
+
+    // ============ Las columnas por id (V67) ============
+
+    /** La prueba del editor de cada postulación que la tiene (menos quien no la completó). */
+    private Map<Long, com.renaser.ai.ai_engine.prueba.service.CalificacionDeLaPruebaPropia.Resultado>
+            pruebasDelEditor(Map<Long, IntentoPrueba> intentoPorPostulacion) {
+        if (calculoPropio == null) {
+            return Map.of();
+        }
+        List<IntentoPrueba> delEditor = intentoPorPostulacion.values().stream()
+                .filter(i -> i.esDelEditor() && !i.isNoCompletada())
+                .toList();
+        if (delEditor.isEmpty()) {
+            return Map.of();
+        }
+        var porIntento = calculoPropio.calcularTanda(delEditor);
+        Map<Long, com.renaser.ai.ai_engine.prueba.service.CalificacionDeLaPruebaPropia.Resultado> salida =
+                new java.util.HashMap<>();
+        delEditor.forEach(i -> {
+            var r = porIntento.get(i.getId());
+            if (r != null) {
+                salida.put(i.getPostulacionId(), r);
+            }
+        });
+        return salida;
+    }
+
+    /**
+     * Una columna por criterio de la prueba del editor, identificada por su id. «24/30» con
+     * nota; «pendiente» si falta la parte calificada que pone la IA; en blanco si es de una
+     * persona y no la puso; y sin estado mientras no se haya entregado.
+     */
+    private static List<NotaCriterioResponse> notasDelEditor(
+            com.renaser.ai.ai_engine.prueba.service.CalificacionDeLaPruebaPropia.Resultado r,
+            IntentoPrueba intento) {
+        boolean entregada = intento != null && intento.getEntregadoEn() != null;
+        return r.criterios().stream().map(c -> {
+            var nota = c.nota();
+            String estado = !entregada ? null
+                    : !c.pendiente() ? "CALIFICADO"
+                    : c.esDePersona() ? "EN_BLANCO" : "PENDIENTE";
+            return new NotaCriterioResponse(c.criterio().getNombre(), null,
+                    entregada ? c.notaDelCriterio() : null,
+                    BigDecimal.valueOf(c.maximo()), BigDecimal.valueOf(c.maximo()),
+                    nota == null ? null : nota.getExplicacion(),
+                    nota == null ? null : nota.getOrigen(),
+                    nota == null ? null : nota.getConfianza(),
+                    nota == null ? null : nota.getMotivoAjuste(),
+                    "prueba:" + c.criterio().getId(), estado);
+        }).toList();
+    }
+
+    /**
+     * Las evaluaciones de las preguntas propias de la tanda, calculadas en bloque: unas seis
+     * consultas para toda la tanda, nunca cinco por persona. Solo las entregadas.
+     */
+    private Map<Long, CalificacionPorPuntos.Resultado> bancoDeLaTanda(List<Postulacion> suyas) {
+        if (porPuntos == null || evaluaciones == null) {
+            return Map.of();
+        }
+        Map<Long, Long> postulacionDeEvaluacion = suyas.stream()
+                .filter(p -> p.getEvaluacionId() != null)
+                .collect(Collectors.toMap(Postulacion::getEvaluacionId, Postulacion::getId, (a, b) -> a));
+        if (postulacionDeEvaluacion.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, Long> versionPorEvaluacion = new java.util.HashMap<>();
+        evaluaciones.findAllById(postulacionDeEvaluacion.keySet()).forEach(e -> {
+            if (e.getVersionBancoNivelId() != null && "TERMINADA".equals(e.getEstado())) {
+                versionPorEvaluacion.put(e.getId(), e.getVersionBancoNivelId());
+            }
+        });
+        Map<Long, CalificacionPorPuntos.Resultado> salida = new java.util.HashMap<>();
+        porPuntos.calcularTanda(versionPorEvaluacion)
+                .forEach((evaluacionId, r) -> salida.put(postulacionDeEvaluacion.get(evaluacionId), r));
+        return salida;
+    }
+
+    /** Una columna por criterio del banco de la vacante, por su id; «pendiente» si falta una abierta. */
+    private static List<NotaCriterioResponse> notasDelBanco(CalificacionPorPuntos.Resultado r) {
+        return r.criterios().stream().map(c -> new NotaCriterioResponse(c.criterio().getNombre(),
+                null, c.nota(), BigDecimal.valueOf(c.maximo()), BigDecimal.valueOf(c.maximo()),
+                null, "PUNTOS", null, null, "banco:" + c.criterio().getId(),
+                c.pendiente() ? "PENDIENTE" : "CALIFICADO")).toList();
     }
 
     /**
@@ -787,6 +915,21 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
             propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
     public List<CriterioDeLaRubrica> rubricaVigente(ContextoUsuario quien, Long vacanteId) {
         Vacante vacante = vacanteVisible(quien, vacanteId, "ver_embudo");
+        // La prueba escrita en el editor (V67): sus criterios, por id, de la versión publicada.
+        if (com.renaser.ai.ai_engine.vacante.service.impl.ServicioVacantesPanelImpl.PRUEBA_PROPIA
+                .equals(vacante.getInstrumentoEtapaTecnica())) {
+            if (calculoPropio == null) {
+                return List.of();
+            }
+            var publicada = versionesBanco.pruebaPropiaDe(vacante.getId(), "PUBLICADA").orElse(null);
+            if (publicada == null) {
+                return List.of();
+            }
+            return calculoPropio.estructura(publicada.getId()).criterios().stream()
+                    .map(c -> new CriterioDeLaRubrica(c.criterio().getNombre(), null,
+                            BigDecimal.valueOf(c.maximo()), "prueba:" + c.criterio().getId()))
+                    .toList();
+        }
         Long vigente = vacante.getVersionPlantillaPruebaId();
         // El cuestionario técnico no reparte puntos entre criterios, así que no tiene rúbrica
         // que enseñar aunque la vacante conserve una versión puesta de antes (V43).

@@ -311,6 +311,29 @@ equivoca—, es que después nadie puede distinguir la nota fundada de la invent
 la ficha ve la rúbrica con unos criterios puestos por el agente y otros vacíos, y eso es
 exactamente lo que ocurrió.
 
+### La prueba escrita en el editor (01/10/2026)
+
+Las vacantes nuevas rinden una prueba que la empresa escribe en el panel, con criterios propios.
+El mismo agente la califica, con tres diferencias:
+
+- **Solo califica la parte que le toca.** Cada criterio tiene una parte automática —sus preguntas
+  cerradas, que cuenta el sistema al entregar y la IA nunca toca— y una parte calificada que
+  pone la IA o una persona. Al agente le llegan solo los criterios de IA, cada uno con el máximo de
+  **su parte**, sus preguntas abiertas con lo que debe tener una buena respuesta y los entregables
+  que mira, con su texto o el motivo por el que no se pudo leer. Además, el caso, el tiempo que de
+  verdad tuvo esa persona y los datos de la vacante, sin modalidad, horario, ubicación ni sueldo.
+- **Los criterios se reconocen por su número, no por su nombre.** Con criterios por vacante hay
+  muchos «Comunicación»: al guardar se descarta lo que no sea un criterio de IA de esa prueba, lo
+  que llegue sin explicación y lo que pase del máximo, y **nunca se pisa una nota que una persona
+  ajustó**.
+- **Quien no la completó no se califica.** Si el tiempo venció con algo sin responder, no se gasta
+  ninguna llamada.
+
+Como en las preguntas propias, **corregir la guía con candidatos dentro vuelve a calificar a
+todos**, solo en los criterios de IA y sin tocar los ajustados, y la nota de la prueba aparece en
+cuanto todos los criterios están enteros, la complete la IA o una persona. El detalle, en
+[La prueba del puesto, por dentro](PRUEBA-DEL-PUESTO.md).
+
 ### De dónde salen las preguntas de la conversación final
 
 De una **contradicción** entre lo que el candidato dijo y lo que se le vio hacer. Por eso al

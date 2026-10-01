@@ -2,6 +2,11 @@
 
 **Estado: aprobado en conversación (2026-08-28). Pendiente de plan de implementación.**
 
+> ⚠️ **Desde el 01/10/2026 (`V67`) la ficha y el REDACTOR no se ofrecen a las vacantes nuevas**, y
+> con ellos desaparece la sugerencia de pesos que salía de la ficha: la prueba técnica de una
+> vacante nueva se escribe en su editor. Siguen para las vacantes que ya rinden el cuestionario
+> técnico. Ver [La prueba del puesto, por dentro](PRUEBA-DEL-PUESTO.md).
+
 El primer ciclo de la etapa 2 del método CAZATALENTOS
 ([qué es la etapa completa](CAZATALENTOS-PRUEBA-TECNICA.md)): la ficha de vacante que
 llena el dueño y el agente que convierte esa ficha en el borrador del cuestionario

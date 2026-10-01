@@ -29,6 +29,14 @@ public interface ServicioPrueba {
     Long crearAlEntrar(Long organizacionId, Long postulacionId, Long versionPlantillaPruebaId,
                        java.time.Instant cierraEn);
 
+    /**
+     * Lo mismo que {@link #crearAlEntrar}, para la prueba escrita en el editor (V67): el
+     * intento cuelga de la versión publicada de la vacante. A quien no la ha abierto se le
+     * pone la que esté publicada hoy; a quien ya la abrió no se le toca (RF-138).
+     */
+    Long crearAlEntrarConPruebaPropia(Long organizacionId, Long postulacionId, Long versionBancoId,
+                                      java.time.Instant cierraEn);
+
     MiPrueba ver(ContextoUsuario quien, UUID uuidPostulacion);
 
     /** Arranca el reloj: fija venceEn y sortea la variante y el minuto del cambio. */
@@ -42,9 +50,16 @@ public interface ServicioPrueba {
     void subirEntregableEnlace(ContextoUsuario quien, UUID uuidPostulacion, Long entregableRequeridoId,
                                SubirEntregableEnlace datos);
 
-    /** Entrega manual: exige que estén todos los obligatorios. */
+    /**
+     * Entrega manual: exige que estén todos los obligatorios. En la prueba del editor (V67)
+     * exige además todas las preguntas respondidas (decisión 11).
+     */
     EntregaResponse entregar(ContextoUsuario quien, UUID uuidPostulacion);
 
-    /** Llamado por el sondeo: entrega lo que haya, aunque falten obligatorios. No existe entregar tarde. */
+    /**
+     * Llamado por el sondeo: entrega lo que haya, aunque falten obligatorios. No existe
+     * entregar tarde. En la prueba del editor (V67), si falta algo el intento se cierra como
+     * «no completada»: no se califica y la postulación no cambia de etapa sola.
+     */
     void entregarVencidos();
 }

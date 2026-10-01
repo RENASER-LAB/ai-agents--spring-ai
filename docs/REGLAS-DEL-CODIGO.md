@@ -142,6 +142,9 @@ está en su classpath, así que `integracion/soporte/RespuestaV3` usa la 2 a pro
 | La nota de las preguntas propias de una vacante (`V66`) | `perfilintegral/service/CalificacionPorPuntos`, calculada al leer. La usan la nota de lo cerrado al entregar, la del Perfil Integral, el desglose de la ficha, lo que recibe el evaluador y el cambio de puntos: si cada uno sumara por su cuenta, la ficha y el ranking dirían cifras distintas |
 | Qué puede guardarse y publicarse en las preguntas propias (`V66`) | `perfilintegral/service/ReglasDePuntos`. Lo usan guardar una pregunta, publicar, cambiar los puntos y validar lo que propone la IA; con una copia en cada uno, el editor dejaría guardar algo que la publicación rechaza por otra razón |
 | La envoltura de una guía de calificación escrita por una empresa | `ai/service/impl/EnvolturaDeGuia`, la misma para la prueba del puesto y para las preguntas propias. Dos copias de una defensa son dos sitios donde arreglarla |
+| La nota de la prueba escrita en el editor (`V67`) | `prueba/service/CalificacionDeLaPruebaPropia`, calculada al leer: parte automática más parte calificada, por id de criterio. La usan el editor (balance y lo que frena publicar), la entrega (¿falta algo por responder?), el cierre de la calificación, la ficha, el ranking, el Excel y el cambio de puntos. **No se unifica con `CalificacionPorPuntos`**, que califica pregunta a pregunta |
+| Cuándo la prueba del editor tiene nota de la etapa y pasa a «por confirmar» (`V67`) | `prueba/service/CierreDeLaPruebaPropia`. La llaman la entrega, el agente, el ajuste a mano y los recálculos: el paso lo da quien complete la rúbrica, sea la IA o una persona |
+| Qué puede guardarse y publicarse en la prueba del editor (`V67`) | `prueba/service/ReglasDeLaPrueba`. La usan guardar, publicar, cambiar los puntos y validar lo que propone la IA; las reglas de cada tipo de pregunta siguen siendo las de `ReglasDePuntos` |
 
 ---
 

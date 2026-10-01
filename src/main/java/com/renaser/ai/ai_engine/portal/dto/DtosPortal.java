@@ -193,7 +193,15 @@ public final class DtosPortal {
                                  * le exigió. Es SUYO: en el portal viaja siempre, sin permiso
                                  * de por medio.
                                  */
-                                Pretension miPretension) {}
+                                Pretension miPretension,
+                                /**
+                                 * Su prueba del editor (V67) venció con algo sin responder y se
+                                 * cerró sin entregar. La postulación sigue en su etapa hasta que
+                                 * el equipo cierre su proceso, así que el estado solo diría que
+                                 * le toca rendirla. Es lo único que viaja del intento: ni puntos
+                                 * ni criterios (RF-53).
+                                 */
+                                boolean pruebaSinCompletar) {}
 
     /** Un monto con su moneda, ya escrito además en una frase para pintarlo sin traducir. */
     public record Pretension(BigDecimal monto, String moneda, String texto) {}

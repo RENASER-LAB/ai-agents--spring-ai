@@ -22,7 +22,8 @@ import com.renaser.ai.ai_engine.usuario.repository.UsuarioRepository;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
 import com.renaser.ai.ai_engine.vacante.entity.Vacante;
 import com.renaser.ai.ai_engine.vacante.repository.VacanteRepository;
-import lombok.RequiredArgsConstructor;
+import com.renaser.ai.ai_engine.perfilintegral.repository.VersionBancoRepository;
+import org.springframework.beans.factory.annotation.Autowired;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,7 +39,6 @@ import java.util.Optional;
 // se entra por POR_CONFIRMAR, no por su primer momento: es la única excepción.
 // Ver docs/03-ESTADOS-POSTULACION.md.
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class MaquinaEstados {
 
@@ -91,6 +91,46 @@ public class MaquinaEstados {
     private final PlantillaCorreoVacanteRepository plantillasPorVacante;
     private final VersionPlantillaPruebaRepository versionesDePrueba;
     private final ServicioParametros parametros;
+    /** La prueba escrita en el editor (V67), para su aviso. Nulo en las pruebas de siempre. */
+    private final VersionBancoRepository versionesBanco;
+
+    /** El constructor de siempre: el que usan las pruebas unitarias del aviso. */
+    public MaquinaEstados(EstadoPostulacionRepository estados, PostulacionRepository postulaciones,
+                          TransicionEstadoRepository transiciones, UsuarioRepository usuarios,
+                          PersonaRepository personas, VacanteRepository vacantes,
+                          ServicioAuditoria auditoria, ServicioCorreo correo,
+                          DireccionDelCandidato direcciones, ServicioEnlaceAcceso enlaces,
+                          PlantillaCorreoVacanteRepository plantillasPorVacante,
+                          VersionPlantillaPruebaRepository versionesDePrueba,
+                          ServicioParametros parametros) {
+        this(estados, postulaciones, transiciones, usuarios, personas, vacantes, auditoria, correo,
+                direcciones, enlaces, plantillasPorVacante, versionesDePrueba, parametros, null);
+    }
+
+    @Autowired
+    public MaquinaEstados(EstadoPostulacionRepository estados, PostulacionRepository postulaciones,
+                          TransicionEstadoRepository transiciones, UsuarioRepository usuarios,
+                          PersonaRepository personas, VacanteRepository vacantes,
+                          ServicioAuditoria auditoria, ServicioCorreo correo,
+                          DireccionDelCandidato direcciones, ServicioEnlaceAcceso enlaces,
+                          PlantillaCorreoVacanteRepository plantillasPorVacante,
+                          VersionPlantillaPruebaRepository versionesDePrueba,
+                          ServicioParametros parametros, VersionBancoRepository versionesBanco) {
+        this.estados = estados;
+        this.postulaciones = postulaciones;
+        this.transiciones = transiciones;
+        this.usuarios = usuarios;
+        this.personas = personas;
+        this.vacantes = vacantes;
+        this.auditoria = auditoria;
+        this.correo = correo;
+        this.direcciones = direcciones;
+        this.enlaces = enlaces;
+        this.plantillasPorVacante = plantillasPorVacante;
+        this.versionesDePrueba = versionesDePrueba;
+        this.parametros = parametros;
+        this.versionesBanco = versionesBanco;
+    }
 
     // ============ El cálculo, puro y testeable ============
 
@@ -447,7 +487,22 @@ public class MaquinaEstados {
         String urlPdf = "";
         String plazo = "";
 
-        var version = vacantes.findById(postulacion.getVacanteId())
+        // La prueba escrita en el editor (V67): su adjunto y su tiempo están en su versión.
+        var vacante = vacantes.findById(postulacion.getVacanteId()).orElse(null);
+        if (vacante != null && "PRUEBA_PROPIA".equals(vacante.getInstrumentoEtapaTecnica())
+                && versionesBanco != null) {
+            var propia = versionesBanco.pruebaPropiaDe(vacante.getId(), "PUBLICADA").orElse(null);
+            if (propia != null) {
+                urlPdf = propia.getUrlConsigna() == null ? "" : propia.getUrlConsigna();
+                plazo = "PLAZO_ABIERTO".equals(propia.getModalidad()) && propia.getPlazoDias() != null
+                        ? propia.getPlazoDias() + " dias"
+                        : propia.getDuracionMinutos() != null ? propia.getDuracionMinutos() + " minutos" : "";
+            }
+            return Map.of("enlacePrueba", urlPdf, "plazo", plazo,
+                    "whatsapp", parametros.texto(postulacion.getOrganizacionId(), "whatsapp_evidencia", ""));
+        }
+
+        var version = Optional.ofNullable(vacante)
                 .map(Vacante::getVersionPlantillaPruebaId)
                 .flatMap(versionesDePrueba::findById);
         if (version.isPresent()) {

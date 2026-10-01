@@ -26,4 +26,18 @@ public interface PuenteRecomendador {
 
     /** La propuesta no pasó la aduana tras la corrección: queda FALLIDA y se dice por qué. */
     void marcarFallida(Long vacanteId, List<String> errores);
+
+    // ==================== La prueba técnica (V67) ====================
+
+    /**
+     * Lo mismo para la prueba técnica de la vacante: lo de siempre más el caso, el tiempo, los
+     * entregables y la parte calificada de cada criterio. Nulo si no hay propuesta de la
+     * prueba pedida esperando.
+     */
+    com.renaser.ai.ai_engine.perfilintegral.dto.DtosRecomendador.InsumoRecomendadorPrueba insumoPrueba(Long vacanteId);
+
+    void guardarPropuestaPrueba(Long vacanteId,
+                                com.renaser.ai.ai_engine.perfilintegral.dto.DtosRecomendador.ResultadoRecomendadorPrueba resultado);
+
+    void marcarFallidaPrueba(Long vacanteId, List<String> errores);
 }

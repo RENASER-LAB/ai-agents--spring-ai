@@ -313,6 +313,84 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
                 .orElse(new Seguimiento("SIN_PEDIR", null));
     }
 
+    // ==================== La prueba técnica escrita en el editor (V67) ====================
+
+    /** La referencia del recomendador de la prueba: otra que la del Perfil Integral. */
+    public static final String REFERENCIA_PRUEBA = "vacante_prueba";
+
+    @Override
+    public boolean recalificarPrueba(Long postulacionId) {
+        if (apagada(postulacionId)) {
+            return false;
+        }
+        Long organizacionId = puente.organizacionDe(postulacionId);
+        Optional<TrabajoIa> creado = registro.crearSiNoHayUnoVivo(organizacionId, postulacionId,
+                AgentePruebaPuesto.CODIGO_AGENTE, RECALIFICA);
+        if (creado.isEmpty()) {
+            return false;
+        }
+        frenarOPublicar(creado.get(), organizacionId);
+        return true;
+    }
+
+    @Override
+    public Map<Long, Seguimiento> recalificacionDePrueba(List<Long> postulacionIds) {
+        return ultimoDe(postulacionIds, true);
+    }
+
+    @Override
+    public Map<Long, Seguimiento> calificacionDePrueba(List<Long> postulacionIds) {
+        return ultimoDe(postulacionIds, false);
+    }
+
+    /** El último trabajo del agente de la prueba de cada postulación (solo RECALIFICA o todos). */
+    private Map<Long, Seguimiento> ultimoDe(List<Long> postulacionIds, boolean soloRecalificacion) {
+        if (postulacionIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, TrabajoIa> ultimaDeCada = new HashMap<>();
+        for (TrabajoIa t : trabajos.findByPostulacionIdInOrderByIdAsc(postulacionIds)) {
+            if (AgentePruebaPuesto.CODIGO_AGENTE.equals(t.getAgenteCodigo())
+                    && (!soloRecalificacion || RECALIFICA.equals(t.getModo()))) {
+                ultimaDeCada.put(t.getPostulacionId(), t);   // en orden: queda la última
+            }
+        }
+        Map<Long, Seguimiento> salida = new HashMap<>();
+        ultimaDeCada.forEach((id, t) -> salida.put(id, seguimientoDe(t)));
+        return salida;
+    }
+
+    @Override
+    public boolean encolarRecomendadorDePrueba(Long organizacionId, Long vacanteId) {
+        if (!habilitada) {
+            log.warn("La IA está apagada por configuración: la recomendación de la prueba de "
+                    + "la vacante {} no se encola", vacanteId);
+            return false;
+        }
+        Optional<TrabajoIa> creado;
+        try {
+            creado = registro.crearParaReferencia(organizacionId,
+                    AgenteRecomendador.CODIGO_AGENTE, REFERENCIA_PRUEBA, vacanteId, FINA);
+        } catch (org.springframework.dao.DataIntegrityViolationException e) {
+            log.info("Recomendación de prueba duplicada de la vacante {} frenada por el índice",
+                    vacanteId);
+            return false;
+        }
+        if (creado.isEmpty()) {
+            return false;
+        }
+        frenarOPublicar(creado.get(), organizacionId);
+        return true;
+    }
+
+    @Override
+    public Seguimiento comoVaElRecomendadorDePrueba(Long vacanteId) {
+        return trabajos.findFirstByReferenciaTablaAndReferenciaIdAndAgenteCodigoOrderByIdDesc(
+                        REFERENCIA_PRUEBA, vacanteId, AgenteRecomendador.CODIGO_AGENTE)
+                .map(this::seguimientoDe)
+                .orElse(new Seguimiento("SIN_PEDIR", null));
+    }
+
     /**
      * Un trabajo contado para el panel. EN_ESPERA es «detenida», no «en curso»: se retoma
      * sola cuando haya cupo, pero mientras tanto no avanza y hay que decir por qué.

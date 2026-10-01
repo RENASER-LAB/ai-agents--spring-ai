@@ -70,6 +70,24 @@ public interface VersionBancoRepository extends JpaRepository<VersionBanco, Long
                                                         @Param("estado") String estado);
 
     /**
+     * La prueba técnica escrita en el editor de una vacante (V67): una BORRADOR y una
+     * PUBLICADA. Filtra por propósito por la misma razón que {@link #cuestionarioTecnicoDe}.
+     */
+    @Query("""
+            select v from VersionBanco v
+             where v.vacanteId = :vacanteId and v.estado = :estado
+               and v.proposito = 'PRUEBA_PUESTO'""")
+    java.util.Optional<VersionBanco> pruebaPropiaDe(@Param("vacanteId") Long vacanteId,
+                                                    @Param("estado") String estado);
+
+    /** Las pruebas propias publicadas de una empresa: la biblioteca de la que se copia (V67). */
+    @Query("""
+            select v from VersionBanco v
+             where v.organizacionId = :organizacionId and v.estado = 'PUBLICADA'
+               and v.proposito = 'PRUEBA_PUESTO'""")
+    List<VersionBanco> pruebasPropiasPublicadasDe(@Param("organizacionId") Long organizacionId);
+
+    /**
      * Las preguntas propias publicadas de una empresa, de todas sus vacantes: la biblioteca de
      * la que se copia. Por la organización de la fila, que es la de la vacante.
      */

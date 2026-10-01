@@ -1,24 +1,93 @@
 # La prueba del puesto, por dentro
 
 Cómo se compone, se rinde, se cierra y se califica la etapa técnica. Reúne lo que se decidió
-entre el 22/08 y el 02/09/2026 (migraciones V29 a V48). El diseño de la ficha del puesto y del
+entre el 22/08 y el 02/09/2026 (migraciones V29 a V48) y la prueba escrita en el editor del
+01/10/2026 (V67). El diseño de la ficha del puesto y del
 redactor está en [Diseño de la prueba técnica](DISENO-PRUEBA-TECNICA-FICHA-Y-REDACTOR.md); cómo
 se reparten los 100 puntos, en [La rúbrica de la prueba](RUBRICA-DE-LA-PRUEBA.md); la regla de
 «una vacante, una versión», en [su decisión](DECISION-UNA-VACANTE-UNA-VERSION.md).
 
 ---
 
-## «Prueba técnica» son dos instrumentos
+## «Prueba técnica» son dos instrumentos, y desde la V67 las vacantes nuevas usan un tercero
 
-La etapa técnica se rinde con **uno de dos** instrumentos, y la vacante elige cuál (V43):
+Las vacantes de antes del 01/10/2026 rinden la etapa técnica con **uno de dos** instrumentos, y la
+vacante eligió cuál (V43):
 
 | Instrumento | Qué es | Quién la escribe |
 |---|---|---|
 | **Cuestionario técnico** | Preguntas que se contestan escribiendo, sin nada que subir; nace de la ficha del puesto y del redactor (V42). Es la etapa 2 de CAZATALENTOS | El panel, con ayuda de la IA |
 | **Prueba del puesto** | Una plantilla con versiones publicadas: preguntas, entregables (archivo o enlace), rúbrica y variantes (el cambio inesperado) | La empresa, desde el panel o por guion |
+| **La prueba escrita en el editor** (`PRUEBA_PROPIA`, V67) | La de **toda vacante nueva**, también en RENASER: criterios, preguntas de cuatro tipos, el caso, el tiempo y los entregables, escritos para esa vacante. Sin entregables es un cuestionario | La empresa, en «Armar la prueba» del panel, con ayuda de la IA si quiere |
+
+**A las vacantes nuevas ya no se les ofrecen las plantillas, el cuestionario CAZATALENTOS ni la
+ficha.** Las existentes siguen igual, sin migrar nada. La pantalla `/admin/pruebas` y los guiones
+de plantillas siguen sirviendo para ellas. Ver «La prueba escrita en el editor», más abajo.
 
 La prueba de la vacante de Administrador es en realidad un cuestionario cargado como prueba del
 puesto: ver «La vacante sin banco» más abajo.
+
+---
+
+## La prueba escrita en el editor (V67, 01/10/2026)
+
+Es el editor de las preguntas propias del Perfil Integral (V66) con lo que le falta a una prueba.
+Vive en `version_banco` con propósito `PRUEBA_PUESTO`; las rutas están en
+[Las APIs](09-APIS.md), «La prueba técnica escrita en el editor», y las tablas en el
+[diccionario de datos](07-DICCIONARIO-DE-DATOS.md).
+
+**Qué se escribe.** El caso (enunciado, adjunto en PDF o Word, materiales y herramientas), el
+tiempo (cronometrada en minutos o plazo abierto en días, **sin cambio inesperado**), los
+entregables (con «qué debe tener una buena entrega», que el candidato no ve) y los criterios. Cada
+criterio tiene **una parte automática** —la suma de sus cerradas— y **una parte calificada**, con
+sus puntos, quién la califica (la IA o una persona) y qué entregables mira. **Las abiertas no
+llevan puntos**: la IA o la persona califican el criterio entero. Todo suma 100. Sin entregables,
+el editor, la vacante y el portal la llaman cuestionario y el enunciado deja de ser obligatorio.
+
+**Se congela en la primera rendición**, no en la primera postulación: hasta que alguien abra la
+prueba se puede abrir un borrador y publicar otra versión. Desde entonces, publicar es 409 y solo
+cambian los puntos y las instrucciones de la IA, que alcanzan a todos a la vez.
+
+**Cómo se rinde.** Con la maquinaria de siempre —`intento_prueba`, el reloj del servidor, las
+entregas que se reemplazan, el cierre de la vacante y el plazo propio—, que ahora cuelga de una
+plantilla **o** de la versión del editor. Diferencias:
+
+- **No se entrega sin responderlo todo** ni sin los entregables obligatorios, aunque se llame a
+  la API directamente. Un texto en blanco no cuenta.
+- **Al vencer con algo pendiente, el intento queda «no completado»**: no se califica, no gasta
+  IA, no sale en el ranking ni en su Excel y la postulación no cambia de etapa. El panel lo lista
+  en «No completaron la prueba», desde donde alguien cierra su proceso. Con todo completo se
+  entrega sola, como antes.
+- Al portal nunca le llegan puntos, claves, criterios ni calificadores (RF-53).
+
+**Cómo se califica.** Las cerradas, el sistema, al entregar; si con eso la prueba ya está entera,
+pasa a «por confirmar» en ese momento. La parte calificada de los criterios de IA, el agente
+`PRUEBA_PUESTO`, que recibe por criterio su máximo **de la parte calificada**, sus abiertas con su
+«qué debe tener» y los entregables que mira con su texto legible o el motivo por el que no se pudo
+leer; además, el caso, **los minutos efectivos** del intento —no los de una plantilla— y los
+datos de la vacante de la fase 1. La guía va en el `system` con la misma envoltura y marca
+sorteada. Una prueba grande se parte en varias llamadas y se guarda todo o nada por persona.
+
+- **La red trabaja por id de criterio** (`nota_criterio_prueba`): descarta criterios
+  desconocidos, de persona o sin explicación, acota cada nota a su parte calificada y **nunca pisa
+  un ajuste a mano**. Un resultado calculado con una guía anterior se descarta.
+- **Nota del criterio = parte automática + parte calificada.** Uno con parte calificada sin nota
+  está **pendiente**, aunque sus cerradas ya cuenten.
+- **La nota de la etapa solo existe con todos los criterios enteros**, y al completarse pasa a
+  «por confirmar», la complete la IA o una persona. No hace falta ponderar a mano: la nota sale
+  sola.
+- **El ajuste a mano** es de la parte calificada, de 0 a sus puntos y con motivo; la automática
+  no se ajusta. La nota de la IA queda a la vista y la IA no vuelve a tocar ese criterio.
+
+**Ranking y Excel**: una columna por criterio, **identificada por id** —dos «Comunicación» de dos
+vacantes no se juntan—, con «pendiente» y en blanco para el de persona sin nota, y «Recalificando
+con la guía nueva» mientras dure una recalificación.
+
+⚠️ **Asignar una plantilla por la API a una vacante nueva la pasa a `PLANTILLA`** si nadie ha
+empezado a rendir. Es una puerta deliberada (decisión del 01/10/2026) para los guiones de RENASER
+que crean la vacante y le ponen su plantilla. En cambio, `/instrumento-tecnico` no entra ni sale
+de `PRUEBA_PROPIA` (400), así que **un guion que llame a `/instrumento-tecnico` antes que a
+`/plantilla-prueba` falla con una vacante nueva**: el orden correcto es primero la plantilla.
 
 ---
 

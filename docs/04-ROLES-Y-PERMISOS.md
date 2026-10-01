@@ -133,6 +133,15 @@ alcance; verlas, con `ver_vacantes`. El panel no lo sabe por su cuenta: el edito
 nota de la IA»** (`ajustar_nota`), con su motivo obligatorio de siempre; la ficha se lo dice con
 `puedeAjustar`.
 
+**La prueba técnica de una vacante nueva (`V67`, 01/10/2026) sigue el mismo reparto, sin
+permiso nuevo.** Armarla, publicarla, copiarla y pedir recomendaciones es **corregir la vacante**
+(`editar_vacante`, con su alcance); verla, `ver_vacantes`. En la ficha, ver la prueba de una
+persona es `abrir_ficha_candidato` —el contenido de sus entregables pide además
+`descargar_entregables`— y ajustar o poner la parte calificada de un criterio, `ajustar_nota`.
+La lista «No completaron la prueba» va con `ver_embudo`, como el ranking, y cerrar el proceso de
+quien no la completó es el descarte de siempre (`mover_postulacion`). Elegir plantilla de prueba
+(`elegir_plantilla_prueba`) queda para las vacantes de antes.
+
 **«Editar una vacante» (`editar_vacante`) es el lápiz de la lista y la tarjeta del sueldo.**
 Desde el 19/09/2026 **respeta su alcance**: con alcance a sus vacantes, solo se corrigen las que
 esa persona dirige; en las demás no sale el lápiz, y pedirlo por la API responde 404, no 403. Sin
@@ -440,9 +449,11 @@ respondían 403. Si la sesión no carga, el menú enseña las cuatro entradas de
 ‡ Las dos filas de los instrumentos y del alta de empresas llegaron con el multiempresa
 (`V37`), y no significan lo mismo. **Personalizar los instrumentos** lo tiene el
 Administrador de cualquier empresa: es
-adaptar a la suya las plantillas, los pesos y las pruebas que la plataforma le prestó. **El banco
-de preguntas ya no** (`V66`): pedirlo responde 409, porque cada empresa usa solo su banco propio
-y escribe las preguntas en cada vacante. Quien se lo copió antes conserva su copia. **Dar de
+adaptar a la suya los pesos y las plantillas de evaluación que la plataforma le prestó. **El
+banco de preguntas y las pruebas ya no** (`V66` el banco, `V67` las pruebas): encenderlos o
+apagarlos, lo pida la empresa o la plataforma, responde 400 «Esta personalización ya no existe»,
+porque cada empresa escribe sus preguntas y su prueba técnica en cada vacante. Quien los copió
+antes conserva lo suyo en sus vacantes de antes. **Dar de
 alta empresas** lo tiene **solo el Administrador de la empresa dueña de la plataforma** —hoy,
 Renaser—: es la operación de Renaser como dueña del producto, no una función del panel de un
 cliente. El alta de una empresa copia los roles de la plataforma y ese permiso lo excluye a

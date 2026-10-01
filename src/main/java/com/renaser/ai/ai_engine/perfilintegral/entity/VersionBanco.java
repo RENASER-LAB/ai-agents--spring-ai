@@ -59,6 +59,23 @@ public class VersionBanco {
     @Builder.Default
     private Integer versionGuia = 1;
 
+    // ---------- Solo en la prueba técnica escrita en el editor (PRUEBA_PUESTO, V67) ----------
+
+    /** El caso. Obligatorio para publicar si hay entregables; sin ellos es un cuestionario. */
+    private String enunciado;
+
+    /** El enunciado en PDF o Word, si se adjuntó: el archivo y el enlace largo del aviso. */
+    private Long consignaArchivoId;
+    private String urlConsigna;
+
+    private String materiales;
+    private String herramientasPermitidas;
+
+    /** CRONOMETRADA (con minutos) o PLAZO_ABIERTO (con días). Sin cambio inesperado. */
+    private String modalidad;
+    private Integer duracionMinutos;
+    private Integer plazoDias;
+
     @PrePersist
     void antesDeGuardar() {
         if (versionGuia == null) {

@@ -106,6 +106,9 @@ class ServicioPostulacionPortalImplTest {
     // no se le pregunta nada; es un doble para poder construirlo.
     @Mock private com.renaser.ai.ai_engine.perfil.service.CatalogosDelPerfil catalogos;
 
+    // Los intentos de la prueba, para saber si la del editor quedó sin completar (V67).
+    @Mock private com.renaser.ai.ai_engine.prueba.repository.IntentoPruebaRepository intentos;
+
     private ServicioPostulacionPortalImpl servicio;
     // El tablón, armado sobre los mismos dobles: la prueba de la suspendida vigila una
     // sola invariante —lo que el tablón esconde, postular tampoco lo acepta— y esa
@@ -121,7 +124,7 @@ class ServicioPostulacionPortalImplTest {
         servicio = new ServicioPostulacionPortalImpl(organizaciones, personas, usuarios,
                 consentimientos, vacantes, puestos, requisitos, evaluaciones, postulaciones,
                 transiciones, estados, cvs, enlaces, maquina, propuestaPerfil, lecturaCv,
-                colaIa, almacen, archivos, perfiles, correo, textoProceso, avisos);
+                colaIa, almacen, archivos, perfiles, correo, textoProceso, avisos, intentos);
         tablon = new ServicioTablonPortalImpl(vacantes, organizaciones, requisitos, textoProceso,
                 catalogos);
     }
@@ -446,6 +449,55 @@ class ServicioPostulacionPortalImplTest {
         org.assertj.core.api.Assertions.assertThat(mias).hasSize(1);
         org.assertj.core.api.Assertions.assertThat(mias.get(0).vacante()).isEqualTo("Analista");
         org.assertj.core.api.Assertions.assertThat(mias.get(0).empresa()).isEqualTo("Acme S.A.C.");
+    }
+
+    @Test
+    @DisplayName("la prueba del editor que venció con huecos viaja en su resumen, y solo se pregunta en la etapa de la prueba (V67)")
+    void laPruebaSinCompletarViajaEnElResumen() {
+        // Tres procesos: uno que venció con huecos, otro que la está rindiendo, y uno que ya
+        // pasó de etapa. El estado de los dos primeros es el mismo; solo el intento los separa.
+        java.time.Instant ahora = java.time.Instant.now();
+        java.util.function.BiFunction<Long, String, Postulacion> postulacion = (id, estado) ->
+                Postulacion.builder().id(id).uuid(java.util.UUID.randomUUID()).usuarioId(USUARIO)
+                        .organizacionId(2L).vacanteId(VACANTE).estadoCodigo(estado)
+                        .movidoEn(ahora).creadoEn(ahora).build();
+        when(postulaciones.findByUsuarioIdOrderByCreadoEnDesc(USUARIO)).thenReturn(List.of(
+                postulacion.apply(1L, "PRUEBA_TURNO_CANDIDATO"),
+                postulacion.apply(2L, "PRUEBA_TURNO_CANDIDATO"),
+                postulacion.apply(3L, "PRUEBA_CALIFICANDO")));
+        when(estados.findAllByOrderByOrden()).thenReturn(List.of());
+        when(vacantes.findAllById(List.of(VACANTE))).thenReturn(List.of(Vacante.builder()
+                .id(VACANTE).organizacionId(2L).titulo("Analista").build()));
+        when(organizaciones.findAllById(List.of(2L))).thenReturn(List.of());
+        when(intentos.findByPostulacionIdIn(List.of(1L, 2L))).thenReturn(List.of(
+                com.renaser.ai.ai_engine.prueba.entity.IntentoPrueba.builder()
+                        .postulacionId(1L).noCompletada(true).build(),
+                com.renaser.ai.ai_engine.prueba.entity.IntentoPrueba.builder()
+                        .postulacionId(2L).noCompletada(false).build()));
+
+        var mias = servicio.misPostulaciones(QUIEN);
+
+        assertThat(mias).extracting(com.renaser.ai.ai_engine.portal.dto.DtosPortal.MiPostulacion::pruebaSinCompletar)
+                .containsExactly(true, false, false);
+        // Una sola consulta, y sin el que ya pasó de etapa: ahí el estado ya dice lo que toca
+        verify(intentos).findByPostulacionIdIn(List.of(1L, 2L));
+    }
+
+    @Test
+    @DisplayName("sin nadie en la etapa de la prueba, ni se pregunta por los intentos")
+    void sinNadieEnLaPruebaNoSePreguntaPorIntentos() {
+        when(postulaciones.findByUsuarioIdOrderByCreadoEnDesc(USUARIO)).thenReturn(List.of(
+                Postulacion.builder().id(77L).uuid(java.util.UUID.randomUUID()).usuarioId(USUARIO)
+                        .organizacionId(2L).vacanteId(VACANTE).estadoCodigo("POSTULADA")
+                        .movidoEn(java.time.Instant.now()).creadoEn(java.time.Instant.now()).build()));
+        when(estados.findAllByOrderByOrden()).thenReturn(List.of());
+        when(vacantes.findAllById(List.of(VACANTE))).thenReturn(List.of(Vacante.builder()
+                .id(VACANTE).organizacionId(2L).titulo("Analista").build()));
+        when(organizaciones.findAllById(List.of(2L))).thenReturn(List.of());
+
+        assertThat(servicio.misPostulaciones(QUIEN)).singleElement()
+                .satisfies(m -> assertThat(m.pruebaSinCompletar()).isFalse());
+        verifyNoInteractions(intentos);
     }
 
     // ============ El currículum: el suyo, o el del perfil ============
