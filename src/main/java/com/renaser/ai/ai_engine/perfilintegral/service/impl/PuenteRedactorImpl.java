@@ -98,7 +98,7 @@ public class PuenteRedactorImpl implements PuenteRedactor {
 
         // Regenerar reemplaza: el borrador anterior se archiva (nada se borra) y el
         // índice parcial de V42 garantiza que nunca haya dos vivos.
-        versionesBanco.findFirstByVacanteIdAndEstado(vacanteId, "BORRADOR")
+        versionesBanco.cuestionarioTecnicoDe(vacanteId, "BORRADOR")
                 .ifPresent(anterior -> {
                     anterior.setEstado("ARCHIVADA");
                     // saveAndFlush a propósito: Hibernate ordena los INSERT antes que los
@@ -115,6 +115,7 @@ public class PuenteRedactorImpl implements PuenteRedactor {
                 .tipoBanco("VACANTE")
                 .nivelPuestoCodigo(nivel)
                 .vacanteId(vacanteId)
+                .proposito("CUESTIONARIO_TECNICO")
                 .metodoCalificacion("CRITERIOS")
                 .etiqueta("Cuestionario técnico · " + vacante.getTitulo())
                 .estado("BORRADOR")

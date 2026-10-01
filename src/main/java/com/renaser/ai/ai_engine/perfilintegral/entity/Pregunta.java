@@ -58,4 +58,18 @@ public class Pregunta {
     // La muestra de trabajo del cuestionario técnico: se guarda pero jamás se envía al
     // candidato — es del dueño, para su entrevista presencial.
     private boolean presencial;
+
+    // --- Preguntas propias de una vacante (método PUNTOS, V66) ---
+    /**
+     * Lo que vale la pregunta, entero de 0 a 100. En el método PUNTOS decide esto y no
+     * {@code esPuntuable}, que se guarda como {@code puntos > 0} solo para no dejar la
+     * columna incoherente.
+     */
+    private Integer puntos;
+
+    /** Su criterio. Obligatorio para publicar; un borrador puede tenerla sin él. */
+    private Long criterioBancoId;
+
+    /** «Qué debe tener una buena respuesta», en las abiertas. Llega a la IA. */
+    private String queDebeTener;
 }

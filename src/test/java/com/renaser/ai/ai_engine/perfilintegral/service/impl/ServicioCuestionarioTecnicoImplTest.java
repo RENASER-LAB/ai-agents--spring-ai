@@ -114,7 +114,7 @@ class ServicioCuestionarioTecnicoImplTest {
         @DisplayName("el borrador manda sobre la publicada: es la copia de trabajo")
         void elBorradorManda() {
             conVacante();
-            when(versionesBanco.findFirstByVacanteIdAndEstado(VACANTE, "BORRADOR"))
+            when(versionesBanco.cuestionarioTecnicoDe(VACANTE, "BORRADOR"))
                     .thenReturn(Optional.of(VersionBanco.builder()
                             .id(31L).estado("BORRADOR").creadoEn(Instant.now()).build()));
             when(preguntas.findByVersionBancoIdOrderByOrden(31L)).thenReturn(List.of(
@@ -137,7 +137,7 @@ class ServicioCuestionarioTecnicoImplTest {
         void laFichaNuevaDesactualiza() {
             conVacante();
             Instant generado = Instant.now().minusSeconds(3600);
-            when(versionesBanco.findFirstByVacanteIdAndEstado(VACANTE, "BORRADOR"))
+            when(versionesBanco.cuestionarioTecnicoDe(VACANTE, "BORRADOR"))
                     .thenReturn(Optional.of(VersionBanco.builder()
                             .id(31L).estado("BORRADOR").creadoEn(generado).build()));
             when(preguntas.findByVersionBancoIdOrderByOrden(31L)).thenReturn(List.of());
@@ -152,7 +152,7 @@ class ServicioCuestionarioTecnicoImplTest {
         @DisplayName("sin cuestionario ni trabajo: vacío y SIN_PEDIR, no un error")
         void sinNada() {
             conVacante();
-            when(versionesBanco.findFirstByVacanteIdAndEstado(any(), any()))
+            when(versionesBanco.cuestionarioTecnicoDe(any(), any()))
                     .thenReturn(Optional.empty());
             when(cola.comoVaElRedactor(VACANTE)).thenReturn("SIN_PEDIR");
 
@@ -167,7 +167,7 @@ class ServicioCuestionarioTecnicoImplTest {
         @DisplayName("un trabajo EN_ESPERA por tope se cuenta como EN_CURSO: va a salir")
         void enEsperaEsEnCurso() {
             conVacante();
-            when(versionesBanco.findFirstByVacanteIdAndEstado(any(), any()))
+            when(versionesBanco.cuestionarioTecnicoDe(any(), any()))
                     .thenReturn(Optional.empty());
             when(cola.comoVaElRedactor(VACANTE)).thenReturn("EN_CURSO");
 
@@ -202,7 +202,7 @@ class ServicioCuestionarioTecnicoImplTest {
         @DisplayName("una pregunta de otro banco no se toca: 404, no un cruce silencioso")
         void preguntaAjena() {
             conVacante();
-            when(versionesBanco.findFirstByVacanteIdAndEstado(VACANTE, "BORRADOR"))
+            when(versionesBanco.cuestionarioTecnicoDe(VACANTE, "BORRADOR"))
                     .thenReturn(Optional.of(VersionBanco.builder().id(31L).build()));
             when(preguntas.findById(400L)).thenReturn(Optional.of(
                     Pregunta.builder().id(400L).versionBancoId(999L).build()));
@@ -216,7 +216,7 @@ class ServicioCuestionarioTecnicoImplTest {
         @DisplayName("sin borrador no hay nada que corregir")
         void sinBorrador() {
             conVacante();
-            when(versionesBanco.findFirstByVacanteIdAndEstado(VACANTE, "BORRADOR"))
+            when(versionesBanco.cuestionarioTecnicoDe(VACANTE, "BORRADOR"))
                     .thenReturn(Optional.empty());
 
             assertThatThrownBy(() -> servicio.corregirPregunta(quien, VACANTE, 400L,
@@ -245,9 +245,9 @@ class ServicioCuestionarioTecnicoImplTest {
                     .nivelPuestoCodigo("EJECUCION").build();
             VersionBanco publicadaVieja = VersionBanco.builder()
                     .id(20L).vacanteId(VACANTE).estado("PUBLICADA").build();
-            when(versionesBanco.findFirstByVacanteIdAndEstado(VACANTE, "BORRADOR"))
+            when(versionesBanco.cuestionarioTecnicoDe(VACANTE, "BORRADOR"))
                     .thenReturn(Optional.of(borrador));
-            when(versionesBanco.findFirstByVacanteIdAndEstado(VACANTE, "PUBLICADA"))
+            when(versionesBanco.cuestionarioTecnicoDe(VACANTE, "PUBLICADA"))
                     .thenReturn(Optional.of(publicadaVieja));
             // Las 8 de EJECUCION, completas.
             when(preguntas.findByVersionBancoIdOrderByOrden(31L)).thenReturn(List.of(
@@ -265,7 +265,7 @@ class ServicioCuestionarioTecnicoImplTest {
         @DisplayName("si el dueño dejó el borrador sin guía, la aduana lo frena")
         void laAduanaFrena() {
             conVacante();
-            when(versionesBanco.findFirstByVacanteIdAndEstado(VACANTE, "BORRADOR"))
+            when(versionesBanco.cuestionarioTecnicoDe(VACANTE, "BORRADOR"))
                     .thenReturn(Optional.of(VersionBanco.builder()
                             .id(31L).vacanteId(VACANTE).estado("BORRADOR")
                             .nivelPuestoCodigo("EJECUCION").build()));

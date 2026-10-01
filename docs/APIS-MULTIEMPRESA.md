@@ -148,6 +148,11 @@ que hay que saber antes de escribir una línea:
   copiarlo. El ÚNICO punto que las interpreta es `organizacion/service/DuenoDelInstrumento`.
   **Leer resuelve, editar no**: con la bandera apagada se VE el método de la plataforma en solo
   lectura; mutar algo ajeno responde 404. Apagar archiva el banco propio, nunca lo borra (RF-138).
+  ⚠️ **Desde el 30/09/2026 (`V66`) la bandera del banco ya no se enciende: 409.** Cada empresa usa
+  solo su banco propio y escribe las preguntas en cada vacante; y «El banco de la empresa para su
+  nivel» se decide mirando solo las filas de la propia empresa, **sin pasar por
+  `DuenoDelInstrumento`**, porque el resolutor contestaría el de RENASER, que es justo el préstamo
+  que se dejó de ofrecer. Las vacantes que ya lo rendían prestado lo conservan.
 - **Dos logins separados**: el portal del candidato y el panel de empresas
   (`POST /panel/auth/login`), que solo autentica cuentas con `usuario.es_equipo`. Las cuentas
   del panel nacen SOLO por invitación (tabla `invitacion`, token de un solo uso, se guarda el

@@ -26,4 +26,11 @@ public interface EjecucionIaRepository extends JpaRepository<EjecucionIa, Long> 
             """)
     BigDecimal costoDelPeriodo(@Param("organizacionId") Long organizacionId,
                                @Param("desde") Instant desde, @Param("hasta") Instant hasta);
+
+    /**
+     * El último intento fallido de un trabajo: su {@code error} es el porqué que se le enseña
+     * a quien espera una recalificación (el mismo texto que el backend ya da cuando el
+     * proveedor contesta 402 o se agota el tiempo).
+     */
+    java.util.Optional<EjecucionIa> findFirstByTrabajoIaIdAndEsExitosaFalseOrderByIdDesc(Long trabajoIaId);
 }

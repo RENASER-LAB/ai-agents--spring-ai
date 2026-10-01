@@ -183,6 +183,10 @@ public class FlujoHito1IT {
                  "titulo": "Desarrollador web", "descripcion": "Portal de talento",
                  "tipoCierre": "PERMANENTE", "responsableUsuarioId": 1}""".formatted(solicitudId))
                 .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString(), "id"));
+        // Rinde el banco del nivel: desde el 30/09/2026 toda vacante nueva nace con sus
+        // preguntas propias, y el banco se elige a mano.
+        conToken(post("/api/v1/panel/vacantes/" + vacanteId + "/origen-preguntas"), tokenEquipo,
+                "{\"origen\":\"NIVEL\"}").andExpect(status().isOk());
 
         requisitoId = Long.parseLong(leer(conToken(
                 post("/api/v1/panel/vacantes/" + vacanteId + "/requisitos"), tokenEquipo,

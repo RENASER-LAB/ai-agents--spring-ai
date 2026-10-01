@@ -1,6 +1,12 @@
 package com.renaser.ai.ai_engine.perfilintegral.service.impl;
 
+import com.renaser.ai.ai_engine.ai.service.ColaCalificacionIa;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.AlineacionVista;
+import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.CriterioDelDesglose;
+import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.DesglosePorPuntos;
+import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.PreguntaDelDesglose;
+import com.renaser.ai.ai_engine.perfilintegral.service.CalificacionPorPuntos;
+import com.renaser.ai.ai_engine.usuario.service.NombresDeUsuarios;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.DesgloseEvaluacion;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.RespuestaAbiertaVista;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.ResumenCerradas;
@@ -52,6 +58,12 @@ public class ServicioDesgloseEvaluacionImpl implements ServicioDesgloseEvaluacio
     private final ServicioCalificacion calificacion;
     private final CalificacionCriterios calificacionCriterios;
     private final com.renaser.ai.ai_engine.perfilintegral.repository.NotaEtapaRepository notasEtapa;
+    // Las preguntas propias de la vacante (V66): su cuenta, cómo va su recalificación, si quien
+    // mira puede ajustar y quién ajustó.
+    private final CalificacionPorPuntos porPuntos;
+    private final ColaCalificacionIa cola;
+    private final Permisos permisos;
+    private final NombresDeUsuarios nombres;
 
     @Override
     @Transactional(readOnly = true)
@@ -62,10 +74,24 @@ public class ServicioDesgloseEvaluacionImpl implements ServicioDesgloseEvaluacio
         // pudo publicarse con la evaluación del banco apagada.
         if (postulacion.getEvaluacionId() == null) {
             return new DesgloseEvaluacion(postulacionId, null, null, null,
-                    new ResumenCerradas(BigDecimal.ZERO, 0), List.of(), List.of(), List.of());
+                    new ResumenCerradas(BigDecimal.ZERO, 0), List.of(), List.of(), List.of(), null);
         }
 
         Evaluacion evaluacion = evaluaciones.findById(postulacion.getEvaluacionId()).orElse(null);
+
+        // Las preguntas propias se enseñan por criterios, con su propia cuenta: la nota del
+        // banco es la suma de los criterios, no la mezcla por cantidad de notaCombinada.
+        if (evaluacion != null && CalificacionPorPuntos.METODO.equals(
+                calificacionCriterios.metodoDe(postulacion))) {
+            CalificacionPorPuntos.Resultado cuenta = porPuntos.calcular(
+                    evaluacion.getVersionBancoNivelId(), evaluacion.getId());
+            ResumenCerrado cerradoPorPuntos = calificacion.resumenDeLoCerrado(postulacionId);
+            return new DesgloseEvaluacion(postulacionId, evaluacion.getEstado(),
+                    evaluacion.getTerminadaEn(), cuenta.nota(),
+                    new ResumenCerradas(cerradoPorPuntos.nota(), cerradoPorPuntos.preguntas()),
+                    List.of(), List.of(), List.of(),
+                    porPuntos(quien, postulacion, cuenta));
+        }
         List<RespuestaAbiertaVista> abiertas = abiertasDe(postulacion.getEvaluacionId());
         ResumenCerrado cerrado = calificacion.resumenDeLoCerrado(postulacionId);
 
@@ -80,7 +106,79 @@ public class ServicioDesgloseEvaluacionImpl implements ServicioDesgloseEvaluacio
                         .map(a -> new AlineacionVista(a.getBloque(), a.getSemaforo(),
                                 a.getExplicacion()))
                         .toList(),
-                patronesDe(abiertas));
+                patronesDe(abiertas), null);
+    }
+
+    /**
+     * El desglose por criterios: cada uno con su nota y de dónde sale, y dentro sus preguntas
+     * con lo que respondió, lo que sacó y lo que dijo la IA. Un criterio con abiertas sin
+     * calificar se ve pendiente, no con una nota parcial.
+     */
+    private DesglosePorPuntos porPuntos(ContextoUsuario quien, Postulacion postulacion,
+                                        CalificacionPorPuntos.Resultado cuenta) {
+        Map<Long, String> quienAjusto = nombres.porUsuario(cuenta.todas().stream()
+                .map(CalificacionPorPuntos.PreguntaCalculada::nota)
+                .filter(java.util.Objects::nonNull)
+                .map(NotaRespuesta::getAjustadaPorUsuarioId)
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toSet()));
+        List<CriterioDelDesglose> criterios = cuenta.criterios().stream()
+                .map(c -> new CriterioDelDesglose(c.criterio().getId(), c.criterio().getNombre(),
+                        c.criterio().getQueEvalua(), c.maximo(), c.nota(), c.sistema(),
+                        c.sistemaMaximo(), c.ia(), c.iaMaximo(), c.pendiente(),
+                        c.preguntas().stream().map(p -> comoPregunta(p, quienAjusto)).toList()))
+                .toList();
+
+        // Cómo va su recalificación: con una recalificación viva, «Recalificando»; con notas
+        // de una guía anterior y nada vivo, «Pendiente de recalificar» con el porqué.
+        int vigente = cuenta.version().getVersionGuia() == null ? 1 : cuenta.version().getVersionGuia();
+        boolean conGuiaVieja = cuenta.todas().stream()
+                .map(CalificacionPorPuntos.PreguntaCalculada::nota)
+                .filter(n -> n != null && n.getVersionGuia() != null && n.getAjustadaPorUsuarioId() == null)
+                .anyMatch(n -> n.getVersionGuia() != vigente);
+        ColaCalificacionIa.Seguimiento seguimiento = cola.recalificacionDe(List.of(postulacion.getId()))
+                .get(postulacion.getId());
+        String recalificacion = null;
+        String motivo = null;
+        if (seguimiento != null && "EN_CURSO".equals(seguimiento.estado())) {
+            recalificacion = "EN_CURSO";
+        } else if (conGuiaVieja) {
+            recalificacion = "PENDIENTE";
+            motivo = seguimiento == null ? null : seguimiento.motivo();
+        }
+
+        boolean puedeAjustar = quien.tiene("ajustar_nota")
+                && alcance.alcanzaA(quien, permisos.alcanceDe("ajustar_nota"), postulacion);
+        return new DesglosePorPuntos(cuenta.total(), cuenta.completo(), puedeAjustar,
+                recalificacion, motivo, criterios,
+                cuenta.sinCriterio().stream().map(p -> comoPregunta(p, quienAjusto)).toList());
+    }
+
+    private static PreguntaDelDesglose comoPregunta(CalificacionPorPuntos.PreguntaCalculada p,
+                                                    Map<Long, String> quienAjusto) {
+        NotaRespuesta nota = p.nota();
+        Respuesta r = p.respuesta();
+        List<String> elegidas = List.of();
+        if (r != null && !p.esAbierta()) {
+            java.util.Set<Long> marcadas = new java.util.HashSet<>(CalificacionPorPuntos.marcadasDe(r));
+            if (r.getOpcionId() != null) {
+                marcadas.add(r.getOpcionId());
+            }
+            elegidas = p.opciones().stream().filter(o -> marcadas.contains(o.getId()))
+                    .map(o -> o.getTexto()).toList();
+        }
+        boolean ajustada = nota != null && nota.getAjustadaPorUsuarioId() != null;
+        return new PreguntaDelDesglose(p.pregunta().getId(), r == null ? null : r.getId(),
+                p.pregunta().getTipo(), p.pregunta().getEnunciado(), p.maximo(), p.obtenido(),
+                p.pendiente(), r == null ? null : r.getTexto(), elegidas,
+                nota == null ? null : nota.getExplicacion(),
+                nota == null ? null : nota.getEvidenciaCitada(),
+                nota == null ? null : nota.getPuntajeIa(),
+                ajustada,
+                ajustada ? quienAjusto.get(nota.getAjustadaPorUsuarioId()) : null,
+                ajustada ? nota.getAjustadaEn() : null,
+                ajustada ? nota.getMotivoAjuste() : null,
+                p.maximo() == 0);
     }
 
     /**

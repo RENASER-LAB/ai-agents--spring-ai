@@ -324,6 +324,9 @@ def montar_convocatoria(api, yo, c):
     cuerpo.update({"solicitudTalentoId": solicitud["id"], "puestoId": puesto_id,
                    "responsableUsuarioId": yo})
     vacante = api.post("/panel/vacantes", cuerpo)
+    # Desde el 30/09/2026 toda vacante nueva nace con sus preguntas propias: esta rinde el
+    # banco del nivel, así que se elige a mano antes de publicar.
+    api.post(f"/panel/vacantes/{vacante['id']}/origen-preguntas", {"origen": "NIVEL"})
     api.post(f"/panel/vacantes/{vacante['id']}/plantilla-evaluacion",
              {"plantillaEvaluacionId": plantillas_eval[nivel]})
     api.post(f"/panel/vacantes/{vacante['id']}/plantilla-prueba",

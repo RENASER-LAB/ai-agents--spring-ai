@@ -149,6 +149,15 @@ public class VacantesPanelController {
         servicio.definirAplicacionEvaluacion(permisos.actual(), id, datos.aplica());
     }
 
+    @PostMapping("/vacantes/{id}/origen-preguntas")
+    @PreAuthorize("@permisos.tiene('elegir_plantilla_evaluacion')")
+    @Operation(summary = "Qué responderá quien postule: SIN_EVALUACION, NIVEL (el banco PROPIO "
+            + "de la empresa para su nivel) o VACANTE (sus preguntas propias). Con postulantes, 409")
+    public void elegirOrigenDePreguntas(@PathVariable Long id,
+                                        @Valid @RequestBody ElegirOrigenPreguntas datos) {
+        servicio.elegirOrigenDePreguntas(permisos.actual(), id, datos.origen());
+    }
+
     @PostMapping("/vacantes/{id}/calificacion-automatica")
     @PreAuthorize("@permisos.tiene('elegir_plantilla_evaluacion')")
     @Operation(summary = "Encender o apagar el recorrido automático. Encendido, la "

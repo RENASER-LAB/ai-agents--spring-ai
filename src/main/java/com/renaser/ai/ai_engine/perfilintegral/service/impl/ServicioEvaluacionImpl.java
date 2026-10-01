@@ -19,6 +19,9 @@ import com.renaser.ai.ai_engine.perfilintegral.entity.Pregunta;
 import com.renaser.ai.ai_engine.perfilintegral.entity.Respuesta;
 import com.renaser.ai.ai_engine.perfilintegral.entity.VersionBanco;
 import com.renaser.ai.ai_engine.perfilintegral.repository.CampoCasoRepository;
+import com.renaser.ai.ai_engine.perfilintegral.repository.CriterioBancoRepository;
+import com.renaser.ai.ai_engine.perfilintegral.service.CalificacionPorPuntos;
+import com.renaser.ai.ai_engine.perfilintegral.service.ReglasDePuntos;
 import com.renaser.ai.ai_engine.perfilintegral.repository.EvaluacionRepository;
 import com.renaser.ai.ai_engine.perfilintegral.repository.OpcionRepository;
 import com.renaser.ai.ai_engine.perfilintegral.repository.OrdenPreguntaRepository;
@@ -114,6 +117,8 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
     private final ColaCalificacionIa colaIa;
     private final ServicioParametros parametros;
     private final DuenoDelInstrumento dueno;
+    // El orden de los criterios de las preguntas propias, para armar su examen (V66).
+    private final CriterioBancoRepository criteriosBanco;
 
     private final SecureRandom azar = new SecureRandom();
 
@@ -165,6 +170,37 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
     }
 
     /**
+     * La evaluación de las preguntas propias de la vacante (V66).
+     *
+     * <p>Se fija AHORA la versión publicada de la vacante, igual que el banco del nivel: si
+     * mañana se publicara otra, este candidato seguiría atado a la suya (RF-138). Desde la
+     * primera postulación, además, no se publica otra.
+     *
+     * <p><b>Sin plantilla y sin vigencia.</b> La V43 exigía plantilla a toda evaluación del
+     * Perfil Integral; la V66 retiró esa exigencia de la base porque solo el código sabe de
+     * dónde sale cada una, y aquí es donde se decide que esta no la necesita: su tiempo lo
+     * dice la versión y no se reutiliza en otra vacante.
+     */
+    @Override
+    @Transactional
+    public Long crearDePreguntasPropias(Long organizacionId, Long usuarioId, Long vacanteId) {
+        VersionBanco propias = versionesBanco.preguntasPropiasDe(vacanteId, "PUBLICADA")
+                .orElseThrow(() -> new IllegalStateException(
+                        "Esta vacante tiene preguntas propias y ninguna versión publicada: no "
+                                + "hay con qué armar la evaluación"));
+        Evaluacion evaluacion = evaluaciones.save(Evaluacion.builder()
+                .organizacionId(organizacionId)
+                .usuarioId(usuarioId)
+                .versionBancoNivelId(propias.getId())
+                .proposito(PERFIL_INTEGRAL)
+                .estado("PENDIENTE")
+                .venceEn(Instant.now().plus(diasDePlazo(organizacionId), ChronoUnit.DAYS))
+                .creadoEn(Instant.now())
+                .build());
+        return evaluacion.getId();
+    }
+
+    /**
      * El examen de la etapa técnica, cuando la vacante rinde el cuestionario CAZATALENTOS.
      *
      * <p>Hermano de {@link #crearAlPostular}, y las diferencias son las que separan a los dos
@@ -201,7 +237,7 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
     @Transactional
     public Long crearTecnicaAlEntrar(Long organizacionId, Long usuarioId, Long vacanteId) {
         VersionBanco cuestionario = versionesBanco
-                .findFirstByVacanteIdAndEstado(vacanteId, "PUBLICADA")
+                .cuestionarioTecnicoDe(vacanteId, "PUBLICADA")
                 .orElseThrow(() -> new IllegalStateException(
                         "Esta vacante rinde el cuestionario técnico y no tiene ninguno "
                                 + "publicado: no hay con qué armar el examen"));
@@ -438,6 +474,27 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
         if ("ABIERTA".equals(pregunta.getTipo()) && datos.opcionId() != null) {
             throw new IllegalArgumentException(
                     "Esta pregunta es de respuesta abierta: no lleva opciones");
+        }
+
+        // La opción única y la escala de las preguntas propias (V66) se responden eligiendo
+        // UNA opción suya. Con una opción ajena el sistema puntuaría con la clave de otra
+        // pregunta; con texto, quedaría respondida sin nada que puntuar.
+        boolean deUnaOpcion = ReglasDePuntos.OPCION_UNICA.equals(pregunta.getTipo())
+                || ReglasDePuntos.ESCALA.equals(pregunta.getTipo());
+        if (deUnaOpcion && datos.opcionId() != null) {
+            if (datos.texto() != null && !datos.texto().isBlank()) {
+                throw new IllegalArgumentException(
+                        "Esta pregunta se responde eligiendo una opción, no escribiendo");
+            }
+            boolean esSuya = opciones.findByPreguntaIdOrderByLetra(preguntaId).stream()
+                    .anyMatch(o -> o.getId().equals(datos.opcionId()));
+            if (!esSuya) {
+                throw new IllegalArgumentException("La opción " + datos.opcionId()
+                        + " no es de esta pregunta");
+            }
+        } else if (deUnaOpcion && datos.texto() != null && !datos.texto().isBlank()) {
+            throw new IllegalArgumentException(
+                    "Esta pregunta se responde eligiendo una opción, no escribiendo");
         }
 
         // Sin opción y sin texto: el candidato borró lo que tenía puesto.
@@ -707,10 +764,16 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
         // diagnóstico del negocio a todo el que postule. Hoy ningún examen apunta a un
         // banco de vacante, pero este es el único sitio que arma exámenes y el filtro
         // vive aquí para que reutilizar el portal (ciclo 2) no la sirva por accidente.
+        boolean porPuntos = versionesBanco.findById(evaluacion.getVersionBancoNivelId())
+                .map(v -> CalificacionPorPuntos.METODO.equals(v.getMetodoCalificacion()))
+                .orElse(false);
         List<Pregunta> finales = preguntas.findByVersionBancoIdOrderByOrden(
                         evaluacion.getVersionBancoNivelId()).stream()
                 .filter(p -> !p.isPresencial())
                 .toList();
+        if (porPuntos) {
+            finales = enElOrdenDeSusCriterios(evaluacion.getVersionBancoNivelId(), finales);
+        }
         if (finales.isEmpty()) {
             throw new IllegalStateException(
                     "El banco de preguntas de este nivel no tiene ninguna pregunta: "
@@ -725,7 +788,15 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
         for (int i = 0; i < finales.size(); i++) {
             Pregunta p = finales.get(i);
             List<Opcion> suyas = new ArrayList<>(porPregunta.getOrDefault(p.getId(), List.of()));
-            barajar(suyas);
+            if (porPuntos) {
+                // Las preguntas propias no se barajan (queda fuera de la spec) y se leen por
+                // su orden explícito: por la letra como texto, diez niveles de una escala
+                // saldrían 1, 10, 2…
+                suyas.sort(Comparator.comparing(
+                        (Opcion o) -> o.getOrden() == null ? Integer.MAX_VALUE : o.getOrden()));
+            } else {
+                barajar(suyas);
+            }
             filas.add(OrdenPregunta.builder()
                     .evaluacionId(evaluacion.getId())
                     .preguntaId(p.getId())
@@ -736,6 +807,24 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
                     .build());
         }
         ordenes.saveAll(filas);
+    }
+
+    /**
+     * Las preguntas propias en el orden del editor: primero el de sus criterios, y dentro
+     * de cada uno el de sus preguntas. {@code pregunta.orden} es la posición DENTRO de su
+     * criterio, así que mover un criterio arriba mueve también sus preguntas en el examen.
+     */
+    private List<Pregunta> enElOrdenDeSusCriterios(Long versionBancoId, List<Pregunta> suyas) {
+        Map<Long, Integer> ordenDelCriterio = new java.util.HashMap<>();
+        criteriosBanco.findByVersionBancoIdOrderByOrdenAscIdAsc(versionBancoId)
+                .forEach(c -> ordenDelCriterio.put(c.getId(), c.getOrden()));
+        return suyas.stream()
+                .sorted(Comparator
+                        .comparing((Pregunta p) -> ordenDelCriterio.getOrDefault(
+                                p.getCriterioBancoId(), Integer.MAX_VALUE))
+                        .thenComparing(p -> p.getOrden() == null ? Integer.MAX_VALUE : p.getOrden())
+                        .thenComparing(Pregunta::getId))
+                .toList();
     }
 
     // ============ Pintar ============

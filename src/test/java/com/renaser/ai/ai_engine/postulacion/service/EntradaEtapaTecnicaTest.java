@@ -84,7 +84,7 @@ class EntradaEtapaTecnicaTest {
           dentro, y «falta publicar el cuestionario» quedaba enterrado bajo un montón de
           excepciones que parecen una avería.
         */
-        when(versionesBanco.findFirstByVacanteIdAndEstado(VACANTE, "PUBLICADA"))
+        when(versionesBanco.cuestionarioTecnicoDe(VACANTE, "PUBLICADA"))
                 .thenReturn(Optional.empty());
 
         assertThat(entrada.hayInstrumento(conCuestionario())).isFalse();
@@ -93,7 +93,7 @@ class EntradaEtapaTecnicaTest {
     @Test
     @DisplayName("con el cuestionario publicado sí cuenta")
     void elCuestionarioPublicadoCuenta() {
-        when(versionesBanco.findFirstByVacanteIdAndEstado(VACANTE, "PUBLICADA"))
+        when(versionesBanco.cuestionarioTecnicoDe(VACANTE, "PUBLICADA"))
                 .thenReturn(Optional.of(VersionBanco.builder().id(8L).build()));
 
         assertThat(entrada.hayInstrumento(conCuestionario())).isTrue();

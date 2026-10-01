@@ -43,6 +43,15 @@ class MigracionesSinChoqueTest {
     /** {@code V37__la_plataforma_y_sus_empresas.sql} → versión 37, y el resto es el nombre. */
     private static final Pattern NOMBRE = Pattern.compile("^V(\\d+)__(.+)\\.sql$");
 
+    /**
+     * Los huecos que se dejaron a propósito, cada uno con su porqué.
+     *
+     * <p>V64 y V65 las reclama otro trabajo que va en paralelo (30/09/2026): las preguntas
+     * propias de la vacante se numeraron desde la V66 para no chocar con él. En cuanto las
+     * dos ramas estén en {@code main} el hueco se cierra solo y esta línea sobra: se borra.
+     */
+    private static final List<String> HUECOS_DELIBERADOS = List.of("entre V63 y V66");
+
     @Test
     @DisplayName("Ningún número de versión se repite: git no ve ese conflicto, Flyway sí")
     void ningunNumeroSeRepite() throws IOException {
@@ -87,8 +96,9 @@ class MigracionesSinChoqueTest {
         for (int i = 1; i < versiones.size(); i++) {
             int anterior = versiones.get(i - 1);
             int actual = versiones.get(i);
-            if (actual != anterior + 1) {
-                huecos.add("entre V" + anterior + " y V" + actual);
+            String hueco = "entre V" + anterior + " y V" + actual;
+            if (actual != anterior + 1 && !HUECOS_DELIBERADOS.contains(hueco)) {
+                huecos.add(hueco);
             }
         }
         // Flyway aplica igual con huecos, así que esto no es una regla suya sino nuestra: un

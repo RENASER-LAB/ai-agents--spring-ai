@@ -250,4 +250,55 @@ public interface ColaCalificacionIa {
      */
     record Estado(String comoVa, String pasada) {
     }
+
+    // ==================== Las preguntas propias de la vacante (V66) ====================
+
+    /**
+     * Por qué no se puede gastar IA ahora mismo en esta organización, o nulo si se puede.
+     *
+     * <p>Lo pregunta quien va a cambiar la guía de calificación ANTES de guardar: con la IA
+     * apagada, la empresa suspendida o su tope del mes agotado no se guarda nada, porque
+     * guardarlo sin recalificar dejaría candidatos medidos con dos guías. También quien
+     * reintenta una recalificación o pide recomendaciones: el texto no nombra la tarea, así
+     * que sirve para las tres y quien llama añade lo que no se hizo.
+     */
+    String porQueNoSePuedeUsarLaIa(Long organizacionId);
+
+    /**
+     * Vuelve a calificar SOLO las abiertas de una postulación, con la guía nueva.
+     *
+     * <p>Va por su propio carril (modo {@code RECALIFICA}): no arma el retrato al terminar,
+     * no mueve a nadie de etapa y no cuenta para {@link #comoVa}. Lo terminado no exime; uno
+     * vivo sí frena al siguiente.
+     *
+     * @return true si quedó en la cola (o en espera por el tope)
+     */
+    boolean recalificar(Long postulacionId);
+
+    /**
+     * Cómo va la última recalificación de cada postulación. Falta la entrada de quien no
+     * tiene ninguna.
+     */
+    java.util.Map<Long, Seguimiento> recalificacionDe(java.util.List<Long> postulacionIds);
+
+    /**
+     * Encola al RECOMENDADOR: proponer criterios y preguntas para una vacante. Como el
+     * REDACTOR, cuelga de la vacante y uno vivo frena al siguiente.
+     *
+     * @return true si quedó en la cola (o en espera por el tope)
+     */
+    boolean encolarRecomendador(Long organizacionId, Long vacanteId);
+
+    /** Cómo va la última recomendación pedida para una vacante. */
+    Seguimiento comoVaElRecomendador(Long vacanteId);
+
+    /**
+     * El estado de un trabajo contado para el panel.
+     *
+     * @param estado SIN_PEDIR · EN_CURSO · DETENIDA (en espera por el tope o fallida: no
+     *               avanza sola) · TERMINADA
+     * @param motivo por qué se detuvo, con el texto que ya da el backend; nulo si no aplica
+     */
+    record Seguimiento(String estado, String motivo) {
+    }
 }

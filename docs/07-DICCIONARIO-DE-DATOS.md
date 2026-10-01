@@ -1,7 +1,7 @@
 # Diccionario de datos
 
 Sistema de selección de personal — Renaser Consulting
-Versión 3.3 · 2026-09-29 · Puesto al día con las migraciones hasta la `V65` (la V64 trae la gestión de personas —`sede`, `colaborador`, `periodo_laboral`, `situacion_laboral`, `cese_anulado` y `contratado_sin_alta`— y sus cuatro permisos; la V65 añade las columnas `antes_*` de `situacion_laboral`; la V49 y la V50 solo siembran pesos; la V51 trae la tabla `lectura_cv_perfil` y los archivos del perfil; la V52 y la V53 no crean tablas; la V55 pone el sueldo en la vacante y la pretensión en la postulación; la V56 trae la tabla `aviso_portal`; la V57 no crea tablas, solo siembra los precios de los dos modelos de DeepSeek; la V58 no crea tablas: suma el aviso `VACANTE_ACTUALIZADA` y apaga el correo `REMUNERACION_ACTUALIZADA`; la V59 añade `vacante.archivada_en`; la V60 añade `vacante.eliminada_en` —el borrado lógico—, el motivo de cierre y el tipo de aviso `VACANTE_ELIMINADA`, y el permiso `eliminar_vacante`; la V61 trae la tabla `recuperacion_clave`, tres parámetros y los dos correos de «¿Olvidaste tu contraseña?»; la V62 añade `vacante.ciudad_ubigeo`; la V63 trae las tablas `resena`, `respuesta_resena` y `reporte_resena`, los tres permisos de las reseñas de empresas y cuatro tipos de aviso)
+Versión 3.4 · 2026-09-30 · Puesto al día con las migraciones hasta la `V66` (la V66 trae las preguntas propias de cada vacante —las tablas `criterio_banco` y `propuesta_preguntas`, `vacante.origen_preguntas`, el propósito, el método `PUNTOS` y la guía en `version_banco`, los tres tipos nuevos con sus puntos en `pregunta`, el orden en `opcion`, la nota hasta 100 y la de la IA aparte en `nota_respuesta`, el modo `RECALIFICA` y el agente `RECOMENDADOR`—; la V64 trae la gestión de personas —`sede`, `colaborador`, `periodo_laboral`, `situacion_laboral`, `cese_anulado` y `contratado_sin_alta`— y sus cuatro permisos; la V65 añade las columnas `antes_*` de `situacion_laboral`; la V49 y la V50 solo siembran pesos; la V51 trae la tabla `lectura_cv_perfil` y los archivos del perfil; la V52 y la V53 no crean tablas; la V55 pone el sueldo en la vacante y la pretensión en la postulación; la V56 trae la tabla `aviso_portal`; la V57 no crea tablas, solo siembra los precios de los dos modelos de DeepSeek; la V58 no crea tablas: suma el aviso `VACANTE_ACTUALIZADA` y apaga el correo `REMUNERACION_ACTUALIZADA`; la V59 añade `vacante.archivada_en`; la V60 añade `vacante.eliminada_en` —el borrado lógico—, el motivo de cierre y el tipo de aviso `VACANTE_ELIMINADA`, y el permiso `eliminar_vacante`; la V61 trae la tabla `recuperacion_clave`, tres parámetros y los dos correos de «¿Olvidaste tu contraseña?»; la V62 añade `vacante.ciudad_ubigeo`; la V63 trae las tablas `resena`, `respuesta_resena` y `reporte_resena`, los tres permisos de las reseñas de empresas y cuatro tipos de aviso)
 
 Cada tabla con todas sus columnas, tipos y claves. **Este documento se consulta**, no se lee de
 corrido: es la base para escribir las migraciones de Flyway.
@@ -11,8 +11,8 @@ Lo que llegó después de la versión 2.0 va marcado con su migración entre par
 ⚠️ **Tres tablas de la base no tienen ficha aquí.** `agent_run` es del motor de agentes y no de
 selección, así que no la tendrá nunca. `invitacion` (`V37`) y `tarifa_modelo` (`V38`) sí
 deberían tenerla: llegaron con el multiempresa y su ficha está pendiente. Hasta que se
-escriban, para esas dos manda la migración. De las **113 tablas de selección y de gestión de
-personas** que existen hoy, aquí hay ficha de 111, más otras diez que están solo diseñadas y
+escriban, para esas dos manda la migración. De las **115 tablas de selección y de gestión de
+personas** que existen hoy, aquí hay ficha de 113, más otras diez que están solo diseñadas y
 todavía no existen.
 
 Para entender *por qué* el modelo es así, está el [Modelo de datos](05-MODELO-DE-DATOS.md).
@@ -694,7 +694,8 @@ Una convocatoria concreta.
 | `version_pesos_id` | bigint | sí | Qué versión de pesos rige |
 | `version_plantilla_prueba_id` | bigint | no | |
 | `plantilla_evaluacion_id` | bigint | no | |
-| `aplica_evaluacion` | boolean | sí | Apagado, quien postula no recibe la evaluación del banco: va directo a la bandeja del equipo y su única evaluación es la prueba del puesto. Por defecto encendido |
+| `aplica_evaluacion` | boolean | sí | Apagado, quien postula no recibe la evaluación del banco: va directo a la bandeja del equipo y su única evaluación es la prueba del puesto. Por defecto encendido. En el panel es «Sin evaluación» |
+| `origen_preguntas` | text | sí | (`V66`) De dónde salen sus preguntas cuando `aplica_evaluacion` está encendido: `NIVEL` (el banco de la empresa para el nivel del puesto) o `VACANTE` (sus preguntas propias, en un `version_banco` con propósito `PERFIL_INTEGRAL`). Por defecto `NIVEL`, que es lo que quedó en todas las anteriores a la `V66`; **las nuevas nacen con `VACANTE`**, también en RENASER. `NIVEL` solo se elige si la empresa tiene un banco **propio** publicado para ese nivel, y desde la primera postulación no cambia: las dos reglas viven en `ServicioVacantesPanelImpl` |
 | `calificacion_automatica` | boolean | sí | Encendido, la postulación se califica y avanza sola hasta que termina la prueba del puesto, y solo entonces espera a una persona. Por defecto **apagado**: en automático cada postulante cuesta una llamada al modelo desde el momento en que postula |
 | `prueba_cierra_en` | timestamptz | no | Cuándo cierra la prueba de esta vacante, para todos. Vacío: se cuentan los días de la versión de la plantilla desde que cada uno empieza. **También se puede fijar sobre una versión `CRONOMETRADA`** (22/09/2026): al empezar rige el plazo que caiga antes entre el reloj y esta fecha, así que no anula el cronómetro — lo que hace es impedir empezar la prueba después de esta fecha |
 | `responsable_usuario_id` | bigint | sí | Quién se hace cargo de contratar |
@@ -1221,16 +1222,26 @@ Una versión del banco, en borrador o publicada.
 |---|---|---|---|
 | `id` | bigint | sí | Clave |
 | `organizacion_id` | bigint | no | **Vacío en la biblioteca global de Renaser** |
-| `tipo_banco` | text | sí | `NIVEL`, `ALINEACION` o `VACANTE` (`V42`: el cuestionario técnico de una vacante) |
+| `tipo_banco` | text | sí | `NIVEL`, `ALINEACION` o `VACANTE` (`V42`: un banco de una vacante; desde la `V66`, su cuestionario técnico o sus preguntas propias, según `proposito`) |
 | `nivel_puesto_codigo` | text | no | Solo si `tipo_banco` es `NIVEL` |
 | `etiqueta` | text | sí | |
 | `estado` | text | sí | `BORRADOR`, `PUBLICADA` o `ARCHIVADA` |
 | `publicada_por_usuario_id` | bigint | no | |
 | `publicada_en` | timestamptz | no | |
-| `vacante_id` | bigint | no | `V42`. Vacío = banco por nivel, como siempre. Con valor = cuestionario técnico de ESA vacante (método CAZATALENTOS etapa 2). Índices parciales: a lo sumo un `BORRADOR` y una `PUBLICADA` por vacante |
-| `metodo_calificacion` | text | no | `V41`. Vacío = motor de claves versionadas (v0.1 y v3) · `CRITERIOS` = conteo C1..C4 del banco CAZATALENTOS. Es lo que decide qué motor califica |
+| `vacante_id` | bigint | no | `V42`. Vacío = banco por nivel, como siempre. Con valor = un banco de ESA vacante: su cuestionario técnico (método CAZATALENTOS etapa 2) o, desde la `V66`, sus preguntas propias; lo dice `proposito`. Índices parciales: a lo sumo un `BORRADOR` y una `PUBLICADA` por vacante **y propósito** (`V66`) |
+| `proposito` | text | no | (`V66`) Solo en los bancos de una vacante: `PERFIL_INTEGRAL` (sus preguntas propias) o `CUESTIONARIO_TECNICO` (su etapa técnica). Vacío en los bancos por nivel. Los de vacante que ya existían pasaron a `CUESTIONARIO_TECNICO` |
+| `metodo_calificacion` | text | no | `V41`. Vacío = motor de claves versionadas (v0.1 y v3) · `CRITERIOS` = conteo C1..C4 del banco CAZATALENTOS · `PUNTOS` (`V66`) = preguntas propias de una vacante: cada pregunta vale sus puntos y suman 100. Es lo que decide qué motor califica |
+| `guia_calificacion` | text | no | (`V66`) La guía que la empresa escribe para que la IA califique las abiertas de sus preguntas propias. Hasta 2000 caracteres, como la de la prueba del puesto (`V46`), y con la misma envoltura al mandarla |
+| `version_guia` | integer | sí | (`V66`) Por defecto 1. Sube cada vez que se corrigen las instrucciones de la IA de una versión publicada —la guía, el «qué evalúa» o el «qué debe tener»—. Cada nota de una abierta guarda con cuál se calculó (`nota_respuesta.version_guia`), y un resultado que llega calculado con una anterior se descarta |
 
 **Clave primaria:** `id`
+
+**Restricciones (`V66`).** `version_banco_proposito_amarrado_check`: hay propósito si y solo si
+hay vacante. `version_banco_propias_por_puntos_check`: el propósito `PERFIL_INTEGRAL` siempre va
+con el método `PUNTOS`. **Un trigger, `version_banco_proposito_por_omision`**, pone
+`CUESTIONARIO_TECNICO` a un banco de vacante que llegue sin propósito: quien lo crea como antes —el
+REDACTOR, un guion, una prueba— no deja una fila a medias, y eso es lo que eran todos hasta la
+`V66`.
 
 `organizacion_id` **vacío** significa biblioteca global de Renaser. Una organización que quiera su
 propio banco crea una versión con su identificador puesto, sin tocar el original.
@@ -1251,7 +1262,7 @@ Una pregunta dentro de una versión.
 | `version_banco_id` | bigint | sí | |
 | `codigo` | text | sí | `D01`, `S14`, `O33`, `C07` |
 | `bloque` | text | no | Para las de alineación personal |
-| `tipo` | text | sí | Los 6 del v0.1 (`ESTILO`…`CONSISTENCIA`), los 8 del v3 (`EF-4`, `SJT-R`, `SEC`, `INV`, `DE`, `CD`, `V`, `PC`) y `ABIERTA` (banco CAZATALENTOS, `V41`) |
+| `tipo` | text | sí | Los 6 del v0.1 (`ESTILO`…`CONSISTENCIA`), los 8 del v3 (`EF-4`, `SJT-R`, `SEC`, `INV`, `DE`, `CD`, `V`, `PC`), `ABIERTA` (banco CAZATALENTOS, `V41`, y preguntas propias) y, desde la `V66`, `OPCION_UNICA`, `OPCION_MULTIPLE` y `ESCALA`, los de las preguntas propias de una vacante |
 | `enunciado` | text | sí | |
 | `situacion` | text | no | El contexto, cuando lo hay |
 | `logica_interna` | text | no | Qué se espera. **Nunca llega al portal** |
@@ -1267,8 +1278,12 @@ Una pregunta dentro de una versión.
 | `c4_esperado` | text | no | Solo `ABIERTA`: qué cuenta como la parte incómoda |
 | `senal_de_cero` | text | no | Solo `ABIERTA`: si la respuesta la cumple, el puntaje es 0 y se acaba el cálculo. En la eliminatoria, cumplirla es además descarte |
 | `presencial` | boolean | sí | `V42`. La muestra de trabajo del cuestionario técnico: se guarda pero **jamás se envía al candidato** — regala el diagnóstico del negocio. Es del dueño, para su entrevista |
+| `puntos` | integer | no | (`V66`) Lo que vale una pregunta propia, entero de 0 a 100. **No es `peso`**, que sigue siendo el multiplicador 0–2 del v3. En el método `PUNTOS` decide esta columna: `es_puntuable` se guarda como `puntos > 0` y nada del método lo lee. Una de 0 puntos se guarda y se ve, pero no suma |
+| `criterio_banco_id` | bigint | no | (`V66`) El criterio al que pertenece. Obligatorio para publicar; un borrador puede tener preguntas sin criterio |
+| `que_debe_tener` | text | no | (`V66`) «Qué debe tener una buena respuesta», hasta 1000 caracteres. Solo en las abiertas; llega a la IA junto a la respuesta y **nunca al candidato** |
 
 **Clave primaria:** `id` · **Único:** `version_banco_id` + `codigo`
+**Índice parcial (`V66`):** `pregunta_criterio_banco_idx` sobre `criterio_banco_id`, solo donde no es nulo
 
 Las de **estilo no suman nota**: solo dibujan el perfil, y el cliente prohíbe expresamente usarlas
 como filtro. Las de **consistencia** tampoco: generan alertas. Eso es lo que dice `es_puntuable`.
@@ -1287,11 +1302,64 @@ Las opciones de respuesta.
 | `valor` | numeric(5,2) | no | El valor de −2 a +2 que EF-4 esconde detrás de cada afirmación (`V20`) |
 | `es_distractor` | boolean | sí | Los elementos inventados que INV y DE mezclan, y que el candidato no distingue |
 | `orden_correcto` | smallint | no | En SEC, que pide ordenar cinco pasos: el lugar que le toca a este |
+| `orden` | integer | no | (`V66`) El orden explícito de las opciones de las preguntas propias. Ordenar por `letra` como texto deja 1, 10, 2… con diez niveles de escala. En la escala es el número del nivel, y el rótulo va en `texto`. Los tipos del v3 siguen ordenándose como antes |
 
 **Clave primaria:** `id` · **Único:** `pregunta_id` + `letra`
 
 `puntaje` admite vacío porque en las preguntas de estilo no hay respuesta correcta, y en algunas
 de situación solo se define la opción buena.
+
+En las preguntas propias (`V66`), `puntaje` son los puntos de la opción o del nivel: **enteros**,
+y en la opción múltiple pueden ser negativos. Como la columna es `numeric(5,2)` y la comparte el
+v3, lo de entero lo exige el servidor al guardar y al publicar, no un CHECK. La `letra` la pone
+el servidor; quien escribe las preguntas no la ve.
+
+## `criterio_banco`
+
+(`V66`) Los criterios de las preguntas propias de una vacante: lo que se califica, y lo que la
+ficha del candidato enseña con su nota.
+
+| Columna | Tipo | Oblig. | Qué guarda |
+|---|---|---|---|
+| `id` | bigint | sí | Clave |
+| `version_banco_id` | bigint | sí | La versión de preguntas propias a la que pertenece |
+| `nombre` | text | sí | No vacío, hasta 120 caracteres |
+| `que_evalua` | text | no | Hasta 1000 caracteres. Llega a la IA; nunca al candidato |
+| `orden` | integer | sí | |
+| `creado_en` | timestamptz | sí | |
+
+**Clave primaria:** `id` · **Apunta a:** `version_banco`
+**Índice:** `criterio_banco_version_idx` sobre `version_banco_id`
+
+**Sus puntos no se guardan**: son la suma de los de sus preguntas. **Se identifica por id**, nunca
+por nombre: habrá muchos «Conocimiento técnico» en vacantes distintas. No se reutilizó `criterio`,
+que ya mezcla los ocho del currículum con los de la rúbrica de la prueba. **No hay nota por
+criterio guardada**: se calcula al leer con las notas de sus preguntas.
+
+## `propuesta_preguntas`
+
+(`V66`) Lo que el agente `RECOMENDADOR` propone para completar el borrador de preguntas propias
+de una vacante. **No toca el borrador**: una persona agrega lo que quiera.
+
+| Columna | Tipo | Oblig. | Qué guarda |
+|---|---|---|---|
+| `id` | bigint | sí | Clave |
+| `organizacion_id` | bigint | sí | |
+| `vacante_id` | bigint | sí | |
+| `indicacion` | text | no | Lo que pidió quien la encargó, hasta 1000 caracteres |
+| `puntos_que_faltan` | integer | sí | De 1 a 100: lo que le faltaba al borrador al pedirla, y lo que la propuesta tiene que sumar exactamente |
+| `estado` | text | sí | `PEDIDA` (por defecto), `LISTA` o `FALLIDA` |
+| `contenido` | jsonb | no | Los criterios y preguntas propuestos, cuando está `LISTA` |
+| `motivo_fallo` | text | no | Por qué falló, dicho para quien la pidió |
+| `pedida_por_usuario_id` | bigint | no | |
+| `creado_en` | timestamptz | sí | |
+| `terminada_en` | timestamptz | no | |
+
+**Clave primaria:** `id` · **Apunta a:** `organizacion`, `vacante`, `usuario`
+**Índice:** `propuesta_preguntas_vacante_idx` sobre (`vacante_id`, `id`): la última de una vacante
+
+`contenido` es `jsonb` porque es una propuesta, no un dato del sistema: nada la lee salvo el panel
+que la enseña y el paso que copia lo elegido al borrador, que lo vuelve a validar.
 
 ## `opcion_dimension`
 
@@ -1535,6 +1603,14 @@ respondió cada cosa.
 Que haya empezado lo dice `iniciada_en`, **no un estado de la postulación**. Esa es la razón de
 que los estados bajaran de 25 a 18.
 
+**La evaluación de las preguntas propias de una vacante** (`V66`) es del propósito
+`PERFIL_INTEGRAL`, guarda en `version_banco_nivel_id` la versión publicada de las preguntas de esa
+vacante —el candidato queda atado a ella aunque después se publique otra— y **no lleva plantilla ni `vigente_hasta`**: su
+tiempo lo dice la versión y no se reutiliza en otra vacante. Por eso la `V66` quitó el CHECK
+`evaluacion_plantilla_solo_del_perfil_check` de la `V43`, y la exigencia de plantilla para las
+demás del Perfil Integral vive ahora en `ServicioEvaluacionImpl`, que es el que sabe de dónde sale
+cada una.
+
 ## `orden_pregunta`
 
 En qué orden se le mostró cada pregunta y sus opciones.
@@ -1592,7 +1668,7 @@ El puntaje de esa respuesta y por qué.
 |---|---|---|---|
 | `id` | bigint | sí | Clave |
 | `respuesta_id` | bigint | sí | |
-| `puntaje` | numeric(5,2) | sí | De 0 a 4 |
+| `puntaje` | numeric(5,2) | sí | La nota que vale. De 0 a 4 en los bancos de siempre; en las preguntas propias (`V66`), de 0 a los puntos de la pregunta. El CHECK de la base pasó a 0..100, y el 0..4 de los métodos de siempre lo exige el código al guardar (`PuenteCalificacionIaImpl`): **fuera de rango se rechaza, no se acota** |
 | `explicacion` | text | sí | **Obligatoria siempre** |
 | `evidencia_citada` | text | no | Qué parte de la respuesta usó |
 | `confianza` | numeric(5,2) | no | |
@@ -1602,8 +1678,14 @@ El puntaje de esa respuesta y por qué.
 | `ajustada_en` | timestamptz | no | |
 | `c1_episodio` … `c4_incomodidad` | boolean ×4 | no | `V41`, solo bancos `CRITERIOS`: qué criterios vio el agente. El `puntaje` sale de **contarlos en código**, no de la aritmética del modelo. **Vacías = ese banco no las medía**, no «no cumplió ninguna» |
 | `cumple_senal_cero` | boolean | no | Si la respuesta cumple la señal de 0 de su pregunta → puntaje 0 |
+| `puntaje_ia` | numeric(5,2) | no | (`V66`) La nota que había puesto la IA, guardada en el **primer** ajuste a mano y nunca más tocada: así la ficha enseña las dos. Vacía si nadie la ajustó, y también si la puso una persona porque la IA no pudo —entonces `explicacion` lleva el motivo— |
+| `version_guia` | integer | no | (`V66`) Con qué guía de la versión se calculó (`version_banco.version_guia`). Vacía en los métodos de siempre y en las que puso una persona sin IA |
 
 **Clave primaria:** `id` · **Único:** `respuesta_id`
+
+**Cambiar los puntos de una pregunta propia con candidatos dentro** (`V66`) escala `puntaje` y
+`puntaje_ia` en proporción al máximo nuevo (12 de 20 pasa a 9 de 15), también en una nota ajustada,
+que conserva su motivo. Lo cerrado no se reescribe: se calcula al leer con los puntos de la versión.
 
 `evidencia_citada` guarda qué parte de la propia respuesta usó el agente para justificar la nota.
 Es lo que permite discutir una calificación sin releerlo todo.
@@ -2494,7 +2576,9 @@ El catálogo de los agentes (once desde `V42`), con su versión.
 **Clave primaria:** `codigo` · **Sin columna `id`**
 
 Los nueve: `NECESIDAD_TALENTO`, `CAZATALENTOS`, `EVIDENCIA_CV`, `EVALUADOR`, `POTENCIAL_RIESGO`,
-`PRUEBA_PUESTO`, `SIMULACION`, `DESEMPENO`, `APRENDIZAJE`.
+`PRUEBA_PUESTO`, `SIMULACION`, `DESEMPENO`, `APRENDIZAJE`. El CHECK de la `V66` admite además
+`DATOS_CV`, `REDACTOR`, `EVALUADOR_TECNICO` y `RECOMENDADOR`, este último sembrado por la `V66`:
+propone preguntas para una vacante y no evalúa a nadie.
 
 El de Aprendizaje propone qué preguntas y pesos parecen útiles, pero **nunca cambia una regla por
 sí solo**: cualquier recalibración crea una versión nueva aprobada.
@@ -2515,7 +2599,7 @@ El encargo pendiente. Se procesa en segundo plano; el candidato no espera.
 | `intentos` | integer | sí | Por defecto 0 |
 | `terminado_en` | timestamptz | no | |
 | `tomado_en` | timestamptz | no | Cuándo lo tomó un trabajador (`V16`). Sin esto, un trabajo que murió a mitad se queda `EN_CURSO` **para siempre**, sin que nadie lo reintente |
-| `modo` | text | sí | `RAPIDA` o `FINA`, por defecto `FINA` (`V19`). Decide si el modelo razona, y es lo que hace que pedir la criba dos veces no cueste el doble |
+| `modo` | text | sí | `RAPIDA` o `FINA`, por defecto `FINA` (`V19`). Decide si el modelo razona, y es lo que hace que pedir la criba dos veces no cueste el doble. La `V66` suma **`RECALIFICA`**: volver a calificar las abiertas de las preguntas propias tras corregir su guía. Es un carril aparte a propósito: no rehace el retrato ni mueve a nadie de etapa, y no cuenta en el «cómo va» de la calificación |
 
 **Clave primaria:** `id`
 
@@ -3218,6 +3302,10 @@ caro sale: cada consulta que filtra por el padre acaba leyendo la tabla entera.
 | `situacion_laboral (periodo_id, vigente_desde)` | La línea de tiempo de un periodo y la situación vigente hoy (`V64`) |
 | `situacion_laboral (jefe_colaborador_id) WHERE jefe_colaborador_id IS NOT NULL` | **Índice parcial.** Quién reporta a quién: el aviso del cese y los círculos de jefes (`V64`) |
 | `periodo_laboral (postulacion_id) WHERE postulacion_id IS NOT NULL` | **Único y parcial.** Una contratación da como mucho un alta (`V64`) |
+| `version_banco (vacante_id, proposito) WHERE vacante_id IS NOT NULL AND estado = 'BORRADOR'` y el mismo con `'PUBLICADA'` | **Únicos y parciales.** Un borrador y una publicada por vacante **y propósito**: su cuestionario técnico y sus preguntas propias no se pisan. Sustituyen a los de la `V42` (`V66`) |
+| `criterio_banco (version_banco_id)` | Los criterios de una versión de preguntas propias (`V66`) |
+| `pregunta (criterio_banco_id) WHERE criterio_banco_id IS NOT NULL` | **Índice parcial.** Las preguntas de un criterio (`V66`) |
+| `propuesta_preguntas (vacante_id, id)` | La última propuesta de la IA para una vacante (`V66`) |
 
 Los índices de `organizacion_id` sueltos **no hacen falta**: van dentro de los compuestos de
 arriba, porque toda consulta filtra primero por organización.
@@ -3252,6 +3340,11 @@ Resumen de las restricciones que están repartidas por el documento:
 - Un cese no es anterior al ingreso y va con su motivo; un cambio con motivo «otro», una
   anulación y un «No dar de alta» llevan texto; un sueldo lleva moneda; nadie es su propio jefe
   (`V64`). Solo una situación anulada lleva las columnas `antes_*` (`V65`).
+- Un banco de vacante lleva propósito y uno por nivel no; las preguntas propias se califican por
+  puntos; un borrador y una publicada por vacante y propósito; los puntos de una pregunta y la
+  nota de una respuesta, de 0 a 100; la guía de las preguntas propias, hasta 2000 caracteres; el
+  nombre de un criterio, no vacío y hasta 120; y una vacante rinde el banco del nivel o sus
+  preguntas propias, nada más (`V66`).
 
 ⚠️ Aquí decía «el rango del cambio inesperado cabe dentro de la duración de la prueba». **Eso no
 lo impide nada**: no hay CHECK que lo diga ni comprobación en el código. Ver

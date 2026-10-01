@@ -139,6 +139,9 @@ está en su classpath, así que `integracion/soporte/RespuestaV3` usa la 2 a pro
 | El nombre de un candidato respetando la anonimización | `NombresDeUsuarios`: sin usuario, sin persona o con la persona borrada devuelve `(anonimizado)`, nunca una cadena vacía |
 | Qué instrumento (banco, pesos, plantillas, pruebas) lee cada empresa | `organizacion/service/DuenoDelInstrumento`. Es el único punto que interpreta las banderas de personalización |
 | La nota de la etapa de la prueba | `ponderarSiLaRubricaEstaEntera`: suma solo si todos los criterios tienen puntaje. Ver [Prueba del puesto](PRUEBA-DEL-PUESTO.md) |
+| La nota de las preguntas propias de una vacante (`V66`) | `perfilintegral/service/CalificacionPorPuntos`, calculada al leer. La usan la nota de lo cerrado al entregar, la del Perfil Integral, el desglose de la ficha, lo que recibe el evaluador y el cambio de puntos: si cada uno sumara por su cuenta, la ficha y el ranking dirían cifras distintas |
+| Qué puede guardarse y publicarse en las preguntas propias (`V66`) | `perfilintegral/service/ReglasDePuntos`. Lo usan guardar una pregunta, publicar, cambiar los puntos y validar lo que propone la IA; con una copia en cada uno, el editor dejaría guardar algo que la publicación rechaza por otra razón |
+| La envoltura de una guía de calificación escrita por una empresa | `ai/service/impl/EnvolturaDeGuia`, la misma para la prueba del puesto y para las preguntas propias. Dos copias de una defensa son dos sitios donde arreglarla |
 
 ---
 

@@ -10,6 +10,8 @@ import com.renaser.ai.ai_engine.perfilintegral.dto.DtosCalificacionIa.InsumoCv;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosCalificacionIa.InsumoDatos;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosCalificacionIa.ResultadoDatos;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosCalificacionIa.InsumoPerfil;
+import com.renaser.ai.ai_engine.perfilintegral.dto.DtosCalificacionIa.AbiertaPorPuntos;
+import com.renaser.ai.ai_engine.perfilintegral.dto.DtosCalificacionIa.InsumoPorPuntos;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosCalificacionIa.InsumoRespuestas;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosCalificacionIa.NotaCriterioIa;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosCalificacionIa.NotaRespuestaIa;
@@ -20,6 +22,11 @@ import com.renaser.ai.ai_engine.perfilintegral.dto.DtosCalificacionIa.ResultadoP
 import com.renaser.ai.ai_engine.perfilintegral.entity.AfirmacionCv;
 import com.renaser.ai.ai_engine.perfilintegral.entity.Alerta;
 import com.renaser.ai.ai_engine.perfilintegral.entity.Criterio;
+import com.renaser.ai.ai_engine.perfilintegral.entity.Evaluacion;
+import com.renaser.ai.ai_engine.perfilintegral.entity.VersionBanco;
+import com.renaser.ai.ai_engine.perfilintegral.repository.EvaluacionRepository;
+import com.renaser.ai.ai_engine.perfilintegral.service.CalificacionPorPuntos;
+import com.renaser.ai.ai_engine.perfilintegral.service.DatosDeLaVacanteParaIa;
 import com.renaser.ai.ai_engine.perfilintegral.entity.HallazgoPerfil;
 import com.renaser.ai.ai_engine.perfilintegral.entity.NotaCriterio;
 import com.renaser.ai.ai_engine.perfilintegral.entity.NotaEtapa;
@@ -125,6 +132,10 @@ public class PuenteCalificacionIaImpl implements PuenteCalificacionIa {
     private final MaquinaEstados maquina;
     private final CalificacionCriterios calificacionCriterios;
     private final CalificacionCuestionarioTecnico calificacionTecnica;
+    // Las preguntas propias de la vacante (método PUNTOS, V66)
+    private final EvaluacionRepository evaluaciones;
+    private final CalificacionPorPuntos porPuntos;
+    private final DatosDeLaVacanteParaIa datosDeLaVacante;
 
     @Override
     public Long organizacionDe(Long postulacionId) {
@@ -386,9 +397,187 @@ public class PuenteCalificacionIaImpl implements PuenteCalificacionIa {
     public void guardarNotasAbiertas(Long postulacionId, Long ejecucionIaId,
                                      ResultadoEvaluador resultado) {
         Postulacion postulacion = postulacion(postulacionId);
+        String metodo = calificacionCriterios.metodoDe(postulacion);
+        // Una evaluación por puntos que llegara por aquí se guarda con SU red, no con la del
+        // 0–4: acotarla a 4 le quitaría a una abierta de 20 casi toda su escala.
+        if (CalificacionPorPuntos.METODO.equals(metodo)) {
+            InsumoPorPuntos insumo = insumoPorPuntos(postulacionId);
+            guardarNotasPorPuntos(postulacionId, ejecucionIaId, resultado,
+                    insumo == null ? 1 : insumo.versionGuia(), false);
+            return;
+        }
         guardarNotasDe(postulacion, postulacion.getEvaluacionId(), ejecucionIaId, resultado,
-                CalificacionCriterios.METODO.equals(calificacionCriterios.metodoDe(postulacion)),
-                false);
+                CalificacionCriterios.METODO.equals(metodo), false);
+    }
+
+    // ==================== EVALUADOR · preguntas propias (PUNTOS) ====================
+
+    @Override
+    @Transactional(readOnly = true)
+    public InsumoPorPuntos insumoPorPuntos(Long postulacionId) {
+        Postulacion postulacion = postulacion(postulacionId);
+        Evaluacion evaluacion = postulacion.getEvaluacionId() == null ? null
+                : evaluaciones.findById(postulacion.getEvaluacionId()).orElse(null);
+        VersionBanco version = evaluacion == null ? null
+                : porPuntos.versionPorPuntos(evaluacion.getVersionBancoNivelId()).orElse(null);
+        if (version == null) {
+            return null;
+        }
+        CalificacionPorPuntos.Resultado cuenta = porPuntos.calcular(version.getId(),
+                evaluacion.getId());
+
+        // Solo las que tienen puntos y algo escrito: una de 0 puntos no puede sumar nada y
+        // una en blanco vale 0 sin preguntarle a nadie. Y sin las ajustadas a mano: esas ya
+        // no las toca la IA, así que mandarlas sería pagar por una nota que no se guarda.
+        List<AbiertaPorPuntos> abiertas = new ArrayList<>();
+        for (CalificacionPorPuntos.CriterioCalculado c : cuenta.criterios()) {
+            for (CalificacionPorPuntos.PreguntaCalculada p : c.preguntas()) {
+                if (seLeManda(p)) {
+                    abiertas.add(comoAbierta(p, c.criterio().getNombre(),
+                            c.criterio().getQueEvalua()));
+                }
+            }
+        }
+        for (CalificacionPorPuntos.PreguntaCalculada p : cuenta.sinCriterio()) {
+            if (seLeManda(p)) {
+                abiertas.add(comoAbierta(p, null, null));
+            }
+        }
+
+        Vacante vacante = vacantes.findById(postulacion.getVacanteId())
+                .orElseThrow(() -> new IllegalStateException(
+                        "La vacante de esta postulación ya no existe"));
+        return new InsumoPorPuntos(version.getVersionGuia() == null ? 1 : version.getVersionGuia(),
+                version.getGuiaCalificacion(), datosDeLaVacante.de(vacante), abiertas);
+    }
+
+    private static boolean seLeManda(CalificacionPorPuntos.PreguntaCalculada p) {
+        return p.vaALaIa()
+                && (p.nota() == null || p.nota().getAjustadaPorUsuarioId() == null);
+    }
+
+    private static AbiertaPorPuntos comoAbierta(CalificacionPorPuntos.PreguntaCalculada p,
+                                                String criterio, String queEvalua) {
+        return new AbiertaPorPuntos(p.respuesta().getId(), p.pregunta().getEnunciado(),
+                p.maximo(), p.pregunta().getQueDebeTener(), criterio, queEvalua,
+                p.respuesta().getTexto());
+    }
+
+    @Override
+    @Transactional
+    public boolean guardarNotasPorPuntos(Long postulacionId, Long ejecucionIaId,
+                                         ResultadoEvaluador resultado, int versionGuia,
+                                         boolean recalificacion) {
+        Postulacion postulacion = postulacion(postulacionId);
+        Evaluacion evaluacion = postulacion.getEvaluacionId() == null ? null
+                : evaluaciones.findById(postulacion.getEvaluacionId()).orElse(null);
+        VersionBanco version = evaluacion == null ? null
+                : porPuntos.versionPorPuntos(evaluacion.getVersionBancoNivelId()).orElse(null);
+        if (version == null) {
+            throw new IllegalStateException("La evaluación de la postulación " + postulacionId
+                    + " no es de preguntas propias: sus notas no se guardan por puntos");
+        }
+
+        // Calculada con una guía anterior: se descarta entera y el evaluador la vuelve a pedir
+        // con la de ahora. Así, quien se estaba calificando justo al cambiar la guía no se
+        // queda medido con la vieja.
+        int vigente = version.getVersionGuia() == null ? 1 : version.getVersionGuia();
+        if (vigente != versionGuia) {
+            log.info("EVALUADOR: las notas de la postulación {} se calcularon con la guía {} y "
+                    + "la vigente es la {}; se descartan", postulacionId, versionGuia, vigente);
+            return false;
+        }
+
+        CalificacionPorPuntos.Resultado cuenta = porPuntos.calcular(version.getId(),
+                evaluacion.getId());
+        Map<Long, CalificacionPorPuntos.PreguntaCalculada> mias = new HashMap<>();
+        cuenta.todas().stream()
+                .filter(CalificacionPorPuntos.PreguntaCalculada::vaALaIa)
+                .forEach(p -> mias.put(p.respuesta().getId(), p));
+
+        // La red de seguridad: lo que llega del modelo se filtra aquí, no en el agente.
+        Map<Long, NotaRespuesta> aGuardar = new java.util.LinkedHashMap<>();
+        for (NotaRespuestaIa nota : lista(resultado == null ? null : resultado.notas())) {
+            CalificacionPorPuntos.PreguntaCalculada suya =
+                    nota.respuestaId() == null ? null : mias.get(nota.respuestaId());
+            if (suya == null) {
+                log.warn("El agente devolvió una nota para una respuesta que no es de esta "
+                        + "evaluación: {}", nota.respuestaId());
+                continue;
+            }
+            if (esVacio(nota.explicacion())) {
+                log.warn("Nota de la respuesta {} descartada: sin explicación", nota.respuestaId());
+                continue;
+            }
+            if (nota.puntaje() == null) {
+                log.warn("Nota de la respuesta {} descartada: sin puntaje", nota.respuestaId());
+                continue;
+            }
+            NotaRespuesta fila = suya.nota();
+            if (fila != null && fila.getAjustadaPorUsuarioId() != null) {
+                continue;   // la ajustó una persona: la IA ya no la toca
+            }
+            if (fila == null) {
+                fila = NotaRespuesta.builder()
+                        .respuestaId(nota.respuestaId())
+                        .creadoEn(Instant.now())
+                        .build();
+            }
+            fila.setPuntaje(acotar(nota.puntaje(), BigDecimal.valueOf(suya.maximo())));
+            fila.setExplicacion(nota.explicacion());
+            fila.setEvidenciaCitada(nota.evidenciaCitada());
+            fila.setConfianza(acotar(nota.confianza(), CIEN));
+            fila.setEjecucionIaId(ejecucionIaId);
+            fila.setVersionGuia(versionGuia);
+            aGuardar.put(nota.respuestaId(), fila);
+        }
+
+        if (recalificacion) {
+            // Las notas nuevas de una persona se aplican juntas: nunca unas abiertas con la
+            // guía vieja y otras con la nueva. Tiene que haber llegado cada abierta que ya
+            // tenía nota de la IA; si falta alguna, no se guarda nada y la cola lo reintenta.
+            List<Long> faltan = mias.values().stream()
+                    .filter(p -> p.nota() != null && p.nota().getAjustadaPorUsuarioId() == null)
+                    .map(p -> p.respuesta().getId())
+                    .filter(id -> !aGuardar.containsKey(id))
+                    .toList();
+            if (!faltan.isEmpty()) {
+                throw new IllegalStateException("La recalificación dejó " + faltan.size()
+                        + " abiertas sin nota nueva (" + faltan + "): las notas de una persona "
+                        + "se aplican juntas o ninguna, se reintenta");
+            }
+        }
+
+        notasRespuesta.saveAll(aGuardar.values());
+        log.info("EVALUADOR (puntos): {} de {} abiertas calificadas en la postulación {} con la "
+                + "guía {}", aGuardar.size(), mias.size(), postulacionId, versionGuia);
+
+        if (recalificacion) {
+            // Como el ajuste a mano: se recalcula todo sin mover a nadie de etapa. La nota se
+            // recalculaba en cerrarPerfilIntegral, que aquí no corre (movería a la persona).
+            recalcularSinMover(postulacionId);
+        }
+        return true;
+    }
+
+    @Override
+    @Transactional
+    public void recalcularSinMover(Long postulacionId) {
+        Postulacion postulacion = postulacion(postulacionId);
+        Vacante vacante = vacante(postulacion);
+        Puesto puesto = puesto(vacante);
+        BigDecimal nota = recalcularNotaDeLaEtapa(postulacionId, vacante, puesto);
+
+        // El grupo necesita saber si hay un riesgo crítico. Tras un ajuste no hay resultado
+        // de la IA en la mano: se leen los hallazgos que dejó el retrato.
+        PerfilTalento perfil = perfiles.findByPostulacionId(postulacionId).orElse(null);
+        boolean riesgoCritico = perfil != null && hallazgos.findByPerfilTalentoId(perfil.getId())
+                .stream().anyMatch(h -> "RIESGO_CRITICO".equals(h.getTipo()));
+        postulacion.setGrupoPrioridad(grupoDe(postulacion.getOrganizacionId(), nota,
+                perfil == null ? null : perfil.getPotencial(), riesgoCritico));
+        postulaciones.save(postulacion);
+        log.info("La postulación {} se recalculó sin moverla de etapa: nota {} y grupo {}",
+                postulacionId, nota, postulacion.getGrupoPrioridad());
     }
 
     /**
@@ -463,6 +652,7 @@ public class PuenteCalificacionIaImpl implements PuenteCalificacionIa {
             } else {
                 puntaje = acotar(nota.puntaje(), CUATRO);
             }
+            exigirEscalaDeCuatro(nota.respuestaId(), puntaje);
 
             NotaRespuesta fila = notasRespuesta.findByRespuestaId(nota.respuestaId())
                     .orElseGet(() -> NotaRespuesta.builder()
@@ -513,6 +703,22 @@ public class PuenteCalificacionIaImpl implements PuenteCalificacionIa {
         }
     }
 
+    /**
+     * El 0–4 de los métodos de siempre (NULL y CRITERIOS), exigido al guardar.
+     *
+     * <p>Hasta la V66 lo exigía la base: {@code nota_respuesta.puntaje} tenía un CHECK 0..4.
+     * Las preguntas propias necesitan hasta 100 y la tabla no sabe de qué método es cada
+     * nota, así que el CHECK pasó a 0..100 y la guarda del 0–4 vive aquí. <b>Fuera de rango
+     * se rechaza, no se acota</b> (AC-23): es lo que hacía la base, y protege a quien está
+     * rindiendo el banco de RENASER. El guardado falla entero y la cola lo reintenta.
+     */
+    static void exigirEscalaDeCuatro(Long respuestaId, BigDecimal puntaje) {
+        if (puntaje == null || puntaje.signum() < 0 || puntaje.compareTo(CUATRO) > 0) {
+            throw new IllegalStateException("La nota " + puntaje + " de la respuesta "
+                    + respuestaId + " está fuera del 0–4 de este banco: no se guarda");
+        }
+    }
+
     /** De qué pregunta es cada respuesta de un examen. */
     private Map<Long, Pregunta> preguntaPorRespuesta(Long evaluacionId) {
         List<Respuesta> suyas = respuestas.findByEvaluacionId(evaluacionId);
@@ -536,6 +742,32 @@ public class PuenteCalificacionIaImpl implements PuenteCalificacionIa {
         ServicioCalificacion.ResumenCerrado cerrado = calificacion.resumenDeLoCerrado(postulacionId);
         List<RespuestaAbierta> abiertas = abiertas(postulacion.getEvaluacionId());
         List<NotaRespuestaIa> notasAbiertas = notasDeLoAbierto(abiertas);
+
+        // Las preguntas propias (V66) no se miden en 0–4: cada abierta vale lo suyo. Al
+        // retrato se le lleva todo a las escalas que conoce —lo cerrado y lo abierto en
+        // porcentaje de su máximo, y cada abierta a 0–4— para que no lea un 12 de 20 como
+        // un 12 de 4.
+        ServicioCalificacion.NotaDelBanco banco = calificacion.notaDelBancoPorPuntos(postulacionId);
+        if (banco != null) {
+            List<NotaRespuestaIa> escaladas = notasAbiertas.stream()
+                    .filter(n -> banco.abiertasSobreCuatro().containsKey(n.respuestaId()))
+                    .map(n -> new NotaRespuestaIa(n.respuestaId(),
+                            banco.abiertasSobreCuatro().get(n.respuestaId()), n.explicacion(),
+                            n.evidenciaCitada(), n.confianza(), null, null, null, null, null))
+                    .toList();
+            return new InsumoPerfil(
+                    puesto.getNombre(),
+                    puesto.getNivelPuestoCodigo(),
+                    queBusca(vacante),
+                    notaCurriculum(postulacionId, vacante, puesto),
+                    notasDelCurriculum(postulacionId),
+                    banco.cerradasSobreCien(),
+                    banco.cerradas(),
+                    banco.abiertasSobreCien(),
+                    escaladas,
+                    alertas.findByPostulacionId(postulacionId).stream()
+                            .map(Alerta::getDescripcion).toList());
+        }
 
         return new InsumoPerfil(
                 puesto.getNombre(),
@@ -710,13 +942,29 @@ public class PuenteCalificacionIaImpl implements PuenteCalificacionIa {
      * ignora sin más; su peso está en cero justamente para eso.
      */
     private BigDecimal recalcularNotaDeLaEtapa(Long postulacionId, Vacante vacante, Puesto puesto) {
+        /*
+         * ⚠️ **Las preguntas propias a medias no dan nota, ni con el currículum solo ni con
+         * un cero provisional** (V66, AC-09). Mientras falte la nota de alguna abierta con
+         * puntos, la del banco no existe, y sin ella la del Perfil Integral tampoco: se quita
+         * la que hubiera —una criba del currículum a solas, de antes de entregar— y no se
+         * escribe nada. En cuanto llega la última (la IA, o una persona a mano), se calcula
+         * como siempre.
+         */
+        ServicioCalificacion.NotaDelBanco banco = calificacion.notaDelBancoPorPuntos(postulacionId);
+        if (banco != null && !banco.completa()) {
+            notasEtapa.findByPostulacionIdAndEtapaCodigo(postulacionId, ETAPA)
+                    .ifPresent(notasEtapa::delete);
+            log.info("La postulación {} no tiene nota de Perfil Integral: a sus preguntas "
+                    + "propias les falta la nota de alguna abierta", postulacionId);
+            return null;
+        }
         Map<String, BigDecimal> pesos = pesosComponente
                 .findByVersionPesosId(vacante.getVersionPesosId()).stream()
                 .collect(Collectors.toMap(PesoComponentePerfil::getComponente,
                         PesoComponentePerfil::getPeso, (a, b) -> a));
 
         BigDecimal notaCv = notaCurriculum(postulacionId, vacante, puesto);
-        BigDecimal notaEvaluacion = notaEvaluacion(postulacionId);
+        BigDecimal notaEvaluacion = banco != null ? banco.nota() : notaEvaluacion(postulacionId);
 
         BigDecimal suma = BigDecimal.ZERO;
         BigDecimal pesoTotal = BigDecimal.ZERO;
@@ -831,12 +1079,24 @@ public class PuenteCalificacionIaImpl implements PuenteCalificacionIa {
         if (nota == null) {
             return null;
         }
-        int alta = parametros.entero(organizacionId, "umbral_grupo_alta", 80);
-        int priorizado = parametros.entero(organizacionId, "umbral_grupo_priorizado", 65);
-
         boolean riesgoCritico = lista(resultado.hallazgos()).stream()
                 .anyMatch(h -> "RIESGO_CRITICO".equals(h.tipo()));
-        BigDecimal potencial = perfil.getPotencial() == null ? BigDecimal.ZERO : perfil.getPotencial();
+        return grupoDe(organizacionId, nota, perfil.getPotencial(), riesgoCritico);
+    }
+
+    /**
+     * La misma regla, con el riesgo y el potencial ya leídos. La usa el recálculo sin IA
+     * (ajuste a mano, cambio de puntos, recalificación), que no tiene el resultado del modelo
+     * en la mano y lee los hallazgos guardados.
+     */
+    private String grupoDe(Long organizacionId, BigDecimal nota, BigDecimal potencialLeido,
+                           boolean riesgoCritico) {
+        if (nota == null) {
+            return null;
+        }
+        int alta = parametros.entero(organizacionId, "umbral_grupo_alta", 80);
+        int priorizado = parametros.entero(organizacionId, "umbral_grupo_priorizado", 65);
+        BigDecimal potencial = potencialLeido == null ? BigDecimal.ZERO : potencialLeido;
 
         if (nota.compareTo(BigDecimal.valueOf(alta)) >= 0 && !riesgoCritico) {
             return "ALTA";

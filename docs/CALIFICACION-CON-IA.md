@@ -25,7 +25,7 @@ queda esperando a que una persona decida.**
 | Agente | Qué hace |
 |---|---|
 | **Evidencia del currículum** | Puntúa el currículum sobre 100 con los ocho criterios, con el peso que corresponde al nivel del puesto. Y clasifica cada afirmación: demostrada, declarada, contradicha o falta información |
-| **Evaluador** | Califica de 0 a 4 las respuestas abiertas, citando la parte de la respuesta en que se basa. Con un banco CAZATALENTOS (método `CRITERIOS`) cambia el contrato: no devuelve puntaje sino **qué criterios vio** (C1 episodio, C2 autoría, C3 dato duro, C4 incomodidad, y si cumple la señal de 0) y el número lo cuenta el código |
+| **Evaluador** | Califica de 0 a 4 las respuestas abiertas, citando la parte de la respuesta en que se basa. Con un banco CAZATALENTOS (método `CRITERIOS`) cambia el contrato: no devuelve puntaje sino **qué criterios vio** (C1 episodio, C2 autoría, C3 dato duro, C4 incomodidad, y si cumple la señal de 0) y el número lo cuenta el código. Con las **preguntas propias de una vacante** (método `PUNTOS`, `V66`) pone a cada abierta una nota entre 0 y sus puntos: ver «Las preguntas propias de una vacante», más abajo |
 | **Potencial y riesgo** | Arma el Perfil de Talento: adecuación, potencial, alto rendimiento, confianza de la evidencia, y los hallazgos |
 
 5. Al terminar el tercero, el sistema **rehace la nota de la etapa** juntando currículum y
@@ -171,6 +171,68 @@ código**. Salieron de las bandas del Banco Maestro y **Renaser todavía no los 
 
 ---
 
+## Las preguntas propias de una vacante: la nota por puntos (30/09/2026)
+
+Desde la `V66` una vacante puede tener **sus propias preguntas** en vez del banco del nivel: la
+empresa las escribe en el panel, agrupadas en criterios, y cada pregunta vale unos puntos que
+suman 100. Cambia cómo se llega a la nota, no quién la pone:
+
+1. Al entregar, **el sistema cuenta las cerradas** —opción única, opción múltiple y escala— con
+   los puntos que la empresa les dio. Sin IA, como siempre.
+2. **El Evaluador califica las abiertas una por una, en puntos**: cada respuesta entre 0 y los
+   puntos de su pregunta, con hasta dos decimales, y citando la parte de la respuesta en que se
+   basa. Recibe la pregunta, sus puntos, su criterio y lo que ese criterio evalúa, «qué debe
+   tener una buena respuesta», los datos de la vacante y **la guía de calificación de la
+   empresa**, envuelta igual que la de la prueba del puesto: anunciada como contenido de otro y
+   cerrada con una marca sorteada en cada llamada. Van de diez en diez, y las notas de todas las
+   tandas se guardan juntas.
+3. La red es la de siempre: una nota sin explicación, de otra respuesta o por encima de su máximo
+   no entra. **Una abierta en blanco vale 0 y no se le manda a la IA.**
+4. **La nota del banco es la suma de los criterios, sobre 100**, y la de cada criterio, la suma
+   de sus preguntas. No se reparte entre cerradas y abiertas por cuántas hay, como en los bancos
+   de siempre. **Solo existe cuando todas las preguntas con puntos tienen nota.**
+5. Desde ahí, el camino de siempre: el retrato, la nota del Perfil Integral, el grupo de
+   prioridad y «por confirmar».
+
+⚠️ **Al entregar, la nota del Perfil Integral que hubiera se borra.** Si antes se había calificado
+solo el currículum, esa cifra ya no dice la verdad: la evaluación existe y todavía no suma. Se
+queda sin nota hasta que las abiertas la tengan, en vez de un número provisional que se leería
+como definitivo.
+
+**Ajustar a mano una abierta.** Desde la ficha, quien tiene `ajustar_nota` corrige la nota de una
+abierta —o la pone, si la IA no pudo— con un motivo escrito. La nota que había puesto la IA se
+sigue viendo al lado. Se recalculan la nota del banco, la del Perfil Integral y el grupo de
+prioridad **sin llamar a la IA y sin mover a nadie de etapa**. Las cerradas no se ajustan: su nota
+sale de los puntos.
+
+**Corregir la guía con gente dentro: la recalificación.** Si la empresa cambia la guía, lo que
+evalúa un criterio o lo que debe tener una abierta cuando ya hay candidatos calificados, **se
+vuelve a calificar a todos los que tenían nota de la IA**, para que nadie quede medido con una
+guía y otros con otra.
+
+- **Va por su propio carril** (`RECALIFICA`): solo corre el Evaluador. No se rehace el retrato ni
+  se mueve a nadie de etapa, y mientras tanto su nota anterior sigue valiendo.
+- **Cada nota recuerda con qué guía se puso.** Si llega un resultado calculado con la anterior,
+  se descarta y se vuelve a pedir.
+- **Con la IA apagada, la empresa suspendida o su tope del mes agotado, el cambio no se guarda**
+  y se dice por qué. Si alguien se quedó con la nota de la guía anterior, el editor lo cuenta y
+  deja reintentar; en esas mismas tres situaciones no se encola a nadie y la respuesta dice el
+  motivo, en vez de un «0 personas» que haría creer que ya no queda nadie.
+- **Cambiar los puntos no pasa por la IA**: se recalcula a todos al instante, y cada abierta ya
+  calificada se escala a su máximo nuevo (12 de 20 pasa a 9 de 15).
+- Mientras corre una recalificación, ni la guía ni los puntos se pueden volver a cambiar.
+
+Los mensajes de que la IA no está disponible **los escribe el servidor enteros** —«La IA está
+apagada en este sistema…», «La empresa está suspendida…», «La IA no tiene saldo…»— y el panel los
+pinta tal cual.
+
+**La instrucción del Evaluador es una para todo el mundo**, así que la `V66` publicó una versión
+nueva que vale para sus tres escalas —0 a 4, los puntos de cada pregunta, y los criterios vistos
+del banco CAZATALENTOS— y deja que el formato de cada llamada diga cuál toca. Solo la publicó
+donde nadie había reescrito la suya desde el panel.
+
+---
+
 ## Los otros dos agentes: la prueba del puesto y la conversación final
 
 Todo lo de arriba es del **Perfil Integral**, que es la primera etapa. Semanas después el
@@ -283,6 +345,17 @@ trabajo queda FALLIDO y visible — un borrador a medias jamás se guarda como s
 bien. El detalle del flujo completo está en
 [el diseño del ciclo 1](DISENO-PRUEBA-TECNICA-FICHA-Y-REDACTOR.md).
 
+**El RECOMENDADOR (`V66`) es el segundo que no califica a nadie.** Es el botón «Recomendaciones
+por IA» del editor de preguntas propias. Como el REDACTOR, trabaja sobre la vacante y no sobre
+una postulación, y lo que escribe no toca a ningún candidato hasta que una persona lo agrega a su
+borrador y lo publica. Lee el título, la descripción, el propósito, las responsabilidades y los
+requisitos de la vacante, su puesto y lo que pidió quien solicitó a la persona, y **completa lo
+que le falta al borrador, no empieza de cero**: su propuesta suma exactamente los puntos que
+faltan para llegar a 100 y puede llenar los criterios que ya existen. Pasa por su aduana
+(`RecetaRecomendacion`) con la misma regla: se le devuelve una vez con los errores delante, y si
+sigue sin cuadrar la propuesta queda fallida y se dice. Con la IA apagada o sin cupo no se encola,
+y el panel lo dice en tono de estado, no de error. Cuenta contra el tope mensual.
+
 ## Cuándo arranca sola, y cuándo la pide una persona
 
 Cada vacante lleva un interruptor —**«calificar y avanzar sola»**, apagado de fábrica— que
@@ -310,7 +383,9 @@ Está contado en [La criba de currículums](CRIBA-DE-CURRICULUMS.md).
 
 `renaser.ai.calificacion.habilitada: false` en la configuración. Con eso la postulación se
 queda en «calificando» y no se encola nada — tampoco los dos agentes de las etapas siguientes. Sirve si el proveedor está caído y no se quiere
-gastar reintentos.
+gastar reintentos. En las preguntas propias, apagada la IA, corregir la guía cuando ya hay
+candidatos calificados no se guarda, y las recomendaciones y los reintentos de recalificación contestan el motivo sin
+encolar nada.
 
 ---
 

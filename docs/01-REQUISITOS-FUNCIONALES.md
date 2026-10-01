@@ -665,6 +665,18 @@ llegan al Perfil Integral.
 familia de trabajo, capacidades críticas, la plantilla de esa vacante y preguntas de
 verificación sacadas del currículum cuando haga falta.
 
+**RF-48b** **Cada vacante elige de dónde salen sus preguntas** (30/09/2026): «Preguntas propias de
+esta vacante», «El banco de la empresa para su nivel» o «Sin evaluación». Las propias las escribe
+la empresa en el panel, para esa vacante, agrupadas en criterios con nombre que suman 100 puntos;
+puede copiarlas de otra vacante suya o pedir a la IA que proponga lo que falta, y nada de lo que
+propone entra sin que una persona lo agregue. **Toda vacante nueva nace con las propias**, también
+en RENASER; el banco del nivel se elige a mano y solo se ofrece si la empresa tiene uno **suyo**
+publicado para ese nivel: el de RENASER ya no se presta a las vacantes nuevas de otras empresas,
+y las que ya lo rendían lo conservan. Con preguntas propias, la vacante no se publica hasta
+tenerlas publicadas. **Desde la primera postulación no cambian ni el origen ni la versión**
+(RF-138); lo único que se toca con gente dentro son los puntos —se recalcula a todos al
+instante— y las instrucciones para la IA —se vuelve a calificar a todos—.
+
 **RF-49** La duración objetivo es: **40–50 minutos** en Dirección, **35–45** en Coordinación y
 **25–35** en Ejecución. Si la configuración pasa de 60 minutos, el sistema **avisa antes de
 publicarla**.
@@ -743,6 +755,17 @@ ni la lógica de cálculo.
 | 2 | Hubo acción clara, pero poca medición, evidencia o aprendizaje |
 | 3 | Actuó por iniciativa, con criterio y resultado verificable |
 | 4 | Anticipó, priorizó, comunicó, actuó, midió y convirtió el aprendizaje en sistema |
+
+**RF-55b** **Las preguntas propias de una vacante se califican en puntos** (30/09/2026). Hay
+cuatro tipos: abierta, opción única, opción múltiple y escala. Cada pregunta vale los puntos que le
+dio la empresa. **Las cerradas las puntúa el sistema** (RF-147): la opción única y la escala, con
+los puntos de lo elegido; la múltiple, con la suma de lo marcado, sin bajar de 0 ni pasar de lo que
+vale. **Las abiertas las califica la IA**, entre 0 y sus puntos, con la guía de calificación de la
+vacante y lo que debe tener una buena respuesta, citando siempre la parte en que se basa (RF-56);
+una en blanco vale 0. La nota de cada criterio es la suma de sus preguntas y la de la evaluación,
+la de sus criterios, sobre 100, y **solo existe cuando todas las preguntas con puntos tienen
+nota**. Quien tiene el permiso ajusta a mano una abierta —o la pone si la IA no pudo— con motivo,
+y eso no mueve a nadie de etapa. La ficha enseña cada criterio con su nota y de dónde sale.
 
 **RF-56** Cada calificación automática guarda: rúbrica usada, evidencia citada de la propia
 respuesta, puntaje, explicación, nivel de confianza, qué agente la hizo y con qué versión.

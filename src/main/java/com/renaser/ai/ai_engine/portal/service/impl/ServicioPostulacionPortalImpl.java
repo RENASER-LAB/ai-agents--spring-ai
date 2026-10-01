@@ -304,12 +304,19 @@ public class ServicioPostulacionPortalImpl implements ServicioPostulacionPortal 
             // Su evaluación se crea aquí, no cuando entre a responderla: así queda atada a la
             // versión del banco que estaba publicada el día que postuló. Sin esto la
             // postulación quedaría esperando algo que el candidato no tendría cómo hacer.
-            Puesto puesto = puestos.findById(vacante.getPuestoId())
-                    .orElseThrow(() -> new IllegalStateException(
-                            "La vacante apunta a un puesto que no existe"));
-            postulacion.setEvaluacionId(evaluaciones.crearAlPostular(
-                    organizacionDeLaVacante, quien.usuarioId(),
-                    vacante.getPlantillaEvaluacionId(), puesto.getNivelPuestoCodigo()));
+            if (vacante.tienePreguntasPropias()) {
+                // Las preguntas propias de la vacante (V66): se le fija la versión publicada
+                // de la vacante y queda atado a ella (RF-138).
+                postulacion.setEvaluacionId(evaluaciones.crearDePreguntasPropias(
+                        organizacionDeLaVacante, quien.usuarioId(), vacante.getId()));
+            } else {
+                Puesto puesto = puestos.findById(vacante.getPuestoId())
+                        .orElseThrow(() -> new IllegalStateException(
+                                "La vacante apunta a un puesto que no existe"));
+                postulacion.setEvaluacionId(evaluaciones.crearAlPostular(
+                        organizacionDeLaVacante, quien.usuarioId(),
+                        vacante.getPlantillaEvaluacionId(), puesto.getNivelPuestoCodigo()));
+            }
             postulaciones.save(postulacion);
 
             maquina.transicionar(postulacion, "PERFIL_TURNO_CANDIDATO", null, null, true, false, null);

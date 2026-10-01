@@ -123,6 +123,12 @@ class ServicioVacantesPanelImplTest {
                 .when(puestos.findById(PUESTO))
                 .thenReturn(Optional.of(com.renaser.ai.ai_engine.vacante.entity.Puesto.builder()
                         .id(PUESTO).nivelPuestoCodigo(NIVEL).build()));
+        // El mismo puesto leído dentro de la empresa: con él se sabe si el banco del nivel es
+        // PROPIO o prestado (V66). Sin este, el nivel sale nulo y toda vacante parece prestada.
+        org.mockito.Mockito.lenient()
+                .when(puestos.findByIdAndOrganizacionId(PUESTO, ORGANIZACION))
+                .thenReturn(Optional.of(com.renaser.ai.ai_engine.vacante.entity.Puesto.builder()
+                        .id(PUESTO).organizacionId(ORGANIZACION).nivelPuestoCodigo(NIVEL).build()));
         org.mockito.Mockito.lenient()
                 .when(versionesBanco.laPublicadaDelNivel(ORGANIZACION, "NIVEL", NIVEL))
                 .thenReturn(Optional.of(com.renaser.ai.ai_engine.perfilintegral.entity.VersionBanco
@@ -371,17 +377,159 @@ class ServicioVacantesPanelImplTest {
     }
 
     @Test
-    @DisplayName("volver a encenderla en una vacante publicada exige banco del nivel")
+    @DisplayName("volver a encenderla en una publicada sin banco propio pasa a sus preguntas "
+            + "propias y exige tenerlas publicadas")
     void encenderlaPublicadaSinBancoAvisaAqui() {
-        // El aviso tiene que salir aqui: encenderla sin banco dejaria al siguiente candidato
-        // chocando contra un error al postular.
+        // El aviso tiene que salir aqui: encenderla sin de donde sacar las preguntas dejaria
+        // al siguiente candidato chocando contra un error al postular. Desde la V66, sin banco
+        // PROPIO del nivel no se rinde el banco: lo que falta son sus preguntas publicadas.
         vacante("PUBLICADA", false, null);
         when(versionesBanco.laPublicadaDelNivel(ORGANIZACION, "NIVEL", NIVEL))
                 .thenReturn(Optional.empty());
+        when(versionesBanco.preguntasPropiasDe(VACANTE, "PUBLICADA")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> servicio.definirAplicacionEvaluacion(QUIEN, VACANTE, true))
                 .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("banco de preguntas publicado");
+                .hasMessageContaining("preguntas propias");
+        verify(vacantes, never()).save(any(Vacante.class));
+    }
+
+    @Test
+    @DisplayName("QA-PP-04: apagar por el interruptor viejo una que rinde el banco prestado lo "
+            + "deja, y al encenderla no vuelve (AC-01c)")
+    void elBancoPrestadoNoVuelvePorElInterruptorViejo() {
+        // Sin banco PROPIO del nivel: lo que rendia era el de RENASER, prestado.
+        Vacante v = vacante("BORRADOR", true, null);
+        when(versionesBanco.laPublicadaDelNivel(ORGANIZACION, "NIVEL", NIVEL))
+                .thenReturn(Optional.empty());
+
+        servicio.definirAplicacionEvaluacion(QUIEN, VACANTE, false);
+
+        assertThat(v.isAplicaEvaluacion()).isFalse();
+        assertThat(v.getOrigenPreguntas()).isEqualTo(Vacante.ORIGEN_VACANTE);
+        verify(auditoria).registrar(ORGANIZACION, QUIEN, "definir_aplicacion_evaluacion",
+                "vacante", VACANTE,
+                Map.of("aplicaEvaluacion", true, "origenPreguntas", Vacante.ORIGEN_NIVEL),
+                Map.of("aplicaEvaluacion", false, "origenPreguntas", Vacante.ORIGEN_VACANTE), null);
+
+        servicio.definirAplicacionEvaluacion(QUIEN, VACANTE, true);
+
+        assertThat(v.isAplicaEvaluacion()).isTrue();
+        assertThat(v.getOrigenPreguntas()).isEqualTo(Vacante.ORIGEN_VACANTE);
+    }
+
+    @Test
+    @DisplayName("QA-PP-04: encender una de antes que estaba apagada no estrena el banco prestado")
+    void encenderUnaApagadaNoEstrenaElPrestado() {
+        Vacante v = vacante("BORRADOR", false, null);
+        when(versionesBanco.laPublicadaDelNivel(ORGANIZACION, "NIVEL", NIVEL))
+                .thenReturn(Optional.empty());
+
+        servicio.definirAplicacionEvaluacion(QUIEN, VACANTE, true);
+
+        assertThat(v.isAplicaEvaluacion()).isTrue();
+        assertThat(v.getOrigenPreguntas()).isEqualTo(Vacante.ORIGEN_VACANTE);
+    }
+
+    @Test
+    @DisplayName("QA-PP-04: dejarla encendida no toca el banco prestado que ya rinde (AC-01c)")
+    void dejarlaEncendidaNoCambiaElOrigen() {
+        Vacante v = vacante("BORRADOR", true, null);
+        org.mockito.Mockito.lenient().when(versionesBanco.laPublicadaDelNivel(ORGANIZACION, "NIVEL", NIVEL))
+                .thenReturn(Optional.empty());
+
+        servicio.definirAplicacionEvaluacion(QUIEN, VACANTE, true);
+
+        assertThat(v.getOrigenPreguntas()).isEqualTo(Vacante.ORIGEN_NIVEL);
+    }
+
+    @Test
+    @DisplayName("QA-PP-04: con banco propio del nivel, apagar y encender lo conserva")
+    void conBancoPropioElOrigenSeConserva() {
+        Vacante v = vacante("BORRADOR", true, null);
+
+        servicio.definirAplicacionEvaluacion(QUIEN, VACANTE, false);
+        servicio.definirAplicacionEvaluacion(QUIEN, VACANTE, true);
+
+        assertThat(v.isAplicaEvaluacion()).isTrue();
+        assertThat(v.getOrigenPreguntas()).isEqualTo(Vacante.ORIGEN_NIVEL);
+    }
+
+    @Test
+    @DisplayName("QA-PP-08: con postulantes, apagar y encender por el interruptor viejo no "
+            + "cambia de dónde salen las preguntas (AC-16)")
+    void conPostulantesElInterruptorViejoNoMueveElOrigen() {
+        // Rinde el banco prestado y ya hay alguien medido con él: apagarla y volver a
+        // encenderla tiene que devolverle ese mismo banco, como antes de la V66.
+        Vacante v = vacante("PUBLICADA", true, null);
+        elBancoDelNivelEsPrestado();
+        when(postulaciones.countByVacanteId(VACANTE)).thenReturn(1L);
+
+        servicio.definirAplicacionEvaluacion(QUIEN, VACANTE, false);
+
+        assertThat(v.isAplicaEvaluacion()).isFalse();
+        assertThat(v.getOrigenPreguntas()).isEqualTo(Vacante.ORIGEN_NIVEL);
+        verify(auditoria).registrar(ORGANIZACION, QUIEN, "definir_aplicacion_evaluacion",
+                "vacante", VACANTE, Map.of("aplicaEvaluacion", true),
+                Map.of("aplicaEvaluacion", false), null);
+
+        servicio.definirAplicacionEvaluacion(QUIEN, VACANTE, true);
+
+        assertThat(v.isAplicaEvaluacion()).isTrue();
+        assertThat(v.getOrigenPreguntas()).isEqualTo(Vacante.ORIGEN_NIVEL);
+        verify(versionesBanco, never()).preguntasPropiasDe(VACANTE, "PUBLICADA");
+    }
+
+    @Test
+    @DisplayName("QA-PP-08: con postulantes, encender una que estaba apagada tampoco le cambia "
+            + "el origen")
+    void conPostulantesEncenderUnaApagadaConservaElOrigen() {
+        Vacante v = vacante("PUBLICADA", false, null);
+        elBancoDelNivelEsPrestado();
+        when(postulaciones.countByVacanteId(VACANTE)).thenReturn(2L);
+
+        servicio.definirAplicacionEvaluacion(QUIEN, VACANTE, true);
+
+        assertThat(v.isAplicaEvaluacion()).isTrue();
+        assertThat(v.getOrigenPreguntas()).isEqualTo(Vacante.ORIGEN_NIVEL);
+        verify(vacantes).save(v);
+    }
+
+    /**
+     * Sin banco PROPIO del nivel, el que rinde es el de RENASER: el resolutor contesta a otra
+     * organización para el banco, y ella sí lo tiene publicado.
+     */
+    private void elBancoDelNivelEsPrestado() {
+        Long renaser = 99L;
+        org.mockito.Mockito.lenient()
+                .when(versionesBanco.laPublicadaDelNivel(ORGANIZACION, "NIVEL", NIVEL))
+                .thenReturn(Optional.empty());
+        org.mockito.Mockito.lenient()
+                .when(dueno.duenoDe(ORGANIZACION,
+                        com.renaser.ai.ai_engine.organizacion.service.Instrumento.BANCO))
+                .thenReturn(renaser);
+        org.mockito.Mockito.lenient()
+                .when(versionesBanco.laPublicadaDelNivel(renaser, "NIVEL", NIVEL))
+                .thenReturn(Optional.of(com.renaser.ai.ai_engine.perfilintegral.entity.VersionBanco
+                        .builder().id(16L).tipoBanco("NIVEL").nivelPuestoCodigo(NIVEL)
+                        .estado("PUBLICADA").minutosObjetivo(35).build()));
+    }
+
+    @Test
+    @DisplayName("QA-PP-08: publicada y sin postulantes, apagar el banco prestado sí lo deja "
+            + "(AC-01c)")
+    void publicadaSinPostulantesElPrestadoSeDeja() {
+        // La línea es la primera postulación, no la publicación: antes de ella, el
+        // préstamo se deja al apagarla igual que en un borrador.
+        Vacante v = vacante("PUBLICADA", true, null);
+        when(versionesBanco.laPublicadaDelNivel(ORGANIZACION, "NIVEL", NIVEL))
+                .thenReturn(Optional.empty());
+        when(postulaciones.countByVacanteId(VACANTE)).thenReturn(0L);
+
+        servicio.definirAplicacionEvaluacion(QUIEN, VACANTE, false);
+
+        assertThat(v.isAplicaEvaluacion()).isFalse();
+        assertThat(v.getOrigenPreguntas()).isEqualTo(Vacante.ORIGEN_VACANTE);
     }
 
     @Test
@@ -703,7 +851,7 @@ class ServicioVacantesPanelImplTest {
         Vacante v = vacante("PUBLICADA", false, null);
         v.setInstrumentoEtapaTecnica("CUESTIONARIO_TECNICO");
         v.setVersionPlantillaPruebaId(null);
-        when(versionesBanco.findFirstByVacanteIdAndEstado(VACANTE, "PUBLICADA"))
+        when(versionesBanco.cuestionarioTecnicoDe(VACANTE, "PUBLICADA"))
                 .thenReturn(Optional.of(
                         com.renaser.ai.ai_engine.perfilintegral.entity.VersionBanco.builder()
                                 .id(70L).estado("PUBLICADA").minutosObjetivo(60).build()));

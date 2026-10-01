@@ -46,7 +46,59 @@ public interface VersionBancoRepository extends JpaRepository<VersionBanco, Long
 
     List<VersionBanco> findByOrganizacionIdAndEstado(Long organizacionId, String estado);
 
-    // El cuestionario técnico de una vacante: a lo sumo un BORRADOR y una PUBLICADA
-    // (índices parciales de V42).
-    java.util.Optional<VersionBanco> findFirstByVacanteIdAndEstado(Long vacanteId, String estado);
+    /**
+     * El cuestionario técnico de una vacante: a lo sumo un BORRADOR y una PUBLICADA (índices
+     * parciales de V42, con el propósito desde la V66).
+     *
+     * <p>⚠️ <b>Filtra por propósito, y es lo que importa.</b> Desde la V66 una vacante tiene
+     * además sus preguntas del Perfil Integral en la misma tabla; sin el filtro, la etapa
+     * técnica podía tomar esas preguntas en vez de su cuestionario.
+     */
+    @Query("""
+            select v from VersionBanco v
+             where v.vacanteId = :vacanteId and v.estado = :estado
+               and v.proposito = 'CUESTIONARIO_TECNICO'""")
+    java.util.Optional<VersionBanco> cuestionarioTecnicoDe(@Param("vacanteId") Long vacanteId,
+                                                           @Param("estado") String estado);
+
+    /** Las preguntas propias del Perfil Integral de una vacante: una BORRADOR y una PUBLICADA. */
+    @Query("""
+            select v from VersionBanco v
+             where v.vacanteId = :vacanteId and v.estado = :estado
+               and v.proposito = 'PERFIL_INTEGRAL'""")
+    java.util.Optional<VersionBanco> preguntasPropiasDe(@Param("vacanteId") Long vacanteId,
+                                                        @Param("estado") String estado);
+
+    /**
+     * Las preguntas propias publicadas de una empresa, de todas sus vacantes: la biblioteca de
+     * la que se copia. Por la organización de la fila, que es la de la vacante.
+     */
+    @Query("""
+            select v from VersionBanco v
+             where v.organizacionId = :organizacionId and v.estado = 'PUBLICADA'
+               and v.proposito = 'PERFIL_INTEGRAL'""")
+    List<VersionBanco> propiasPublicadasDe(@Param("organizacionId") Long organizacionId);
+
+    /**
+     * Las preguntas propias en curso de todas las vacantes de una empresa: su BORRADOR y su
+     * PUBLICADA. La lista de vacantes las lee de una vez para decir en qué punto está cada
+     * una, en vez de dos consultas por fila.
+     */
+    @Query("""
+            select v from VersionBanco v
+             where v.organizacionId = :organizacionId and v.vacanteId is not null
+               and v.estado in ('BORRADOR', 'PUBLICADA')
+               and v.proposito = 'PERFIL_INTEGRAL'""")
+    List<VersionBanco> propiasEnCursoDe(@Param("organizacionId") Long organizacionId);
+
+    /**
+     * Los niveles para los que una empresa tiene un banco PROPIO publicado. Es la misma
+     * regla que {@link #laPublicadaDelNivel} con {@code tipoBanco = 'NIVEL'}, pero de una vez
+     * para todos los niveles: la lista de vacantes la necesita en cada fila.
+     */
+    @Query("""
+            select distinct v.nivelPuestoCodigo from VersionBanco v
+             where v.organizacionId = :organizacionId and v.tipoBanco = 'NIVEL'
+               and v.estado = 'PUBLICADA' and v.nivelPuestoCodigo is not null""")
+    List<String> nivelesConBancoPublicado(@Param("organizacionId") Long organizacionId);
 }

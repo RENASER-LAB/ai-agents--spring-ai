@@ -26,6 +26,15 @@ public interface ServicioEvaluacion {
                          String nivelPuestoCodigo);
 
     /**
+     * La evaluación del Perfil Integral de una vacante con preguntas propias (V66).
+     *
+     * <p>Hermana de {@link #crearAlPostular}: se crea al postular y queda atada a la versión
+     * publicada de ese momento (RF-138). Sin plantilla —su tiempo lo dice la versión— y sin
+     * {@code vigenteHasta}: no se reutiliza en otra postulación.
+     */
+    Long crearDePreguntasPropias(Long organizacionId, Long usuarioId, Long vacanteId);
+
+    /**
      * El examen de la etapa técnica, cuando la vacante rinde el cuestionario CAZATALENTOS.
      *
      * <p>Se crea al ENTRAR en la etapa —no al postular— porque hasta que el equipo no lo

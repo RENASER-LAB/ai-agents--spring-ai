@@ -237,6 +237,10 @@ public class FlujoPlataformaIT {
                  "tipoCierre": "PERMANENTE", "responsableUsuarioId": %d}"""
                 .formatted(solicitudId, puestoId, anaId))
                 .andReturn().getResponse().getContentAsString(), "id"));
+        // Desde la V66 una vacante nueva de ACME (sin banco propio) nace con preguntas propias.
+        // Esta prueba mira el costo y el tope de la IA, no el banco: se la deja como una
+        // vacante de antes de la V66, que sigue rindiendo el banco de Renaser (AC-01c).
+        jdbc.update("update vacante set origen_preguntas = 'NIVEL' where id = ?", vacanteAcmeId);
         Long plantillaId = jdbc.queryForObject("""
                 select id from plantilla_evaluacion
                  where organizacion_id = %d and nivel_puesto_codigo = 'EJECUCION'"""

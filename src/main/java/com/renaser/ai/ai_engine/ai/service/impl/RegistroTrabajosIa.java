@@ -1,6 +1,7 @@
 package com.renaser.ai.ai_engine.ai.service.impl;
 
 import com.renaser.ai.ai_engine.ai.model.TrabajoIa;
+import com.renaser.ai.ai_engine.ai.repository.EjecucionIaRepository;
 import com.renaser.ai.ai_engine.ai.repository.TrabajoIaRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -36,6 +37,7 @@ import java.util.stream.Collectors;
 public class RegistroTrabajosIa {
 
     private final TrabajoIaRepository trabajos;
+    private final EjecucionIaRepository ejecuciones;
 
     /**
      * Crea el trabajo de un agente si de verdad hace falta.
@@ -74,6 +76,47 @@ public class RegistroTrabajosIa {
                 .intentos(0)
                 .creadoEn(Instant.now())
                 .build()));
+    }
+
+    /**
+     * Crea el trabajo aunque ya haya uno TERMINADO: solo lo frena uno vivo.
+     *
+     * <p>Es el de la recalificación (V66): corregir la guía obliga a volver a calificar a
+     * quien ya tiene nota, así que lo terminado no exime —rehacerlo es justo lo que se
+     * pide—. Uno vivo sí: dos a la vez pagarían dos veces por la misma persona, y el que
+     * está corriendo ya leerá la guía nueva (o el puente descartará su resultado).
+     */
+    @Transactional
+    public Optional<TrabajoIa> crearSiNoHayUnoVivo(Long organizacionId, Long postulacionId,
+                                                  String agenteCodigo, String modo) {
+        boolean vivo = trabajos
+                .findFirstByPostulacionIdAndAgenteCodigoAndModoOrderByIdDesc(
+                        postulacionId, agenteCodigo, modo)
+                .map(t -> "PENDIENTE".equals(t.getEstado()) || "EN_CURSO".equals(t.getEstado())
+                        || "EN_ESPERA".equals(t.getEstado()))
+                .orElse(false);
+        if (vivo) {
+            return Optional.empty();
+        }
+        return Optional.of(trabajos.save(TrabajoIa.builder()
+                .organizacionId(organizacionId)
+                .agenteCodigo(agenteCodigo)
+                .modo(modo)
+                .postulacionId(postulacionId)
+                .referenciaTabla("postulacion")
+                .referenciaId(postulacionId)
+                .estado("PENDIENTE")
+                .intentos(0)
+                .creadoEn(Instant.now())
+                .build()));
+    }
+
+    /** El porqué del último intento fallido de un trabajo, o vacío si no quedó escrito. */
+    @Transactional(readOnly = true)
+    public Optional<String> motivoDelUltimoFallo(Long trabajoIaId) {
+        return ejecuciones.findFirstByTrabajoIaIdAndEsExitosaFalseOrderByIdDesc(trabajoIaId)
+                .map(e -> e.getError())
+                .filter(error -> error != null && !error.isBlank());
     }
 
     /**

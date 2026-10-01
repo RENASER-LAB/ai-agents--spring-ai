@@ -42,6 +42,7 @@ public final class ValidadorDetalleV3 {
             case "SJT-R" -> sjtR(opcionesDeLaPregunta, detalle);
             case "SEC" -> sec(opcionesDeLaPregunta, detalle);
             case "INV", "DE" -> marcadas(tipo, opcionesDeLaPregunta, detalle);
+            case "OPCION_MULTIPLE" -> alMenosUnaMarcada(opcionesDeLaPregunta, detalle);
             case "CD" -> campos(detalle);
             default -> throw new IllegalArgumentException(
                     "El tipo " + tipo + " no se responde con detalle");
@@ -50,7 +51,8 @@ public final class ValidadorDetalleV3 {
 
     /** Los formatos que necesitan detalle. El resto se sigue respondiendo con opción o texto. */
     public static boolean necesitaDetalle(String tipo) {
-        return List.of("EF-4", "SJT-R", "SEC", "INV", "DE", "CD").contains(tipo);
+        // OPCION_MULTIPLE es de las preguntas propias (V66): se marcan varias, como un INV.
+        return List.of("EF-4", "SJT-R", "SEC", "INV", "DE", "CD", "OPCION_MULTIPLE").contains(tipo);
     }
 
     /**
@@ -73,7 +75,7 @@ public final class ValidadorDetalleV3 {
             case "EF-4" -> Set.of("mas", "menos");
             case "SJT-R" -> Set.of("calificaciones");
             case "SEC" -> Set.of("orden");
-            case "INV", "DE" -> Set.of("marcadas");
+            case "INV", "DE", "OPCION_MULTIPLE" -> Set.of("marcadas");
             case "CD" -> Set.of("campos");
             default -> Set.of();
         };
@@ -134,6 +136,18 @@ public final class ValidadorDetalleV3 {
                     "Un " + tipo + " no puede traer el mismo elemento marcado dos veces");
         }
         exigirQueSean(suyas, marcadas);
+    }
+
+    /**
+     * La opción múltiple de las preguntas propias: como un INV, pero sin «ninguna». Para
+     * darla por respondida hace falta al menos una marcada (spec, punto 11).
+     */
+    private static void alMenosUnaMarcada(Set<Long> suyas, Map<String, Object> detalle) {
+        marcadas("OPCION_MULTIPLE", suyas, detalle);
+        if (comoIds(detalle.get("marcadas"), "marcadas").isEmpty()) {
+            throw new IllegalArgumentException(
+                    "Una pregunta de opción múltiple se responde marcando al menos una opción");
+        }
     }
 
     private static void campos(Map<String, Object> detalle) {

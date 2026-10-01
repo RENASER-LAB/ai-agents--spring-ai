@@ -127,6 +127,21 @@ public class ManejadorErrores {
         return problema;
     }
 
+    // Las preguntas propias de una vacante no se pueden publicar o guardar así (V66): 400
+    // con la lista ENTERA en `faltas`, para que el panel la pinte como lista y quien publica
+    // lo arregle de una pasada.
+    @ExceptionHandler(com.renaser.ai.ai_engine.perfilintegral.service.PreguntasInvalidasException.class)
+    public ProblemDetail preguntasInvalidas(
+            com.renaser.ai.ai_engine.perfilintegral.service.PreguntasInvalidasException ex,
+            WebRequest request) {
+        log.warn("Preguntas propias inválidas - Path: {}, Faltas: {}",
+                request.getDescription(false), ex.getFaltas().size());
+        ProblemDetail problema = construir(HttpStatus.BAD_REQUEST,
+                "Las preguntas no se pueden guardar así", "preguntas-invalidas", ex.getMessage());
+        problema.setProperty("faltas", ex.getFaltas());
+        return problema;
+    }
+
     // El Excel de colaboradores (V64), todo o nada: 400 con TODOS los errores {fila, columna,
     // valor, mensaje}, que la pantalla pinta en una tabla. Sin ver_sueldos, ningún valor de
     // sueldo viaja aquí: el servicio no lo pone.

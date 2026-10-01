@@ -54,6 +54,14 @@ public class BancoPreguntasController {
 
     // ---------- Versiones ----------
 
+    @GetMapping("/propio")
+    @PreAuthorize("@permisos.tiene('ver_banco_preguntas')")
+    @Operation(summary = "Si la empresa tiene banco por nivel propio. Sin él, sus preguntas se "
+            + "escriben en cada vacante (V66)")
+    public Map<String, Boolean> propio() {
+        return Map.of("propio", servicio.tieneBancoPropio(permisos.actual()));
+    }
+
     @GetMapping("/versiones")
     @PreAuthorize("@permisos.tiene('ver_banco_preguntas')")
     @Operation(summary = "Las versiones visibles: las propias más la biblioteca global")

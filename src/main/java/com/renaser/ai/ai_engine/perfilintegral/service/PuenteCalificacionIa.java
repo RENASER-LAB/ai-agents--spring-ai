@@ -4,6 +4,7 @@ import com.renaser.ai.ai_engine.perfilintegral.dto.DtosCalificacionIa.InsumoCv;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosCalificacionIa.InsumoDatos;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosCalificacionIa.ResultadoDatos;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosCalificacionIa.InsumoPerfil;
+import com.renaser.ai.ai_engine.perfilintegral.dto.DtosCalificacionIa.InsumoPorPuntos;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosCalificacionIa.InsumoRespuestas;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosCalificacionIa.ResultadoCv;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosCalificacionIa.ResultadoEvaluador;
@@ -85,6 +86,41 @@ public interface PuenteCalificacionIa {
     InsumoRespuestas insumoRespuestas(Long postulacionId);
 
     void guardarNotasAbiertas(Long postulacionId, Long ejecucionIaId, ResultadoEvaluador resultado);
+
+    // ---------- Las preguntas propias de la vacante (método PUNTOS, V66) ----------
+
+    /**
+     * Lo que el evaluador necesita para calificar las abiertas por puntos: las que tienen
+     * puntos y algo escrito, sin las ajustadas a mano (esas no se tocan), con su máximo, su
+     * criterio y los datos de la vacante.
+     *
+     * @return nulo si la evaluación de esa postulación no es de este método: el evaluador
+     *         sigue entonces por su camino de siempre
+     */
+    InsumoPorPuntos insumoPorPuntos(Long postulacionId);
+
+    /**
+     * Guarda las notas de las abiertas, con la red de seguridad del backend: descarta
+     * respuestas que no son de esta evaluación y notas sin explicación, acota cada nota entre
+     * 0 y el máximo de su pregunta, y nunca guarda una nota global.
+     *
+     * @param versionGuia    con qué guía se calcularon (la del insumo)
+     * @param recalificacion si viene de corregir la guía: entonces las notas de la persona se
+     *                       aplican juntas o ninguna, y al terminar se recalculan sus notas
+     *                       sin moverla de etapa
+     * @return false si la guía cambió mientras se calificaba: no se guardó nada y hay que
+     *         volver a pedirlo con la nueva
+     */
+    boolean guardarNotasPorPuntos(Long postulacionId, Long ejecucionIaId,
+                                  ResultadoEvaluador resultado, int versionGuia,
+                                  boolean recalificacion);
+
+    /**
+     * Recalcula la nota del Perfil Integral y el grupo de prioridad <b>sin llamar a la IA y
+     * sin mover a nadie de etapa</b>: el camino del ajuste a mano, del cambio de puntos y de
+     * la recalificación. El grupo se decide con los hallazgos ya guardados del retrato.
+     */
+    void recalcularSinMover(Long postulacionId);
 
     // ---------- El cuestionario técnico de la vacante (etapa 2) ----------
     // Lo mismo contra el otro examen de la postulación. El método es siempre CRITERIOS y la

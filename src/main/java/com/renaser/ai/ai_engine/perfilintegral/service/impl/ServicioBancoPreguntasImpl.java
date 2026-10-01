@@ -88,6 +88,13 @@ public class ServicioBancoPreguntasImpl implements ServicioBancoPreguntas {
     }
 
     @Override
+    public boolean tieneBancoPropio(ContextoUsuario quien) {
+        // Propio = el resolutor contesta la propia empresa: la plataforma, o una empresa
+        // que ya se copió el banco antes de que eso dejara de ofrecerse (V66).
+        return quien.organizacionId().equals(dueno.duenoDe(quien.organizacionId(), Instrumento.BANCO));
+    }
+
+    @Override
     public List<VersionBancoResponse> listarVersiones(ContextoUsuario quien) {
         permisos.alcanceDe("ver_banco_preguntas");
         // El resolutor decide de quién es el banco que esta organización ve: el suyo si

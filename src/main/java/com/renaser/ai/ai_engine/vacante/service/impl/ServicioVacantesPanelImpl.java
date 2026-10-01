@@ -18,6 +18,7 @@ import com.renaser.ai.ai_engine.vacante.service.ServicioVacantesPanel;
 import com.renaser.ai.ai_engine.vacante.service.VacanteArchivada;
 import com.renaser.ai.ai_engine.vacante.dto.DtosVacante.*;
 import com.renaser.ai.ai_engine.perfilintegral.entity.PlantillaEvaluacion;
+import com.renaser.ai.ai_engine.perfilintegral.entity.VersionBanco;
 import com.renaser.ai.ai_engine.perfilintegral.repository.EvaluacionRepository;
 import com.renaser.ai.ai_engine.perfilintegral.repository.PlantillaEvaluacionRepository;
 import com.renaser.ai.ai_engine.perfilintegral.repository.VersionBancoRepository;
@@ -47,10 +48,14 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.text.Normalizer;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.function.Function;
 
 @Service
 @RequiredArgsConstructor
@@ -60,6 +65,8 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
     /** Los dos instrumentos de la etapa técnica. Uno por vacante, nunca los dos (V43). */
     public static final String PLANTILLA = "PLANTILLA";
     public static final String CUESTIONARIO_TECNICO = "CUESTIONARIO_TECNICO";
+    /** La tercera opción de «Qué responderá quien postule»: la evaluación apagada (V66). */
+    public static final String SIN_EVALUACION = "SIN_EVALUACION";
 
     /**
      * El suelo del reloj de la etapa técnica, en minutos. El mismo que exige publicar una
@@ -71,6 +78,14 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
     /** Los dos estados que este servicio pregunta por su nombre. */
     private static final String ESTADO_CERRADA = "CERRADA";
     private static final String ESTADO_PUBLICADA = "PUBLICADA";
+
+    /**
+     * En qué punto están las preguntas propias de una fila de la lista: los mismos tres
+     * valores que el resumen del editor ({@code ServicioPreguntasVacanteImpl}).
+     */
+    private static final String PROPIAS_SIN_PREGUNTAS = "SIN_PREGUNTAS";
+    private static final String PROPIAS_BORRADOR = "BORRADOR";
+    private static final String PROPIAS_PUBLICADAS = "PUBLICADAS";
 
     /** El permiso que abre el lápiz de la lista y el PUT de la vacante. */
     private static final String PERMISO_EDITAR = "editar_vacante";
@@ -271,6 +286,11 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                 .cierraEn(datos.cierraEn())
                 .estado("BORRADOR")
                 .versionPesosId(pesos.getId())
+                // De dónde salen sus preguntas (V66): toda vacante nueva nace con sus preguntas
+                // propias, también en una empresa con banco propio publicado para el nivel
+                // (decisión del 30/09/2026). Ese banco se sigue pudiendo elegir después, en
+                // elegirOrigenDePreguntas; el de RENASER ya no se presta a las de otras empresas.
+                .origenPreguntas(Vacante.ORIGEN_VACANTE)
                 .responsableUsuarioId(datos.responsableUsuarioId())
                 .creadoEn(Instant.now())
                 .build());
@@ -504,6 +524,7 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
         // El catálogo de ciudades una vez para toda la lista, y solo si alguna la tiene.
         Map<String, OpcionUbigeo> ciudades =
                 ciudadesDe(filas.stream().map(Vacante::getCiudadUbigeo).toArray(String[]::new));
+        Function<Vacante, PreguntasDeLaFila> preguntas = preguntasDeLaLista(quien.organizacionId());
         return filas.stream()
                 // ⚠️ Sin el plazo vigente, y es deliberado: resolverlo pide la versión de la
                 // plantilla y los intentos abiertos de CADA vacante, o sea dos consultas por
@@ -513,8 +534,48 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                 .map(v -> comoPanel(v, porVacante.getOrDefault(v.getId(), 0),
                         puedeEditar(quien, alcanceDeEdicion, v),
                         alcanceDeArchivo, alcanceDeEliminacion, quien,
-                        PlazoDeLaPrueba.SIN_DATO, ciudadDe(v, ciudades)))
+                        PlazoDeLaPrueba.SIN_DATO, ciudadDe(v, ciudades), preguntas.apply(v)))
                 .toList();
+    }
+
+    /**
+     * Lo que una fila no lee de la propia vacante para decir de dónde salen sus preguntas: si
+     * su empresa tiene un banco PROPIO publicado para el nivel del puesto y en qué punto están
+     * sus preguntas propias. Vacío = no se miró.
+     */
+    private record PreguntasDeLaFila(Boolean bancoPropio, String estadoPropias) {}
+
+    /**
+     * {@code PreguntasDeLaFila} de cada vacante de la lista, con tres consultas para toda la
+     * lista y no por fila: los puestos de la empresa, los niveles con banco propio publicado y
+     * sus preguntas propias en curso.
+     *
+     * <p>Las reglas son las del detalle y el editor, no otras: el banco propio es el de
+     * {@code tieneBancoPropioDelNivel}, y una versión publicada manda sobre el
+     * borrador como en el resumen del editor. El estado solo se dice de las que rinden
+     * preguntas propias.
+     */
+    private Function<Vacante, PreguntasDeLaFila> preguntasDeLaLista(Long organizacionId) {
+        Map<Long, String> nivelDelPuesto = new HashMap<>();
+        for (Puesto puesto : puestos.findByOrganizacionIdOrderByNombre(organizacionId)) {
+            nivelDelPuesto.put(puesto.getId(), puesto.getNivelPuestoCodigo());
+        }
+        Set<String> nivelesConBanco =
+                new HashSet<>(versionesBanco.nivelesConBancoPublicado(organizacionId));
+        Map<Long, String> estadoDeLasPropias = new HashMap<>();
+        for (VersionBanco version : versionesBanco.propiasEnCursoDe(organizacionId)) {
+            String estado = ESTADO_PUBLICADA.equals(version.getEstado())
+                    ? PROPIAS_PUBLICADAS : PROPIAS_BORRADOR;
+            estadoDeLasPropias.merge(version.getVacanteId(), estado,
+                    (antes, otra) -> PROPIAS_PUBLICADAS.equals(antes) ? antes : otra);
+        }
+        return v -> {
+            String nivel = nivelDelPuesto.get(v.getPuestoId());
+            String estado = Vacante.ORIGEN_VACANTE.equals(v.getOrigenPreguntas())
+                    ? estadoDeLasPropias.getOrDefault(v.getId(), PROPIAS_SIN_PREGUNTAS)
+                    : null;
+            return new PreguntasDeLaFila(nivel != null && nivelesConBanco.contains(nivel), estado);
+        };
     }
 
     /**
@@ -543,7 +604,9 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                 puedeEditar(quien, alcanceDeEdicionDe(quien), vacante),
                 alcanceDeArchivoDe(quien), alcanceDeEliminacionDe(quien), quien,
                 loQueRigeHoy(quien, vacante),
-                ciudadDe(vacante, ciudadesDe(vacante.getCiudadUbigeo())));
+                ciudadDe(vacante, ciudadesDe(vacante.getCiudadUbigeo())),
+                // El estado de las propias no: el detalle lo lee del editor, con sus puntos.
+                new PreguntasDeLaFila(tieneBancoPropioDelNivel(vacante), null));
     }
 
     /**
@@ -574,7 +637,7 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
             // de la vacante y, si no los fijó, los del banco que le toca. Y no usa
             // `intento_prueba`, así que no hay ningún examen al que mover nada.
             Integer minutos = minutosVacante != null ? minutosVacante
-                    : versionesBanco.findFirstByVacanteIdAndEstado(v.getId(), "PUBLICADA")
+                    : versionesBanco.cuestionarioTecnicoDe(v.getId(), "PUBLICADA")
                             .map(banco -> banco.getMinutosObjetivo())
                             .orElse(null);
             return new PlazoDeLaPrueba(null, minutos, null, 0, 0);
@@ -712,7 +775,7 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
         //
         // Con la evaluación apagada no hace falta: su única evaluación es la prueba.
         if (vacante.isAplicaEvaluacion()) {
-            exigirBancoDelNivel(vacante);
+            exigirDeDondeSalenSusPreguntas(vacante);
         }
         // "Es obligatoria para todo puesto" (RF-73), pero desde el ciclo 2 hay DOS formas de
         // cumplirlo y la vacante dice cuál usa: la prueba del puesto de siempre, o el
@@ -804,17 +867,42 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
         if ("CERRADA".equals(vacante.getEstado())) {
             throw new IllegalStateException("Una vacante cerrada no se edita");
         }
-        // Encenderla en una vacante ya publicada y sin banco del nivel dejaría al siguiente
-        // candidato chocando contra un error al postular: el aviso tiene que salir aquí.
-        if (aplica && "PUBLICADA".equals(vacante.getEstado())) {
-            exigirBancoDelNivel(vacante);
-        }
         boolean anterior = vacante.isAplicaEvaluacion();
+        String origenAntes = vacante.getOrigenPreguntas();
+        /*
+         * ⚠️ El interruptor de antes de la V66 también mueve el origen, con la misma regla que
+         * elegirOrigenDePreguntas (AC-01c). Una vacante que rinde el banco del nivel sin tener
+         * banco PROPIO lo rinde prestado: al apagarla, ese préstamo se deja y no vuelve; y al
+         * encender una que estaba apagada, no lo estrena. En los dos casos pasa a sus preguntas
+         * propias. Sin esto, apagar y encender por aquí devolvía el banco de RENASER.
+         *
+         * ⚠️ Pero solo antes de la primera postulación (QA-PP-08). Con gente dentro, de dónde
+         * salen las preguntas no se mueve (AC-16): el interruptor apaga y enciende como antes
+         * de la V66, sin tocar el origen, y al volver a encenderla rinde el mismo banco con el
+         * que ya se midieron sus candidatos. Pasarla a VACANTE aquí la dejaba sin evaluación:
+         * sus preguntas propias no existen y ya no se pueden estrenar.
+         */
+        if (aplica != anterior && Vacante.ORIGEN_NIVEL.equals(origenAntes)
+                && !yaTienePostulantes(vacante) && !tieneBancoPropioDelNivel(vacante)) {
+            vacante.setOrigenPreguntas(Vacante.ORIGEN_VACANTE);
+        }
+        // Encenderla en una vacante ya publicada sin de dónde sacar sus preguntas dejaría al
+        // siguiente candidato chocando contra un error al postular: el aviso tiene que salir aquí.
+        if (aplica && "PUBLICADA".equals(vacante.getEstado())) {
+            exigirDeDondeSalenSusPreguntas(vacante);
+        }
         vacante.setAplicaEvaluacion(aplica);
         vacantes.save(vacante);
+        Map<String, Object> antes = new java.util.LinkedHashMap<>();
+        Map<String, Object> despues = new java.util.LinkedHashMap<>();
+        antes.put("aplicaEvaluacion", anterior);
+        despues.put("aplicaEvaluacion", aplica);
+        if (!Objects.equals(origenAntes, vacante.getOrigenPreguntas())) {
+            antes.put("origenPreguntas", origenAntes);
+            despues.put("origenPreguntas", vacante.getOrigenPreguntas());
+        }
         auditoria.registrar(quien.organizacionId(), quien, "definir_aplicacion_evaluacion",
-                "vacante", id, Map.of("aplicaEvaluacion", anterior),
-                Map.of("aplicaEvaluacion", aplica), null);
+                "vacante", id, antes, despues, null);
     }
 
     @Override
@@ -944,7 +1032,7 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
      */
     private void exigirInstrumentoTecnico(Vacante vacante) {
         if (CUESTIONARIO_TECNICO.equals(vacante.getInstrumentoEtapaTecnica())) {
-            versionesBanco.findFirstByVacanteIdAndEstado(vacante.getId(), "PUBLICADA")
+            versionesBanco.cuestionarioTecnicoDe(vacante.getId(), "PUBLICADA")
                     .orElseThrow(() -> new IllegalStateException(
                             "Esta vacante rinde el cuestionario técnico y todavía no hay ninguno "
                                     + "publicado: apruébalo antes de publicar la vacante"));
@@ -1035,6 +1123,116 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                     + "evaluación. Publica una, o apaga la evaluación del banco en esta "
                     + "vacante y quédate con la prueba del puesto");
         }
+    }
+
+    /**
+     * Lo que exige tener preguntas: el banco del nivel, o las preguntas propias publicadas
+     * (V66). Con «Preguntas propias», la vacante no se publica sin su versión publicada: el
+     * cartel «Todo listo» y el botón del panel miran esta misma regla (AC-17).
+     */
+    private void exigirDeDondeSalenSusPreguntas(Vacante vacante) {
+        if (vacante.tienePreguntasPropias()) {
+            if (versionesBanco.preguntasPropiasDe(vacante.getId(), "PUBLICADA").isEmpty()) {
+                throw new IllegalStateException("Esta vacante tiene preguntas propias y todavía "
+                        + "no están publicadas: quien postule no tendría qué responder. "
+                        + "Publícalas en «Escribir las preguntas» antes de publicar la vacante.");
+            }
+            return;
+        }
+        exigirBancoDelNivel(vacante);
+    }
+
+    /**
+     * Si la empresa tiene un banco PROPIO publicado para ese nivel (V66).
+     *
+     * <p>⚠️ <b>No pasa por {@link DuenoDelInstrumento}, y es a propósito</b>: el resolutor
+     * contesta el banco de RENASER a una empresa sin banco propio, y eso es justo el préstamo
+     * que deja de ofrecerse a las vacantes nuevas. Aquí se miran solo las filas de la propia
+     * empresa. RENASER lo tiene porque es suyo, no por ser una excepción.
+     */
+    private boolean tieneBancoPropioDelNivel(Long organizacionId, String nivel) {
+        return nivel != null
+                && versionesBanco.laPublicadaDelNivel(organizacionId, "NIVEL", nivel).isPresent();
+    }
+
+    private boolean tieneBancoPropioDelNivel(Vacante vacante) {
+        return tieneBancoPropioDelNivel(vacante.getOrganizacionId(), nivelDe(vacante));
+    }
+
+    private String nivelDe(Vacante vacante) {
+        return vacante.getPuestoId() == null ? null
+                : puestos.findByIdAndOrganizacionId(vacante.getPuestoId(), vacante.getOrganizacionId())
+                        .map(Puesto::getNivelPuestoCodigo).orElse(null);
+    }
+
+    @Override
+    @Transactional
+    public void elegirOrigenDePreguntas(ContextoUsuario quien, Long id, String origen) {
+        Vacante vacante = laQueSePuedeTocar(quien, id);
+        if ("CERRADA".equals(vacante.getEstado())) {
+            throw new IllegalStateException("Una vacante cerrada no se edita");
+        }
+        String pedido = origen == null ? "" : origen.trim().toUpperCase(java.util.Locale.ROOT);
+        String actual = origenEfectivo(vacante);
+        if (pedido.equals(actual)) {
+            return;
+        }
+        boolean propio = tieneBancoPropioDelNivel(vacante);
+        boolean aplica;
+        String nuevo;
+        switch (pedido) {
+            case SIN_EVALUACION -> {
+                aplica = false;
+                // El banco prestado desaparece al dejarlo: no se puede volver a elegir, así
+                // que no se queda guardado como si siguiera disponible (AC-01c).
+                nuevo = Vacante.ORIGEN_NIVEL.equals(vacante.getOrigenPreguntas()) && !propio
+                        ? Vacante.ORIGEN_VACANTE : vacante.getOrigenPreguntas();
+            }
+            case Vacante.ORIGEN_NIVEL -> {
+                if (!propio) {
+                    throw new IllegalArgumentException("Tu empresa no tiene un banco propio "
+                            + "publicado para el nivel de este puesto: sus preguntas se escriben en "
+                            + "la vacante, en «Preguntas propias de esta vacante».");
+                }
+                aplica = true;
+                nuevo = Vacante.ORIGEN_NIVEL;
+            }
+            case Vacante.ORIGEN_VACANTE -> {
+                aplica = true;
+                nuevo = Vacante.ORIGEN_VACANTE;
+            }
+            default -> throw new IllegalArgumentException(
+                    "El origen de las preguntas es SIN_EVALUACION, NIVEL o VACANTE");
+        }
+        // Desde la primera postulación, de dónde salen las preguntas no se cambia: todos sus
+        // candidatos se miden con la misma vara (es la regla de exigirVaraQuieta).
+        if (yaTienePostulantes(vacante)) {
+            throw new IllegalStateException("Esta vacante ya tiene postulantes y de dónde salen "
+                    + "sus preguntas no se cambia: todos sus candidatos se miden con la misma "
+                    + "vara. Para estrenar otras preguntas, ábrelas en la siguiente convocatoria.");
+        }
+        vacante.setAplicaEvaluacion(aplica);
+        vacante.setOrigenPreguntas(nuevo);
+        if (aplica && "PUBLICADA".equals(vacante.getEstado())) {
+            exigirDeDondeSalenSusPreguntas(vacante);
+        }
+        vacantes.save(vacante);
+        auditoria.registrar(quien.organizacionId(), quien, "elegir_origen_preguntas",
+                "vacante", id, Map.of("origen", actual), Map.of("origen", origenEfectivo(vacante)), null);
+    }
+
+    /**
+     * La línea desde la que de dónde salen las preguntas ya no se cambia (AC-16): la primera
+     * postulación. La misma para el endpoint nuevo y para el interruptor de antes de la V66.
+     */
+    private boolean yaTienePostulantes(Vacante vacante) {
+        return !"BORRADOR".equals(vacante.getEstado())
+                && postulaciones.countByVacanteId(vacante.getId()) > 0;
+    }
+
+    /** SIN_EVALUACION, NIVEL o VACANTE: lo que la sección «Qué responderá» enseña marcado. */
+    private static String origenEfectivo(Vacante vacante) {
+        return vacante.isAplicaEvaluacion() ? vacante.getOrigenPreguntas() : SIN_EVALUACION;
     }
 
     /**
@@ -1526,7 +1724,9 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
     private VacantePanel comoPanel(Vacante v, int postulantesEnCarrera, boolean puedeEditar,
                                    FiltroAlcance alcanceDeArchivo,
                                    FiltroAlcance alcanceDeEliminacion, ContextoUsuario quien,
-                                   PlazoDeLaPrueba plazo, CiudadDeLaVacante ciudad) {
+                                   PlazoDeLaPrueba plazo, CiudadDeLaVacante ciudad,
+                                   PreguntasDeLaFila preguntas) {
+        Boolean bancoPropio = preguntas.bancoPropio();
         boolean alcanzaParaArchivar = alcanceDeArchivo != null
                 && alcance.alcanzaALaVacante(quien, alcanceDeArchivo, v);
         // ⚠️ `puedeArchivar` NO mira cuánta gente sigue en carrera. El icono tiene que estar
@@ -1558,7 +1758,14 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                 postulantesEnCarrera, v.getArchivadaEn(), puedeEditar,
                 puedeArchivar, puedeDesarchivar, puedeEliminar,
                 v.getPruebaCierraEn(), plazo.modalidad(), plazo.minutos(), plazo.dias(),
-                plazo.abiertosSinPlazoPropio(), plazo.abiertosConPlazoPropio());
+                plazo.abiertosSinPlazoPropio(), plazo.abiertosConPlazoPropio(),
+                v.getOrigenPreguntas(), bancoPropio,
+                // Prestado = rinde el banco del nivel y no es de la empresa: el de RENASER.
+                bancoPropio == null ? null
+                        : v.isAplicaEvaluacion()
+                                && Vacante.ORIGEN_NIVEL.equals(v.getOrigenPreguntas())
+                                && Boolean.FALSE.equals(bancoPropio),
+                preguntas.estadoPropias());
     }
 
     // ============ La remuneración ============

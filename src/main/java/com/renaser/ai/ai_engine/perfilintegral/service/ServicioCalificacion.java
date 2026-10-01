@@ -32,6 +32,31 @@ public interface ServicioCalificacion {
     }
 
     /**
+     * La nota de las preguntas propias de la vacante (método PUNTOS, V66).
+     *
+     * <p>Es la suma de sus criterios, de 0 a 100, sin ponderar cerradas y abiertas por cuántas
+     * hay (eso es {@link #notaCombinada}, que sigue siendo de los otros métodos).
+     *
+     * @return nulo si la evaluación de esa postulación no es de este método
+     */
+    NotaDelBanco notaDelBancoPorPuntos(Long postulacionId);
+
+    /**
+     * @param nota               la del banco, sobre 100; nula mientras falte alguna abierta
+     * @param completa           si todas sus preguntas con puntos tienen nota
+     * @param cerradasSobreCien  lo cerrado en porcentaje de su máximo, o nulo si no hay
+     * @param cerradas           cuántas cerradas con puntos tiene
+     * @param abiertasSobreCien  lo abierto ya calificado en porcentaje de su máximo, o nulo
+     * @param abiertasSobreCuatro la nota de cada abierta calificada llevada a 0–4, por el id
+     *                           de su respuesta: la escala que el retrato conoce
+     */
+    record NotaDelBanco(java.math.BigDecimal nota, boolean completa,
+                        java.math.BigDecimal cerradasSobreCien, int cerradas,
+                        java.math.BigDecimal abiertasSobreCien,
+                        java.util.Map<Long, java.math.BigDecimal> abiertasSobreCuatro) {
+    }
+
+    /**
      * La nota de la evaluación entera, sobre 100: lo cerrado y lo abierto ponderados por
      * cuántas preguntas produjo cada mitad. Sin nada calificado no se inventa un cero: nulo.
      *

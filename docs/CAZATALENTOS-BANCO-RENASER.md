@@ -23,12 +23,38 @@ anotadas en la hoja «Correcciones» de cada libro. Lo de la etapa 2 está en
 | Varía por | **Nivel** del puesto: DIR (18) · SUP (15) · OPE (12) |
 | No varía por | Puesto, empresa, rubro, familia |
 | Quién la redacta | Nadie: está escrita. El xlsx lo instruye en la cabecera de la columna del enunciado: *«Se aplica textualmente. No se reformula.»* |
-| Cuándo se envía | A todos los que postulan |
+| Cuándo se envía | A todos los que postulan **a una vacante que lo eligió**. Desde el 30/09/2026 se elige a mano: ver abajo |
 | Corte | Índice ≥ 60 · integridad ≠ 0 · máximo 1 bandera activa |
 | Tiempo | DIR 50–60 min (en dos sesiones) · SUP 40–45 · OPE 25–35 |
 
 **La IA no formula nada aquí.** Solo califica. La redacción de cada pregunta es parte del
 instrumento: cambiarla cambia lo que mide.
+
+---
+
+## Qué vacantes lo rinden (30/09/2026)
+
+**Desde la `V66` toda vacante nueva nace con «Preguntas propias de esta vacante», también en
+RENASER.** Este banco no cambia —ni sus preguntas, ni su método, ni el importador—, pero ya no
+llega solo: **para que una vacante lo rinda, alguien tiene que elegir «El banco de la empresa
+para su nivel»** en la vacante, sección «Qué responderá quien postule», y hacerlo antes de la
+primera postulación. Desde ahí el origen ya no se cambia: todos los candidatos de una vacante se
+miden con la misma vara. Decidido por el usuario el 30/09/2026, en lugar de que la vacante naciera
+con el banco marcado cuando la empresa lo tiene.
+
+⚠️ **Consecuencia operativa: cada vacante de RENASER que deba rendir los 15 formatos necesita ese
+paso a mano.** Por API es `POST /panel/vacantes/{id}/origen-preguntas` con `{"origen": "NIVEL"}`
+(ver [las APIs](09-APIS.md)). `scripts/sembrar-datos-de-prueba.py` y `scripts/cargar-convocatoria.py`
+ya lo hacen; los guiones sin versionar del árbol principal que publican vacantes —como
+`preparar-vacante-prueba.py`— todavía no, y sin él la vacante sale con preguntas propias vacías y
+no se puede publicar.
+
+**Las demás empresas ya no reciben este banco prestado.** «El banco de la empresa para su nivel»
+solo se ofrece si la empresa tiene uno **propio** publicado para ese nivel; RENASER lo tiene porque
+es suyo. Personalizar el banco —copiarse el de RENASER— **ya no se puede: responde 409**. Quien se
+lo copió antes conserva su copia, y **las vacantes que ya rendían el banco prestado lo siguen
+rindiendo**; si alguien les cambia de opción antes de la primera postulación, el préstamo
+desaparece y no vuelve.
 
 ---
 

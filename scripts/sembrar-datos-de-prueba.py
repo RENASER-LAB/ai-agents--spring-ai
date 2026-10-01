@@ -381,6 +381,9 @@ def sembrar(api, uid_equipo):
         nivel = NIVEL_DE_PUESTO[puesto_cod]
         if nivel not in plantillas_eval:
             raise RuntimeError(f"No hay plantilla de evaluación publicada para {nivel}")
+        # Desde el 30/09/2026 toda vacante nueva nace con sus preguntas propias: estas
+        # rinden el banco del nivel, así que se elige a mano antes de publicar.
+        api.post(f"/panel/vacantes/{v['id']}/origen-preguntas", {"origen": "NIVEL"})
         api.post(f"/panel/vacantes/{v['id']}/plantilla-evaluacion",
                  {"plantillaEvaluacionId": plantillas_eval[nivel]})
         api.post(f"/panel/vacantes/{v['id']}/plantilla-prueba",
