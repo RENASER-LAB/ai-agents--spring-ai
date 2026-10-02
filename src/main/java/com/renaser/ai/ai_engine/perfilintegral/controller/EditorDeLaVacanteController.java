@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.List;
@@ -34,8 +35,14 @@ import java.util.List;
  *
  * <p>No es un controlador por sí mismo (no lleva {@code @RestController}): solo lo son sus
  * hijos.
+ *
+ * <p>⚠️ El {@code @RequestMapping} de aquí no publica nada: el de cada hijo lo sustituye,
+ * porque Spring toma el más cercano en la jerarquía. Está para que el {@code {vacanteId}} de
+ * los métodos tenga plantilla en la propia clase, que es donde la busca SonarCloud (S6856).
+ * Sin él, el gate cae por fiabilidad aunque la ruta funcione.
  */
-public class EditorDeLaVacanteController {
+@RequestMapping("/api/v1/panel/vacantes/{vacanteId}")
+public abstract class EditorDeLaVacanteController {
 
     private final EditorDeLaVacante editor;
     protected final Permisos permisos;
