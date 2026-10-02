@@ -1121,6 +1121,101 @@ public class FlujoPruebaPropiaIT {
         return new NotaCriterioPropiaIa(criterioId, new BigDecimal(puntaje), explicacion, "cita");
     }
 
+    @DisplayName("El taller del borrador: el enunciado adjunto, los entregables, los criterios y las preguntas se cambian, se mueven y se quitan")
+    @Test
+    @Order(24)
+    void elTallerDelBorrador() throws Exception {
+        long taller = crearVacante("Auxiliar de caja");
+        JsonNode editor = respuesta(conToken(put(base(taller) + "/borrador"), tokenTalento, """
+                {"guiaCalificacion":"Mide el cuadre","enunciado":"Cuadra la caja del día",
+                 "modalidad":"PLAZO_ABIERTO","plazoDias":3}"""));
+        assertThat(editor.at("/borrador/prueba/plazoDias").asInt()).isEqualTo(3);
+        assertThat(editor.at("/resumen/estado").asText()).isEqualTo("BORRADOR");
+        assertThat(editor.at("/resumen/dias").asInt()).isEqualTo(3);
+
+        // El enunciado en PDF entra y sale del borrador
+        MockMultipartFile pdf = new MockMultipartFile("archivo", "caso.pdf", "application/pdf",
+                "%PDF-1.4".getBytes());
+        editor = respuesta(mvc.perform(multipart(base(taller) + "/borrador/consigna").file(pdf)
+                .header("Authorization", "Bearer " + tokenTalento)));
+        assertThat(editor.at("/borrador/prueba/consigna/nombre").asText()).isEqualTo("caso.pdf");
+        editor = respuesta(conToken(delete(base(taller) + "/borrador/consigna"), tokenTalento, null));
+        assertThat(editor.at("/borrador/prueba/consigna").isNull()
+                || editor.at("/borrador/prueba/consigna").isMissingNode()).isTrue();
+
+        // Dos entregables: el segundo se cambia y sube al primer puesto
+        long tablero = idDelEntregable(conToken(post(base(taller) + "/entregables"), tokenTalento, """
+                {"nombre":"Tablero","detalle":"La hoja del cuadre","formato":"ARCHIVO","obligatorio":true}"""),
+                "Tablero");
+        long video = idDelEntregable(conToken(post(base(taller) + "/entregables"), tokenTalento, """
+                {"nombre":"Video","formato":"ENLACE","obligatorio":true}"""), "Video");
+        editor = respuesta(conToken(put(base(taller) + "/entregables/" + video), tokenTalento, """
+                {"nombre":"Video corto","formato":"ENLACE","obligatorio":false,"queDebeTener":"Que se oiga"}"""));
+        assertThat(editor.at("/borrador/prueba/entregables/1/nombre").asText()).isEqualTo("Video corto");
+        assertThat(editor.at("/borrador/prueba/entregables/1/obligatorio").asBoolean()).isFalse();
+        editor = respuesta(conToken(post(base(taller) + "/entregables/" + video + "/movimiento"), tokenTalento,
+                "{\"direccion\":\"ARRIBA\"}"));
+        assertThat(editor.at("/borrador/prueba/entregables/0/id").asLong()).isEqualTo(video);
+
+        // Dos criterios: «Caja» mira el tablero; «Orden» sube al primer puesto
+        long caja = idDelCriterio(conToken(post(base(taller) + "/criterios"), tokenTalento, """
+                {"nombre":"Caja","puntosCalificados":40,"calificador":"IA","entregables":[%d]}"""
+                .formatted(tablero)), "Caja");
+        long orden = idDelCriterio(conToken(post(base(taller) + "/criterios"), tokenTalento,
+                "{\"nombre\":\"Orden\"}"), "Orden");
+        editor = respuesta(conToken(post(base(taller) + "/criterios/" + orden + "/movimiento"), tokenTalento,
+                "{\"direccion\":\"ARRIBA\"}"));
+        assertThat(editor.at("/borrador/criterios/0/id").asLong()).isEqualTo(orden);
+
+        // Dos cerradas en «Caja»: la segunda sube; la primera pasa a «Orden»; la segunda se quita
+        String cerrada = """
+                {"tipo":"OPCION_UNICA","enunciado":"%s","puntos":30,"criterioId":%d,
+                 "opciones":[{"texto":"Sí","puntos":30},{"texto":"No","puntos":0}]}""";
+        respuesta(conToken(post(base(taller) + "/preguntas"), tokenTalento, cerrada.formatted("¿Arqueo?", caja)));
+        editor = respuesta(conToken(post(base(taller) + "/preguntas"), tokenTalento,
+                cerrada.formatted("¿Vuelto?", caja)));
+        JsonNode deCaja = buscarCriterio(editor.get("borrador"), caja).get("preguntas");
+        long arqueo = deCaja.get(0).get("id").asLong();
+        long vuelto = deCaja.get(1).get("id").asLong();
+        editor = respuesta(conToken(post(base(taller) + "/preguntas/" + vuelto + "/movimiento"), tokenTalento,
+                "{\"direccion\":\"ARRIBA\"}"));
+        assertThat(buscarCriterio(editor.get("borrador"), caja).at("/preguntas/0/id").asLong()).isEqualTo(vuelto);
+        editor = respuesta(conToken(put(base(taller) + "/preguntas/" + arqueo), tokenTalento, """
+                {"tipo":"OPCION_UNICA","enunciado":"¿Arqueo diario?","puntos":20,"criterioId":%d,
+                 "opciones":[{"texto":"Sí","puntos":20},{"texto":"No","puntos":0}]}""".formatted(orden)));
+        assertThat(buscarCriterio(editor.get("borrador"), orden).at("/preguntas/0/enunciado").asText())
+                .isEqualTo("¿Arqueo diario?");
+        editor = respuesta(conToken(delete(base(taller) + "/preguntas/" + vuelto), tokenTalento, null));
+        assertThat(buscarCriterio(editor.get("borrador"), caja).get("preguntas").size()).isZero();
+
+        // Quitar «Orden» deja su pregunta sin criterio; quitar el tablero lo saca de lo que mira «Caja»
+        editor = respuesta(conToken(delete(base(taller) + "/criterios/" + orden), tokenTalento, null));
+        assertThat(editor.at("/borrador/sinCriterio/0/id").asLong()).isEqualTo(arqueo);
+        assertThat(buscarCriterio(editor.get("borrador"), caja).get("entregables").size()).isEqualTo(1);
+        editor = respuesta(conToken(delete(base(taller) + "/entregables/" + tablero), tokenTalento, null));
+        assertThat(editor.at("/borrador/prueba/entregables").size()).isEqualTo(1);
+        assertThat(buscarCriterio(editor.get("borrador"), caja).get("entregables").size()).isZero();
+
+        // Sin publicada no hay recalificación que reintentar; lo copiable se busca sin tildes
+        conToken(post(base(taller) + "/publicada/recalificacion"), tokenTalento, null)
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.detail").value("Esta vacante todavía no tiene la prueba publicada"));
+        JsonNode copiables = json.readTree(conTokenGet(base(taller) + "/copiables?buscar=ASISTENTE",
+                tokenTalento).andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        assertThat(copiables.toString()).contains("\"vacanteId\":" + vacanteId);
+        assertThat(json.readTree(conTokenGet(base(taller) + "/copiables?buscar=pasteleria", tokenTalento)
+                .andReturn().getResponse().getContentAsString()).size()).isZero();
+
+        // Descartar el borrador lo borra entero
+        editor = respuesta(conToken(delete(base(taller) + "/borrador"), tokenTalento, null));
+        assertThat(editor.at("/borrador").isNull() || editor.at("/borrador").isMissingNode()).isTrue();
+        assertThat(editor.at("/resumen/estado").asText()).isEqualTo("SIN_PRUEBA");
+    }
+
+    private JsonNode respuesta(ResultActions peticion) throws Exception {
+        return json.readTree(peticion.andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+    }
+
     private JsonNode editor(long vacante) throws Exception {
         return json.readTree(conTokenGet(base(vacante), tokenTalento).andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString());

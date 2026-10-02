@@ -9,7 +9,6 @@ import com.renaser.ai.ai_engine.archivo.service.TiposDeArchivo;
 import com.renaser.ai.ai_engine.auditoria.service.ServicioAuditoria;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPreguntasVacante.CambioAplicado;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPreguntasVacante.ConsignaAdjunta;
-import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPreguntasVacante.CopiarDeOtraVacante;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPreguntasVacante.CriterioDeLaVersion;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPreguntasVacante.EditorDePreguntas;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPreguntasVacante.EntregableDeLaVersion;
@@ -23,11 +22,9 @@ import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPreguntasVacante.Pregunta
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPreguntasVacante.PruebaDeLaVersion;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPreguntasVacante.PuntosDeOpcion;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPreguntasVacante.PuntosDePregunta;
-import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPreguntasVacante.Recalificacion;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPreguntasVacante.RecomendacionPedida;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPreguntasVacante.ResumenDePreguntas;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPreguntasVacante.TextoDe;
-import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPreguntasVacante.VacanteCopiable;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPreguntasVacante.VersionDePreguntas;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosRecomendador.CriterioPropuesto;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosRecomendador.EntregablePropuesto;
@@ -43,8 +40,8 @@ import com.renaser.ai.ai_engine.perfilintegral.repository.OpcionRepository;
 import com.renaser.ai.ai_engine.perfilintegral.repository.PreguntaRepository;
 import com.renaser.ai.ai_engine.perfilintegral.repository.PropuestaPreguntasRepository;
 import com.renaser.ai.ai_engine.perfilintegral.repository.VersionBancoRepository;
-import com.renaser.ai.ai_engine.perfilintegral.service.CalificacionPorPuntos;
 import com.renaser.ai.ai_engine.perfilintegral.service.PreguntasInvalidasException;
+import com.renaser.ai.ai_engine.perfilintegral.service.impl.EditorDeVersionPropia;
 import com.renaser.ai.ai_engine.perfilintegral.service.ReglasDePuntos;
 import com.renaser.ai.ai_engine.perfilintegral.service.ReglasDePuntos.OpcionAValidar;
 import com.renaser.ai.ai_engine.perfilintegral.service.ReglasDePuntos.PreguntaAValidar;
@@ -72,15 +69,12 @@ import com.renaser.ai.ai_engine.prueba.service.CierreDeLaPruebaPropia;
 import com.renaser.ai.ai_engine.prueba.service.ReglasDeLaPrueba;
 import com.renaser.ai.ai_engine.prueba.service.ServicioPruebaPropia;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
-import com.renaser.ai.ai_engine.seguridad.dto.FiltroAlcance;
 import com.renaser.ai.ai_engine.seguridad.service.Permisos;
-import com.renaser.ai.ai_engine.vacante.entity.Puesto;
 import com.renaser.ai.ai_engine.vacante.entity.Vacante;
 import com.renaser.ai.ai_engine.vacante.repository.PuestoRepository;
 import com.renaser.ai.ai_engine.vacante.repository.VacanteRepository;
 import com.renaser.ai.ai_engine.vacante.service.AlcanceSobreLaVacante;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -88,44 +82,46 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.text.Normalizer;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
-import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-/** Ver {@link ServicioPruebaPropia}. */
+/**
+ * Ver {@link ServicioPruebaPropia}. Lo que comparte con el editor de las preguntas propias
+ * vive en {@link EditorDeVersionPropia}; aquí queda lo suyo: el caso, el tiempo, los
+ * entregables, la parte calificada de cada criterio y su vara, que se congela en la primera
+ * rendición.
+ */
 @Service
 @RequiredArgsConstructor
-@Slf4j
-public class ServicioPruebaPropiaImpl implements ServicioPruebaPropia {
+public class ServicioPruebaPropiaImpl extends EditorDeVersionPropia implements ServicioPruebaPropia {
 
-    static final String BORRADOR = "BORRADOR";
-    static final String PUBLICADA = "PUBLICADA";
     static final String PROPOSITO = "PRUEBA_PUESTO";
     public static final String PRUEBA_PROPIA = "PRUEBA_PROPIA";
-
-    private static final String PERMISO_VER = "ver_vacantes";
-    private static final String PERMISO_EDITAR = "editar_vacante";
 
     /** «Una vacante, una versión», desde la primera rendición (decisión 9). */
     private static final String VARA_QUIETA = "Alguien ya empezó a rendir esta prueba y su "
             + "contenido no se cambia: todos sus candidatos se miden con la misma vara. Solo se "
             + "pueden cambiar los puntos y las instrucciones de la IA, y cualquiera de los dos "
             + "vuelve a calcular la nota de todos.";
+
+    private static final Textos TEXTOS = new Textos(PROPOSITO, "Prueba técnica · ", VARA_QUIETA,
+            "No hay borrador que cambiar: abre uno agregando un criterio, una pregunta o un entregable",
+            "No hay borrador que publicar: escribe la prueba primero",
+            "La prueba no se puede publicar todavía: ",
+            "Esta vacante todavía no tiene la prueba publicada", "Prueba publicada de la vacante",
+            "la prueba publicada de esta vacante", "publicar_prueba_propia",
+            "corregir_instrucciones_ia_prueba", "copiar_prueba_propia");
 
     private static final ObjectMapper JSON = new ObjectMapper();
 
@@ -152,12 +148,7 @@ public class ServicioPruebaPropiaImpl implements ServicioPruebaPropia {
     // ============================== Leer ==============================
 
     @Override
-    @Transactional(readOnly = true)
-    public EditorDePreguntas ver(ContextoUsuario quien, Long vacanteId) {
-        return editor(quien, laVisible(quien, vacanteId));
-    }
-
-    private EditorDePreguntas editor(ContextoUsuario quien, Vacante vacante) {
+    protected EditorDePreguntas editor(ContextoUsuario quien, Vacante vacante) {
         VersionBanco borrador = versionesBanco.pruebaPropiaDe(vacante.getId(), BORRADOR).orElse(null);
         VersionBanco publicada = versionesBanco.pruebaPropiaDe(vacante.getId(), PUBLICADA).orElse(null);
         Resultado delBorrador = borrador == null ? null : calculo.estructura(borrador.getId());
@@ -168,7 +159,7 @@ public class ServicioPruebaPropiaImpl implements ServicioPruebaPropia {
                 delBorrador == null ? null : comoVersion(delBorrador),
                 deLaPublicada == null ? null : comoVersion(deLaPublicada),
                 resumen(delBorrador, deLaPublicada),
-                publicada == null ? null : recalificacionDe(publicada),
+                publicada == null ? null : recalificacionDe(vacante, publicada),
                 PROPOSITO);
     }
 
@@ -204,14 +195,6 @@ public class ServicioPruebaPropiaImpl implements ServicioPruebaPropia {
 
     @Override
     @Transactional
-    public EditorDePreguntas abrirBorrador(ContextoUsuario quien, Long vacanteId) {
-        Vacante vacante = laEditable(quien, vacanteId);
-        elBorrador(vacante);
-        return editor(quien, vacante);
-    }
-
-    @Override
-    @Transactional
     public EditorDePreguntas guardarDatos(ContextoUsuario quien, Long vacanteId,
                                           GuardarDatosDeLaPrueba datos) {
         Vacante vacante = laEditable(quien, vacanteId);
@@ -233,14 +216,6 @@ public class ServicioPruebaPropiaImpl implements ServicioPruebaPropia {
         borrador.setPlazoDias(ReglasDeLaPrueba.PLAZO_ABIERTO.equals(modalidad)
                 ? datos.plazoDias() : null);
         versionesBanco.save(borrador);
-        return editor(quien, vacante);
-    }
-
-    @Override
-    @Transactional
-    public EditorDePreguntas descartarBorrador(ContextoUsuario quien, Long vacanteId) {
-        Vacante vacante = laEditable(quien, vacanteId);
-        versionesBanco.pruebaPropiaDe(vacante.getId(), BORRADOR).ifPresent(this::vaciarYBorrar);
         return editor(quien, vacante);
     }
 
@@ -315,46 +290,6 @@ public class ServicioPruebaPropiaImpl implements ServicioPruebaPropia {
         return editor(quien, vacante);
     }
 
-    @Override
-    @Transactional
-    public EditorDePreguntas quitarCriterio(ContextoUsuario quien, Long vacanteId, Long criterioId) {
-        Vacante vacante = laEditable(quien, vacanteId);
-        VersionBanco borrador = elBorradorQueYaExiste(vacante);
-        CriterioBanco criterio = elCriterio(borrador, criterioId);
-        // Sus preguntas quedan «sin criterio» hasta que alguien las mueva: borrarlas en cascada
-        // sería perder trabajo por un clic en la X del bloque. Sus entregables siguen en la
-        // prueba; solo deja de mirarlos.
-        List<Pregunta> suyas = preguntas.findByVersionBancoIdOrderByOrden(borrador.getId()).stream()
-                .filter(p -> criterioId.equals(p.getCriterioBancoId())).toList();
-        int siguiente = siguienteOrden(borrador.getId(), null);
-        for (Pregunta p : suyas) {
-            p.setCriterioBancoId(null);
-            p.setOrden(siguiente++);
-        }
-        preguntas.saveAllAndFlush(suyas);
-        miradas.deleteByCriterioBancoId(criterio.getId());
-        miradas.flush();
-        criteriosBanco.delete(criterio);
-        return editor(quien, vacante);
-    }
-
-    @Override
-    @Transactional
-    public EditorDePreguntas moverCriterio(ContextoUsuario quien, Long vacanteId, Long criterioId,
-                                          Mover datos) {
-        Vacante vacante = laEditable(quien, vacanteId);
-        VersionBanco borrador = elBorradorQueYaExiste(vacante);
-        List<CriterioBanco> todos = new ArrayList<>(
-                criteriosBanco.findByVersionBancoIdOrderByOrdenAscIdAsc(borrador.getId()));
-        int i = indiceDe(todos, criterioId, CriterioBanco::getId, "Criterio");
-        int j = i + paso(datos);
-        if (j >= 0 && j < todos.size()) {
-            renumerar(todos, i, j, CriterioBanco::setOrden);
-            criteriosBanco.saveAll(todos);
-        }
-        return editor(quien, vacante);
-    }
-
     // ---------- Preguntas ----------
 
     @Override
@@ -384,57 +319,9 @@ public class ServicioPruebaPropiaImpl implements ServicioPruebaPropia {
         exigirForma(datos);
         VersionBanco borrador = elBorradorQueYaExiste(vacante);
         Pregunta pregunta = laPregunta(borrador, preguntaId);
-        if (datos.criterioId() != null) {
-            elCriterio(borrador, datos.criterioId());
-        }
-        if (!Objects.equals(pregunta.getCriterioBancoId(), datos.criterioId())) {
-            pregunta.setCriterioBancoId(datos.criterioId());
-            pregunta.setOrden(siguienteOrden(borrador.getId(), datos.criterioId()));
-        }
-        int puntos = puntosDe(datos.tipo(), datos.puntos());
-        pregunta.setTipo(datos.tipo());
-        pregunta.setEnunciado(datos.enunciado().strip());
-        pregunta.setPuntos(puntos);
-        pregunta.setEsPuntuable(puntos > 0);
-        pregunta.setQueDebeTener(ReglasDePuntos.ABIERTA.equals(datos.tipo())
-                ? textoONulo(datos.queDebeTener()) : null);
-        preguntas.save(pregunta);
-        // Las opciones se rehacen enteras: en un borrador ninguna respuesta apunta a ellas.
-        opciones.deleteByPreguntaIdIn(List.of(pregunta.getId()));
-        opciones.flush();
-        guardarOpciones(pregunta, comoOpciones(datos.opciones()));
-        return editor(quien, vacante);
-    }
-
-    @Override
-    @Transactional
-    public EditorDePreguntas quitarPregunta(ContextoUsuario quien, Long vacanteId, Long preguntaId) {
-        Vacante vacante = laEditable(quien, vacanteId);
-        Pregunta pregunta = laPregunta(elBorradorQueYaExiste(vacante), preguntaId);
-        opciones.deleteByPreguntaIdIn(List.of(pregunta.getId()));
-        preguntas.delete(pregunta);
-        return editor(quien, vacante);
-    }
-
-    @Override
-    @Transactional
-    public EditorDePreguntas moverPregunta(ContextoUsuario quien, Long vacanteId, Long preguntaId,
-                                          Mover datos) {
-        Vacante vacante = laEditable(quien, vacanteId);
-        VersionBanco borrador = elBorradorQueYaExiste(vacante);
-        Pregunta pregunta = laPregunta(borrador, preguntaId);
-        List<Pregunta> hermanas = new ArrayList<>(preguntas
-                .findByVersionBancoIdOrderByOrden(borrador.getId()).stream()
-                .filter(p -> Objects.equals(p.getCriterioBancoId(), pregunta.getCriterioBancoId()))
-                .sorted(Comparator.comparing((Pregunta p) -> p.getOrden() == null
-                        ? Integer.MAX_VALUE : p.getOrden()).thenComparing(Pregunta::getId))
-                .toList());
-        int i = indiceDe(hermanas, preguntaId, Pregunta::getId, "Pregunta");
-        int j = i + paso(datos);
-        if (j >= 0 && j < hermanas.size()) {
-            renumerar(hermanas, i, j, Pregunta::setOrden);
-            preguntas.saveAll(hermanas);
-        }
+        reescribirPregunta(borrador, pregunta, new PreguntaEscrita(datos.tipo(), datos.enunciado(),
+                puntosDe(datos.tipo(), datos.puntos()), datos.criterioId(), datos.queDebeTener(),
+                comoOpciones(datos.opciones())));
         return editor(quien, vacante);
     }
 
@@ -497,112 +384,24 @@ public class ServicioPruebaPropiaImpl implements ServicioPruebaPropia {
         return editor(quien, vacante);
     }
 
-    // ---------- Publicar ----------
-
-    @Override
-    @Transactional
-    public EditorDePreguntas publicar(ContextoUsuario quien, Long vacanteId) {
-        Vacante vacante = laEditable(quien, vacanteId);
-        VersionBanco borrador = versionesBanco.pruebaPropiaDe(vacante.getId(), BORRADOR)
-                .orElseThrow(() -> new IllegalStateException(
-                        "No hay borrador que publicar: escribe la prueba primero"));
-        List<String> faltas = ReglasDeLaPrueba.faltasParaPublicar(calculo.estructura(borrador.getId()));
-        if (!faltas.isEmpty()) {
-            throw new PreguntasInvalidasException("La prueba no se puede publicar todavía: "
-                    + (faltas.size() == 1 ? "falta una cosa" : "faltan " + faltas.size() + " cosas"),
-                    faltas);
-        }
-        Optional<VersionBanco> anterior = versionesBanco.pruebaPropiaDe(vacante.getId(), PUBLICADA);
-        if (anterior.isPresent()) {
-            // Hasta la primera rendición se puede sustituir; desde ahí, no (decisión 9).
-            if (yaSeRindio(vacante)) {
-                throw new IllegalStateException(VARA_QUIETA);
-            }
-            VersionBanco saliente = anterior.get();
-            saliente.setEstado("ARCHIVADA");
-            // saveAndFlush: el índice «una publicada por vacante y propósito» no perdona que
-            // el borrador pase a PUBLICADA antes de que esta se archive.
-            versionesBanco.saveAndFlush(saliente);
-        }
-        borrador.setEstado(PUBLICADA);
-        borrador.setPublicadaPorUsuarioId(quien.usuarioId());
-        borrador.setPublicadaEn(Instant.now());
-        versionesBanco.save(borrador);
-        auditoria.registrar(quien.organizacionId(), quien, "publicar_prueba_propia",
-                "version_banco", borrador.getId(), Map.of("estado", BORRADOR),
-                Map.of("estado", PUBLICADA, "vacante", vacante.getId()), null);
-        return editor(quien, vacante);
-    }
-
     // ============================== Con la versión publicada ==============================
 
     @Override
     @Transactional
     public CambioAplicado corregirInstrucciones(ContextoUsuario quien, Long vacanteId,
                                                 CorregirInstruccionesDePrueba datos) {
-        Vacante vacante = laEditable(quien, vacanteId);
-        VersionBanco publicada = laPublicada(vacante);
-        Map<Long, List<NotaCriterioPrueba>> conNota = notasDeLaIaPorPostulacion(publicada);
-        exigirQueNoHayaRecalificacionEnCurso(conNota.keySet());
+        return corregir(quien, vacanteId, datos.guiaCalificacion(), datos.criterios(), datos.preguntas(),
+                (publicada, antes, despues) -> corregirEntregables(publicada, datos.entregables(), antes,
+                        despues));
+    }
 
-        // Sin saldo o con la IA apagada NO se guarda nada: guardarlo sin recalificar dejaría a
-        // unos medidos con una guía y a otros con otra.
-        if (!conNota.isEmpty()) {
-            String motivo = cola.porQueNoSePuedeUsarLaIa(vacante.getOrganizacionId());
-            if (motivo != null) {
-                throw new IllegalStateException(motivo + " No se guardó el cambio: guardarlo "
-                        + "sin recalificar dejaría a unos candidatos medidos con una guía y a "
-                        + "otros con otra.");
-            }
-        }
-
-        Map<String, Object> antes = new LinkedHashMap<>();
-        Map<String, Object> despues = new LinkedHashMap<>();
-        if (datos.guiaCalificacion() != null) {
-            String nueva = textoONulo(datos.guiaCalificacion());
-            if (!Objects.equals(nueva, publicada.getGuiaCalificacion())) {
-                antes.put("guiaCalificacion", String.valueOf(publicada.getGuiaCalificacion()));
-                despues.put("guiaCalificacion", String.valueOf(nueva));
-                publicada.setGuiaCalificacion(nueva);
-            }
-        }
-        Map<Long, CriterioBanco> criterios = criteriosBanco
-                .findByVersionBancoIdOrderByOrdenAscIdAsc(publicada.getId()).stream()
-                .collect(Collectors.toMap(CriterioBanco::getId, Function.identity()));
-        for (TextoDe t : lista(datos.criterios())) {
-            CriterioBanco c = criterios.get(t.id());
-            if (c == null) {
-                throw new IllegalArgumentException("El criterio " + t.id()
-                        + " no es de la prueba publicada de esta vacante");
-            }
-            String nuevo = textoONulo(t.texto());
-            if (!Objects.equals(nuevo, c.getQueEvalua())) {
-                antes.put("criterio " + c.getId() + " · qué evalúa", String.valueOf(c.getQueEvalua()));
-                despues.put("criterio " + c.getId() + " · qué evalúa", String.valueOf(nuevo));
-                c.setQueEvalua(nuevo);
-                criteriosBanco.save(c);
-            }
-        }
-        Map<Long, Pregunta> suyas = preguntas.findByVersionBancoIdOrderByOrden(publicada.getId())
-                .stream().collect(Collectors.toMap(Pregunta::getId, Function.identity()));
-        for (TextoDe t : lista(datos.preguntas())) {
-            Pregunta p = suyas.get(t.id());
-            if (p == null || !ReglasDePuntos.ABIERTA.equals(p.getTipo())) {
-                throw new IllegalArgumentException("La pregunta " + t.id()
-                        + " no es una abierta de la prueba publicada de esta vacante");
-            }
-            String nuevo = textoONulo(t.texto());
-            if (!Objects.equals(nuevo, p.getQueDebeTener())) {
-                antes.put("pregunta " + p.getId() + " · qué debe tener", String.valueOf(p.getQueDebeTener()));
-                despues.put("pregunta " + p.getId() + " · qué debe tener", String.valueOf(nuevo));
-                p.setQueDebeTener(nuevo);
-                preguntas.save(p);
-            }
-        }
+    /** El «qué debe tener» de los entregables: lo que la prueba corrige además del banco. */
+    private void corregirEntregables(VersionBanco publicada, List<TextoDe> textos,
+                                     Map<String, Object> antes, Map<String, Object> despues) {
         Map<Long, EntregableRequerido> deLaVersion = entregables
                 .findByVersionBancoIdOrderByOrdenAscIdAsc(publicada.getId()).stream()
                 .collect(Collectors.toMap(EntregableRequerido::getId, Function.identity()));
-        for (TextoDe t : lista(datos.entregables())) {
+        for (TextoDe t : lista(textos)) {
             EntregableRequerido e = deLaVersion.get(t.id());
             if (e == null) {
                 throw new IllegalArgumentException("El entregable " + t.id()
@@ -616,65 +415,6 @@ public class ServicioPruebaPropiaImpl implements ServicioPruebaPropia {
                 entregables.save(e);
             }
         }
-        if (antes.isEmpty()) {
-            return new CambioAplicado(0);
-        }
-        int anterior = publicada.getVersionGuia() == null ? 1 : publicada.getVersionGuia();
-        publicada.setVersionGuia(anterior + 1);
-        versionesBanco.save(publicada);
-        antes.put("versionGuia", anterior);
-        despues.put("versionGuia", anterior + 1);
-        auditoria.registrar(quien.organizacionId(), quien, "corregir_instrucciones_ia_prueba",
-                "version_banco", publicada.getId(), antes, despues, null);
-
-        int encoladas = 0;
-        for (Long postulacionId : conNota.keySet()) {
-            if (cola.recalificarPrueba(postulacionId)) {
-                encoladas++;
-            }
-        }
-        log.info("Instrucciones de la IA de la prueba corregidas en la vacante {} (guía {}): {} "
-                + "personas a recalificar, {} encoladas", vacante.getId(), anterior + 1,
-                conNota.size(), encoladas);
-        return new CambioAplicado(conNota.size());
-    }
-
-    @Override
-    @Transactional
-    public CambioAplicado reintentarRecalificacion(ContextoUsuario quien, Long vacanteId) {
-        Vacante vacante = laEditable(quien, vacanteId);
-        VersionBanco publicada = laPublicada(vacante);
-        int vigente = publicada.getVersionGuia() == null ? 1 : publicada.getVersionGuia();
-        Map<Long, List<NotaCriterioPrueba>> conNota = notasDeLaIaPorPostulacion(publicada);
-        Map<Long, ColaCalificacionIa.Seguimiento> seguimiento =
-                cola.recalificacionDePrueba(List.copyOf(conNota.keySet()));
-        List<Long> pendientes = new ArrayList<>();
-        conNota.forEach((postulacionId, suyas) -> {
-            boolean viejas = suyas.stream().anyMatch(n -> !Objects.equals(n.getVersionGuia(), vigente));
-            ColaCalificacionIa.Seguimiento s = seguimiento.get(postulacionId);
-            if (viejas && (s == null || !"EN_CURSO".equals(s.estado()))) {
-                pendientes.add(postulacionId);
-            }
-        });
-        if (pendientes.isEmpty()) {
-            return new CambioAplicado(0);
-        }
-        String motivo = cola.porQueNoSePuedeUsarLaIa(vacante.getOrganizacionId());
-        if (motivo != null) {
-            return new CambioAplicado(0, motivo + " No se volvió a pedir la recalificación: "
-                    + personas(pendientes.size(), "sigue", "siguen")
-                    + " con la nota de la guía anterior.");
-        }
-        int encoladas = 0;
-        for (Long postulacionId : pendientes) {
-            if (cola.recalificarPrueba(postulacionId)) {
-                encoladas++;
-            }
-        }
-        int sinEncolar = pendientes.size() - encoladas;
-        return new CambioAplicado(encoladas, sinEncolar == 0 ? null
-                : personas(sinEncolar, "ya tenía", "ya tenían")
-                        + " una recalificación en marcha: no se pidió otra.");
     }
 
     @Override
@@ -682,7 +422,7 @@ public class ServicioPruebaPropiaImpl implements ServicioPruebaPropia {
     public CambioAplicado cambiarPuntos(ContextoUsuario quien, Long vacanteId, CambiarPuntosDePrueba datos) {
         Vacante vacante = laEditable(quien, vacanteId);
         VersionBanco publicada = laPublicada(vacante);
-        exigirQueNoHayaRecalificacionEnCurso(notasDeLaIaPorPostulacion(publicada).keySet());
+        exigirQueNoHayaRecalificacionEnCurso(guiasDeLaIa(vacante, publicada).keySet());
 
         Resultado r = calculo.estructura(publicada.getId());
         Map<Long, PreguntaDeLaPrueba> porId = r.todas().stream()
@@ -839,93 +579,6 @@ public class ServicioPruebaPropiaImpl implements ServicioPruebaPropia {
         return new CambioAplicado(entregados.size());
     }
 
-    /** En proporción al máximo nuevo, con dos decimales; de un máximo 0 no hay proporción. */
-    static BigDecimal escalar(BigDecimal nota, int maximoAnterior, int maximoNuevo) {
-        if (nota == null) {
-            return null;
-        }
-        if (maximoAnterior <= 0) {
-            return BigDecimal.ZERO;
-        }
-        BigDecimal escalada = nota.multiply(BigDecimal.valueOf(maximoNuevo))
-                .divide(BigDecimal.valueOf(maximoAnterior), 2, RoundingMode.HALF_UP);
-        return ReglasDePuntos.acotar(escalada, BigDecimal.valueOf(maximoNuevo));
-    }
-
-    // ============================== Copiar de otra vacante ==============================
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<VacanteCopiable> copiables(ContextoUsuario quien, Long vacanteId, String buscar,
-                                           String nivel) {
-        Vacante destino = laVisible(quien, vacanteId);
-        List<VersionBanco> publicadas = versionesBanco.pruebasPropiasPublicadasDe(quien.organizacionId())
-                .stream().filter(v -> !destino.getId().equals(v.getVacanteId())).toList();
-        if (publicadas.isEmpty()) {
-            return List.of();
-        }
-        Map<Long, Vacante> vacantesPorId = vacantes.findAllById(publicadas.stream()
-                        .map(VersionBanco::getVacanteId).collect(Collectors.toSet())).stream()
-                .filter(v -> quien.organizacionId().equals(v.getOrganizacionId())
-                        && v.getEliminadaEn() == null)
-                .collect(Collectors.toMap(Vacante::getId, Function.identity()));
-        Map<Long, String> nivelPorPuesto = puestos.findAllById(vacantesPorId.values().stream()
-                        .map(Vacante::getPuestoId).filter(Objects::nonNull).collect(Collectors.toSet()))
-                .stream().filter(p -> quien.organizacionId().equals(p.getOrganizacionId()))
-                .collect(Collectors.toMap(Puesto::getId, Puesto::getNivelPuestoCodigo));
-        List<Long> versionIds = publicadas.stream().map(VersionBanco::getId).toList();
-        Map<Long, Long> criteriosPorVersion = criteriosBanco.findByVersionBancoIdIn(versionIds).stream()
-                .collect(Collectors.groupingBy(CriterioBanco::getVersionBancoId, Collectors.counting()));
-        Map<Long, Long> preguntasPorVersion = preguntas.findByVersionBancoIdIn(versionIds).stream()
-                .collect(Collectors.groupingBy(Pregunta::getVersionBancoId, Collectors.counting()));
-
-        String buscado = sinTildes(buscar);
-        return publicadas.stream()
-                .filter(v -> vacantesPorId.containsKey(v.getVacanteId()))
-                .map(v -> {
-                    Vacante origen = vacantesPorId.get(v.getVacanteId());
-                    return new VacanteCopiable(origen.getId(), origen.getTitulo(),
-                            nivelPorPuesto.get(origen.getPuestoId()), origen.getPublicadaEn(),
-                            estadoDe(origen),
-                            criteriosPorVersion.getOrDefault(v.getId(), 0L).intValue(),
-                            preguntasPorVersion.getOrDefault(v.getId(), 0L).intValue());
-                })
-                .filter(c -> buscado.isEmpty() || sinTildes(c.titulo()).contains(buscado))
-                .filter(c -> nivel == null || nivel.isBlank() || nivel.equals(c.nivel()))
-                .sorted(Comparator.comparing(VacanteCopiable::publicadaEn,
-                                Comparator.nullsLast(Comparator.reverseOrder()))
-                        .thenComparing(VacanteCopiable::vacanteId, Comparator.reverseOrder()))
-                .toList();
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public VersionDePreguntas vistaPrevia(ContextoUsuario quien, Long vacanteId, Long vacanteOrigenId) {
-        laVisible(quien, vacanteId);
-        return comoVersion(calculo.estructura(laPublicadaDeOtraVacante(quien, vacanteOrigenId).getId()));
-    }
-
-    @Override
-    @Transactional
-    public EditorDePreguntas copiar(ContextoUsuario quien, Long vacanteId, CopiarDeOtraVacante datos) {
-        Vacante destino = laEditable(quien, vacanteId);
-        if (destino.getId().equals(datos.vacanteOrigenId())) {
-            throw new IllegalArgumentException("Se copia de otra vacante, no de esta misma");
-        }
-        // Mismo corte por empresa que la vista previa: lo ajeno es 404 y no se crea nada.
-        VersionBanco origen = laPublicadaDeOtraVacante(quien, datos.vacanteOrigenId());
-        if (versionesBanco.pruebaPropiaDe(destino.getId(), PUBLICADA).isPresent() && yaSeRindio(destino)) {
-            throw new IllegalStateException(VARA_QUIETA);
-        }
-        versionesBanco.pruebaPropiaDe(destino.getId(), BORRADOR).ifPresent(this::vaciarYBorrar);
-        VersionBanco borrador = nuevoBorrador(destino);
-        copiarContenido(origen, borrador);
-        auditoria.registrar(quien.organizacionId(), quien, "copiar_prueba_propia",
-                "version_banco", borrador.getId(), null,
-                Map.of("desdeVacante", datos.vacanteOrigenId(), "desdeVersion", origen.getId()), null);
-        return editor(quien, destino);
-    }
-
     // ============================== Recomendaciones por IA ==============================
 
     /**
@@ -967,16 +620,8 @@ public class ServicioPruebaPropiaImpl implements ServicioPruebaPropia {
                 .pedidaPorUsuarioId(quien.usuarioId())
                 .creadoEn(Instant.now())
                 .build());
-        if (!cola.encolarRecomendadorDePrueba(vacante.getOrganizacionId(), vacante.getId())) {
-            pedida.setEstado(PropuestaPreguntas.FALLIDA);
-            pedida.setMotivoFallo("No se pudo poner en la cola: ya había una en marcha, o la IA "
-                    + "está apagada.");
-            pedida.setTerminadaEn(Instant.now());
-            propuestas.save(pedida);
-            return new RecomendacionPedida(false, pedida.getMotivoFallo());
-        }
-        return new RecomendacionPedida(true, "La IA completará los " + faltan
-                + " puntos que faltan. Tarda unos segundos.");
+        return enLaCola(pedida, cola.encolarRecomendadorDePrueba(vacante.getOrganizacionId(),
+                vacante.getId()), faltan);
     }
 
     @Override
@@ -1143,29 +788,23 @@ public class ServicioPruebaPropiaImpl implements ServicioPruebaPropia {
         return JSON.readValue(propuesta.getContenido(), PropuestaDePrueba.class);
     }
 
-    // ============================== Apoyo: vacante y versiones ==============================
+    // ============================== Su propósito ==============================
 
-    private Vacante laVisible(ContextoUsuario quien, Long vacanteId) {
-        return alcance.laVacanteVisible(quien, vacanteId, PERMISO_VER);
+    @Override
+    protected Optional<VersionBanco> version(Long vacanteId, String estado) {
+        return versionesBanco.pruebaPropiaDe(vacanteId, estado);
     }
 
-    private Vacante laEditable(ContextoUsuario quien, Long vacanteId) {
-        Vacante vacante = alcance.laVacanteVisible(quien, vacanteId, PERMISO_EDITAR);
-        if (vacante.getArchivadaEn() != null || "CERRADA".equals(vacante.getEstado())) {
-            throw new IllegalStateException("Una vacante cerrada o archivada no se edita");
-        }
-        return vacante;
+    @Override
+    protected Piezas piezas() {
+        return new Piezas(alcance, permisos, vacantes, puestos, versionesBanco, criteriosBanco,
+                preguntas, opciones, propuestas, cola, auditoria);
     }
 
-    private boolean puedeEditar(ContextoUsuario quien, Vacante vacante) {
-        if (!quien.tiene(PERMISO_EDITAR)) {
-            return false;
-        }
-        FiltroAlcance alcanceDeEdicion = permisos.alcanceDe(PERMISO_EDITAR);
-        return alcanceDeEdicion != null
-                && vacante.getArchivadaEn() == null
-                && !"CERRADA".equals(vacante.getEstado())
-                && alcance.alcanzaALaVacante(quien, alcanceDeEdicion, vacante);
+    /** La vara de la prueba se congela en la primera rendición (decisión 9). */
+    @Override
+    protected boolean laVaraNoSeMueve(Vacante vacante) {
+        return yaSeRindio(vacante);
     }
 
     /** La frontera de la decisión 9: alguien ya abrió su prueba en esta vacante. */
@@ -1173,76 +812,41 @@ public class ServicioPruebaPropiaImpl implements ServicioPruebaPropia {
         return intentos.algunoEmpezadoDeLaVacante(vacante.getId());
     }
 
-    private String nivelDe(Vacante vacante) {
-        return vacante.getPuestoId() == null ? null
-                : puestos.findByIdAndOrganizacionId(vacante.getPuestoId(), vacante.getOrganizacionId())
-                        .map(Puesto::getNivelPuestoCodigo).orElse(null);
+    @Override
+    protected Textos textos() {
+        return TEXTOS;
     }
 
-    private static String estadoDe(Vacante v) {
-        if (v.getArchivadaEn() != null) {
-            return "ARCHIVADA";
-        }
-        return "CERRADA".equals(v.getEstado()) ? "CERRADA" : "ACTIVA";
+    @Override
+    protected List<String> faltasDelBorrador(VersionBanco borrador) {
+        return ReglasDeLaPrueba.faltasParaPublicar(calculo.estructura(borrador.getId()));
     }
 
-    private VersionBanco laPublicada(Vacante vacante) {
-        return versionesBanco.pruebaPropiaDe(vacante.getId(), PUBLICADA)
-                .orElseThrow(() -> new IllegalStateException(
-                        "Esta vacante todavía no tiene la prueba publicada"));
+    @Override
+    protected List<VersionBanco> publicadasDe(Long organizacionId) {
+        return versionesBanco.pruebasPropiasPublicadasDe(organizacionId);
     }
 
-    private VersionBanco laPublicadaDeOtraVacante(ContextoUsuario quien, Long vacanteOrigenId) {
-        Vacante origen = vacantes
-                .findByIdAndOrganizacionIdAndEliminadaEnIsNull(vacanteOrigenId, quien.organizacionId())
-                .orElseThrow(() -> new ResourceNotFoundException("Vacante", "id", vacanteOrigenId));
-        return versionesBanco.pruebaPropiaDe(origen.getId(), PUBLICADA)
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Prueba publicada de la vacante", "id", vacanteOrigenId));
+    @Override
+    protected int cuantosRindieron(Vacante vacante, VersionBanco publicada) {
+        return entregadosDe(publicada).size();
     }
 
-    /**
-     * El borrador de la vacante; si no hay, se abre. Con una versión publicada nace como copia
-     * suya, y eso solo hasta la primera rendición.
-     */
-    private VersionBanco elBorrador(Vacante vacante) {
-        Optional<VersionBanco> borrador = versionesBanco.pruebaPropiaDe(vacante.getId(), BORRADOR);
-        if (borrador.isPresent()) {
-            return borrador.get();
-        }
-        Optional<VersionBanco> publicada = versionesBanco.pruebaPropiaDe(vacante.getId(), PUBLICADA);
-        if (publicada.isPresent() && yaSeRindio(vacante)) {
-            throw new IllegalStateException(VARA_QUIETA);
-        }
-        VersionBanco nuevo = nuevoBorrador(vacante);
-        publicada.ifPresent(p -> copiarContenido(p, nuevo));
-        return nuevo;
+    @Override
+    protected Map<Long, ColaCalificacionIa.Seguimiento> seguimiento(List<Long> postulacionIds) {
+        return cola.recalificacionDePrueba(postulacionIds);
     }
 
-    private VersionBanco elBorradorQueYaExiste(Vacante vacante) {
-        return versionesBanco.pruebaPropiaDe(vacante.getId(), BORRADOR)
-                .orElseThrow(() -> {
-                    boolean publicada = versionesBanco.pruebaPropiaDe(vacante.getId(), PUBLICADA).isPresent();
-                    return new IllegalStateException(publicada && yaSeRindio(vacante)
-                            ? VARA_QUIETA
-                            : "No hay borrador que cambiar: abre uno agregando un criterio, una "
-                                    + "pregunta o un entregable");
-                });
+    @Override
+    protected boolean recalificar(Long postulacionId) {
+        return cola.recalificarPrueba(postulacionId);
     }
 
-    private VersionBanco nuevoBorrador(Vacante vacante) {
-        return versionesBanco.saveAndFlush(VersionBanco.builder()
-                .organizacionId(vacante.getOrganizacionId())
-                .tipoBanco("VACANTE")
-                .nivelPuestoCodigo(nivelDe(vacante))
-                .vacanteId(vacante.getId())
-                .proposito(PROPOSITO)
-                .metodoCalificacion(CalificacionPorPuntos.METODO)
-                .etiqueta("Prueba técnica · " + vacante.getTitulo())
-                .estado(BORRADOR)
-                .versionGuia(1)
-                .creadoEn(Instant.now())
-                .build());
+    /** Lo que miraba el criterio se suelta: sus entregables siguen en la prueba. */
+    @Override
+    protected void antesDeQuitarElCriterio(Long criterioId) {
+        miradas.deleteByCriterioBancoId(criterioId);
+        miradas.flush();
     }
 
     /**
@@ -1251,7 +855,8 @@ public class ServicioPruebaPropiaImpl implements ServicioPruebaPropia {
      * un enlace: cambiar después cualquiera de las dos no toca la otra (el adjunto se comparte:
      * es el mismo archivo de la misma empresa, y nadie lo modifica).
      */
-    private void copiarContenido(VersionBanco origen, VersionBanco destino) {
+    @Override
+    protected void copiarContenido(VersionBanco origen, VersionBanco destino) {
         destino.setGuiaCalificacion(origen.getGuiaCalificacion());
         destino.setEnunciado(origen.getEnunciado());
         destino.setConsignaArchivoId(origen.getConsignaArchivoId());
@@ -1329,7 +934,8 @@ public class ServicioPruebaPropiaImpl implements ServicioPruebaPropia {
     }
 
     /** Un borrador se descarta entero: ningún intento apunta a él. */
-    private void vaciarYBorrar(VersionBanco borrador) {
+    @Override
+    protected void vaciarYBorrar(VersionBanco borrador) {
         List<CriterioBanco> suyos = criteriosBanco.findByVersionBancoIdOrderByOrdenAscIdAsc(borrador.getId());
         if (!suyos.isEmpty()) {
             miradas.deleteByCriterioBancoIdIn(suyos.stream().map(CriterioBanco::getId).toList());
@@ -1344,18 +950,6 @@ public class ServicioPruebaPropiaImpl implements ServicioPruebaPropia {
         criteriosBanco.deleteByVersionBancoId(borrador.getId());
         versionesBanco.delete(borrador);
         versionesBanco.flush();
-    }
-
-    private CriterioBanco elCriterio(VersionBanco version, Long criterioId) {
-        return criteriosBanco.findById(criterioId)
-                .filter(c -> version.getId().equals(c.getVersionBancoId()))
-                .orElseThrow(() -> new ResourceNotFoundException("Criterio", "id", criterioId));
-    }
-
-    private Pregunta laPregunta(VersionBanco version, Long preguntaId) {
-        return preguntas.findById(preguntaId)
-                .filter(p -> version.getId().equals(p.getVersionBancoId()))
-                .orElseThrow(() -> new ResourceNotFoundException("Pregunta", "id", preguntaId));
     }
 
     private EntregableRequerido elEntregable(VersionBanco version, Long entregableId) {
@@ -1433,61 +1027,6 @@ public class ServicioPruebaPropiaImpl implements ServicioPruebaPropia {
                 .build());
     }
 
-    private Pregunta nuevaPregunta(VersionBanco borrador, String tipo, String enunciado, int puntos,
-                                   Long criterioId, String queDebeTener, List<OpcionAValidar> suyasOpciones) {
-        Pregunta pregunta = preguntas.save(Pregunta.builder()
-                .versionBancoId(borrador.getId())
-                .codigo(codigoNuevo(borrador))
-                .tipo(tipo)
-                .enunciado(enunciado.strip())
-                .esPuntuable(puntos > 0)
-                .orden(siguienteOrden(borrador.getId(), criterioId))
-                .puntos(puntos)
-                .criterioBancoId(criterioId)
-                .queDebeTener(ReglasDePuntos.ABIERTA.equals(tipo) ? textoONulo(queDebeTener) : null)
-                .creadoEn(Instant.now())
-                .build());
-        guardarOpciones(pregunta, suyasOpciones);
-        return pregunta;
-    }
-
-    /** Las opciones de una cerrada, con su orden y la letra que pone el servidor. */
-    private void guardarOpciones(Pregunta pregunta, List<OpcionAValidar> suyas) {
-        if (!ReglasDePuntos.esCerrada(pregunta.getTipo())) {
-            return;
-        }
-        boolean escala = ReglasDePuntos.ESCALA.equals(pregunta.getTipo());
-        int n = 1;
-        for (OpcionAValidar o : suyas) {
-            String rotulo = o.texto() == null ? "" : o.texto().strip();
-            opciones.save(Opcion.builder()
-                    .preguntaId(pregunta.getId())
-                    .letra(escala ? String.valueOf(n) : String.valueOf((char) ('A' + n - 1)))
-                    .texto(rotulo.isEmpty() && escala ? String.valueOf(n) : rotulo)
-                    .puntaje(o.puntos().setScale(0, RoundingMode.UNNECESSARY))
-                    .orden(n)
-                    .creadoEn(Instant.now())
-                    .build());
-            n++;
-        }
-    }
-
-    private String codigoNuevo(VersionBanco borrador) {
-        int mayor = preguntas.findByVersionBancoIdOrderByOrden(borrador.getId()).stream()
-                .map(Pregunta::getCodigo)
-                .filter(c -> c != null && c.matches("P\\d+"))
-                .mapToInt(c -> Integer.parseInt(c.substring(1)))
-                .max().orElse(0);
-        return "P" + (mayor + 1);
-    }
-
-    private int siguienteOrden(Long versionId, Long criterioId) {
-        return preguntas.findByVersionBancoIdOrderByOrden(versionId).stream()
-                .filter(p -> Objects.equals(p.getCriterioBancoId(), criterioId))
-                .map(Pregunta::getOrden).filter(Objects::nonNull)
-                .max(Integer::compareTo).orElse(0) + 1;
-    }
-
     private static void exigirForma(GuardarPreguntaDePrueba datos) {
         List<String> faltas = ReglasDeLaPrueba.formaDeLaPregunta("La pregunta",
                 new PreguntaAValidar(datos.tipo(), datos.enunciado(),
@@ -1527,6 +1066,11 @@ public class ServicioPruebaPropiaImpl implements ServicioPruebaPropia {
     }
 
     // ============================== Apoyo: lo que se pinta ==============================
+
+    @Override
+    protected VersionDePreguntas comoVersion(VersionBanco version) {
+        return comoVersion(calculo.estructura(version.getId()));
+    }
 
     private VersionDePreguntas comoVersion(Resultado r) {
         VersionBanco v = r.version();
@@ -1586,116 +1130,32 @@ public class ServicioPruebaPropiaImpl implements ServicioPruebaPropia {
     }
 
     /**
-     * Quién tiene criterios calificados por la IA (no ajustados a mano), con esas notas: la
-     * gente a la que una guía nueva obliga a recalificar.
+     * Quién tiene criterios calificados por la IA (no ajustados a mano), con la guía de cada
+     * nota: la gente a la que una guía nueva obliga a recalificar.
      */
-    private Map<Long, List<NotaCriterioPrueba>> notasDeLaIaPorPostulacion(VersionBanco version) {
+    @Override
+    protected Map<Long, List<Integer>> guiasDeLaIa(Vacante vacante, VersionBanco version) {
         List<IntentoPrueba> entregados = entregadosDe(version);
         if (entregados.isEmpty()) {
             return Map.of();
         }
         Map<Long, Long> postulacionDeIntento = entregados.stream()
                 .collect(Collectors.toMap(IntentoPrueba::getId, IntentoPrueba::getPostulacionId));
-        Map<Long, List<NotaCriterioPrueba>> salida = new LinkedHashMap<>();
+        Map<Long, List<Integer>> salida = new LinkedHashMap<>();
         for (NotaCriterioPrueba n : notas.findByIntentoPruebaIdIn(postulacionDeIntento.keySet())) {
             if (!NotaCriterioPrueba.IA.equals(n.getOrigen()) || n.ajustadaAMano()
                     || n.getVersionGuia() == null) {
                 continue;
             }
             salida.computeIfAbsent(postulacionDeIntento.get(n.getIntentoPruebaId()),
-                    k -> new ArrayList<>()).add(n);
+                    k -> new ArrayList<>()).add(n.getVersionGuia());
         }
         return salida;
     }
 
-    private void exigirQueNoHayaRecalificacionEnCurso(Collection<Long> postulacionIds) {
-        boolean enCurso = cola.recalificacionDePrueba(List.copyOf(postulacionIds)).values().stream()
-                .anyMatch(s -> "EN_CURSO".equals(s.estado()));
-        if (enCurso) {
-            throw new IllegalStateException("Hay una recalificación de la IA en curso: espera a "
-                    + "que termine para volver a cambiar la guía o los puntos.");
-        }
-    }
-
-    private Recalificacion recalificacionDe(VersionBanco publicada) {
-        int vigente = publicada.getVersionGuia() == null ? 1 : publicada.getVersionGuia();
-        Map<Long, List<NotaCriterioPrueba>> conNota = notasDeLaIaPorPostulacion(publicada);
-        int rindieron = entregadosDe(publicada).size();
-        if (conNota.isEmpty()) {
-            return new Recalificacion(rindieron, 0, 0, 0, 0, List.of());
-        }
-        Map<Long, ColaCalificacionIa.Seguimiento> seguimiento =
-                cola.recalificacionDePrueba(List.copyOf(conNota.keySet()));
-        int alDia = 0;
-        int recalificando = 0;
-        int pendientes = 0;
-        Set<String> motivos = new LinkedHashSet<>();
-        for (Map.Entry<Long, List<NotaCriterioPrueba>> e : conNota.entrySet()) {
-            boolean alDiaEsta = e.getValue().stream().allMatch(n -> Objects.equals(n.getVersionGuia(), vigente));
-            ColaCalificacionIa.Seguimiento s = seguimiento.get(e.getKey());
-            if (alDiaEsta) {
-                alDia++;
-            } else if (s != null && "EN_CURSO".equals(s.estado())) {
-                recalificando++;
-            } else {
-                pendientes++;
-                motivos.add(s != null && s.motivo() != null ? s.motivo()
-                        : "No se llegó a pedir su recalificación.");
-            }
-        }
-        return new Recalificacion(rindieron, conNota.size(), alDia, recalificando, pendientes,
-                List.copyOf(motivos));
-    }
-
     // ============================== Apoyo: pequeño ==============================
-
-    private static String personas(int cuantas, String verboUna, String verboVarias) {
-        return cuantas == 1 ? "1 persona " + verboUna : cuantas + " personas " + verboVarias;
-    }
-
-    private static int paso(Mover datos) {
-        return switch (datos.direccion().toUpperCase(Locale.ROOT)) {
-            case "ARRIBA" -> -1;
-            case "ABAJO" -> 1;
-            default -> throw new IllegalArgumentException("La dirección es ARRIBA o ABAJO");
-        };
-    }
-
-    private static <T> int indiceDe(List<T> lista, Long id, Function<T, Long> suId, String que) {
-        for (int i = 0; i < lista.size(); i++) {
-            if (id.equals(suId.apply(lista.get(i)))) {
-                return i;
-            }
-        }
-        throw new ResourceNotFoundException(que, "id", id);
-    }
-
-    private static <T> void renumerar(List<T> lista, int i, int j, BiConsumer<T, Integer> ponerOrden) {
-        T a = lista.get(i);
-        lista.set(i, lista.get(j));
-        lista.set(j, a);
-        for (int k = 0; k < lista.size(); k++) {
-            ponerOrden.accept(lista.get(k), k + 1);
-        }
-    }
 
     private static int entero(BigDecimal puntos) {
         return puntos == null ? 0 : puntos.setScale(0, RoundingMode.UNNECESSARY).intValueExact();
-    }
-
-    private static String textoONulo(String texto) {
-        return texto == null || texto.isBlank() ? null : texto.strip();
-    }
-
-    private static String sinTildes(String texto) {
-        if (texto == null) {
-            return "";
-        }
-        return Normalizer.normalize(texto, Normalizer.Form.NFD)
-                .replaceAll("\\p{M}", "").toLowerCase(Locale.ROOT).strip();
-    }
-
-    private static <T> List<T> lista(List<T> valor) {
-        return valor == null ? List.of() : valor;
     }
 }

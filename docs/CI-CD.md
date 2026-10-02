@@ -11,7 +11,7 @@ La regla es una sola: **si algo sale rojo, el cambio no se fusiona.**
 | Reglas de arquitectura | Que las fronteras acordadas se respeten: controladores sin repositorios, la frontera con el módulo de agentes, la lista del candado de Swagger | `ArquitecturaTest` |
 | Patrones prohibidos | Que la IA no lea el currículum sin anonimizar, que no aparezcan rutas públicas nuevas fuera de `ConfiguracionSeguridad`, que ningún error se trague por consola | `.semgrep/` |
 | Secretos filtrados | Que ninguna clave quede en el código ni en la historia de git | Gitleaks |
-| Cobertura de lo nuevo | Que las líneas que **este PR** añade o cambia tengan tests (~80%). No pide nada sobre el código viejo | SonarCloud |
+| Cobertura y duplicación de lo nuevo | Que lo que **este PR** añade o cambia tenga tests (al menos 80 %, contando líneas **y** ramas) y no repita código (como mucho 3 % de líneas duplicadas). No pide nada sobre el código viejo | SonarCloud |
 
 La prueba que llama a DeepSeek de verdad (`CalificacionIaRealIT`) **no corre aquí**:
 solo se enciende a mano con la variable `RENASER_IA_REAL`:
