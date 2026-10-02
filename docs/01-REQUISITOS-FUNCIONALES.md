@@ -878,6 +878,10 @@ patrón.
 > ⚠️ **Hoy nada comprueba que ese rango quepa dentro de la prueba**, ni en la base ni en el
 > código, y con pocos minutos el cambio no se revela nunca. Está abierto y descrito en
 > [Defectos conocidos](DEFECTOS-CONOCIDOS.md).
+>
+> **La prueba que cada vacante nueva escribe en su editor (01/10/2026, `V67`) no tiene cambio
+> inesperado**, por decisión del usuario: ni variantes ni minutos extra. Las plantillas que lo
+> tenían lo conservan. Ver [La prueba del puesto, por dentro](PRUEBA-DEL-PUESTO.md).
 
 **RF-78** El sistema arranca con once plantillas cargadas: Dirección de unidad, Coordinación de
 Operaciones, Talento y Recursos Humanos, Crecimiento y Marketing, Compra de Medios, Desarrollo

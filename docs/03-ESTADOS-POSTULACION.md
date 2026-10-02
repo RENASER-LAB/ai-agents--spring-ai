@@ -113,10 +113,17 @@ empezar y hasta cuándo se puede terminar.
 | `PRUEBA_CALIFICANDO` | ⚙️ | Entregó. La IA califica lo que hizo |
 | `PRUEBA_POR_CONFIRMAR` | 🟡 | Una persona confirma si avanza |
 
-⚠️ **Los tres estados sirven a las DOS formas de esta etapa**, y por eso el estado no basta para
+⚠️ **Los tres estados sirven a todas las formas de esta etapa**, y por eso el estado no basta para
 saber qué se le enseña a nadie: hay que mirar `vacante.instrumento_etapa_tecnica`. Con
 `PLANTILLA` rinde la prueba del puesto de siempre; con `CUESTIONARIO_TECNICO`, el cuestionario
-que la IA escribió para esa vacante. Es el mismo recorrido con distinto contenido.
+que la IA escribió para esa vacante; y desde la `V67` (01/10/2026), con `PRUEBA_PROPIA` —la de
+toda vacante nueva—, la prueba que la empresa escribió en el editor. Es el mismo recorrido con
+distinto contenido.
+
+En la prueba del editor, `PRUEBA_TURNO_CANDIDATO` también puede ser **«quedó sin completar»**:
+el tiempo venció con algo sin responder y el intento se cerró sin entregar. **No es un estado
+nuevo**: la postulación sigue ahí hasta que una persona cierre su proceso, y lo que lo distingue
+es el intento (`no_completada`). Ver «El cronómetro se agota», más abajo.
 
 Que el cronómetro esté corriendo no es un estado: el intento guarda cuándo empezó y cuándo
 vence. Un candidato que aún no ha entrado y otro con el reloj corriendo están en el mismo
@@ -468,6 +475,19 @@ los no funcionales).
 
 El intento guarda su propia fecha de vencimiento, calculada al empezar. Así el barrido que
 busca relojes agotados es una consulta directa y no depende de que la plantilla siga igual.
+
+**En la prueba escrita en el editor (`V67`) la regla es otra**: solo se entrega quien lo tiene
+todo respondido y los entregables obligatorios subidos, también a mano. Al vencer:
+
+- **Con todo completo**, el sistema la entrega sola, como siempre, y pasa a `PRUEBA_CALIFICANDO`;
+  si las cerradas ya la dejan entera —una prueba sin parte calificada—, sigue enseguida a
+  `PRUEBA_POR_CONFIRMAR`.
+- **Con algo pendiente**, el intento se cierra como **no completada**: no se califica, no gasta
+  IA y no sale en el ranking. **La postulación no se mueve**: se queda en
+  `PRUEBA_TURNO_CANDIDATO`, el portal le dice «Tu tiempo terminó y la prueba quedó sin
+  completar» sin botón, y el panel la lista en «No completaron la prueba», desde donde una
+  persona cierra su proceso. Alargarle el plazo antes de que venza lo evita; después no se
+  reabre.
 
 ### El candidato ya respondió las preguntas antes
 

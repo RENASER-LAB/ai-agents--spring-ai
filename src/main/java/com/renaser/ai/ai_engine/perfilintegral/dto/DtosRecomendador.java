@@ -45,7 +45,66 @@ public final class DtosRecomendador {
      * que ya está en el borrador (y el nombre se ignora); sin él, es un criterio nuevo.
      */
     public record CriterioPropuesto(Long criterioExistenteId, String nombre, String queEvalua,
-                                    List<PreguntaPropuesta> preguntas) {
+                                    List<PreguntaPropuesta> preguntas,
+                                    /* Solo en la prueba técnica (V67): los puntos de su parte
+                                       calificada, quién la califica (IA o PERSONA) y qué
+                                       entregables mira, por su posición en la propuesta
+                                       (`entregables`) o por su id si ya están en el borrador
+                                       (`entregablesExistentes`). */
+                                    BigDecimal parteCalificada, String calificador,
+                                    List<Integer> entregables, List<Long> entregablesExistentes) {
+
+        public CriterioPropuesto(Long criterioExistenteId, String nombre, String queEvalua,
+                                 List<PreguntaPropuesta> preguntas) {
+            this(criterioExistenteId, nombre, queEvalua, preguntas, null, null, null, null);
+        }
+    }
+
+    /** El caso que propone la IA para la prueba técnica (V67). */
+    public record CasoPropuesto(String enunciado, String materiales, String herramientasPermitidas) {
+    }
+
+    /**
+     * Un entregable que propone la IA (V67). {@code detalle} es qué debe contener;
+     * {@code queDebeTener}, qué distingue una buena entrega.
+     */
+    public record EntregablePropuesto(String nombre, String detalle, String formato,
+                                      Boolean obligatorio, String queDebeTener) {
+    }
+
+    /**
+     * Lo que devuelve el RECOMENDADOR para una prueba técnica (V67): el caso (si el borrador
+     * no tiene), los entregables nuevos y los criterios con su parte calificada.
+     */
+    public record ResultadoRecomendadorPrueba(CasoPropuesto caso,
+                                              List<EntregablePropuesto> entregables,
+                                              List<CriterioPropuesto> criterios) {
+    }
+
+    /** Lo que se guarda de una propuesta de prueba, ya validada. */
+    public record PropuestaDePrueba(CasoPropuesto caso, List<EntregablePropuesto> entregables,
+                                    List<CriterioPropuesto> criterios) {
+    }
+
+    /**
+     * Lo que recibe para proponer una prueba técnica (V67): lo de siempre más el caso, el
+     * tiempo y los entregables que ya hay, y la parte calificada de cada criterio.
+     */
+    public record InsumoRecomendadorPrueba(DatosDeLaVacante vacante, int puntosQueFaltan,
+                                           String indicacion, List<String> tiposPermitidos,
+                                           String enunciadoActual, String modalidad,
+                                           Integer duracionMinutos, Integer plazoDias,
+                                           List<EntregableDelBorrador> entregablesDelBorrador,
+                                           List<CriterioDelBorradorDePrueba> criteriosDelBorrador) {
+    }
+
+    public record EntregableDelBorrador(Long id, String nombre, String formato) {
+    }
+
+    public record CriterioDelBorradorDePrueba(Long id, String nombre, String queEvalua,
+                                              int puntosDeCerradas, int parteCalificada,
+                                              String calificador, List<Long> entregables,
+                                              List<PreguntaDelBorrador> preguntas) {
     }
 
     /** Una pregunta propuesta. Los puntos llegan como número para poder rechazar decimales. */

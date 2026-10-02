@@ -157,6 +157,66 @@ public class CalificacionPorPuntos {
                         .collect(Collectors.toMap(NotaRespuesta::getRespuestaId,
                                 Function.identity(), (a, b) -> a));
 
+        return armar(version, criterios, suyas, opcionesPorPregunta, respuestaPorPregunta,
+                notaPorRespuesta);
+    }
+
+    /**
+     * La cuenta de una tanda entera de evaluaciones de este método, en bloque: seis consultas
+     * para toda la tanda, nunca cinco por persona. La usan las columnas de los criterios del
+     * banco en el ranking del Perfil Integral y su Excel (V67).
+     *
+     * @param versionPorEvaluacion de cada evaluación, la versión con que se rindió
+     * @return el resultado de cada evaluación, por su id
+     */
+    public Map<Long, Resultado> calcularTanda(Map<Long, Long> versionPorEvaluacion) {
+        if (versionPorEvaluacion.isEmpty()) {
+            return Map.of();
+        }
+        List<Long> versionIds = List.copyOf(new java.util.HashSet<>(versionPorEvaluacion.values()));
+        Map<Long, VersionBanco> versiones = versionesBanco.findAllById(versionIds).stream()
+                .collect(Collectors.toMap(VersionBanco::getId, Function.identity()));
+        Map<Long, List<CriterioBanco>> criteriosPorVersion = criteriosBanco
+                .findByVersionBancoIdIn(versionIds).stream()
+                .sorted(Comparator.comparing((CriterioBanco c) -> c.getOrden() == null
+                        ? Integer.MAX_VALUE : c.getOrden()).thenComparing(CriterioBanco::getId))
+                .collect(Collectors.groupingBy(CriterioBanco::getVersionBancoId,
+                        LinkedHashMap::new, Collectors.toList()));
+        List<Pregunta> todas = preguntas.findByVersionBancoIdIn(versionIds);
+        Map<Long, List<Pregunta>> preguntasPorVersion = todas.stream()
+                .collect(Collectors.groupingBy(Pregunta::getVersionBancoId));
+        Map<Long, List<Opcion>> opcionesPorPregunta = opcionesDe(todas);
+        Map<Long, List<Respuesta>> respuestasPorEvaluacion = respuestas
+                .findByEvaluacionIdIn(versionPorEvaluacion.keySet()).stream()
+                .collect(Collectors.groupingBy(Respuesta::getEvaluacionId));
+        List<Long> respuestaIds = respuestasPorEvaluacion.values().stream().flatMap(List::stream)
+                .map(Respuesta::getId).toList();
+        Map<Long, NotaRespuesta> notaPorRespuesta = respuestaIds.isEmpty() ? Map.of()
+                : notasRespuesta.findByRespuestaIdIn(respuestaIds).stream()
+                        .collect(Collectors.toMap(NotaRespuesta::getRespuestaId,
+                                Function.identity(), (a, b) -> a));
+        Map<Long, Resultado> salida = new LinkedHashMap<>();
+        versionPorEvaluacion.forEach((evaluacionId, versionId) -> {
+            VersionBanco version = versiones.get(versionId);
+            if (version == null || !METODO.equals(version.getMetodoCalificacion())) {
+                return;
+            }
+            Map<Long, Respuesta> respuestaPorPregunta = respuestasPorEvaluacion
+                    .getOrDefault(evaluacionId, List.of()).stream()
+                    .collect(Collectors.toMap(Respuesta::getPreguntaId, Function.identity(),
+                            (a, b) -> a));
+            salida.put(evaluacionId, armar(version,
+                    criteriosPorVersion.getOrDefault(versionId, List.of()),
+                    preguntasPorVersion.getOrDefault(versionId, List.of()), opcionesPorPregunta,
+                    respuestaPorPregunta, notaPorRespuesta));
+        });
+        return salida;
+    }
+
+    private static Resultado armar(VersionBanco version, List<CriterioBanco> criterios,
+                                   List<Pregunta> suyas, Map<Long, List<Opcion>> opcionesPorPregunta,
+                                   Map<Long, Respuesta> respuestaPorPregunta,
+                                   Map<Long, NotaRespuesta> notaPorRespuesta) {
         Map<Long, List<PreguntaCalculada>> porCriterio = new LinkedHashMap<>();
         criterios.forEach(c -> porCriterio.put(c.getId(), new ArrayList<>()));
         List<PreguntaCalculada> sinCriterio = new ArrayList<>();

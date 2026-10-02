@@ -11,6 +11,13 @@ import lombok.RequiredArgsConstructor;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import com.renaser.ai.ai_engine.prueba.dto.DtosPruebaIa.CriterioParaLaIa;
+import com.renaser.ai.ai_engine.prueba.dto.DtosPruebaIa.InsumoPruebaPropia;
+import com.renaser.ai.ai_engine.prueba.dto.DtosPruebaIa.ResultadoPruebaPropia;
+import com.renaser.ai.ai_engine.prueba.dto.DtosPruebaIa.TandaCalificada;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Califica la prueba del puesto contra su rúbrica (RF-85).
@@ -108,6 +115,47 @@ public class AgentePruebaPuesto implements AgenteSeleccion {
      */
     static final int MAXIMO_GUIA = EnvolturaDeGuia.MAXIMO_GUIA;
 
+    // ==================== La prueba escrita en el editor (V67) ====================
+
+    private static final String OBJETIVO_DEL_EDITOR =
+            "Calificar la parte calificada de los criterios de una prueba técnica";
+
+    /**
+     * El formato de la prueba del editor. Va por el id del criterio, nunca por código ni por
+     * nombre: con criterios por vacante hay muchos que se llaman igual.
+     */
+    public static final String FORMATO_DEL_EDITOR = """
+            Cada criterio que recibes trae su criterioId, lo que evalua, sus puntosMaximos (el
+            maximo de la parte que te toca calificar, no el del criterio entero), sus preguntas
+            abiertas con lo que debe tener una buena respuesta y lo que respondio, y los
+            entregables que mira con lo que debia contener, lo que debe tener una buena entrega
+            y su texto, o el motivo por el que no se pudo leer. Las preguntas cerradas no
+            llegan: las cuenta el sistema.
+            Responde SOLO con un objeto json con esta forma exacta:
+            {
+              "criterios": [
+                {"criterioId": <el mismo criterioId que recibiste>,
+                 "puntaje": <numero entre 0 y los puntosMaximos de ese criterio>,
+                 "explicacion": "<por que esa nota>",
+                 "evidencia": "<la parte literal de la respuesta o la entrega en que te basas>"}
+              ],
+              "confianza": <numero de 0 a 100>
+            }
+            Una entrada por cada criterio que puedas calificar con lo que recibiste. Si de un
+            criterio no tienes evidencia porque lo que mira no se pudo leer, NO lo incluyas: lo
+            calificara una persona. No inventes criterios ni cambies sus ids.
+            """;
+
+    /**
+     * Cuántos criterios van en una llamada como mucho, y cuánto texto. Una prueba de sesenta
+     * preguntas y doce criterios no cabe en una sola respuesta del modelo: se parte en
+     * tandas y se guardan todas juntas (AC-29), todo o nada para la persona.
+     */
+    static final int CRITERIOS_POR_LLAMADA = 4;
+    static final int CARACTERES_POR_LLAMADA = 60_000;
+
+    private static final tools.jackson.databind.ObjectMapper JSON = new tools.jackson.databind.ObjectMapper();
+
     private final PuentePruebaIa puente;
     private final EjecutorAgenteIa ejecutor;
 
@@ -118,6 +166,10 @@ public class AgentePruebaPuesto implements AgenteSeleccion {
 
     @Override
     public void ejecutar(TrabajoIa trabajo) {
+        if (puente.esDelEditor(trabajo.getPostulacionId())) {
+            ejecutarDelEditor(trabajo);
+            return;
+        }
         InsumoPrueba insumo = puente.insumoPrueba(trabajo.getPostulacionId());
         if (insumo.criterios().isEmpty()) {
             log.info("PRUEBA_PUESTO: la rúbrica de la postulación {} no tiene ningún criterio "
@@ -182,6 +234,69 @@ public class AgentePruebaPuesto implements AgenteSeleccion {
      * explicación y acota el puntaje al máximo del criterio. Aunque la guía convenciera al
      * modelo de inventarse una nota global de 500, no habría dónde escribirla.
      */
+    /**
+     * La prueba del editor: solo la parte calificada de sus criterios de IA, en tantas
+     * llamadas como haga falta, y todo se guarda junto al final. Si una llamada falla, no se
+     * guarda nada y el trabajo se reintenta: la persona se queda con su nota anterior hasta
+     * que llegue la nueva entera (decisión 6).
+     */
+    private void ejecutarDelEditor(TrabajoIa trabajo) {
+        InsumoPruebaPropia insumo = puente.insumoPruebaPropia(trabajo.getPostulacionId());
+        if (insumo.criterios().isEmpty()) {
+            log.info("PRUEBA_PUESTO: la prueba de la postulación {} no tiene criterios de IA por "
+                    + "calificar", trabajo.getPostulacionId());
+            return;
+        }
+        String formato = conLaGuiaDeLaPrueba(insumo.guiaCalificacion(), FORMATO_DEL_EDITOR);
+        List<TandaCalificada> tandas = new ArrayList<>();
+        for (List<CriterioParaLaIa> tanda : enTandas(insumo.criterios())) {
+            InsumoPruebaPropia deEstaTanda = new InsumoPruebaPropia(insumo.vacante(),
+                    insumo.enunciado(), insumo.materiales(), insumo.herramientasPermitidas(),
+                    insumo.modalidad(), insumo.minutosEfectivos(), insumo.diasEfectivos(),
+                    insumo.seLeAcaboElTiempo(), null, insumo.versionGuia(), tanda);
+            EjecutorAgenteIa.Ejecutado<ResultadoPruebaPropia> salida = ejecutor.ejecutar(
+                    trabajo, OBJETIVO_DEL_EDITOR, formato, deEstaTanda, ResultadoPruebaPropia.class);
+            tandas.add(new TandaCalificada(salida.ejecucionIaId(), salida.resultado()));
+        }
+        log.info("PRUEBA_PUESTO calificó {} criterios de la postulación {} en {} llamada(s)",
+                insumo.criterios().size(), trabajo.getPostulacionId(), tandas.size());
+        puente.guardarNotasPruebaPropia(trabajo.getPostulacionId(), insumo.versionGuia(), tandas);
+    }
+
+    /** Los criterios partidos en tandas por cantidad y por tamaño. */
+    static List<List<CriterioParaLaIa>> enTandas(List<CriterioParaLaIa> criterios) {
+        List<List<CriterioParaLaIa>> tandas = new ArrayList<>();
+        List<CriterioParaLaIa> actual = new ArrayList<>();
+        int largo = 0;
+        for (CriterioParaLaIa c : criterios) {
+            int suyo = largoDe(c);
+            if (!actual.isEmpty() && (actual.size() >= CRITERIOS_POR_LLAMADA
+                    || largo + suyo > CARACTERES_POR_LLAMADA)) {
+                tandas.add(actual);
+                actual = new ArrayList<>();
+                largo = 0;
+            }
+            actual.add(c);
+            largo += suyo;
+        }
+        if (!actual.isEmpty()) {
+            tandas.add(actual);
+        }
+        return tandas;
+    }
+
+    private static int largoDe(CriterioParaLaIa c) {
+        try {
+            return JSON.writeValueAsString(c).length();
+        } catch (RuntimeException e) {
+            return CARACTERES_POR_LLAMADA;
+        }
+    }
+
+    static String conLaGuiaDeLaPrueba(String guia, String formato) {
+        return EnvolturaDeGuia.envolver(guia, GUIA_ABRE, GUIA_CIERRA, formato);
+    }
+
     static String conLaGuiaDeLaPrueba(String guia) {
         // La envoltura se comparte con el evaluador de las preguntas propias (V66): la
         // defensa vive en un solo sitio. Sin guía devuelve el FORMATO tal cual.

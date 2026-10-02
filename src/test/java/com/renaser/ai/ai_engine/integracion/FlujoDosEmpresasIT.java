@@ -617,17 +617,26 @@ public class FlujoDosEmpresasIT {
                 .andExpect(jsonPath("$.bancoPropio").value(false));
     }
 
-    @DisplayName("ACME se lleva también el banco, las plantillas y las pruebas — copia completa")
+    @DisplayName("ACME se lleva sus plantillas de evaluación; el banco y las pruebas ya no se personalizan")
     @Test
     @Order(8)
     void acmePersonalizaLosOtrosTresInstrumentos() throws Exception {
-        // El banco ya no se personaliza (decisión del 29/09/2026, AC-01d): cada empresa usa
-        // solo su propio banco, y una empresa sin banco escribe las preguntas en cada
-        // vacante. Se rechaza y no se copia nada; los otros instrumentos siguen igual.
-        conToken(post("/api/v1/panel/organizacion/personalizacion"), tokenAcme,
-                "{\"instrumento\":\"BANCO\"}").andExpect(status().isConflict());
+        // El banco y las pruebas ya no se personalizan (V67, decisión 13, AC-26): cada
+        // empresa escribe sus preguntas y su prueba técnica en cada vacante. Encenderlo o
+        // apagarlo contesta 400 y no copia ni cambia nada; los otros instrumentos siguen igual.
+        int pruebasAntes = contar("select count(*) from plantilla_prueba");
+        for (String instrumento : List.of("BANCO", "PRUEBA")) {
+            conToken(post("/api/v1/panel/organizacion/personalizacion"), tokenAcme,
+                    "{\"instrumento\":\"" + instrumento + "\"}")
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString(
+                            "Esta personalización ya no existe")));
+            conToken(delete("/api/v1/panel/organizacion/personalizacion/" + instrumento), tokenAcme, null)
+                    .andExpect(status().isBadRequest());
+        }
         assertThat(contar("select count(*) from version_banco where organizacion_id = "
                 + acmeId + " and tipo_banco = 'NIVEL'")).isZero();
+        assertThat(contar("select count(*) from plantilla_prueba")).isEqualTo(pruebasAntes);
 
         // Plantillas de evaluación y pruebas del puesto: copia con origen y sus hijas
         conToken(post("/api/v1/panel/organizacion/personalizacion"), tokenAcme,
@@ -643,23 +652,12 @@ public class FlujoDosEmpresasIT {
                   join plantilla_evaluacion pl on pl.id = c.plantilla_evaluacion_id
                  where pl.organizacion_id = %d and pl.estado = 'PUBLICADA'""".formatted(plataformaId)));
 
-        conToken(post("/api/v1/panel/organizacion/personalizacion"), tokenAcme,
-                "{\"instrumento\":\"PRUEBA\"}").andExpect(status().isOk());
-        // La copia de la prueba no arrastra amarres ajenos: ni el puesto de Renaser ni
-        // ninguna vacante — nace suelta, para que ACME la ate a lo suyo
-        assertThat(contar("select count(*) from plantilla_prueba where organizacion_id = "
-                + acmeId + " and puesto_id is not null")).isZero();
-        assertThat(contar("""
-                select count(*) from version_plantilla_prueba v
-                  join plantilla_prueba pp on pp.id = v.plantilla_prueba_id
-                 where pp.organizacion_id = %d and v.vacante_id is not null"""
-                .formatted(acmeId))).isZero();
-
-        // Encendida la bandera de las que se pueden personalizar; la del banco, no
+        // Encendida la bandera de las que se pueden personalizar; la del banco y la de las
+        // pruebas, no: su bandera no cambió
         conTokenGet("/api/v1/panel/organizacion/personalizacion", tokenAcme)
                 .andExpect(jsonPath("$.bancoPropio").value(false))
                 .andExpect(jsonPath("$.plantillasEvaluacionPropias").value(true))
-                .andExpect(jsonPath("$.pruebasPuestoPropias").value(true));
+                .andExpect(jsonPath("$.pruebasPuestoPropias").value(false));
     }
 
     // ============ El borrado ============

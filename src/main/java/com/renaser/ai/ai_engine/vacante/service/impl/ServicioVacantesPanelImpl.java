@@ -65,6 +65,12 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
     /** Los dos instrumentos de la etapa técnica. Uno por vacante, nunca los dos (V43). */
     public static final String PLANTILLA = "PLANTILLA";
     public static final String CUESTIONARIO_TECNICO = "CUESTIONARIO_TECNICO";
+    /**
+     * La prueba técnica escrita en el editor (V67): la que reciben todas las vacantes nuevas,
+     * también las de RENASER. Las plantillas y el cuestionario CAZATALENTOS siguen para las
+     * que ya existen.
+     */
+    public static final String PRUEBA_PROPIA = "PRUEBA_PROPIA";
     /** La tercera opción de «Qué responderá quien postule»: la evaluación apagada (V66). */
     public static final String SIN_EVALUACION = "SIN_EVALUACION";
 
@@ -291,6 +297,9 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                 // (decisión del 30/09/2026). Ese banco se sigue pudiendo elegir después, en
                 // elegirOrigenDePreguntas; el de RENASER ya no se presta a las de otras empresas.
                 .origenPreguntas(Vacante.ORIGEN_VACANTE)
+                // Y su prueba técnica se escribe en el editor (V67, decisión 5): las plantillas
+                // y el cuestionario CAZATALENTOS ya no se ofrecen a las vacantes nuevas.
+                .instrumentoEtapaTecnica(PRUEBA_PROPIA)
                 .responsableUsuarioId(datos.responsableUsuarioId())
                 .creadoEn(Instant.now())
                 .build());
@@ -632,6 +641,24 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
      */
     private PlazoDeLaPrueba loQueRigeHoy(ContextoUsuario quien, Vacante v) {
         Integer minutosVacante = v.getMinutosEtapaTecnica();
+        if (PRUEBA_PROPIA.equals(v.getInstrumentoEtapaTecnica())) {
+            // La prueba del editor lleva su tiempo dentro: la vacante no fija minutos (V67).
+            VersionBanco publicada = versionesBanco.pruebaPropiaDe(v.getId(), "PUBLICADA").orElse(null);
+            String modalidad = publicada == null ? null : publicada.getModalidad();
+            int conPropio = 0;
+            int sinPropio = 0;
+            for (IntentoPrueba intento : intentos.abiertosDeLaVacante(v.getId())) {
+                if (intento.isPlazoPropio()) {
+                    conPropio++;
+                } else {
+                    sinPropio++;
+                }
+            }
+            return new PlazoDeLaPrueba(modalidad,
+                    "CRONOMETRADA".equals(modalidad) ? publicada.getDuracionMinutos() : null,
+                    "PLAZO_ABIERTO".equals(modalidad) ? publicada.getPlazoDias() : null,
+                    sinPropio, conPropio);
+        }
         if (CUESTIONARIO_TECNICO.equals(v.getInstrumentoEtapaTecnica())) {
             // El cuestionario técnico no se cierra con una fecha: su plazo son los minutos
             // de la vacante y, si no los fijó, los del banco que le toca. Y no usa
@@ -852,6 +879,16 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
 
         Long anterior = vacante.getVersionPlantillaPruebaId();
         exigirVaraQuieta(vacante, anterior, versionPlantillaPruebaId, "su versión de prueba");
+        /*
+         * ⚠️ Asignar una plantilla por la API la pasa a rendir esa plantilla (V67). El panel no
+         * ofrece plantillas a las vacantes nuevas; este camino queda para los guiones de las
+         * vacantes que ya existen y para las pruebas que las simulan, que crean la vacante y
+         * le ponen su plantilla. Cambiar de instrumento con gente que ya empezó no se puede.
+         */
+        if (PRUEBA_PROPIA.equals(vacante.getInstrumentoEtapaTecnica())) {
+            exigirVaraQuietaDelInstrumento(vacante);
+            vacante.setInstrumentoEtapaTecnica(PLANTILLA);
+        }
         vacante.setVersionPlantillaPruebaId(versionPlantillaPruebaId);
         vacantes.save(vacante);
         auditoria.registrar(quien.organizacionId(), quien, "asignar_plantilla_prueba",
@@ -985,10 +1022,37 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
     public void elegirInstrumentoTecnico(ContextoUsuario quien, Long id,
                                          String instrumento, Integer minutos) {
         Vacante vacante = laQueSePuedeTocar(quien, id);
-        if (!PLANTILLA.equals(instrumento) && !CUESTIONARIO_TECNICO.equals(instrumento)) {
+        if (!PLANTILLA.equals(instrumento) && !CUESTIONARIO_TECNICO.equals(instrumento)
+                && !PRUEBA_PROPIA.equals(instrumento)) {
             throw new IllegalArgumentException(
-                    "El instrumento de la etapa técnica es «" + PLANTILLA + "» o «"
-                            + CUESTIONARIO_TECNICO + "»; llegó «" + instrumento + "»");
+                    "El instrumento de la etapa técnica es «" + PLANTILLA + "», «"
+                            + CUESTIONARIO_TECNICO + "» o «" + PRUEBA_PROPIA + "»; llegó «"
+                            + instrumento + "»");
+        }
+        /*
+         * ⚠️ La prueba del editor no se entra ni se sale por aquí (V67, AC-02). Una vacante
+         * nueva que se pasara a PLANTILLA o al cuestionario CAZATALENTOS acabaría rindiendo lo
+         * que ya no se ofrece, y el panel le pintaría los desplegables viejos sin camino de
+         * vuelta al editor. Y a la inversa, ninguna pantalla ni guion pasa una vacante de las
+         * de antes a la prueba del editor: siguen entre sus dos instrumentos de siempre.
+         *
+         * La única salida es asignarle una plantilla (asignarPlantillaPrueba), que queda para
+         * los guiones de las vacantes que ya existen mientras nadie haya rendido.
+         */
+        String anterior = vacante.getInstrumentoEtapaTecnica();
+        if (PRUEBA_PROPIA.equals(anterior) && !PRUEBA_PROPIA.equals(instrumento)) {
+            throw new IllegalArgumentException("La prueba técnica de esta vacante se escribe en "
+                    + "«Armar la prueba»: no se cambia por una plantilla ni por el cuestionario "
+                    + "técnico");
+        }
+        if (!PRUEBA_PROPIA.equals(anterior) && PRUEBA_PROPIA.equals(instrumento)) {
+            throw new IllegalArgumentException("La prueba escrita en «Armar la prueba» es la de "
+                    + "las vacantes nuevas: esta vacante sigue con la prueba del puesto o el "
+                    + "cuestionario técnico");
+        }
+        // La prueba del editor lleva su tiempo dentro: unos minutos de la vacante mentirían.
+        if (PRUEBA_PROPIA.equals(instrumento)) {
+            minutos = null;
         }
         if (minutos != null && minutos < MINUTOS_MINIMOS) {
             throw new IllegalArgumentException("La etapa técnica dura al menos "
@@ -1008,7 +1072,6 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
         // ⚠️ Que los dos se comporten igual es la condición para que la guarda diga la
         // verdad: si uno de ellos congelara, este cambio se guardaría y se auditaría sin
         // llegarle a media tanda. Es lo que pasaba con el cuestionario hasta hoy.
-        String anterior = vacante.getInstrumentoEtapaTecnica();
         if (!anterior.equals(instrumento)
                 || !Objects.equals(vacante.getMinutosEtapaTecnica(), minutos)) {
             exigirVaraQuietaDelInstrumento(vacante);
@@ -1031,6 +1094,14 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
      * equivocada.
      */
     private void exigirInstrumentoTecnico(Vacante vacante) {
+        // ⚠️ Antes que la plantilla: un tercer valor que cayera abajo pediría una plantilla.
+        if (PRUEBA_PROPIA.equals(vacante.getInstrumentoEtapaTecnica())) {
+            versionesBanco.pruebaPropiaDe(vacante.getId(), "PUBLICADA")
+                    .orElseThrow(() -> new IllegalStateException(
+                            "Antes de publicar la vacante hay que publicar su prueba técnica: "
+                                    + "ármala en «Armar la prueba»"));
+            return;
+        }
         if (CUESTIONARIO_TECNICO.equals(vacante.getInstrumentoEtapaTecnica())) {
             versionesBanco.cuestionarioTecnicoDe(vacante.getId(), "PUBLICADA")
                     .orElseThrow(() -> new IllegalStateException(
@@ -1342,7 +1413,14 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
             // es un camino normal —una vacante con cuestionario técnico se publica sin ella—
             // y no un borrador a medias: antes reventaba con «The given id must not be null»,
             // el error crudo de Spring Data en la cara de quien usa el panel.
-            if (vacante.getVersionPlantillaPruebaId() == null) {
+            // La prueba escrita en el editor (V67) también se cierra con una fecha, una vez
+            // publicada: es la misma maquinaria de intentos que la plantilla.
+            if (PRUEBA_PROPIA.equals(vacante.getInstrumentoEtapaTecnica())) {
+                if (versionesBanco.pruebaPropiaDe(vacante.getId(), "PUBLICADA").isEmpty()) {
+                    throw new IllegalStateException("Esta vacante todavía no tiene su prueba "
+                            + "técnica publicada: el plazo se fija sobre la prueba, publícala antes");
+                }
+            } else if (vacante.getVersionPlantillaPruebaId() == null) {
                 throw new IllegalStateException("Esta vacante no rinde una prueba del puesto, "
                         + "así que no hay una fecha de cierre que fijarle: su etapa técnica es "
                         + "el cuestionario, y su tiempo son los minutos de la vacante");
@@ -1397,6 +1475,16 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
     private Instant fechaDeCierreDe(IntentoPrueba intento, Instant cierraEn) {
         if (cierraEn != null || intento.getIniciadoEn() == null) {
             return cierraEn;
+        }
+        // La prueba del editor (V67) no tiene plantilla: su reloj está en su versión.
+        if (intento.esDelEditor()) {
+            return versionesBanco.findById(intento.getVersionBancoId())
+                    .map(v -> "CRONOMETRADA".equals(v.getModalidad()) && v.getDuracionMinutos() != null
+                            ? intento.getIniciadoEn().plus(v.getDuracionMinutos(), ChronoUnit.MINUTES)
+                            : v.getPlazoDias() != null
+                                    ? intento.getIniciadoEn().plus(v.getPlazoDias(), ChronoUnit.DAYS)
+                                    : intento.getVenceEn())
+                    .orElse(intento.getVenceEn());
         }
         return versionesPrueba.findById(intento.getVersionPlantillaPruebaId())
                 .map(v -> "CRONOMETRADA".equals(v.getModalidad())

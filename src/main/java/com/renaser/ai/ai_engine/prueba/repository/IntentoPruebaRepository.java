@@ -25,6 +25,15 @@ public interface IntentoPruebaRepository extends JpaRepository<IntentoPrueba, Lo
      */
     List<IntentoPrueba> findByPostulacionIdIn(java.util.Collection<Long> postulacionIds);
 
+    /**
+     * ¿Alguien abrió ya una prueba de esta versión del editor (V67)? Es la frontera de la
+     * decisión 9: hasta la primera rendición se puede publicar otra versión.
+     */
+    boolean existsByVersionBancoIdAndIniciadoEnIsNotNull(Long versionBancoId);
+
+    /** Los intentos de una versión del editor: a quienes recalcula un cambio de puntos o de guía. */
+    List<IntentoPrueba> findByVersionBancoId(Long versionBancoId);
+
     // Los que ya vencieron y nadie entregó: el sondeo los cierra solo (RF: "no existe
     // entregar tarde").
     List<IntentoPrueba> findByEntregadoEnIsNullAndIniciadoEnIsNotNullAndVenceEnBefore(Instant momento);

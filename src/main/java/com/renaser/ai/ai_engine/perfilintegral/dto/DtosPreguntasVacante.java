@@ -133,7 +133,24 @@ public final class DtosPreguntasVacante {
                                     boolean puedeEditar, boolean hayPostulantes,
                                     VersionDePreguntas borrador, VersionDePreguntas publicada,
                                     ResumenDePreguntas resumen,
-                                    Recalificacion recalificacion) {
+                                    Recalificacion recalificacion,
+                                    /*
+                                     * PERFIL_INTEGRAL (las preguntas propias, fase 1) o
+                                     * PRUEBA_PUESTO (la prueba técnica, V67). En la prueba,
+                                     * `origen` es el instrumento de la vacante y
+                                     * `hayPostulantes` dice si alguien ya empezó a rendirla:
+                                     * esa es su frontera (decisión 9), no la postulación.
+                                     */
+                                    String proposito) {
+
+        public EditorDePreguntas(Long vacanteId, String titulo, String nivel, String origen,
+                                 boolean aplicaEvaluacion, boolean puedeEditar,
+                                 boolean hayPostulantes, VersionDePreguntas borrador,
+                                 VersionDePreguntas publicada, ResumenDePreguntas resumen,
+                                 Recalificacion recalificacion) {
+            this(vacanteId, titulo, nivel, origen, aplicaEvaluacion, puedeEditar, hayPostulantes,
+                    borrador, publicada, resumen, recalificacion, "PERFIL_INTEGRAL");
+        }
     }
 
     /**
@@ -147,13 +164,63 @@ public final class DtosPreguntasVacante {
                                      int cuantosCriterios, int cuantasPreguntas,
                                      List<CriterioDeLaVersion> criterios,
                                      List<PreguntaDeLaVersion> sinCriterio,
-                                     List<String> avisos) {
+                                     List<String> avisos,
+                                     /* Solo en la prueba técnica (V67): el caso, el tiempo y
+                                        los entregables. Nulo en las preguntas propias. */
+                                     PruebaDeLaVersion prueba) {
+
+        public VersionDePreguntas(Long id, String estado, String guiaCalificacion,
+                                  Integer minutosObjetivo, int versionGuia, int total,
+                                  int cuantosCriterios, int cuantasPreguntas,
+                                  List<CriterioDeLaVersion> criterios,
+                                  List<PreguntaDeLaVersion> sinCriterio, List<String> avisos) {
+            this(id, estado, guiaCalificacion, minutosObjetivo, versionGuia, total,
+                    cuantosCriterios, cuantasPreguntas, criterios, sinCriterio, avisos, null);
+        }
+    }
+
+    /**
+     * Lo que una prueba técnica tiene y unas preguntas no (V67): el caso, el tiempo y los
+     * entregables. {@code cuestionario} es verdad cuando no hay entregables: entonces la
+     * pantalla la llama cuestionario y el enunciado es opcional.
+     */
+    public record PruebaDeLaVersion(String enunciado, ConsignaAdjunta consigna, String materiales,
+                                    String herramientasPermitidas, String modalidad,
+                                    Integer duracionMinutos, Integer plazoDias,
+                                    boolean cuestionario,
+                                    List<EntregableDeLaVersion> entregables) {
+    }
+
+    /** El enunciado en PDF o Word adjunto: el archivo y su nombre. */
+    public record ConsignaAdjunta(Long archivoId, String nombre) {
+    }
+
+    /**
+     * Un entregable de la prueba. {@code detalle} es «qué debe contener» (lo ve el candidato);
+     * {@code queDebeTener}, lo que llega a la IA y a quien califica. {@code criterios} son los
+     * ids de los criterios que lo miran.
+     */
+    public record EntregableDeLaVersion(Long id, String nombre, String detalle, String formato,
+                                        boolean obligatorio, String queDebeTener, int orden,
+                                        List<Long> criterios) {
     }
 
     /** Un criterio: sus puntos son la suma de sus preguntas, partidos en sistema e IA. */
     public record CriterioDeLaVersion(Long id, String nombre, String queEvalua, int orden,
                                       int puntos, int puntosSistema, int puntosIa,
-                                      List<PreguntaDeLaVersion> preguntas) {
+                                      List<PreguntaDeLaVersion> preguntas,
+                                      /* Solo en la prueba técnica (V67): los puntos de su parte
+                                         calificada, quién la califica (IA o PERSONA) y los ids
+                                         de los entregables que mira. Nulos en las propias. */
+                                      Integer puntosCalificados, String calificador,
+                                      List<Long> entregables) {
+
+        public CriterioDeLaVersion(Long id, String nombre, String queEvalua, int orden,
+                                   int puntos, int puntosSistema, int puntosIa,
+                                   List<PreguntaDeLaVersion> preguntas) {
+            this(id, nombre, queEvalua, orden, puntos, puntosSistema, puntosIa, preguntas,
+                    null, null, null);
+        }
     }
 
     public record PreguntaDeLaVersion(Long id, String tipo, String enunciado, int puntos,
@@ -173,7 +240,16 @@ public final class DtosPreguntasVacante {
      * @param estado SIN_PREGUNTAS · BORRADOR · PUBLICADAS
      */
     public record ResumenDePreguntas(String estado, Integer puntos, Integer criterios,
-                                     Integer preguntas) {
+                                     Integer preguntas,
+                                     /* Solo en la prueba técnica (V67): cuántos entregables,
+                                        su tiempo (minutos o días) y si es un cuestionario. */
+                                     Integer entregables, Integer minutos, Integer dias,
+                                     Boolean cuestionario) {
+
+        public ResumenDePreguntas(String estado, Integer puntos, Integer criterios,
+                                  Integer preguntas) {
+            this(estado, puntos, criterios, preguntas, null, null, null, null);
+        }
     }
 
     /**
@@ -204,7 +280,19 @@ public final class DtosPreguntasVacante {
      */
     public record EstadoDeLaRecomendacion(String estado, String motivo, Long propuestaId,
                                           Integer puntosQueFaltan, String indicacion,
-                                          List<CriterioPropuesto> propuesta) {
+                                          List<CriterioPropuesto> propuesta,
+                                          /* Solo en la prueba técnica (V67): el caso y los
+                                             entregables que propone la IA. */
+                                          com.renaser.ai.ai_engine.perfilintegral.dto
+                                                  .DtosRecomendador.CasoPropuesto caso,
+                                          List<com.renaser.ai.ai_engine.perfilintegral.dto
+                                                  .DtosRecomendador.EntregablePropuesto> entregables) {
+
+        public EstadoDeLaRecomendacion(String estado, String motivo, Long propuestaId,
+                                       Integer puntosQueFaltan, String indicacion,
+                                       List<CriterioPropuesto> propuesta) {
+            this(estado, motivo, propuestaId, puntosQueFaltan, indicacion, propuesta, null, null);
+        }
     }
 
     /** Lo que contesta pedir recomendaciones: si quedó en la cola, y si no, por qué. */

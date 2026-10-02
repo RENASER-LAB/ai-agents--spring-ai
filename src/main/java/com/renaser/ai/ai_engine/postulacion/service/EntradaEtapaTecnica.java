@@ -35,6 +35,9 @@ public class EntradaEtapaTecnica {
     /** La vacante rinde el cuestionario CAZATALENTOS y no la prueba del puesto. */
     public static final String CUESTIONARIO_TECNICO = "CUESTIONARIO_TECNICO";
 
+    /** La vacante rinde la prueba escrita en el editor (V67): la de toda vacante nueva. */
+    public static final String PRUEBA_PROPIA = "PRUEBA_PROPIA";
+
     private final PostulacionRepository postulaciones;
     private final ServicioPrueba prueba;
     private final ServicioEvaluacion evaluaciones;
@@ -59,6 +62,11 @@ public class EntradaEtapaTecnica {
      * cualquier cosa.
      */
     public boolean hayInstrumento(Vacante vacante) {
+        // ⚠️ La prueba del editor se pregunta ANTES que la plantilla: un tercer valor que
+        // cayera en la rama de abajo preguntaría por una plantilla que no tiene (V67).
+        if (PRUEBA_PROPIA.equals(vacante.getInstrumentoEtapaTecnica())) {
+            return versionesBanco.pruebaPropiaDe(vacante.getId(), "PUBLICADA").isPresent();
+        }
         if (CUESTIONARIO_TECNICO.equals(vacante.getInstrumentoEtapaTecnica())) {
             // El cuestionario preparado y todavía en borrador NO cuenta. Sin esto, una
             // vacante a medio montar en automático escribía un error por CADA candidato que
@@ -91,6 +99,17 @@ public class EntradaEtapaTecnica {
      */
     public void crearAlEntrar(Postulacion postulacion, Vacante vacante) {
         Long organizacionId = postulacion.getOrganizacionId();
+
+        if (PRUEBA_PROPIA.equals(vacante.getInstrumentoEtapaTecnica())) {
+            Long publicada = versionesBanco.pruebaPropiaDe(vacante.getId(), "PUBLICADA")
+                    .map(com.renaser.ai.ai_engine.perfilintegral.entity.VersionBanco::getId)
+                    .orElseThrow(() -> new IllegalStateException(
+                            "Esta vacante todavía no tiene su prueba técnica publicada: no se "
+                                    + "puede avanzar"));
+            prueba.crearAlEntrarConPruebaPropia(organizacionId, postulacion.getId(), publicada,
+                    vacante.getPruebaCierraEn());
+            return;
+        }
 
         if (CUESTIONARIO_TECNICO.equals(vacante.getInstrumentoEtapaTecnica())) {
             if (postulacion.getEvaluacionTecnicaId() != null) {

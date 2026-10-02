@@ -29,7 +29,21 @@ import com.renaser.ai.ai_engine.vacante.entity.Vacante;
 import com.renaser.ai.ai_engine.vacante.repository.VacanteRepository;
 import com.renaser.ai.ai_engine.vacante.service.VacanteEliminada;
 
-import lombok.RequiredArgsConstructor;
+import com.renaser.ai.ai_engine.archivo.repository.ArchivoRepository;
+import com.renaser.ai.ai_engine.perfilintegral.entity.Opcion;
+import com.renaser.ai.ai_engine.perfilintegral.entity.Pregunta;
+import com.renaser.ai.ai_engine.perfilintegral.entity.VersionBanco;
+import com.renaser.ai.ai_engine.perfilintegral.repository.PreguntaRepository;
+import com.renaser.ai.ai_engine.perfilintegral.repository.VersionBancoRepository;
+import com.renaser.ai.ai_engine.perfilintegral.service.PreguntasInvalidasException;
+import com.renaser.ai.ai_engine.perfilintegral.service.ReglasDePuntos;
+import com.renaser.ai.ai_engine.prueba.service.CalificacionDeLaPruebaPropia;
+import com.renaser.ai.ai_engine.prueba.service.CalificacionDeLaPruebaPropia.LoQueFalta;
+import com.renaser.ai.ai_engine.prueba.service.CalificacionDeLaPruebaPropia.PreguntaDeLaPrueba;
+import com.renaser.ai.ai_engine.prueba.service.CalificacionDeLaPruebaPropia.Resultado;
+import com.renaser.ai.ai_engine.prueba.service.CierreDeLaPruebaPropia;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -38,8 +52,10 @@ import java.security.SecureRandom;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -58,7 +74,7 @@ import java.util.stream.Collectors;
  * que nadie pudiera verlo desde el panel.
  */
 @Service
-@RequiredArgsConstructor
+@Slf4j
 public class ServicioPruebaImpl implements ServicioPrueba {
 
     private final IntentoPruebaRepository intentos;
@@ -75,7 +91,67 @@ public class ServicioPruebaImpl implements ServicioPrueba {
     private final MaquinaEstados maquina;
     private final com.renaser.ai.ai_engine.ai.service.ColaCalificacionIa cola;
 
+    // ---------- La prueba escrita en el editor (V67) ----------
+    // Nulos en las pruebas unitarias de las plantillas, que construyen el servicio con su
+    // constructor de siempre: ninguno se usa fuera de la rama del editor.
+    private final VersionBancoRepository versionesBanco;
+    private final PreguntaRepository preguntasBanco;
+    private final ArchivoRepository archivos;
+    private final CalificacionDeLaPruebaPropia calculo;
+    private final CierreDeLaPruebaPropia cierre;
+
+    private static final tools.jackson.databind.ObjectMapper JSON =
+            new tools.jackson.databind.ObjectMapper();
+
     private final SecureRandom azar = new SecureRandom();
+
+    /** El constructor de las plantillas: el que usan sus pruebas unitarias. */
+    public ServicioPruebaImpl(IntentoPruebaRepository intentos, VersionPlantillaPruebaRepository versiones,
+                              VacanteRepository vacantes, VarianteCambioRepository variantes,
+                              PreguntaVersionPlantillaRepository preguntasElegidas,
+                              PreguntaPruebaRepository preguntasCatalogo,
+                              EntregableRequeridoRepository entregablesRequeridos,
+                              EntregableRepository entregables, RespuestaPruebaRepository respuestas,
+                              PostulacionRepository postulaciones, AlmacenArchivos almacen,
+                              MaquinaEstados maquina,
+                              com.renaser.ai.ai_engine.ai.service.ColaCalificacionIa cola) {
+        this(intentos, versiones, vacantes, variantes, preguntasElegidas, preguntasCatalogo,
+                entregablesRequeridos, entregables, respuestas, postulaciones, almacen, maquina,
+                cola, null, null, null, null, null);
+    }
+
+    @Autowired
+    public ServicioPruebaImpl(IntentoPruebaRepository intentos, VersionPlantillaPruebaRepository versiones,
+                              VacanteRepository vacantes, VarianteCambioRepository variantes,
+                              PreguntaVersionPlantillaRepository preguntasElegidas,
+                              PreguntaPruebaRepository preguntasCatalogo,
+                              EntregableRequeridoRepository entregablesRequeridos,
+                              EntregableRepository entregables, RespuestaPruebaRepository respuestas,
+                              PostulacionRepository postulaciones, AlmacenArchivos almacen,
+                              MaquinaEstados maquina,
+                              com.renaser.ai.ai_engine.ai.service.ColaCalificacionIa cola,
+                              VersionBancoRepository versionesBanco, PreguntaRepository preguntasBanco,
+                              ArchivoRepository archivos, CalificacionDeLaPruebaPropia calculo,
+                              CierreDeLaPruebaPropia cierre) {
+        this.intentos = intentos;
+        this.versiones = versiones;
+        this.vacantes = vacantes;
+        this.variantes = variantes;
+        this.preguntasElegidas = preguntasElegidas;
+        this.preguntasCatalogo = preguntasCatalogo;
+        this.entregablesRequeridos = entregablesRequeridos;
+        this.entregables = entregables;
+        this.respuestas = respuestas;
+        this.postulaciones = postulaciones;
+        this.almacen = almacen;
+        this.maquina = maquina;
+        this.cola = cola;
+        this.versionesBanco = versionesBanco;
+        this.preguntasBanco = preguntasBanco;
+        this.archivos = archivos;
+        this.calculo = calculo;
+        this.cierre = cierre;
+    }
 
     @Override
     @Transactional
@@ -119,8 +195,38 @@ public class ServicioPruebaImpl implements ServicioPrueba {
     }
 
     @Override
+    @Transactional
+    public Long crearAlEntrarConPruebaPropia(Long organizacionId, Long postulacionId,
+                                             Long versionBancoId, Instant cierraEn) {
+        IntentoPrueba existente = intentos.findByPostulacionId(postulacionId).orElse(null);
+        if (existente != null) {
+            // Quien ya abrió la suya se queda con la versión con que empezó (RF-138). A quien no
+            // la abrió se le pone la que la vacante rinde hoy, plantilla fuera.
+            if (existente.getIniciadoEn() == null) {
+                existente.setVersionBancoId(versionBancoId);
+                existente.setVersionPlantillaPruebaId(null);
+                if (!existente.isPlazoPropio()) {
+                    existente.setVenceEn(cierraEn);
+                }
+                intentos.save(existente);
+            }
+            return existente.getId();
+        }
+        return intentos.save(IntentoPrueba.builder()
+                .postulacionId(postulacionId)
+                .versionBancoId(versionBancoId)
+                .venceEn(cierraEn)
+                .esEntregaAutomatica(false)
+                .creadoEn(Instant.now())
+                .build()).getId();
+    }
+
+    @Override
     public MiPrueba ver(ContextoUsuario quien, UUID uuidPostulacion) {
         var par = laMia(quien, uuidPostulacion);
+        if (par.intento().esDelEditor()) {
+            return pintarDelEditor(par.intento());
+        }
         return pintar(par.intento(), minutosDeLaVacante(par.postulacion()));
     }
 
@@ -154,6 +260,9 @@ public class ServicioPruebaImpl implements ServicioPrueba {
         var par = laMia(quien, uuidPostulacion);
         IntentoPrueba intento = par.intento();
         exigirAbierto(intento);
+        if (intento.esDelEditor()) {
+            return iniciarDelEditor(par.postulacion(), intento);
+        }
         Integer minutosVacante = minutosDeLaVacante(par.postulacion());
 
         if (intento.getIniciadoEn() == null) {
@@ -191,6 +300,10 @@ public class ServicioPruebaImpl implements ServicioPrueba {
         IntentoPrueba intento = laMia(quien, uuidPostulacion).intento();
         exigirAbierto(intento);
         exigirIniciado(intento);
+        if (intento.esDelEditor()) {
+            responderDelEditor(intento, preguntaId, datos);
+            return;
+        }
         exigirQueLeToca(intento, preguntaId);
 
         var laQueHay = respuestas.findByIntentoPruebaIdAndPreguntaPruebaId(
@@ -254,6 +367,11 @@ public class ServicioPruebaImpl implements ServicioPrueba {
         exigirAbierto(intento);
         exigirIniciado(intento);
 
+        if (intento.esDelEditor()) {
+            exigirCompleta(intento);
+            cerrarIntento(intento, par.postulacion(), false);
+            return new EntregaResponse("ENTREGADA", true, 0);
+        }
         List<String> faltan = obligatoriosFaltantes(intento);
         if (!faltan.isEmpty()) {
             throw new IllegalArgumentException(
@@ -297,6 +415,13 @@ public class ServicioPruebaImpl implements ServicioPrueba {
              * {@code entregarTecnicasVencidas}; faltaba en esta mitad.
              */
             if (maquina.yaTermino(postulacion)) {
+                continue;
+            }
+            // La prueba del editor solo se entrega sola con todo respondido (decisión 11). Si
+            // falta algo se cierra como «no completada»: no se califica, no gasta IA, no sale
+            // en el ranking y la postulación se queda donde está hasta que alguien la cierre.
+            if (intento.esDelEditor() && !loQueFaltaA(intento).nada()) {
+                cerrarSinCompletar(intento);
                 continue;
             }
             cerrarIntento(intento, postulacion, true);
@@ -395,6 +520,15 @@ public class ServicioPruebaImpl implements ServicioPrueba {
          * que nadie iba a llamar.
          */
         Vacante vacante = vacantes.findById(postulacion.getVacanteId()).orElse(null);
+        if (intento.esDelEditor()) {
+            // Las cerradas las cuenta el sistema ahora; si con eso ya está entera, pasa a «por
+            // confirmar» aquí mismo. Solo se encola a la IA si le queda algo por calificar.
+            boolean faltaLaIa = cierre.alEntregar(intento, postulacion);
+            if (faltaLaIa && vacante != null && vacante.isCalificacionAutomatica()) {
+                cola.encolarPruebaPuesto(postulacion.getId());
+            }
+            return;
+        }
         if (vacante != null && vacante.isCalificacionAutomatica()) {
             cola.encolarPruebaPuesto(postulacion.getId());
         }
@@ -519,7 +653,10 @@ public class ServicioPruebaImpl implements ServicioPrueba {
         exigirAbierto(intento);
         exigirIniciado(intento);
         EntregableRequerido requerido = entregablesRequeridos.findById(entregableRequeridoId)
-                .filter(e -> e.getVersionPlantillaPruebaId().equals(intento.getVersionPlantillaPruebaId()))
+                // De SU versión, sea una plantilla o una del editor (V67).
+                .filter(e -> intento.esDelEditor()
+                        ? intento.getVersionBancoId().equals(e.getVersionBancoId())
+                        : intento.getVersionPlantillaPruebaId().equals(e.getVersionPlantillaPruebaId()))
                 .orElseThrow(() -> new ResourceNotFoundException("Entregable requerido", "id", entregableRequeridoId));
         if (!"CUALQUIERA".equals(requerido.getFormato()) && !requerido.getFormato().equals(formatoUsado)) {
             throw new IllegalArgumentException(
@@ -538,6 +675,10 @@ public class ServicioPruebaImpl implements ServicioPrueba {
     }
 
     private void exigirAbierto(IntentoPrueba intento) {
+        if (intento.isNoCompletada()) {
+            throw new IllegalStateException(
+                    "Tu tiempo terminó y la prueba quedó sin completar: ya no se puede entregar");
+        }
         if (intento.getEntregadoEn() != null) {
             throw new IllegalStateException("Esta prueba ya fue entregada");
         }
@@ -578,4 +719,195 @@ public class ServicioPruebaImpl implements ServicioPrueba {
     }
 
     private record Par(Postulacion postulacion, IntentoPrueba intento) {}
+
+    // ============ La prueba escrita en el editor (V67) ============
+
+    /**
+     * Empezarla: si todavía no la había abierto, se le pone la versión que la vacante tiene
+     * publicada hoy (hasta la primera rendición se puede publicar otra, decisión 9) y arranca
+     * el reloj de esa versión. Sin cambio inesperado.
+     */
+    private MiPrueba iniciarDelEditor(Postulacion postulacion, IntentoPrueba intento) {
+        if (intento.getIniciadoEn() == null) {
+            versionesBanco.pruebaPropiaDe(postulacion.getVacanteId(), "PUBLICADA")
+                    .ifPresent(v -> intento.setVersionBancoId(v.getId()));
+            VersionBanco version = laVersionDelEditor(intento);
+            Instant ahora = Instant.now();
+            intento.setIniciadoEn(ahora);
+            boolean concedidaAMano = intento.isPlazoPropio() && intento.getVenceEn() != null;
+            if (!concedidaAMano) {
+                Integer minutos = "CRONOMETRADA".equals(version.getModalidad())
+                        ? version.getDuracionMinutos() : null;
+                if (intento.getVenceEn() == null) {
+                    intento.setVenceEn(minutos != null ? ahora.plus(minutos, ChronoUnit.MINUTES)
+                            : ahora.plus(version.getPlazoDias() == null ? 1 : version.getPlazoDias(),
+                                    ChronoUnit.DAYS));
+                } else if (minutos != null) {
+                    // Ya tiene la fecha de la convocatoria: solo un cronómetro la acerca.
+                    Instant porElReloj = ahora.plus(minutos, ChronoUnit.MINUTES);
+                    if (porElReloj.isBefore(intento.getVenceEn())) {
+                        intento.setVenceEn(porElReloj);
+                    }
+                }
+            }
+            intentos.save(intento);
+        }
+        return pintarDelEditor(intento);
+    }
+
+    private MiPrueba pintarDelEditor(IntentoPrueba intento) {
+        Resultado r = calculo.calcular(intento);
+        VersionBanco v = r.version();
+        List<PreguntaCandidato> preguntas = new ArrayList<>();
+        int posicion = 1;
+        for (PreguntaDeLaPrueba pc : r.todas()) {
+            RespuestaPrueba resp = pc.respuesta();
+            List<Long> marcadas = resp == null ? List.of()
+                    : com.renaser.ai.ai_engine.perfilintegral.service.CalificacionPorPuntos.marcadasDe(
+                            com.renaser.ai.ai_engine.perfilintegral.entity.Respuesta.builder()
+                                    .detalle(resp.getDetalle()).build());
+            preguntas.add(new PreguntaCandidato(pc.pregunta().getId(), pc.pregunta().getTipo(),
+                    pc.pregunta().getEnunciado(), resp == null ? null : resp.getTexto(),
+                    // Sin puntos ni claves (RF-53): el id, el texto y el orden.
+                    pc.opciones().stream().map(o -> new OpcionCandidato(o.getId(), o.getTexto(),
+                            o.getOrden() == null ? 0 : o.getOrden())).toList(),
+                    resp == null ? null : resp.getOpcionId(), marcadas, posicion++));
+        }
+        List<Entregable> subidos = entregables.findByIntentoPruebaId(intento.getId());
+        List<EntregableRequeridoCandidato> deLaPrueba = r.entregables().stream()
+                .map(e -> new EntregableRequeridoCandidato(e.getId(), e.getNombre(),
+                        e.getDetalle() == null || e.getDetalle().isBlank() ? null : e.getDetalle(),
+                        e.getFormato(), e.isEsObligatorio(),
+                        subidos.stream().anyMatch(s -> s.getEntregableRequeridoId().equals(e.getId()))))
+                .toList();
+        String estado = intento.isNoCompletada() ? "NO_COMPLETADA"
+                : intento.getEntregadoEn() != null ? "ENTREGADA"
+                : intento.getIniciadoEn() != null ? "EN_CURSO" : "PENDIENTE";
+        boolean cronometrada = "CRONOMETRADA".equals(v.getModalidad());
+        return new MiPrueba(intento.getId(), estado, v.getModalidad(), intento.getIniciadoEn(),
+                intento.getVenceEn(), cronometrada ? v.getDuracionMinutos() : null,
+                v.getEnunciado(), v.getMateriales(), v.getHerramientasPermitidas(),
+                null, preguntas, deLaPrueba,
+                cronometrada ? null : v.getPlazoDias(), r.esCuestionario(), consignaDe(v), true);
+    }
+
+    /** El enunciado adjunto, con un enlace fresco para descargarlo si el almacén los reparte. */
+    private ConsignaCandidato consignaDe(VersionBanco v) {
+        if (v.getConsignaArchivoId() == null) {
+            return null;
+        }
+        return archivos.findByIdAndOrganizacionId(v.getConsignaArchivoId(), v.getOrganizacionId())
+                .filter(a -> a.getBorradoEn() == null && a.getRuta() != null)
+                .map(a -> new ConsignaCandidato(a.getNombreOriginal(),
+                        almacen.urlDeDescarga(a).map(AlmacenArchivos.EnlaceFirmado::url)
+                                .orElse(v.getUrlConsigna())))
+                .orElse(null);
+    }
+
+    /**
+     * Responder una pregunta de la prueba del editor: el texto de una abierta, la opción de
+     * una de opción única o de una escala, o las marcadas de una múltiple. Vaciarla es dejarla
+     * sin responder, no un error.
+     */
+    private void responderDelEditor(IntentoPrueba intento, Long preguntaId, Responder datos) {
+        Pregunta pregunta = preguntasBanco.findById(preguntaId)
+                .filter(p -> intento.getVersionBancoId().equals(p.getVersionBancoId()))
+                .orElseThrow(() -> new ResourceNotFoundException("Pregunta de prueba", "id", preguntaId));
+        var laQueHay = respuestas.findByIntentoPruebaIdAndPreguntaId(intento.getId(), preguntaId);
+        RespuestaPrueba r = laQueHay.orElseGet(() -> RespuestaPrueba.builder()
+                .intentoPruebaId(intento.getId())
+                .preguntaId(preguntaId)
+                .build());
+        String tipo = pregunta.getTipo();
+        if (ReglasDePuntos.ABIERTA.equals(tipo)) {
+            if (datos.texto() == null || datos.texto().isBlank()) {
+                laQueHay.ifPresent(respuestas::delete);
+                return;
+            }
+            r.setTexto(datos.texto());
+        } else {
+            Set<Long> suyas = new java.util.HashSet<>(calculo.estructura(intento.getVersionBancoId())
+                    .todas().stream().filter(pc -> pc.pregunta().getId().equals(preguntaId))
+                    .flatMap(pc -> pc.opciones().stream()).map(Opcion::getId).toList());
+            if (ReglasDePuntos.OPCION_MULTIPLE.equals(tipo)) {
+                List<Long> marcadas = datos.marcadas() == null ? List.of()
+                        : List.copyOf(new LinkedHashSet<>(datos.marcadas()));
+                if (marcadas.isEmpty()) {
+                    laQueHay.ifPresent(respuestas::delete);
+                    return;
+                }
+                if (!suyas.containsAll(marcadas)) {
+                    throw new IllegalArgumentException("Alguna de las opciones marcadas no es de esta pregunta");
+                }
+                r.setDetalle(JSON.writeValueAsString(Map.of("marcadas", marcadas)));
+            } else {
+                if (datos.opcionId() == null) {
+                    laQueHay.ifPresent(respuestas::delete);
+                    return;
+                }
+                if (!suyas.contains(datos.opcionId())) {
+                    throw new IllegalArgumentException("Esa opción no es de esta pregunta");
+                }
+                r.setOpcionId(datos.opcionId());
+            }
+        }
+        r.setRespondidaEn(Instant.now());
+        respuestas.save(r);
+    }
+
+    private LoQueFalta loQueFaltaA(IntentoPrueba intento) {
+        return CalificacionDeLaPruebaPropia.loQueFalta(calculo.calcular(intento),
+                entregables.findByIntentoPruebaId(intento.getId()));
+    }
+
+    /**
+     * Sin todas las preguntas respondidas ni los entregables obligatorios no se entrega
+     * (decisión 11), aunque se llame a la API directamente.
+     */
+    private void exigirCompleta(IntentoPrueba intento) {
+        LoQueFalta falta = loQueFaltaA(intento);
+        if (falta.nada()) {
+            return;
+        }
+        List<String> faltas = new ArrayList<>();
+        falta.preguntas().forEach(n -> faltas.add("Falta responder la pregunta " + n + "."));
+        falta.entregables().forEach(e -> faltas.add("Falta subir «" + e + "»."));
+        StringBuilder dicho = new StringBuilder("Para entregar te falta ");
+        if (!falta.preguntas().isEmpty()) {
+            int n = falta.preguntas().size();
+            dicho.append("responder ").append(n == 1 ? "1 pregunta (la " : n + " preguntas (la ")
+                    .append(enumerar(falta.preguntas())).append(")");
+        }
+        if (!falta.entregables().isEmpty()) {
+            if (!falta.preguntas().isEmpty()) {
+                dicho.append(" y ");
+            }
+            dicho.append("subir ").append(String.join(", ",
+                    falta.entregables().stream().map(e -> "«" + e + "»").toList()));
+        }
+        throw new PreguntasInvalidasException(dicho.append(".").toString(), faltas);
+    }
+
+    /** «3», «3 y 7», «3, 5 y 7». */
+    private static String enumerar(List<Integer> numeros) {
+        List<String> textos = numeros.stream().map(String::valueOf).toList();
+        if (textos.size() == 1) {
+            return textos.get(0);
+        }
+        return String.join(", ", textos.subList(0, textos.size() - 1)) + " y " + textos.get(textos.size() - 1);
+    }
+
+    private void cerrarSinCompletar(IntentoPrueba intento) {
+        intento.setEntregadoEn(Instant.now());
+        intento.setEsEntregaAutomatica(true);
+        intento.setNoCompletada(true);
+        intentos.save(intento);
+        log.info("La prueba de la postulación {} venció sin completar: no se califica y su "
+                + "proceso espera a que alguien lo cierre", intento.getPostulacionId());
+    }
+
+    private VersionBanco laVersionDelEditor(IntentoPrueba intento) {
+        return versionesBanco.findById(intento.getVersionBancoId())
+                .orElseThrow(() -> new IllegalStateException("La versión de esta prueba ya no existe"));
+    }
 }

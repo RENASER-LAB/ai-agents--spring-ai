@@ -510,12 +510,17 @@ public class FlujoCuestionarioTecnicoIT {
         conToken(post("/api/v1/panel/solicitudes/" + solicitudId + "/aprobacion"), tokenEquipo,
                 "{\"motivo\":\"Hay presupuesto\"}").andExpect(status().isOk());
 
-        return Long.parseLong(leer(conToken(post("/api/v1/panel/vacantes"), tokenEquipo, """
+        long id = Long.parseLong(leer(conToken(post("/api/v1/panel/vacantes"), tokenEquipo, """
                 {"solicitudTalentoId": %d, "puestoId": %d,
                  "titulo": "Administrador de sedes", "descripcion": "Caja y personal de tres sedes",
                  "tipoCierre": "PERMANENTE", "responsableUsuarioId": 1}"""
                 .formatted(solicitudId, puestoId))
                 .andReturn().getResponse().getContentAsString(), "id"));
+        // Una vacante de las de antes de la V67: desde entonces las nuevas nacen con su prueba
+        // escrita en el editor (PRUEBA_PROPIA). Este recorrido es el de las que ya existían,
+        // que siguen con el valor de siempre de la columna.
+        jdbc.update("update vacante set instrumento_etapa_tecnica = 'PLANTILLA' where id = ?", id);
+        return id;
     }
 
     private String crearCandidatoYEntrar() throws Exception {

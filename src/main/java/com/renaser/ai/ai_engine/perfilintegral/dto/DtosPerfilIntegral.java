@@ -67,10 +67,27 @@ public final class DtosPerfilIntegral {
     //
     // Va ADEMAS del nombre, no en su lugar: el corto rotula y el largo explica. Quien
     // pinte una columna estrecha usa el codigo y deja el nombre para el titulo emergente.
+    //
+    // clave y estado (V67): los criterios de la prueba escrita en el editor y los de las
+    // preguntas propias del Perfil Integral se identifican por su id, nunca por el nombre
+    // —con criterios por vacante hay muchos «Comunicación»—. `clave` es única dentro de la
+    // tanda y es la que agrupa columnas en la tabla y en el Excel («prueba:12»,
+    // «banco:34»). Nula en los de siempre (los del currículum y los de las plantillas), que
+    // siguen agrupando como hasta hoy. `estado`: CALIFICADO · PENDIENTE (falta una nota que
+    // pone la IA, o una abierta) · EN_BLANCO (de persona y sin nota). Nulo en los de siempre.
     public record NotaCriterioResponse(String criterio, String codigo, BigDecimal puntaje,
                                        BigDecimal maximo, BigDecimal peso,
                                        String explicacion, String origen,
-                                       BigDecimal confianza, String motivoAjuste) {}
+                                       BigDecimal confianza, String motivoAjuste,
+                                       String clave, String estado) {
+
+        public NotaCriterioResponse(String criterio, String codigo, BigDecimal puntaje,
+                                    BigDecimal maximo, BigDecimal peso, String explicacion,
+                                    String origen, BigDecimal confianza, String motivoAjuste) {
+            this(criterio, codigo, puntaje, maximo, peso, explicacion, origen, confianza,
+                    motivoAjuste, null, null);
+        }
+    }
 
     /**
      * Un criterio de la rúbrica que la vacante tiene puesta HOY, sin la nota de nadie.
@@ -81,7 +98,15 @@ public final class DtosPerfilIntegral {
      * {@link NotaCriterioResponse}: aquello es la nota de UN candidato contra la rúbrica con
      * la que se le midió, y esto es la rúbrica vigente, la haya rendido alguien o no.
      */
-    public record CriterioDeLaRubrica(String nombre, String codigo, BigDecimal puntos) {}
+    public record CriterioDeLaRubrica(String nombre, String codigo, BigDecimal puntos,
+                                      /* La clave por id de la prueba del editor (V67), la
+                                         misma de NotaCriterioResponse; nula en las plantillas. */
+                                      String clave) {
+
+        public CriterioDeLaRubrica(String nombre, String codigo, BigDecimal puntos) {
+            this(nombre, codigo, puntos, null);
+        }
+    }
 
     // Una alerta no descarta a nadie: es una pregunta para la conversación final.
     public record AlertaResponse(String tipo, String descripcion, Instant creadoEn) {}
@@ -187,35 +212,6 @@ public final class DtosPerfilIntegral {
             boolean puedeVerResenas,
             List<FilaRanking> filas) {}
 
-    /**
-     * Lo que el candidato lleva rendido, sobre 100.
-     *
-     * <p>El embudo son cuatro etapas y solo dos han ocurrido a estas alturas: el Perfil
-     * Integral —que por dentro es el currículum y el banco de preguntas— y la prueba del
-     * puesto. Juntas no llegan a 100 —en la v4 son 70—, así que la cifra se reescala entre
-     * la suma de ESOS dos pesos y no entre 100. Sirve para comparar candidatos entre sí
-     * antes de que exista la nota global; no la sustituye ni se guarda en ninguna parte.
-     *
-     * <p>{@code sobre100} viene vacío mientras falte cualquiera de las dos notas: media
-     * cifra reescalada parece comparable con la de otro candidato y no lo es. Las partes
-     * del desglose se pueden quedar vacías por su cuenta sin que eso anule el total.
-     *
-     * <p><b>El desglose no trae la nota del banco de preguntas suelta, y no es un olvido.</b>
-     * No se guarda en ninguna parte: lo que se guarda es la mezcla ya hecha con el
-     * currículum. Despejarla restando parece fácil y da un número falso en dos casos
-     * reales —quien no tiene evaluación asignada, cuyo Perfil Integral ES su nota de
-     * currículum, y las vacantes que califica {@code CalificacionCriterios}, que escriben
-     * ahí un índice de pilares que no es CV + banco—. Así que se enseña el Perfil Integral
-     * entero, que es exacto.
-     *
-     * <p>El desglose enseña de dónde sale la cifra, no permite recalcularla: los pesos con
-     * que se mezclan no viajan aquí y cambian por vacante.
-     *
-     * @param sobre100 la cifra reescalada; vacía si falta alguna de las dos notas de etapa
-     * @param cv       la nota del currículum, tal como se calcula para el ranking
-     * @param perfil   la nota del Perfil Integral, que ya incluye la del banco
-     * @param prueba   la nota de la prueba del puesto
-     */
     public record Ponderado(
             BigDecimal sobre100,
             BigDecimal cv,
@@ -339,7 +335,39 @@ public final class DtosPerfilIntegral {
              * <p>⚠️ <b>No ordena nada en el servidor ni pesa en ninguna nota.</b> El orden de
              * la tanda, el Excel y el pase automático no lo leen: es para mirar.
              */
-            com.renaser.ai.ai_engine.resena.dto.DtosResena.PromedioResenas resenas) {}
+            com.renaser.ai.ai_engine.resena.dto.DtosResena.PromedioResenas resenas,
+            /**
+             * Si se le está recalificando con la guía nueva (V67): la de la prueba en esa
+             * pestaña, la de las preguntas propias en la del Perfil Integral. Mientras tanto
+             * conserva su nota anterior.
+             */
+            boolean recalificando) {
+
+        public FilaRanking(int puesto, Long postulacionId, String uuid, String candidato,
+                           String correo, String estado, String estadoNombre,
+                           String estadoCalificacion, String pasada, String archivoNombre,
+                           Long archivoId, DatosCandidato datos, String grupoPrioridad,
+                           BigDecimal notaEtapa, BigDecimal notaCurriculum, BigDecimal adecuacion,
+                           BigDecimal potencial, BigDecimal altoRendimiento,
+                           BigDecimal confianzaEvidencia, String resumen, int riesgosCriticos,
+                           int fortalezas, int alertas, Instant actualizadoEn,
+                           List<NotaCriterioResponse> notasCriterio, String ciudad,
+                           String ciudadCodigo, BigDecimal pretensionMin,
+                           BigDecimal pretensionMax, String pretensionMoneda,
+                           BigDecimal pretensionDeclarada, String pretensionDeclaradaMoneda,
+                           Ponderado ponderado, EstadoPruebaDelPuesto estadoPrueba,
+                           Instant postuladoEn,
+                           com.renaser.ai.ai_engine.resena.dto.DtosResena.PromedioResenas resenas) {
+            this(puesto, postulacionId, uuid, candidato, correo, estado, estadoNombre,
+                    estadoCalificacion, pasada, archivoNombre, archivoId, datos, grupoPrioridad,
+                    notaEtapa, notaCurriculum, adecuacion, potencial, altoRendimiento,
+                    confianzaEvidencia, resumen, riesgosCriticos, fortalezas, alertas,
+                    actualizadoEn, notasCriterio, ciudad, ciudadCodigo, pretensionMin,
+                    pretensionMax, pretensionMoneda, pretensionDeclarada,
+                    pretensionDeclaradaMoneda, ponderado, estadoPrueba, postuladoEn, resenas,
+                    false);
+        }
+    }
 
     // ============ El desglose de la evaluación del banco ============
 

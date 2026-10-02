@@ -22,6 +22,8 @@ public class PropuestaPreguntas {
     public static final String PEDIDA = "PEDIDA";
     public static final String LISTA = "LISTA";
     public static final String FALLIDA = "FALLIDA";
+    public static final String PERFIL_INTEGRAL = "PERFIL_INTEGRAL";
+    public static final String PRUEBA_PUESTO = "PRUEBA_PUESTO";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -29,6 +31,12 @@ public class PropuestaPreguntas {
 
     private Long organizacionId;
     private Long vacanteId;
+    /**
+     * Para qué es: las preguntas del Perfil Integral o la prueba técnica (V67). Las dos de una
+     * misma vacante no se pisan.
+     */
+    @Builder.Default
+    private String proposito = PERFIL_INTEGRAL;
     private String indicacion;
     private Integer puntosQueFaltan;
     private String estado;

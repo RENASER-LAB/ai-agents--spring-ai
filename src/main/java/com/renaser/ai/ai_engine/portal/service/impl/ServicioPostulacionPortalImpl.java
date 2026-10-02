@@ -67,6 +67,9 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ServicioPostulacionPortalImpl implements ServicioPostulacionPortal {
 
+    /** El único estado en que una prueba sin completar cambia lo que el portal le dice. */
+    private static final String ESTADO_PRUEBA_TURNO_CANDIDATO = "PRUEBA_TURNO_CANDIDATO";
+
     private final OrganizacionRepository organizaciones;
     private final PersonaRepository personas;
     private final UsuarioRepository usuarios;
@@ -92,6 +95,9 @@ public class ServicioPostulacionPortalImpl implements ServicioPostulacionPortal 
     // Para el punto de cada fila de «mis postulaciones»: cuántos avisos de ese proceso
     // siguen sin ver. Ver ServicioAvisosPortal (V56).
     private final ServicioAvisosPortal avisos;
+    // Para decirle al portal que su prueba del editor quedó sin completar (V67): el estado
+    // no cambia y, sin esto, el portal le seguiría ofreciendo abrirla.
+    private final com.renaser.ai.ai_engine.prueba.repository.IntentoPruebaRepository intentos;
 
     @Override
     @Transactional
@@ -418,10 +424,12 @@ public class ServicioPostulacionPortalImpl implements ServicioPostulacionPortal 
         // pantalla que abre cada vez que entra.
         Map<Long, Long> puntos = avisos.sinLeerPorPostulacion(quien.usuarioId(),
                 mias.stream().map(Postulacion::getId).toList());
+        // Las que quedaron sin completar, también de una sola consulta y por lo mismo.
+        Set<Long> sinCompletar = sinCompletarEntre(mias);
 
         return mias.stream()
                 .map(p -> comoResumen(p, porVacante, nombreEstado, nombrePorOrganizacion,
-                        puntos.getOrDefault(p.getId(), 0L)))
+                        puntos.getOrDefault(p.getId(), 0L), sinCompletar.contains(p.getId())))
                 .toList();
     }
 
@@ -506,7 +514,28 @@ public class ServicioPostulacionPortalImpl implements ServicioPostulacionPortal 
                 .getOrDefault(p.getId(), 0L);
         return comoResumen(p, unaVacante, unEstado,
                 nombresDeOrganizacion(unaVacante.values().stream().toList()),
-                sinLeer);
+                sinLeer, sinCompletarEntre(List.of(p)).contains(p.getId()));
+    }
+
+    /**
+     * De estas postulaciones, las que tienen su prueba del editor cerrada sin completar (V67).
+     *
+     * <p>Solo se pregunta por las que siguen en la etapa de la prueba: en las demás el portal
+     * no tiene nada que corregir —el estado ya dice lo que toca— y así la consulta no corre
+     * en la lista de quien no está rindiendo nada.
+     */
+    private Set<Long> sinCompletarEntre(List<Postulacion> deEstas) {
+        List<Long> enLaPrueba = deEstas.stream()
+                .filter(p -> ESTADO_PRUEBA_TURNO_CANDIDATO.equals(p.getEstadoCodigo()))
+                .map(Postulacion::getId)
+                .toList();
+        if (enLaPrueba.isEmpty()) {
+            return Set.of();
+        }
+        return intentos.findByPostulacionIdIn(enLaPrueba).stream()
+                .filter(com.renaser.ai.ai_engine.prueba.entity.IntentoPrueba::isNoCompletada)
+                .map(com.renaser.ai.ai_engine.prueba.entity.IntentoPrueba::getPostulacionId)
+                .collect(Collectors.toSet());
     }
 
     // ============ La campana (V56) ============
@@ -601,7 +630,7 @@ public class ServicioPostulacionPortalImpl implements ServicioPostulacionPortal 
     private MiPostulacion comoResumen(Postulacion p, Map<Long, Vacante> porVacante,
                                       Map<String, String> nombrePorEstado,
                                       Map<Long, String> nombrePorOrganizacion,
-                                      long avisosSinLeer) {
+                                      long avisosSinLeer, boolean pruebaSinCompletar) {
         Optional<Vacante> vacante = Optional.ofNullable(porVacante.get(p.getVacanteId()));
         String titulo = vacante.map(Vacante::getTitulo).orElse("");
         String empresa = vacante.map(Vacante::getOrganizacionId)
@@ -620,6 +649,7 @@ public class ServicioPostulacionPortalImpl implements ServicioPostulacionPortal 
                 // `ver_pretension`.
                 vacante.map(RemuneracionQueVeElCandidato::de)
                         .orElse(DtosPortal.RemuneracionPublica.OCULTA),
-                RemuneracionQueVeElCandidato.pretensionDe(p));
+                RemuneracionQueVeElCandidato.pretensionDe(p),
+                pruebaSinCompletar);
     }
 }

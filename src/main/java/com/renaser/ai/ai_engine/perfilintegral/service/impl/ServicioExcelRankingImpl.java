@@ -367,7 +367,8 @@ public class ServicioExcelRankingImpl implements ServicioExcelRanking {
                     if (suyo == null) {
                         continue;
                     }
-                    Criterio criterio = Criterio.de(suyo.nombre(), suyo.codigo(), suyo.puntos());
+                    Criterio criterio = Criterio.de(suyo.nombre(), suyo.codigo(), suyo.puntos(),
+                            suyo.clave());
                     porClave.putIfAbsent(criterio.clave(), criterio);
                 }
             }
@@ -465,11 +466,15 @@ public class ServicioExcelRankingImpl implements ServicioExcelRanking {
      * distingue mayúsculas, porque la unicidad que lo respalda también lo hace: {@code COM} y
      * {@code com} pueden convivir en una rúbrica y son dos criterios.
      */
-    private record Clave(String nombre, String codigo, String techo) {}
+    private record Clave(String id, String nombre, String codigo, String techo) {}
 
     /** Un criterio de la rúbrica y su techo, que es lo que va en la cabecera. */
     private record Criterio(String nombre, String codigo, BigDecimal maximo,
-                            boolean codigoALaVista, int ordinal) {
+                            boolean codigoALaVista, int ordinal,
+                            /* La clave por id de los criterios del editor y del banco de la
+                               vacante (V67): dos «Comunicación» de dos vacantes, o de dos
+                               versiones, no comparten columna. Nula en los de siempre. */
+                            String id) {
 
         /**
          * Lo que se escribe cuando el criterio llegó sin nombre.
@@ -482,26 +487,31 @@ public class ServicioExcelRankingImpl implements ServicioExcelRanking {
         private static final String SIN_NOMBRE = "(criterio sin nombre)";
 
         static Criterio de(NotaCriterioResponse nota) {
-            return de(nota.criterio(), nota.codigo(), nota.maximo());
+            return de(nota.criterio(), nota.codigo(), nota.maximo(), nota.clave());
         }
 
         /**
          * El mismo criterio escrito igual venga de una nota o de la rúbrica: si las dos
          * formas limpiaran distinto, la cabecera y la celda dejarían de casar.
          */
-        static Criterio de(String nombre, String codigo, BigDecimal maximo) {
+        static Criterio de(String nombre, String codigo, BigDecimal maximo, String id) {
             String suyo = nombre == null ? "" : nombre.trim();
             String suCodigo = codigo == null ? "" : codigo.trim();
-            return new Criterio(suyo.isEmpty() ? SIN_NOMBRE : suyo, suCodigo, maximo, false, 0);
+            return new Criterio(suyo.isEmpty() ? SIN_NOMBRE : suyo, suCodigo, maximo, false, 0,
+                    id == null || id.isBlank() ? null : id);
         }
 
         Clave clave() {
-            return new Clave(nombre.toLowerCase(Locale.ROOT), codigo, techoDicho());
+            // Por id cuando lo hay: el nombre, el código y el techo no identifican un criterio.
+            if (id != null) {
+                return new Clave(id, null, null, null);
+            }
+            return new Clave(null, nombre.toLowerCase(Locale.ROOT), codigo, techoDicho());
         }
 
         /** El mismo criterio, rotulado con su código para no confundirse con su homónimo. */
         Criterio conElCodigoALaVista() {
-            return codigo.isEmpty() ? this : new Criterio(nombre, codigo, maximo, true, 0);
+            return codigo.isEmpty() ? this : new Criterio(nombre, codigo, maximo, true, 0, id);
         }
 
         /**
@@ -514,7 +524,7 @@ public class ServicioExcelRankingImpl implements ServicioExcelRanking {
          * dejar dos columnas iguales, que es lo que obliga a adivinar cuál es cuál.
          */
         Criterio numerado(int cual) {
-            return new Criterio(nombre, codigo, maximo, codigoALaVista, cual);
+            return new Criterio(nombre, codigo, maximo, codigoALaVista, cual, id);
         }
 
         private String techoDicho() {
@@ -566,7 +576,12 @@ public class ServicioExcelRankingImpl implements ServicioExcelRanking {
             // Sin nota de ESE criterio la celda se queda en blanco y no dice «rúbrica
             // incompleta»: en una columna por criterio, el hueco ya es el mensaje, y
             // ochenta celdas repitiendo la misma frase taparían las cifras que hay al lado.
-            cifra(f, c++, nota == null ? null : nota.puntaje(), pinceles);
+            // Un criterio pendiente lo dice; uno de persona sin nota queda en blanco (V67).
+            if (nota != null && "PENDIENTE".equals(nota.estado())) {
+                texto(f, c++, "pendiente", pinceles);
+            } else {
+                cifra(f, c++, nota == null ? null : nota.puntaje(), pinceles);
+            }
         }
 
         if (deLaPrueba) {

@@ -31,4 +31,14 @@ public class CriterioBanco {
     private String queEvalua;
     private Integer orden;
     private Instant creadoEn;
+
+    /**
+     * Solo en la prueba técnica (V67): los puntos de su parte calificada —lo que la IA o una
+     * persona califica del criterio entero mirando sus abiertas y sus entregables—. Nulo o 0
+     * = el criterio solo tiene cerradas. En el Perfil Integral no se usa.
+     */
+    private Integer puntosCalificados;
+
+    /** Quién califica la parte calificada: IA o PERSONA. Nulo sin parte calificada. */
+    private String calificador;
 }

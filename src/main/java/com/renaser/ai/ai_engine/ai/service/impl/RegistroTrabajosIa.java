@@ -154,6 +154,37 @@ public class RegistroTrabajosIa {
     }
 
     /**
+     * Crea un trabajo que cuelga de una referencia cualquiera que no es una postulación: la
+     * de {@link #crearParaVacante}, con otra tabla. La usa el recomendador de la prueba
+     * técnica (V67), que cuelga de la vacante por un carril propio para no frenar ni mezclarse
+     * con el del Perfil Integral.
+     */
+    @Transactional
+    public Optional<TrabajoIa> crearParaReferencia(Long organizacionId, String agenteCodigo,
+                                                   String referenciaTabla, Long referenciaId,
+                                                   String modo) {
+        boolean vivo = trabajos
+                .findFirstByReferenciaTablaAndReferenciaIdAndAgenteCodigoOrderByIdDesc(
+                        referenciaTabla, referenciaId, agenteCodigo)
+                .map(t -> "PENDIENTE".equals(t.getEstado()) || "EN_CURSO".equals(t.getEstado())
+                        || "EN_ESPERA".equals(t.getEstado()))
+                .orElse(false);
+        if (vivo) {
+            return Optional.empty();
+        }
+        return Optional.of(trabajos.saveAndFlush(TrabajoIa.builder()
+                .organizacionId(organizacionId)
+                .agenteCodigo(agenteCodigo)
+                .modo(modo)
+                .referenciaTabla(referenciaTabla)
+                .referenciaId(referenciaId)
+                .estado("PENDIENTE")
+                .intentos(0)
+                .creadoEn(Instant.now())
+                .build()));
+    }
+
+    /**
      * Crea el trabajo de una LECTURA DE PERFIL: un currículum sin postulación detrás.
      *
      * <p>Mismo molde que {@link #crearParaVacante}, con {@code referencia_tabla} apuntando a

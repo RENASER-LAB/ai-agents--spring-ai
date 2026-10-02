@@ -39,6 +39,10 @@ dueño en el listado, con la regla de siempre (una empresa ve las suyas y, si no
 de la plataforma en solo lectura). El borrado del catálogo es aparte y hay que pensarlo: una
 pregunta ya elegida por una versión publicada tiene respuestas colgando.
 
+**Desde el 01/10/2026 (`V67`) no alcanza a las vacantes nuevas.** Su prueba técnica se escribe
+en su editor y sus preguntas son de la vacante: no pasan por `pregunta_prueba`. Sigue abierta
+para el catálogo y las plantillas, que se siguen usando en las vacantes de antes.
+
 ---
 
 ## 2 · El enlace del enunciado caduca, y puede quedar imposible de renovar

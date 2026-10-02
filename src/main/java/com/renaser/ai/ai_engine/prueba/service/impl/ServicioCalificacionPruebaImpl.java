@@ -40,7 +40,6 @@ import com.renaser.ai.ai_engine.seguridad.service.Permisos;
 import com.renaser.ai.ai_engine.vacante.entity.Vacante;
 import com.renaser.ai.ai_engine.vacante.service.AlcanceSobreLaVacante;
 
-import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -55,7 +54,6 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
-@RequiredArgsConstructor
 public class ServicioCalificacionPruebaImpl implements ServicioCalificacionPrueba {
 
     private static final String ETAPA = "PRUEBA_PUESTO";
@@ -79,6 +77,69 @@ public class ServicioCalificacionPruebaImpl implements ServicioCalificacionPrueb
     private final EntregableRepository entregables;
     private final EntregableRequeridoRepository entregablesRequeridos;
     private final com.renaser.ai.ai_engine.archivo.repository.ArchivoRepository archivos;
+    // La prueba escrita en el editor (V67). Nulos en las pruebas unitarias de las plantillas,
+    // que usan el constructor de siempre: solo se tocan en la rama del editor.
+    private final com.renaser.ai.ai_engine.prueba.service.CalificacionDeLaPruebaPropia calculo;
+    private final com.renaser.ai.ai_engine.prueba.service.CierreDeLaPruebaPropia cierre;
+
+    /** El constructor de las plantillas: el que usan sus pruebas unitarias. */
+    public ServicioCalificacionPruebaImpl(PostulacionRepository postulaciones, AlcanceSobreLaVacante alcance,
+            IntentoPruebaRepository intentos, CriterioRepository criterios,
+            PreguntaVersionPlantillaRepository preguntasElegidas, PreguntaPruebaRepository preguntasCatalogo,
+            RespuestaPruebaRepository respuestas, NotaCriterioRepository notasCriterio,
+            VersionPesosRepository versionesPesos, ColaCalificacionIa cola, ServicioAuditoria auditoria,
+            com.renaser.ai.ai_engine.vacante.repository.VacanteRepository vacantes,
+            com.renaser.ai.ai_engine.perfilintegral.service.impl.CalificacionCuestionarioTecnico cuestionarioTecnico,
+            com.renaser.ai.ai_engine.perfilintegral.repository.NotaEtapaRepository notasEtapa,
+            CalificacionPorCriterio calificacion, EntregableRepository entregables,
+            EntregableRequeridoRepository entregablesRequeridos,
+            com.renaser.ai.ai_engine.archivo.repository.ArchivoRepository archivos) {
+        this(postulaciones, alcance, intentos, criterios, preguntasElegidas, preguntasCatalogo,
+                respuestas, notasCriterio, versionesPesos, cola, auditoria, vacantes,
+                cuestionarioTecnico, notasEtapa, calificacion, entregables, entregablesRequeridos,
+                archivos, null, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public ServicioCalificacionPruebaImpl(PostulacionRepository postulaciones, AlcanceSobreLaVacante alcance,
+            IntentoPruebaRepository intentos, CriterioRepository criterios,
+            PreguntaVersionPlantillaRepository preguntasElegidas, PreguntaPruebaRepository preguntasCatalogo,
+            RespuestaPruebaRepository respuestas, NotaCriterioRepository notasCriterio,
+            VersionPesosRepository versionesPesos, ColaCalificacionIa cola, ServicioAuditoria auditoria,
+            com.renaser.ai.ai_engine.vacante.repository.VacanteRepository vacantes,
+            com.renaser.ai.ai_engine.perfilintegral.service.impl.CalificacionCuestionarioTecnico cuestionarioTecnico,
+            com.renaser.ai.ai_engine.perfilintegral.repository.NotaEtapaRepository notasEtapa,
+            CalificacionPorCriterio calificacion, EntregableRepository entregables,
+            EntregableRequeridoRepository entregablesRequeridos,
+            com.renaser.ai.ai_engine.archivo.repository.ArchivoRepository archivos,
+            com.renaser.ai.ai_engine.prueba.service.CalificacionDeLaPruebaPropia calculo,
+            com.renaser.ai.ai_engine.prueba.service.CierreDeLaPruebaPropia cierre) {
+        this.postulaciones = postulaciones;
+        this.alcance = alcance;
+        this.intentos = intentos;
+        this.criterios = criterios;
+        this.preguntasElegidas = preguntasElegidas;
+        this.preguntasCatalogo = preguntasCatalogo;
+        this.respuestas = respuestas;
+        this.notasCriterio = notasCriterio;
+        this.versionesPesos = versionesPesos;
+        this.cola = cola;
+        this.auditoria = auditoria;
+        this.vacantes = vacantes;
+        this.cuestionarioTecnico = cuestionarioTecnico;
+        this.notasEtapa = notasEtapa;
+        this.calificacion = calificacion;
+        this.entregables = entregables;
+        this.entregablesRequeridos = entregablesRequeridos;
+        this.archivos = archivos;
+        this.calculo = calculo;
+        this.cierre = cierre;
+    }
+
+    /** La prueba de esta postulación, si es una escrita en el editor (V67). */
+    private Optional<IntentoPrueba> delEditor(Long postulacionId) {
+        return intentos.findByPostulacionId(postulacionId).filter(IntentoPrueba::esDelEditor);
+    }
 
     @Override
     public List<NotaCriterioResponse> verNotas(ContextoUsuario quien, Long postulacionId) {
@@ -151,8 +212,11 @@ public class ServicioCalificacionPruebaImpl implements ServicioCalificacionPrueb
         boolean puedeVerElContenido = quien.tiene("descargar_entregables");
 
         List<Entregable> subidos = entregables.findByIntentoPruebaId(intento.getId());
-        return entregablesRequeridos
-                .findByVersionPlantillaPruebaIdOrderByOrden(intento.getVersionPlantillaPruebaId())
+        List<EntregableRequerido> pedidos = intento.esDelEditor()
+                ? entregablesRequeridos.findByVersionBancoIdOrderByOrdenAscIdAsc(intento.getVersionBancoId())
+                : entregablesRequeridos.findByVersionPlantillaPruebaIdOrderByOrden(
+                        intento.getVersionPlantillaPruebaId());
+        return pedidos
                 .stream()
                 .map(requerido -> pintarEntrega(requerido, ultimaVersionDe(subidos, requerido),
                         puedeVerElContenido))
@@ -219,6 +283,11 @@ public class ServicioCalificacionPruebaImpl implements ServicioCalificacionPrueb
         IntentoPrueba intento = intentos.findByPostulacionId(postulacion.getId())
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Prueba del puesto", "postulación", postulacionId));
+        // La prueba del editor (V67) se lee entera, criterio por criterio, en
+        // /prueba-propia: sus preguntas no son del catálogo de las plantillas.
+        if (intento.esDelEditor()) {
+            return List.of();
+        }
 
         // Las preguntas de SU versión de la plantilla, en el orden en que las vio. Salen de
         // ahí y no del catálogo entero: una versión publicada después puede llevar otras, y
@@ -277,6 +346,9 @@ public class ServicioCalificacionPruebaImpl implements ServicioCalificacionPrueb
         IntentoPrueba intento = intentos.findByPostulacionId(postulacionId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Prueba del puesto", "postulación", postulacionId));
+        if (intento.esDelEditor()) {
+            return calificarConIaDelEditor(postulacion, intento);
+        }
         if (intento.getEntregadoEn() == null) {
             throw new IllegalStateException(
                     "Esta prueba todavía no está entregada: calificarla ahora daría una nota "
@@ -304,10 +376,51 @@ public class ServicioCalificacionPruebaImpl implements ServicioCalificacionPrueb
                         + "las notas para verla.");
     }
 
+    /**
+     * Pedir (o volver a pedir) la IA para los criterios de IA que siguen pendientes en una
+     * prueba del editor. Si la primera calificación ya terminó y dejó alguno sin nota, se pide
+     * por el carril de la recalificación: el normal no repite lo terminado.
+     */
+    private CalificacionIaEncolada calificarConIaDelEditor(Postulacion postulacion, IntentoPrueba intento) {
+        if (intento.isNoCompletada()) {
+            throw new IllegalStateException("Esta prueba quedó sin completar: no se califica.");
+        }
+        if (intento.getEntregadoEn() == null) {
+            throw new IllegalStateException("Esta prueba todavía no está entregada: calificarla "
+                    + "ahora daría una nota de lo que el candidato lleve escrito a medias");
+        }
+        var r = calculo.calcular(intento);
+        boolean faltaLaIa = r.criterios().stream().anyMatch(c -> c.pendiente() && c.esDeIa());
+        if (!faltaLaIa) {
+            return new CalificacionIaEncolada("SIN_CAMBIOS", "No queda ningún criterio de IA sin "
+                    + "nota: lo que falta, si falta algo, lo califica una persona.");
+        }
+        Long postulacionId = postulacion.getId();
+        String motivo = cola.porQueNoSePuedeUsarLaIa(postulacion.getOrganizacionId());
+        if (motivo != null) {
+            return new CalificacionIaEncolada("SIN_CAMBIOS", motivo);
+        }
+        ColaCalificacionIa.Seguimiento ultima = cola.calificacionDePrueba(List.of(postulacionId))
+                .get(postulacionId);
+        if (ultima != null && "EN_CURSO".equals(ultima.estado())) {
+            return new CalificacionIaEncolada("SIN_CAMBIOS", "Ya hay una calificación en marcha ahora mismo.");
+        }
+        boolean encolada = cola.encolarPruebaPuesto(postulacionId) || cola.recalificarPrueba(postulacionId);
+        if (!encolada) {
+            return new CalificacionIaEncolada("SIN_CAMBIOS", "Ya hay una calificación en marcha ahora mismo.");
+        }
+        return new CalificacionIaEncolada("ENCOLADA", "La calificación quedó en cola. Tarda "
+                + "decenas de segundos: vuelve a abrir la prueba para verla.");
+    }
+
     @Override
     @Transactional
     public void ponerNota(ContextoUsuario quien, Long postulacionId, Long criterioId, PonerNotaCriterio datos) {
         Postulacion postulacion = laQueSePuedeTocar(quien, postulacionId, "ajustar_nota");
+        if (delEditor(postulacion.getId()).isPresent()) {
+            throw new IllegalArgumentException("En esta prueba se ajusta la parte calificada de "
+                    + "cada criterio desde su desglose (/prueba-propia/criterios/{id}/nota)");
+        }
         Criterio criterio = criterios.findById(criterioId)
                 .orElseThrow(() -> new ResourceNotFoundException("Criterio", "id", criterioId));
         if (!laRubricaDe(postulacion).contains(criterio)) {
@@ -346,6 +459,15 @@ public class ServicioCalificacionPruebaImpl implements ServicioCalificacionPrueb
         // El cuestionario técnico no se pondera por rúbrica: su nota es el índice sobre las
         // calificaciones de sus respuestas. Recalcularlo aquí le da al equipo la misma
         // palanca que tiene con la prueba del puesto — pedirlo cuando ya están las notas.
+        Optional<IntentoPrueba> delEditor = delEditor(postulacion.getId());
+        if (delEditor.isPresent()) {
+            BigDecimal nota = cierre.recalcular(delEditor.get(), false);
+            if (nota == null) {
+                throw new IllegalStateException("Todavía no se puede poner la nota: falta la "
+                        + "parte calificada de algún criterio");
+            }
+            return nota;
+        }
         if (rindeElCuestionario(postulacion)) {
             cuestionarioTecnico.calificarEtapa(postulacion);
             return notasEtapa.findByPostulacionIdAndEtapaCodigo(postulacion.getId(), ETAPA)
@@ -485,6 +607,11 @@ public class ServicioCalificacionPruebaImpl implements ServicioCalificacionPrueb
         }
         IntentoPrueba intento = intentos.findByPostulacionId(postulacion.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("Prueba del puesto", "postulación", postulacion.getId()));
+        // La prueba del editor (V67) no tiene rúbrica de la tabla `criterio`: sus criterios
+        // son de su versión y se leen en /prueba-propia.
+        if (intento.esDelEditor()) {
+            return List.of();
+        }
         // Ordenada: esto acaba en una pantalla y en las columnas del ranking, y sin `orden`
         // la rúbrica sale como la devuelva la base, que puede cambiar entre dos peticiones.
         return criterios.findByVersionPlantillaPruebaIdOrderByOrden(

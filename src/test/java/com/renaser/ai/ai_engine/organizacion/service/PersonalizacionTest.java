@@ -4,8 +4,6 @@ import com.renaser.ai.ai_engine.auditoria.service.ServicioAuditoria;
 import com.renaser.ai.ai_engine.organizacion.entity.Organizacion;
 import com.renaser.ai.ai_engine.organizacion.repository.OrganizacionRepository;
 import com.renaser.ai.ai_engine.organizacion.service.impl.ServicioPersonalizacionImpl;
-import com.renaser.ai.ai_engine.perfilintegral.entity.VersionBanco;
-import com.renaser.ai.ai_engine.perfilintegral.repository.VersionBancoRepository;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -30,8 +28,9 @@ import static org.mockito.Mockito.when;
  * Encender y apagar las banderas: los dos únicos movimientos de la personalización.
  *
  * <p>Lo que se defiende: encender sin copia no existe (van en la misma transacción, y si
- * la copia revienta la bandera no queda encendida), apagar no borra nada (RF-138: el
- * banco propio se archiva), y la plataforma no personaliza — ya es dueña de su método.
+ * la copia revienta la bandera no queda encendida), la plataforma no personaliza —ya es
+ * dueña de su método— y, desde la V67, personalizar el banco o las pruebas ya no existe:
+ * se rechaza con un 400 sin copiar ni cambiar nada (decisión 13).
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("Encender y apagar la personalización")
@@ -43,7 +42,6 @@ class PersonalizacionTest {
 
     @Mock private OrganizacionRepository organizaciones;
     @Mock private CopiadorDeInstrumentos copiador;
-    @Mock private VersionBancoRepository versionesBanco;
     @Mock private ServicioAuditoria auditoria;
 
     private ServicioPersonalizacionImpl servicio;
@@ -51,7 +49,7 @@ class PersonalizacionTest {
 
     @BeforeEach
     void armar() {
-        servicio = new ServicioPersonalizacionImpl(organizaciones, copiador, versionesBanco, auditoria);
+        servicio = new ServicioPersonalizacionImpl(organizaciones, copiador, auditoria);
         empresa = Organizacion.builder().id(EMPRESA).codigo("ACME").build();
         // lenient: las pruebas de la doble llave de la plataforma cortan antes de llegar
         // a buscar la empresa, y el modo estricto las tumbaría por este stub sin usar.
@@ -83,18 +81,26 @@ class PersonalizacionTest {
     }
 
     @Test
-    @DisplayName("El banco ya no se personaliza: se rechaza y no se copia nada (AC-01d)")
-    void elBancoYaNoSePersonaliza() {
-        assertThatThrownBy(() -> servicio.encender(ADMIN, Instrumento.BANCO))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("ya no se personaliza");
+    @DisplayName("Encender o apagar el banco o las pruebas ya no existe: 400 y no se toca nada (AC-26)")
+    void elBancoYLasPruebasYaNoSePersonalizan() {
+        empresa.setPruebasPuestoPropias(true);
+        for (Instrumento cual : List.of(Instrumento.BANCO, Instrumento.PRUEBA)) {
+            assertThatThrownBy(() -> servicio.encender(ADMIN, cual))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("ya no existe");
+            assertThatThrownBy(() -> servicio.apagar(ADMIN, cual))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("ya no existe");
+        }
+        // Quien ya las tenía personalizadas conserva lo suyo: su bandera no cambia.
+        assertThat(empresa.isPruebasPuestoPropias()).isTrue();
         assertThat(empresa.isBancoPropio()).isFalse();
-        verify(copiador, never()).copiarBanco(any());
         verify(organizaciones, never()).save(any());
+        verify(auditoria, never()).registrar(any(), any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
-    @DisplayName("Tampoco cuando lo pide la plataforma por otra empresa (AC-01d)")
+    @DisplayName("Tampoco cuando lo pide la plataforma por otra empresa (AC-26)")
     void niSiquieraDesdeLaPlataforma() {
         Organizacion plataforma = Organizacion.builder().id(1L).codigo("RENASER")
                 .esPlataforma(true).build();
@@ -102,11 +108,16 @@ class PersonalizacionTest {
         ContextoUsuario renaser = new ContextoUsuario(
                 11L, 21L, 1L, "EQUIPO", List.of(), Map.of());
 
-        assertThatThrownBy(() -> servicio.encenderPara(renaser, EMPRESA, Instrumento.BANCO, "la pidió"))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("ya no se personaliza");
-        verify(copiador, never()).copiarBanco(any());
+        for (Instrumento cual : List.of(Instrumento.BANCO, Instrumento.PRUEBA)) {
+            assertThatThrownBy(() -> servicio.encenderPara(renaser, EMPRESA, cual, "la pidió"))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("ya no existe");
+            assertThatThrownBy(() -> servicio.apagarPara(renaser, EMPRESA, cual, "la pidió"))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("ya no existe");
+        }
         assertThat(empresa.isBancoPropio()).isFalse();
+        verify(organizaciones, never()).save(any());
     }
 
     @Test
@@ -125,32 +136,26 @@ class PersonalizacionTest {
     void laPlataformaNoPersonaliza() {
         empresa.setEsPlataforma(true);
 
-        assertThatThrownBy(() -> servicio.encender(ADMIN, Instrumento.BANCO))
+        assertThatThrownBy(() -> servicio.encender(ADMIN, Instrumento.PESOS))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("plataforma");
     }
 
     @Test
-    @DisplayName("Apagar el banco archiva las versiones propias publicadas, no las borra")
-    void apagarElBancoArchivaLoPropio() {
-        empresa.setBancoPropio(true);
-        VersionBanco propia = VersionBanco.builder()
-                .id(80L).organizacionId(EMPRESA).estado("PUBLICADA").build();
-        when(versionesBanco.findByOrganizacionIdAndEstado(EMPRESA, "PUBLICADA"))
-                .thenReturn(List.of(propia));
+    @DisplayName("Apagar los pesos propios vuelve a los de la plataforma, sin borrar nada")
+    void apagarLosPesosVuelveALaPlataforma() {
+        empresa.setPesosPropios(true);
 
-        servicio.apagar(ADMIN, Instrumento.BANCO);
+        servicio.apagar(ADMIN, Instrumento.PESOS);
 
-        assertThat(empresa.isBancoPropio()).isFalse();
-        assertThat(propia.getEstado()).isEqualTo("ARCHIVADA");
-        verify(versionesBanco).save(propia);
-        verify(versionesBanco, never()).delete(any());
+        assertThat(empresa.isPesosPropios()).isFalse();
+        verify(organizaciones).save(empresa);
     }
 
     @Test
     @DisplayName("Apagar lo ya apagado es un conflicto")
     void apagarDosVecesEsConflicto() {
-        assertThatThrownBy(() -> servicio.apagar(ADMIN, Instrumento.PRUEBA))
+        assertThatThrownBy(() -> servicio.apagar(ADMIN, Instrumento.PLANTILLA_EVALUACION))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("ya está apagada");
     }

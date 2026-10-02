@@ -1,5 +1,9 @@
 # La prueba técnica — Etapa 2
 
+> ⚠️ **Desde el 01/10/2026 (`V67`) este cuestionario no se ofrece a las vacantes nuevas**, tampoco
+> en RENASER: su prueba técnica se escribe en el editor de la vacante. Las vacantes que ya lo
+> rinden siguen igual. Ver [La prueba del puesto, por dentro](PRUEBA-DEL-PUESTO.md).
+
 La segunda de las dos pruebas del sistema CAZATALENTOS. **No es fija**: no existe hasta que
 existe una vacante, y se escribe para esa vacante.
 

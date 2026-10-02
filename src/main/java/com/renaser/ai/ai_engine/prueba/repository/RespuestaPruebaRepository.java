@@ -11,4 +11,10 @@ public interface RespuestaPruebaRepository extends JpaRepository<RespuestaPrueba
 
     List<RespuestaPrueba> findByIntentoPruebaId(Long intentoPruebaId);
     Optional<RespuestaPrueba> findByIntentoPruebaIdAndPreguntaPruebaId(Long intentoPruebaId, Long preguntaPruebaId);
+
+    /** La respuesta a una pregunta de la prueba escrita en el editor (V67). */
+    Optional<RespuestaPrueba> findByIntentoPruebaIdAndPreguntaId(Long intentoPruebaId, Long preguntaId);
+
+    /** En bloque, para el ranking y el Excel. */
+    List<RespuestaPrueba> findByIntentoPruebaIdIn(java.util.Collection<Long> intentoPruebaIds);
 }

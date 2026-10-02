@@ -1081,4 +1081,130 @@ class ServicioVacantesPanelImplTest {
         assertThat(v.getMinutosEtapaTecnica()).isNull();
         verify(vacantes).save(v);
     }
+
+    // ============ La prueba del editor no se entra ni se sale por el instrumento (V67) ============
+    //
+    // Una vacante nueva rinde la prueba escrita en «Armar la prueba» (AC-02). Pasarla por la
+    // API a una plantilla o al cuestionario CAZATALENTOS la dejaba rindiendo lo que ya no se
+    // ofrece, y el panel le pintaba los desplegables viejos sin camino de vuelta al editor.
+    // La única salida que queda es asignarle una plantilla, para los guiones de las vacantes
+    // que ya existen, y solo mientras nadie haya rendido.
+
+    /** Una vacante nueva: la prueba del editor y ninguna plantilla colgada. */
+    private Vacante vacanteConPruebaPropia(String estado) {
+        Vacante v = vacante(estado, false, null);
+        v.setInstrumentoEtapaTecnica("PRUEBA_PROPIA");
+        v.setVersionPlantillaPruebaId(null);
+        return v;
+    }
+
+    @Test
+    @DisplayName("una vacante con la prueba del editor no se pasa a una plantilla: 400 y la bandera no cambia")
+    void laPruebaDelEditorNoSePasaAUnaPlantilla() {
+        Vacante v = vacanteConPruebaPropia("BORRADOR");
+
+        assertThatThrownBy(() -> servicio.elegirInstrumentoTecnico(QUIEN, VACANTE, "PLANTILLA", null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("se escribe en «Armar la prueba»");
+
+        assertThat(v.getInstrumentoEtapaTecnica()).isEqualTo("PRUEBA_PROPIA");
+        assertThat(v.getMinutosEtapaTecnica()).isNull();
+        verify(vacantes, never()).save(any(Vacante.class));
+        org.mockito.Mockito.verifyNoInteractions(auditoria);
+    }
+
+    @Test
+    @DisplayName("ni al cuestionario CAZATALENTOS, aunque esté publicada y nadie haya rendido: 400 antes de la guarda")
+    void laPruebaDelEditorNoSePasaAlCuestionario() {
+        // Publicada y sin nadie dentro es justo el caso en que la guarda de la vara dejaría
+        // pasar el cambio: el rechazo es de la regla, no del momento de la vacante.
+        Vacante v = vacanteConPruebaPropia("PUBLICADA");
+
+        assertThatThrownBy(() ->
+                servicio.elegirInstrumentoTecnico(QUIEN, VACANTE, "CUESTIONARIO_TECNICO", 45))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("se escribe en «Armar la prueba»");
+
+        assertThat(v.getInstrumentoEtapaTecnica()).isEqualTo("PRUEBA_PROPIA");
+        assertThat(v.getMinutosEtapaTecnica()).isNull();
+        verify(vacantes, never()).save(any(Vacante.class));
+        verify(intentos, never()).algunoEmpezadoDeLaVacante(VACANTE);
+        org.mockito.Mockito.verifyNoInteractions(auditoria);
+    }
+
+    @Test
+    @DisplayName("pedir la prueba del editor sobre ella misma es inocuo: se queda igual y sin minutos")
+    void laPruebaDelEditorSobreSiMismaEsInocua() {
+        Vacante v = vacanteConPruebaPropia("PUBLICADA");
+
+        servicio.elegirInstrumentoTecnico(QUIEN, VACANTE, "PRUEBA_PROPIA", 45);
+
+        assertThat(v.getInstrumentoEtapaTecnica()).isEqualTo("PRUEBA_PROPIA");
+        // Su tiempo va dentro de la prueba: unos minutos de la vacante mentirían.
+        assertThat(v.getMinutosEtapaTecnica()).isNull();
+        verify(vacantes).save(v);
+        // No cambia la vara de nadie, así que ni se pregunta quién empezó.
+        verify(intentos, never()).algunoEmpezadoDeLaVacante(VACANTE);
+    }
+
+    @Test
+    @DisplayName("una vacante de las de antes no se pasa a la prueba del editor: 400 y sigue con la suya")
+    void unaDeLasDeAntesNoSePasaALaPruebaDelEditor() {
+        // Ninguna pantalla ni guion lo pide: el panel solo ofrece sus dos instrumentos.
+        for (String deAntes : List.of("PLANTILLA", "CUESTIONARIO_TECNICO")) {
+            Vacante v = vacante("BORRADOR", false, null);
+            v.setInstrumentoEtapaTecnica(deAntes);
+            v.setMinutosEtapaTecnica(60);
+
+            assertThatThrownBy(() ->
+                    servicio.elegirInstrumentoTecnico(QUIEN, VACANTE, "PRUEBA_PROPIA", null))
+                    .as(deAntes)
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessageContaining("es la de las vacantes nuevas");
+
+            assertThat(v.getInstrumentoEtapaTecnica()).as(deAntes).isEqualTo(deAntes);
+            assertThat(v.getMinutosEtapaTecnica()).as(deAntes).isEqualTo(60);
+        }
+        verify(vacantes, never()).save(any(Vacante.class));
+        org.mockito.Mockito.verifyNoInteractions(auditoria);
+    }
+
+    @Test
+    @DisplayName("asignarle una plantilla sí la pasa a PLANTILLA mientras nadie haya rendido (guiones)")
+    void asignarUnaPlantillaLaPasaAPlantilla() {
+        Vacante v = vacanteConPruebaPropia("PUBLICADA");
+        when(versionesPrueba.findById(32L)).thenReturn(Optional.of(
+                VersionPlantillaPrueba.builder().id(32L).plantillaPruebaId(300L)
+                        .estado("PUBLICADA").build()));
+        when(plantillasPrueba.findByIdAndOrganizacionId(300L, ORGANIZACION)).thenReturn(Optional.of(
+                com.renaser.ai.ai_engine.prueba.entity.PlantillaPrueba.builder().id(300L).build()));
+        when(intentos.algunoEmpezadoDeLaVacante(VACANTE)).thenReturn(false);
+        when(evaluaciones.algunaTecnicaEmpezadaDeLaVacante(VACANTE)).thenReturn(false);
+
+        servicio.asignarPlantillaPrueba(QUIEN, VACANTE, 32L);
+
+        assertThat(v.getInstrumentoEtapaTecnica()).isEqualTo("PLANTILLA");
+        assertThat(v.getVersionPlantillaPruebaId()).isEqualTo(32L);
+        verify(vacantes).save(v);
+    }
+
+    @Test
+    @DisplayName("con alguien que ya rindió, asignarle una plantilla no le cambia el instrumento: 409")
+    void conAlguienQueRindioLaPlantillaNoEntra() {
+        Vacante v = vacanteConPruebaPropia("PUBLICADA");
+        when(versionesPrueba.findById(32L)).thenReturn(Optional.of(
+                VersionPlantillaPrueba.builder().id(32L).plantillaPruebaId(300L)
+                        .estado("PUBLICADA").build()));
+        when(plantillasPrueba.findByIdAndOrganizacionId(300L, ORGANIZACION)).thenReturn(Optional.of(
+                com.renaser.ai.ai_engine.prueba.entity.PlantillaPrueba.builder().id(300L).build()));
+        when(intentos.algunoEmpezadoDeLaVacante(VACANTE)).thenReturn(true);
+
+        assertThatThrownBy(() -> servicio.asignarPlantillaPrueba(QUIEN, VACANTE, 32L))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("misma vara");
+
+        assertThat(v.getInstrumentoEtapaTecnica()).isEqualTo("PRUEBA_PROPIA");
+        assertThat(v.getVersionPlantillaPruebaId()).isNull();
+        verify(vacantes, never()).save(any(Vacante.class));
+    }
 }

@@ -292,6 +292,34 @@ public interface ColaCalificacionIa {
     /** Cómo va la última recomendación pedida para una vacante. */
     Seguimiento comoVaElRecomendador(Long vacanteId);
 
+    // ==================== La prueba técnica escrita en el editor (V67) ====================
+
+    /**
+     * Vuelve a calificar SOLO los criterios de IA de la prueba de una postulación, con la
+     * guía nueva. Mismo carril que {@link #recalificar} pero con el agente de la prueba: no
+     * mueve a nadie de etapa. Lo terminado no exime; uno vivo sí frena al siguiente.
+     */
+    boolean recalificarPrueba(Long postulacionId);
+
+    /** Cómo va la última recalificación de la prueba de cada postulación. */
+    java.util.Map<Long, Seguimiento> recalificacionDePrueba(java.util.List<Long> postulacionIds);
+
+    /**
+     * Cómo va la última calificación de la prueba (la primera o una recalificación) de cada
+     * postulación: para decir por qué un criterio de IA sigue pendiente.
+     */
+    java.util.Map<Long, Seguimiento> calificacionDePrueba(java.util.List<Long> postulacionIds);
+
+    /**
+     * Encola al RECOMENDADOR para la prueba técnica de una vacante. Va por su propio carril
+     * (otra referencia): una recomendación del Perfil Integral en curso no la frena ni la
+     * mezcla, y al revés.
+     */
+    boolean encolarRecomendadorDePrueba(Long organizacionId, Long vacanteId);
+
+    /** Cómo va la última recomendación pedida para la prueba técnica de una vacante. */
+    Seguimiento comoVaElRecomendadorDePrueba(Long vacanteId);
+
     /**
      * El estado de un trabajo contado para el panel.
      *

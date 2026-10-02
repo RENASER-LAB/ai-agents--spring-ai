@@ -18,7 +18,12 @@ public class IntentoPrueba {
     private Long id;
 
     private Long postulacionId;
+    /**
+     * Una de las dos: la plantilla de siempre, o la versión de la prueba escrita en el editor
+     * (V67). Con la segunda no se sortea cambio inesperado.
+     */
     private Long versionPlantillaPruebaId;
+    private Long versionBancoId;
     private Instant iniciadoEn;
     private Instant venceEn;
     // A esta persona se le fijó su propia fecha de cierre: mover la de la vacante no se la
@@ -30,4 +35,14 @@ public class IntentoPrueba {
     private Integer minutoCambio;
     private Instant cambioMostradoEn;
     private Instant creadoEn;
+    /**
+     * Venció con algo sin responder (V67, solo la prueba del editor): se cerró sin entregar.
+     * {@code entregadoEn} guarda cuándo se cerró. No se califica ni sale en el ranking.
+     */
+    private boolean noCompletada;
+
+    /** Si es una prueba escrita en el editor y no una plantilla. */
+    public boolean esDelEditor() {
+        return versionBancoId != null;
+    }
 }
