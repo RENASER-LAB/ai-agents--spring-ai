@@ -331,7 +331,8 @@ class ArquitecturaTest {
             // Derivan de una postulación o vacante ya validada por su guardián: la
             // vacante de la postulación, el puesto de la vacante, la plantilla que la
             // vacante tiene asignada (y que se validó contra el dueño al asignarla).
-            "ServicioPostulacionesPanelImpl#confirmarAvance",
+            // (confirmarAvance salió de la lista en octubre de 2026: la vacante de la etapa
+            // técnica se pide ya por su organización, en `laVacanteDe`.)
             "ServicioPostulacionesPanelImpl#ficha",
             // El pase automático de la V53. No hay usuario del que sacar la organización —lo
             // dispara el final de la calificación, no una persona— y por eso no puede pasar

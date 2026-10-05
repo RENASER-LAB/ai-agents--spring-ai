@@ -13,8 +13,38 @@ import java.util.List;
  */
 public interface ServicioValidacion {
 
-    /** La crea el sistema al entrar a la etapa, en POR_HABILITAR y sin modalidad todavía. */
-    Long crearAlEntrar(Long postulacionId, Long organizacionId);
+    /**
+     * Dónde entra de verdad la persona a Validación, y qué hay que contar de ello.
+     *
+     * @param validacionId el periodo con el que entra: el recién creado o el que ya tenía
+     * @param paso         el estado de la postulación que corresponde a ese periodo
+     * @param coletilla    lo que se añade al motivo para que el historial lo explique; nula
+     *                     cuando entra a «por habilitar», que es lo que se espera
+     */
+    record Entrada(Long validacionId, String paso, String coletilla) {
+
+        /**
+         * El motivo escrito, con la coletilla detrás, igual que la de «sin avisar al
+         * candidato». Un motivo vacío se queda vacío: la coletilla no cuenta como motivo y
+         * no puede tapar que falta.
+         */
+        public String motivoCon(String motivo) {
+            if (coletilla == null || motivo == null || motivo.isBlank()) {
+                return motivo;
+            }
+            return motivo + " · " + coletilla;
+        }
+    }
+
+    /**
+     * El periodo de quien entra a la etapa: se crea en POR_HABILITAR, sin modalidad todavía,
+     * o se reutiliza el que ya tenía <b>sin tocar ninguno de sus datos</b>.
+     *
+     * <p>Devuelve el paso de Validación que corresponde a ese periodo: quien vuelve con su
+     * periodo en curso entra a su turno, y quien lo tenía vencido o cerrado, a «por
+     * confirmar».
+     */
+    Entrada crearAlEntrar(Long postulacionId, Long organizacionId);
 
     ValidacionResponse ver(ContextoUsuario quien, Long postulacionId);
 
