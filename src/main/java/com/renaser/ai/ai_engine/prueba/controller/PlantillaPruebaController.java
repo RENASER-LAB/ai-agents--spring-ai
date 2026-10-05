@@ -2,20 +2,28 @@ package com.renaser.ai.ai_engine.prueba.controller;
 
 import com.renaser.ai.ai_engine.prueba.dto.DtosPlantillaPrueba.*;
 import com.renaser.ai.ai_engine.prueba.service.ServicioPlantillaPrueba;
+import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
 import com.renaser.ai.ai_engine.seguridad.service.Permisos;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.core.MethodParameter;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.util.ReflectionUtils;
+import org.springframework.validation.BindingResult;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.lang.reflect.Method;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 @RestController
 @RequestMapping("/api/v1/panel/plantillas-prueba")
@@ -77,25 +85,68 @@ public class PlantillaPruebaController {
         return Map.of("id", servicio.agregarVariante(permisos.actual(), versionId, datos));
     }
 
+    // ---------- El catálogo de preguntas: solo de la plataforma ----------
+    // A otra empresa le contesta 404 (ServicioPlantillaPrueba#exigirElCatalogoDeLaPlataforma).
+    // El orden es permiso → empresa → cuerpo: sin permiso, 403; de otra empresa, 404 aunque
+    // el cuerpo venga mal; y solo a la plataforma se le valida el cuerpo, con el 400 de
+    // siempre.
+
     @GetMapping("/preguntas")
     @PreAuthorize("@permisos.tiene('elegir_plantilla_prueba')")
-    @Operation(summary = "El catálogo de preguntas, opcionalmente filtrado por tipo")
+    @Operation(summary = "El catálogo de preguntas, opcionalmente filtrado por tipo. Solo la "
+            + "plataforma: a otra empresa le contesta 404")
     public List<PreguntaPruebaResponse> preguntas(@RequestParam(required = false) String tipo) {
-        return servicio.listarPreguntasCatalogo(tipo);
+        return servicio.listarPreguntasCatalogo(permisos.actual(), tipo);
     }
 
     @PostMapping("/preguntas")
     @PreAuthorize("@permisos.tiene('editar_plantillas_prueba')")
     @ResponseStatus(HttpStatus.CREATED)
-    public Map<String, Long> crearPregunta(@Valid @RequestBody CrearPreguntaPrueba datos) {
-        return Map.of("id", servicio.crearPreguntaCatalogo(permisos.actual(), datos));
+    @Operation(summary = "Crear una pregunta en el catálogo. Solo la plataforma: a otra "
+            + "empresa le contesta 404 sin mirar el cuerpo ni escribir nada")
+    public Map<String, Long> crearPregunta(@Valid @RequestBody CrearPreguntaPrueba datos,
+                                           BindingResult errores)
+            throws MethodArgumentNotValidException {
+        ContextoUsuario quien = permisos.actual();
+        servicio.exigirElCatalogoDeLaPlataforma(quien);
+        exigirCuerpoValido(errores, "crearPregunta", CrearPreguntaPrueba.class, BindingResult.class);
+        return Map.of("id", servicio.crearPreguntaCatalogo(quien, datos));
     }
 
     @PostMapping("/versiones/{versionId}/preguntas")
     @PreAuthorize("@permisos.tiene('editar_plantillas_prueba')")
-    @Operation(summary = "Elegir una pregunta del catálogo para esta versión")
-    public void elegirPregunta(@PathVariable Long versionId, @Valid @RequestBody ElegirPregunta datos) {
-        servicio.elegirPregunta(permisos.actual(), versionId, datos);
+    @Operation(summary = "Elegir una pregunta del catálogo para esta versión. Solo la "
+            + "plataforma: a otra empresa le contesta 404 sin mirar la versión ni la pregunta")
+    public void elegirPregunta(@PathVariable Long versionId, @Valid @RequestBody ElegirPregunta datos,
+                               BindingResult errores) throws MethodArgumentNotValidException {
+        ContextoUsuario quien = permisos.actual();
+        servicio.exigirElCatalogoDeLaPlataforma(quien);
+        exigirCuerpoValido(errores, "elegirPregunta", Long.class, ElegirPregunta.class, BindingResult.class);
+        servicio.elegirPregunta(quien, versionId, datos);
+    }
+
+    /**
+     * Lanza el 400 de validación que {@code @Valid} habría lanzado solo, pero después de
+     * comprobar la empresa.
+     *
+     * <p>Con {@code @Valid} a secas Spring valida el cuerpo al leerlo, antes incluso del
+     * {@code @PreAuthorize}, y a una empresa que no es la plataforma le contestaría 400 en
+     * vez del 404 de un recurso ajeno. El {@link BindingResult} detrás del cuerpo hace que
+     * Spring apunte los errores sin lanzarlos; aquí se lanzan con la misma excepción, así
+     * que la plataforma recibe exactamente el 400 de antes (el de
+     * {@code GlobalControllerAdvice}, con su mapa {@code errors}).
+     */
+    private static void exigirCuerpoValido(BindingResult errores, String metodo, Class<?>... parametros)
+            throws MethodArgumentNotValidException {
+        if (!errores.hasErrors()) {
+            return;
+        }
+        Method manejador = Objects.requireNonNull(
+                ReflectionUtils.findMethod(PlantillaPruebaController.class, metodo, parametros),
+                () -> "PlantillaPruebaController no tiene " + metodo);
+        Class<?> tipoDelCuerpo = Objects.requireNonNull(errores.getTarget()).getClass();
+        int indice = Arrays.asList(manejador.getParameterTypes()).indexOf(tipoDelCuerpo);
+        throw new MethodArgumentNotValidException(new MethodParameter(manejador, indice), errores);
     }
 
     @PostMapping("/versiones/{versionId}/entregables")

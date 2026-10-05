@@ -17,12 +17,16 @@ vacante eligió cuál (V43):
 | Instrumento | Qué es | Quién la escribe |
 |---|---|---|
 | **Cuestionario técnico** | Preguntas que se contestan escribiendo, sin nada que subir; nace de la ficha del puesto y del redactor (V42). Es la etapa 2 de CAZATALENTOS | El panel, con ayuda de la IA |
-| **Prueba del puesto** | Una plantilla con versiones publicadas: preguntas, entregables (archivo o enlace), rúbrica y variantes (el cambio inesperado) | La empresa, desde el panel o por guion |
+| **Prueba del puesto** | Una plantilla con versiones publicadas: preguntas, entregables (archivo o enlace), rúbrica y variantes (el cambio inesperado) | RENASER, por guion. El panel ya no tiene pantalla para escribirla (05/10/2026) |
 | **La prueba escrita en el editor** (`PRUEBA_PROPIA`, V67) | La de **toda vacante nueva**, también en RENASER: criterios, preguntas de cuatro tipos, el caso, el tiempo y los entregables, escritos para esa vacante. Sin entregables es un cuestionario | La empresa, en «Armar la prueba» del panel, con ayuda de la IA si quiere |
 
 **A las vacantes nuevas ya no se les ofrecen las plantillas, el cuestionario CAZATALENTOS ni la
-ficha.** Las existentes siguen igual, sin migrar nada. La pantalla `/admin/pruebas` y los guiones
-de plantillas siguen sirviendo para ellas. Ver «La prueba escrita en el editor», más abajo.
+ficha.** Las existentes siguen igual, sin migrar nada: en su configuración se sigue eligiendo la
+versión publicada que rinden, y los guiones de plantillas de RENASER siguen sirviendo para ellas.
+La sección «Pruebas» del panel (`/admin/pruebas`), donde se escribían las plantillas, **se retiró
+el 05/10/2026** para todas las empresas: quien abre esa dirección llega a la lista de vacantes.
+Ver «La prueba escrita en el editor» y «El catálogo de preguntas es solo de la plataforma», más
+abajo.
 
 La prueba de la vacante de Administrador es en realidad un cuestionario cargado como prueba del
 puesto: ver «La vacante sin banco» más abajo.
@@ -122,8 +126,33 @@ Ahora hay **doce endpoints** de corrección y borrado, más dos que no lo son:
   manda el tiempo que ponga la empresa. Queda un **piso de 5 minutos**, el mismo en los dos
   sitios: publicar la versión y fijar los minutos de la vacante.
 
-⚠️ **Fuga conocida y abierta**: el catálogo `pregunta_prueba` se lee **sin filtrar por empresa**
-y las preguntas específicas SON el texto del examen. Ver [Defectos conocidos](DEFECTOS-CONOCIDOS.md).
+### El catálogo de preguntas es solo de la plataforma (05/10/2026)
+
+Las preguntas de las plantillas salen de un catálogo, `pregunta_prueba`, que **no tiene dueño**:
+nació antes del multiempresa, y sus preguntas específicas son el texto del examen. Hasta esta
+fecha cualquier empresa con permiso de pruebas podía listarlo entero, y con él leer el examen de
+otra. Ahora **listarlo, crear una pregunta y elegirla para una versión es solo de la
+plataforma**:
+
+| Qué | Ruta | A otra empresa |
+|---|---|---|
+| Listar el catálogo, con `tipo` o sin él | `GET /plantillas-prueba/preguntas` | 404, sin ningún texto de pregunta |
+| Crear una pregunta | `POST /plantillas-prueba/preguntas` | 404; no se crea nada y el código queda libre |
+| Elegir una pregunta para una versión | `POST /plantillas-prueba/versiones/{id}/preguntas` | 404, aunque la versión sea suya y la pregunta exista; la versión no la gana |
+
+- **El orden es permiso → empresa → cuerpo.** Sin el permiso de siempre, 403; con él y de otra
+  empresa, 404 aunque el cuerpo venga mal, como cualquier recurso ajeno; y solo a la plataforma
+  se le revisa el cuerpo, con el 400 de antes.
+- **Lo demás no cambia**: quitar una pregunta elegida de un borrador propio, leer una versión y
+  el resto de las rutas de plantillas comprueban la empresa como antes.
+- **Sin migración.** El catálogo sigue sin `organizacion_id` y con el código único en toda la
+  plataforma, pero como solo escribe la plataforma, ninguna empresa le bloquea un código a otra.
+  Darle dueño quedó fuera.
+- **Las vacantes de antes no notan nada**: sus candidatos ven las mismas preguntas, se califican
+  igual y salen en el ranking como antes. El sembrador y los guiones de RENASER siguen
+  funcionando.
+
+Lo prueba `CatalogoDePreguntasSoloPlataformaIT`, con dos empresas.
 
 ---
 
