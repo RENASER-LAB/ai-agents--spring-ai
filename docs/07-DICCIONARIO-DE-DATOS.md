@@ -1977,7 +1977,9 @@ Las distintas formas que puede tomar el cambio inesperado.
 
 ## `pregunta_prueba`
 
-El catálogo de preguntas de la prueba: previas, universales y del puesto.
+El catálogo de preguntas de la prueba: previas, universales y del puesto. **No tiene
+`organizacion_id`**: desde el 05/10/2026 solo la plataforma lo lista, le añade preguntas y las
+elige para una versión; a cualquier otra empresa la API le responde 404. Sin migración.
 
 | Columna | Tipo | Oblig. | Qué guarda |
 |---|---|---|---|

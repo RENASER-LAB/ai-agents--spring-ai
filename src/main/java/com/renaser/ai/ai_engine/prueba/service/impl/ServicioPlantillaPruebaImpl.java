@@ -252,9 +252,22 @@ public class ServicioPlantillaPruebaImpl implements ServicioPlantillaPrueba {
         return v.getId();
     }
 
+    // El catálogo es de la plataforma (spec fuga-del-catalogo-de-preguntas). 404 y no 403:
+    // para otra empresa el catálogo es un recurso ajeno, igual que la plantilla de otra; el
+    // 403 queda para quien no tiene el permiso, que @PreAuthorize ya contestó antes.
+    // Quién es la plataforma lo dice `es_plataforma`, nunca un id fijo.
+    @Override
+    public void exigirElCatalogoDeLaPlataforma(ContextoUsuario quien) {
+        if (!dueno.plataforma().getId().equals(quien.organizacionId())) {
+            throw new ResourceNotFoundException("Catálogo de preguntas de prueba",
+                    "organizacionId", quien.organizacionId());
+        }
+    }
+
     @Override
     @Transactional
     public Long crearPreguntaCatalogo(ContextoUsuario quien, CrearPreguntaPrueba datos) {
+        exigirElCatalogoDeLaPlataforma(quien);
         int siguiente = preguntasCatalogo.findByTipo(datos.tipo()).size() + 1;
         PreguntaPrueba p = preguntasCatalogo.save(PreguntaPrueba.builder()
                 .codigo(datos.codigo())
@@ -271,7 +284,8 @@ public class ServicioPlantillaPruebaImpl implements ServicioPlantillaPrueba {
     }
 
     @Override
-    public List<PreguntaPruebaResponse> listarPreguntasCatalogo(String tipo) {
+    public List<PreguntaPruebaResponse> listarPreguntasCatalogo(ContextoUsuario quien, String tipo) {
+        exigirElCatalogoDeLaPlataforma(quien);
         List<PreguntaPrueba> lista = tipo == null ? preguntasCatalogo.findAll()
                 : preguntasCatalogo.findByTipo(tipo);
         return lista.stream()
@@ -283,6 +297,9 @@ public class ServicioPlantillaPruebaImpl implements ServicioPlantillaPrueba {
     @Override
     @Transactional
     public void elegirPregunta(ContextoUsuario quien, Long versionId, ElegirPregunta datos) {
+        // Antes que la versión: a otra empresa no se le dice ni si el borrador existe ni si
+        // la pregunta existe. Eso era justo la fuga, ir probando ids hasta leer textos ajenos.
+        exigirElCatalogoDeLaPlataforma(quien);
         VersionPlantillaPrueba version = laVersionEnBorrador(quien, versionId);
         preguntasCatalogo.findById(datos.preguntaPruebaId())
                 .orElseThrow(() -> new ResourceNotFoundException("Pregunta de prueba", "id", datos.preguntaPruebaId()));

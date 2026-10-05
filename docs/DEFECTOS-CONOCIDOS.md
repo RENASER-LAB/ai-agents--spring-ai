@@ -11,37 +11,10 @@ haría falta para arreglarlo**. Sin lo tercero, una lista así solo sirve para p
 > descubrir cada pocos meses, normalmente con un candidato dentro. Lo que **ya está arreglado**
 > no vive aquí: vive en el documento de su tema, en `CLAUDE.MD` o en el javadoc de su clase.
 
-Última revisión: **26/09/2026**.
+**Los números no se corren ni se reutilizan.** Otros documentos citan las entradas por su número,
+así que la que se cierra deja su hueco.
 
----
-
-## 1 · Una empresa puede leer el examen de otra
-
-**Qué le pasa a alguien.** Quien administra las pruebas de la empresa B abre el catálogo de
-preguntas y **ve las preguntas específicas que escribió la empresa A**. Esas preguntas no son
-metadatos: **son el texto del examen**. Con dos empresas del mismo rubro compitiendo por la misma
-gente, es filtrar el examen antes de tomarlo.
-
-**Por qué pasa.** `pregunta_prueba` es un catálogo **sin `organizacion_id`**. Nació antes del
-multiempresa, cuando solo Renaser contrataba, y se quedó igual: el listado (`GET
-/plantillas-prueba/preguntas`) hace un `findAll()` sin filtrar por nada. Todo lo demás del módulo
-de pruebas —plantillas, versiones, rúbricas— sí tiene dueño y sí lo comprueba; este catálogo es
-el agujero que quedó.
-
-**Y hay un segundo daño, más callado.** `codigo` es **único en toda la plataforma**. Así que la
-primera empresa que use `ADMIN_Q01` se lo queda **para siempre**: cualquier otra que lo intente
-recibe un error de clave duplicada, y **no hay ningún endpoint que borre una pregunta del
-catálogo**, así que ni siquiera se puede liberar. Un código escrito por error es permanente.
-
-**Qué haría falta.** Una migración: `organizacion_id` en `pregunta_prueba` —repartiendo las filas
-que ya hay a la plataforma—, el único cambiado a `(organizacion_id, codigo)`, y el filtro por
-dueño en el listado, con la regla de siempre (una empresa ve las suyas y, si no personalizó, las
-de la plataforma en solo lectura). El borrado del catálogo es aparte y hay que pensarlo: una
-pregunta ya elegida por una versión publicada tiene respuestas colgando.
-
-**Desde el 01/10/2026 (`V67`) no alcanza a las vacantes nuevas.** Su prueba técnica se escribe
-en su editor y sus preguntas son de la vacante: no pasan por `pregunta_prueba`. Sigue abierta
-para el catálogo y las plantillas, que se siguen usando en las vacantes de antes.
+Última revisión: **05/10/2026**.
 
 ---
 

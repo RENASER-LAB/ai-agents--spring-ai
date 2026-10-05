@@ -140,7 +140,10 @@ persona es `abrir_ficha_candidato` —el contenido de sus entregables pide adem�
 `descargar_entregables`— y ajustar o poner la parte calificada de un criterio, `ajustar_nota`.
 La lista «No completaron la prueba» va con `ver_embudo`, como el ranking, y cerrar el proceso de
 quien no la completó es el descarte de siempre (`mover_postulacion`). Elegir plantilla de prueba
-(`elegir_plantilla_prueba`) queda para las vacantes de antes.
+(`elegir_plantilla_prueba`) queda para las vacantes de antes. **El catálogo de preguntas de las
+plantillas no basta con el permiso** (05/10/2026): listarlo, crear una pregunta o elegirla para
+una versión es solo de la plataforma, y a cualquier otra empresa le responde 404 aunque tenga
+`elegir_plantilla_prueba` o `editar_plantillas_prueba`.
 
 **«Editar una vacante» (`editar_vacante`) es el lápiz de la lista y la tarjeta del sueldo.**
 Desde el 19/09/2026 **respeta su alcance**: con alcance a sus vacantes, solo se corrigen las que
@@ -418,10 +421,12 @@ acciones a quien no tiene `editar_estructura`.
 
 **El menú lateral del panel (`V64`) enseña solo lo que cada uno puede usar**, leyendo los
 permisos de `GET /panel/sesion`, y sigue los permisos que ya exigía cada pantalla: «Vacantes»
-con `ver_vacantes`, «Simulación» con crear sesiones o ver sus inscritos, «Pruebas» con
-`elegir_plantilla_prueba`, «Colaboradores» con `ver_colaboradores` en `TODO`, y «Configuración»
-siempre. **El Administrador no ve «Vacantes»**: no tiene `ver_vacantes` y esas pantallas ya le
-respondían 403. Si la sesión no carga, el menú enseña las cuatro entradas de siempre.
+con `ver_vacantes`, «Simulación» con crear sesiones o ver sus inscritos, «Colaboradores» con
+`ver_colaboradores` en `TODO`, y «Configuración» siempre. **El Administrador no ve «Vacantes»**:
+no tiene `ver_vacantes` y esas pantallas ya le respondían 403. Si la sesión no carga, el menú
+enseña las tres entradas de siempre: Vacantes, Simulación y Configuración. **«Pruebas» ya no sale
+para nadie**, RENASER incluida: la sección se retiró el 05/10/2026 y su dirección lleva a la
+lista de vacantes.
 
 ### Configuración
 

@@ -1025,7 +1025,7 @@ La sugerencia de otro puesto **no mueve nada sola**: es información para que un
 | `plantilla_prueba` | La prueba de un puesto | organizacion_id, puesto_id, nombre |
 | `version_plantilla_prueba` | Una versión concreta. Si tiene vacante, es una copia privada de esa vacante | plantilla_prueba_id, vacante_id, enunciado, modalidad, duracion_minutos, plazo_dias, minuto_cambio_min, minuto_cambio_max, minutos_extra, estado |
 | `variante_cambio` | Las distintas formas que puede tomar el cambio inesperado | version_plantilla_prueba_id, texto, orden |
-| `pregunta_prueba` | El catálogo de preguntas: previas, universales y del puesto | codigo, enunciado, tipo, puesto_id, revela |
+| `pregunta_prueba` | El catálogo de preguntas: previas, universales y del puesto. Sin dueño; desde el 05/10/2026 solo la plataforma lo lee y escribe por la API | codigo, enunciado, tipo, puesto_id, revela |
 | `pregunta_version_plantilla` | Cuáles eligió esta plantilla | version_plantilla_prueba_id, pregunta_prueba_id, orden |
 | `entregable_requerido` | Qué cosas distintas hay que entregar, cada una con su regla. Desde la `V67`, de una plantilla **o** de la prueba del editor | version_plantilla_prueba_id, version_banco_id, nombre, detalle, formato, es_obligatorio, orden, que_debe_tener |
 | `intento_prueba` | Cuando un candidato rinde. Desde la `V67`, una plantilla **o** la prueba del editor | postulacion_id, version_plantilla_prueba_id, version_banco_id, iniciado_en, vence_en, entregado_en, es_entrega_automatica, no_completada, variante_cambio_id, minuto_cambio, cambio_mostrado_en |
@@ -1040,7 +1040,11 @@ La sugerencia de otro puesto **no mueve nada sola**: es información para que un
 reutiliza toda la maquinaria de la rendición —el reloj, las entregas que se reemplazan, el cierre
 por plazo y el plazo propio— sin un segundo intento. **El cambio inesperado no se sortea** para
 la prueba del editor, y sus preguntas son de la vacante, así que **no pasan por el catálogo
-`pregunta_prueba`** y su fuga entre empresas no las alcanza.
+`pregunta_prueba`**.
+
+**`pregunta_prueba` no tiene `organizacion_id`**, y su `codigo` es único en toda la plataforma.
+Para que una empresa no lea el examen de otra, desde el 05/10/2026 listarlo, crear preguntas y
+elegirlas es solo de la plataforma: a las demás la API les responde 404. No hubo migración.
 
 **`nota_criterio_prueba` guarda solo la parte calificada.** La automática —las cerradas— se
 calcula al leer con los puntos que tenga la versión, así que corregir una clave mal puesta mueve

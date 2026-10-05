@@ -65,8 +65,28 @@ public interface ServicioPlantillaPrueba {
 
     Long agregarVariante(ContextoUsuario quien, Long versionId, CrearVariante datos);
 
+    /**
+     * El catálogo de preguntas es <b>solo de la plataforma</b>: listar, crear y elegir.
+     *
+     * <p>No tiene dueño —{@code pregunta_prueba} no lleva {@code organizacion_id} y su
+     * {@code codigo} es único en toda la tabla—, así que abierto a cualquier empresa era una
+     * fuga: la empresa B leía el examen que escribió la A, elegía ids correlativos para verlos
+     * dentro de su propio borrador, y el primer código que alguien usaba quedaba ocupado para
+     * todas y para siempre. Las vacantes nuevas guardan sus preguntas en su propia versión y
+     * no pasan por aquí; quien lo sigue usando es la plataforma (el sembrador, los scripts de
+     * carga y los tests).
+     *
+     * <p>A otra empresa se le contesta <b>404, como a cualquier recurso ajeno</b>, y antes de
+     * mirar nada más: ni la versión, ni la pregunta, ni el cuerpo. Quitar una pregunta de un
+     * borrador propio y ver una versión no pasan por aquí, porque no leen el catálogo.
+     */
+    void exigirElCatalogoDeLaPlataforma(ContextoUsuario quien);
+
+    /** Solo la plataforma: ver {@link #exigirElCatalogoDeLaPlataforma}. */
     Long crearPreguntaCatalogo(ContextoUsuario quien, CrearPreguntaPrueba datos);
-    List<PreguntaPruebaResponse> listarPreguntasCatalogo(String tipo);
+    /** Solo la plataforma: ver {@link #exigirElCatalogoDeLaPlataforma}. */
+    List<PreguntaPruebaResponse> listarPreguntasCatalogo(ContextoUsuario quien, String tipo);
+    /** Solo la plataforma: ver {@link #exigirElCatalogoDeLaPlataforma}. */
     void elegirPregunta(ContextoUsuario quien, Long versionId, ElegirPregunta datos);
 
     Long agregarEntregableRequerido(ContextoUsuario quien, Long versionId, CrearEntregableRequerido datos);
