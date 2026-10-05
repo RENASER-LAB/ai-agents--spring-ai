@@ -524,7 +524,265 @@ public class FlujoSimulacionValidacionIT {
         assertThat(rastro.get(0).get("motivo")).isEqualTo("Los nombres los lleva Talento");
     }
 
+    // ============ Volver a entrar en Validación (y en la prueba) ============
+    //
+    // Cada una con su postulación propia, y después del recorrido de arriba: lo que aquí se
+    // mueve no toca a A ni a B, ni los conteos que el @Order(11) da por hechos.
+
+    /**
+     * Retrocedida y vuelta a avanzar con su periodo en curso. Antes, el segundo «Avanzar»
+     * chocaba con la clave única de la V18 y la persona se quedaba en Simulación.
+     */
+    @DisplayName("Volver con el periodo en curso entra a su turno con el mismo periodo, y al vencer pasa a por confirmar")
+    @Test
+    @Order(12)
+    void volverConElPeriodoEnCursoEntraASuTurno() throws Exception {
+        Candidata c = nuevaCandidata("carla@correo.pe");
+        llevarAValidacionEIniciar(c.id());
+        Map<String, Object> periodoAntes = periodoDe(c.id());
+        assertThat(periodoAntes.get("estado")).isEqualTo("EN_CURSO");
+
+        moverAMano(c.id(), "SIMULACION_POR_CONFIRMAR", "Retrocede para revisar su simulación")
+                .andExpect(status().isOk());
+        avanzar(c.id(), "Vuelve tras revisar su simulación").andExpect(status().isOk());
+
+        assertThat(estadoDe(c.id())).isEqualTo("VALIDACION_TURNO_CANDIDATO");
+        // El mismo periodo, fila idéntica: ni el id, ni las fechas, ni lo habilitado cambian.
+        assertThat(periodoDe(c.id())).isEqualTo(periodoAntes);
+        assertThat(periodosDe(c.id())).isOne();
+        Map<String, Object> ultima = ultimaTransicion(c.id());
+        assertThat(ultima.get("estado_anterior_codigo")).isEqualTo("SIMULACION_POR_CONFIRMAR");
+        assertThat(ultima.get("estado_nuevo_codigo")).isEqualTo("VALIDACION_TURNO_CANDIDATO");
+        assertThat(ultima.get("motivo")).isEqualTo(
+                "Vuelve tras revisar su simulación · su periodo de validación ya estaba en curso");
+
+        // El reloj siguió corriendo: al vencer, el sondeo la trata como a cualquier otra.
+        jdbc.update("update validacion set fin_en = now() - interval '1 hour' where postulacion_id = ?",
+                c.id());
+        sondeo.ejecutar();
+        assertThat(estadoDe(c.id())).isEqualTo("VALIDACION_POR_CONFIRMAR");
+    }
+
+    @DisplayName("Volver con el periodo cerrado entra a por confirmar con sus métricas, y cerrar recalcula con ellas")
+    @Test
+    @Order(13)
+    void volverConElPeriodoCerradoConservaLasMetricas() throws Exception {
+        Candidata d = nuevaCandidata("dora@correo.pe");
+        llevarAValidacionEIniciar(d.id());
+        jdbc.update("update validacion set fin_en = now() - interval '1 hour' where postulacion_id = ?",
+                d.id());
+        sondeo.ejecutar();
+        assertThat(estadoDe(d.id())).isEqualTo("VALIDACION_POR_CONFIRMAR");
+        completarMetricasYCerrar(d.id());
+        assertThat(estadoDe(d.id())).isEqualTo("DECISION_POR_CONFIRMAR");
+
+        Map<String, Object> periodoAntes = periodoDe(d.id());
+        assertThat(periodoAntes.get("estado")).isEqualTo("TERMINADA");
+        String metricasAntes = conTokenGet(
+                "/api/v1/panel/postulaciones/" + d.id() + "/validacion/metricas", tokenTalento)
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        Object notaAntes = notaDeValidacion(d.id());
+
+        moverAMano(d.id(), "SIMULACION_POR_CONFIRMAR", "Retrocede para repasar el proceso")
+                .andExpect(status().isOk());
+        avanzar(d.id(), "Vuelve para revisar su validación").andExpect(status().isOk());
+
+        assertThat(estadoDe(d.id())).isEqualTo("VALIDACION_POR_CONFIRMAR");
+        assertThat(periodoDe(d.id())).isEqualTo(periodoAntes);
+        assertThat(periodosDe(d.id())).isOne();
+        assertThat(ultimaTransicion(d.id()).get("motivo")).isEqualTo(
+                "Vuelve para revisar su validación · su periodo de validación ya estaba cerrado");
+        conTokenGet("/api/v1/panel/postulaciones/" + d.id() + "/validacion/metricas", tokenTalento)
+                .andExpect(status().isOk())
+                .andExpect(content().json(metricasAntes));
+
+        // Cerrar otra vez: la nota sale de las mismas métricas y pasa a la decisión.
+        conToken(post("/api/v1/panel/postulaciones/" + d.id() + "/validacion/cierre"), tokenTalento, null)
+                .andExpect(status().isOk());
+        assertThat(estadoDe(d.id())).isEqualTo("DECISION_POR_CONFIRMAR");
+        assertThat(notaDeValidacion(d.id())).isEqualTo(notaAntes);
+    }
+
+    /**
+     * Un movimiento manual a Validación no creaba el periodo: la ficha decía «todavía no hay»
+     * y habilitar, iniciar, métricas y cerrar contestaban 404.
+     */
+    @DisplayName("Mover a mano a Validación sin periodo lo crea, e iniciar lo pone en curso sin moverla")
+    @Test
+    @Order(14)
+    void moverAManoAValidacionCreaElPeriodo() throws Exception {
+        Candidata e = nuevaCandidata("elena@correo.pe");
+        llevarAPorConfirmarPrueba(e.id());
+
+        moverAMano(e.id(), "VALIDACION_TURNO_CANDIDATO", "Pasa directo a su periodo")
+                .andExpect(status().isOk());
+        assertThat(estadoDe(e.id())).isEqualTo("VALIDACION_TURNO_CANDIDATO");
+        assertThat(periodoDe(e.id()).get("estado")).isEqualTo("POR_HABILITAR");
+
+        conToken(post("/api/v1/panel/postulaciones/" + e.id() + "/validacion/habilitacion"), tokenTalento,
+                "{\"modalidad\":\"SIMULACION_EXTENDIDA\",\"dias\":5}").andExpect(status().isOk());
+        conToken(post("/api/v1/panel/postulaciones/" + e.id() + "/validacion/inicio"), tokenTalento, null)
+                .andExpect(status().isOk());
+        assertThat(periodoDe(e.id()).get("estado")).isEqualTo("EN_CURSO");
+        assertThat(estadoDe(e.id())).isEqualTo("VALIDACION_TURNO_CANDIDATO");
+
+        // Y a «por confirmar»: tiene periodo, así que verlo y sus métricas ya no dan 404.
+        Candidata f = nuevaCandidata("fabiola@correo.pe");
+        llevarAPorConfirmarPrueba(f.id());
+        moverAMano(f.id(), "VALIDACION_POR_CONFIRMAR", "Ya la observamos en el área")
+                .andExpect(status().isOk());
+        assertThat(estadoDe(f.id())).isEqualTo("VALIDACION_POR_CONFIRMAR");
+        conTokenGet("/api/v1/panel/postulaciones/" + f.id() + "/validacion", tokenTalento)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.estado").value("POR_HABILITAR"));
+        completarMetricasYCerrar(f.id());
+        assertThat(estadoDe(f.id())).isEqualTo("DECISION_POR_CONFIRMAR");
+    }
+
+    /**
+     * Mover a mano a la prueba mandaba «tu prueba está disponible» sin crearla: el candidato
+     * abría el enlace y encontraba la pantalla vacía. Ahora se crea, y sin prueba lista el
+     * movimiento se rechaza como «Avanzar».
+     */
+    @DisplayName("Mover a mano a la prueba crea el intento; sin prueba lista da 409 y no se mueve")
+    @Test
+    @Order(15)
+    void moverAManoALaPruebaCreaElIntento() throws Exception {
+        Candidata g = nuevaCandidata("gabriel@correo.pe");
+        for (String destino : List.of("PERFIL_CALIFICANDO", "PERFIL_POR_CONFIRMAR")) {
+            moverAMano(g.id(), destino, "Avance de prueba").andExpect(status().isOk());
+        }
+        Long version = jdbc.queryForObject(
+                "select version_plantilla_prueba_id from vacante where id = ?", Long.class, vacanteId);
+        int transicionesAntes = transicionesDe(g.id());
+        int correosAntes = correosDe(g.id());
+
+        // Sin prueba lista: la vacante pierde su plantilla un momento y la recupera al final.
+        try {
+            jdbc.update("update vacante set version_plantilla_prueba_id = null where id = ?", vacanteId);
+            moverAMano(g.id(), "PRUEBA_TURNO_CANDIDATO", "Pasa a la prueba")
+                    .andExpect(status().isConflict())
+                    .andExpect(jsonPath("$.detail").value(
+                            "Esta vacante no tiene plantilla de prueba asignada: no se puede avanzar"));
+        } finally {
+            jdbc.update("update vacante set version_plantilla_prueba_id = ? where id = ?", version, vacanteId);
+        }
+        assertThat(estadoDe(g.id())).isEqualTo("PERFIL_POR_CONFIRMAR");
+        assertThat(transicionesDe(g.id())).isEqualTo(transicionesAntes);
+        assertThat(correosDe(g.id())).isEqualTo(correosAntes);
+        assertThat(jdbc.queryForObject("select count(*) from intento_prueba where postulacion_id = ?",
+                Integer.class, g.id())).isZero();
+
+        // Con la prueba lista: se crea su intento, y el enlace del correo abre esa prueba.
+        moverAMano(g.id(), "PRUEBA_TURNO_CANDIDATO", "Pasa a la prueba").andExpect(status().isOk());
+        assertThat(estadoDe(g.id())).isEqualTo("PRUEBA_TURNO_CANDIDATO");
+        assertThat(jdbc.queryForObject(
+                "select version_plantilla_prueba_id from intento_prueba where postulacion_id = ?",
+                Long.class, g.id())).isEqualTo(version);
+        mvc.perform(get("/api/v1/portal/prueba/" + g.codigo())
+                        .header("Authorization", "Bearer " + g.token()))
+                .andExpect(status().isOk());
+    }
+
     // ============ Apoyo ============
+
+    /** Una candidata nueva con su postulación a la vacante de este flujo. */
+    private record Candidata(String token, String codigo, long id) {}
+
+    private Candidata nuevaCandidata(String correo) throws Exception {
+        String token = crearCandidato(correo);
+        String codigo = postular(token);
+        return new Candidata(token, codigo, idDe(codigo));
+    }
+
+    /** A mano hasta la prueba ya calificada, sin pasar por la simulación. */
+    private void llevarAPorConfirmarPrueba(long postulacionId) throws Exception {
+        for (String destino : List.of("PERFIL_CALIFICANDO", "PERFIL_POR_CONFIRMAR",
+                "PRUEBA_TURNO_CANDIDATO", "PRUEBA_CALIFICANDO", "PRUEBA_POR_CONFIRMAR")) {
+            moverAMano(postulacionId, destino, "Avance de prueba").andExpect(status().isOk());
+        }
+    }
+
+    /**
+     * A Validación con «Avanzar», habilitada e iniciada: su periodo queda en curso. Llega a
+     * «Simulación · por confirmar» a mano para no recalcular las sesiones de A y B.
+     */
+    private void llevarAValidacionEIniciar(long postulacionId) throws Exception {
+        llevarAPorConfirmarPrueba(postulacionId);
+        moverAMano(postulacionId, "SIMULACION_POR_CONFIRMAR", "Simulación observada")
+                .andExpect(status().isOk());
+        avanzar(postulacionId, "Simulación calificada").andExpect(status().isOk());
+        assertThat(estadoDe(postulacionId)).isEqualTo("VALIDACION_POR_HABILITAR");
+        conToken(post("/api/v1/panel/postulaciones/" + postulacionId + "/validacion/habilitacion"),
+                tokenTalento, "{\"modalidad\":\"SIMULACION_EXTENDIDA\",\"dias\":5}")
+                .andExpect(status().isOk());
+        conToken(post("/api/v1/panel/postulaciones/" + postulacionId + "/validacion/inicio"),
+                tokenTalento, null).andExpect(status().isOk());
+        assertThat(estadoDe(postulacionId)).isEqualTo("VALIDACION_TURNO_CANDIDATO");
+    }
+
+    private void completarMetricasYCerrar(long postulacionId) throws Exception {
+        List<Map<String, Object>> metricas = jdbc.queryForList("""
+                select c.id, pc.peso from criterio c
+                join peso_criterio pc on pc.criterio_id = c.id
+                join vacante v on v.version_pesos_id = pc.version_pesos_id
+                join puesto pu on pu.id = v.puesto_id and pu.nivel_puesto_codigo = pc.nivel_puesto_codigo
+                where c.etapa_codigo = 'VALIDACION' and v.id = ?
+                order by c.orden""", vacanteId);
+        for (Map<String, Object> m : metricas) {
+            // Algo por debajo del máximo, para que la nota no sea la de una rúbrica perfecta.
+            double puntaje = ((Number) m.get("peso")).doubleValue() / 2;
+            conToken(post("/api/v1/panel/postulaciones/" + postulacionId + "/validacion/metricas/"
+                            + m.get("id")), tokenTalento,
+                    "{\"puntaje\":%s,\"explicacion\":\"Observado durante el periodo\"}".formatted(puntaje))
+                    .andExpect(status().isOk());
+        }
+        conToken(post("/api/v1/panel/postulaciones/" + postulacionId + "/validacion/cierre"),
+                tokenTalento, null).andExpect(status().isOk());
+    }
+
+    private ResultActions moverAMano(long postulacionId, String destino, String motivo) throws Exception {
+        return conToken(post("/api/v1/panel/postulaciones/" + postulacionId + "/transiciones"),
+                tokenTalento, "{\"estadoDestino\":\"%s\",\"motivo\":\"%s\"}".formatted(destino, motivo));
+    }
+
+    private ResultActions avanzar(long postulacionId, String motivo) throws Exception {
+        return conToken(post("/api/v1/panel/postulaciones/" + postulacionId + "/confirmacion-avance"),
+                tokenTalento, "{\"motivo\":\"%s\"}".formatted(motivo));
+    }
+
+    private Map<String, Object> periodoDe(long postulacionId) {
+        return jdbc.queryForMap("select * from validacion where postulacion_id = ?", postulacionId);
+    }
+
+    private int periodosDe(long postulacionId) {
+        return jdbc.queryForObject("select count(*) from validacion where postulacion_id = ?",
+                Integer.class, postulacionId);
+    }
+
+    private Map<String, Object> ultimaTransicion(long postulacionId) {
+        return jdbc.queryForMap("""
+                select estado_anterior_codigo, estado_nuevo_codigo, motivo from transicion_estado
+                where postulacion_id = ? order by id desc limit 1""", postulacionId);
+    }
+
+    private int transicionesDe(long postulacionId) {
+        return jdbc.queryForObject("select count(*) from transicion_estado where postulacion_id = ?",
+                Integer.class, postulacionId);
+    }
+
+    private int correosDe(long postulacionId) {
+        return jdbc.queryForObject("""
+                select count(*) from correo_enviado
+                where usuario_id = (select usuario_id from postulacion where id = ?)""",
+                Integer.class, postulacionId);
+    }
+
+    private Object notaDeValidacion(long postulacionId) {
+        return jdbc.queryForObject("""
+                select puntaje from nota_etapa where postulacion_id = ? and etapa_codigo = 'VALIDACION'""",
+                Object.class, postulacionId);
+    }
 
     private long crearSesion(int cupo) throws Exception {
         String cuerpo = """

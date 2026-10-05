@@ -96,4 +96,20 @@ public interface PostulacionRepository extends JpaRepository<Postulacion, Long> 
 
     /** La dueña del cuestionario técnico: cuelga de otra columna que la del perfil integral (V43). */
     Optional<Postulacion> findByEvaluacionTecnicaId(Long evaluacionTecnicaId);
+
+    /**
+     * El estado guardado de la postulación, <b>bloqueando su fila</b> hasta que acabe la
+     * transacción.
+     *
+     * <p>Para entrar a una etapa que crea o reutiliza algo —el periodo de validación, la
+     * prueba—. Dos entradas a la vez leían el mismo estado de partida y, al reutilizar, no
+     * había clave única que parara a la segunda: las dos escribían su transición. Con el
+     * bloqueo la segunda espera, lee el estado que dejó la primera y se planta sin escribir.
+     *
+     * <p>Consulta nativa a propósito: lo que se quiere es el valor de la base después de la
+     * espera, no la entidad que ya está cargada en memoria con el estado de antes.
+     */
+    @Query(value = "select estado_codigo from postulacion where id = :id for update",
+            nativeQuery = true)
+    String estadoBloqueandoLaFila(@Param("id") Long id);
 }

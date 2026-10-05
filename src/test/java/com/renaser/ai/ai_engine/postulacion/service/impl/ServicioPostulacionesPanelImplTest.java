@@ -563,4 +563,315 @@ class ServicioPostulacionesPanelImplTest {
             verifyNoInteractions(enlacesDeAcceso);
         }
     }
+
+    // ============ Entrar a la prueba o a Validación ============
+
+    /*
+     * «Avanzar» y el movimiento manual comparten las reglas de entrada: crear o reutilizar lo
+     * que la persona necesita en la etapa, y en Validación llevarla al paso que corresponde a
+     * su periodo. Van sin @Nested a propósito: el check del harness no corre las clases
+     * anidadas.
+     */
+
+    private static final long SUYA = 5L;
+    private static final String YA_EN_CURSO = "su periodo de validación ya estaba en curso";
+
+    /** La etapa de cada estado, como en la semilla de la V9. Los finales no tienen. */
+    private static final Map<String, String> ETAPA_DE = Map.ofEntries(
+            Map.entry("PERFIL_POR_CONFIRMAR", "PERFIL_INTEGRAL"),
+            Map.entry("PRUEBA_TURNO_CANDIDATO", "PRUEBA_PUESTO"),
+            Map.entry("PRUEBA_POR_CONFIRMAR", "PRUEBA_PUESTO"),
+            Map.entry("SIMULACION_POR_HABILITAR", "SIMULACION"),
+            Map.entry("SIMULACION_POR_CONFIRMAR", "SIMULACION"),
+            Map.entry("VALIDACION_POR_HABILITAR", "VALIDACION"),
+            Map.entry("VALIDACION_TURNO_CANDIDATO", "VALIDACION"),
+            Map.entry("VALIDACION_POR_CONFIRMAR", "VALIDACION"));
+
+    @Mock private com.renaser.ai.ai_engine.postulacion.service.EntradaEtapaTecnica entradaTecnica;
+
+    private static EstadoPostulacion estado(String codigo) {
+        return EstadoPostulacion.builder().codigo(codigo).etapaCodigo(ETAPA_DE.get(codigo))
+                .esFinal("NO_CONTINUA".equals(codigo)).build();
+    }
+
+    /** Una postulación en {@code estadoActual}, que el guardián deja ver con {@code permiso}. */
+    private Postulacion enCarrera(String estadoActual, String permiso) {
+        Postulacion p = Postulacion.builder().id(SUYA).organizacionId(ORGANIZACION)
+                .vacanteId(VACANTE).usuarioId(77L).estadoCodigo(estadoActual).build();
+        when(alcanceVacante.laPostulacionVisible(any(), eq(SUYA), eq(permiso))).thenReturn(p);
+        lenient().when(estados.findById(anyString())).thenAnswer(inv -> {
+            String codigo = inv.getArgument(0);
+            return ETAPA_DE.containsKey(codigo) || "NO_CONTINUA".equals(codigo)
+                    ? Optional.of(estado(codigo)) : Optional.empty();
+        });
+        // Nadie la ha movido mientras tanto: la fila bloqueada dice lo mismo que la leída.
+        lenient().when(postulaciones.estadoBloqueandoLaFila(SUYA)).thenReturn(estadoActual);
+        lenient().when(vacantes.findByIdAndOrganizacionId(VACANTE, ORGANIZACION))
+                .thenReturn(Optional.of(vacante()));
+        return p;
+    }
+
+    /** «Avanzar» desde {@code estadoActual}, que la máquina calcula hacia {@code siguiente}. */
+    private Postulacion paraAvanzar(String estadoActual, String siguiente) {
+        Postulacion p = enCarrera(estadoActual, "confirmar_avance");
+        when(maquina.siguiente(estadoActual)).thenReturn(Optional.of(estado(siguiente)));
+        return p;
+    }
+
+    private void moverAMano(String destino, String motivo) {
+        servicio.transicionar(quien, SUYA,
+                new com.renaser.ai.ai_engine.postulacion.dto.DtosPostulacion.Transicionar(
+                        destino, motivo, null, null));
+    }
+
+    private void noSeMovio() {
+        verify(maquina, never()).transicionar(any(), anyString(), any(), anyString(),
+                org.mockito.ArgumentMatchers.anyBoolean(), org.mockito.ArgumentMatchers.anyBoolean(),
+                any(), org.mockito.ArgumentMatchers.anyBoolean());
+        verify(maquina, never()).transicionar(any(), anyString(), any(), anyString(),
+                org.mockito.ArgumentMatchers.anyBoolean(), org.mockito.ArgumentMatchers.anyBoolean(),
+                org.mockito.ArgumentMatchers.<String>any());
+    }
+
+    @Test
+    @DisplayName("«Avanzar» a Validación entra al paso que devuelve el periodo, con su coletilla")
+    void avanzarAValidacionEntraAlPasoDelPeriodo() {
+        Postulacion p = paraAvanzar("SIMULACION_POR_CONFIRMAR", "VALIDACION_POR_HABILITAR");
+        when(validacion.crearAlEntrar(SUYA, ORGANIZACION)).thenReturn(
+                new com.renaser.ai.ai_engine.validacion.service.ServicioValidacion.Entrada(
+                        9L, "VALIDACION_TURNO_CANDIDATO", YA_EN_CURSO));
+
+        servicio.confirmarAvance(quien, SUYA, "Vuelve tras revisar su simulación");
+
+        // Una sola transición, desde donde estaba hasta donde entró de verdad.
+        verify(maquina).transicionar(p, "VALIDACION_TURNO_CANDIDATO", quien,
+                "Vuelve tras revisar su simulación · " + YA_EN_CURSO, false, false, null);
+        verify(postulaciones).estadoBloqueandoLaFila(SUYA);
+        verifyNoInteractions(entradaTecnica, disponibilidad);
+    }
+
+    @Test
+    @DisplayName("«Avanzar» sin periodo lo crea «por habilitar» y el motivo va sin coletilla")
+    void avanzarSinPeriodoNoLlevaColetilla() {
+        Postulacion p = paraAvanzar("SIMULACION_POR_CONFIRMAR", "VALIDACION_POR_HABILITAR");
+        when(validacion.crearAlEntrar(SUYA, ORGANIZACION)).thenReturn(
+                new com.renaser.ai.ai_engine.validacion.service.ServicioValidacion.Entrada(
+                        9L, "VALIDACION_POR_HABILITAR", null));
+
+        servicio.confirmarAvance(quien, SUYA, "Simulación calificada");
+
+        verify(maquina).transicionar(p, "VALIDACION_POR_HABILITAR", quien,
+                "Simulación calificada", false, false, null);
+    }
+
+    @Test
+    @DisplayName("«Avanzar» a la prueba crea antes lo que rinde la vacante, y después mueve")
+    void avanzarALaPruebaCreaLoQueRinde() {
+        Postulacion p = paraAvanzar("PERFIL_POR_CONFIRMAR", "PRUEBA_TURNO_CANDIDATO");
+
+        servicio.confirmarAvance(quien, SUYA, "Pasa a la prueba");
+
+        var orden = org.mockito.Mockito.inOrder(postulaciones, entradaTecnica, maquina);
+        orden.verify(postulaciones).estadoBloqueandoLaFila(SUYA);
+        orden.verify(entradaTecnica).crearAlEntrar(eq(p), any(Vacante.class));
+        orden.verify(maquina).transicionar(p, "PRUEBA_TURNO_CANDIDATO", quien,
+                "Pasa a la prueba", false, false, null);
+        verifyNoInteractions(validacion);
+    }
+
+    @Test
+    @DisplayName("«Avanzar» a simulación no crea nada y recalcula la disponibilidad, como siempre")
+    void avanzarASimulacionNoCreaNada() {
+        Postulacion p = paraAvanzar("PRUEBA_POR_CONFIRMAR", "SIMULACION_POR_HABILITAR");
+
+        servicio.confirmarAvance(quien, SUYA, "Pasa a la simulación");
+
+        verify(maquina).transicionar(p, "SIMULACION_POR_HABILITAR", quien,
+                "Pasa a la simulación", false, false, null);
+        verify(disponibilidad).recalcularVacante(ORGANIZACION, VACANTE);
+        verifyNoInteractions(entradaTecnica, validacion);
+        verify(postulaciones, never()).estadoBloqueandoLaFila(any());
+    }
+
+    @Test
+    @DisplayName("Si otra entrada ganó la carrera, esta se planta sin crear ni mover nada")
+    void siOtraEntradaGanoSePlanta() {
+        paraAvanzar("SIMULACION_POR_CONFIRMAR", "VALIDACION_POR_HABILITAR");
+        // La otra petición ya la llevó a Validación y soltó la fila: esta lee lo que dejó.
+        when(postulaciones.estadoBloqueandoLaFila(SUYA)).thenReturn("VALIDACION_TURNO_CANDIDATO");
+
+        assertThatThrownBy(() -> servicio.confirmarAvance(quien, SUYA, "Doble clic"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("acaba de moverse");
+
+        verifyNoInteractions(validacion, entradaTecnica);
+        noSeMovio();
+    }
+
+    @Test
+    @DisplayName("Si crear el periodo falla, no hay transición: todo o nada")
+    void siFallaCrearElPeriodoNoHayTransicion() {
+        paraAvanzar("SIMULACION_POR_CONFIRMAR", "VALIDACION_POR_HABILITAR");
+        when(validacion.crearAlEntrar(SUYA, ORGANIZACION)).thenThrow(
+                new org.springframework.dao.DataIntegrityViolationException("validacion_postulacion_id_key"));
+
+        assertThatThrownBy(() -> servicio.confirmarAvance(quien, SUYA, "Avanza"))
+                .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+
+        noSeMovio();
+    }
+
+    @Test
+    @DisplayName("Mover a mano a Validación desde otra etapa crea el periodo y respeta el paso elegido")
+    void moverAManoAValidacionRespetaElPaso() {
+        Postulacion p = enCarrera("PRUEBA_POR_CONFIRMAR", "mover_postulacion");
+        // Recién creado: «por habilitar». Desde su turno se puede habilitar e iniciar igual.
+        when(validacion.crearAlEntrar(SUYA, ORGANIZACION)).thenReturn(
+                new com.renaser.ai.ai_engine.validacion.service.ServicioValidacion.Entrada(
+                        9L, "VALIDACION_POR_HABILITAR", null));
+
+        moverAMano("VALIDACION_TURNO_CANDIDATO", "Lo retomamos a mano");
+
+        verify(validacion).crearAlEntrar(SUYA, ORGANIZACION);
+        verify(maquina).transicionar(p, "VALIDACION_TURNO_CANDIDATO", quien,
+                "Lo retomamos a mano", false, false, null, true);
+    }
+
+    @Test
+    @DisplayName("Mover a mano a «por confirmar» con el periodo cerrado lo reutiliza y respeta el paso")
+    void moverAManoAPorConfirmarConPeriodoCerrado() {
+        Postulacion p = enCarrera("SIMULACION_POR_CONFIRMAR", "mover_postulacion");
+        when(validacion.crearAlEntrar(SUYA, ORGANIZACION)).thenReturn(
+                new com.renaser.ai.ai_engine.validacion.service.ServicioValidacion.Entrada(
+                        9L, "VALIDACION_POR_CONFIRMAR", "su periodo de validación ya estaba cerrado"));
+
+        moverAMano("VALIDACION_TURNO_CANDIDATO", "Repite el periodo");
+
+        // El paso elegido manda y el motivo queda como se escribió: la coletilla solo explica
+        // por qué alguien entró a otro paso que el pedido.
+        verify(maquina).transicionar(p, "VALIDACION_TURNO_CANDIDATO", quien,
+                "Repite el periodo", false, false, null, true);
+    }
+
+    @Test
+    @DisplayName("Mover a mano a «por habilitar» con el periodo en curso entra a su turno, con coletilla")
+    void moverAManoAPorHabilitarAplicaLaTabla() {
+        Postulacion p = enCarrera("SIMULACION_POR_CONFIRMAR", "mover_postulacion");
+        when(validacion.crearAlEntrar(SUYA, ORGANIZACION)).thenReturn(
+                new com.renaser.ai.ai_engine.validacion.service.ServicioValidacion.Entrada(
+                        9L, "VALIDACION_TURNO_CANDIDATO", YA_EN_CURSO));
+
+        moverAMano("VALIDACION_POR_HABILITAR", "Vuelve a validación");
+
+        verify(maquina).transicionar(p, "VALIDACION_TURNO_CANDIDATO", quien,
+                "Vuelve a validación · " + YA_EN_CURSO, false, false, null, true);
+    }
+
+    @Test
+    @DisplayName("Moverse dentro de la misma etapa no crea ni redirige nada")
+    void dentroDeLaMismaEtapaNoCreaNada() {
+        Postulacion p = enCarrera("VALIDACION_TURNO_CANDIDATO", "mover_postulacion");
+
+        moverAMano("VALIDACION_POR_HABILITAR", "Hay que habilitarlo otra vez");
+
+        verify(maquina).transicionar(p, "VALIDACION_POR_HABILITAR", quien,
+                "Hay que habilitarlo otra vez", false, false, null, true);
+        verifyNoInteractions(validacion, entradaTecnica);
+        verify(postulaciones, never()).estadoBloqueandoLaFila(any());
+    }
+
+    @Test
+    @DisplayName("Un cierre o un estado que no existe no crean nada: la máquina decide")
+    void aUnCierreNoSeCreaNada() {
+        Postulacion p = enCarrera("VALIDACION_TURNO_CANDIDATO", "mover_postulacion");
+
+        moverAMano("NO_CONTINUA", "No sigue");
+        moverAMano("ESTADO_INVENTADO", "Probando");
+
+        verify(maquina).transicionar(p, "NO_CONTINUA", quien, "No sigue", false, false,
+                "DECISION_PERSONA", true);
+        verify(maquina).transicionar(p, "ESTADO_INVENTADO", quien, "Probando", false, false,
+                null, true);
+        verifyNoInteractions(validacion, entradaTecnica);
+    }
+
+    @Test
+    @DisplayName("De un estado final no se sale, y tampoco se crea nada antes de intentarlo")
+    void desdeUnEstadoFinalNoSeCreaNada() {
+        Postulacion p = enCarrera("NO_CONTINUA", "mover_postulacion");
+
+        moverAMano("PRUEBA_TURNO_CANDIDATO", "Lo reabrimos");
+
+        // La negativa la da la máquina, con su mensaje de siempre.
+        verify(maquina).transicionar(p, "PRUEBA_TURNO_CANDIDATO", quien, "Lo reabrimos",
+                false, false, null, true);
+        verifyNoInteractions(validacion, entradaTecnica);
+    }
+
+    @Test
+    @DisplayName("Desde un estado que el catálogo no conoce no se crea nada")
+    void desdeUnEstadoDesconocidoNoSeCreaNada() {
+        Postulacion p = enCarrera("ESTADO_RETIRADO", "mover_postulacion");
+
+        moverAMano("VALIDACION_POR_HABILITAR", "Prueba");
+
+        verify(maquina).transicionar(p, "VALIDACION_POR_HABILITAR", quien, "Prueba",
+                false, false, null, true);
+        verifyNoInteractions(validacion, entradaTecnica);
+    }
+
+    @Test
+    @DisplayName("Mover a mano a la prueba desde otra etapa crea lo que rinde la vacante")
+    void moverAManoALaPruebaLaCrea() {
+        Postulacion p = enCarrera("PERFIL_POR_CONFIRMAR", "mover_postulacion");
+
+        moverAMano("PRUEBA_TURNO_CANDIDATO", "Pasa a la prueba");
+
+        var orden = org.mockito.Mockito.inOrder(entradaTecnica, maquina);
+        orden.verify(entradaTecnica).crearAlEntrar(eq(p), any(Vacante.class));
+        orden.verify(maquina).transicionar(p, "PRUEBA_TURNO_CANDIDATO", quien,
+                "Pasa a la prueba", false, false, null, true);
+        verifyNoInteractions(validacion);
+    }
+
+    @Test
+    @DisplayName("Sin prueba lista, mover a mano a la prueba da 409 con el mensaje de «Avanzar»")
+    void moverAManoALaPruebaSinPruebaLista() {
+        Postulacion p = enCarrera("PERFIL_POR_CONFIRMAR", "mover_postulacion");
+        String mensaje = "Esta vacante no tiene plantilla de prueba asignada: no se puede avanzar";
+        org.mockito.Mockito.doThrow(new IllegalStateException(mensaje))
+                .when(entradaTecnica).crearAlEntrar(eq(p), any(Vacante.class));
+
+        assertThatThrownBy(() -> moverAMano("PRUEBA_TURNO_CANDIDATO", "Pasa a la prueba"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage(mensaje);
+
+        // Ni transición ni correo: los dos salen de la máquina, que no se llega a llamar.
+        verifyNoInteractions(maquina, transiciones);
+    }
+
+    @Test
+    @DisplayName("Si su vacante ya no existe, mover a mano a la prueba se planta sin crear nada")
+    void moverAManoALaPruebaSinVacante() {
+        enCarrera("PERFIL_POR_CONFIRMAR", "mover_postulacion");
+        when(vacantes.findByIdAndOrganizacionId(VACANTE, ORGANIZACION)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> moverAMano("PRUEBA_TURNO_CANDIDATO", "Pasa a la prueba"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("ya no existe");
+
+        verifyNoInteractions(entradaTecnica, maquina);
+    }
+
+    @Test
+    @DisplayName("Con la vacante archivada se rechaza antes de crear nada, como hoy")
+    void conLaVacanteArchivadaNoSeCreaNada() {
+        enCarrera("SIMULACION_POR_CONFIRMAR", "mover_postulacion");
+        when(vacantes.existsByIdAndArchivadaEnIsNotNull(VACANTE)).thenReturn(true);
+
+        assertThatThrownBy(() -> moverAMano("VALIDACION_POR_HABILITAR", "Vuelve"))
+                .isInstanceOf(IllegalStateException.class);
+
+        verifyNoInteractions(validacion, entradaTecnica, maquina);
+    }
 }
