@@ -16,10 +16,12 @@ public interface ServicioPostulacionesPanel {
 
     List<PasoHistorial> historial(ContextoUsuario quien, Long postulacionId);
 
-    // Una persona puede mover una postulación a donde quiera, siempre con motivo
+    // Una persona puede mover una postulación a donde quiera, siempre con motivo. Si entra a
+    // la prueba o a Validación desde otra etapa, se le crea o reutiliza lo que necesita allí.
     void transicionar(ContextoUsuario quien, Long postulacionId, Transicionar datos);
 
-    // Aplica el estado siguiente calculado por la máquina
+    // Aplica el estado siguiente calculado por la máquina. Quien vuelve a Validación con su
+    // periodo ya iniciado o cerrado entra al paso que corresponde a ese periodo.
     void confirmarAvance(ContextoUsuario quien, Long postulacionId, String motivo);
 
     /**

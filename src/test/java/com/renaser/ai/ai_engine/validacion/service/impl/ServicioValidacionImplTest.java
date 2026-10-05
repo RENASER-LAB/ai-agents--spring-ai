@@ -12,24 +12,31 @@ import com.renaser.ai.ai_engine.seguridad.service.Permisos;
 import com.renaser.ai.ai_engine.usuario.repository.RolRepository;
 import com.renaser.ai.ai_engine.usuario.repository.UsuarioRolRepository;
 import com.renaser.ai.ai_engine.vacante.service.AlcanceSobreLaVacante;
+import com.renaser.ai.ai_engine.validacion.entity.Validacion;
 import com.renaser.ai.ai_engine.validacion.repository.ValidacionRepository;
+import com.renaser.ai.ai_engine.validacion.service.ServicioValidacion;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -142,6 +149,139 @@ class ServicioValidacionImplTest {
                 .isInstanceOf(ResourceNotFoundException.class);
 
         verify(validaciones).findByPostulacionId(POSTULACION);
+    }
+
+    // ============ Entrar a la etapa: crear o reutilizar el periodo ============
+
+    /*
+     * Volver a Validación tras retroceder a alguien chocaba contra la clave única de la V18:
+     * «ya existe un registro con postulacion_id X», y la persona se quedaba en Simulación. Lo
+     * que se vigila aquí es la tabla del paso 3 de la spec —a qué paso entra según cómo estaba
+     * su periodo— y, sobre todo, que el periodo que ya existía NO se guarda: ni una fecha, ni
+     * lo habilitado, ni el estado.
+     */
+
+    private static final Long PERIODO = 501L;
+
+    /** Un periodo ya habilitado como trabajo real, con todo lo que no se puede perder. */
+    private static Validacion periodo(String estado, Instant inicio, Instant fin) {
+        return Validacion.builder()
+                .id(PERIODO).postulacionId(POSTULACION)
+                .modalidad("TRABAJO_REAL").tipoVinculacion("Locación de servicios")
+                .dias(10).inicioEn(inicio).finEn(fin).estado(estado)
+                .habilitadaPorUsuarioId(USUARIO).responsableUsuarioId(OTRO_USUARIO)
+                .creadoEn(Instant.now().minus(20, ChronoUnit.DAYS))
+                .build();
+    }
+
+    /** Entra con el periodo que ya tenía, y comprueba que la fila no se toca. */
+    private ServicioValidacion.Entrada entraCon(Validacion suyo) {
+        Validacion antes = periodo(suyo.getEstado(), suyo.getInicioEn(), suyo.getFinEn());
+        antes.setCreadoEn(suyo.getCreadoEn());
+        when(validaciones.findByPostulacionId(POSTULACION)).thenReturn(Optional.of(suyo));
+
+        ServicioValidacion.Entrada entrada = servicio.crearAlEntrar(POSTULACION, ORGANIZACION);
+
+        assertThat(entrada.validacionId()).as("se reutiliza el mismo periodo").isEqualTo(PERIODO);
+        verify(validaciones, never()).save(any());
+        assertThat(suyo).as("ningún dato del periodo cambia al volver")
+                .usingRecursiveComparison().isEqualTo(antes);
+        // Ni siquiera se pregunta por los días por defecto: no hay nada que crear.
+        verifyNoInteractions(parametros);
+        return entrada;
+    }
+
+    @Test
+    @DisplayName("Sin periodo, se crea «por habilitar» y entra a ese paso sin coletilla")
+    void sinPeriodoSeCrea() {
+        when(validaciones.findByPostulacionId(POSTULACION)).thenReturn(Optional.empty());
+        when(parametros.entero(ORGANIZACION, "dias_validacion_por_defecto", 7)).thenReturn(7);
+        when(validaciones.save(any(Validacion.class))).thenAnswer(inv -> {
+            Validacion nueva = inv.getArgument(0);
+            nueva.setId(PERIODO);
+            return nueva;
+        });
+
+        ServicioValidacion.Entrada entrada = servicio.crearAlEntrar(POSTULACION, ORGANIZACION);
+
+        assertThat(entrada).isEqualTo(new ServicioValidacion.Entrada(
+                PERIODO, "VALIDACION_POR_HABILITAR", null));
+        ArgumentCaptor<Validacion> guardada = ArgumentCaptor.forClass(Validacion.class);
+        verify(validaciones).save(guardada.capture());
+        assertThat(guardada.getValue().getEstado()).isEqualTo("POR_HABILITAR");
+        assertThat(guardada.getValue().getModalidad()).isEqualTo("SIMULACION_EXTENDIDA");
+        assertThat(guardada.getValue().getDias()).isEqualTo(7);
+        assertThat(guardada.getValue().getInicioEn()).isNull();
+    }
+
+    @Test
+    @DisplayName("Por habilitar y ya habilitado: entra a «por habilitar» y lo habilitado se conserva")
+    void porHabilitarSeReutiliza() {
+        ServicioValidacion.Entrada entrada = entraCon(periodo("POR_HABILITAR", null, null));
+
+        assertThat(entrada.paso()).isEqualTo("VALIDACION_POR_HABILITAR");
+        assertThat(entrada.coletilla()).as("es lo que se espera: no hay nada que explicar").isNull();
+    }
+
+    @Test
+    @DisplayName("En curso con el fin por delante: entra a su turno y el reloj no se reinicia")
+    void enCursoEntraASuTurno() {
+        Instant inicio = Instant.now().minus(2, ChronoUnit.DAYS);
+        ServicioValidacion.Entrada entrada = entraCon(
+                periodo("EN_CURSO", inicio, inicio.plus(10, ChronoUnit.DAYS)));
+
+        assertThat(entrada.paso()).isEqualTo("VALIDACION_TURNO_CANDIDATO");
+        assertThat(entrada.coletilla()).isEqualTo("su periodo de validación ya estaba en curso");
+    }
+
+    @Test
+    @DisplayName("En curso con el fin ya pasado: entra a «por confirmar»")
+    void enCursoVencidoEntraAPorConfirmar() {
+        Instant inicio = Instant.now().minus(12, ChronoUnit.DAYS);
+        ServicioValidacion.Entrada entrada = entraCon(
+                periodo("EN_CURSO", inicio, inicio.plus(10, ChronoUnit.DAYS)));
+
+        assertThat(entrada.paso()).isEqualTo("VALIDACION_POR_CONFIRMAR");
+        assertThat(entrada.coletilla()).isEqualTo("su periodo de validación ya había vencido");
+    }
+
+    @Test
+    @DisplayName("En curso sin fecha de fin: cuenta como vencido, porque el sondeo no lo vería nunca")
+    void enCursoSinFinCuentaComoVencido() {
+        ServicioValidacion.Entrada entrada = entraCon(
+                periodo("EN_CURSO", Instant.now().minus(1, ChronoUnit.DAYS), null));
+
+        assertThat(entrada.paso()).isEqualTo("VALIDACION_POR_CONFIRMAR");
+        assertThat(entrada.coletilla()).isEqualTo("su periodo de validación ya había vencido");
+    }
+
+    @Test
+    @DisplayName("Terminado: entra a «por confirmar» con sus métricas, para revisarlas y cerrar")
+    void terminadoEntraAPorConfirmar() {
+        Instant inicio = Instant.now().minus(15, ChronoUnit.DAYS);
+        ServicioValidacion.Entrada entrada = entraCon(
+                periodo("TERMINADA", inicio, inicio.plus(10, ChronoUnit.DAYS)));
+
+        assertThat(entrada.paso()).isEqualTo("VALIDACION_POR_CONFIRMAR");
+        assertThat(entrada.coletilla()).isEqualTo("su periodo de validación ya estaba cerrado");
+        // Las métricas viven aparte del periodo: entrar no las lee ni las toca.
+        verifyNoInteractions(calificacion);
+    }
+
+    @Test
+    @DisplayName("La coletilla va detrás del motivo, y no rellena un motivo vacío")
+    void laColetillaNoCuentaComoMotivo() {
+        var conColetilla = new ServicioValidacion.Entrada(
+                PERIODO, "VALIDACION_TURNO_CANDIDATO", "su periodo de validación ya estaba en curso");
+        var sinColetilla = new ServicioValidacion.Entrada(PERIODO, "VALIDACION_POR_HABILITAR", null);
+
+        assertThat(conColetilla.motivoCon("Vuelve tras revisar su simulación"))
+                .isEqualTo("Vuelve tras revisar su simulación · su periodo de validación ya estaba en curso");
+        assertThat(sinColetilla.motivoCon("Vuelve")).isEqualTo("Vuelve");
+        // Sin motivo, sigue sin motivo: la máquina de estados es quien lo exige, y una
+        // coletilla sola le haría creer que alguien lo escribió.
+        assertThat(conColetilla.motivoCon("  ")).isEqualTo("  ");
+        assertThat(conColetilla.motivoCon(null)).isNull();
     }
 
     // ============ Una vacante eliminada (V60) ============

@@ -331,6 +331,11 @@ cerrada.
 Toda transición manual guarda quién, cuándo, de qué estado a cuál y por qué (ver «Auditoría» en
 los no funcionales). El motivo es **obligatorio**.
 
+Entrar a mano en la prueba del puesto o en Validación le prepara a la persona lo que necesita en
+esa etapa, igual que «Avanzar». Por eso hay una excepción desde el 05/10/2026: **a la prueba no se
+mueve a nadie si la vacante no tiene prueba lista**. Ver «Vuelve a una etapa por la que ya pasó»,
+más abajo.
+
 ### Regla 3 · Los estados en ⚙️ tienen que avanzar solos
 
 `PERFIL_CALIFICANDO` y `PRUEBA_CALIFICANDO` dependen de que la IA responda. Si la IA falla, la
@@ -501,6 +506,55 @@ y lo reutilizado queda atado a la versión con que se obtuvo.
 
 Tanto la vigencia de cada componente como qué familias son afines entre sí son configurables y
 versionadas.
+
+### Vuelve a una etapa por la que ya pasó (05/10/2026)
+
+Pasa cuando alguien retrocede a una persona —hoy solo por la API o con los scripts: el panel no
+tiene botón para eso— y después la vuelve a avanzar. Al entrar en la prueba del puesto o en
+Validación, el sistema le prepara lo que necesita: su prueba o su periodo de validación. **Si ya
+lo tenía, lo reutiliza tal como estaba**; nunca le crea un segundo.
+
+**Hasta el 05/10/2026, Validación se atascaba.** Al volver a avanzar, el sistema intentaba
+crearle otro periodo, la base lo rechazaba y el panel decía «No avanzaron: … (ya existe un
+registro con postulacion_id X)». La persona se quedaba en Simulación y cada «Avanzar» fallaba
+igual. La prueba del puesto ya reutilizaba su intento desde el 01/09/2026.
+
+**A qué paso de Validación entra.** Con «Avanzar», o movida a mano a «Validación · por
+habilitar», entra al paso que corresponde a su periodo. El periodo no se toca: ni lo habilitado,
+ni las fechas, ni las métricas.
+
+| Cómo estaba su periodo | A dónde entra | Qué dice el historial |
+|---|---|---|
+| No tenía | Por habilitar, con un periodo nuevo | El motivo, sin más |
+| Por habilitar, habilitado o no | Por habilitar. Lo habilitado se conserva | El motivo, sin más |
+| En curso, con días por delante | Turno del candidato. El reloj sigue donde iba y, al vencer, pasa sola a «por confirmar» | «… · su periodo de validación ya estaba en curso» |
+| En curso y ya vencido, o sin fecha de fin | Por confirmar: completar métricas y cerrar | «… · su periodo de validación ya había vencido» |
+| Terminado | Por confirmar. Sus métricas siguen ahí y, al cerrar, la nota sale de ellas | «… · su periodo de validación ya estaba cerrado» |
+
+La coletilla va detrás del motivo que escribió quien avanzó, como la de «sin avisar al
+candidato». Al candidato le llega el aviso del paso donde entró: si es su turno, el de su turno.
+
+**Movida a mano desde otra etapa:**
+
+- **A Validación**, se le crea el periodo «por habilitar» si no lo tenía. Si el destino es «por
+  habilitar», manda la tabla de arriba; a «turno del candidato» o «por confirmar», se respeta el
+  destino. Desde ahí se puede habilitar, iniciar, completar métricas y cerrar; antes respondían
+  «no encontrado», porque no había periodo.
+- **A la prueba del puesto**, se le crea o reutiliza su prueba —o su cuestionario técnico—, con
+  las mismas reglas que «Avanzar». Si la vacante no tiene prueba lista, se rechaza con el mismo
+  mensaje que «Avanzar»: no se mueve, no queda transición y no sale el correo «tu prueba está
+  disponible». Antes ese correo salía y el candidato abría una pantalla vacía.
+- **Dentro de la misma etapa** no se crea ni se redirige nada.
+
+**Todo o nada.** Si preparar el periodo o la prueba falla, no se guarda nada: ni eso, ni el
+cambio de estado, ni el correo. Y si dos personas la mueven a la vez —dos «Avanzar», o un
+«Avanzar» y un movimiento manual—, gana la primera; la segunda recibe «Esta postulación acaba de
+moverse… vuelve a cargarla» y no escribe nada.
+
+**Lo que no cambia.** Salir de Validación no toca el periodo: uno en curso sigue en curso, pero
+el sondeo de los periodos vencidos no la mueve mientras no esté en «turno del candidato». Un
+periodo ya iniciado no se reinicia ni se alarga. Quien entró a Validación a mano antes del
+05/10/2026 puede seguir sin periodo: se le crea cuando vuelva a entrar.
 
 ### La postulación lleva mucho tiempo sin moverse
 

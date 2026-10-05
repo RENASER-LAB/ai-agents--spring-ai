@@ -2368,6 +2368,11 @@ El periodo de trabajo.
 La modalidad de trabajo real **no se puede habilitar** hasta que `tipo_vinculacion` esté
 registrado. Es lo que impide que una aceptación digital sustituya una obligación legal.
 
+**Una fila por postulación, para siempre.** Nace `POR_HABILITAR` al entrar en Validación —con
+«Avanzar» o con un movimiento manual desde otra etapa— y, si la persona sale y vuelve, se
+reutiliza esta misma fila sin cambiarle nada (05/10/2026). Salir de Validación tampoco la toca.
+Las métricas, en su tabla, se quedan igual.
+
 `fin_en` se guarda como fecha concreta para que el barrido que cierra periodos vencidos sea una
 consulta directa.
 

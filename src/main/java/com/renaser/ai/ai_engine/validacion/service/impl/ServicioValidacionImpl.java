@@ -53,7 +53,18 @@ public class ServicioValidacionImpl implements ServicioValidacion {
 
     @Override
     @Transactional
-    public Long crearAlEntrar(Long postulacionId, Long organizacionId) {
+    public Entrada crearAlEntrar(Long postulacionId, Long organizacionId) {
+        // ⚠️ Solo si no tiene ya el suyo. Volver a entrar en la etapa —se retrocede a alguien
+        // y se le vuelve a avanzar— chocaba contra la clave única de la tabla (V18) y el panel
+        // devolvía «ya existe un registro con postulacion_id X»: la persona se quedaba en
+        // Simulación sin arreglo desde la pantalla. Mismo patrón que la prueba del puesto
+        // (ServicioPruebaImpl.crearAlEntrar), con una diferencia: aquí no se toca NADA del
+        // periodo. Lo habilitado, las fechas y el estado son decisiones y hechos que ya
+        // ocurrieron; reiniciar o alargar un periodo no existe y no se hace de rebote.
+        Validacion existente = validaciones.findByPostulacionId(postulacionId).orElse(null);
+        if (existente != null) {
+            return pasoQueCorresponde(existente);
+        }
         int dias = parametros.entero(organizacionId, "dias_validacion_por_defecto", 7);
         Validacion fila = validaciones.save(Validacion.builder()
                 .postulacionId(postulacionId)
@@ -64,7 +75,33 @@ public class ServicioValidacionImpl implements ServicioValidacion {
                 .estado("POR_HABILITAR")
                 .creadoEn(Instant.now())
                 .build());
-        return fila.getId();
+        return new Entrada(fila.getId(), POR_HABILITAR, null);
+    }
+
+    /**
+     * El paso de Validación que corresponde a un periodo que ya existía.
+     *
+     * <p>Sin esto la persona entraría siempre a «por habilitar», y desde ahí no hay salida
+     * para un periodo ya iniciado: iniciar exige POR_HABILITAR y el sondeo solo mueve a quien
+     * está en su turno. Se quedaría parada con el reloj corriendo.
+     *
+     * <p>La fecha de fin igual a ahora cuenta como vencida, y un periodo en curso sin fecha de
+     * fin —no debería existir: iniciar fija las dos— también: el sondeo no lo vería nunca, y
+     * en «por confirmar» al menos una persona puede cerrarlo.
+     */
+    private static Entrada pasoQueCorresponde(Validacion periodo) {
+        return switch (periodo.getEstado()) {
+            case "EN_CURSO" -> periodo.getFinEn() != null && periodo.getFinEn().isAfter(Instant.now())
+                    ? new Entrada(periodo.getId(), TURNO_CANDIDATO,
+                            "su periodo de validación ya estaba en curso")
+                    : new Entrada(periodo.getId(), POR_CONFIRMAR,
+                            "su periodo de validación ya había vencido");
+            case "TERMINADA" -> new Entrada(periodo.getId(), POR_CONFIRMAR,
+                    "su periodo de validación ya estaba cerrado");
+            // POR_HABILITAR, habilitado o no: se habilita e inicia como siempre, y lo que ya
+            // estaba habilitado se conserva. La base no admite otro estado (CHECK de la V18).
+            default -> new Entrada(periodo.getId(), POR_HABILITAR, null);
+        };
     }
 
     @Override
