@@ -42,6 +42,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.never;
@@ -109,6 +110,10 @@ class ServicioPostulacionPortalImplTest {
     // Los intentos de la prueba, para saber si la del editor quedó sin completar (V67).
     @Mock private com.renaser.ai.ai_engine.prueba.repository.IntentoPruebaRepository intentos;
 
+    // El aviso de que postuló a una vacante sin banco que califica sola, para el pase al
+    // instante (V70).
+    @Mock private org.springframework.context.ApplicationEventPublisher eventos;
+
     private ServicioPostulacionPortalImpl servicio;
     // El tablón, armado sobre los mismos dobles: la prueba de la suspendida vigila una
     // sola invariante —lo que el tablón esconde, postular tampoco lo acepta— y esa
@@ -124,7 +129,7 @@ class ServicioPostulacionPortalImplTest {
         servicio = new ServicioPostulacionPortalImpl(organizaciones, personas, usuarios,
                 consentimientos, vacantes, puestos, requisitos, evaluaciones, postulaciones,
                 transiciones, estados, cvs, enlaces, maquina, propuestaPerfil, lecturaCv,
-                colaIa, almacen, archivos, perfiles, correo, textoProceso, avisos, intentos);
+                colaIa, almacen, archivos, perfiles, correo, textoProceso, avisos, intentos, eventos);
         tablon = new ServicioTablonPortalImpl(vacantes, organizaciones, requisitos, textoProceso,
                 catalogos);
     }
@@ -606,5 +611,59 @@ class ServicioPostulacionPortalImplTest {
 
         verify(archivos).findByIdAndOrganizacionId(500L, ORGANIZACION);
         verify(archivos, never()).findByIdAndOrganizacionId(500L, 9L);
+    }
+
+    // ============ La prueba al instante (V70) ============
+
+    /** La vacante sin banco del arnés, con el pase automático encendido o apagado. */
+    private Vacante conPaseAutomatico(boolean encendido) {
+        armarVacantePublicada(ORGANIZACION);
+        Vacante vacante = vacantes.findById(VACANTE).orElseThrow();
+        vacante.setCalificacionAutomatica(encendido);
+        return vacante;
+    }
+
+    @Test
+    @DisplayName("sin banco y con pase automático: se pide el pase al instante, antes de encolar la nota del CV (AC-2)")
+    void sinBancoConPaseSePideElPaseAlInstante() {
+        conPaseAutomatico(true);
+
+        servicio.postular(QUIEN, VACANTE, cv, "Ordené la caja", null, null, null, null, true,
+                null, null, "10.0.0.1", "Navegador");
+
+        // El pase se pide antes de encolar la nota: así termina antes de que la IA la reciba
+        var orden = org.mockito.Mockito.inOrder(colaIa, eventos);
+        orden.verify(eventos).publishEvent(new com.renaser.ai.ai_engine.perfilintegral.service
+                .TurnoDelPerfilCumplido(77L, com.renaser.ai.ai_engine.perfilintegral.service
+                        .TurnoDelPerfilCumplido.Momento.AL_POSTULAR));
+        orden.verify(colaIa).encolarCribaCv(77L);
+    }
+
+    @Test
+    @DisplayName("sin pase automático no se pide nada: espera a que el equipo confirme, como hoy (AC-7)")
+    void sinPaseNoSePideNada() {
+        conPaseAutomatico(false);
+
+        servicio.postular(QUIEN, VACANTE, cv, "Ordené la caja", null, null, null, null, true,
+                null, null, "10.0.0.1", "Navegador");
+
+        org.mockito.Mockito.verifyNoInteractions(eventos);
+    }
+
+    @Test
+    @DisplayName("con un requisito incumplido, «no continúa» y ni nota ni prueba (AC-9)")
+    void conRequisitoIncumplidoNada() {
+        conPaseAutomatico(true);
+        when(requisitos.findByVacanteIdAndEsActivoTrue(VACANTE)).thenReturn(List.of(
+                com.renaser.ai.ai_engine.vacante.entity.RequisitoObjetivo.builder()
+                        .id(4L).regla("Licencia A-IIb vigente").esActivo(true).build()));
+
+        servicio.postular(QUIEN, VACANTE, cv, "Ordené la caja", null, null, null, null, true,
+                null, null, "10.0.0.1", "Navegador");
+
+        verify(maquina).transicionar(any(), eq("NO_CONTINUA"), any(), anyString(), eq(true),
+                eq(false), eq("REQUISITO_OBJETIVO"));
+        org.mockito.Mockito.verifyNoInteractions(eventos);
+        verify(colaIa, never()).encolarCribaCv(any());
     }
 }

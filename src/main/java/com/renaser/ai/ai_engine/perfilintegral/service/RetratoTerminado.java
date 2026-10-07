@@ -3,7 +3,8 @@ package com.renaser.ai.ai_engine.perfilintegral.service;
 /**
  * La calificación del Perfil Integral de esta postulación acaba de terminar y guardarse.
  *
- * <p>⚠️ <b>Es el único evento de Spring del proyecto, y eso es a propósito.</b> Aquí todo lo
+ * <p>⚠️ <b>Es uno de los dos únicos eventos de Spring del proyecto —el otro es
+ * {@link TurnoDelPerfilCumplido}, por el mismo círculo—, y eso es a propósito.</b> Aquí todo lo
  * demás se llama por su nombre, con la dependencia escrita en el constructor y vigilada por
  * las reglas de arquitectura. Un evento es lo contrario: quien lo publica no sabe quién
  * escucha, y por eso hay que decir aquí en qué consiste todo el mecanismo.

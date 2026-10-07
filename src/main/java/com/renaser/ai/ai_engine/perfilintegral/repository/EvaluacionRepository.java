@@ -48,4 +48,20 @@ public interface EvaluacionRepository extends JpaRepository<Evaluacion, Long> {
                            where p.vacanteId = :vacanteId and p.evaluacionTecnicaId is not null)
             """)
     boolean algunaTecnicaEmpezadaDeLaVacante(@Param("vacanteId") Long vacanteId);
+
+    /**
+     * El estado guardado de la evaluación, <b>bloqueando su fila</b> hasta que acabe la
+     * transacción.
+     *
+     * <p>Para entregar. Dos pestañas que entregaban a la vez leían las dos la evaluación
+     * abierta y las dos la cerraban: dos pasos a «calificando» en el historial, dos avisos de
+     * entrega y dos encargos a la IA (V70). Con el bloqueo la segunda espera, lee lo que dejó
+     * la primera y falla como si hubiera llegado después.
+     *
+     * <p>Consulta nativa a propósito, como {@code PostulacionRepository.estadoBloqueandoLaFila}:
+     * lo que se quiere es el valor de la base después de la espera, no la entidad que ya está
+     * cargada en memoria con el estado de antes.
+     */
+    @Query(value = "select estado from evaluacion where id = :id for update", nativeQuery = true)
+    String estadoBloqueandoLaFila(@Param("id") Long id);
 }

@@ -65,6 +65,32 @@ public class AvisoPortal {
     /** La plataforma ocultó su respuesta, a pedido de la empresa autora. */
     public static final String RESPUESTA_RESENA_OCULTADA = "RESPUESTA_RESENA_OCULTADA";
 
+    /*
+     * Los de las etapas (V70): la pareja de cada correo de la máquina de estados, con su mismo
+     * código. Cuelgan de la postulación y llevan a su proceso. Ver AvisoDeEtapaEnLaCampana.
+     */
+
+    /** Le toca la prueba del puesto (o el cuestionario técnico). */
+    public static final String PRUEBA_DISPONIBLE = "PRUEBA_DISPONIBLE";
+
+    /** Le toca algo en otra etapa: su evaluación, la simulación, la validación, una evidencia. */
+    public static final String POSTULACION_AVANZA = "POSTULACION_AVANZA";
+
+    /** Su proceso terminó sin continuar. */
+    public static final String POSTULACION_NO_CONTINUA = "POSTULACION_NO_CONTINUA";
+
+    /** Su postulación se cerró. */
+    public static final String POSTULACION_CERRADA = "POSTULACION_CERRADA";
+
+    /** Se retiró él mismo, y se le confirma. */
+    public static final String RETIRO_CONFIRMADO = "RETIRO_CONFIRMADO";
+
+    /** No ha entregado su evaluación: a las 24 horas, o antes de que venza (V70). */
+    public static final String RECORDATORIO_EVALUACION = "RECORDATORIO_EVALUACION";
+
+    /** No ha empezado su prueba: a las 24 horas, o antes de que venza (V70). */
+    public static final String RECORDATORIO_PRUEBA = "RECORDATORIO_PRUEBA";
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;

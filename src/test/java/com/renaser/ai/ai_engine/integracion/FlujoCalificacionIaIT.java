@@ -815,16 +815,19 @@ public class FlujoCalificacionIaIT {
         String codigo = postularConCurriculumReal("diego@correo.pe");
         long id = idDe(codigo);
 
-        // Y esto es todo lo que hace falta. Nadie pulsa nada: se le califica el currículum
-        // al postular y, cuando termina, se le pasa solo a rendir su prueba.
+        // Y esto es todo lo que hace falta. Nadie pulsa nada: desde la V70 la prueba se le
+        // abre al postular, sin esperar a la nota del currículum, que se calcula por detrás.
         esperarA(() -> "PRUEBA_TURNO_CANDIDATO".equals(jdbc.queryForObject(
                         "select estado_codigo from postulacion where id = ?", String.class, id)),
                 "la postulación llegue sola hasta la prueba del puesto");
 
-        // Con su nota puesta, que es lo que hace que el pase signifique algo
+        // Con su nota puesta cuando la IA termina, y sin moverla de la prueba (V70, AC-4)
+        esperarA(() -> jdbc.queryForObject(
+                        "select grupo_prioridad from postulacion where id = ?", String.class, id) != null,
+                "la nota del currículum llegue por detrás");
         assertThat(jdbc.queryForObject(
-                "select grupo_prioridad from postulacion where id = ?", String.class, id))
-                .isNotNull();
+                "select estado_codigo from postulacion where id = ?", String.class, id))
+                .isEqualTo("PRUEBA_TURNO_CANDIDATO");
 
         // Y con su prueba ya creada: sin esto llegaría a la etapa sin nada que rendir
         assertThat(contar("select count(*) from intento_prueba where postulacion_id = %d"

@@ -308,8 +308,9 @@ public class FlujoRemuneracionIT {
                 .isEqualTo(1);
         // Y el texto queda ESCRITO, no reconstruido: un aviso que se rearmara al leerlo diría
         // el sueldo de hoy y dejaría de ser la noticia de aquel día.
-        String cuerpo = jdbc.queryForObject(
-                "select cuerpo from aviso_portal where vacante_id = ?", String.class, vacanteConBanda);
+        // Por tipo: desde la V70 la misma vacante deja también el «te toca» de cada etapa.
+        String cuerpo = jdbc.queryForObject("select cuerpo from aviso_portal where vacante_id = ? "
+                + "and tipo = 'REMUNERACION_ACTUALIZADA'", String.class, vacanteConBanda);
         assertThat(cuerpo).contains(BANDA).contains(FIJO);
 
         // 2. Y NINGÚN correo. Hasta la V58 salían los dos; el correo se retiró porque se
@@ -341,32 +342,43 @@ public class FlujoRemuneracionIT {
     @Order(6)
     @DisplayName("la campana cuenta lo que no ha visto, lo dice en cada fila, y se apaga al abrirla")
     void laCampanaCuentaYSeApaga() throws Exception {
+        // Desde la V70 la campana también lleva el «te toca tu evaluación» de cada postulación
+        // con banco —la pareja del correo POSTULACION_AVANZA—: postuló a dos, son dos.
+        long deEtapa = contar("""
+                select count(*) from aviso_portal
+                 where usuario_id = %d and tipo = 'POSTULACION_AVANZA'""".formatted(usuarioCandidatoId));
+        assertThat(deEtapa).isEqualTo(2);
+        String conBanda = jdbc.queryForObject("select uuid::text from postulacion where id = ?",
+                String.class, postulacionConBanda);
+
         mvc.perform(get("/api/v1/portal/avisos")
                         .header("Authorization", "Bearer " + tokenCandidato))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.sinLeer").value(1))
+                .andExpect(jsonPath("$.sinLeer").value(1 + deEtapa))
                 .andExpect(jsonPath("$.avisos[0].tipo").value("REMUNERACION_ACTUALIZADA"))
                 .andExpect(jsonPath("$.avisos[0].leidoEn").doesNotExist());
 
         // El punto de la fila de «Mis procesos»: el mismo hecho, contado donde se está
-        // mirando. Y la fila lleva ya el sueldo de hoy, para no esconder la noticia tras un clic.
+        // mirando —el del sueldo y su «te toca»—. Y la fila lleva ya el sueldo de hoy, para no
+        // esconder la noticia tras un clic.
         mvc.perform(get("/api/v1/portal/postulaciones")
                         .header("Authorization", "Bearer " + tokenCandidato))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[?(@.avisosSinLeer == 1)]").exists());
+                .andExpect(jsonPath("$[?(@.uuid == '" + conBanda + "' && @.avisosSinLeer == 2)]")
+                        .exists());
 
         // Se apaga al ABRIR LA CAMPANA: enterarse de que hay algo es lo que lo apaga.
         mvc.perform(post("/api/v1/portal/avisos/lectura")
                         .header("Authorization", "Bearer " + tokenCandidato))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.marcados").value(1));
+                .andExpect(jsonPath("$.marcados").value(1 + deEtapa));
 
         mvc.perform(get("/api/v1/portal/avisos")
                         .header("Authorization", "Bearer " + tokenCandidato))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.sinLeer").value(0))
-                // Sigue ahí para releerlo: deja de contar, no desaparece.
-                .andExpect(jsonPath("$.avisos.length()").value(1))
+                // Siguen ahí para releerlos: dejan de contar, no desaparecen.
+                .andExpect(jsonPath("$.avisos.length()").value(1 + deEtapa))
                 .andExpect(jsonPath("$.avisos[0].leidoEn").exists());
     }
 
@@ -603,11 +615,13 @@ public class FlujoRemuneracionIT {
                 .as("editar la vacante no manda correos a nadie")
                 .isEqualTo(correosAntes);
 
-        // Y el aviso lleva al proceso: el candidato lo pulsa y llega a su postulación.
+        // Y el aviso lleva al proceso: el candidato lo pulsa y llega a su postulación. Le
+        // quedan sin ver este y, desde la V70, el «te toca tu evaluación» de cuando postuló.
         mvc.perform(get("/api/v1/portal/avisos")
                         .header("Authorization", "Bearer " + tokenSegundo))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.sinLeer").value(1))
+                .andExpect(jsonPath("$.sinLeer").value(2))
+                .andExpect(jsonPath("$.avisos[1].tipo").value("POSTULACION_AVANZA"))
                 .andExpect(jsonPath("$.avisos[0].tipo").value("VACANTE_ACTUALIZADA"))
                 .andExpect(jsonPath("$.avisos[0].postulacionUuid").isNotEmpty());
     }

@@ -82,6 +82,8 @@ class ServicioEvaluacionImplTest {
     @Mock private ServicioCalificacion calificacion;
     @Mock private ColaCalificacionIa colaIa;
     @Mock private ServicioParametros parametros;
+    // El aviso de que entregó, para el pase al instante (V70).
+    @Mock private org.springframework.context.ApplicationEventPublisher eventos;
 
     @InjectMocks
     private ServicioEvaluacionImpl servicio;
@@ -621,6 +623,71 @@ class ServicioEvaluacionImplTest {
             contestaComoSuProceso(() -> servicio.responderTecnico(CANDIDATA, CODIGO, 1L,
                     new Responder(null, "Lo resolvería así", null, 30)));
             contestaComoSuProceso(() -> servicio.entregarTecnico(CANDIDATA, CODIGO));
+        }
+    }
+
+    /**
+     * Dos pestañas entregan a la vez (casos límite de la spec V70, QA-V70-01). Las dos cargan
+     * la evaluación abierta; la segunda espera al cerrojo de la fila y, cuando lo obtiene, la
+     * base ya dice TERMINADA. Aquí el mock hace de esa base: la entidad en memoria sigue
+     * abierta y lo que manda es lo que se lee bloqueando.
+     */
+    @Nested
+    @DisplayName("Dos entregas a la vez: la segunda falla como si llegara después")
+    class DosEntregasALaVez {
+
+        @org.junit.jupiter.api.BeforeEach
+        void cargadaAbierta() {
+            when(postulaciones.findByUuid(CODIGO)).thenReturn(Optional.of(Postulacion.builder()
+                    .id(50L).uuid(CODIGO).usuarioId(CANDIDATA.usuarioId())
+                    .evaluacionId(60L).evaluacionTecnicaId(61L).build()));
+        }
+
+        private void abiertaEnMemoria(Long id) {
+            when(evaluaciones.findById(id)).thenReturn(Optional.of(Evaluacion.builder()
+                    .id(id).usuarioId(CANDIDATA.usuarioId()).estado("EN_CURSO")
+                    .iniciadaEn(Instant.now()).plantillaEvaluacionId(3L).build()));
+        }
+
+        private void nadaSeMovio() {
+            verify(evaluaciones, never()).save(any());
+            org.mockito.Mockito.verifyNoInteractions(maquina, calificacion, colaIa, eventos);
+        }
+
+        @Test
+        @DisplayName("el banco: la otra pestaña ya la entregó y esta no escribe ni avisa nada")
+        void elBanco() {
+            abiertaEnMemoria(60L);
+            when(evaluaciones.estadoBloqueandoLaFila(60L)).thenReturn("TERMINADA");
+
+            assertThatThrownBy(() -> servicio.entregar(CANDIDATA, CODIGO))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("Esta evaluación ya fue entregada");
+            nadaSeMovio();
+        }
+
+        @Test
+        @DisplayName("el banco: si mientras esperaba la cerró el plazo, dice que el plazo pasó")
+        void elBancoVencidoMientras() {
+            abiertaEnMemoria(60L);
+            when(evaluaciones.estadoBloqueandoLaFila(60L)).thenReturn("VENCIDA");
+
+            assertThatThrownBy(() -> servicio.entregar(CANDIDATA, CODIGO))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("El plazo para responder esta evaluación ya pasó");
+            nadaSeMovio();
+        }
+
+        @Test
+        @DisplayName("el cuestionario técnico: igual, la segunda falla sin escribir")
+        void elCuestionarioTecnico() {
+            abiertaEnMemoria(61L);
+            when(evaluaciones.estadoBloqueandoLaFila(61L)).thenReturn("TERMINADA");
+
+            assertThatThrownBy(() -> servicio.entregarTecnico(CANDIDATA, CODIGO))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("Esta evaluación ya fue entregada");
+            nadaSeMovio();
         }
     }
 }
