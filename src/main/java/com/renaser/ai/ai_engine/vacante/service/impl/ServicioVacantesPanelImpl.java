@@ -46,7 +46,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.text.Normalizer;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -166,6 +165,9 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
     // El catálogo de ciudades (V62): valida el código que llega y pone nombre al guardado. Es
     // el mismo que usa el registro del candidato, a propósito: una sola lista de ciudades.
     private final CatalogosDelPerfil catalogos;
+    // Fijar la fecha de cierre de la prueba y moverla a los que ya están dentro: la misma
+    // pieza que usa la configuración del editor de la prueba (V68).
+    private final com.renaser.ai.ai_engine.prueba.service.FechaLimiteDeLaVacante fechaLimite;
 
     /** Lo que contesta la API a un código de ciudad que el catálogo no ofrece (V62). */
     static final String CIUDAD_FUERA_DEL_CATALOGO = "Esa ciudad no está en el catálogo";
@@ -1413,14 +1415,11 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
             // es un camino normal —una vacante con cuestionario técnico se publica sin ella—
             // y no un borrador a medias: antes reventaba con «The given id must not be null»,
             // el error crudo de Spring Data en la cara de quien usa el panel.
-            // La prueba escrita en el editor (V67) también se cierra con una fecha, una vez
-            // publicada: es la misma maquinaria de intentos que la plantilla.
-            if (PRUEBA_PROPIA.equals(vacante.getInstrumentoEtapaTecnica())) {
-                if (versionesBanco.pruebaPropiaDe(vacante.getId(), "PUBLICADA").isEmpty()) {
-                    throw new IllegalStateException("Esta vacante todavía no tiene su prueba "
-                            + "técnica publicada: el plazo se fija sobre la prueba, publícala antes");
-                }
-            } else if (vacante.getVersionPlantillaPruebaId() == null) {
+            // La prueba escrita en el editor (V67) también se cierra con una fecha, y desde
+            // la V68 se puede poner antes de publicarla: es la fecha límite de su
+            // configuración, obligatoria para publicar.
+            if (!PRUEBA_PROPIA.equals(vacante.getInstrumentoEtapaTecnica())
+                    && vacante.getVersionPlantillaPruebaId() == null) {
                 throw new IllegalStateException("Esta vacante no rinde una prueba del puesto, "
                         + "así que no hay una fecha de cierre que fijarle: su etapa técnica es "
                         + "el cuestionario, y su tiempo son los minutos de la vacante");
@@ -1435,23 +1434,7 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
         }
 
         Instant anterior = vacante.getPruebaCierraEn();
-        vacante.setPruebaCierraEn(datos.cierraEn());
-        vacantes.save(vacante);
-
-        // Y se mueve a los que ya están dentro. Sin esto, la fecha valdría solo para quien
-        // entrara después: la mitad de la tanda cerraría el domingo y la otra mitad a los
-        // siete días de su propio lunes, sin nada que lo explicara.
-        int movidos = 0;
-        int conPlazoPropio = 0;
-        for (IntentoPrueba intento : intentos.abiertosDeLaVacante(vacanteId)) {
-            if (intento.isPlazoPropio()) {
-                conPlazoPropio++;
-                continue;
-            }
-            intento.setVenceEn(fechaDeCierreDe(intento, datos.cierraEn()));
-            intentos.save(intento);
-            movidos++;
-        }
+        var movidos = fechaLimite.fijar(vacante, datos.cierraEn());
 
         auditoria.registrar(quien.organizacionId(), quien, "definir_cierre_prueba",
                 "vacante", vacanteId,
@@ -1459,40 +1442,7 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                 datos.cierraEn() == null ? Map.of() : Map.of("pruebaCierraEn", datos.cierraEn().toString()),
                 datos.motivo());
 
-        return new CierrePruebaResponse(datos.cierraEn(), movidos, conPlazoPropio);
-    }
-
-    /**
-     * Qué fecha de cierre le toca a este intento cuando cambia la de la vacante.
-     *
-     * <p>El caso que obliga a que esto exista es <b>quitar</b> la fecha. A quien todavía no
-     * ha empezado se le deja vacía y se le calculará al empezar, como siempre. Pero a quien
-     * ya está dentro, empezar no vuelve a pasarle: dejársela vacía lo dejaría <b>sin
-     * vencimiento para siempre</b> —podría entregar cuando quisiera y el barrido de vencidos
-     * jamás lo cerraría, porque una comparación contra nulo nunca casa—. A ese se le devuelve
-     * el plazo de su plantilla, contado desde que empezó.
-     */
-    private Instant fechaDeCierreDe(IntentoPrueba intento, Instant cierraEn) {
-        if (cierraEn != null || intento.getIniciadoEn() == null) {
-            return cierraEn;
-        }
-        // La prueba del editor (V67) no tiene plantilla: su reloj está en su versión.
-        if (intento.esDelEditor()) {
-            return versionesBanco.findById(intento.getVersionBancoId())
-                    .map(v -> "CRONOMETRADA".equals(v.getModalidad()) && v.getDuracionMinutos() != null
-                            ? intento.getIniciadoEn().plus(v.getDuracionMinutos(), ChronoUnit.MINUTES)
-                            : v.getPlazoDias() != null
-                                    ? intento.getIniciadoEn().plus(v.getPlazoDias(), ChronoUnit.DAYS)
-                                    : intento.getVenceEn())
-                    .orElse(intento.getVenceEn());
-        }
-        return versionesPrueba.findById(intento.getVersionPlantillaPruebaId())
-                .map(v -> "CRONOMETRADA".equals(v.getModalidad())
-                        ? intento.getIniciadoEn().plus(v.getDuracionMinutos(), ChronoUnit.MINUTES)
-                        : intento.getIniciadoEn().plus(v.getPlazoDias(), ChronoUnit.DAYS))
-                // Si su versión ya no existe, se le deja la que tenía: quitarle el
-                // vencimiento sería peor que dejarle uno viejo.
-                .orElse(intento.getVenceEn());
+        return new CierrePruebaResponse(datos.cierraEn(), movidos.movidos(), movidos.conPlazoPropio());
     }
 
     @Override

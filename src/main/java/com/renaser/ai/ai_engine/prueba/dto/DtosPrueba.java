@@ -42,9 +42,19 @@ public final class DtosPrueba {
     /** El enunciado adjunto en PDF o Word, con un enlace para descargarlo (o nulo si no hay). */
     public record ConsignaCandidato(String nombre, String url) {}
 
+    /**
+     * Un entregable que tiene que subir. {@code preguntaId} (V68, solo la prueba del editor): la
+     * pregunta en la que se sube su archivo; nulo en los generales, que van al final.
+     */
     public record EntregableRequeridoCandidato(
             Long id, String nombre, String detalle, String formato,
-            boolean esObligatorio, boolean entregado) {}
+            boolean esObligatorio, boolean entregado, Long preguntaId) {
+
+        public EntregableRequeridoCandidato(Long id, String nombre, String detalle, String formato,
+                                            boolean esObligatorio, boolean entregado) {
+            this(id, nombre, detalle, formato, esObligatorio, entregado, null);
+        }
+    }
 
     public record MiPrueba(
             Long id,
@@ -64,7 +74,10 @@ public final class DtosPrueba {
             Integer plazoDias,
             boolean cuestionario,
             ConsignaCandidato consigna,
-            boolean delEditor) {
+            boolean delEditor,
+            /* La fecha límite para dar la prueba (V68, solo la prueba del editor): la de la
+               vacante, o la suya si se la dieron a mano. Nula si no hay. */
+            Instant fechaLimite) {
 
         public MiPrueba(Long id, String estadoIntento, String modalidad, Instant iniciadoEn,
                         Instant venceEn, Integer duracionMinutos, String enunciado,
@@ -73,7 +86,7 @@ public final class DtosPrueba {
                         List<EntregableRequeridoCandidato> entregables) {
             this(id, estadoIntento, modalidad, iniciadoEn, venceEn, duracionMinutos, enunciado,
                     materiales, herramientasPermitidas, cambioTexto, preguntas, entregables,
-                    null, false, null, false);
+                    null, false, null, false, null);
         }
     }
 

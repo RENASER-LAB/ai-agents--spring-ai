@@ -24,9 +24,11 @@ import com.renaser.ai.ai_engine.prueba.dto.DtosPruebaPropia.GuardarCriterioDePru
 import com.renaser.ai.ai_engine.prueba.dto.DtosPruebaPropia.GuardarDatosDeLaPrueba;
 import com.renaser.ai.ai_engine.prueba.dto.DtosPruebaPropia.GuardarEntregable;
 import com.renaser.ai.ai_engine.prueba.dto.DtosPruebaPropia.GuardarPreguntaDePrueba;
-import com.renaser.ai.ai_engine.prueba.entity.CriterioBancoEntregable;
+import com.renaser.ai.ai_engine.prueba.dto.DtosPruebaPropia.FijarFechaLimite;
+import com.renaser.ai.ai_engine.prueba.entity.EntregableCubrePregunta;
 import com.renaser.ai.ai_engine.prueba.entity.EntregableRequerido;
 import com.renaser.ai.ai_engine.prueba.repository.CriterioBancoEntregableRepository;
+import com.renaser.ai.ai_engine.prueba.repository.EntregableCubrePreguntaRepository;
 import com.renaser.ai.ai_engine.prueba.repository.EntregableRequeridoRepository;
 import com.renaser.ai.ai_engine.prueba.repository.IntentoPruebaRepository;
 import com.renaser.ai.ai_engine.prueba.repository.NotaCriterioPruebaRepository;
@@ -34,6 +36,7 @@ import com.renaser.ai.ai_engine.prueba.service.CalificacionDeLaPruebaPropia;
 import com.renaser.ai.ai_engine.prueba.service.CalificacionDeLaPruebaPropia.CriterioDeLaPrueba;
 import com.renaser.ai.ai_engine.prueba.service.CalificacionDeLaPruebaPropia.Resultado;
 import com.renaser.ai.ai_engine.prueba.service.CierreDeLaPruebaPropia;
+import com.renaser.ai.ai_engine.prueba.service.FechaLimiteDeLaVacante;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
 import com.renaser.ai.ai_engine.seguridad.service.Permisos;
 import com.renaser.ai.ai_engine.vacante.entity.Vacante;
@@ -96,6 +99,7 @@ class ServicioPruebaPropiaImplTest {
     @Mock private OpcionRepository opciones;
     @Mock private EntregableRequeridoRepository entregables;
     @Mock private CriterioBancoEntregableRepository miradas;
+    @Mock private EntregableCubrePreguntaRepository cubiertas;
     @Mock private IntentoPruebaRepository intentos;
     @Mock private NotaCriterioPruebaRepository notas;
     @Mock private PropuestaPreguntasRepository propuestas;
@@ -105,6 +109,7 @@ class ServicioPruebaPropiaImplTest {
     @Mock private CierreDeLaPruebaPropia cierre;
     @Mock private ColaCalificacionIa cola;
     @Mock private ServicioAuditoria auditoria;
+    @Mock private FechaLimiteDeLaVacante fechaLimite;
     @InjectMocks private ServicioPruebaPropiaImpl servicio;
 
     private final Vacante vacante = Vacante.builder().id(VACANTE).organizacionId(ORGANIZACION)
@@ -221,7 +226,7 @@ class ServicioPruebaPropiaImplTest {
         hayBorrador();
 
         assertThatThrownBy(() -> servicio.guardarDatos(QUIEN, VACANTE,
-                new GuardarDatosDeLaPrueba(null, null, null, null, "CRONOMETRADA", 3, null)))
+                new GuardarDatosDeLaPrueba(null, null, null, null, "CRONOMETRADA", 3)))
                 .isInstanceOf(PreguntasInvalidasException.class)
                 .hasMessage("El tiempo no se puede guardar así");
         verify(versionesBanco, never()).save(any());
@@ -233,7 +238,7 @@ class ServicioPruebaPropiaImplTest {
         hayBorrador();
 
         servicio.guardarDatos(QUIEN, VACANTE, new GuardarDatosDeLaPrueba("  Mide el cierre ", " Cuadra la caja ",
-                "  ", "Excel", "CRONOMETRADA", 60, 4));
+                "  ", "Excel", "CRONOMETRADA", 60));
 
         assertThat(borrador.getGuiaCalificacion()).isEqualTo("Mide el cierre");
         assertThat(borrador.getEnunciado()).isEqualTo("Cuadra la caja");
@@ -245,22 +250,23 @@ class ServicioPruebaPropiaImplTest {
     }
 
     @Test
-    @DisplayName("Una de plazo abierto guarda sus días y olvida los minutos")
-    void plazoAbiertoGuardaDias() {
+    @DisplayName("«Sin cronómetro» no guarda minutos ni días: se trabaja hasta la fecha límite (AC-12)")
+    void sinCronometroNoGuardaDias() {
         hayBorrador();
+        borrador.setPlazoDias(4);
 
         servicio.guardarDatos(QUIEN, VACANTE, new GuardarDatosDeLaPrueba(null, null, null, null,
-                "PLAZO_ABIERTO", 60, 4));
+                "PLAZO_ABIERTO", 60));
 
         assertThat(borrador.getModalidad()).isEqualTo("PLAZO_ABIERTO");
-        assertThat(borrador.getPlazoDias()).isEqualTo(4);
+        assertThat(borrador.getPlazoDias()).isNull();
         assertThat(borrador.getDuracionMinutos()).isNull();
     }
 
     @Test
     @DisplayName("Sin borrador, guardar el caso abre uno nuevo de prueba técnica")
     void guardarAbreElBorrador() {
-        servicio.guardarDatos(QUIEN, VACANTE, new GuardarDatosDeLaPrueba(null, "Caso", null, null, null, null, null));
+        servicio.guardarDatos(QUIEN, VACANTE, new GuardarDatosDeLaPrueba(null, "Caso", null, null, null, null));
 
         ArgumentCaptor<VersionBanco> nuevo = ArgumentCaptor.forClass(VersionBanco.class);
         verify(versionesBanco).saveAndFlush(nuevo.capture());
@@ -350,45 +356,36 @@ class ServicioPruebaPropiaImplTest {
     // ---------------------------------------------------------------- criterios
 
     @Test
-    @DisplayName("Un criterio que dice mirar un entregable de otra prueba es 404 y no se crea")
-    void criterioQueMiraLoAjeno() {
+    @DisplayName("Un criterio nuevo guarda lo que vale y quién califica lo que no es de cerradas; lo que mira no se escribe (AC-04)")
+    void criterioSinMira() {
         hayBorrador();
-        when(entregables.findByVersionBancoIdOrderByOrdenAscIdAsc(BORRADOR)).thenReturn(List.of(entregable(30L, BORRADOR, 1)));
-
-        assertThatThrownBy(() -> servicio.agregarCriterio(QUIEN, VACANTE,
-                new GuardarCriterioDePrueba("Excel", null, BigDecimal.TEN, "IA", List.of(30L, 99L))))
-                .isInstanceOf(ResourceNotFoundException.class);
-        verify(criteriosBanco, never()).save(any());
-    }
-
-    @Test
-    @DisplayName("Un criterio nuevo guarda su parte calificada, quién la califica y lo que mira")
-    void criterioConLoQueMira() {
-        hayBorrador();
-        when(entregables.findByVersionBancoIdOrderByOrdenAscIdAsc(BORRADOR)).thenReturn(List.of(entregable(30L, BORRADOR, 1)));
         when(criteriosBanco.findByVersionBancoIdOrderByOrdenAscIdAsc(BORRADOR)).thenReturn(List.of(criterio(5L, BORRADOR, 2)));
 
         servicio.agregarCriterio(QUIEN, VACANTE,
-                new GuardarCriterioDePrueba(" Excel ", "Fórmulas", BigDecimal.valueOf(20), " IA ", List.of(30L, 30L)));
+                new GuardarCriterioDePrueba(" Excel ", "Fórmulas", BigDecimal.valueOf(20), " IA "));
 
         ArgumentCaptor<CriterioBanco> nuevo = ArgumentCaptor.forClass(CriterioBanco.class);
         verify(criteriosBanco).save(nuevo.capture());
         assertThat(nuevo.getValue().getNombre()).isEqualTo("Excel");
         assertThat(nuevo.getValue().getOrden()).isEqualTo(3);
+        // Sin cerradas todavía, todo lo que vale es parte calificada.
+        assertThat(nuevo.getValue().getPuntosDelCriterio()).isEqualTo(20);
         assertThat(nuevo.getValue().getPuntosCalificados()).isEqualTo(20);
         assertThat(nuevo.getValue().getCalificador()).isEqualTo("IA");
-        ArgumentCaptor<CriterioBancoEntregable> mira = ArgumentCaptor.forClass(CriterioBancoEntregable.class);
-        verify(miradas).save(mira.capture());
-        assertThat(mira.getValue().getEntregableRequeridoId()).isEqualTo(30L);
+        verify(miradas, never()).save(any());
     }
 
     @Test
-    @DisplayName("Una parte calificada con decimales no se guarda")
-    void parteCalificadaConDecimales() {
-        assertThatThrownBy(() -> servicio.agregarCriterio(QUIEN, VACANTE,
-                new GuardarCriterioDePrueba("Excel", null, new BigDecimal("2.5"), "IA", null)))
-                .isInstanceOf(PreguntasInvalidasException.class)
-                .hasMessage("El criterio no se puede guardar así");
+    @DisplayName("Unos puntos del criterio con decimales, por encima de 100 o sin poner no se guardan")
+    void puntosDelCriterioMalEscritos() {
+        for (BigDecimal puntos : new BigDecimal[]{new BigDecimal("2.5"), BigDecimal.valueOf(101),
+                BigDecimal.valueOf(-1), null}) {
+            assertThatThrownBy(() -> servicio.agregarCriterio(QUIEN, VACANTE,
+                    new GuardarCriterioDePrueba("Excel", null, puntos, "IA")))
+                    .isInstanceOf(PreguntasInvalidasException.class)
+                    .hasMessage("El criterio no se puede guardar así");
+        }
+        verify(criteriosBanco, never()).save(any());
     }
 
     @Test
@@ -397,13 +394,13 @@ class ServicioPruebaPropiaImplTest {
         hayBorrador();
 
         assertThatThrownBy(() -> servicio.agregarCriterio(QUIEN, VACANTE,
-                new GuardarCriterioDePrueba("  ", null, null, null, null)))
+                new GuardarCriterioDePrueba("  ", null, BigDecimal.ZERO, null)))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessage("El criterio necesita un nombre");
     }
 
     @Test
-    @DisplayName("Editar un criterio sin parte calificada olvida a su calificador y rehace lo que mira")
+    @DisplayName("Editar un criterio sin parte calificada olvida a su calificador y no toca lo que mira")
     void editarCriterioSinParteCalificada() {
         hayBorrador();
         CriterioBanco c = criterio(5L, BORRADOR, 1);
@@ -412,14 +409,75 @@ class ServicioPruebaPropiaImplTest {
         when(criteriosBanco.findById(5L)).thenReturn(Optional.of(c));
 
         servicio.editarCriterio(QUIEN, VACANTE, 5L,
-                new GuardarCriterioDePrueba("Cierre", "  ", BigDecimal.ZERO, "IA", List.of()));
+                new GuardarCriterioDePrueba("Cierre", "  ", BigDecimal.ZERO, "IA"));
 
         assertThat(c.getNombre()).isEqualTo("Cierre");
         assertThat(c.getQueEvalua()).isNull();
+        assertThat(c.getPuntosDelCriterio()).isZero();
         assertThat(c.getPuntosCalificados()).isZero();
         assertThat(c.getCalificador()).isNull();
-        verify(miradas).deleteByCriterioBancoId(5L);
+        verify(miradas, never()).deleteByCriterioBancoId(any());
         verify(miradas, never()).save(any());
+    }
+
+    /** Un criterio del borrador con una cerrada de 10, una abierta y una cerrada de otro criterio. */
+    private CriterioBanco conUnaCerradaDe10() {
+        hayBorrador();
+        CriterioBanco c = criterio(5L, BORRADOR, 1);
+        when(criteriosBanco.findById(5L)).thenReturn(Optional.of(c));
+        Pregunta cerrada = pregunta(1L, 5L, 1);
+        cerrada.setTipo("OPCION_UNICA");
+        cerrada.setPuntos(10);
+        Pregunta deOtro = pregunta(3L, 6L, 1);
+        deOtro.setTipo("OPCION_UNICA");
+        deOtro.setPuntos(30);
+        when(preguntas.findByVersionBancoIdOrderByOrden(BORRADOR))
+                .thenReturn(List.of(cerrada, pregunta(2L, 5L, 2), deOtro));
+        return c;
+    }
+
+    @Test
+    @DisplayName("Lo que se escribe es lo que vale el criterio: su parte calificada es eso menos sus cerradas (V69)")
+    void editarCriterioDeduceLaParteCalificada() {
+        CriterioBanco c = conUnaCerradaDe10();
+
+        servicio.editarCriterio(QUIEN, VACANTE, 5L,
+                new GuardarCriterioDePrueba("Excel", null, BigDecimal.valueOf(30), "PERSONA"));
+
+        assertThat(c.getPuntosDelCriterio()).isEqualTo(30);
+        assertThat(c.getPuntosCalificados()).isEqualTo(20);
+        assertThat(c.getCalificador()).isEqualTo("PERSONA");
+        verify(criteriosBanco).save(c);
+    }
+
+    @Test
+    @DisplayName("Si las cerradas suman lo que vale el criterio, no se pregunta quién califica; si lo pasan, se guarda y la falta sale al publicar")
+    void editarCriterioSinParteQueCalificar() {
+        CriterioBanco c = conUnaCerradaDe10();
+
+        servicio.editarCriterio(QUIEN, VACANTE, 5L, new GuardarCriterioDePrueba("Excel", null, BigDecimal.TEN, null));
+        assertThat(c.getPuntosDelCriterio()).isEqualTo(10);
+        assertThat(c.getPuntosCalificados()).isZero();
+        assertThat(c.getCalificador()).isNull();
+
+        servicio.editarCriterio(QUIEN, VACANTE, 5L, new GuardarCriterioDePrueba("Excel", null, BigDecimal.valueOf(4), "IA"));
+        assertThat(c.getPuntosDelCriterio()).isEqualTo(4);
+        assertThat(c.getPuntosCalificados()).isZero();
+        assertThat(c.getCalificador()).isNull();
+    }
+
+    @Test
+    @DisplayName("Con puntos por encima de sus cerradas y sin decir quién los califica, no se guarda")
+    void editarCriterioSinCalificador() {
+        CriterioBanco c = conUnaCerradaDe10();
+
+        assertThatThrownBy(() -> servicio.editarCriterio(QUIEN, VACANTE, 5L,
+                new GuardarCriterioDePrueba("Excel", null, BigDecimal.valueOf(30), "  ")))
+                .isInstanceOf(PreguntasInvalidasException.class)
+                .satisfies(e -> assertThat(((PreguntasInvalidasException) e).getFaltas()).containsExactly(
+                        "Falta decir quién califica los 20 puntos que no son de cerradas: la IA o una persona."));
+        assertThat(c.getPuntosDelCriterio()).isNull();
+        verify(criteriosBanco, never()).save(any());
     }
 
     @Test
@@ -429,7 +487,7 @@ class ServicioPruebaPropiaImplTest {
         when(criteriosBanco.findById(5L)).thenReturn(Optional.of(criterio(5L, 999L, 1)));
 
         assertThatThrownBy(() -> servicio.editarCriterio(QUIEN, VACANTE, 5L,
-                new GuardarCriterioDePrueba("Cierre", null, null, null, null)))
+                new GuardarCriterioDePrueba("Cierre", null, null, null)))
                 .isInstanceOf(ResourceNotFoundException.class);
     }
 
@@ -454,6 +512,30 @@ class ServicioPruebaPropiaImplTest {
         orden.verify(criteriosBanco).delete(c);
     }
 
+    @Test
+    @DisplayName("Al publicar se deja escrita la parte calificada deducida de lo que vale cada criterio; uno de antes, sin total, no se toca (V69)")
+    void alPublicarEscribeLaParteDeducida() {
+        CriterioBanco conTotal = criterio(5L, BORRADOR, 1);
+        conTotal.setPuntosDelCriterio(30);
+        conTotal.setPuntosCalificados(99);
+        CriterioBanco yaAlDia = criterio(6L, BORRADOR, 2);
+        yaAlDia.setPuntosDelCriterio(20);
+        yaAlDia.setPuntosCalificados(20);
+        CriterioBanco deAntes = criterio(7L, BORRADOR, 3);
+        deAntes.setPuntosCalificados(15);
+        when(calculo.estructura(BORRADOR)).thenReturn(new Resultado(borrador, List.of(
+                new CriterioDeLaPrueba(conTotal, List.of(), List.of(), 10, BigDecimal.ZERO, 20, "IA", null),
+                new CriterioDeLaPrueba(yaAlDia, List.of(), List.of(), 0, BigDecimal.ZERO, 20, "IA", null),
+                new CriterioDeLaPrueba(deAntes, List.of(), List.of(), 0, BigDecimal.ZERO, 15, "IA", null)),
+                List.of(), List.of()));
+
+        servicio.alPublicar(borrador);
+
+        assertThat(conTotal.getPuntosCalificados()).isEqualTo(20);
+        assertThat(deAntes.getPuntosCalificados()).isEqualTo(15);
+        verify(criteriosBanco).saveAll(List.of(conTotal));
+    }
+
     // ---------------------------------------------------------------- preguntas
 
     @Test
@@ -467,6 +549,7 @@ class ServicioPruebaPropiaImplTest {
         ArgumentCaptor<CriterioBanco> general = ArgumentCaptor.forClass(CriterioBanco.class);
         verify(criteriosBanco).save(general.capture());
         assertThat(general.getValue().getNombre()).isEqualTo("General");
+        assertThat(general.getValue().getPuntosDelCriterio()).isZero();
         assertThat(general.getValue().getPuntosCalificados()).isZero();
         assertThat(general.getValue().getCalificador()).isNull();
         ArgumentCaptor<Pregunta> nueva = ArgumentCaptor.forClass(Pregunta.class);
@@ -475,6 +558,22 @@ class ServicioPruebaPropiaImplTest {
         assertThat(nueva.getValue().getCriterioBancoId()).isEqualTo(900L);
         assertThat(nueva.getValue().getQueDebeTener()).isEqualTo("Que cuadre");
         assertThat(nueva.getValue().getCodigo()).isEqualTo("P1");
+    }
+
+    @Test
+    @DisplayName("Si la primera pregunta es una cerrada, «General» vale lo que ella: solo cerradas (V69)")
+    void generalValeSuPrimeraCerrada() {
+        hayBorrador();
+
+        servicio.agregarPregunta(QUIEN, VACANTE, new GuardarPreguntaDePrueba("OPCION_UNICA", "¿Libro?",
+                BigDecimal.TEN, null, null, List.of(new GuardarOpcion("Diario", BigDecimal.TEN),
+                        new GuardarOpcion("Mayor", BigDecimal.ZERO))));
+
+        ArgumentCaptor<CriterioBanco> general = ArgumentCaptor.forClass(CriterioBanco.class);
+        verify(criteriosBanco).save(general.capture());
+        assertThat(general.getValue().getPuntosDelCriterio()).isEqualTo(10);
+        assertThat(general.getValue().getPuntosCalificados()).isZero();
+        assertThat(general.getValue().getCalificador()).isNull();
     }
 
     @Test
@@ -599,7 +698,7 @@ class ServicioPruebaPropiaImplTest {
     }
 
     @Test
-    @DisplayName("Quitar un entregable lo saca antes de lo que miran sus criterios")
+    @DisplayName("Quitar un entregable suelta antes lo que cubre y lo que lo miraba a mano")
     void quitarEntregable() {
         hayBorrador();
         EntregableRequerido e = entregable(30L, BORRADOR, 1);
@@ -607,9 +706,10 @@ class ServicioPruebaPropiaImplTest {
 
         servicio.quitarEntregable(QUIEN, VACANTE, 30L);
 
-        InOrder orden = inOrder(miradas, entregables);
+        InOrder orden = inOrder(miradas, cubiertas, entregables);
         orden.verify(miradas).deleteByEntregableRequeridoId(30L);
-        orden.verify(miradas).flush();
+        orden.verify(cubiertas).deleteByEntregableRequeridoId(30L);
+        orden.verify(cubiertas).flush();
         orden.verify(entregables).delete(e);
     }
 
@@ -648,19 +748,22 @@ class ServicioPruebaPropiaImplTest {
     // ---------------------------------------------------------------- descartar
 
     @Test
-    @DisplayName("Descartar el borrador suelta lo que miran sus criterios y borra todo lo suyo")
+    @DisplayName("Descartar el borrador suelta lo que miran sus criterios, borra sus entregables antes que sus preguntas y todo lo suyo")
     void descartarElBorrador() {
         hayBorrador();
         when(criteriosBanco.findByVersionBancoIdOrderByOrdenAscIdAsc(BORRADOR)).thenReturn(List.of(criterio(5L, BORRADOR, 1)));
         when(preguntas.findByVersionBancoIdOrderByOrden(BORRADOR)).thenReturn(List.of(pregunta(1L, 5L, 1)));
+        when(entregables.findByVersionBancoIdOrderByOrdenAscIdAsc(BORRADOR)).thenReturn(List.of(entregable(30L, BORRADOR, 1)));
 
         servicio.descartarBorrador(QUIEN, VACANTE);
 
-        InOrder orden = inOrder(miradas, opciones, preguntas, entregables, criteriosBanco, versionesBanco);
+        InOrder orden = inOrder(miradas, cubiertas, opciones, preguntas, entregables, criteriosBanco, versionesBanco);
         orden.verify(miradas).deleteByCriterioBancoIdIn(List.of(5L));
+        orden.verify(cubiertas).deleteByEntregableRequeridoIdIn(List.of(30L));
+        orden.verify(entregables).deleteByVersionBancoId(BORRADOR);
+        orden.verify(entregables).flush();
         orden.verify(opciones).deleteByPreguntaIdIn(List.of(1L));
         orden.verify(preguntas).deleteByVersionBancoId(BORRADOR);
-        orden.verify(entregables).deleteByVersionBancoId(BORRADOR);
         orden.verify(criteriosBanco).deleteByVersionBancoId(BORRADOR);
         orden.verify(versionesBanco).delete(borrador);
     }
@@ -676,5 +779,278 @@ class ServicioPruebaPropiaImplTest {
         verify(opciones, never()).deleteByPreguntaIdIn(any());
         verify(versionesBanco).delete(borrador);
         assertThat(editor.proposito()).isEqualTo("PRUEBA_PUESTO");
+    }
+
+    // ---------------------------------------------------------------- el alcance (V68)
+
+    private static GuardarEntregable deUnaPregunta(String nombre, Long preguntaId) {
+        return new GuardarEntregable(nombre, null, "ARCHIVO", true, null, preguntaId, false, List.of());
+    }
+
+    private static GuardarEntregable general(String nombre, boolean todaLaPrueba, List<Long> cubre) {
+        return new GuardarEntregable(nombre, null, "ARCHIVO", true, null, null, todaLaPrueba, cubre);
+    }
+
+    @Test
+    @DisplayName("Pedir un archivo desde una pregunta lo cuelga de ella (AC-04)")
+    void archivoDeUnaPregunta() {
+        hayBorrador();
+        when(preguntas.findById(1L)).thenReturn(Optional.of(pregunta(1L, 5L, 1)));
+        when(entregables.findByPreguntaId(1L)).thenReturn(Optional.empty());
+        when(entregables.save(any(EntregableRequerido.class))).thenAnswer(inv -> {
+            EntregableRequerido e = inv.getArgument(0);
+            e.setId(30L);
+            return e;
+        });
+
+        servicio.agregarEntregable(QUIEN, VACANTE, deUnaPregunta(" Flujo de caja.xlsx ", 1L));
+
+        ArgumentCaptor<EntregableRequerido> nuevo = ArgumentCaptor.forClass(EntregableRequerido.class);
+        verify(entregables).save(nuevo.capture());
+        assertThat(nuevo.getValue().getAlcance()).isEqualTo(EntregableRequerido.PREGUNTA);
+        assertThat(nuevo.getValue().getPreguntaId()).isEqualTo(1L);
+        assertThat(nuevo.getValue().esGeneral()).isFalse();
+        verify(cubiertas, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Una pregunta pide como mucho un archivo: el segundo es 400 y no se crea; una ajena, 404")
+    void dosArchivosEnUnaPregunta() {
+        hayBorrador();
+        when(preguntas.findById(1L)).thenReturn(Optional.of(pregunta(1L, 5L, 1)));
+        EntregableRequerido yaEsta = entregable(30L, BORRADOR, 1);
+        when(entregables.findByPreguntaId(1L)).thenReturn(Optional.of(yaEsta));
+        when(preguntas.findById(2L)).thenReturn(Optional.of(Pregunta.builder().id(2L).versionBancoId(999L).build()));
+
+        assertThatThrownBy(() -> servicio.agregarEntregable(QUIEN, VACANTE, deUnaPregunta("Otro", 1L)))
+                .isInstanceOf(PreguntasInvalidasException.class)
+                .satisfies(e -> assertThat(((PreguntasInvalidasException) e).getFaltas())
+                        .anyMatch(f -> f.contains("ya pide un archivo («E30»)")));
+        assertThatThrownBy(() -> servicio.agregarEntregable(QUIEN, VACANTE, deUnaPregunta("Ajeno", 2L)))
+                .isInstanceOf(ResourceNotFoundException.class);
+        verify(entregables, never()).save(any());
+
+        // Editar el mismo archivo de su pregunta no cuenta como «otro».
+        when(entregables.findById(30L)).thenReturn(Optional.of(yaEsta));
+        servicio.editarEntregable(QUIEN, VACANTE, 30L, deUnaPregunta("Flujo", 1L));
+        assertThat(yaEsta.getPreguntaId()).isEqualTo(1L);
+        assertThat(yaEsta.getAlcance()).isEqualTo(EntregableRequerido.PREGUNTA);
+    }
+
+    @Test
+    @DisplayName("Un general que cubre la 1 y la 2 guarda lo que cubre, sin repetir (AC-05)")
+    void generalQueCubrePreguntas() {
+        hayBorrador();
+        when(preguntas.findById(1L)).thenReturn(Optional.of(pregunta(1L, 5L, 1)));
+        when(preguntas.findById(2L)).thenReturn(Optional.of(pregunta(2L, 6L, 1)));
+        when(entregables.save(any(EntregableRequerido.class))).thenAnswer(inv -> {
+            EntregableRequerido e = inv.getArgument(0);
+            e.setId(31L);
+            return e;
+        });
+
+        servicio.agregarEntregable(QUIEN, VACANTE, general("Informe final", false, List.of(1L, 2L, 1L)));
+
+        ArgumentCaptor<EntregableRequerido> nuevo = ArgumentCaptor.forClass(EntregableRequerido.class);
+        verify(entregables).save(nuevo.capture());
+        assertThat(nuevo.getValue().getAlcance()).isEqualTo(EntregableRequerido.PREGUNTAS);
+        assertThat(nuevo.getValue().getPreguntaId()).isNull();
+        ArgumentCaptor<EntregableCubrePregunta> cubre = ArgumentCaptor.forClass(EntregableCubrePregunta.class);
+        verify(cubiertas, org.mockito.Mockito.times(2)).save(cubre.capture());
+        assertThat(cubre.getAllValues()).extracting(EntregableCubrePregunta::getPreguntaId).containsExactly(1L, 2L);
+        assertThat(cubre.getAllValues()).allMatch(c -> c.getEntregableRequeridoId().equals(31L));
+    }
+
+    @Test
+    @DisplayName("Un general sin «Cubre», o de una pregunta y general a la vez: 400 con la lista entera")
+    void generalSinCubre() {
+        hayBorrador();
+
+        assertThatThrownBy(() -> servicio.agregarEntregable(QUIEN, VACANTE,
+                new GuardarEntregable(" ", null, null, true, null, null, false, List.of())))
+                .isInstanceOf(PreguntasInvalidasException.class)
+                .satisfies(e -> assertThat(((PreguntasInvalidasException) e).getFaltas())
+                        .hasSize(3).anyMatch(f -> f.contains("Elige qué cubre")));
+        assertThatThrownBy(() -> servicio.agregarEntregable(QUIEN, VACANTE,
+                new GuardarEntregable("Mixto", null, "ARCHIVO", true, null, 1L, true, List.of())))
+                .isInstanceOf(PreguntasInvalidasException.class)
+                .satisfies(e -> assertThat(((PreguntasInvalidasException) e).getFaltas())
+                        .anyMatch(f -> f.contains("de una pregunta o general")));
+        verify(entregables, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Editar un general rehace lo que cubre: borra, vacía y vuelve a escribir")
+    void editarGeneralRehaceLoQueCubre() {
+        hayBorrador();
+        EntregableRequerido e = entregable(30L, BORRADOR, 1);
+        e.setAlcance(EntregableRequerido.PREGUNTAS);
+        when(entregables.findById(30L)).thenReturn(Optional.of(e));
+        when(preguntas.findById(2L)).thenReturn(Optional.of(pregunta(2L, 6L, 1)));
+
+        servicio.editarEntregable(QUIEN, VACANTE, 30L, general("Informe", false, List.of(2L)));
+
+        InOrder orden = inOrder(cubiertas, entregables);
+        orden.verify(cubiertas).deleteByEntregableRequeridoId(30L);
+        orden.verify(cubiertas).flush();
+        orden.verify(entregables).save(e);
+        orden.verify(cubiertas).save(any(EntregableCubrePregunta.class));
+
+        servicio.editarEntregable(QUIEN, VACANTE, 30L, general("Informe", true, List.of()));
+        assertThat(e.getAlcance()).isEqualTo(EntregableRequerido.TODA_LA_PRUEBA);
+    }
+
+    @Test
+    @DisplayName("Quitar una pregunta quita su archivo y la saca de lo que cubren los generales")
+    void quitarPreguntaQuitaSuArchivo() {
+        hayBorrador();
+        Pregunta p = pregunta(1L, 5L, 1);
+        when(preguntas.findById(1L)).thenReturn(Optional.of(p));
+        EntregableRequerido suArchivo = entregable(30L, BORRADOR, 1);
+        when(entregables.findByPreguntaId(1L)).thenReturn(Optional.of(suArchivo));
+
+        servicio.quitarPregunta(QUIEN, VACANTE, 1L);
+
+        InOrder orden = inOrder(entregables, cubiertas, preguntas);
+        orden.verify(entregables).delete(suArchivo);
+        orden.verify(cubiertas).deleteByPreguntaId(1L);
+        orden.verify(cubiertas).flush();
+        orden.verify(preguntas).delete(p);
+    }
+
+    // ---------------------------------------------------------------- la fecha límite (V68)
+
+    private void rindeLaDelEditor() {
+        vacante.setInstrumentoEtapaTecnica("PRUEBA_PROPIA");
+        when(fechaLimite.fijar(any(), any())).thenAnswer(inv -> {
+            Vacante v = inv.getArgument(0);
+            v.setPruebaCierraEn(inv.getArgument(1));
+            return new FechaLimiteDeLaVacante.Movidos(0, 0);
+        });
+    }
+
+    @Test
+    @DisplayName("Un borrador sin publicar pone su fecha sin motivo, y se audita (AC-09)")
+    void fechaAntesDePublicar() {
+        rindeLaDelEditor();
+        hayBorrador();
+        Instant viernes = Instant.now().plus(5, java.time.temporal.ChronoUnit.DAYS);
+
+        EditorDePreguntas editor = servicio.fijarFechaLimite(QUIEN, VACANTE, new FijarFechaLimite(viernes, null));
+
+        verify(fechaLimite).fijar(vacante, viernes);
+        verify(auditoria).registrar(eq(ORGANIZACION), eq(QUIEN), eq("fijar_fecha_limite_prueba_propia"),
+                eq("vacante"), eq(VACANTE), any(), any(), eq(null));
+        assertThat(editor.fechaLimite().cierraEn()).isEqualTo(viernes);
+        assertThat(editor.fechaLimite().pideMotivo()).isFalse();
+    }
+
+    @Test
+    @DisplayName("Con la prueba publicada y alguien en la etapa técnica, pide motivo; con él, se audita (AC-10)")
+    void fechaConGenteDentroPideMotivo() {
+        rindeLaDelEditor();
+        hayPublicada();
+        when(calculo.estructura(PUBLICADA)).thenReturn(conUnCriterio(publicada));
+        when(intentos.algunoDeLaVacante(VACANTE)).thenReturn(true);
+        Instant otra = Instant.now().plus(9, java.time.temporal.ChronoUnit.DAYS);
+
+        assertThatThrownBy(() -> servicio.fijarFechaLimite(QUIEN, VACANTE, new FijarFechaLimite(otra, "  ")))
+                .isInstanceOf(PreguntasInvalidasException.class)
+                .satisfies(e -> assertThat(((PreguntasInvalidasException) e).getFaltas())
+                        .anyMatch(f -> f.contains("pide un motivo")));
+        verify(fechaLimite, never()).fijar(any(), any());
+
+        EditorDePreguntas editor = servicio.fijarFechaLimite(QUIEN, VACANTE,
+                new FijarFechaLimite(otra, " Se amplía la convocatoria "));
+
+        verify(fechaLimite).fijar(vacante, otra);
+        verify(auditoria).registrar(eq(ORGANIZACION), eq(QUIEN), eq("fijar_fecha_limite_prueba_propia"),
+                eq("vacante"), eq(VACANTE), any(), any(), eq("Se amplía la convocatoria"));
+        assertThat(editor.fechaLimite().pideMotivo()).isTrue();
+    }
+
+    @Test
+    @DisplayName("Una fecha vacía o pasada es 400; la misma fecha otra vez no mueve nada; una vacante de plantilla, 409")
+    void fechaQueNoVale() {
+        rindeLaDelEditor();
+        Instant ayer = Instant.now().minus(1, java.time.temporal.ChronoUnit.DAYS);
+
+        assertThatThrownBy(() -> servicio.fijarFechaLimite(QUIEN, VACANTE, new FijarFechaLimite(null, null)))
+                .isInstanceOf(PreguntasInvalidasException.class);
+        assertThatThrownBy(() -> servicio.fijarFechaLimite(QUIEN, VACANTE, new FijarFechaLimite(ayer, null)))
+                .isInstanceOf(PreguntasInvalidasException.class)
+                .satisfies(e -> assertThat(((PreguntasInvalidasException) e).getFaltas())
+                        .anyMatch(f -> f.contains("ya pasó")));
+
+        Instant puesta = Instant.now().plus(2, java.time.temporal.ChronoUnit.DAYS);
+        vacante.setPruebaCierraEn(puesta);
+        servicio.fijarFechaLimite(QUIEN, VACANTE, new FijarFechaLimite(puesta, null));
+        verify(fechaLimite, never()).fijar(any(), any());
+
+        vacante.setInstrumentoEtapaTecnica("PLANTILLA");
+        assertThatThrownBy(() -> servicio.fijarFechaLimite(QUIEN, VACANTE, new FijarFechaLimite(puesta, null)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Plazos de la prueba");
+    }
+
+    @Test
+    @DisplayName("Sin fecha, lo que frena publicar el borrador lo dice junto al tiempo (AC-08)")
+    void sinFechaNoSePublica() {
+        hayBorrador();
+        borrador.setModalidad("CRONOMETRADA");
+        borrador.setDuracionMinutos(90);
+        when(calculo.estructura(BORRADOR)).thenReturn(conUnCriterio(borrador));
+
+        EditorDePreguntas editor = servicio.ver(QUIEN, VACANTE);
+
+        assertThat(editor.borrador().avisos()).contains("Falta la fecha límite para dar la prueba.");
+        assertThat(editor.fechaLimite().cierraEn()).isNull();
+    }
+
+    // ---------------------------------------------------------------- abrir desde una de antes
+
+    @Test
+    @DisplayName("Un borrador abierto desde una publicada de antes pasa su «Mira» a generales: cubre las preguntas, o toda la prueba si un criterio no tenía")
+    void borradorDesdeUnaDeAntes() {
+        hayPublicada();
+        CriterioBanco conPreguntas = criterio(5L, PUBLICADA, 1);
+        CriterioBanco sinPreguntas = criterio(6L, PUBLICADA, 2);
+        Pregunta p1 = Pregunta.builder().id(1L).versionBancoId(PUBLICADA).criterioBancoId(5L).orden(1)
+                .tipo("ABIERTA").enunciado("¿Cómo?").puntos(0).build();
+        EntregableRequerido tablero = entregable(30L, PUBLICADA, 1);
+        EntregableRequerido video = entregable(31L, PUBLICADA, 2);
+        var pc1 = CalificacionDeLaPruebaPropia.calcularPregunta(p1, List.of(), null);
+        Resultado deAntes = new Resultado(publicada, List.of(
+                new CriterioDeLaPrueba(conPreguntas, List.of(pc1), List.of(tablero), 0, BigDecimal.ZERO,
+                        50, "IA", null),
+                new CriterioDeLaPrueba(sinPreguntas, List.of(), List.of(video), 0, BigDecimal.ZERO,
+                        50, "PERSONA", null)),
+                List.of(), List.of(tablero, video));
+        when(calculo.estructura(PUBLICADA)).thenReturn(deAntes);
+        when(criteriosBanco.findByVersionBancoIdOrderByOrdenAscIdAsc(PUBLICADA))
+                .thenReturn(List.of(conPreguntas, sinPreguntas));
+        when(preguntas.findByVersionBancoIdOrderByOrden(PUBLICADA)).thenReturn(List.of(p1));
+        when(entregables.save(any(EntregableRequerido.class))).thenAnswer(inv -> {
+            EntregableRequerido e = inv.getArgument(0);
+            e.setId(e.getNombre().equals("E30") ? 40L : 41L);
+            return e;
+        });
+        publicada.setModalidad("PLAZO_ABIERTO");
+        publicada.setPlazoDias(3);
+
+        servicio.abrirBorrador(QUIEN, VACANTE);
+
+        ArgumentCaptor<EntregableRequerido> copias = ArgumentCaptor.forClass(EntregableRequerido.class);
+        verify(entregables, org.mockito.Mockito.times(2)).save(copias.capture());
+        assertThat(copias.getAllValues().get(0).getAlcance()).isEqualTo(EntregableRequerido.PREGUNTAS);
+        assertThat(copias.getAllValues().get(1).getAlcance()).isEqualTo(EntregableRequerido.TODA_LA_PRUEBA);
+        ArgumentCaptor<EntregableCubrePregunta> cubre = ArgumentCaptor.forClass(EntregableCubrePregunta.class);
+        verify(cubiertas).save(cubre.capture());
+        assertThat(cubre.getValue().getEntregableRequeridoId()).isEqualTo(40L);
+        assertThat(cubre.getValue().getPreguntaId()).isEqualTo(700L);
+        verify(miradas, never()).save(any());
+        ArgumentCaptor<VersionBanco> nuevo = ArgumentCaptor.forClass(VersionBanco.class);
+        verify(versionesBanco).save(nuevo.capture());
+        assertThat(nuevo.getValue().getPlazoDias()).as("sin días: «Sin cronómetro»").isNull();
     }
 }

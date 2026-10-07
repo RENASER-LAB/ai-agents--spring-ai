@@ -8,6 +8,7 @@ import com.renaser.ai.ai_engine.perfilintegral.service.EditorDeLaVacante;
 import com.renaser.ai.ai_engine.prueba.dto.DtosPruebaPropia.AgregarDeLaPropuestaDePrueba;
 import com.renaser.ai.ai_engine.prueba.dto.DtosPruebaPropia.CambiarPuntosDePrueba;
 import com.renaser.ai.ai_engine.prueba.dto.DtosPruebaPropia.CorregirInstruccionesDePrueba;
+import com.renaser.ai.ai_engine.prueba.dto.DtosPruebaPropia.FijarFechaLimite;
 import com.renaser.ai.ai_engine.prueba.dto.DtosPruebaPropia.GuardarCriterioDePrueba;
 import com.renaser.ai.ai_engine.prueba.dto.DtosPruebaPropia.GuardarDatosDeLaPrueba;
 import com.renaser.ai.ai_engine.prueba.dto.DtosPruebaPropia.GuardarEntregable;
@@ -66,6 +67,13 @@ public interface ServicioPruebaPropia extends EditorDeLaVacante {
     EditorDePreguntas quitarEntregable(ContextoUsuario quien, Long vacanteId, Long entregableId);
 
     EditorDePreguntas moverEntregable(ContextoUsuario quien, Long vacanteId, Long entregableId, Mover datos);
+
+    /**
+     * La fecha límite para dar la prueba (V68): la de la vacante. Se puede poner antes de
+     * publicar; no se acepta una pasada; mueve los intentos abiertos sin plazo propio; y con
+     * la prueba publicada y alguien en la etapa técnica pide un motivo, que se audita.
+     */
+    EditorDePreguntas fijarFechaLimite(ContextoUsuario quien, Long vacanteId, FijarFechaLimite datos);
 
     // ---------- Con la versión publicada ----------
 

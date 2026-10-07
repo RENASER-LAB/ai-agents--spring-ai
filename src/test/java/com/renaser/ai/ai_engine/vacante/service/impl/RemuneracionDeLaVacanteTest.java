@@ -108,7 +108,9 @@ class RemuneracionDeLaVacanteTest {
         servicio = new ServicioVacantesPanelImpl(vacantes, puestos, requisitos, solicitudes,
                 versionesPesos, plantillas, versionesPrueba, plantillasPrueba, plantillasCorreo,
                 plantillasPorVacante, intentos, evaluaciones, versionesBanco,
-                auditoria, dueno, postulaciones, enCarrera, maquina, avisos, alcance, permisos, catalogos);
+                auditoria, dueno, postulaciones, enCarrera, maquina, avisos, alcance, permisos, catalogos,
+                new com.renaser.ai.ai_engine.prueba.service.FechaLimiteDeLaVacante(vacantes, intentos,
+                        versionesPrueba, versionesBanco));
     }
 
     // ---------- el escenario ----------

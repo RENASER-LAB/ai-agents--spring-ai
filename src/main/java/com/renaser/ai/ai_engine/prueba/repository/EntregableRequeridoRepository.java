@@ -16,4 +16,7 @@ public interface EntregableRequeridoRepository extends JpaRepository<EntregableR
     List<EntregableRequerido> findByVersionBancoIdIn(java.util.Collection<Long> versionBancoIds);
 
     void deleteByVersionBancoId(Long versionBancoId);
+
+    /** El archivo que pide una pregunta de la prueba del editor (V68), si lo pide. */
+    java.util.Optional<EntregableRequerido> findByPreguntaId(Long preguntaId);
 }

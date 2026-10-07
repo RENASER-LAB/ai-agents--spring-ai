@@ -12,11 +12,13 @@ import com.renaser.ai.ai_engine.perfilintegral.repository.VersionBancoRepository
 import com.renaser.ai.ai_engine.perfilintegral.service.CalificacionPorPuntos;
 import com.renaser.ai.ai_engine.perfilintegral.service.ReglasDePuntos;
 import com.renaser.ai.ai_engine.prueba.entity.CriterioBancoEntregable;
+import com.renaser.ai.ai_engine.prueba.entity.EntregableCubrePregunta;
 import com.renaser.ai.ai_engine.prueba.entity.EntregableRequerido;
 import com.renaser.ai.ai_engine.prueba.entity.IntentoPrueba;
 import com.renaser.ai.ai_engine.prueba.entity.NotaCriterioPrueba;
 import com.renaser.ai.ai_engine.prueba.entity.RespuestaPrueba;
 import com.renaser.ai.ai_engine.prueba.repository.CriterioBancoEntregableRepository;
+import com.renaser.ai.ai_engine.prueba.repository.EntregableCubrePreguntaRepository;
 import com.renaser.ai.ai_engine.prueba.repository.EntregableRequeridoRepository;
 import com.renaser.ai.ai_engine.prueba.repository.NotaCriterioPruebaRepository;
 import com.renaser.ai.ai_engine.prueba.repository.RespuestaPruebaRepository;
@@ -72,6 +74,7 @@ public class CalificacionDeLaPruebaPropia {
     private final RespuestaPruebaRepository respuestas;
     private final NotaCriterioPruebaRepository notas;
     private final com.renaser.ai.ai_engine.prueba.repository.EntregableRepository subidas;
+    private final EntregableCubrePreguntaRepository cubiertas;
 
     // ============================== Lo que sale ==============================
 
@@ -91,9 +94,26 @@ public class CalificacionDeLaPruebaPropia {
                                      BigDecimal sistema, int calificadaMaximo, String calificador,
                                      NotaCriterioPrueba nota) {
 
-        /** Sus puntos: los de sus cerradas más los de su parte calificada. */
+        /**
+         * Lo que puede sacar: los de sus cerradas más los de su parte calificada. Es su total,
+         * salvo que sus cerradas pasen de él (una falta que frena publicar).
+         */
         public int maximo() {
             return sistemaMaximo + calificadaMaximo;
+        }
+
+        /**
+         * Lo que vale el criterio (V69): el total que escribió quien arma la prueba, o, en una
+         * versión de antes, sus cerradas más su parte calificada.
+         */
+        public int puntosDelCriterio() {
+            Integer total = criterio.getPuntosDelCriterio();
+            return total == null ? maximo() : total;
+        }
+
+        /** Si sus cerradas pasan de lo que vale el criterio (V69): no se publica así. */
+        public boolean cerradasPorEncima() {
+            return sistemaMaximo > puntosDelCriterio();
         }
 
         public boolean tieneParteCalificada() {
@@ -136,7 +156,20 @@ public class CalificacionDeLaPruebaPropia {
     /** Todo lo que sale de una prueba (con o sin candidato). */
     public record Resultado(VersionBanco version, List<CriterioDeLaPrueba> criterios,
                             List<PreguntaDeLaPrueba> sinCriterio,
-                            List<EntregableRequerido> entregables) {
+                            List<EntregableRequerido> entregables,
+                            /* Las preguntas que cubre cada entregable general de alcance
+                               PREGUNTAS (V68), por el id del entregable. */
+                            Map<Long, List<Long>> cubre) {
+
+        public Resultado(VersionBanco version, List<CriterioDeLaPrueba> criterios,
+                         List<PreguntaDeLaPrueba> sinCriterio, List<EntregableRequerido> entregables) {
+            this(version, criterios, sinCriterio, entregables, Map.of());
+        }
+
+        /** Las preguntas que cubre un entregable general; vacío si no cubre ninguna. */
+        public List<Long> cubreDe(Long entregableId) {
+            return cubre == null ? List.of() : cubre.getOrDefault(entregableId, List.of());
+        }
 
         public List<PreguntaDeLaPrueba> todas() {
             List<PreguntaDeLaPrueba> todas = new ArrayList<>();
@@ -145,9 +178,13 @@ public class CalificacionDeLaPruebaPropia {
             return todas;
         }
 
-        /** Lo que suma la versión: cerradas y partes calificadas. Tiene que dar 100. */
+        /**
+         * Lo que suma la versión: lo que vale cada criterio (sus cerradas y su parte calificada;
+         * V69, lo escrito aunque sus cerradas pasen de ahí) y las cerradas sueltas. Tiene que
+         * dar 100.
+         */
         public int total() {
-            int deLosCriterios = criterios.stream().mapToInt(CriterioDeLaPrueba::maximo).sum();
+            int deLosCriterios = criterios.stream().mapToInt(CriterioDeLaPrueba::puntosDelCriterio).sum();
             int sueltas = sinCriterio.stream().filter(p -> !p.esAbierta())
                     .mapToInt(PreguntaDeLaPrueba::maximo).sum();
             return deLosCriterios + sueltas;
@@ -328,12 +365,21 @@ public class CalificacionDeLaPruebaPropia {
                                         Collectors.toList())));
         Map<Long, List<Pregunta>> preguntasPorVersion = todasLasPreguntas.stream()
                 .collect(Collectors.groupingBy(Pregunta::getVersionBancoId));
+        Set<Long> generales = entregablesPorVersion.values().stream().flatMap(List::stream)
+                .filter(e -> EntregableRequerido.PREGUNTAS.equals(e.getAlcance()))
+                .map(EntregableRequerido::getId).collect(Collectors.toSet());
+        Map<Long, List<Long>> cubre = generales.isEmpty() ? Map.of()
+                : cubiertas.findByEntregableRequeridoIdIn(generales).stream()
+                        .collect(Collectors.groupingBy(EntregableCubrePregunta::getEntregableRequeridoId,
+                                Collectors.mapping(EntregableCubrePregunta::getPreguntaId,
+                                        Collectors.toList())));
+        Mirados mirados = new Mirados(miraPorCriterio, cubre);
 
         Map<Long, Resultado> estructuras = new HashMap<>();
         for (VersionBanco v : versiones.values()) {
             estructuras.put(v.getId(), armar(v, criteriosPorVersion.getOrDefault(v.getId(), List.of()),
                     preguntasPorVersion.getOrDefault(v.getId(), List.of()), opcionesPorPregunta,
-                    entregablesPorVersion.getOrDefault(v.getId(), List.of()), miraPorCriterio,
+                    entregablesPorVersion.getOrDefault(v.getId(), List.of()), mirados,
                     Map.of(), Map.of()));
         }
 
@@ -363,17 +409,42 @@ public class CalificacionDeLaPruebaPropia {
                 porIntento.put(intento.getId(), armar(v,
                         criteriosPorVersion.getOrDefault(v.getId(), List.of()),
                         preguntasPorVersion.getOrDefault(v.getId(), List.of()), opcionesPorPregunta,
-                        entregablesPorVersion.getOrDefault(v.getId(), List.of()), miraPorCriterio,
+                        entregablesPorVersion.getOrDefault(v.getId(), List.of()), mirados,
                         respuestaPorPregunta, notaPorCriterio));
             }
         }
         return new Tanda(estructuras, porIntento);
     }
 
+    /**
+     * De dónde sale lo que mira cada criterio: lo marcado a mano en las versiones de antes de
+     * la V68 y, en las demás, las preguntas que cubre cada entregable general.
+     */
+    private record Mirados(Map<Long, List<Long>> aMano, Map<Long, List<Long>> cubre) {
+    }
+
+    /**
+     * Si un criterio mira un entregable (punto 8 de la spec). Se deduce del alcance: el archivo
+     * de una de sus preguntas, un general de toda la prueba o uno que cubre alguna de sus
+     * preguntas. Un entregable de antes de la V68 (sin alcance) conserva lo marcado a mano.
+     */
+    public static boolean loMira(EntregableRequerido e, Set<Long> preguntasDelCriterio,
+                                 Collection<Long> marcadosAMano, Collection<Long> cubiertas) {
+        String alcance = e.getAlcance();
+        if (alcance == null) {
+            return marcadosAMano.contains(e.getId());
+        }
+        return switch (alcance) {
+            case EntregableRequerido.PREGUNTA -> preguntasDelCriterio.contains(e.getPreguntaId());
+            case EntregableRequerido.TODA_LA_PRUEBA -> true;
+            default -> cubiertas.stream().anyMatch(preguntasDelCriterio::contains);
+        };
+    }
+
     private static Resultado armar(VersionBanco version, List<CriterioBanco> criterios,
                                    List<Pregunta> suyas, Map<Long, List<Opcion>> opcionesPorPregunta,
                                    List<EntregableRequerido> entregablesDeLaVersion,
-                                   Map<Long, List<Long>> miraPorCriterio,
+                                   Mirados mirados,
                                    Map<Long, RespuestaPrueba> respuestaPorPregunta,
                                    Map<Long, NotaCriterioPrueba> notaPorCriterio) {
         Map<Long, List<PreguntaDeLaPrueba>> porCriterio = new LinkedHashMap<>();
@@ -393,8 +464,13 @@ public class CalificacionDeLaPruebaPropia {
                 .thenComparing(pc -> pc.pregunta().getId(), Comparator.nullsLast(Comparator.naturalOrder()));
         sinCriterio.sort(enOrden);
 
-        Map<Long, EntregableRequerido> entregablePorId = entregablesDeLaVersion.stream()
-                .collect(Collectors.toMap(EntregableRequerido::getId, Function.identity()));
+        Map<Long, List<Long>> cubreDeLaVersion = new HashMap<>();
+        entregablesDeLaVersion.forEach(e -> {
+            List<Long> suyasCubiertas = mirados.cubre().get(e.getId());
+            if (suyasCubiertas != null) {
+                cubreDeLaVersion.put(e.getId(), suyasCubiertas);
+            }
+        });
         List<CriterioDeLaPrueba> calculados = new ArrayList<>();
         for (CriterioBanco c : criterios) {
             List<PreguntaDeLaPrueba> deEste = porCriterio.get(c.getId());
@@ -408,16 +484,32 @@ public class CalificacionDeLaPruebaPropia {
                 }
             }
             // Los que mira, en el orden de los entregables de la versión.
-            Set<Long> mira = Set.copyOf(miraPorCriterio.getOrDefault(c.getId(), List.of()));
+            Set<Long> aMano = Set.copyOf(mirados.aMano().getOrDefault(c.getId(), List.of()));
+            Set<Long> susPreguntas = deEste.stream().map(pc -> pc.pregunta().getId())
+                    .collect(Collectors.toSet());
             List<EntregableRequerido> loQueMira = entregablesDeLaVersion.stream()
-                    .filter(e -> mira.contains(e.getId()) && entregablePorId.containsKey(e.getId()))
+                    .filter(e -> loMira(e, susPreguntas, aMano,
+                            cubreDeLaVersion.getOrDefault(e.getId(), List.of())))
                     .toList();
-            int calificada = c.getPuntosCalificados() == null ? 0 : c.getPuntosCalificados();
+            int calificada = parteCalificada(c, sistemaMaximo);
             calculados.add(new CriterioDeLaPrueba(c, deEste, loQueMira, sistemaMaximo, sistema,
                     calificada, calificada > 0 ? c.getCalificador() : null,
                     calificada > 0 ? notaPorCriterio.get(c.getId()) : null));
         }
-        return new Resultado(version, calculados, sinCriterio, entregablesDeLaVersion);
+        return new Resultado(version, calculados, sinCriterio, entregablesDeLaVersion,
+                cubreDeLaVersion);
+    }
+
+    /**
+     * La parte calificada de un criterio (V69): lo que vale menos lo que suman sus cerradas,
+     * nunca por debajo de 0. Una versión de antes, sin total, la lee tal cual se guardó: así
+     * sus notas no cambian.
+     */
+    public static int parteCalificada(CriterioBanco c, int cerradas) {
+        if (c.getPuntosDelCriterio() != null) {
+            return Math.max(0, c.getPuntosDelCriterio() - cerradas);
+        }
+        return c.getPuntosCalificados() == null ? 0 : c.getPuntosCalificados();
     }
 
     /**

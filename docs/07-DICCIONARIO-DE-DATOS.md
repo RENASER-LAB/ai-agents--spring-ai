@@ -1,7 +1,7 @@
 # Diccionario de datos
 
 Sistema de selección de personal — Renaser Consulting
-Versión 3.5 · 2026-10-01 · Puesto al día con las migraciones hasta la `V67` (la V67 trae la prueba técnica escrita en el editor —las tablas `criterio_banco_entregable` y `nota_criterio_prueba`, el tercer valor `PRUEBA_PROPIA` de `vacante.instrumento_etapa_tecnica`, el propósito `PRUEBA_PUESTO` con el caso y el tiempo en `version_banco`, la parte calificada en `criterio_banco`, `entregable_requerido`, `intento_prueba` y `respuesta_prueba` colgando también de la versión del editor, `intento_prueba.no_completada` y el propósito en `propuesta_preguntas`—; la V66 trae las preguntas propias de cada vacante —las tablas `criterio_banco` y `propuesta_preguntas`, `vacante.origen_preguntas`, el propósito, el método `PUNTOS` y la guía en `version_banco`, los tres tipos nuevos con sus puntos en `pregunta`, el orden en `opcion`, la nota hasta 100 y la de la IA aparte en `nota_respuesta`, el modo `RECALIFICA` y el agente `RECOMENDADOR`—; la V64 trae la gestión de personas —`sede`, `colaborador`, `periodo_laboral`, `situacion_laboral`, `cese_anulado` y `contratado_sin_alta`— y sus cuatro permisos; la V65 añade las columnas `antes_*` de `situacion_laboral`; la V49 y la V50 solo siembran pesos; la V51 trae la tabla `lectura_cv_perfil` y los archivos del perfil; la V52 y la V53 no crean tablas; la V55 pone el sueldo en la vacante y la pretensión en la postulación; la V56 trae la tabla `aviso_portal`; la V57 no crea tablas, solo siembra los precios de los dos modelos de DeepSeek; la V58 no crea tablas: suma el aviso `VACANTE_ACTUALIZADA` y apaga el correo `REMUNERACION_ACTUALIZADA`; la V59 añade `vacante.archivada_en`; la V60 añade `vacante.eliminada_en` —el borrado lógico—, el motivo de cierre y el tipo de aviso `VACANTE_ELIMINADA`, y el permiso `eliminar_vacante`; la V61 trae la tabla `recuperacion_clave`, tres parámetros y los dos correos de «¿Olvidaste tu contraseña?»; la V62 añade `vacante.ciudad_ubigeo`; la V63 trae las tablas `resena`, `respuesta_resena` y `reporte_resena`, los tres permisos de las reseñas de empresas y cuatro tipos de aviso)
+Versión 3.6 · 2026-10-07 · Puesto al día con las migraciones hasta la `V69` (la V69 añade `criterio_banco.puntos_del_criterio`, lo que vale entero un criterio de la prueba técnica; la V68 trae el alcance de los entregables de la prueba del editor —`entregable_requerido.alcance` y `pregunta_id` y la tabla `entregable_cubre_pregunta`—, desde la que «Mira» se deduce, y deja sin días los borradores de esa prueba; la V67 trae la prueba técnica escrita en el editor —las tablas `criterio_banco_entregable` y `nota_criterio_prueba`, el tercer valor `PRUEBA_PROPIA` de `vacante.instrumento_etapa_tecnica`, el propósito `PRUEBA_PUESTO` con el caso y el tiempo en `version_banco`, la parte calificada en `criterio_banco`, `entregable_requerido`, `intento_prueba` y `respuesta_prueba` colgando también de la versión del editor, `intento_prueba.no_completada` y el propósito en `propuesta_preguntas`—; la V66 trae las preguntas propias de cada vacante —las tablas `criterio_banco` y `propuesta_preguntas`, `vacante.origen_preguntas`, el propósito, el método `PUNTOS` y la guía en `version_banco`, los tres tipos nuevos con sus puntos en `pregunta`, el orden en `opcion`, la nota hasta 100 y la de la IA aparte en `nota_respuesta`, el modo `RECALIFICA` y el agente `RECOMENDADOR`—; la V64 trae la gestión de personas —`sede`, `colaborador`, `periodo_laboral`, `situacion_laboral`, `cese_anulado` y `contratado_sin_alta`— y sus cuatro permisos; la V65 añade las columnas `antes_*` de `situacion_laboral`; la V49 y la V50 solo siembran pesos; la V51 trae la tabla `lectura_cv_perfil` y los archivos del perfil; la V52 y la V53 no crean tablas; la V55 pone el sueldo en la vacante y la pretensión en la postulación; la V56 trae la tabla `aviso_portal`; la V57 no crea tablas, solo siembra los precios de los dos modelos de DeepSeek; la V58 no crea tablas: suma el aviso `VACANTE_ACTUALIZADA` y apaga el correo `REMUNERACION_ACTUALIZADA`; la V59 añade `vacante.archivada_en`; la V60 añade `vacante.eliminada_en` —el borrado lógico—, el motivo de cierre y el tipo de aviso `VACANTE_ELIMINADA`, y el permiso `eliminar_vacante`; la V61 trae la tabla `recuperacion_clave`, tres parámetros y los dos correos de «¿Olvidaste tu contraseña?»; la V62 añade `vacante.ciudad_ubigeo`; la V63 trae las tablas `resena`, `respuesta_resena` y `reporte_resena`, los tres permisos de las reseñas de empresas y cuatro tipos de aviso)
 
 Cada tabla con todas sus columnas, tipos y claves. **Este documento se consulta**, no se lee de
 corrido: es la base para escribir las migraciones de Flyway.
@@ -11,8 +11,8 @@ Lo que llegó después de la versión 2.0 va marcado con su migración entre par
 ⚠️ **Tres tablas de la base no tienen ficha aquí.** `agent_run` es del motor de agentes y no de
 selección, así que no la tendrá nunca. `invitacion` (`V37`) y `tarifa_modelo` (`V38`) sí
 deberían tenerla: llegaron con el multiempresa y su ficha está pendiente. Hasta que se
-escriban, para esas dos manda la migración. De las **117 tablas de selección y de gestión de
-personas** que existen hoy, aquí hay ficha de 115, más otras diez que están solo diseñadas y
+escriban, para esas dos manda la migración. De las **118 tablas de selección y de gestión de
+personas** que existen hoy, aquí hay ficha de 116, más otras diez que están solo diseñadas y
 todavía no existen.
 
 Para entender *por qué* el modelo es así, está el [Modelo de datos](05-MODELO-DE-DATOS.md).
@@ -697,7 +697,7 @@ Una convocatoria concreta.
 | `aplica_evaluacion` | boolean | sí | Apagado, quien postula no recibe la evaluación del banco: va directo a la bandeja del equipo y su única evaluación es la prueba del puesto. Por defecto encendido. En el panel es «Sin evaluación» |
 | `origen_preguntas` | text | sí | (`V66`) De dónde salen sus preguntas cuando `aplica_evaluacion` está encendido: `NIVEL` (el banco de la empresa para el nivel del puesto) o `VACANTE` (sus preguntas propias, en un `version_banco` con propósito `PERFIL_INTEGRAL`). Por defecto `NIVEL`, que es lo que quedó en todas las anteriores a la `V66`; **las nuevas nacen con `VACANTE`**, también en RENASER. `NIVEL` solo se elige si la empresa tiene un banco **propio** publicado para ese nivel, y desde la primera postulación no cambia: las dos reglas viven en `ServicioVacantesPanelImpl` |
 | `calificacion_automatica` | boolean | sí | Encendido, la postulación se califica y avanza sola hasta que termina la prueba del puesto, y solo entonces espera a una persona. Por defecto **apagado**: en automático cada postulante cuesta una llamada al modelo desde el momento en que postula |
-| `prueba_cierra_en` | timestamptz | no | Cuándo cierra la prueba de esta vacante, para todos. Vacío: se cuentan los días de la versión de la plantilla desde que cada uno empieza. **También se puede fijar sobre una versión `CRONOMETRADA`** (22/09/2026): al empezar rige el plazo que caiga antes entre el reloj y esta fecha, así que no anula el cronómetro — lo que hace es impedir empezar la prueba después de esta fecha |
+| `prueba_cierra_en` | timestamptz | no | Cuándo cierra la prueba de esta vacante, para todos. Vacío: se cuentan los días de la versión de la plantilla desde que cada uno empieza. **También se puede fijar sobre una versión `CRONOMETRADA`** (22/09/2026): al empezar rige el plazo que caiga antes entre el reloj y esta fecha, así que no anula el cronómetro — lo que hace es impedir empezar la prueba después de esta fecha. **Con `PRUEBA_PROPIA` (`V68`) es la fecha límite de la prueba del editor**: obligatoria y futura para publicarla, se puede poner antes de publicar y no viaja al copiar la prueba |
 | `responsable_usuario_id` | bigint | sí | Quién se hace cargo de contratar |
 | `publicada_en` | timestamptz | no | |
 | `cerrada_en` | timestamptz | no | |
@@ -1233,14 +1233,14 @@ Una versión del banco, en borrador o publicada.
 | `metodo_calificacion` | text | no | `V41`. Vacío = motor de claves versionadas (v0.1 y v3) · `CRITERIOS` = conteo C1..C4 del banco CAZATALENTOS · `PUNTOS` (`V66`) = preguntas propias de una vacante y, desde la `V67`, su prueba técnica: todo suma 100. Es lo que decide qué motor califica |
 | `guia_calificacion` | text | no | (`V66`) La guía que la empresa escribe para que la IA califique las abiertas de sus preguntas propias. Hasta 2000 caracteres, como la de la prueba del puesto (`V46`), y con la misma envoltura al mandarla |
 | `version_guia` | integer | sí | (`V66`) Por defecto 1. Sube cada vez que se corrigen las instrucciones de la IA de una versión publicada —la guía, el «qué evalúa» o el «qué debe tener»—. Cada nota de una abierta guarda con cuál se calculó (`nota_respuesta.version_guia`), y un resultado que llega calculado con una anterior se descarta. En la prueba del editor (`V67`), igual con `nota_criterio_prueba.version_guia` |
-| `enunciado` | text | no | (`V67`) El caso de la prueba técnica, hasta 10 000 caracteres. Obligatorio para publicar si hay entregables —lo exige el servidor, que sabe cuántos hay—; sin entregables es un cuestionario y el caso es opcional |
+| `enunciado` | text | no | (`V67`) El caso de la prueba técnica, hasta 10 000 caracteres. **Opcional desde la `V68`**, haya o no entregables |
 | `consigna_archivo_id` | bigint | no | (`V67`) El enunciado en PDF o Word, como la consigna de las plantillas |
 | `url_consigna` | text | no | (`V67`) El enlace largo de ese archivo, el que se pega en el aviso `PRUEBA_DISPONIBLE` |
 | `materiales` | text | no | (`V67`) Hasta 2000 caracteres |
 | `herramientas_permitidas` | text | no | (`V67`) Hasta 1000 caracteres |
-| `modalidad` | text | no | (`V67`) `CRONOMETRADA` o `PLAZO_ABIERTO`. **Sin cambio inesperado**. Que traiga su número lo exige el servidor al publicar: un borrador se escribe por partes |
+| `modalidad` | text | no | (`V67`) `CRONOMETRADA` o `PLAZO_ABIERTO`, que desde la `V68` es «Sin cronómetro»: se trabaja hasta la fecha límite de la vacante. **Sin cambio inesperado**. Que una cronometrada traiga sus minutos lo exige el servidor al publicar: un borrador se escribe por partes |
 | `duracion_minutos` | integer | no | (`V67`) Con `CRONOMETRADA`, al menos 5 |
-| `plazo_dias` | integer | no | (`V67`) Con `PLAZO_ABIERTO`, al menos 1 |
+| `plazo_dias` | integer | no | (`V67`) Con `PLAZO_ABIERTO`, al menos 1. **Desde la `V68` ya no se escribe**: la migración lo vació en los borradores, y solo lo conservan las publicadas de antes, que sin fecha límite cuentan esos días desde que se abre |
 
 **Clave primaria:** `id` · **Apunta a:** `archivo` (`consigna_archivo_id`, `V67`)
 
@@ -1335,8 +1335,9 @@ ficha del candidato enseña con su nota.
 | `que_evalua` | text | no | Hasta 1000 caracteres. Llega a la IA; nunca al candidato |
 | `orden` | integer | sí | |
 | `creado_en` | timestamptz | sí | |
-| `puntos_calificados` | integer | no | (`V67`) Solo en la prueba técnica: los puntos de su **parte calificada**, de 0 a 100. Vacío o 0 = sin parte calificada. En las preguntas propias no se usa |
+| `puntos_calificados` | integer | no | (`V67`) Solo en la prueba técnica: los puntos de su **parte calificada**, de 0 a 100. Vacío o 0 = sin parte calificada. En las preguntas propias no se usa. **Desde la `V69` no se escribe a mano**: con `puntos_del_criterio` puesto, la parte calificada se deduce al leer (el total menos sus cerradas), y esta columna se deja escrita al guardar el criterio y al publicar, con el valor que leerá la calificación. En un borrador puede ir por detrás de sus cerradas |
 | `calificador` | text | no | (`V67`) Quién califica esa parte: `IA` o `PERSONA` |
+| `puntos_del_criterio` | integer | no | (`V69`) Solo en la prueba técnica: **lo que vale el criterio entero**, cerradas incluidas; es lo que escribe quien arma la prueba. CHECK: vacío o 0 en adelante. Vacío = una versión publicada antes de la `V69`, que lee `puntos_calificados` tal cual; la migración se lo puso a los borradores (cerradas más parte calificada). En las preguntas propias no se usa |
 
 **Clave primaria:** `id` · **Apunta a:** `version_banco`
 **Índice:** `criterio_banco_version_idx` sobre `version_banco_id`
@@ -1348,13 +1349,18 @@ criterio guardada**: se calcula al leer con las notas de sus preguntas.
 
 **En la prueba técnica (`V67`) las abiertas no llevan puntos**: el criterio vale la suma de sus
 cerradas —su parte automática, que tampoco se guarda— más `puntos_calificados`. La nota de esa
-parte sí se guarda, en `nota_criterio_prueba`.
+parte sí se guarda, en `nota_criterio_prueba`. **Desde la `V69` se guarda el total**
+(`puntos_del_criterio`) y la parte calificada sale de restarle las cerradas: si las cerradas
+cambian, el criterio sigue valiendo lo mismo. Si lo suman todo no queda parte calificada, y si lo
+pasan es una falta al publicar.
 
 ## `criterio_banco_entregable`
 
-(`V67`) Qué entregables mira cada criterio de la prueba técnica. Un entregable puede estar en
-varios criterios, y todo entregable tiene que estar en al menos uno: lo exige el servidor al
-publicar.
+(`V67`) Qué entregables mira cada criterio de la prueba técnica, **marcado a mano**. Un entregable
+puede estar en varios criterios. ⚠️ **Desde la `V68` solo lo leen las versiones publicadas antes
+de esa migración**: en las demás «Mira» se deduce al leer del alcance de los entregables
+(`entregable_requerido.alcance`) y aquí no se escribe nada. La migración borró las filas de los
+borradores abiertos después de pasar sus entregables a generales.
 
 | Columna | Tipo | Oblig. | Qué guarda |
 |---|---|---|---|
@@ -1368,7 +1374,7 @@ publicar.
 **Índice:** `criterio_banco_entregable_entregable_idx` sobre `entregable_requerido_id`
 
 Es lo que le dice a la IA y a quien califica qué leer, y lo que permite impedir que un criterio de
-IA dependa solo de enlaces, que la IA no lee.
+IA dependa solo de enlaces, que la IA no lee. Lo deducido desde la `V68` sirve para lo mismo.
 
 ## `propuesta_preguntas`
 
@@ -2026,12 +2032,19 @@ Qué cosas distintas tiene que entregar, cada una con su regla.
 | `es_obligatorio` | boolean | sí | |
 | `orden` | integer | sí | |
 | `que_debe_tener` | text | no | (`V67`) «Qué debe tener una buena entrega», hasta 1000 caracteres. Llega a la IA y a quien califica, **nunca al portal** |
+| `alcance` | text | no | (`V68`) Solo en la prueba del editor: `PREGUNTA` (el archivo de `pregunta_id`), `TODA_LA_PRUEBA` (un general que reúne el resultado de toda la prueba) o `PREGUNTAS` (un general que reúne las respuestas de las preguntas de `entregable_cubre_pregunta`). De él se deduce qué criterios lo miran. Vacío = un entregable de una plantilla, o uno publicado antes de la `V68`, que sigue con su «Mira» marcado a mano en `criterio_banco_entregable` |
+| `pregunta_id` | bigint | no | (`V68`) Con `PREGUNTA`, la pregunta del editor de la que es el archivo. Quitar la pregunta quita el archivo |
 
 **Clave primaria:** `id` · **Único:** `version_plantilla_prueba_id` + `orden`
 **Restricción `entregable_requerido_de_una_version_check` (`V67`):** cuelga de una plantilla o
 de una versión del editor, exactamente de una
+**Restricciones (`V68`):** `entregable_requerido_alcance_pregunta_check` —hay `pregunta_id` si y
+solo si el alcance es `PREGUNTA`— y `entregable_requerido_alcance_del_editor_check` —solo un
+entregable del editor lleva alcance—
 **Índice parcial (`V67`):** `entregable_requerido_version_banco_idx` sobre `version_banco_id`,
 solo donde no es nulo
+**Índice único y parcial (`V68`):** `entregable_requerido_uno_por_pregunta_idx` sobre
+`pregunta_id`, solo donde no es nulo: una pregunta pide como mucho un archivo
 
 Antes esto era una columna de texto libre en la versión de la plantilla, y no servía: **el
 sistema no podía decir «falta el video»**, ni la rúbrica podía puntuar un entregable concreto.
@@ -2040,6 +2053,25 @@ Las cinco pruebas reales de `insumos/pruebas-tecnicas/` piden entre uno y cuatro
 distintos, cada uno con su propia regla: producto funcional más video de 5 minutos más documento
 de 1 página; o documento de 5 páginas más plano más imágenes más video. Una presentación de 10
 diapositivas cuenta como uno solo. Por eso es una tabla y no una columna.
+
+## `entregable_cubre_pregunta`
+
+(`V68`) Las preguntas que cubre un entregable general de alcance `PREGUNTAS` en la prueba del
+editor. Lo miran los criterios de esas preguntas.
+
+| Columna | Tipo | Oblig. | Qué guarda |
+|---|---|---|---|
+| `id` | bigint | sí | Clave |
+| `entregable_requerido_id` | bigint | sí | El entregable general |
+| `pregunta_id` | bigint | sí | Una pregunta de la misma versión que reúne |
+| `creado_en` | timestamptz | sí | |
+
+**Clave primaria:** `id` · **Único:** `entregable_requerido_id` + `pregunta_id` ·
+**Apunta a:** `entregable_requerido`, `pregunta`
+**Índice:** `entregable_cubre_pregunta_pregunta_idx` sobre `pregunta_id`
+
+Un general de alcance `PREGUNTAS` sin ninguna fila aquí no cubre nada y no se publica. Si se
+quita la única pregunta que cubría, el general queda sin cubrir y sale como falta.
 
 ## `intento_prueba`
 
@@ -2052,7 +2084,7 @@ Cuando un candidato rinde.
 | `version_plantilla_prueba_id` | bigint | no | La versión congelada con que rindió. **Obligatoria hasta la `V67`**; vacía en la prueba del editor |
 | `version_banco_id` | bigint | no | (`V67`) La versión de la prueba del editor con que rindió (RF-138: queda atado a ella) |
 | `iniciado_en` | timestamptz | sí | Desde aquí corre el reloj |
-| `vence_en` | timestamptz | sí | Cuándo se le cierra. **Se calcula al empezar y se guarda**: entre el reloj de la prueba (`ahora + minutos`) y la fecha de la vacante (`prueba_cierra_en`) rige **el que caiga antes**, y sin ninguno de los dos, los días de la versión de la plantilla desde que empieza. ⚠️ **Los días nunca acercan la fecha de la vacante**, solo un cronómetro puede; y con `plazo_propio` manda la fecha puesta a mano |
+| `vence_en` | timestamptz | sí | Cuándo se le cierra. **Se calcula al empezar y se guarda**: entre el reloj de la prueba (`ahora + minutos`) y la fecha de la vacante (`prueba_cierra_en`) rige **el que caiga antes**, y sin ninguno de los dos, los días de la versión de la plantilla desde que empieza. ⚠️ **Los días nunca acercan la fecha de la vacante**, solo un cronómetro puede; y con `plazo_propio` manda la fecha puesta a mano. **En la prueba del editor (`V68`)** una «Sin cronómetro» vence en la fecha límite, y al mover esa fecha a quien ya abrió una cronometrada le queda lo que llegue antes entre su inicio más los minutos y la nueva fecha: mover la fecha no le alarga el reloj |
 | `plazo_propio` | boolean | sí | A esta persona se le fijó su fecha a mano. Mover la de la vacante no se la toca |
 | `entregado_en` | timestamptz | no | Cuándo se entregó. Vacío = no llegó a entregarse |
 | `es_entrega_automatica` | boolean | sí | Si lo entregó el reloj por él |
@@ -3407,7 +3439,9 @@ caro sale: cada consulta que filtra por el padre acaba leyendo la tabla entera.
 | `pregunta (criterio_banco_id) WHERE criterio_banco_id IS NOT NULL` | **Índice parcial.** Las preguntas de un criterio (`V66`) |
 | `propuesta_preguntas (vacante_id, proposito, id)` | La última propuesta de la IA para una vacante y cada propósito: sus preguntas o su prueba (`V67`; sustituye al de la `V66`, sin propósito) |
 | `entregable_requerido (version_banco_id) WHERE version_banco_id IS NOT NULL` | **Índice parcial.** Los entregables de una prueba del editor (`V67`) |
-| `criterio_banco_entregable (entregable_requerido_id)` | Qué criterios miran un entregable: quitarlo lo quita de sus «Mira» (`V67`) |
+| `criterio_banco_entregable (entregable_requerido_id)` | Qué criterios miran un entregable: quitarlo lo quita de sus «Mira» (`V67`). Desde la `V68`, solo en las versiones publicadas antes |
+| `entregable_requerido (pregunta_id) WHERE pregunta_id IS NOT NULL` | **Único y parcial.** Una pregunta de la prueba del editor pide como mucho un archivo (`V68`) |
+| `entregable_cubre_pregunta (pregunta_id)` | Qué generales cubren una pregunta (`V68`) |
 | `respuesta_prueba (intento_prueba_id, pregunta_id) WHERE pregunta_id IS NOT NULL` | **Único y parcial.** Una respuesta por pregunta del editor en cada intento (`V67`) |
 | `nota_criterio_prueba (criterio_banco_id)` | Las notas de un criterio de la prueba del editor, para recalcular o recalificar a todos (`V67`) |
 
@@ -3454,6 +3488,9 @@ Resumen de las restricciones que están repartidas por el documento:
   prueba cuelgan de una plantilla o del editor, nunca de los dos; una parte calificada va de 0 a
   100 y la califica `IA` o `PERSONA`; un intento no completado está cerrado; y un ajuste de la
   parte calificada lleva motivo (`V67`).
+- Un entregable con alcance es del editor; uno de alcance `PREGUNTA` lleva su pregunta y los
+  demás no; una pregunta pide como mucho un archivo; y un general no cubre dos veces la misma
+  pregunta (`V68`). Lo que vale un criterio no es negativo (`V69`).
 
 ⚠️ Aquí decía «el rango del cambio inesperado cabe dentro de la duración de la prueba». **Eso no
 lo impide nada**: no hay CHECK que lo diga ni comprobación en el código. Ver

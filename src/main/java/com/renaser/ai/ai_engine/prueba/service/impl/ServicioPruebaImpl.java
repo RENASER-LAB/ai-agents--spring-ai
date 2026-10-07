@@ -225,7 +225,7 @@ public class ServicioPruebaImpl implements ServicioPrueba {
     public MiPrueba ver(ContextoUsuario quien, UUID uuidPostulacion) {
         var par = laMia(quien, uuidPostulacion);
         if (par.intento().esDelEditor()) {
-            return pintarDelEditor(par.intento());
+            return pintarDelEditor(par.postulacion(), par.intento());
         }
         return pintar(par.intento(), minutosDeLaVacante(par.postulacion()));
     }
@@ -752,10 +752,10 @@ public class ServicioPruebaImpl implements ServicioPrueba {
             }
             intentos.save(intento);
         }
-        return pintarDelEditor(intento);
+        return pintarDelEditor(postulacion, intento);
     }
 
-    private MiPrueba pintarDelEditor(IntentoPrueba intento) {
+    private MiPrueba pintarDelEditor(Postulacion postulacion, IntentoPrueba intento) {
         Resultado r = calculo.calcular(intento);
         VersionBanco v = r.version();
         List<PreguntaCandidato> preguntas = new ArrayList<>();
@@ -778,7 +778,10 @@ public class ServicioPruebaImpl implements ServicioPrueba {
                 .map(e -> new EntregableRequeridoCandidato(e.getId(), e.getNombre(),
                         e.getDetalle() == null || e.getDetalle().isBlank() ? null : e.getDetalle(),
                         e.getFormato(), e.isEsObligatorio(),
-                        subidos.stream().anyMatch(s -> s.getEntregableRequeridoId().equals(e.getId()))))
+                        subidos.stream().anyMatch(s -> s.getEntregableRequeridoId().equals(e.getId())),
+                        // El archivo de una pregunta se sube dentro de ella (V68). Nunca viaja
+                        // qué criterio lo mira (RF-53).
+                        e.getPreguntaId()))
                 .toList();
         String estado = intento.isNoCompletada() ? "NO_COMPLETADA"
                 : intento.getEntregadoEn() != null ? "ENTREGADA"
@@ -788,7 +791,21 @@ public class ServicioPruebaImpl implements ServicioPrueba {
                 intento.getVenceEn(), cronometrada ? v.getDuracionMinutos() : null,
                 v.getEnunciado(), v.getMateriales(), v.getHerramientasPermitidas(),
                 null, preguntas, deLaPrueba,
-                cronometrada ? null : v.getPlazoDias(), r.esCuestionario(), consignaDe(v), true);
+                cronometrada ? null : v.getPlazoDias(), r.esCuestionario(), consignaDe(v), true,
+                fechaLimiteDe(postulacion, intento));
+    }
+
+    /**
+     * La fecha límite que se le enseña antes de empezar (V68): la suya si se la dieron a mano
+     * desde su ficha, que manda; si no, la de la vacante.
+     */
+    private Instant fechaLimiteDe(Postulacion postulacion, IntentoPrueba intento) {
+        if (intento.isPlazoPropio() && intento.getVenceEn() != null) {
+            return intento.getVenceEn();
+        }
+        return vacantes.findByIdAndOrganizacionId(postulacion.getVacanteId(), postulacion.getOrganizacionId())
+                .map(com.renaser.ai.ai_engine.vacante.entity.Vacante::getPruebaCierraEn)
+                .orElse(null);
     }
 
     /** El enunciado adjunto, con un enlace fresco para descargarlo si el almacén los reparte. */

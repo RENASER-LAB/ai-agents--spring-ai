@@ -109,7 +109,9 @@ class ServicioVacantesPanelImplTest {
         servicio = new ServicioVacantesPanelImpl(vacantes, puestos, requisitos, solicitudes,
                 versionesPesos, plantillas, versionesPrueba, plantillasPrueba, plantillasCorreo,
                 plantillasPorVacante, intentos, evaluaciones, versionesBanco,
-                auditoria, dueno, postulaciones, enCarrera, maquina, avisos, alcance, permisos, catalogos);
+                auditoria, dueno, postulaciones, enCarrera, maquina, avisos, alcance, permisos, catalogos,
+                new com.renaser.ai.ai_engine.prueba.service.FechaLimiteDeLaVacante(vacantes, intentos,
+                        versionesPrueba, versionesBanco));
         // En estas pruebas la organizacion no personaliza nada: el resolutor contesta
         // que el dueño de todo instrumento es ella misma (aqui hace de plataforma).
         org.mockito.Mockito.lenient()

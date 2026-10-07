@@ -29,7 +29,6 @@ import com.renaser.ai.ai_engine.prueba.dto.DtosPruebaPropia.AgregarDeLaPropuesta
 import com.renaser.ai.ai_engine.prueba.dto.DtosPruebaPropia.CambiarPuntosDePrueba;
 import com.renaser.ai.ai_engine.prueba.dto.DtosPruebaPropia.CorregirInstruccionesDePrueba;
 import com.renaser.ai.ai_engine.prueba.dto.DtosPruebaPropia.PuntosDeCriterio;
-import com.renaser.ai.ai_engine.prueba.entity.CriterioBancoEntregable;
 import com.renaser.ai.ai_engine.prueba.entity.EntregableRequerido;
 import com.renaser.ai.ai_engine.prueba.entity.IntentoPrueba;
 import com.renaser.ai.ai_engine.prueba.entity.NotaCriterioPrueba;
@@ -105,6 +104,7 @@ class ServicioPruebaPropiaPublicadaTest {
     @Mock private OpcionRepository opciones;
     @Mock private EntregableRequeridoRepository entregables;
     @Mock private CriterioBancoEntregableRepository miradas;
+    @Mock private com.renaser.ai.ai_engine.prueba.repository.EntregableCubrePreguntaRepository cubiertas;
     @Mock private IntentoPruebaRepository intentos;
     @Mock private NotaCriterioPruebaRepository notas;
     @Mock private PropuestaPreguntasRepository propuestas;
@@ -114,6 +114,7 @@ class ServicioPruebaPropiaPublicadaTest {
     @Mock private CierreDeLaPruebaPropia cierre;
     @Mock private ColaCalificacionIa cola;
     @Mock private ServicioAuditoria auditoria;
+    @Mock private com.renaser.ai.ai_engine.prueba.service.FechaLimiteDeLaVacante fechaLimite;
     @InjectMocks private ServicioPruebaPropiaImpl servicio;
 
     private final Vacante vacante = Vacante.builder().id(VACANTE).organizacionId(ORGANIZACION)
@@ -352,13 +353,14 @@ class ServicioPruebaPropiaPublicadaTest {
     }
 
     @Test
-    @DisplayName("Puntos a una abierta y la parte calificada en 0 no pasan: la lista entera y nada se toca")
+    @DisplayName("Puntos a una abierta y un criterio que solo vale sus cerradas no pasan: la lista entera y nada se toca")
     void cambiarPuntosConFaltas() {
         laPublicadaSuma100();
 
+        // Vale 60, lo que ya suman sus cerradas: su parte calificada quedaría en 0.
         assertThatThrownBy(() -> servicio.cambiarPuntos(QUIEN, VACANTE, new CambiarPuntosDePrueba(
                 List.of(new PuntosDePregunta(2L, BigDecimal.valueOf(5), null)),
-                List.of(new PuntosDeCriterio(5L, BigDecimal.ZERO)))))
+                List.of(new PuntosDeCriterio(5L, BigDecimal.valueOf(60))))))
                 .isInstanceOf(PreguntasInvalidasException.class)
                 .hasMessage("Los puntos no se cambiaron: faltan 3 cosas")
                 .satisfies(e -> assertThat(((PreguntasInvalidasException) e).getFaltas()).containsExactly(
@@ -368,6 +370,112 @@ class ServicioPruebaPropiaPublicadaTest {
                                 + "abiertas o entregables que alguien califica."));
         verify(preguntas, never()).save(any());
         verify(criteriosBanco, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Unas cerradas que pasan de lo que vale el criterio, o unos puntos mal escritos, no pasan (V69)")
+    void cambiarPuntosConCerradasPorEncima() {
+        laPublicadaSuma100();
+
+        assertThatThrownBy(() -> servicio.cambiarPuntos(QUIEN, VACANTE, new CambiarPuntosDePrueba(
+                null, List.of(new PuntosDeCriterio(5L, BigDecimal.valueOf(50))))))
+                .isInstanceOf(PreguntasInvalidasException.class)
+                .satisfies(e -> assertThat(((PreguntasInvalidasException) e).getFaltas())
+                        .contains("Las cerradas de «Contable» suman 60 y el criterio vale 50."));
+        assertThatThrownBy(() -> servicio.cambiarPuntos(QUIEN, VACANTE, new CambiarPuntosDePrueba(
+                null, List.of(new PuntosDeCriterio(5L, new BigDecimal("99.5"))))))
+                .isInstanceOf(PreguntasInvalidasException.class)
+                .satisfies(e -> assertThat(((PreguntasInvalidasException) e).getFaltas()).contains(
+                        "El criterio «Contable»: Los puntos del criterio tienen que ser un número entero, sin decimales."));
+        verify(criteriosBanco, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("QA-11: un total mal escrito dice su falta, y la suma, si se da, es la de lo escrito")
+    void cambiarPuntosConUnTotalMalEscrito() {
+        laPublicadaSuma100();
+
+        // Un entero fuera de 0 a 100 se suma tal cual: es lo que el formulario enseña escrito.
+        assertThatThrownBy(() -> servicio.cambiarPuntos(QUIEN, VACANTE, new CambiarPuntosDePrueba(
+                null, List.of(new PuntosDeCriterio(5L, BigDecimal.valueOf(150))))))
+                .isInstanceOf(PreguntasInvalidasException.class)
+                .satisfies(e -> assertThat(((PreguntasInvalidasException) e).getFaltas()).containsExactly(
+                        "Los puntos suman 150 de 100: sobran 50.",
+                        "El criterio «Contable»: Los puntos del criterio van de 0 a 100."));
+        // Con decimales no hay suma que decir: una que lo dejara fuera contradiría la escrita.
+        assertThatThrownBy(() -> servicio.cambiarPuntos(QUIEN, VACANTE, new CambiarPuntosDePrueba(
+                null, List.of(new PuntosDeCriterio(5L, new BigDecimal("25.5"))))))
+                .isInstanceOf(PreguntasInvalidasException.class)
+                .hasMessage("Los puntos no se cambiaron: falta una cosa")
+                .satisfies(e -> assertThat(((PreguntasInvalidasException) e).getFaltas()).containsExactly(
+                        "El criterio «Contable»: Los puntos del criterio tienen que ser un número entero, sin decimales."));
+        // Por debajo de sus cerradas también cuenta lo escrito (50), no sus cerradas (60).
+        assertThatThrownBy(() -> servicio.cambiarPuntos(QUIEN, VACANTE, new CambiarPuntosDePrueba(
+                null, List.of(new PuntosDeCriterio(5L, BigDecimal.valueOf(50))))))
+                .isInstanceOf(PreguntasInvalidasException.class)
+                .satisfies(e -> assertThat(((PreguntasInvalidasException) e).getFaltas()).containsExactly(
+                        "Los puntos suman 50 de 100: faltan 50.",
+                        "Las cerradas de «Contable» suman 60 y el criterio vale 50."));
+        verify(preguntas, never()).save(any());
+        verify(criteriosBanco, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("QA-11: una cerrada con decimales que cuenta en la suma (suelta, o de un criterio solo de cerradas) no da suma")
+    void cambiarPuntosConUnaCerradaMalEscrita() {
+        CriterioBanco sinParte = CriterioBanco.builder().id(6L).versionBancoId(PUBLICADA).nombre("Excel")
+                .puntosCalificados(0).build();
+        unica.setPuntos(100);
+        diario.setPuntaje(BigDecimal.valueOf(100));
+        PreguntaDeLaPrueba deUnica = new PreguntaDeLaPrueba(unica, List.of(diario, mayor), null, 100, null, false);
+        when(calculo.estructura(PUBLICADA)).thenReturn(new Resultado(publicada, List.of(
+                new CriterioDeLaPrueba(sinParte, List.of(deUnica), List.of(), 100, BigDecimal.ZERO, 0, null, null)),
+                List.of(), List.of()));
+
+        assertThatThrownBy(() -> servicio.cambiarPuntos(QUIEN, VACANTE, new CambiarPuntosDePrueba(
+                List.of(new PuntosDePregunta(1L, new BigDecimal("90.5"),
+                        List.of(new PuntosDeOpcion(11L, new BigDecimal("90.5"))))), null)))
+                .isInstanceOf(PreguntasInvalidasException.class)
+                .satisfies(e -> assertThat(((PreguntasInvalidasException) e).getFaltas())
+                        .isNotEmpty()
+                        .noneMatch(f -> f.startsWith("Los puntos suman")));
+
+        // Suelta, fuera de todo criterio: igual.
+        when(calculo.estructura(PUBLICADA)).thenReturn(new Resultado(publicada, List.of(), List.of(deUnica), List.of()));
+        assertThatThrownBy(() -> servicio.cambiarPuntos(QUIEN, VACANTE, new CambiarPuntosDePrueba(
+                List.of(new PuntosDePregunta(1L, new BigDecimal("90.5"),
+                        List.of(new PuntosDeOpcion(11L, new BigDecimal("90.5"))))), null)))
+                .isInstanceOf(PreguntasInvalidasException.class)
+                .satisfies(e -> assertThat(((PreguntasInvalidasException) e).getFaltas())
+                        .isNotEmpty()
+                        .noneMatch(f -> f.startsWith("Los puntos suman")));
+        // Y bien escrita, la suelta sí suma.
+        assertThatThrownBy(() -> servicio.cambiarPuntos(QUIEN, VACANTE, new CambiarPuntosDePrueba(
+                List.of(new PuntosDePregunta(1L, BigDecimal.valueOf(90),
+                        List.of(new PuntosDeOpcion(11L, BigDecimal.valueOf(90))))), null)))
+                .isInstanceOf(PreguntasInvalidasException.class)
+                .satisfies(e -> assertThat(((PreguntasInvalidasException) e).getFaltas())
+                        .containsExactly("Los puntos suman 90 de 100: faltan 10."));
+        verify(preguntas, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("El total se mantiene: bajar una cerrada sin tocar el criterio sube su parte calificada y escala la nota puesta (V69)")
+    void cambiarPuntosMantieneElTotal() {
+        laPublicadaSuma100();
+        when(intentos.findByVersionBancoId(PUBLICADA)).thenReturn(List.of(deAna));
+        NotaCriterioPrueba puesta = NotaCriterioPrueba.builder().intentoPruebaId(100L).criterioBancoId(5L)
+                .puntaje(BigDecimal.valueOf(20)).origen("IA").build();
+        when(notas.findByCriterioBancoIdIn(anyCollection())).thenReturn(List.of(puesta));
+
+        servicio.cambiarPuntos(QUIEN, VACANTE, new CambiarPuntosDePrueba(
+                List.of(new PuntosDePregunta(1L, BigDecimal.valueOf(50),
+                        List.of(new PuntosDeOpcion(11L, BigDecimal.valueOf(50))))), null));
+
+        assertThat(contable.getPuntosDelCriterio()).isEqualTo(100);
+        assertThat(contable.getPuntosCalificados()).isEqualTo(50);
+        assertThat(puesta.getPuntaje()).isEqualByComparingTo("25.00");
+        verify(cierre).recalcular(deAna, false);
     }
 
     @Test
@@ -382,13 +490,34 @@ class ServicioPruebaPropiaPublicadaTest {
                 new CriterioDeLaPrueba(sinParte, List.of(deUnica), List.of(), 100, BigDecimal.ZERO, 0, "IA", null)),
                 List.of(), List.of()));
 
+        // Sus cerradas bajan a 90 y se le pide que siga valiendo 100: 10 serían de parte calificada.
         assertThatThrownBy(() -> servicio.cambiarPuntos(QUIEN, VACANTE, new CambiarPuntosDePrueba(
                 List.of(new PuntosDePregunta(1L, BigDecimal.valueOf(90),
                         List.of(new PuntosDeOpcion(11L, BigDecimal.valueOf(90))))),
-                List.of(new PuntosDeCriterio(6L, BigDecimal.TEN)))))
+                List.of(new PuntosDeCriterio(6L, BigDecimal.valueOf(100))))))
                 .isInstanceOf(PreguntasInvalidasException.class)
                 .satisfies(e -> assertThat(((PreguntasInvalidasException) e).getFaltas()).anyMatch(f ->
                         f.startsWith("El criterio «Excel» no tiene parte calificada")));
+    }
+
+    @Test
+    @DisplayName("Un criterio solo de cerradas vale lo que sumen: sin decir nada, sigue a sus cerradas")
+    void cambiarPuntosDeUnCriterioSoloDeCerradas() {
+        CriterioBanco sinParte = CriterioBanco.builder().id(6L).versionBancoId(PUBLICADA).nombre("Excel")
+                .puntosCalificados(0).build();
+        PreguntaDeLaPrueba deUnica = new PreguntaDeLaPrueba(unica, List.of(diario, mayor), null, 100, null, false);
+        unica.setPuntos(100);
+        diario.setPuntaje(BigDecimal.valueOf(100));
+        when(calculo.estructura(PUBLICADA)).thenReturn(new Resultado(publicada, List.of(
+                new CriterioDeLaPrueba(sinParte, List.of(deUnica), List.of(), 100, BigDecimal.ZERO, 0, null, null)),
+                List.of(), List.of()));
+
+        assertThatThrownBy(() -> servicio.cambiarPuntos(QUIEN, VACANTE, new CambiarPuntosDePrueba(
+                List.of(new PuntosDePregunta(1L, BigDecimal.valueOf(90),
+                        List.of(new PuntosDeOpcion(11L, BigDecimal.valueOf(90))))), null)))
+                .isInstanceOf(PreguntasInvalidasException.class)
+                .satisfies(e -> assertThat(((PreguntasInvalidasException) e).getFaltas())
+                        .containsExactly("Los puntos suman 90 de 100: faltan 10."));
     }
 
     @Test
@@ -400,14 +529,16 @@ class ServicioPruebaPropiaPublicadaTest {
                 .puntaje(BigDecimal.valueOf(20)).puntajeIa(BigDecimal.valueOf(30)).origen("IA").build();
         when(notas.findByCriterioBancoIdIn(anyCollection())).thenReturn(List.of(puesta));
 
+        // La cerrada baja a 50 y el criterio pasa a valer 100 entero: su parte calificada, 50.
         CambioAplicado cambio = servicio.cambiarPuntos(QUIEN, VACANTE, new CambiarPuntosDePrueba(
                 List.of(new PuntosDePregunta(1L, BigDecimal.valueOf(50),
                         List.of(new PuntosDeOpcion(11L, BigDecimal.valueOf(50))))),
-                List.of(new PuntosDeCriterio(5L, BigDecimal.valueOf(50)))));
+                List.of(new PuntosDeCriterio(5L, BigDecimal.valueOf(100)))));
 
         assertThat(cambio.personas()).isEqualTo(1);
         assertThat(unica.getPuntos()).isEqualTo(50);
         assertThat(diario.getPuntaje()).isEqualByComparingTo("50");
+        assertThat(contable.getPuntosDelCriterio()).isEqualTo(100);
         assertThat(contable.getPuntosCalificados()).isEqualTo(50);
         assertThat(puesta.getPuntaje()).isEqualByComparingTo("25.00");
         assertThat(puesta.getPuntajeIa()).isEqualByComparingTo("37.50");
@@ -424,10 +555,11 @@ class ServicioPruebaPropiaPublicadaTest {
 
         CambioAplicado cambio = servicio.cambiarPuntos(QUIEN, VACANTE, new CambiarPuntosDePrueba(
                 List.of(new PuntosDePregunta(1L, BigDecimal.valueOf(60), null)),
-                List.of(new PuntosDeCriterio(5L, BigDecimal.valueOf(40)))));
+                List.of(new PuntosDeCriterio(5L, BigDecimal.valueOf(100)))));
 
         assertThat(cambio.personas()).isZero();
         verify(cierre, never()).recalcular(any(), anyBoolean());
+        verify(criteriosBanco, never()).save(any());
     }
 
     @Test
@@ -656,7 +788,7 @@ class ServicioPruebaPropiaPublicadaTest {
     }
 
     @Test
-    @DisplayName("Un criterio entero trae su parte calificada, sus entregables y sus preguntas; el caso solo llena lo vacío")
+    @DisplayName("Un criterio entero trae su parte calificada, sus preguntas y los generales de toda la prueba (una propuesta de antes también); el caso solo llena lo vacío")
     void agregarUnCriterioEntero() {
         enElBorrador();
         borrador.setEnunciado("Mi caso");
@@ -674,12 +806,13 @@ class ServicioPruebaPropiaPublicadaTest {
         assertThat(entregable.getValue().getOrden()).isEqualTo(2);
         ArgumentCaptor<CriterioBanco> criterio = ArgumentCaptor.forClass(CriterioBanco.class);
         verify(criteriosBanco).save(criterio.capture());
+        // Una propuesta de antes de la V69 solo traía la parte calificada: vale su cerrada más ella.
+        assertThat(criterio.getValue().getPuntosDelCriterio()).isEqualTo(30);
         assertThat(criterio.getValue().getPuntosCalificados()).isEqualTo(20);
         assertThat(criterio.getValue().getCalificador()).isEqualTo("IA");
-        ArgumentCaptor<CriterioBancoEntregable> mira = ArgumentCaptor.forClass(CriterioBancoEntregable.class);
-        verify(miradas, times(2)).save(mira.capture());
-        assertThat(mira.getAllValues()).extracting(CriterioBancoEntregable::getEntregableRequeridoId)
-                .containsExactly(40L, 31L);
+        assertThat(entregable.getValue().getAlcance()).isEqualTo(EntregableRequerido.TODA_LA_PRUEBA);
+        // «Mira» ya no se escribe (V68): se deduce del alcance.
+        verify(miradas, never()).save(any());
         ArgumentCaptor<Pregunta> pregunta = ArgumentCaptor.forClass(Pregunta.class);
         verify(preguntas).save(pregunta.capture());
         assertThat(pregunta.getValue().getPuntos()).isEqualTo(10);
@@ -702,5 +835,94 @@ class ServicioPruebaPropiaPublicadaTest {
         assertThat(pregunta.getValue().getCriterioBancoId()).isEqualTo(5L);
         assertThat(pregunta.getValue().getPuntos()).isZero();
         assertThat(pregunta.getValue().getQueDebeTener()).isEqualTo("Que cuadre");
+    }
+
+    /** Una propuesta de la V69: el criterio nuevo dice lo que vale entero. */
+    private static final String CON_PUNTOS = """
+            {"criterios":[{"nombre":"Cierre","puntos":35,"calificador":"PERSONA","preguntas":[
+               {"tipo":"OPCION_UNICA","enunciado":"¿Qué cuenta cierra?","puntos":10,
+                "opciones":[{"texto":"Caja","puntos":10},{"texto":"Ventas","puntos":0}]},
+               {"tipo":"ABIERTA","enunciado":"¿Cómo cierras el mes?"}]}]}""";
+
+    @Test
+    @DisplayName("Un criterio nuevo entero vale lo propuesto; con solo alguna de sus preguntas, lo que sumen sus cerradas (V69)")
+    void agregarUnCriterioConSusPuntos() {
+        enElBorrador();
+        ultima("LISTA", CON_PUNTOS);
+
+        servicio.agregarDeLaPropuesta(QUIEN, VACANTE, 60L, new AgregarDeLaPropuestaDePrueba(false, null, List.of(0), null));
+        servicio.agregarDeLaPropuesta(QUIEN, VACANTE, 60L, new AgregarDeLaPropuestaDePrueba(false, null, null,
+                List.of(new PreguntaElegida(0, 0))));
+
+        ArgumentCaptor<CriterioBanco> criterios = ArgumentCaptor.forClass(CriterioBanco.class);
+        verify(criteriosBanco, times(2)).save(criterios.capture());
+        CriterioBanco entero = criterios.getAllValues().get(0);
+        assertThat(entero.getPuntosDelCriterio()).isEqualTo(35);
+        assertThat(entero.getPuntosCalificados()).isEqualTo(25);
+        assertThat(entero.getCalificador()).isEqualTo("PERSONA");
+        CriterioBanco suelto = criterios.getAllValues().get(1);
+        assertThat(suelto.getPuntosDelCriterio()).isEqualTo(10);
+        assertThat(suelto.getPuntosCalificados()).isZero();
+        assertThat(suelto.getCalificador()).isNull();
+    }
+
+    /** Una propuesta con alcance (V68): el archivo de una pregunta, un general de dos y uno de toda la prueba. */
+    private static final String CON_ALCANCE = """
+            {"entregables":[
+               {"nombre":"Flujo.xlsx","formato":"ARCHIVO","obligatorio":true,"pregunta":{"criterio":0,"pregunta":0}},
+               {"nombre":"Informe","formato":"ARCHIVO","obligatorio":false,"todaLaPrueba":false,
+                "cubre":[{"criterio":0,"pregunta":0},{"criterio":0,"pregunta":1}]},
+               {"nombre":" video ","formato":"ENLACE","todaLaPrueba":true}],
+             "criterios":[{"nombre":"Flujos","parteCalificada":60,"calificador":"IA","preguntas":[
+               {"tipo":"ABIERTA","enunciado":"Arma un flujo","queDebeTener":"Que cuadre"},
+               {"tipo":"ABIERTA","enunciado":"Explica el flujo"}]}]}""";
+
+    @Test
+    @DisplayName("Con alcance: el archivo llega con su pregunta, el general cubre las creadas y el que ya está no se duplica (AC-21)")
+    void agregarConAlcance() {
+        enElBorrador();
+        ultima("LISTA", CON_ALCANCE);
+        java.util.concurrent.atomic.AtomicLong ids = new java.util.concurrent.atomic.AtomicLong(700);
+        when(preguntas.save(any(Pregunta.class))).thenAnswer(inv -> {
+            Pregunta p = inv.getArgument(0);
+            p.setId(ids.incrementAndGet());
+            return p;
+        });
+
+        servicio.agregarDeLaPropuesta(QUIEN, VACANTE, 60L, new AgregarDeLaPropuestaDePrueba(false, null, List.of(0), null));
+
+        ArgumentCaptor<EntregableRequerido> creados = ArgumentCaptor.forClass(EntregableRequerido.class);
+        verify(entregables, times(2)).save(creados.capture());
+        EntregableRequerido flujo = creados.getAllValues().get(0);
+        assertThat(flujo.getNombre()).isEqualTo("Flujo.xlsx");
+        assertThat(flujo.getAlcance()).isEqualTo(EntregableRequerido.PREGUNTA);
+        assertThat(flujo.getPreguntaId()).isEqualTo(701L);
+        assertThat(creados.getAllValues().get(1).getAlcance()).isEqualTo(EntregableRequerido.PREGUNTAS);
+        ArgumentCaptor<com.renaser.ai.ai_engine.prueba.entity.EntregableCubrePregunta> cubre =
+                ArgumentCaptor.forClass(com.renaser.ai.ai_engine.prueba.entity.EntregableCubrePregunta.class);
+        verify(cubiertas, times(2)).save(cubre.capture());
+        assertThat(cubre.getAllValues()).extracting(c -> c.getPreguntaId()).containsExactly(701L, 702L);
+        // «video» ya estaba en el borrador como «Video»: no se agrega otra vez
+        assertThat(creados.getAllValues()).noneMatch(e -> e.getNombre().equalsIgnoreCase("video"));
+        verify(miradas, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Un general elegido después busca sus preguntas por su enunciado en el borrador; una pregunta sola no trae los generales")
+    void agregarUnGeneralDespues() {
+        enElBorrador();
+        ultima("LISTA", CON_ALCANCE);
+        when(preguntas.findByVersionBancoIdOrderByOrden(BORRADOR)).thenReturn(List.of(
+                Pregunta.builder().id(801L).versionBancoId(BORRADOR).enunciado("Explica el flujo").build()));
+
+        servicio.agregarDeLaPropuesta(QUIEN, VACANTE, 60L, new AgregarDeLaPropuestaDePrueba(false, List.of(1), null, null));
+
+        ArgumentCaptor<EntregableRequerido> creado = ArgumentCaptor.forClass(EntregableRequerido.class);
+        verify(entregables).save(creado.capture());
+        assertThat(creado.getValue().getNombre()).isEqualTo("Informe");
+        ArgumentCaptor<com.renaser.ai.ai_engine.prueba.entity.EntregableCubrePregunta> cubre =
+                ArgumentCaptor.forClass(com.renaser.ai.ai_engine.prueba.entity.EntregableCubrePregunta.class);
+        verify(cubiertas).save(cubre.capture());
+        assertThat(cubre.getValue().getPreguntaId()).isEqualTo(801L);
     }
 }

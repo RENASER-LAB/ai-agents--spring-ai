@@ -168,7 +168,7 @@ class AgentesDeLaPruebaDelEditorTest {
             return new ResultadoRecomendadorPrueba(new CasoPropuesto("Un caso", null, null),
                     List.of(new EntregablePropuesto("Video", "Dos minutos", "ENLACE", true, null)),
                     List.of(new CriterioPropuesto(null, "Comunicación", null, List.of(),
-                            new BigDecimal("100"), "IA", List.of(0), List.of())));
+                            null, "IA", List.of(0), List.of(), new BigDecimal("100"))));
         }
 
         private static ResultadoRecomendadorPrueba deUnaPersona() {
@@ -179,7 +179,7 @@ class AgentesDeLaPruebaDelEditorTest {
                                     new BigDecimal("10"), null, List.of(
                                     new com.renaser.ai.ai_engine.perfilintegral.dto.DtosRecomendador.OpcionPropuesta("El dato", new BigDecimal("10")),
                                     new com.renaser.ai.ai_engine.perfilintegral.dto.DtosRecomendador.OpcionPropuesta("Un saludo", BigDecimal.ZERO)))),
-                            new BigDecimal("90"), "PERSONA", List.of(0), List.of())));
+                            null, "PERSONA", List.of(0), List.of(), new BigDecimal("100"))));
         }
 
         @Test
@@ -204,6 +204,34 @@ class AgentesDeLaPruebaDelEditorTest {
         }
 
         @Test
+        @DisplayName("Un entregable sin nadie que lo califique, dos veces seguidas: la generación queda fallida (AC-21)")
+        void dosVecesSinQuienLoCalifiqueQuedaFallida() {
+            var cerrada = new PreguntaPropuesta("OPCION_UNICA", "¿Qué libro?", new BigDecimal("100"), null,
+                    List.of(new com.renaser.ai.ai_engine.perfilintegral.dto.DtosRecomendador.OpcionPropuesta("Diario", new BigDecimal("100")),
+                            new com.renaser.ai.ai_engine.perfilintegral.dto.DtosRecomendador.OpcionPropuesta("Caja", BigDecimal.ZERO)));
+            var sinQuien = new ResultadoRecomendadorPrueba(null,
+                    List.of(new EntregablePropuesto("Hoja.xlsx", null, "ARCHIVO", true, null,
+                            new com.renaser.ai.ai_engine.perfilintegral.dto.DtosRecomendador.PosicionDePregunta(0, 0),
+                            null, null)),
+                    List.of(new CriterioPropuesto(null, "Solo cerradas", null, List.of(cerrada),
+                            null, null, null, null, new BigDecimal("100"))));
+            when(puente.insumoPrueba(VACANTE)).thenReturn(insumo);
+            when(ejecutor.ejecutar(any(TrabajoIa.class), anyString(), anyString(), any(),
+                    eq(ResultadoRecomendadorPrueba.class)))
+                    .thenReturn(new EjecutorAgenteIa.Ejecutado<>(1L, sinQuien));
+
+            agente.ejecutar(trabajo);
+
+            verify(ejecutor, times(2)).ejecutar(any(TrabajoIa.class), anyString(), anyString(), any(),
+                    eq(ResultadoRecomendadorPrueba.class));
+            @SuppressWarnings("unchecked")
+            ArgumentCaptor<List<String>> errores = ArgumentCaptor.forClass(List.class);
+            verify(puente).marcarFallidaPrueba(eq(VACANTE), errores.capture());
+            assertThat(errores.getValue()).anyMatch(e -> e.contains("no lo califica nadie"));
+            verify(puente, never()).guardarPropuestaPrueba(any(), any());
+        }
+
+        @Test
         @DisplayName("Si la corrección cuadra, se guarda la propuesta de la prueba")
         void laCorreccionSeGuarda() {
             when(puente.insumoPrueba(VACANTE)).thenReturn(insumo);
@@ -216,6 +244,32 @@ class AgentesDeLaPruebaDelEditorTest {
 
             verify(puente).guardarPropuestaPrueba(eq(VACANTE), any());
             verify(puente, never()).marcarFallidaPrueba(any(), anyList());
+        }
+
+        @Test
+        @DisplayName("Un criterio cuyas cerradas pasan de lo que vale, dos veces seguidas: la generación queda fallida (V69)")
+        void dosVecesCerradasPorEncimaQuedaFallida() {
+            var porEncima = new ResultadoRecomendadorPrueba(null, List.of(),
+                    List.of(new CriterioPropuesto(null, "Comunicación", null,
+                            List.of(new PreguntaPropuesta("OPCION_UNICA", "¿Qué dirías primero?",
+                                    new BigDecimal("100"), null, List.of(
+                                    new com.renaser.ai.ai_engine.perfilintegral.dto.DtosRecomendador.OpcionPropuesta("El dato", new BigDecimal("100")),
+                                    new com.renaser.ai.ai_engine.perfilintegral.dto.DtosRecomendador.OpcionPropuesta("Un saludo", BigDecimal.ZERO)))),
+                            null, null, null, null, new BigDecimal("60"))));
+            when(puente.insumoPrueba(VACANTE)).thenReturn(insumo);
+            when(ejecutor.ejecutar(any(TrabajoIa.class), anyString(), anyString(), any(),
+                    eq(ResultadoRecomendadorPrueba.class)))
+                    .thenReturn(new EjecutorAgenteIa.Ejecutado<>(1L, porEncima));
+
+            agente.ejecutar(trabajo);
+
+            verify(ejecutor, times(2)).ejecutar(any(TrabajoIa.class), anyString(), anyString(), any(),
+                    eq(ResultadoRecomendadorPrueba.class));
+            @SuppressWarnings("unchecked")
+            ArgumentCaptor<List<String>> errores = ArgumentCaptor.forClass(List.class);
+            verify(puente).marcarFallidaPrueba(eq(VACANTE), errores.capture());
+            assertThat(errores.getValue()).anyMatch(e -> e.contains("sus cerradas suman 100 y el criterio vale 60"));
+            verify(puente, never()).guardarPropuestaPrueba(any(), any());
         }
     }
 }

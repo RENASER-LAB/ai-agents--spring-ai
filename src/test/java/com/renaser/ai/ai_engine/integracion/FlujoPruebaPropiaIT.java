@@ -163,12 +163,14 @@ public class FlujoPruebaPropiaIT {
         conToken(post("/api/v1/panel/vacantes/" + vacanteId + "/publicacion"), tokenTalento, null)
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("prueba técnica")));
-        // Y sin prueba publicada tampoco hay plazo que fijarle
-        conToken(post("/api/v1/panel/vacantes/" + vacanteId + "/cierre-prueba"), tokenTalento,
-                "{\"cierraEn\":\"%s\",\"motivo\":\"Cierre de la convocatoria\"}"
-                        .formatted(java.time.Instant.now().plus(java.time.Duration.ofDays(20))))
-                .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("publícala antes")));
+        // La fecha límite (V68) es de la vacante y todavía no hay; una pasada no se acepta
+        conTokenGet(base(vacanteId), tokenTalento)
+                .andExpect(jsonPath("$.fechaLimite.cierraEn").doesNotExist())
+                .andExpect(jsonPath("$.fechaLimite.pideMotivo").value(false));
+        conToken(put(base(vacanteId) + "/fecha-limite"), tokenTalento,
+                "{\"cierraEn\":\"%s\"}".formatted(java.time.Instant.now().minus(java.time.Duration.ofDays(1))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.faltas[0]").value(org.hamcrest.Matchers.containsString("ya pasó")));
     }
 
     @DisplayName("Lo que no se puede guardar: 400 con la lista entera (casos límite)")
@@ -176,16 +178,20 @@ public class FlujoPruebaPropiaIT {
     @Order(2)
     void loQueNoSePuedeGuardar() throws Exception {
         conToken(post(base(vacanteId) + "/criterios"), tokenTalento, """
-                {"nombre":"Mal","puntosCalificados":2.5,"calificador":"IA"}""")
+                {"nombre":"Mal","puntos":2.5,"calificador":"IA"}""")
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.faltas[0]").value(org.hamcrest.Matchers.containsString("entero")));
         conToken(post(base(vacanteId) + "/criterios"), tokenTalento, """
-                {"nombre":"Mal","puntosCalificados":-3}""")
+                {"nombre":"Mal","puntos":-3}""")
                 .andExpect(status().isBadRequest());
         conToken(post(base(vacanteId) + "/criterios"), tokenTalento, """
-                {"nombre":"Mal","puntosCalificados":20}""")
+                {"nombre":"Mal","puntos":20}""")
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.faltas[0]").value(org.hamcrest.Matchers.containsString("quién califica")));
+        // Lo que vale el criterio se escribe siempre (V69)
+        conToken(post(base(vacanteId) + "/criterios"), tokenTalento, "{\"nombre\":\"Mal\"}")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.faltas[0]").value(org.hamcrest.Matchers.startsWith("Faltan los puntos del criterio")));
         conToken(post(base(vacanteId) + "/entregables"), tokenTalento, """
                 {"nombre":"Sin formato","obligatorio":true}""")
                 .andExpect(status().isBadRequest());
@@ -206,26 +212,24 @@ public class FlujoPruebaPropiaIT {
         assertThat(editor.at("/borrador/prueba/entregables").size()).isZero();
     }
 
-    @DisplayName("Con 90 puntos, un entregable suelto, un criterio de IA que solo mira un enlace y sin enunciado: las cuatro faltas (AC-04, AC-05)")
+    @DisplayName("Sin enunciado no es falta; sí lo son los puntos, la fecha, un criterio de IA que solo mira un enlace y un general que nadie califica (AC-02, AC-05, AC-06, AC-08)")
     @Test
     @Order(3)
     void publicarConCuatroFaltasLasDiceTodas() throws Exception {
         conToken(put(base(vacanteId) + "/borrador"), tokenTalento, """
                 {"guiaCalificacion":"Mira las cifras","modalidad":"CRONOMETRADA","duracionMinutos":90}""")
                 .andExpect(status().isOk());
-        entregableTablero = idDelEntregable(conToken(post(base(vacanteId) + "/entregables"), tokenTalento, """
-                {"nombre":"Tablero.xlsx","detalle":"La conciliación de marzo","formato":"ARCHIVO",
-                 "obligatorio":true,"queDebeTener":"El descuadre ubicado y corregido"}"""), "Tablero.xlsx");
-        entregableVideo = idDelEntregable(conToken(post(base(vacanteId) + "/entregables"), tokenTalento, """
-                {"nombre":"Video","detalle":"Dos minutos explicando","formato":"ENLACE",
-                 "obligatorio":false}"""), "Video");
-
+        // Se escribe lo que vale el criterio entero (V69): la cerrada que llegue después saldrá
+        // de esos 70, no se sumará a ellos.
         criterioConocimiento = idDelCriterio(conToken(post(base(vacanteId) + "/criterios"), tokenTalento, """
                 {"nombre":"Conocimiento contable","queEvalua":"Registro y cierre mensual",
-                 "puntosCalificados":60,"calificador":"IA","entregables":[]}"""), "Conocimiento contable");
+                 "puntos":70,"calificador":"IA"}"""), "Conocimiento contable");
         criterioComunicacion = idDelCriterio(conToken(post(base(vacanteId) + "/criterios"), tokenTalento, """
-                {"nombre":"Comunicación","puntosCalificados":20,"calificador":"IA","entregables":[%d]}"""
-                .formatted(entregableVideo)), "Comunicación");
+                {"nombre":"Comunicación","puntos":20,"calificador":"IA"}"""), "Comunicación");
+        // Recién creado no tiene cerradas: quién califica se dice ahora y deja de contar cuando
+        // su cerrada de 25 llena lo que vale.
+        criterioExcel = idDelCriterio(conToken(post(base(vacanteId) + "/criterios"), tokenTalento,
+                "{\"nombre\":\"Manejo de Excel\",\"puntos\":25,\"calificador\":\"IA\"}"), "Manejo de Excel");
         agregar("unica", """
                 {"tipo":"OPCION_UNICA","enunciado":"¿Qué libro registra primero una venta al crédito?",
                  "puntos":10,"criterioId":%d,
@@ -234,29 +238,66 @@ public class FlujoPruebaPropiaIT {
         agregar("abiertaA", """
                 {"tipo":"ABIERTA","enunciado":"¿Cómo hallaste el descuadre?","criterioId":%d,
                  "queDebeTener":"La cuenta y el monto"}""".formatted(criterioConocimiento));
+        agregar("multiple", """
+                {"tipo":"OPCION_MULTIPLE","enunciado":"¿Qué funciones buscan un valor?","puntos":25,"criterioId":%d,
+                 "opciones":[{"texto":"BUSCARV","puntos":15},{"texto":"XLOOKUP","puntos":10},
+                             {"texto":"SUMA","puntos":-5}]}""".formatted(criterioExcel));
 
-        JsonNode criterio = buscarCriterio(editor(vacanteId).get("borrador"), criterioConocimiento);
-        // AC-05: la cabecera cuenta sistema + parte calificada, y la abierta no tiene puntos
+        // El archivo se pide desde su pregunta (AC-04): lo mira su criterio, sin marcar nada
+        entregableTablero = idDelEntregable(conToken(post(base(vacanteId) + "/entregables"), tokenTalento, """
+                {"nombre":"Tablero.xlsx","detalle":"La conciliación de marzo","formato":"ARCHIVO",
+                 "obligatorio":true,"queDebeTener":"El descuadre ubicado y corregido","preguntaId":%d}"""
+                .formatted(pregunta.get("abiertaA"))), "Tablero.xlsx");
+        // Pedirlo dos veces en la misma pregunta no crea dos
+        conToken(post(base(vacanteId) + "/entregables"), tokenTalento, """
+                {"nombre":"Otro","formato":"ARCHIVO","obligatorio":true,"preguntaId":%d}"""
+                .formatted(pregunta.get("abiertaA"))).andExpect(status().isBadRequest());
+        // Un general de toda la prueba lo miran todos; uno de las cerradas de Excel, nadie lo califica
+        entregableVideo = idDelEntregable(conToken(post(base(vacanteId) + "/entregables"), tokenTalento, """
+                {"nombre":"Video","detalle":"Dos minutos explicando","formato":"ENLACE",
+                 "obligatorio":false,"todaLaPrueba":true}"""), "Video");
+        long notas = idDelEntregable(conToken(post(base(vacanteId) + "/entregables"), tokenTalento, """
+                {"nombre":"Notas.docx","formato":"ARCHIVO","obligatorio":false,"cubre":[%d]}"""
+                .formatted(pregunta.get("multiple"))), "Notas.docx");
+        // Un general sin «Cubre» no se guarda
+        conToken(post(base(vacanteId) + "/entregables"), tokenTalento, """
+                {"nombre":"Suelto","formato":"ARCHIVO","obligatorio":true}""")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.faltas[0]").value(org.hamcrest.Matchers.containsString("Elige qué cubre")));
+
+        JsonNode borrador = editor(vacanteId).get("borrador");
+        JsonNode criterio = buscarCriterio(borrador, criterioConocimiento);
+        // AC-05: la cabecera cuenta sistema + parte calificada, y la abierta no tiene puntos. El
+        // criterio sigue valiendo 70 con su cerrada dentro: su parte calificada bajó a 60 (V69).
         assertThat(criterio.get("puntos").asInt()).isEqualTo(70);
         assertThat(criterio.get("puntosSistema").asInt()).isEqualTo(10);
         assertThat(criterio.get("puntosCalificados").asInt()).isEqualTo(60);
         assertThat(criterio.get("calificador").asText()).isEqualTo("IA");
-        assertThat(buscarPregunta(editor(vacanteId).get("borrador"), "abiertaA").get("puntos").asInt()).isZero();
+        assertThat(buscarPregunta(borrador, "abiertaA").get("puntos").asInt()).isZero();
+        // «Mira» se deduce: el archivo de su pregunta y el general de toda la prueba
+        assertThat(idsDe(criterio.get("entregables"))).containsExactlyInAnyOrder(entregableTablero, entregableVideo);
+        assertThat(idsDe(buscarCriterio(borrador, criterioComunicacion).get("entregables")))
+                .containsExactly(entregableVideo);
+        assertThat(idsDe(buscarCriterio(borrador, criterioExcel).get("entregables")))
+                .containsExactlyInAnyOrder(entregableVideo, notas);
 
         JsonNode error = json.readTree(conToken(post(base(vacanteId) + "/publicacion"), tokenTalento, null)
                 .andExpect(status().isBadRequest()).andReturn().getResponse().getContentAsString());
         List<String> faltas = new ArrayList<>();
         error.get("faltas").forEach(f -> faltas.add(f.asText()));
         assertThat(faltas).hasSize(4);
-        assertThat(faltas).anyMatch(f -> f.contains("suman 90 de 100"));
-        assertThat(faltas).anyMatch(f -> f.contains("«Tablero.xlsx» no está en ningún criterio"));
+        assertThat(faltas).anyMatch(f -> f.contains("suman 115 de 100"));
+        assertThat(faltas).anyMatch(f -> f.contains("Falta la fecha límite"));
         assertThat(faltas).anyMatch(f -> f.contains("solo mira enlaces"));
-        assertThat(faltas).anyMatch(f -> f.contains("Falta el enunciado"));
+        assertThat(faltas).anyMatch(f -> f.contains("«Notas.docx»: nadie lo califica"));
+        assertThat(faltas).noneMatch(f -> f.contains("enunciado"));
         assertThat(jdbc.queryForObject("select count(*) from version_banco where vacante_id = ? "
                 + "and proposito = 'PRUEBA_PUESTO' and estado = 'PUBLICADA'", Integer.class, vacanteId)).isZero();
+
+        conToken(delete(base(vacanteId) + "/entregables/" + notas), tokenTalento, null).andExpect(status().isOk());
     }
 
-    @DisplayName("Con todo en su sitio se publica, y la vacante también (AC-03, AC-05)")
+    @DisplayName("Con todo en su sitio y la fecha puesta sin motivo se publica, y la vacante también (AC-03, AC-05, AC-09)")
     @Test
     @Order(4)
     void conTodoSePublica() throws Exception {
@@ -264,33 +305,57 @@ public class FlujoPruebaPropiaIT {
                 {"guiaCalificacion":"Mira las cifras","enunciado":"La empresa cerró marzo con un descuadre de 1200 soles.",
                  "materiales":"El libro mayor de marzo","herramientasPermitidas":"Excel",
                  "modalidad":"CRONOMETRADA","duracionMinutos":90}""").andExpect(status().isOk());
-        // Conocimiento: 10 de cerradas + 20 de IA, mira el tablero (un criterio mixto de 30)
+        // Conocimiento vale 30: 10 de cerradas + 20 de IA, mira el tablero (un criterio mixto)
         conToken(put(base(vacanteId) + "/criterios/" + criterioConocimiento), tokenTalento, """
                 {"nombre":"Conocimiento contable","queEvalua":"Registro y cierre mensual",
-                 "puntosCalificados":20,"calificador":"IA","entregables":[%d]}""".formatted(entregableTablero))
-                .andExpect(status().isOk());
-        // Comunicación: de una persona, mira el video y una abierta
+                 "puntos":30,"calificador":"IA"}""").andExpect(status().isOk());
+        // Comunicación: de una persona, con una abierta; el video pasa a cubrir solo esa abierta
         conToken(put(base(vacanteId) + "/criterios/" + criterioComunicacion), tokenTalento, """
-                {"nombre":"Comunicación","puntosCalificados":20,"calificador":"PERSONA","entregables":[%d]}"""
-                .formatted(entregableVideo)).andExpect(status().isOk());
+                {"nombre":"Comunicación","puntos":20,"calificador":"PERSONA"}""")
+                .andExpect(status().isOk());
         agregar("abiertaB", """
                 {"tipo":"ABIERTA","enunciado":"Explica el ajuste a tu jefe en tres líneas","criterioId":%d,
                  "queDebeTener":"Claridad"}""".formatted(criterioComunicacion));
-        // Manejo de Excel: solo cerradas, 50 puntos
-        criterioExcel = idDelCriterio(conToken(post(base(vacanteId) + "/criterios"), tokenTalento,
-                "{\"nombre\":\"Manejo de Excel\"}"), "Manejo de Excel");
-        agregar("multiple", """
-                {"tipo":"OPCION_MULTIPLE","enunciado":"¿Qué funciones buscan un valor?","puntos":25,"criterioId":%d,
-                 "opciones":[{"texto":"BUSCARV","puntos":15},{"texto":"XLOOKUP","puntos":10},
-                             {"texto":"SUMA","puntos":-5}]}""".formatted(criterioExcel));
+        conToken(put(base(vacanteId) + "/entregables/" + entregableVideo), tokenTalento, """
+                {"nombre":"Video","detalle":"Dos minutos explicando","formato":"ENLACE",
+                 "obligatorio":false,"cubre":[%d]}""".formatted(pregunta.get("abiertaB")))
+                .andExpect(status().isOk());
+        // Manejo de Excel: solo cerradas. Una cerrada más no lo hace valer más: sigue en 25 y
+        // sus cerradas pasan de ahí, una falta también al publicar (V69).
         agregar("escala", """
                 {"tipo":"ESCALA","enunciado":"¿Cuánto dominas las tablas dinámicas?","puntos":25,"criterioId":%d,
                  "opciones":[{"texto":"Nada","puntos":0},{"texto":"","puntos":12},{"texto":"Mucho","puntos":25}]}"""
                 .formatted(criterioExcel));
+        JsonNode conExcelPorEncima = editor(vacanteId).get("borrador");
+        JsonNode excel = buscarCriterio(conExcelPorEncima, criterioExcel);
+        assertThat(excel.get("puntos").asInt()).isEqualTo(25);
+        assertThat(excel.get("puntosSistema").asInt()).isEqualTo(50);
+        assertThat(excel.get("puntosCalificados").asInt()).isZero();
+        assertThat(conExcelPorEncima.get("total").asInt()).isEqualTo(75);
+        assertThat(conExcelPorEncima.get("avisos").toString())
+                .contains("Las cerradas de «Manejo de Excel» suman 50 y el criterio vale 25.");
+        // Se arregla diciendo lo que vale ahora: 50, todo del sistema, sin preguntar quién califica
+        conToken(put(base(vacanteId) + "/criterios/" + criterioExcel), tokenTalento,
+                "{\"nombre\":\"Manejo de Excel\",\"puntos\":50}").andExpect(status().isOk());
 
         JsonNode borrador = editor(vacanteId).get("borrador");
         assertThat(borrador.get("total").asInt()).isEqualTo(100);
-        assertThat(borrador.get("avisos").size()).as(borrador.get("avisos").toString()).isZero();
+        assertThat(borrador.get("avisos").toString()).contains("Falta la fecha límite");
+        assertThat(idsDe(buscarCriterio(borrador, criterioConocimiento).get("entregables")))
+                .containsExactly(entregableTablero);
+        assertThat(idsDe(buscarCriterio(borrador, criterioComunicacion).get("entregables")))
+                .containsExactly(entregableVideo);
+
+        // AC-09: la fecha se pone antes de publicar, sin motivo, y queda en la vacante
+        java.time.Instant cierre = java.time.Instant.now().plus(java.time.Duration.ofDays(20))
+                .truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
+        JsonNode conFecha = respuesta(conToken(put(base(vacanteId) + "/fecha-limite"), tokenTalento,
+                "{\"cierraEn\":\"%s\"}".formatted(cierre)));
+        assertThat(conFecha.at("/fechaLimite/cierraEn").isNull()
+                || conFecha.at("/fechaLimite/cierraEn").isMissingNode()).isFalse();
+        assertThat(conFecha.at("/borrador/avisos").size()).as(conFecha.at("/borrador/avisos").toString()).isZero();
+        assertThat(jdbc.queryForObject("select prueba_cierra_en from vacante where id = ?",
+                java.sql.Timestamp.class, vacanteId).toInstant()).isEqualTo(cierre);
 
         JsonNode publicado = json.readTree(conToken(post(base(vacanteId) + "/publicacion"), tokenTalento, null)
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
@@ -299,20 +364,18 @@ public class FlujoPruebaPropiaIT {
         assertThat(publicado.at("/resumen/criterios").asInt()).isEqualTo(3);
         assertThat(publicado.at("/resumen/entregables").asInt()).isEqualTo(2);
         assertThat(publicado.at("/resumen/minutos").asInt()).isEqualTo(90);
-        assertThat(publicado.at("/resumen/cuestionario").asBoolean()).isFalse();
 
         conToken(post("/api/v1/panel/vacantes/" + vacanteId + "/publicacion"), tokenTalento, null)
                 .andExpect(status().isOk());
 
-        // Publicada, la prueba del editor sí admite la fecha de cierre de la convocatoria:
-        // es la misma maquinaria de intentos que la plantilla. Se fija y se quita.
+        // Publicada y sin nadie dentro, cambiarla tampoco pide motivo; la de siempre (la de
+        // «Plazos de la prueba») sigue moviéndola igual.
         conToken(post("/api/v1/panel/vacantes/" + vacanteId + "/cierre-prueba"), tokenTalento,
                 "{\"cierraEn\":\"%s\",\"motivo\":\"Cierre de la convocatoria\"}"
-                        .formatted(java.time.Instant.now().plus(java.time.Duration.ofDays(20))))
+                        .formatted(java.time.Instant.now().plus(java.time.Duration.ofDays(21))))
                 .andExpect(status().isOk());
-        conToken(post("/api/v1/panel/vacantes/" + vacanteId + "/cierre-prueba"), tokenTalento,
-                "{\"cierraEn\":null,\"motivo\":\"Sin fecha común\"}")
-                .andExpect(status().isOk());
+        respuesta(conToken(put(base(vacanteId) + "/fecha-limite"), tokenTalento,
+                "{\"cierraEn\":\"%s\"}".formatted(cierre)));
         conTokenGet("/api/v1/panel/vacantes/" + vacanteId, tokenTalento)
                 .andExpect(jsonPath("$.modalidadPrueba").value("CRONOMETRADA"))
                 .andExpect(jsonPath("$.minutosPruebaVigentes").value(90));
@@ -373,6 +436,15 @@ public class FlujoPruebaPropiaIT {
         List<String> tipos = new ArrayList<>();
         prueba.get("preguntas").forEach(p -> tipos.add(p.get("tipo").asText()));
         assertThat(tipos).contains("ABIERTA", "OPCION_UNICA", "OPCION_MULTIPLE", "ESCALA");
+        // La pantalla previa sabe la fecha límite, y el archivo de una pregunta dice cuál es
+        assertThat(prueba.get("fechaLimite").isNull()).isFalse();
+        for (JsonNode e : prueba.get("entregables")) {
+            if ("Tablero.xlsx".equals(e.get("nombre").asText())) {
+                assertThat(e.get("preguntaId").asLong()).isEqualTo(pregunta.get("abiertaA"));
+            } else {
+                assertThat(e.get("preguntaId").isNull()).isTrue();
+            }
+        }
 
         JsonNode iniciada = json.readTree(mvc.perform(post("/api/v1/portal/prueba/" + codigo.get("ana") + "/inicio")
                         .header("Authorization", "Bearer " + tokenCandidata.get("ana")))
@@ -655,7 +727,7 @@ public class FlujoPruebaPropiaIT {
     @Order(16)
     void desdeLaPrimeraRendicionSeCongela() throws Exception {
         conToken(post(base(vacanteId) + "/borrador"), tokenTalento, null).andExpect(status().isConflict());
-        conToken(post(base(vacanteId) + "/criterios"), tokenTalento, "{\"nombre\":\"Nuevo\"}")
+        conToken(post(base(vacanteId) + "/criterios"), tokenTalento, "{\"nombre\":\"Nuevo\",\"puntos\":0}")
                 .andExpect(status().isConflict());
     }
 
@@ -670,7 +742,7 @@ public class FlujoPruebaPropiaIT {
                 opcion.get("multiple:BUSCARV"), opcion.get("multiple:XLOOKUP"), opcion.get("multiple:SUMA"));
         conToken(put(base(vacanteId) + "/publicada/puntos"), tokenTalento, """
                 {"preguntas":[{"id":%d,"puntos":30,"opciones":%s}],
-                 "criterios":[{"id":%d,"puntosCalificados":15}]}"""
+                 "criterios":[{"id":%d,"puntos":25}]}"""
                 .formatted(multiple.get("id").asLong(), opciones, criterioConocimiento))
                 .andExpect(status().isOk());
         // Beto tenía 4 de 20 en Conocimiento: ahora 3 de 15. Ana, ajustada a 12, pasa a 9.
@@ -689,8 +761,28 @@ public class FlujoPruebaPropiaIT {
 
         // El total sigue en 100: si no, 400 con la lista y no se cambia nada
         conToken(put(base(vacanteId) + "/publicada/puntos"), tokenTalento, """
-                {"criterios":[{"id":%d,"puntosCalificados":16}]}""".formatted(criterioConocimiento))
+                {"criterios":[{"id":%d,"puntos":26}]}""".formatted(criterioConocimiento))
                 .andExpect(status().isBadRequest());
+
+        // QA-11: un total mal escrito dice su falta; la suma, si se da, es la de lo escrito
+        // (150 + los 75 de los demás), nunca una que lo deja fuera.
+        List<String> fueraDeRango = faltasAlCambiarLosPuntos("""
+                {"criterios":[{"id":%d,"puntos":150}]}""".formatted(criterioConocimiento));
+        assertThat(fueraDeRango).hasSize(2);
+        assertThat(fueraDeRango).contains("Los puntos suman 225 de 100: sobran 125.");
+        assertThat(fueraDeRango).anyMatch(f -> f.endsWith(": Los puntos del criterio van de 0 a 100."));
+        List<String> conDecimales = faltasAlCambiarLosPuntos("""
+                {"criterios":[{"id":%d,"puntos":25.5}]}""".formatted(criterioConocimiento));
+        assertThat(conDecimales).singleElement().asString()
+                .endsWith(": Los puntos del criterio tienen que ser un número entero, sin decimales.");
+    }
+
+    private List<String> faltasAlCambiarLosPuntos(String cuerpo) throws Exception {
+        JsonNode error = json.readTree(conToken(put(base(vacanteId) + "/publicada/puntos"), tokenTalento, cuerpo)
+                .andExpect(status().isBadRequest()).andReturn().getResponse().getContentAsString());
+        List<String> faltas = new ArrayList<>();
+        error.get("faltas").forEach(f -> faltas.add(f.asText()));
+        return faltas;
     }
 
     @DisplayName("Corregir la guía: sin saldo no se guarda; con IA, recalifica solo a quien tiene nota de la IA (AC-18, AC-24)")
@@ -731,7 +823,7 @@ public class FlujoPruebaPropiaIT {
 
     // ============ Copiar ============
 
-    @DisplayName("Otra vacante copia la prueba con su caso, tiempo, entregables y lo que mira cada criterio (AC-20)")
+    @DisplayName("Otra vacante copia la prueba con su caso, tiempo y entregables con su alcance, y no la fecha (AC-14, AC-20)")
     @Test
     @Order(19)
     void otraVacanteCopiaLaPrueba() throws Exception {
@@ -743,6 +835,10 @@ public class FlujoPruebaPropiaIT {
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
         assertThat(vista.at("/prueba/enunciado").asText()).contains("descuadre");
         assertThat(vista.at("/prueba/entregables").size()).isEqualTo(2);
+        // La vista previa enseña el alcance de cada entregable
+        List<String> alcances = new ArrayList<>();
+        vista.at("/prueba/entregables").forEach(e -> alcances.add(e.get("alcance").asText()));
+        assertThat(alcances).containsExactlyInAnyOrder("PREGUNTA", "PREGUNTAS");
 
         JsonNode copiado = json.readTree(conToken(post(base(otra) + "/copia"), tokenTalento,
                         "{\"vacanteOrigenId\":%d}".formatted(vacanteId))
@@ -761,6 +857,16 @@ public class FlujoPruebaPropiaIT {
         assertThat(comunicacionCopia.get("id").asLong()).isNotEqualTo(criterioComunicacion);
         assertThat(comunicacionCopia.get("entregables").size()).isEqualTo(1);
         assertThat(comunicacionCopia.get("calificador").asText()).isEqualTo("PERSONA");
+        // El alcance viaja con las preguntas de la copia; la fecha límite es de la vacante y no
+        assertThat(copiado.at("/fechaLimite/cierraEn").isMissingNode()
+                || copiado.at("/fechaLimite/cierraEn").isNull()).isTrue();
+        for (JsonNode e : borrador.at("/prueba/entregables")) {
+            if ("PREGUNTA".equals(e.get("alcance").asText())) {
+                assertThat(e.get("preguntaId").asLong()).isNotEqualTo(pregunta.get("abiertaA"));
+            } else {
+                assertThat(e.get("cubre").size()).isEqualTo(1);
+            }
+        }
         long criterioCopiado = comunicacionCopia.get("id").asLong();
 
         // AC-14 (dos versiones, ids distintos): la nota de un criterio de la otra vacante no
@@ -835,7 +941,7 @@ public class FlujoPruebaPropiaIT {
                 List.of(new CriterioPropuesto(null, "Cierre", "Cierra el mes",
                         List.of(new PreguntaPropuesta("ABIERTA", "¿Qué revisas primero?", BigDecimal.ZERO,
                                 "La cuenta", List.of())),
-                        new BigDecimal("100"), "IA", List.of(0), List.of()))));
+                        null, "IA", List.of(0), List.of(), new BigDecimal("100")))));
         // La de la prueba está lista; la del banco sigue pedida, sin tocar
         conTokenGet(base(otra) + "/recomendaciones", tokenTalento)
                 .andExpect(jsonPath("$.estado").value("LISTA"))
@@ -854,8 +960,12 @@ public class FlujoPruebaPropiaIT {
         JsonNode borrador = editor.get("borrador");
         assertThat(borrador.at("/prueba/enunciado").asText()).isEqualTo("Un cierre con descuadre");
         assertThat(borrador.at("/prueba/entregables").size()).isEqualTo(1);
+        assertThat(borrador.at("/criterios/0/puntos").asInt()).isEqualTo(100);
         assertThat(borrador.at("/criterios/0/puntosCalificados").asInt()).isEqualTo(100);
         assertThat(borrador.at("/criterios/0/entregables").size()).isEqualTo(1);
+        // Lo guardado dice lo que vale cada criterio nuevo (V69)
+        assertThat(jdbc.queryForObject("select puntos_del_criterio from criterio_banco where id = ?",
+                Integer.class, borrador.at("/criterios/0/id").asLong())).isEqualTo(100);
     }
 
     // ============ Lo de siempre ============
@@ -924,6 +1034,14 @@ public class FlujoPruebaPropiaIT {
         // Y su prueba técnica, copiada de la otra vacante
         conToken(post(base(otra) + "/copia"), tokenTalento, "{\"vacanteOrigenId\":%d}".formatted(vacanteId))
                 .andExpect(status().isOk());
+        // La fecha límite no viaja con la copia (AC-14): sin ella no se publica, y se pone aquí
+        conToken(post(base(otra) + "/publicacion"), tokenTalento, null)
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.faltas.length()").value(1))
+                .andExpect(jsonPath("$.faltas[0]").value(org.hamcrest.Matchers.containsString("Falta la fecha límite")));
+        respuesta(conToken(put(base(otra) + "/fecha-limite"), tokenTalento, "{\"cierraEn\":\"%s\"}".formatted(
+                java.time.Instant.now().plus(java.time.Duration.ofDays(20))
+                        .truncatedTo(java.time.temporal.ChronoUnit.SECONDS))));
         conToken(post(base(otra) + "/publicacion"), tokenTalento, null).andExpect(status().isOk());
         conToken(post("/api/v1/panel/vacantes/" + otra + "/publicacion"), tokenTalento, null)
                 .andExpect(status().isOk());
@@ -1121,17 +1239,19 @@ public class FlujoPruebaPropiaIT {
         return new NotaCriterioPropiaIa(criterioId, new BigDecimal(puntaje), explicacion, "cita");
     }
 
-    @DisplayName("El taller del borrador: el enunciado adjunto, los entregables, los criterios y las preguntas se cambian, se mueven y se quitan")
+    @DisplayName("El taller del borrador: el adjunto, los entregables con su alcance, los criterios y las preguntas se cambian, se mueven y se quitan")
     @Test
     @Order(24)
     void elTallerDelBorrador() throws Exception {
         long taller = crearVacante("Auxiliar de caja");
+        // «Sin cronómetro»: sin días (AC-12)
         JsonNode editor = respuesta(conToken(put(base(taller) + "/borrador"), tokenTalento, """
                 {"guiaCalificacion":"Mide el cuadre","enunciado":"Cuadra la caja del día",
-                 "modalidad":"PLAZO_ABIERTO","plazoDias":3}"""));
-        assertThat(editor.at("/borrador/prueba/plazoDias").asInt()).isEqualTo(3);
+                 "modalidad":"PLAZO_ABIERTO"}"""));
+        assertThat(editor.at("/borrador/prueba/modalidad").asText()).isEqualTo("PLAZO_ABIERTO");
+        assertThat(editor.at("/borrador/prueba/plazoDias").isNull()).isTrue();
         assertThat(editor.at("/resumen/estado").asText()).isEqualTo("BORRADOR");
-        assertThat(editor.at("/resumen/dias").asInt()).isEqualTo(3);
+        assertThat(editor.at("/resumen/dias").isNull()).isTrue();
 
         // El enunciado en PDF entra y sale del borrador
         MockMultipartFile pdf = new MockMultipartFile("archivo", "caso.pdf", "application/pdf",
@@ -1143,31 +1263,33 @@ public class FlujoPruebaPropiaIT {
         assertThat(editor.at("/borrador/prueba/consigna").isNull()
                 || editor.at("/borrador/prueba/consigna").isMissingNode()).isTrue();
 
-        // Dos entregables: el segundo se cambia y sube al primer puesto
+        // Dos generales de toda la prueba: el segundo se cambia y sube al primer puesto
         long tablero = idDelEntregable(conToken(post(base(taller) + "/entregables"), tokenTalento, """
-                {"nombre":"Tablero","detalle":"La hoja del cuadre","formato":"ARCHIVO","obligatorio":true}"""),
-                "Tablero");
+                {"nombre":"Tablero","detalle":"La hoja del cuadre","formato":"ARCHIVO","obligatorio":true,
+                 "todaLaPrueba":true}"""), "Tablero");
         long video = idDelEntregable(conToken(post(base(taller) + "/entregables"), tokenTalento, """
-                {"nombre":"Video","formato":"ENLACE","obligatorio":true}"""), "Video");
+                {"nombre":"Video","formato":"ENLACE","obligatorio":true,"todaLaPrueba":true}"""), "Video");
         editor = respuesta(conToken(put(base(taller) + "/entregables/" + video), tokenTalento, """
-                {"nombre":"Video corto","formato":"ENLACE","obligatorio":false,"queDebeTener":"Que se oiga"}"""));
+                {"nombre":"Video corto","formato":"ENLACE","obligatorio":false,"queDebeTener":"Que se oiga",
+                 "todaLaPrueba":true}"""));
         assertThat(editor.at("/borrador/prueba/entregables/1/nombre").asText()).isEqualTo("Video corto");
         assertThat(editor.at("/borrador/prueba/entregables/1/obligatorio").asBoolean()).isFalse();
+        assertThat(editor.at("/borrador/prueba/entregables/1/alcance").asText()).isEqualTo("TODA_LA_PRUEBA");
         editor = respuesta(conToken(post(base(taller) + "/entregables/" + video + "/movimiento"), tokenTalento,
                 "{\"direccion\":\"ARRIBA\"}"));
         assertThat(editor.at("/borrador/prueba/entregables/0/id").asLong()).isEqualTo(video);
 
-        // Dos criterios: «Caja» mira el tablero; «Orden» sube al primer puesto
+        // Dos criterios; «Orden» sube al primer puesto. Los dos miran los generales de toda la prueba
         long caja = idDelCriterio(conToken(post(base(taller) + "/criterios"), tokenTalento, """
-                {"nombre":"Caja","puntosCalificados":40,"calificador":"IA","entregables":[%d]}"""
-                .formatted(tablero)), "Caja");
+                {"nombre":"Caja","puntos":40,"calificador":"IA"}"""), "Caja");
         long orden = idDelCriterio(conToken(post(base(taller) + "/criterios"), tokenTalento,
-                "{\"nombre\":\"Orden\"}"), "Orden");
+                "{\"nombre\":\"Orden\",\"puntos\":0}"), "Orden");
         editor = respuesta(conToken(post(base(taller) + "/criterios/" + orden + "/movimiento"), tokenTalento,
                 "{\"direccion\":\"ARRIBA\"}"));
         assertThat(editor.at("/borrador/criterios/0/id").asLong()).isEqualTo(orden);
+        assertThat(buscarCriterio(editor.get("borrador"), orden).get("entregables").size()).isEqualTo(2);
 
-        // Dos cerradas en «Caja»: la segunda sube; la primera pasa a «Orden»; la segunda se quita
+        // Dos cerradas en «Caja»: la segunda sube; la primera pasa a «Orden»
         String cerrada = """
                 {"tipo":"OPCION_UNICA","enunciado":"%s","puntos":30,"criterioId":%d,
                  "opciones":[{"texto":"Sí","puntos":30},{"texto":"No","puntos":0}]}""";
@@ -1177,24 +1299,61 @@ public class FlujoPruebaPropiaIT {
         JsonNode deCaja = buscarCriterio(editor.get("borrador"), caja).get("preguntas");
         long arqueo = deCaja.get(0).get("id").asLong();
         long vuelto = deCaja.get(1).get("id").asLong();
+        // El total se mantiene (V69): «Caja» sigue valiendo 40 con 60 de cerradas dentro; su parte
+        // calificada queda en 0 y es una falta, también al intentar publicar.
+        assertThat(buscarCriterio(editor.get("borrador"), caja).get("puntos").asInt()).isEqualTo(40);
+        assertThat(buscarCriterio(editor.get("borrador"), caja).get("puntosSistema").asInt()).isEqualTo(60);
+        assertThat(buscarCriterio(editor.get("borrador"), caja).get("puntosCalificados").asInt()).isZero();
+        String porEncima = "Las cerradas de «Caja» suman 60 y el criterio vale 40.";
+        assertThat(editor.at("/borrador/avisos").toString()).contains(porEncima);
+        JsonNode alPublicar = json.readTree(conToken(post(base(taller) + "/publicacion"), tokenTalento, null)
+                .andExpect(status().isBadRequest()).andReturn().getResponse().getContentAsString());
+        assertThat(alPublicar.get("faltas").toString()).contains(porEncima);
         editor = respuesta(conToken(post(base(taller) + "/preguntas/" + vuelto + "/movimiento"), tokenTalento,
                 "{\"direccion\":\"ARRIBA\"}"));
         assertThat(buscarCriterio(editor.get("borrador"), caja).at("/preguntas/0/id").asLong()).isEqualTo(vuelto);
+
+        // Un archivo pedido desde «¿Vuelto?»: lo mira «Caja», sin marcar nada
+        long recibo = idDelEntregable(conToken(post(base(taller) + "/entregables"), tokenTalento, """
+                {"nombre":"Recibo","formato":"ARCHIVO","obligatorio":true,"preguntaId":%d}""".formatted(vuelto)),
+                "Recibo");
+        // El tablero pasa a cubrir solo «¿Arqueo?»
+        respuesta(conToken(put(base(taller) + "/entregables/" + tablero), tokenTalento, """
+                {"nombre":"Tablero","formato":"ARCHIVO","obligatorio":true,"cubre":[%d]}""".formatted(arqueo)));
+        // Mover «¿Arqueo?» de criterio mueve con ella lo que mira cada uno
         editor = respuesta(conToken(put(base(taller) + "/preguntas/" + arqueo), tokenTalento, """
                 {"tipo":"OPCION_UNICA","enunciado":"¿Arqueo diario?","puntos":20,"criterioId":%d,
                  "opciones":[{"texto":"Sí","puntos":20},{"texto":"No","puntos":0}]}""".formatted(orden)));
         assertThat(buscarCriterio(editor.get("borrador"), orden).at("/preguntas/0/enunciado").asText())
                 .isEqualTo("¿Arqueo diario?");
+        assertThat(idsDe(buscarCriterio(editor.get("borrador"), caja).get("entregables")))
+                .containsExactlyInAnyOrder(video, recibo);
+        assertThat(idsDe(buscarCriterio(editor.get("borrador"), orden).get("entregables")))
+                .containsExactlyInAnyOrder(video, tablero);
+        // Cambiarle los puntos y de criterio no mueve lo que vale cada uno: «Caja» sigue en 40, ahora
+        // con 10 de parte calificada; «Orden» sigue en 0 y su cerrada de 20 pasa de ahí.
+        assertThat(buscarCriterio(editor.get("borrador"), caja).get("puntos").asInt()).isEqualTo(40);
+        assertThat(buscarCriterio(editor.get("borrador"), caja).get("puntosCalificados").asInt()).isEqualTo(10);
+        assertThat(buscarCriterio(editor.get("borrador"), orden).get("puntos").asInt()).isZero();
+        assertThat(editor.at("/borrador/avisos").toString())
+                .contains("Las cerradas de «Orden» suman 20 y el criterio vale 0.")
+                .doesNotContain("Las cerradas de «Caja»");
+
+        // Quitar «¿Vuelto?» quita también su archivo; «Caja» sigue valiendo 40, todo calificado
         editor = respuesta(conToken(delete(base(taller) + "/preguntas/" + vuelto), tokenTalento, null));
         assertThat(buscarCriterio(editor.get("borrador"), caja).get("preguntas").size()).isZero();
+        assertThat(buscarCriterio(editor.get("borrador"), caja).get("puntos").asInt()).isEqualTo(40);
+        assertThat(buscarCriterio(editor.get("borrador"), caja).get("puntosCalificados").asInt()).isEqualTo(40);
+        assertThat(editor.at("/borrador/prueba/entregables").size()).isEqualTo(2);
 
-        // Quitar «Orden» deja su pregunta sin criterio; quitar el tablero lo saca de lo que mira «Caja»
+        // Quitar «Orden» deja su pregunta sin criterio; quitar esa pregunta deja el tablero sin cubrir
         editor = respuesta(conToken(delete(base(taller) + "/criterios/" + orden), tokenTalento, null));
         assertThat(editor.at("/borrador/sinCriterio/0/id").asLong()).isEqualTo(arqueo);
-        assertThat(buscarCriterio(editor.get("borrador"), caja).get("entregables").size()).isEqualTo(1);
+        editor = respuesta(conToken(delete(base(taller) + "/preguntas/" + arqueo), tokenTalento, null));
+        assertThat(editor.at("/borrador/avisos").toString()).contains("«Tablero» no cubre ninguna pregunta");
         editor = respuesta(conToken(delete(base(taller) + "/entregables/" + tablero), tokenTalento, null));
         assertThat(editor.at("/borrador/prueba/entregables").size()).isEqualTo(1);
-        assertThat(buscarCriterio(editor.get("borrador"), caja).get("entregables").size()).isZero();
+        assertThat(idsDe(buscarCriterio(editor.get("borrador"), caja).get("entregables"))).containsExactly(video);
 
         // Sin publicada no hay recalificación que reintentar; lo copiable se busca sin tildes
         conToken(post(base(taller) + "/publicada/recalificacion"), tokenTalento, null)
@@ -1210,6 +1369,110 @@ public class FlujoPruebaPropiaIT {
         editor = respuesta(conToken(delete(base(taller) + "/borrador"), tokenTalento, null));
         assertThat(editor.at("/borrador").isNull() || editor.at("/borrador").isMissingNode()).isTrue();
         assertThat(editor.at("/resumen/estado").asText()).isEqualTo("SIN_PRUEBA");
+    }
+
+    @DisplayName("Con la prueba publicada y gente en la etapa técnica, cambiar la fecha pide motivo, se audita y mueve a los abiertos sin plazo propio (AC-10)")
+    @Test
+    @Order(25)
+    void laFechaConGenteDentroPideMotivo() throws Exception {
+        // Dentro y sin plazo propio: Fabi ya abrió la cronometrada de 90 minutos; Gael todavía no.
+        entrarALaPrueba("fabi", "fabi.propia@correo.pe");
+        iniciar("fabi");
+        entrarALaPrueba("gael", "gael.propia@correo.pe");
+        assertThat(venceASusMinutos("fabi")).isTrue();
+        JsonNode editor = editor(vacanteId);
+        assertThat(editor.at("/fechaLimite/pideMotivo").asBoolean()).isTrue();
+        java.time.Instant nueva = java.time.Instant.now().plus(java.time.Duration.ofDays(30))
+                .truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
+
+        conToken(put(base(vacanteId) + "/fecha-limite"), tokenTalento, "{\"cierraEn\":\"%s\"}".formatted(nueva))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.faltas[0]").value(org.hamcrest.Matchers.containsString("pide un motivo")));
+        // Sin editar_vacante, 403
+        conToken(put(base(vacanteId) + "/fecha-limite"), tokenArea,
+                "{\"cierraEn\":\"%s\",\"motivo\":\"x\"}".formatted(nueva)).andExpect(status().isForbidden());
+
+        respuesta(conToken(put(base(vacanteId) + "/fecha-limite"), tokenTalento,
+                "{\"cierraEn\":\"%s\",\"motivo\":\"Se amplía la convocatoria\"}".formatted(nueva)));
+
+        assertThat(jdbc.queryForObject("select motivo from auditoria where accion = "
+                + "'fijar_fecha_limite_prueba_propia' and entidad_id = ? order by id desc limit 1",
+                String.class, vacanteId)).isEqualTo("Se amplía la convocatoria");
+        // La nueva fecha es para quien no ha empezado; a Fabi no le alarga el reloj: sigue
+        // venciendo a los 90 minutos de abrirla, que llegan antes.
+        assertThat(venceEn("gael")).isEqualTo(nueva);
+        assertThat(venceASusMinutos("fabi")).isTrue();
+
+        // Adelantarla por debajo de su reloj sí la corta, a ella y a quien no ha empezado.
+        java.time.Instant pronto = java.time.Instant.now().plus(java.time.Duration.ofMinutes(20))
+                .truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
+        respuesta(conToken(put(base(vacanteId) + "/fecha-limite"), tokenTalento,
+                "{\"cierraEn\":\"%s\",\"motivo\":\"Se adelanta el cierre\"}".formatted(pronto)));
+        assertThat(venceEn("fabi")).isEqualTo(pronto);
+        assertThat(venceEn("gael")).isEqualTo(pronto);
+
+        // «Sin cronómetro» pasa a la nueva fecha. La publicada está congelada desde la primera
+        // rendición: para no montar otra vacante entera se la pasa a «Sin cronómetro» en la
+        // base, y se le devuelve el reloj al terminar.
+        long publicada = publicadaId(vacanteId);
+        jdbc.update("update version_banco set modalidad = 'PLAZO_ABIERTO', duracion_minutos = null where id = ?",
+                publicada);
+        try {
+            respuesta(conToken(put(base(vacanteId) + "/fecha-limite"), tokenTalento,
+                    "{\"cierraEn\":\"%s\",\"motivo\":\"Se amplía otra vez\"}".formatted(nueva)));
+            assertThat(venceEn("fabi")).isEqualTo(nueva);
+            assertThat(venceEn("gael")).isEqualTo(nueva);
+        } finally {
+            jdbc.update("update version_banco set modalidad = 'CRONOMETRADA', duracion_minutos = 90 where id = ?",
+                    publicada);
+        }
+    }
+
+    private java.time.Instant venceEn(String quien) {
+        return jdbc.queryForObject("select vence_en from intento_prueba where postulacion_id = ?",
+                java.sql.Timestamp.class, postulacion.get(quien)).toInstant();
+    }
+
+    /** Si vence justo a los 90 minutos de haberla abierto (se compara en la base, sin redondeos). */
+    private boolean venceASusMinutos(String quien) {
+        return Boolean.TRUE.equals(jdbc.queryForObject("select vence_en = iniciado_en + interval '90 minutes' "
+                + "from intento_prueba where postulacion_id = ?", Boolean.class, postulacion.get(quien)));
+    }
+
+    @DisplayName("Una prueba publicada antes de la V68, con «Mira» marcado a mano, conserva lo que miraba y sus notas (AC-22)")
+    @Test
+    @Order(26)
+    void laDeAntesConservaSuMira() throws Exception {
+        JsonNode antes = pruebaDe("ana");
+        // Como la dejó la V67: el tablero sin alcance y mirado a mano por «Comunicación»
+        jdbc.update("update entregable_requerido set alcance = null, pregunta_id = null where id = ?",
+                entregableTablero);
+        jdbc.update("insert into criterio_banco_entregable (criterio_banco_id, entregable_requerido_id) "
+                + "values (?, ?)", criterioComunicacion, entregableTablero);
+
+        JsonNode despues = pruebaDe("ana");
+        assertThat(idsDe(criterioDe(despues, criterioComunicacion).get("entregables"))).contains(entregableTablero);
+        assertThat(idsDe(criterioDe(despues, criterioConocimiento).get("entregables")))
+                .doesNotContain(entregableTablero);
+        assertThat(despues.get("nota").toString()).isEqualTo(antes.get("nota").toString());
+        assertThat(criterioDe(despues, criterioComunicacion).get("nota").toString())
+                .isEqualTo(criterioDe(antes, criterioComunicacion).get("nota").toString());
+
+        // Y como la dejó la V68, sin lo que vale cada criterio (V69 no toca las publicadas): lee la
+        // parte calificada guardada, que publicar y cambiar los puntos dejaron escrita, y nada cambia.
+        long publicada = publicadaId(vacanteId);
+        assertThat(jdbc.queryForObject("select puntos_calificados from criterio_banco where id = ?",
+                Integer.class, criterioConocimiento)).isEqualTo(15);
+        jdbc.update("update criterio_banco set puntos_del_criterio = null where version_banco_id = ?", publicada);
+        JsonNode sinTotal = pruebaDe("ana");
+        assertThat(sinTotal.get("nota").toString()).isEqualTo(antes.get("nota").toString());
+        for (long criterio : List.of(criterioConocimiento, criterioExcel, criterioComunicacion)) {
+            assertThat(criterioDe(sinTotal, criterio).get("maximo").asInt())
+                    .isEqualTo(criterioDe(antes, criterio).get("maximo").asInt());
+            assertThat(criterioDe(sinTotal, criterio).get("nota").toString())
+                    .isEqualTo(criterioDe(antes, criterio).get("nota").toString());
+        }
+        assertThat(editor(vacanteId).at("/publicada/total").asInt()).isEqualTo(100);
     }
 
     private JsonNode respuesta(ResultActions peticion) throws Exception {
@@ -1281,6 +1544,12 @@ public class FlujoPruebaPropiaIT {
             if ("Tablero.xlsx".equals(e.get("nombre").asText())) entregableTablero = e.get("id").asLong();
             if ("Video".equals(e.get("nombre").asText())) entregableVideo = e.get("id").asLong();
         }
+    }
+
+    private static List<Long> idsDe(JsonNode lista) {
+        List<Long> ids = new ArrayList<>();
+        lista.forEach(n -> ids.add(n.asLong()));
+        return ids;
     }
 
     private static JsonNode buscarCriterio(JsonNode version, long id) {
