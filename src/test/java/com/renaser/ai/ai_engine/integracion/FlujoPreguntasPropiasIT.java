@@ -475,6 +475,18 @@ public class FlujoPreguntasPropiasIT {
                 {"preguntas":[{"id":%d,"puntos":15}]}""".formatted(pregunta.get("abiertaA")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.faltas[0]").value(org.hamcrest.Matchers.containsString("faltan 5")));
+        // Con decimales no hay ninguna suma, solo la falta de ese campo; con 150, la suma de lo
+        // escrito (AC-10)
+        conToken(put(base() + "/publicada/puntos"), tokenTalento, """
+                {"preguntas":[{"id":%d,"puntos":25.5}]}""".formatted(pregunta.get("abiertaA")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.faltas.length()").value(1))
+                .andExpect(jsonPath("$.faltas[0]").value(org.hamcrest.Matchers.containsString(
+                        "los puntos tienen que ser enteros, sin decimales.")));
+        conToken(put(base() + "/publicada/puntos"), tokenTalento, """
+                {"preguntas":[{"id":%d,"puntos":150}]}""".formatted(pregunta.get("abiertaA")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.faltas[0]").value("Los puntos suman 230 de 100: sobran 130."));
 
         // La clave estaba al revés y la abierta A pasa de 20 a 15; la B sube 5 para seguir en 100
         conToken(put(base() + "/publicada/puntos"), tokenTalento, """

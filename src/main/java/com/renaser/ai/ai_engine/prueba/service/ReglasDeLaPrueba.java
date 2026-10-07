@@ -38,9 +38,6 @@ public final class ReglasDeLaPrueba {
     /** Los mismos límites que las plantillas: cinco minutos como suelo, sin techo. */
     public static final int MINUTOS_MINIMOS = 5;
 
-    /** Más allá de esto, lo escrito no se suma: ningún punto vale tanto y la suma no se desborda. */
-    private static final BigDecimal TECHO_DE_LO_ESCRITO = BigDecimal.valueOf(1_000_000);
-
     private ReglasDeLaPrueba() {
     }
 
@@ -85,13 +82,11 @@ public final class ReglasDeLaPrueba {
      * Lo escrito, como entero, para sumarlo al total de la prueba; vacío si no es un entero
      * (o es tan grande que no cabe en una suma). Entonces no hay suma que decir: la falta de
      * ese campo ya dice qué está mal, y una suma que lo dejara fuera contradiría la que se ve
-     * escrita en el formulario (QA-11).
+     * escrita en el formulario (QA-11). La regla es la de las preguntas propias
+     * ({@link ReglasDePuntos#paraLaSuma}): «Cambiar los puntos» del banco suma igual.
      */
     public static OptionalInt paraLaSuma(BigDecimal escrito) {
-        if (!ReglasDePuntos.esEntero(escrito) || escrito.abs().compareTo(TECHO_DE_LO_ESCRITO) > 0) {
-            return OptionalInt.empty();
-        }
-        return OptionalInt.of(escrito.intValue());
+        return ReglasDePuntos.paraLaSuma(escrito);
     }
 
     /** La falta de un criterio cuyas cerradas pasan de lo que vale (V69). */
@@ -276,8 +271,7 @@ public final class ReglasDeLaPrueba {
                         + "una persona.");
             }
             if (!tieneAbiertas && c.entregables().isEmpty()) {
-                faltas.add(cual + ": su parte calificada no mira nada. Agrégale una abierta o "
-                        + "pide un archivo en una de sus preguntas.");
+                faltas.add(nadaQueCalificar(nombre, c.puntosDelCriterio(), c.sistemaMaximo()));
             } else if (c.esDeIa() && !tieneAbiertas && soloEnlaces(c.entregables())) {
                 faltas.add(cual + " lo califica la IA y solo mira enlaces, que la IA no abre. "
                         + "Pásalo a una persona o agrégale una abierta.");
@@ -291,6 +285,26 @@ public final class ReglasDeLaPrueba {
             faltas.add(cual + " está vacío: no tiene cerradas ni parte calificada.");
         }
         return faltas;
+    }
+
+    /**
+     * La falta de un criterio cuyos puntos para abiertas y archivos no tienen nada que mirar:
+     * cuántos quedan sin quien los califique y las tres salidas. Sin cerradas tiene su propio
+     * texto. Empieza por «El criterio «X»» para que el panel la lleve a ese criterio y no la
+     * tome por la de un entregable.
+     *
+     * @param total    lo que vale el criterio
+     * @param cerradas lo que suman sus cerradas (menos que el total: si no, no queda nada)
+     */
+    static String nadaQueCalificar(String nombre, int total, int cerradas) {
+        String vale = "El criterio «" + nombre + "» vale " + total;
+        if (cerradas == 0) {
+            return vale + " y no tiene nada que calificar: agrégale una abierta, un archivo o "
+                    + "cerradas que sumen " + total + ".";
+        }
+        return vale + " y sus cerradas suman " + cerradas + ": nadie puede calificar los otros "
+                + (total - cerradas) + ". Baja el total a " + cerradas + ", sube sus cerradas o "
+                + "agrégale una abierta o un archivo.";
     }
 
     /**
