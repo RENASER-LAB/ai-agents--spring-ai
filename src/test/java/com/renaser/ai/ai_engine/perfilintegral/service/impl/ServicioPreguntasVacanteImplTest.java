@@ -7,6 +7,7 @@ import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPreguntasVacante.CambiarP
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPreguntasVacante.CopiarDeOtraVacante;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPreguntasVacante.CorregirInstrucciones;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPreguntasVacante.PedirRecomendaciones;
+import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPreguntasVacante.PuntosDePregunta;
 import com.renaser.ai.ai_engine.perfilintegral.entity.Evaluacion;
 import com.renaser.ai.ai_engine.perfilintegral.entity.NotaRespuesta;
 import com.renaser.ai.ai_engine.perfilintegral.entity.Pregunta;
@@ -21,6 +22,7 @@ import com.renaser.ai.ai_engine.perfilintegral.repository.PropuestaPreguntasRepo
 import com.renaser.ai.ai_engine.perfilintegral.repository.RespuestaRepository;
 import com.renaser.ai.ai_engine.perfilintegral.repository.VersionBancoRepository;
 import com.renaser.ai.ai_engine.perfilintegral.service.CalificacionPorPuntos;
+import com.renaser.ai.ai_engine.perfilintegral.service.PreguntasInvalidasException;
 import com.renaser.ai.ai_engine.perfilintegral.service.PuenteCalificacionIa;
 import com.renaser.ai.ai_engine.postulacion.entity.Postulacion;
 import com.renaser.ai.ai_engine.postulacion.repository.PostulacionRepository;
@@ -444,5 +446,41 @@ class ServicioPreguntasVacanteImplTest {
                 .isEqualByComparingTo("10.88");
         assertThat(ServicioPreguntasVacanteImpl.escalar(new BigDecimal("3"), 0, 10))
                 .isEqualByComparingTo("0");
+    }
+
+    /** Cuatro abiertas de 25 publicadas, sin nadie que haya rendido. */
+    private void cuatroAbiertasDe25() {
+        List<Pregunta> cuatro = java.util.stream.LongStream.rangeClosed(1, 4)
+                .mapToObj(id -> Pregunta.builder().id(id).tipo("ABIERTA").enunciado("Cuenta " + id)
+                        .puntos(25).versionBancoId(PUBLICADA).orden((int) id).build())
+                .toList();
+        when(preguntas.findByVersionBancoIdOrderByOrden(PUBLICADA)).thenReturn(cuatro);
+        when(porPuntos.calcular(PUBLICADA, null)).thenReturn(new CalificacionPorPuntos.Resultado(
+                publicada, List.of(),
+                cuatro.stream().map(p -> new CalificacionPorPuntos.PreguntaCalculada(
+                        p, List.of(), null, null, 25, BigDecimal.ZERO, false)).toList(),
+                BigDecimal.ZERO, true));
+    }
+
+    private List<String> faltasAlCambiar(String puntosDeLaPrimera) {
+        CambiarPuntos datos = new CambiarPuntos(List.of(new PuntosDePregunta(1L,
+                new BigDecimal(puntosDeLaPrimera), List.of())));
+        Throwable error = org.assertj.core.api.Assertions.catchThrowable(
+                () -> servicio.cambiarPuntos(QUIEN, VACANTE, datos));
+        assertThat(error).isInstanceOf(PreguntasInvalidasException.class);
+        return ((PreguntasInvalidasException) error).getFaltas();
+    }
+
+    @Test
+    @DisplayName("«Cambiar los puntos» suma lo escrito, y con decimales no da ninguna suma: solo la falta de ese campo (AC-10)")
+    void cambiarLosPuntosSumaLoEscrito() {
+        cuatroAbiertasDe25();
+
+        assertThat(faltasAlCambiar("25.5")).containsExactly(
+                "La pregunta 1 («Cuenta 1»): los puntos tienen que ser enteros, sin decimales.");
+        assertThat(faltasAlCambiar("150")).containsExactly(
+                "Los puntos suman 225 de 100: sobran 125.",
+                "La pregunta 1 («Cuenta 1»): los puntos van de 0 a 100.");
+        verify(preguntas, never()).save(any());
     }
 }

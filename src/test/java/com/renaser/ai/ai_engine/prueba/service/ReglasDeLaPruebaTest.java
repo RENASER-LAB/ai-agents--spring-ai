@@ -151,8 +151,31 @@ class ReglasDeLaPruebaTest {
                     List.of(), List.of());
             List<String> faltas = ReglasDeLaPrueba.faltasParaPublicar(r);
             assertThat(faltas).anyMatch(f -> f.contains("«Sin calificador»: falta decir quién califica"));
-            assertThat(faltas).anyMatch(f -> f.contains("«Sin calificador»: su parte calificada no mira nada"));
+            assertThat(faltas).contains("El criterio «Sin calificador» vale 50 y no tiene nada que calificar: "
+                    + "agrégale una abierta, un archivo o cerradas que sumen 50.");
             assertThat(faltas).anyMatch(f -> f.contains("«Abiertas sin puntos» tiene abiertas y su parte calificada no tiene puntos"));
+        }
+
+        @Test
+        @DisplayName("Puntos para abiertas y archivos sin nada que mirar: cuántos quedan sin quien los califique y "
+                + "las salidas; sin cerradas, su propio texto (AC-08, AC-09)")
+        void nadaQueCalificar() {
+            Resultado conCerrada = new Resultado(VERSION, List.of(
+                    conTotal(10, "Excel", 20, "IA", List.of(unica(1, 10, 5, null)))), List.of(), List.of());
+            Resultado sinCerradas = new Resultado(VERSION, List.of(
+                    conTotal(10, "Excel", 20, "IA", List.of())), List.of(), List.of());
+
+            assertThat(ReglasDeLaPrueba.faltasParaPublicar(conCerrada)).contains(
+                    "El criterio «Excel» vale 20 y sus cerradas suman 5: nadie puede calificar los otros 15. "
+                            + "Baja el total a 5, sube sus cerradas o agrégale una abierta o un archivo.");
+            assertThat(ReglasDeLaPrueba.faltasParaPublicar(sinCerradas)).contains(
+                    "El criterio «Excel» vale 20 y no tiene nada que calificar: agrégale una abierta, un "
+                            + "archivo o cerradas que sumen 20.");
+            // Con una abierta ya tiene qué mirar: ninguna de las dos.
+            Resultado conAbierta = new Resultado(VERSION, List.of(
+                    conTotal(10, "Excel", 20, "IA", List.of(unica(1, 10, 5, null), abierta(2, 10, null)))),
+                    List.of(), List.of());
+            assertThat(ReglasDeLaPrueba.faltasParaPublicar(conAbierta)).noneMatch(f -> f.contains("calificar"));
         }
 
         @Test

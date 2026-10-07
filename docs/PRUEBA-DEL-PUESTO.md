@@ -149,6 +149,24 @@ la vacante, solo después de publicar. La forma de calificar no cambió.
 
 Lo prueban `FlujoPruebaPropiaIT`, `MigracionPuntosDelCriterioIT` y `FechaLimiteDeLaVacanteTest`.
 
+### Los avisos de los puntos (07/10/2026)
+
+**Cambian solo textos**: lo que exige publicar, la calificación y la API son los de antes, y no hay
+migración. Cómo los enseña el panel, en el `docs/PANEL.md` del frontend, «Los puntos explicados
+donde se escriben».
+
+- **Un criterio con puntos que nadie puede calificar** (`ReglasDeLaPrueba`; T su total, C sus
+  cerradas): «El criterio «X» vale T y sus cerradas suman C: nadie puede calificar los otros T−C.
+  Baja el total a C, sube sus cerradas o agrégale una abierta o un archivo.»; sin cerradas, «El
+  criterio «X» vale T y no tiene nada que calificar: agrégale una abierta, un archivo o cerradas
+  que sumen T.». Empieza por «El criterio «X»» para que el panel lo lleve al criterio y no a un
+  entregable que se llame igual.
+- **«Cambiar los puntos» de las preguntas propias** (`ServicioPreguntasVacanteImpl.cambiarPuntos`):
+  el 400 da la suma de lo escrito, o ninguna si algo de lo que suma no es entero, como la prueba.
+- El mensaje interno con el que se reintenta una recomendación de la IA
+  (`RecetaRecomendacionPrueba`, «tiene parte calificada y no mira nada») no cambió: no lo lee
+  nadie del panel.
+
 ---
 
 ## Componer una versión antes de publicarla (V46)

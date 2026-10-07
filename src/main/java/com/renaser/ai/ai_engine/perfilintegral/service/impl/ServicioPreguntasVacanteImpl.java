@@ -76,6 +76,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -285,8 +286,12 @@ public class ServicioPreguntasVacanteImpl extends EditorDeVersionPropia implemen
         }
 
         // Todo se valida antes de tocar nada: o cambia entero, o no cambia (AC-32).
+        // La suma es la de lo escrito, como la del formulario. Si algo de lo que suma no es un
+        // entero no se dice ninguna (como QA-11 en la prueba): su falta ya lo dice, y una suma
+        // que lo dejara fuera contradiría la escrita.
         List<String> faltas = new ArrayList<>();
         int suma = 0;
+        boolean haySuma = true;
         int posicion = 1;
         for (Pregunta p : enOrdenDePresentacion(publicada, suyas)) {
             BigDecimal puntos = puntosNuevos.getOrDefault(p.getId(), BigDecimal.valueOf(puntosDe(p)));
@@ -300,11 +305,11 @@ public class ServicioPreguntasVacanteImpl extends EditorDeVersionPropia implemen
             String donde = ReglasDePuntos.nombreDe(posicion++, p.getEnunciado());
             faltas.addAll(ReglasDePuntos.formaDeLaPregunta(donde, aValidar));
             faltas.addAll(ReglasDePuntos.puntuacionDeLaPregunta(donde, aValidar));
-            if (ReglasDePuntos.esEntero(puntos)) {
-                suma += puntos.intValue();
-            }
+            OptionalInt escrito = ReglasDePuntos.paraLaSuma(puntos);
+            suma += escrito.orElse(0);
+            haySuma &= escrito.isPresent();
         }
-        String total = ReglasDePuntos.faltaDelTotal(suma);
+        String total = haySuma ? ReglasDePuntos.faltaDelTotal(suma) : null;
         if (total != null) {
             faltas.add(0, total);
         }

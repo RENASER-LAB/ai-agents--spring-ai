@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
+import java.util.OptionalInt;
 import java.util.Set;
 
 /**
@@ -44,6 +45,9 @@ public final class ReglasDePuntos {
     public static final int MAXIMO_TEXTO_IA = 1000;
 
     private static final BigDecimal CIEN = BigDecimal.valueOf(TOTAL);
+
+    /** Más allá de esto, lo escrito no se suma: ningún punto vale tanto y la suma no se desborda. */
+    private static final BigDecimal TECHO_DE_LO_ESCRITO = BigDecimal.valueOf(1_000_000);
 
     private ReglasDePuntos() {
     }
@@ -176,6 +180,19 @@ public final class ReglasDePuntos {
         return suma < TOTAL
                 ? "Los puntos suman " + suma + " de 100: faltan " + (TOTAL - suma) + "."
                 : "Los puntos suman " + suma + " de 100: sobran " + (suma - TOTAL) + ".";
+    }
+
+    /**
+     * Lo escrito, como entero, para sumarlo al total; vacío si no es un entero (o es tan
+     * grande que no cabe en una suma). Entonces no hay suma que decir: la falta de ese campo
+     * ya dice qué está mal, y una suma que lo dejara fuera contradiría la que se ve escrita en
+     * el formulario (QA-11).
+     */
+    public static OptionalInt paraLaSuma(BigDecimal escrito) {
+        if (!esEntero(escrito) || escrito.abs().compareTo(TECHO_DE_LO_ESCRITO) > 0) {
+            return OptionalInt.empty();
+        }
+        return OptionalInt.of(escrito.intValue());
     }
 
     /**
