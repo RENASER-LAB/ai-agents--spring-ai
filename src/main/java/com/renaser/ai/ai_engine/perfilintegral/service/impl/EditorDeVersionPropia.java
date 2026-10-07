@@ -169,6 +169,16 @@ public abstract class EditorDeVersionPropia implements EditorDeLaVacante {
         // Las preguntas propias no tienen nada más que soltar: sus preguntas ya quedaron sin él.
     }
 
+    /** Lo que se deja escrito al publicar el borrador, ya sin faltas. Nada, salvo que se diga. */
+    protected void alPublicar(VersionBanco borrador) {
+        // Las preguntas propias no deducen nada: lo que se publica es lo que ya estaba escrito.
+    }
+
+    /** Lo que se suelta antes de borrar una pregunta del borrador. Nada, salvo que se diga. */
+    protected void antesDeQuitarLaPregunta(Long preguntaId) {
+        // Las preguntas propias no tienen nada colgado de una pregunta más que sus opciones.
+    }
+
     // ============================== Leer ==============================
 
     @Override
@@ -243,6 +253,7 @@ public abstract class EditorDeVersionPropia implements EditorDeLaVacante {
         Vacante vacante = laEditable(quien, vacanteId);
         Pregunta pregunta = laPregunta(elBorradorQueYaExiste(vacante), preguntaId);
         piezas().opciones().deleteByPreguntaIdIn(List.of(pregunta.getId()));
+        antesDeQuitarLaPregunta(pregunta.getId());
         piezas().preguntas().delete(pregunta);
         return editor(quien, vacante);
     }
@@ -295,6 +306,7 @@ public abstract class EditorDeVersionPropia implements EditorDeLaVacante {
             // actualiza en su propio orden).
             versiones.saveAndFlush(saliente);
         }
+        alPublicar(borrador);
         borrador.setEstado(PUBLICADA);
         borrador.setPublicadaPorUsuarioId(quien.usuarioId());
         borrador.setPublicadaEn(Instant.now());

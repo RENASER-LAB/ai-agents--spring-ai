@@ -41,4 +41,12 @@ public class CriterioBanco {
 
     /** Quién califica la parte calificada: IA o PERSONA. Nulo sin parte calificada. */
     private String calificador;
+
+    /**
+     * Solo en la prueba técnica (V69): lo que vale el criterio entero, que es lo que escribe
+     * quien la arma. Su parte calificada se deduce —este total menos lo que suman sus
+     * cerradas— y por eso el total se mantiene aunque cambien sus cerradas. Nulo en las
+     * versiones publicadas antes de la V69, que leen {@link #puntosCalificados} tal cual.
+     */
+    private Integer puntosDelCriterio;
 }

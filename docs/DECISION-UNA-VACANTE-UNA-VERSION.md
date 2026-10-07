@@ -83,8 +83,10 @@ que alguien la abra se puede abrir un borrador y publicar otra versión, que arc
 Desde la primera rendición el contenido queda congelado —publicar otra es 409— y cada candidato
 queda atado a la versión con que empezó (RF-138). Las dos excepciones son las de las preguntas
 propias: **las instrucciones de la IA** (recalifica a todos con la guía nueva) y **los puntos**
-(recalcula a todos al instante, sin IA); las dos cambian la vara para todos a la vez. Con la misma
-línea, asignar una plantilla por la API a una vacante nueva la pasa a `PLANTILLA` solo mientras
+(recalcula a todos al instante, sin IA); las dos cambian la vara para todos a la vez. **La fecha
+límite** (`V68`) tampoco se congela, pero no es de la versión sino de la vacante: se cambia en
+cualquier momento, con motivo si alguien ya está en la etapa técnica, y no viaja al copiar la
+prueba. Con la misma línea, asignar una plantilla por la API a una vacante nueva la pasa a `PLANTILLA` solo mientras
 nadie haya empezado a rendir.
 
 ---

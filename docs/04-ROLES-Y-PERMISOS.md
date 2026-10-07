@@ -134,7 +134,8 @@ nota de la IA»** (`ajustar_nota`), con su motivo obligatorio de siempre; la fic
 `puedeAjustar`.
 
 **La prueba técnica de una vacante nueva (`V67`, 01/10/2026) sigue el mismo reparto, sin
-permiso nuevo.** Armarla, publicarla, copiarla y pedir recomendaciones es **corregir la vacante**
+permiso nuevo.** Armarla, publicarla, copiarla, pedir recomendaciones y fijar su fecha límite
+(`V68`) es **corregir la vacante**
 (`editar_vacante`, con su alcance); verla, `ver_vacantes`. En la ficha, ver la prueba de una
 persona es `abrir_ficha_candidato` —el contenido de sus entregables pide además
 `descargar_entregables`— y ajustar o poner la parte calificada de un criterio, `ajustar_nota`.

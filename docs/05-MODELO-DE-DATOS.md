@@ -23,8 +23,8 @@ Sirve para tres cosas:
 - **Entender el sistema.** Un modelo de datos bien contado explica el negocio mejor que
   cualquier otro documento.
 
-**La base ya está construida.** Las migraciones `V1` a `V67` viven en
-`src/main/resources/db/migration` —**118 tablas de este módulo**, 121 en la base contando la de
+**La base ya está construida.** Las migraciones `V1` a `V69` viven en
+`src/main/resources/db/migration` —**119 tablas de este módulo**, 122 en la base contando la de
 Flyway y las dos del motor de agentes— y Flyway es el dueño del esquema. Cambiar algo de aquí
 ya cuesta una migración nueva, y **una migración aplicada no se edita nunca**: se escribe otra
 encima.
@@ -190,6 +190,16 @@ algo sin responder) y las propuestas de la IA llevan propósito, para que las de
 prueba de una misma vacante no se pisen. **Las vacantes que ya existían siguen con su
 instrumento y sus datos.** Ver «Prueba del puesto» más abajo y en el
 [diccionario de datos](07-DICCIONARIO-DE-DATOS.md).
+
+La `V68` (05/10/2026) **simplifica esa prueba**: los archivos se piden donde se usan y el sistema
+deduce qué mira cada criterio. `entregable_requerido` gana `alcance` —el archivo de una pregunta
+(`pregunta_id`, como mucho uno por pregunta), un general de toda la prueba o uno de unas preguntas—
+y una tabla nueva, `entregable_cubre_pregunta`, guarda cuáles. `criterio_banco_entregable` deja de
+escribirse: solo la leen las versiones publicadas antes, que conservan su «Mira» marcado a mano y
+sus notas. Los borradores pasaron al modelo nuevo y perdieron los días: «Sin cronómetro» es
+`PLAZO_ABIERTO` sin días, hasta la fecha límite, que sigue en `vacante.prueba_cierra_en`. La `V69`
+(06/10/2026) añade `criterio_banco.puntos_del_criterio`: se escribe lo que vale el criterio entero y
+la parte calificada se deduce restándole las cerradas. Las publicadas de antes lo tienen vacío.
 
 La `V54` (14/09/2026) **no añade ninguna tabla y cambia quién firma qué**. Hasta ella había dos
 tipos de texto —`PROCESO` y `FUTUROS_CONTACTOS`— y el de la cuenta usaba el primero, que habla de
@@ -878,8 +888,8 @@ hace falta repreguntar.
 | `opcion_dimension` | Cuánto suma cada opción a cada dimensión | opcion_id, dimension_codigo, incremento |
 | `pregunta_dimension` | Qué dimensiones evalúa una pregunta abierta, que no tiene opciones | pregunta_id, dimension_codigo |
 | `par_consistencia` | Dos preguntas que miden lo mismo y deberían responderse parecido | version_banco_id, pregunta_a_id, pregunta_b_id, diferencia_maxima |
-| `criterio_banco` | Los criterios de las preguntas propias de una vacante y de su prueba técnica: lo que se califica y lo que se ve como columna (`V66`; la parte calificada, `V67`) | version_banco_id, nombre, que_evalua, orden, puntos_calificados, calificador |
-| `criterio_banco_entregable` | Qué entregables mira cada criterio de la prueba técnica (`V67`) | criterio_banco_id, entregable_requerido_id |
+| `criterio_banco` | Los criterios de las preguntas propias de una vacante y de su prueba técnica: lo que se califica y lo que se ve como columna (`V66`; la parte calificada, `V67`; lo que vale entero, `V69`) | version_banco_id, nombre, que_evalua, orden, puntos_calificados, calificador, puntos_del_criterio |
+| `criterio_banco_entregable` | Qué entregables mira cada criterio de la prueba técnica, marcado a mano (`V67`). Desde la `V68` solo en las versiones publicadas antes: en las demás se deduce del alcance | criterio_banco_id, entregable_requerido_id |
 | `propuesta_preguntas` | Lo que propone la IA para completar el borrador de una vacante; no toca el borrador hasta que una persona lo agrega (`V66`). Desde la `V67`, con su propósito | organizacion_id, vacante_id, proposito, indicacion, puntos_que_faltan, estado, contenido, motivo_fallo, pedida_por_usuario_id |
 
 **Las preguntas propias de una vacante son un banco más** (`V66`), del tipo `VACANTE` y con
@@ -903,8 +913,10 @@ hasta que alguien agrega lo que quiere: criterios enteros o preguntas sueltas.
 criterios, preguntas, opciones y guía numerada, para no tener dos editores, con dos diferencias.
 **Las abiertas no llevan puntos**: cada criterio tiene una parte automática —la suma de sus
 cerradas, que no se guarda— y una **parte calificada** (`puntos_calificados` y `calificador`, `IA`
-o `PERSONA`) que califica el criterio entero mirando sus abiertas y los entregables que
-`criterio_banco_entregable` le asigna. Y la versión guarda **el caso y el tiempo**, que una
+o `PERSONA`) que califica el criterio entero mirando sus abiertas y los entregables que le tocan.
+Desde la `V69` se guarda lo que vale el criterio entero (`puntos_del_criterio`) y la parte
+calificada es eso menos sus cerradas; desde la `V68`, lo que mira se deduce del alcance de los
+entregables (ver «Prueba del puesto»). Y la versión guarda **el caso y el tiempo**, que una
 pregunta suelta no tiene. **No hay que unificar este camino con el del Perfil Integral**, que
 califica pregunta a pregunta.
 
@@ -1018,7 +1030,7 @@ La sugerencia de otro puesto **no mueve nada sola**: es información para que un
 
 ---
 
-### Prueba del puesto · 10 tablas
+### Prueba del puesto · 11 tablas
 
 | Tabla | Para qué existe | Columnas que importan |
 |---|---|---|
@@ -1027,7 +1039,8 @@ La sugerencia de otro puesto **no mueve nada sola**: es información para que un
 | `variante_cambio` | Las distintas formas que puede tomar el cambio inesperado | version_plantilla_prueba_id, texto, orden |
 | `pregunta_prueba` | El catálogo de preguntas: previas, universales y del puesto. Sin dueño; desde el 05/10/2026 solo la plataforma lo lee y escribe por la API | codigo, enunciado, tipo, puesto_id, revela |
 | `pregunta_version_plantilla` | Cuáles eligió esta plantilla | version_plantilla_prueba_id, pregunta_prueba_id, orden |
-| `entregable_requerido` | Qué cosas distintas hay que entregar, cada una con su regla. Desde la `V67`, de una plantilla **o** de la prueba del editor | version_plantilla_prueba_id, version_banco_id, nombre, detalle, formato, es_obligatorio, orden, que_debe_tener |
+| `entregable_requerido` | Qué cosas distintas hay que entregar, cada una con su regla. Desde la `V67`, de una plantilla **o** de la prueba del editor; desde la `V68`, en el editor, con su alcance: de una pregunta o general | version_plantilla_prueba_id, version_banco_id, nombre, detalle, formato, es_obligatorio, orden, que_debe_tener, alcance, pregunta_id |
+| `entregable_cubre_pregunta` | Las preguntas que reúne un entregable general de la prueba del editor (`V68`) | entregable_requerido_id, pregunta_id |
 | `intento_prueba` | Cuando un candidato rinde. Desde la `V67`, una plantilla **o** la prueba del editor | postulacion_id, version_plantilla_prueba_id, version_banco_id, iniciado_en, vence_en, entregado_en, es_entrega_automatica, no_completada, variante_cambio_id, minuto_cambio, cambio_mostrado_en |
 | `entregable` | Lo que sube o el enlace que pega, y **cuál de los pedidos es** | intento_prueba_id, entregable_requerido_id, archivo_id, enlace, version, subido_en |
 | `respuesta_prueba` | Sus respuestas a las preguntas de la prueba. Desde la `V67`, también a las del editor, cerradas incluidas | intento_prueba_id, pregunta_prueba_id, pregunta_id, texto, opcion_id, detalle, respondida_en |
@@ -1041,6 +1054,13 @@ reutiliza toda la maquinaria de la rendición —el reloj, las entregas que se r
 por plazo y el plazo propio— sin un segundo intento. **El cambio inesperado no se sortea** para
 la prueba del editor, y sus preguntas son de la vacante, así que **no pasan por el catálogo
 `pregunta_prueba`**.
+
+**En el editor, lo que se guarda es el alcance de cada entregable, no lo que mira cada
+criterio** (`V68`). Un criterio mira el archivo de cada una de sus preguntas y los generales que
+cubren toda la prueba o alguna de sus preguntas, y eso se calcula al leer: así no hay dos datos
+que puedan contradecirse al mover o quitar una pregunta. Las versiones publicadas antes de la
+`V68` no tienen alcance y siguen leyendo su «Mira» de `criterio_banco_entregable`, para que sus
+notas no cambien.
 
 **`pregunta_prueba` no tiene `organizacion_id`**, y su `codigo` es único en toda la plataforma.
 Para que una empresa no lea el examen de otra, desde el 05/10/2026 listarlo, crear preguntas y
@@ -1418,6 +1438,9 @@ cuáles sí, porque las que no, hay que probarlas en el código.
   menos 5 y sus días al menos 1; una parte calificada va de 0 a 100 y la califica `IA` o
   `PERSONA`; un intento no completado está cerrado; y un ajuste de la parte calificada lleva
   motivo.
+- **El alcance de un entregable es solo del editor y es coherente** (`V68`): el de una pregunta
+  lleva su pregunta y los demás no, una pregunta pide como mucho un archivo y un general no cubre
+  dos veces la misma. Lo que vale un criterio no es negativo (`V69`).
 
 ### Tienen que vivir en el código
 
@@ -1469,11 +1492,13 @@ cuáles sí, porque las que no, hay que probarlas en el código.
   si la empresa tiene uno **propio** publicado para ese nivel, y que el origen no cambie desde la
   primera postulación. Dependen de otras filas y del momento.
 - **Las reglas de la prueba del editor** (`V67`): que la publicada sume 100 con la parte
-  automática y la calificada de cada criterio; que el enunciado exista si hay entregables; que
-  todo entregable esté en algún criterio y que un criterio de IA no mire solo enlaces; que no se
-  entregue sin todo respondido; que la vara se congele **en la primera rendición** y no en la
-  primera postulación; y que una vacante no entre ni salga de `PRUEBA_PROPIA` por
-  `/instrumento-tecnico`. Dependen de otras filas y del momento.
+  automática y la calificada de cada criterio; que las cerradas no pasen de lo que vale su
+  criterio (`V69`); que todo entregable lo mire algún criterio con parte calificada, que un general
+  cubra algo y que un criterio de IA no mire solo enlaces (`V68`); que haya fecha límite futura
+  para publicar, aunque sea de la vacante (`V68`); que no se entregue sin todo respondido; que la
+  vara se congele **en la primera rendición** y no en la primera postulación; y que una vacante no
+  entre ni salga de `PRUEBA_PROPIA` por `/instrumento-tecnico`. Dependen de otras filas y del
+  momento. **El enunciado ya no se exige** (`V68`).
 
 ### Nunca existen, ni siquiera como opción
 

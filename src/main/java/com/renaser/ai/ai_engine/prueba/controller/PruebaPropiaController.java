@@ -7,6 +7,7 @@ import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPreguntasVacante.Mover;
 import com.renaser.ai.ai_engine.prueba.dto.DtosPruebaPropia.AgregarDeLaPropuestaDePrueba;
 import com.renaser.ai.ai_engine.prueba.dto.DtosPruebaPropia.CambiarPuntosDePrueba;
 import com.renaser.ai.ai_engine.prueba.dto.DtosPruebaPropia.CorregirInstruccionesDePrueba;
+import com.renaser.ai.ai_engine.prueba.dto.DtosPruebaPropia.FijarFechaLimite;
 import com.renaser.ai.ai_engine.prueba.dto.DtosPruebaPropia.GuardarCriterioDePrueba;
 import com.renaser.ai.ai_engine.prueba.dto.DtosPruebaPropia.GuardarDatosDeLaPrueba;
 import com.renaser.ai.ai_engine.prueba.dto.DtosPruebaPropia.GuardarEntregable;
@@ -89,7 +90,8 @@ public class PruebaPropiaController extends EditorDeLaVacanteController {
 
     @PostMapping("/criterios")
     @PreAuthorize("@permisos.tiene('editar_vacante')")
-    @Operation(summary = "Agregar un criterio, con su parte calificada y lo que mira")
+    @Operation(summary = "Agregar un criterio, con su parte calificada. Lo que mira lo deduce el "
+            + "sistema del alcance de los entregables")
     public EditorDePreguntas agregarCriterio(@PathVariable Long vacanteId,
                                             @Valid @RequestBody GuardarCriterioDePrueba datos) {
         return servicio.agregarCriterio(permisos.actual(), vacanteId, datos);
@@ -98,7 +100,7 @@ public class PruebaPropiaController extends EditorDeLaVacanteController {
     @PutMapping("/criterios/{criterioId}")
     @PreAuthorize("@permisos.tiene('editar_vacante')")
     @Operation(summary = "Cambiar un criterio del borrador: nombre, qué evalúa, parte "
-            + "calificada, quién la califica y qué entregables mira")
+            + "calificada y quién la califica")
     public EditorDePreguntas editarCriterio(@PathVariable Long vacanteId, @PathVariable Long criterioId,
                                            @Valid @RequestBody GuardarCriterioDePrueba datos) {
         return servicio.editarCriterio(permisos.actual(), vacanteId, criterioId, datos);
@@ -122,8 +124,8 @@ public class PruebaPropiaController extends EditorDeLaVacanteController {
 
     @PostMapping("/entregables")
     @PreAuthorize("@permisos.tiene('editar_vacante')")
-    @Operation(summary = "Agregar un entregable: nombre, qué debe contener, formato, si es "
-            + "obligatorio y qué debe tener una buena entrega")
+    @Operation(summary = "Pedir un archivo: el de una pregunta (preguntaId, como mucho uno por "
+            + "pregunta) o uno general que cubre toda la prueba o algunas preguntas")
     public EditorDePreguntas agregarEntregable(@PathVariable Long vacanteId,
                                               @Valid @RequestBody GuardarEntregable datos) {
         return servicio.agregarEntregable(permisos.actual(), vacanteId, datos);
@@ -150,6 +152,18 @@ public class PruebaPropiaController extends EditorDeLaVacanteController {
     public EditorDePreguntas moverEntregable(@PathVariable Long vacanteId, @PathVariable Long entregableId,
                                             @Valid @RequestBody Mover datos) {
         return servicio.moverEntregable(permisos.actual(), vacanteId, entregableId, datos);
+    }
+
+    // ---------- La fecha límite (V68) ----------
+
+    @PutMapping("/fecha-limite")
+    @PreAuthorize("@permisos.tiene('editar_vacante')")
+    @Operation(summary = "La fecha límite para dar la prueba: la de la vacante. Se puede poner antes "
+            + "de publicar; una pasada es 400; mueve los intentos abiertos sin plazo propio y, con "
+            + "alguien en la etapa técnica, pide un motivo que se audita")
+    public EditorDePreguntas fijarFechaLimite(@PathVariable Long vacanteId,
+                                              @Valid @RequestBody FijarFechaLimite datos) {
+        return servicio.fijarFechaLimite(permisos.actual(), vacanteId, datos);
     }
 
     // ---------- Con la versión publicada ----------

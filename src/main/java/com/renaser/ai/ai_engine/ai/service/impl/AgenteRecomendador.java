@@ -77,14 +77,16 @@ public class AgenteRecomendador implements AgenteSeleccion {
             """;
 
     /**
-     * El formato de la prueba técnica (V67). Además de lo de siempre: el caso, los
-     * entregables y la parte calificada de cada criterio, con quién la califica y qué mira.
+     * El formato de la prueba técnica (V67, V68). Además de lo de siempre: el caso opcional,
+     * los entregables con su alcance y la parte calificada de cada criterio, con quién la
+     * califica. Nunca «Mira»: lo que mira cada criterio se deduce del alcance.
      */
     public static final String FORMATO_PRUEBA = """
             Recibes los datos de la vacante, cuantos puntos tiene que sumar tu propuesta
             (puntosQueFaltan), una indicacion opcional, el enunciado actual de la prueba (o
-            null), su tiempo, sus entregables y sus criterios, cada uno con los puntos de sus
-            preguntas cerradas, su parte calificada, quien la califica y que entregables mira.
+            null), su tiempo, sus entregables y sus criterios, cada uno con lo que vale
+            (puntos), lo que suman sus preguntas cerradas (puntosDeCerradas) y el resto, su
+            parte calificada, con quien la califica.
             Completa lo que falta para una PRUEBA TECNICA: no repitas nada del borrador.
             Como se puntua una prueba:
             - Las preguntas cerradas (OPCION_UNICA, OPCION_MULTIPLE, ESCALA) llevan puntos y
@@ -95,22 +97,32 @@ public class AgenteRecomendador implements AgenteSeleccion {
               negativo ni por encima de los puntos, y al menos uno da exactamente esos puntos.
             - Las ABIERTAS NO llevan puntos (pon 0): en queDebeTener di que debe tener una
               buena respuesta.
-            - Cada criterio nuevo tiene una parteCalificada (entero) que califica alguien
-              mirando sus abiertas y los entregables que mira: calificador "IA" o "PERSONA".
-              Un criterio con abiertas o entregables necesita parteCalificada mayor que 0; uno
-              con parteCalificada mayor que 0 mira al menos una abierta o un entregable.
+            - Cada criterio nuevo dice lo que vale entero en "puntos" (entero): sus cerradas
+              mas su parte calificada. Su parte calificada es puntos menos lo que suman sus
+              cerradas, nunca negativa, y la califica alguien mirando sus abiertas y los
+              archivos de sus preguntas: calificador "IA" o "PERSONA" (null si sus cerradas
+              suman todos sus puntos). Un criterio con abiertas necesita parte calificada
+              mayor que 0; uno con parte calificada mayor que 0 tiene al menos una abierta o
+              mira algun entregable.
+            - Los entregables se piden donde se usan. Cada uno es de UNA pregunta de tu
+              propuesta ("pregunta": {"criterio": <posicion del criterio desde 0>,
+              "pregunta": <posicion de la pregunta desde 0>}), como mucho uno por pregunta; o
+              es general y cubre toda la prueba ("todaLaPrueba": true) o algunas preguntas de
+              tu propuesta ("cubre": [{"criterio": .., "pregunta": ..}]). Un criterio mira el
+              archivo de cada una de sus preguntas y los generales que cubren toda la prueba
+              o alguna de sus preguntas: tu no dices que mira cada criterio.
+            - Todo entregable lo tiene que mirar al menos un criterio con parte calificada
+              mayor que 0: si no, nadie lo califica.
             - La IA no abre enlaces: un criterio que solo mira entregables con formato ENLACE,
               sin abiertas, tiene calificador "PERSONA".
-            - Los puntos de todas tus cerradas mas las parteCalificada de tus criterios nuevos
-              suman exactamente puntosQueFaltan.
-            - Si propones entregables (nombre, detalle = que debe contener, formato ARCHIVO,
-              ENLACE o CUALQUIERA, obligatorio, queDebeTener), cada uno lo mira al menos un
-              criterio tuyo, por su posicion en tu lista (desde 0) en "entregables". Un
-              criterio tuyo tambien puede mirar entregables del borrador por su id, en
-              "entregablesExistentes".
-            - Si la prueba no tiene enunciado y va a tener entregables, propon el caso.
+            - Los puntos de tus criterios nuevos suman exactamente puntosQueFaltan.
+            - El caso es opcional: proponlo solo si la prueba no tiene enunciado y un escenario
+              le sirve.
             - Puedes poner preguntas en un criterio del borrador (criterioExistenteId); entonces
-              no propones su parte calificada.
+              no propones sus puntos: ese criterio sigue valiendo lo mismo y sus cerradas
+              nuevas salen de su parte calificada. No pueden pasarla, y si el criterio tiene
+              o recibe abiertas, o mira archivos, le tiene que quedar algo. Esas preguntas no
+              suman a puntosQueFaltan.
             Responde SOLO con un objeto json con esta forma exacta:
             {
               "caso": {"enunciado": "<el caso, o null>", "materiales": "<o null>",
@@ -118,15 +130,16 @@ public class AgenteRecomendador implements AgenteSeleccion {
               "entregables": [{"nombre": "<...>", "detalle": "<que debe contener>",
                                "formato": "<ARCHIVO | ENLACE | CUALQUIERA>",
                                "obligatorio": <true | false>,
-                               "queDebeTener": "<que debe tener una buena entrega>"}],
+                               "queDebeTener": "<que debe tener una buena entrega>",
+                               "pregunta": {"criterio": <entero>, "pregunta": <entero>} o null,
+                               "todaLaPrueba": <true | false>,
+                               "cubre": [{"criterio": <entero>, "pregunta": <entero>}]}],
               "criterios": [
                 {"criterioExistenteId": <id de un criterio del borrador, o null>,
                  "nombre": "<nombre del criterio nuevo, o null>",
                  "queEvalua": "<que evalua, o null>",
-                 "parteCalificada": <entero>,
+                 "puntos": <entero: lo que vale el criterio nuevo entero, o null>,
                  "calificador": "<IA | PERSONA | null>",
-                 "entregables": [<posiciones de tus entregables que mira>],
-                 "entregablesExistentes": [<ids de entregables del borrador que mira>],
                  "preguntas": [
                    {"tipo": "<ABIERTA | OPCION_UNICA | OPCION_MULTIPLE | ESCALA>",
                     "enunciado": "<la pregunta>",

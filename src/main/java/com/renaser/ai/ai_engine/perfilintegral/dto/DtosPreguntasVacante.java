@@ -141,7 +141,11 @@ public final class DtosPreguntasVacante {
                                      * `hayPostulantes` dice si alguien ya empezó a rendirla:
                                      * esa es su frontera (decisión 9), no la postulación.
                                      */
-                                    String proposito) {
+                                    String proposito,
+                                    /* Solo en la prueba técnica (V68): la fecha límite para
+                                       dar la prueba, que es de la vacante. Nula en las
+                                       preguntas propias. */
+                                    FechaLimiteDeLaPrueba fechaLimite) {
 
         public EditorDePreguntas(Long vacanteId, String titulo, String nivel, String origen,
                                  boolean aplicaEvaluacion, boolean puedeEditar,
@@ -149,8 +153,27 @@ public final class DtosPreguntasVacante {
                                  VersionDePreguntas publicada, ResumenDePreguntas resumen,
                                  Recalificacion recalificacion) {
             this(vacanteId, titulo, nivel, origen, aplicaEvaluacion, puedeEditar, hayPostulantes,
-                    borrador, publicada, resumen, recalificacion, "PERFIL_INTEGRAL");
+                    borrador, publicada, resumen, recalificacion, "PERFIL_INTEGRAL", null);
         }
+
+        public EditorDePreguntas(Long vacanteId, String titulo, String nivel, String origen,
+                                 boolean aplicaEvaluacion, boolean puedeEditar,
+                                 boolean hayPostulantes, VersionDePreguntas borrador,
+                                 VersionDePreguntas publicada, ResumenDePreguntas resumen,
+                                 Recalificacion recalificacion, String proposito) {
+            this(vacanteId, titulo, nivel, origen, aplicaEvaluacion, puedeEditar, hayPostulantes,
+                    borrador, publicada, resumen, recalificacion, proposito, null);
+        }
+    }
+
+    /**
+     * La fecha límite para dar la prueba técnica (V68): {@code vacante.prueba_cierra_en}.
+     *
+     * @param cierraEn   la fecha y hora en que la prueba se cierra para todos, o nula
+     * @param pideMotivo si cambiarla pide un motivo: la prueba está publicada y alguien ya
+     *                   está en la etapa técnica
+     */
+    public record FechaLimiteDeLaPrueba(Instant cierraEn, boolean pideMotivo) {
     }
 
     /**
@@ -181,8 +204,9 @@ public final class DtosPreguntasVacante {
 
     /**
      * Lo que una prueba técnica tiene y unas preguntas no (V67): el caso, el tiempo y los
-     * entregables. {@code cuestionario} es verdad cuando no hay entregables: entonces la
-     * pantalla la llama cuestionario y el enunciado es opcional.
+     * entregables. {@code cuestionario} es verdad cuando no hay entregables; desde la V68 la
+     * pantalla ya no lo usa («cuestionario» desaparece: hay una sola prueba) y el caso es
+     * siempre opcional. {@code plazoDias} solo lo traen las publicadas de antes, sin fecha.
      */
     public record PruebaDeLaVersion(String enunciado, ConsignaAdjunta consigna, String materiales,
                                     String herramientasPermitidas, String modalidad,
@@ -198,14 +222,24 @@ public final class DtosPreguntasVacante {
     /**
      * Un entregable de la prueba. {@code detalle} es «qué debe contener» (lo ve el candidato);
      * {@code queDebeTener}, lo que llega a la IA y a quien califica. {@code criterios} son los
-     * ids de los criterios que lo miran.
+     * ids de los criterios que lo miran, deducidos del alcance.
+     *
+     * <p>El alcance (V68): {@code PREGUNTA} (el archivo de {@code preguntaId}),
+     * {@code TODA_LA_PRUEBA} o {@code PREGUNTAS} (las de {@code cubre}). Nulo en los de antes,
+     * con «Mira» marcado a mano.
      */
     public record EntregableDeLaVersion(Long id, String nombre, String detalle, String formato,
                                         boolean obligatorio, String queDebeTener, int orden,
-                                        List<Long> criterios) {
+                                        List<Long> criterios, String alcance, Long preguntaId,
+                                        List<Long> cubre) {
     }
 
-    /** Un criterio: sus puntos son la suma de sus preguntas, partidos en sistema e IA. */
+    /**
+     * Un criterio: sus puntos son la suma de sus preguntas, partidos en sistema e IA. En la
+     * prueba técnica (V69) son lo que vale el criterio, que es lo que se escribe; su parte
+     * calificada es eso menos sus cerradas ({@code puntosSistema}), y si las cerradas pasan de
+     * él la parte queda en 0 y sale una falta.
+     */
     public record CriterioDeLaVersion(Long id, String nombre, String queEvalua, int orden,
                                       int puntos, int puntosSistema, int puntosIa,
                                       List<PreguntaDeLaVersion> preguntas,

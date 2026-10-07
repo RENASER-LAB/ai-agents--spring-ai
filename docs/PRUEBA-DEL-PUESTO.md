@@ -2,7 +2,7 @@
 
 Cómo se compone, se rinde, se cierra y se califica la etapa técnica. Reúne lo que se decidió
 entre el 22/08 y el 02/09/2026 (migraciones V29 a V48) y la prueba escrita en el editor del
-01/10/2026 (V67). El diseño de la ficha del puesto y del
+01/10/2026 (V67), simplificada el 05-06/10/2026 (V68-V69). El diseño de la ficha del puesto y del
 redactor está en [Diseño de la prueba técnica](DISENO-PRUEBA-TECNICA-FICHA-Y-REDACTOR.md); cómo
 se reparten los 100 puntos, en [La rúbrica de la prueba](RUBRICA-DE-LA-PRUEBA.md); la regla de
 «una vacante, una versión», en [su decisión](DECISION-UNA-VACANTE-UNA-VERSION.md).
@@ -18,7 +18,7 @@ vacante eligió cuál (V43):
 |---|---|---|
 | **Cuestionario técnico** | Preguntas que se contestan escribiendo, sin nada que subir; nace de la ficha del puesto y del redactor (V42). Es la etapa 2 de CAZATALENTOS | El panel, con ayuda de la IA |
 | **Prueba del puesto** | Una plantilla con versiones publicadas: preguntas, entregables (archivo o enlace), rúbrica y variantes (el cambio inesperado) | RENASER, por guion. El panel ya no tiene pantalla para escribirla (05/10/2026) |
-| **La prueba escrita en el editor** (`PRUEBA_PROPIA`, V67) | La de **toda vacante nueva**, también en RENASER: criterios, preguntas de cuatro tipos, el caso, el tiempo y los entregables, escritos para esa vacante. Sin entregables es un cuestionario | La empresa, en «Armar la prueba» del panel, con ayuda de la IA si quiere |
+| **La prueba escrita en el editor** (`PRUEBA_PROPIA`, V67) | La de **toda vacante nueva**, también en RENASER: criterios, preguntas de cuatro tipos, un caso opcional, los archivos que se piden, el tiempo y la fecha límite, escritos para esa vacante. Es una sola prueba, haya o no archivos (desde la V68 ya no se llama cuestionario) | La empresa, en «Armar la prueba» del panel, con ayuda de la IA si quiere |
 
 **A las vacantes nuevas ya no se les ofrecen las plantillas, el cuestionario CAZATALENTOS ni la
 ficha.** Las existentes siguen igual, sin migrar nada: en su configuración se sigue eligiendo la
@@ -40,17 +40,19 @@ Vive en `version_banco` con propósito `PRUEBA_PUESTO`; las rutas están en
 [Las APIs](09-APIS.md), «La prueba técnica escrita en el editor», y las tablas en el
 [diccionario de datos](07-DICCIONARIO-DE-DATOS.md).
 
-**Qué se escribe.** El caso (enunciado, adjunto en PDF o Word, materiales y herramientas), el
-tiempo (cronometrada en minutos o plazo abierto en días, **sin cambio inesperado**), los
-entregables (con «qué debe tener una buena entrega», que el candidato no ve) y los criterios. Cada
-criterio tiene **una parte automática** —la suma de sus cerradas— y **una parte calificada**, con
-sus puntos, quién la califica (la IA o una persona) y qué entregables mira. **Las abiertas no
-llevan puntos**: la IA o la persona califican el criterio entero. Todo suma 100. Sin entregables,
-el editor, la vacante y el portal la llaman cuestionario y el enunciado deja de ser obligatorio.
+**Qué se escribe.** Los criterios con sus preguntas, un caso opcional (enunciado y adjunto en PDF
+o Word), la guía para la IA, los archivos que se piden (con «qué debe tener una buena entrega»,
+que el candidato no ve) y la configuración: el tiempo (cronometrada en minutos o sin cronómetro,
+**sin cambio inesperado**), la fecha límite, los materiales y las herramientas. Cada criterio
+**vale unos puntos** que se reparten en **una parte automática** —la suma de sus cerradas— y
+**una parte calificada** —el resto—, que califica la IA o una persona mirando sus abiertas y los
+archivos que le tocan. **Las abiertas no llevan puntos**: la IA o la persona califican el criterio
+entero. Todo suma 100. Cómo quedó así, en «El editor más simple», más abajo.
 
 **Se congela en la primera rendición**, no en la primera postulación: hasta que alguien abra la
 prueba se puede abrir un borrador y publicar otra versión. Desde entonces, publicar es 409 y solo
-cambian los puntos y las instrucciones de la IA, que alcanzan a todos a la vez.
+cambian los puntos y las instrucciones de la IA, que alcanzan a todos a la vez. La fecha límite no
+es de la versión sino de la vacante, y se cambia en cualquier momento.
 
 **Cómo se rinde.** Con la maquinaria de siempre —`intento_prueba`, el reloj del servidor, las
 entregas que se reemplazan, el cierre de la vacante y el plazo propio—, que ahora cuelga de una
@@ -62,7 +64,11 @@ plantilla **o** de la versión del editor. Diferencias:
   IA, no sale en el ranking ni en su Excel y la postulación no cambia de etapa. El panel lo lista
   en «No completaron la prueba», desde donde alguien cierra su proceso. Con todo completo se
   entrega sola, como antes.
-- Al portal nunca le llegan puntos, claves, criterios ni calificadores (RF-53).
+- Al portal nunca le llegan puntos, claves, criterios, calificadores ni qué mira cada criterio
+  (RF-53).
+- **El reloj al abrirla.** Una cronometrada vence a los N minutos o en la fecha límite, lo que
+  llegue antes; una sin cronómetro, en la fecha límite. El plazo propio de una persona sigue
+  mandando.
 
 **Cómo se califica.** Las cerradas, el sistema, al entregar; si con eso la prueba ya está entera,
 pasa a «por confirmar» en ese momento. La parte calificada de los criterios de IA, el agente
@@ -92,6 +98,56 @@ empezado a rendir. Es una puerta deliberada (decisión del 01/10/2026) para los 
 que crean la vacante y le ponen su plantilla. En cambio, `/instrumento-tecnico` no entra ni sale
 de `PRUEBA_PROPIA` (400), así que **un guion que llame a `/instrumento-tecnico` antes que a
 `/plantilla-prueba` falla con una vacante nueva**: el orden correcto es primero la plantilla.
+
+### El editor más simple (V68-V69, 05-06/10/2026)
+
+Armar la prueba pedía pasos de más: crear un entregable aparte y marcar a mano qué criterio lo
+miraba, escribir un caso aunque la prueba no girara en torno a uno, y fijar la fecha de cierre en
+la vacante, solo después de publicar. La forma de calificar no cambió.
+
+- **Los archivos se piden donde se usan** (`entregable_requerido.alcance`, V68): el de una
+  pregunta (`PREGUNTA`, como mucho uno por pregunta) o uno general que cubre toda la prueba
+  (`TODA_LA_PRUEBA`) o unas preguntas (`PREGUNTAS`, en `entregable_cubre_pregunta`). Quitar una
+  pregunta quita su archivo, y moverla de criterio mueve con ella lo que mira cada criterio.
+- **«Mira» se deduce al leer** y nadie lo marca: un criterio mira el archivo de cada una de sus
+  preguntas y los generales que cubren toda la prueba o alguna de sus preguntas. Lo calcula
+  `CalificacionDeLaPruebaPropia`, así que la IA, la ficha y la red de seguridad leen lo mismo que
+  antes.
+- ⚠️ **Lo publicado antes de la V68 no cambió**: sus entregables quedan sin alcance y siguen
+  leyendo el «Mira» marcado a mano en `criterio_banco_entregable`, así que sus notas, su ficha y su
+  ranking son los mismos. Los borradores abiertos pasaron a generales que cubren las preguntas de
+  los criterios que los miraban, o toda la prueba si alguno de esos criterios no tenía preguntas.
+- **Los puntos del criterio son el total** (`criterio_banco.puntos_del_criterio`, V69): se escribe
+  lo que vale el criterio entero y su parte calificada es ese total menos sus cerradas. Si luego
+  cambian las cerradas, el criterio sigue valiendo lo mismo y se mueve su parte calificada. Si las
+  cerradas lo suman todo, no queda parte calificada; si lo pasan, es una falta: «Las cerradas de
+  «X» suman N y el criterio vale T». Las versiones publicadas antes de la V69 tienen el total vacío
+  y leen `puntos_calificados` tal cual; los borradores tomaron cerradas más parte calificada.
+- **El caso nunca es obligatorio**, haya o no archivos, y ya no hay «cuestionario»: es una sola
+  prueba.
+- **El tiempo** es «Cronometrada» (5 minutos como mínimo) o «Sin cronómetro», que se guarda como
+  `PLAZO_ABIERTO` sin días: se trabaja hasta la fecha límite. Los borradores perdieron sus días; una
+  publicada de antes y sin fecha los conserva y los cuenta desde que se abre.
+- **La fecha límite es la de la vacante** (`prueba_cierra_en`) y se fija desde el editor,
+  `PUT …/prueba-propia/fecha-limite`, **también antes de publicar**. Una pasada es 400 y no viaja al
+  copiar la prueba. Cada cambio queda en la auditoría y, con la prueba publicada y alguien ya en la
+  etapa técnica, pide un motivo. Las vacantes con plantilla la siguen fijando en
+  `POST /vacantes/{id}/cierre-prueba`; las dos rutas escriben con `FechaLimiteDeLaVacante`.
+- **Mover la fecha** mueve los intentos abiertos sin plazo propio. A quien ya abrió una
+  cronometrada le vence lo que llegue antes, su inicio más N minutos o la nueva fecha: mover la
+  fecha nunca le alarga el reloj. A quien abrió una sin cronómetro y a quien no ha empezado, la
+  nueva fecha. Las plantillas, como antes.
+- **Publicar exige además** la fecha límite futura, los minutos si es cronometrada, que todo
+  entregable lo mire al menos un criterio con parte calificada mayor que 0 («nadie lo califica») y
+  que un general cubra algo. **Ya no exige** el enunciado ni los días.
+- **Recomendaciones por IA y copia.** La IA propone entregables con su alcance y nunca «Mira», y
+  a un criterio del borrador le respeta su total. La copia trae el caso, el tiempo, los materiales,
+  las herramientas y los entregables con su alcance; la fecha no.
+- **El portal** recibe `fechaLimite` y, en cada entregable, `preguntaId` (nulo en los generales):
+  el archivo de una pregunta se sube dentro de ella. La ficha del candidato lo enseña junto a su
+  respuesta.
+
+Lo prueban `FlujoPruebaPropiaIT`, `MigracionPuntosDelCriterioIT` y `FechaLimiteDeLaVacanteTest`.
 
 ---
 
@@ -214,7 +270,8 @@ decir «esta convocatoria cierra el domingo».
 
 - **Por vacante**: `POST /panel/vacantes/{id}/cierre-prueba`. Además de fijarla, **mueve los
   intentos ya abiertos**; si no, valdría solo para quien entrara después y la tanda quedaría
-  partida en dos.
+  partida en dos. En la prueba del editor es su fecha límite, y se fija desde el editor (ver «El
+  editor más simple»).
 - **Por candidato**: `POST /panel/postulaciones/{id}/prueba/plazo`, para dar más horas a quien
   las pide. Marca `intento_prueba.plazo_propio`, y **a esos no les afecta mover la fecha de la
   vacante**.

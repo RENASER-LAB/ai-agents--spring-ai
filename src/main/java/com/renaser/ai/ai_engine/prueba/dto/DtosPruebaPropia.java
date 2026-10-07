@@ -35,8 +35,11 @@ public final class DtosPruebaPropia {
     // ============================== El editor: lo que entra ==============================
 
     /**
-     * Un criterio de la prueba: su nombre, qué evalúa y su parte calificada —sus puntos,
-     * quién la califica (IA o PERSONA) y los ids de los entregables que mira—.
+     * Un criterio de la prueba: su nombre, qué evalúa, <b>lo que vale entero</b> ({@code puntos},
+     * V69) y quién califica lo que no suman sus cerradas (IA o PERSONA). Esa diferencia es su
+     * parte calificada, que se deduce: si luego cambian sus cerradas, el criterio sigue
+     * valiendo lo mismo. <b>Lo que mira no se escribe</b> (V68): lo deduce el sistema del
+     * alcance de los entregables.
      */
     public record GuardarCriterioDePrueba(
             @NotBlank(message = "El criterio necesita un nombre")
@@ -44,9 +47,8 @@ public final class DtosPruebaPropia {
             String nombre,
             @Size(max = 1000, message = "«Qué evalúa» admite hasta 1000 caracteres")
             String queEvalua,
-            BigDecimal puntosCalificados,
-            String calificador,
-            List<Long> entregables) {
+            BigDecimal puntos,
+            String calificador) {
     }
 
     /**
@@ -65,7 +67,12 @@ public final class DtosPruebaPropia {
             @Valid List<GuardarOpcion> opciones) {
     }
 
-    /** La guía de la IA, el caso y el tiempo del borrador. Lo que no venga queda vacío. */
+    /**
+     * La guía de la IA, el caso y el tiempo del borrador. Lo que no venga queda vacío.
+     *
+     * <p>El tiempo es «Cronometrada» ({@code CRONOMETRADA} con sus minutos) o «Sin cronómetro»
+     * ({@code PLAZO_ABIERTO}, sin días: se trabaja hasta la fecha límite de la vacante).
+     */
     public record GuardarDatosDeLaPrueba(
             @Size(max = 2000, message = "La guía de calificación admite hasta 2000 caracteres")
             String guiaCalificacion,
@@ -76,14 +83,22 @@ public final class DtosPruebaPropia {
             @Size(max = 1000, message = "Las herramientas permitidas admiten hasta 1000 caracteres")
             String herramientasPermitidas,
             String modalidad,
-            Integer duracionMinutos,
-            Integer plazoDias) {
+            Integer duracionMinutos) {
     }
 
     /**
      * Un entregable: su nombre, qué debe contener (lo lee el candidato), su formato (ARCHIVO,
      * ENLACE o CUALQUIERA), si es obligatorio y «qué debe tener una buena entrega» (lo leen la
      * IA y quien califica).
+     *
+     * <p>Y su alcance (V68): {@code preguntaId} para el archivo de una pregunta (como mucho uno
+     * por pregunta); si no, es general y cubre {@code todaLaPrueba} o las preguntas de
+     * {@code cubre}. Los criterios que lo miran se deducen de eso.
+     *
+     * <p>Los dos sí/no admiten venir omitidos o nulos (Jackson 3 no deja un {@code null} en un
+     * primitivo y respondía 500): {@code obligatorio} vale entonces sí, como el entregable que
+     * propone la IA sin decirlo, y {@code todaLaPrueba} vale no, de modo que un general sin
+     * alcance cae en la falta «Elige qué cubre» y no en un error.
      */
     public record GuardarEntregable(
             @NotBlank(message = "El entregable necesita un nombre")
@@ -92,9 +107,33 @@ public final class DtosPruebaPropia {
             @Size(max = 1000, message = "«Qué debe contener» admite hasta 1000 caracteres")
             String detalle,
             String formato,
-            boolean obligatorio,
+            Boolean obligatorio,
             @Size(max = 1000, message = "«Qué debe tener una buena entrega» admite hasta 1000 caracteres")
-            String queDebeTener) {
+            String queDebeTener,
+            Long preguntaId,
+            Boolean todaLaPrueba,
+            List<Long> cubre) {
+
+        public GuardarEntregable {
+            obligatorio = !Boolean.FALSE.equals(obligatorio);
+            todaLaPrueba = Boolean.TRUE.equals(todaLaPrueba);
+        }
+
+        /** Un general que cubre toda la prueba, sin pregunta propia. */
+        public GuardarEntregable(String nombre, String detalle, String formato, boolean obligatorio,
+                                 String queDebeTener) {
+            this(nombre, detalle, formato, obligatorio, queDebeTener, null, true, List.of());
+        }
+    }
+
+    /**
+     * La fecha límite para dar la prueba (V68): la de la vacante ({@code prueba_cierra_en}),
+     * que se pone desde el editor. El motivo solo hace falta con la prueba publicada y alguien
+     * ya en la etapa técnica: entonces queda en la auditoría.
+     */
+    public record FijarFechaLimite(
+            @NotNull(message = "Falta la fecha límite") Instant cierraEn,
+            @Size(max = 1000, message = "El motivo admite hasta 1000 caracteres") String motivo) {
     }
 
     /**
@@ -110,12 +149,19 @@ public final class DtosPruebaPropia {
             @Valid List<TextoDe> entregables) {
     }
 
-    /** Los puntos nuevos de una prueba publicada: de cerradas, opciones y partes calificadas. */
+    /**
+     * Los puntos nuevos de una prueba publicada: de cerradas, opciones y lo que vale cada
+     * criterio con parte calificada (V69). Lo que no se dice se mantiene: un criterio con parte
+     * calificada sigue valiendo lo mismo y su parte se ajusta a sus cerradas nuevas; uno solo
+     * de cerradas vale lo que sumen.
+     */
     public record CambiarPuntosDePrueba(@Valid List<PuntosDePregunta> preguntas,
                                         @Valid List<PuntosDeCriterio> criterios) {
     }
 
-    public record PuntosDeCriterio(@NotNull Long id, @NotNull BigDecimal puntosCalificados) {
+    /** Lo que vale un criterio entero; su parte calificada es eso menos sus cerradas. */
+    public record PuntosDeCriterio(@NotNull Long id,
+                                   @NotNull(message = "Faltan los puntos del criterio") BigDecimal puntos) {
     }
 
     /**
@@ -182,12 +228,13 @@ public final class DtosPruebaPropia {
     /**
      * Un entregable y cómo llegó. {@code enlace} y {@code archivoId} viajan solo con
      * {@code descargar_entregables}; {@code porQueNoSeVe} lo dice con palabras cuando no hay
-     * contenido que enseñar.
+     * contenido que enseñar. {@code preguntaId} (V68): la pregunta de la que es el archivo, para
+     * enseñarlo junto a su respuesta; nulo en los generales.
      */
     public record EntregaVista(Long entregableId, String nombre, String detalle, String formato,
                                boolean obligatorio, String queDebeTener, boolean loEntrego,
                                String enlace, Long archivoId, String archivoNombre,
-                               Instant subidoEn, String porQueNoSeVe) {
+                               Instant subidoEn, String porQueNoSeVe, Long preguntaId) {
     }
 
     /** Ajustar (o poner) la parte calificada de un criterio, con su motivo. */

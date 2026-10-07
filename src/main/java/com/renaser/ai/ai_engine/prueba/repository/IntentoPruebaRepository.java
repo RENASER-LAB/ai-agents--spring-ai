@@ -68,4 +68,15 @@ public interface IntentoPruebaRepository extends JpaRepository<IntentoPrueba, Lo
               and i.postulacionId in (select p.id from Postulacion p where p.vacanteId = :vacanteId)
             """)
     boolean algunoEmpezadoDeLaVacante(@Param("vacanteId") Long vacanteId);
+
+    /**
+     * ¿Hay alguien de esta vacante en la etapa técnica? El intento se crea al entrar en ella,
+     * aunque no la haya abierto todavía (V68): desde ahí, cambiar la fecha límite pide un
+     * motivo, porque ya hay a quien se le mueve.
+     */
+    @Query("""
+            select count(i) > 0 from IntentoPrueba i
+            where i.postulacionId in (select p.id from Postulacion p where p.vacanteId = :vacanteId)
+            """)
+    boolean algunoDeLaVacante(@Param("vacanteId") Long vacanteId);
 }

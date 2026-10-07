@@ -6,6 +6,7 @@ import com.renaser.ai.ai_engine.perfilintegral.dto.DtosRecomendador.InsumoRecome
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosRecomendador.OpcionPropuesta;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosRecomendador.PreguntaPropuesta;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosRecomendador.ResultadoRecomendador;
+import com.renaser.ai.ai_engine.perfilintegral.dto.DtosRecomendador.ResultadoRecomendadorPrueba;
 import com.renaser.ai.ai_engine.perfilintegral.entity.CriterioBanco;
 import com.renaser.ai.ai_engine.perfilintegral.entity.Pregunta;
 import com.renaser.ai.ai_engine.perfilintegral.entity.PropuestaPreguntas;
@@ -231,6 +232,44 @@ class PuenteRecomendadorImplTest {
         JsonNode cerrada = json.get(1).get("preguntas").get(0);
         assertThat(cerrada.get("opciones").get(0).get("puntos").asString()).isEqualTo("10");
         assertThat(cerrada.get("opciones").get(1).get("puntos").isNull()).isTrue();
+    }
+
+    @Test
+    @DisplayName("La propuesta de prueba guarda lo que vale cada criterio nuevo y su parte ya deducida; uno del borrador, ninguna de las dos (V69)")
+    void guardarLaPropuestaDePrueba() {
+        PropuestaPreguntas pedida = PropuestaPreguntas.builder().id(4L).organizacionId(ORGANIZACION)
+                .vacanteId(VACANTE).proposito(PropuestaPreguntas.PRUEBA_PUESTO)
+                .estado(PropuestaPreguntas.PEDIDA).puntosQueFaltan(60).build();
+        when(propuestas.findFirstByVacanteIdAndPropositoOrderByIdDesc(VACANTE, PropuestaPreguntas.PRUEBA_PUESTO))
+                .thenReturn(Optional.of(pedida));
+        var cerrada = new PreguntaPropuesta(ReglasDePuntos.OPCION_UNICA, "¿Qué libro?", new BigDecimal("10.0"),
+                null, List.of(new OpcionPropuesta("Diario", new BigDecimal("10")),
+                        new OpcionPropuesta("Caja", BigDecimal.ZERO)));
+        var abierta = new PreguntaPropuesta(ReglasDePuntos.ABIERTA, "¿Cómo cuadras?", new BigDecimal("5"),
+                "Que cuadre", null);
+        var resultado = new ResultadoRecomendadorPrueba(null, null, List.of(
+                new CriterioPropuesto(null, "Excel", null, List.of(cerrada, abierta), null, "IA",
+                        List.of(0), null, new BigDecimal("30")),
+                // Una IA que contesta a la antigua, con la parte calificada: vale su cerrada más ella.
+                new CriterioPropuesto(null, "Caja", null, List.of(cerrada), new BigDecimal("20"), "PERSONA",
+                        null, null, null),
+                new CriterioPropuesto(8L, "ignorado", null, List.of(abierta), new BigDecimal("9"), "IA",
+                        null, null, new BigDecimal("9"))));
+
+        puente.guardarPropuestaPrueba(VACANTE, resultado);
+
+        verify(propuestas).save(pedida);
+        assertThat(pedida.getEstado()).isEqualTo(PropuestaPreguntas.LISTA);
+        JsonNode criterios = new ObjectMapper().readTree(pedida.getContenido()).get("criterios");
+        assertThat(criterios.get(0).get("puntos").asInt()).isEqualTo(30);
+        assertThat(criterios.get(0).get("parteCalificada").asInt()).isEqualTo(20);
+        assertThat(criterios.get(0).get("entregables").isEmpty()).isTrue();
+        assertThat(criterios.get(0).get("preguntas").get(1).get("puntos").asInt()).isZero();
+        assertThat(criterios.get(1).get("puntos").asInt()).isEqualTo(30);
+        assertThat(criterios.get(1).get("parteCalificada").asInt()).isEqualTo(20);
+        // Un criterio del borrador sigue valiendo lo mismo: la propuesta no dice sus puntos.
+        assertThat(criterios.get(2).path("puntos").isNumber()).isFalse();
+        assertThat(criterios.get(2).path("parteCalificada").isNumber()).isFalse();
     }
 
     // ---------------------------------------------------------------- marcarFallida

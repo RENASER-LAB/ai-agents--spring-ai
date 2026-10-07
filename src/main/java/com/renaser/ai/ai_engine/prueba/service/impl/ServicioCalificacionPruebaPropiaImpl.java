@@ -201,36 +201,40 @@ public class ServicioCalificacionPruebaPropiaImpl implements ServicioCalificacio
 
     private EntregaVista comoEntrega(EntregableRequerido requerido, Optional<Entregable> entregado,
                                      boolean veElContenido, Postulacion postulacion) {
-        String detalle = requerido.getDetalle() == null || requerido.getDetalle().isBlank()
-                ? null : requerido.getDetalle();
         if (entregado.isEmpty()) {
-            return new EntregaVista(requerido.getId(), requerido.getNombre(), detalle,
-                    requerido.getFormato(), requerido.isEsObligatorio(), requerido.getQueDebeTener(),
-                    false, null, null, null, null,
+            return vista(requerido, false, null, null, null, null,
                     requerido.isEsObligatorio() ? "No lo entregó, y era obligatorio" : "No lo entregó");
         }
         Entregable e = entregado.get();
         if (!veElContenido) {
-            return new EntregaVista(requerido.getId(), requerido.getNombre(), detalle,
-                    requerido.getFormato(), requerido.isEsObligatorio(), requerido.getQueDebeTener(),
-                    true, null, null, null, e.getSubidoEn(),
+            return vista(requerido, true, null, null, null, e.getSubidoEn(),
                     "Hace falta el permiso «descargar_entregables» para abrirlo");
         }
         if (e.getArchivoId() == null) {
-            return new EntregaVista(requerido.getId(), requerido.getNombre(), detalle,
-                    requerido.getFormato(), requerido.isEsObligatorio(), requerido.getQueDebeTener(),
-                    true, e.getEnlace(), null, null, e.getSubidoEn(), null);
+            return vista(requerido, true, e.getEnlace(), null, null, e.getSubidoEn(), null);
         }
         Archivo archivo = archivos.findByIdAndOrganizacionId(e.getArchivoId(), postulacion.getOrganizacionId())
                 .orElse(null);
         if (archivo == null || archivo.getBorradoEn() != null || archivo.getRuta() == null) {
-            return new EntregaVista(requerido.getId(), requerido.getNombre(), detalle,
-                    requerido.getFormato(), requerido.isEsObligatorio(), requerido.getQueDebeTener(),
-                    true, null, null, null, e.getSubidoEn(), "El archivo ya no está guardado");
+            return vista(requerido, true, null, null, null, e.getSubidoEn(), "El archivo ya no está guardado");
         }
+        return vista(requerido, true, e.getEnlace(), archivo.getId(), archivo.getNombreOriginal(),
+                e.getSubidoEn(), null);
+    }
+
+    /**
+     * Un entregable como lo ve la ficha. Lleva la pregunta de la que es el archivo (V68) para
+     * enseñarlo junto a su respuesta; los generales van en su sitio.
+     */
+    private static EntregaVista vista(EntregableRequerido requerido, boolean loEntrego, String enlace,
+                                      Long archivoId, String archivoNombre, java.time.Instant subidoEn,
+                                      String porQueNoSeVe) {
+        String detalle = requerido.getDetalle() == null || requerido.getDetalle().isBlank()
+                ? null : requerido.getDetalle();
         return new EntregaVista(requerido.getId(), requerido.getNombre(), detalle,
                 requerido.getFormato(), requerido.isEsObligatorio(), requerido.getQueDebeTener(),
-                true, e.getEnlace(), archivo.getId(), archivo.getNombreOriginal(), e.getSubidoEn(), null);
+                loEntrego, enlace, archivoId, archivoNombre, subidoEn, porQueNoSeVe,
+                requerido.getPreguntaId());
     }
 
     // ============================== Ajustar a mano ==============================

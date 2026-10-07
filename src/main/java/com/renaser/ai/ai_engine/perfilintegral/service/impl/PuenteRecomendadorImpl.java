@@ -168,7 +168,8 @@ public class PuenteRecomendadorImpl implements PuenteRecomendador {
             dias = base.getPlazoDias();
             entregables = r.entregables().stream()
                     .map(e -> new com.renaser.ai.ai_engine.perfilintegral.dto.DtosRecomendador.EntregableDelBorrador(
-                            e.getId(), e.getNombre(), e.getFormato()))
+                            e.getId(), e.getNombre(), e.getFormato(),
+                            com.renaser.ai.ai_engine.prueba.entity.EntregableRequerido.TODA_LA_PRUEBA.equals(e.getAlcance())))
                     .toList();
             criterios = r.criterios().stream()
                     .map(c -> new com.renaser.ai.ai_engine.perfilintegral.dto.DtosRecomendador.CriterioDelBorradorDePrueba(
@@ -177,7 +178,9 @@ public class PuenteRecomendadorImpl implements PuenteRecomendador {
                             c.entregables().stream().map(e -> e.getId()).toList(),
                             c.preguntas().stream().map(pc -> new PreguntaDelBorrador(
                                     pc.pregunta().getTipo(), pc.pregunta().getEnunciado(), pc.maximo()))
-                                    .toList()))
+                                    .toList(),
+                            // Lo que vale (V69): no cambia aunque la IA le agregue preguntas.
+                            c.puntosDelCriterio()))
                     .toList();
         }
         return new com.renaser.ai.ai_engine.perfilintegral.dto.DtosRecomendador.InsumoRecomendadorPrueba(
@@ -195,18 +198,7 @@ public class PuenteRecomendadorImpl implements PuenteRecomendador {
             return;
         }
         List<CriterioPropuesto> criterios = resultado.criterios().stream()
-                .map(c -> new CriterioPropuesto(c.criterioExistenteId(), c.nombre(), c.queEvalua(),
-                        c.preguntas() == null ? List.of() : c.preguntas().stream()
-                                .map(p -> new PreguntaPropuesta(p.tipo(), p.enunciado(),
-                                        ReglasDePuntos.ABIERTA.equals(p.tipo()) ? BigDecimal.ZERO : entero(p.puntos()),
-                                        p.queDebeTener(),
-                                        p.opciones() == null ? List.of() : p.opciones().stream()
-                                                .map(o -> new OpcionPropuesta(o.texto(), entero(o.puntos())))
-                                                .toList()))
-                                .toList(),
-                        entero(c.parteCalificada()), c.calificador(),
-                        c.entregables() == null ? List.of() : c.entregables(),
-                        c.entregablesExistentes() == null ? List.of() : c.entregablesExistentes()))
+                .map(PuenteRecomendadorImpl::criterioLimpio)
                 .toList();
         var limpia = new com.renaser.ai.ai_engine.perfilintegral.dto.DtosRecomendador.PropuestaDePrueba(
                 resultado.caso(), resultado.entregables() == null ? List.of() : resultado.entregables(),
@@ -247,5 +239,31 @@ public class PuenteRecomendadorImpl implements PuenteRecomendador {
 
     private static BigDecimal entero(BigDecimal puntos) {
         return puntos == null ? null : puntos.setScale(0, RoundingMode.HALF_UP);
+    }
+
+    /**
+     * Un criterio de la propuesta de prueba tal como se guarda: puntos enteros, abiertas en 0
+     * y nunca «Mira» (V68). Un criterio nuevo guarda lo que vale (V69) y, para leerlo de un
+     * vistazo, su parte calificada ya deducida; uno del borrador no trae ni una cosa ni otra:
+     * sigue valiendo lo mismo.
+     */
+    private static CriterioPropuesto criterioLimpio(CriterioPropuesto c) {
+        List<PreguntaPropuesta> preguntas = c.preguntas() == null ? List.of() : c.preguntas().stream()
+                .map(p -> new PreguntaPropuesta(p.tipo(), p.enunciado(),
+                        ReglasDePuntos.ABIERTA.equals(p.tipo()) ? BigDecimal.ZERO : entero(p.puntos()),
+                        p.queDebeTener(),
+                        p.opciones() == null ? List.of() : p.opciones().stream()
+                                .map(o -> new OpcionPropuesta(o.texto(), entero(o.puntos())))
+                                .toList()))
+                .toList();
+        CriterioPropuesto sinPuntos = new CriterioPropuesto(c.criterioExistenteId(), c.nombre(),
+                c.queEvalua(), preguntas, null, c.calificador(), List.of(), List.of(), null);
+        BigDecimal puntos = c.criterioExistenteId() == null ? entero(c.puntosDelCriterio()) : null;
+        if (puntos == null) {
+            return sinPuntos;
+        }
+        BigDecimal parte = puntos.subtract(BigDecimal.valueOf(sinPuntos.puntosDeCerradas())).max(BigDecimal.ZERO);
+        return new CriterioPropuesto(c.criterioExistenteId(), c.nombre(), c.queEvalua(), preguntas,
+                parte, c.calificador(), List.of(), List.of(), puntos);
     }
 }

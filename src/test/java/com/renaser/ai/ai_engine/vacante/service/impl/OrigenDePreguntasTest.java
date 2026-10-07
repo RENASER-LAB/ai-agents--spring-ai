@@ -86,7 +86,9 @@ class OrigenDePreguntasTest {
         servicio = new ServicioVacantesPanelImpl(vacantes, puestos, requisitos, solicitudes,
                 versionesPesos, plantillas, versionesPrueba, plantillasPrueba, plantillasCorreo,
                 plantillasPorVacante, intentos, evaluaciones, versionesBanco,
-                auditoria, dueno, postulaciones, enCarrera, maquina, avisos, alcance, permisos, catalogos);
+                auditoria, dueno, postulaciones, enCarrera, maquina, avisos, alcance, permisos, catalogos,
+                new com.renaser.ai.ai_engine.prueba.service.FechaLimiteDeLaVacante(vacantes, intentos,
+                        versionesPrueba, versionesBanco));
         lenient().when(puestos.findByIdAndOrganizacionId(PUESTO, ORGANIZACION))
                 .thenReturn(Optional.of(Puesto.builder().id(PUESTO).organizacionId(ORGANIZACION)
                         .nivelPuestoCodigo(NIVEL).familiaCodigo("OPERACIONES").esActivo(true).build()));

@@ -29,4 +29,20 @@ public class EntregableRequerido {
     private Instant creadoEn;
     /** «Qué debe tener una buena entrega» (V67): llega a la IA, nunca al portal. */
     private String queDebeTener;
+    /**
+     * Su alcance en la prueba del editor (V68): {@link #PREGUNTA}, {@link #TODA_LA_PRUEBA} o
+     * {@link #PREGUNTAS}. Nulo en los de antes (con «Mira» marcado a mano) y en las plantillas.
+     */
+    private String alcance;
+    /** La pregunta que pide este archivo, si su alcance es {@link #PREGUNTA}. */
+    private Long preguntaId;
+
+    public static final String PREGUNTA = "PREGUNTA";
+    public static final String TODA_LA_PRUEBA = "TODA_LA_PRUEBA";
+    public static final String PREGUNTAS = "PREGUNTAS";
+
+    /** Un entregable general (de toda la prueba o de unas preguntas), no el de una pregunta. */
+    public boolean esGeneral() {
+        return TODA_LA_PRUEBA.equals(alcance) || PREGUNTAS.equals(alcance);
+    }
 }
