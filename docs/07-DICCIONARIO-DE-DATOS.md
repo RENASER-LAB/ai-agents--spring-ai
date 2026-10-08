@@ -1,7 +1,7 @@
 # Diccionario de datos
 
 Sistema de selección de personal — Renaser Consulting
-Versión 3.6 · 2026-10-07 · Puesto al día con las migraciones hasta la `V69` (la V69 añade `criterio_banco.puntos_del_criterio`, lo que vale entero un criterio de la prueba técnica; la V68 trae el alcance de los entregables de la prueba del editor —`entregable_requerido.alcance` y `pregunta_id` y la tabla `entregable_cubre_pregunta`—, desde la que «Mira» se deduce, y deja sin días los borradores de esa prueba; la V67 trae la prueba técnica escrita en el editor —las tablas `criterio_banco_entregable` y `nota_criterio_prueba`, el tercer valor `PRUEBA_PROPIA` de `vacante.instrumento_etapa_tecnica`, el propósito `PRUEBA_PUESTO` con el caso y el tiempo en `version_banco`, la parte calificada en `criterio_banco`, `entregable_requerido`, `intento_prueba` y `respuesta_prueba` colgando también de la versión del editor, `intento_prueba.no_completada` y el propósito en `propuesta_preguntas`—; la V66 trae las preguntas propias de cada vacante —las tablas `criterio_banco` y `propuesta_preguntas`, `vacante.origen_preguntas`, el propósito, el método `PUNTOS` y la guía en `version_banco`, los tres tipos nuevos con sus puntos en `pregunta`, el orden en `opcion`, la nota hasta 100 y la de la IA aparte en `nota_respuesta`, el modo `RECALIFICA` y el agente `RECOMENDADOR`—; la V64 trae la gestión de personas —`sede`, `colaborador`, `periodo_laboral`, `situacion_laboral`, `cese_anulado` y `contratado_sin_alta`— y sus cuatro permisos; la V65 añade las columnas `antes_*` de `situacion_laboral`; la V49 y la V50 solo siembran pesos; la V51 trae la tabla `lectura_cv_perfil` y los archivos del perfil; la V52 y la V53 no crean tablas; la V55 pone el sueldo en la vacante y la pretensión en la postulación; la V56 trae la tabla `aviso_portal`; la V57 no crea tablas, solo siembra los precios de los dos modelos de DeepSeek; la V58 no crea tablas: suma el aviso `VACANTE_ACTUALIZADA` y apaga el correo `REMUNERACION_ACTUALIZADA`; la V59 añade `vacante.archivada_en`; la V60 añade `vacante.eliminada_en` —el borrado lógico—, el motivo de cierre y el tipo de aviso `VACANTE_ELIMINADA`, y el permiso `eliminar_vacante`; la V61 trae la tabla `recuperacion_clave`, tres parámetros y los dos correos de «¿Olvidaste tu contraseña?»; la V62 añade `vacante.ciudad_ubigeo`; la V63 trae las tablas `resena`, `respuesta_resena` y `reporte_resena`, los tres permisos de las reseñas de empresas y cuatro tipos de aviso)
+Versión 3.7 · 2026-10-08 · Puesto al día con las migraciones hasta la `V70` (la V70 añade `transicion_estado.aviso_al_candidato` y la tabla `recordatorio_enviado`, siembra en todas las organizaciones tres parámetros y los correos `RECORDATORIO_EVALUACION` y `RECORDATORIO_PRUEBA`, publica una versión nueva de los textos de `PRUEBA_DISPONIBLE` que decían «desde este correo» y documenta siete tipos de aviso de la campana; la V69 añade `criterio_banco.puntos_del_criterio`, lo que vale entero un criterio de la prueba técnica; la V68 trae el alcance de los entregables de la prueba del editor —`entregable_requerido.alcance` y `pregunta_id` y la tabla `entregable_cubre_pregunta`—, desde la que «Mira» se deduce, y deja sin días los borradores de esa prueba; la V67 trae la prueba técnica escrita en el editor —las tablas `criterio_banco_entregable` y `nota_criterio_prueba`, el tercer valor `PRUEBA_PROPIA` de `vacante.instrumento_etapa_tecnica`, el propósito `PRUEBA_PUESTO` con el caso y el tiempo en `version_banco`, la parte calificada en `criterio_banco`, `entregable_requerido`, `intento_prueba` y `respuesta_prueba` colgando también de la versión del editor, `intento_prueba.no_completada` y el propósito en `propuesta_preguntas`—; la V66 trae las preguntas propias de cada vacante —las tablas `criterio_banco` y `propuesta_preguntas`, `vacante.origen_preguntas`, el propósito, el método `PUNTOS` y la guía en `version_banco`, los tres tipos nuevos con sus puntos en `pregunta`, el orden en `opcion`, la nota hasta 100 y la de la IA aparte en `nota_respuesta`, el modo `RECALIFICA` y el agente `RECOMENDADOR`—; la V64 trae la gestión de personas —`sede`, `colaborador`, `periodo_laboral`, `situacion_laboral`, `cese_anulado` y `contratado_sin_alta`— y sus cuatro permisos; la V65 añade las columnas `antes_*` de `situacion_laboral`; la V49 y la V50 solo siembran pesos; la V51 trae la tabla `lectura_cv_perfil` y los archivos del perfil; la V52 y la V53 no crean tablas; la V55 pone el sueldo en la vacante y la pretensión en la postulación; la V56 trae la tabla `aviso_portal`; la V57 no crea tablas, solo siembra los precios de los dos modelos de DeepSeek; la V58 no crea tablas: suma el aviso `VACANTE_ACTUALIZADA` y apaga el correo `REMUNERACION_ACTUALIZADA`; la V59 añade `vacante.archivada_en`; la V60 añade `vacante.eliminada_en` —el borrado lógico—, el motivo de cierre y el tipo de aviso `VACANTE_ELIMINADA`, y el permiso `eliminar_vacante`; la V61 trae la tabla `recuperacion_clave`, tres parámetros y los dos correos de «¿Olvidaste tu contraseña?»; la V62 añade `vacante.ciudad_ubigeo`; la V63 trae las tablas `resena`, `respuesta_resena` y `reporte_resena`, los tres permisos de las reseñas de empresas y cuatro tipos de aviso)
 
 Cada tabla con todas sus columnas, tipos y claves. **Este documento se consulta**, no se lee de
 corrido: es la base para escribir las migraciones de Flyway.
@@ -696,7 +696,7 @@ Una convocatoria concreta.
 | `plantilla_evaluacion_id` | bigint | no | |
 | `aplica_evaluacion` | boolean | sí | Apagado, quien postula no recibe la evaluación del banco: va directo a la bandeja del equipo y su única evaluación es la prueba del puesto. Por defecto encendido. En el panel es «Sin evaluación» |
 | `origen_preguntas` | text | sí | (`V66`) De dónde salen sus preguntas cuando `aplica_evaluacion` está encendido: `NIVEL` (el banco de la empresa para el nivel del puesto) o `VACANTE` (sus preguntas propias, en un `version_banco` con propósito `PERFIL_INTEGRAL`). Por defecto `NIVEL`, que es lo que quedó en todas las anteriores a la `V66`; **las nuevas nacen con `VACANTE`**, también en RENASER. `NIVEL` solo se elige si la empresa tiene un banco **propio** publicado para ese nivel, y desde la primera postulación no cambia: las dos reglas viven en `ServicioVacantesPanelImpl` |
-| `calificacion_automatica` | boolean | sí | Encendido, la postulación se califica y avanza sola hasta que termina la prueba del puesto, y solo entonces espera a una persona. Por defecto **apagado**: en automático cada postulante cuesta una llamada al modelo desde el momento en que postula |
+| `calificacion_automatica` | boolean | sí | Encendido, la postulación se califica y avanza sola hasta que termina la prueba del puesto, y solo entonces espera a una persona. Desde el 07/10/2026, con la prueba montada, pasa a ella al entregar el banco (o al postular, sin banco) sin esperar a la nota, que se calcula por detrás. Por defecto **apagado**: en automático cada postulante cuesta una llamada al modelo desde el momento en que postula |
 | `prueba_cierra_en` | timestamptz | no | Cuándo cierra la prueba de esta vacante, para todos. Vacío: se cuentan los días de la versión de la plantilla desde que cada uno empieza. **También se puede fijar sobre una versión `CRONOMETRADA`** (22/09/2026): al empezar rige el plazo que caiga antes entre el reloj y esta fecha, así que no anula el cronómetro — lo que hace es impedir empezar la prueba después de esta fecha. **Con `PRUEBA_PROPIA` (`V68`) es la fecha límite de la prueba del editor**: obligatoria y futura para publicarla, se puede poner antes de publicar y no viaja al copiar la prueba |
 | `responsable_usuario_id` | bigint | sí | Quién se hace cargo de contratar |
 | `publicada_en` | timestamptz | no | |
@@ -1024,9 +1024,11 @@ Cada cambio de estado. **No se modifica ni se borra nunca.**
 | `es_por_lote` | boolean | sí | Si se despachó en bloque |
 | `motivo` | text | no | **Obligatorio si no es del sistema** |
 | `ocurrida_en` | timestamptz | sí | |
+| `aviso_al_candidato` | text | no | (`V70`) Cómo se enteró el candidato: `CORREO` (correo y aviso en la campana), `NINGUNO` (movida «sin avisar») o `POR_LA_CAMPANA` (solo el aviso propio, como el cierre por vacante eliminada). **Vacía en todas las anteriores a la `V70`** |
 
 **Clave primaria:** `id`
-**Restricción:** `motivo` no puede estar vacío cuando `es_sistema` es falso
+**Restricción:** `motivo` no puede estar vacío cuando `es_sistema` es falso; `aviso_al_candidato`
+es vacío o uno de sus tres valores
 **No admite UPDATE ni DELETE**
 
 `es_por_lote` marca las transiciones hechas en bloque. Aunque se despachen cien de una vez,
@@ -1034,6 +1036,42 @@ Cada cambio de estado. **No se modifica ni se borra nunca.**
 
 Se guarda el rol además del usuario porque una persona puede tener varios, y la auditoría necesita
 saber con cuál actuó.
+
+**`aviso_al_candidato` vacía es a propósito** (`V70`): los recordatorios solo cuentan los turnos
+que se abrieron con `CORREO`, así que un turno abierto antes del despliegue nunca recibe uno de
+golpe. Añadir la columna no actualizó ninguna fila, y por eso el trigger de inmutabilidad no saltó.
+
+## `recordatorio_enviado`
+
+(`V70`) Qué recordatorio salió, o se dio por omitido, para qué turno de una postulación. **El
+turno es la transición que lo abrió**: si el candidato vuelve a entrar en el mismo estado, es otra
+transición y otro turno, con sus dos recordatorios.
+
+| Columna | Tipo | Oblig. | Qué guarda |
+|---|---|---|---|
+| `id` | bigint | sí | Clave |
+| `postulacion_id` | bigint | sí | |
+| `transicion_estado_id` | bigint | sí | El turno: la transición que lo abrió |
+| `tipo` | text | sí | `TRAS_ENTRAR` (el de las 24 horas) o `ANTES_DEL_PLAZO` (el de 24 horas antes de vencer) |
+| `plazo_en` | timestamptz | no | La fecha que se recordó. **Solo la lleva `ANTES_DEL_PLAZO`**, y siempre |
+| `resultado` | text | sí | `ENVIADO` u `OMITIDO` |
+| `creado_en` | timestamptz | sí | |
+
+**Clave primaria:** `id`
+**Apunta a:** `postulacion`, `transicion_estado`
+**Únicos y parciales:** `recordatorio_tras_entrar_una_vez` (`transicion_estado_id`) donde
+`tipo = 'TRAS_ENTRAR'`, y `recordatorio_antes_del_plazo_una_vez` (`transicion_estado_id`,
+`plazo_en`) donde `tipo = 'ANTES_DEL_PLAZO'`: reiniciar el servidor, o dos sondeos a la vez, no
+repiten nada. Si la fecha del plazo se mueve, el del plazo puede volver a salir para la nueva, una
+sola vez.
+**Índice:** `recordatorio_enviado_postulacion_idx` (`postulacion_id`)
+
+**`OMITIDO` es «este ya no sale».** El de las 24 horas se da por gastado solo si cae a menos de
+12 horas del del plazo o con el turno ya vencido; a 12 horas justas salen los dos. Queda escrito
+para que el sondeo, que corre cada 60 segundos, no lo vuelva a considerar.
+
+Cada fila se escribe en la misma transacción que su correo. El aviso de la campana sale después de
+confirmarla.
 
 ---
 
@@ -2641,6 +2679,12 @@ empresa es—: `minutos_vida_recuperacion` (60, cuánto vale el enlace de contra
 por IP se cuenta en la memoria del servidor**, no en la base: se reinicia cada vez que el
 servidor arranca.
 
+La `V70` suma tres, **en todas las organizaciones** —un parámetro que no existe no se puede editar
+desde el panel—: `recordatorios_activos` (`BOOLEANO`, `true`: si se mandan los recordatorios del
+banco y de la prueba), `recordatorio_horas_tras_el_turno` (`ENTERO`, 24: horas desde que le toca
+hasta el primero) y `recordatorio_horas_antes_del_plazo` (`ENTERO`, 24: horas antes de vencer en
+que sale el segundo). Las empresas dadas de alta después los copian de la plataforma.
+
 ## `plantilla_correo`
 
 Los textos que se envían, versionados.
@@ -2669,6 +2713,24 @@ y para estos dos correos el envío usa la de la plataforma cuando a la empresa l
 tampoco la tiene la plataforma, no se crea el enlace y queda un error en el registro del
 servidor: la pantalla ya le dijo a la persona que revise su correo. Ninguna frase termina en
 `{{nombre_empresa}}`, porque el nombre de la plataforma ya acaba en punto y saldría «S.A.C..».
+
+**`RECORDATORIO_EVALUACION` y `RECORDATORIO_PRUEBA` (`V70`) se sembraron en todas las
+organizaciones**, no solo en la plataforma, para que cada empresa tenga el suyo que editar. Si a
+alguna le faltara, el recordatorio sale con el de la plataforma. El asunto es `{{aviso}}`, la frase que pone el sistema según el
+momento («Aún no has respondido tu evaluación para X», «Tu evaluación para X vence el vie 10/10 a
+las 23:59»): un solo texto por etapa sirve a los dos recordatorios. Llevan `{{nombre}}` y
+`{{enlace}}`.
+
+**`PRUEBA_DISPONIBLE` ya no dice «desde este correo»** (`V70`): el reloj arranca al abrir la
+prueba, no al recibir el correo. La migración publicó una versión nueva solo de los textos activos
+que contenían esa frase —los de cada organización y los propios que una vacante use para ese aviso
+en `plantilla_correo_vacante`— y desactivó las anteriores sin borrarlas. Lo demás del texto se
+quedó como estaba. Desde entonces, en la prueba del editor (`PRUEBA_PROPIA`), `{{plazo}}` dice el
+tiempo y la fecha límite que rijan para esa persona —su plazo propio o, si no, la fecha de la
+vacante—, en hora de Lima («90 minutos desde que la empieces, hasta el vie 10/10 a las 23:59»,
+«hasta el …», «90 minutos desde que la empieces», «7 días desde que la empieces»), y nunca sale
+vacío: sin minutos, días ni fecha dice «sin fecha límite». Con `PLANTILLA` o
+`CUESTIONARIO_TECNICO` se rellena como antes.
 
 ## `instruccion_ia`
 
@@ -2873,7 +2935,7 @@ leído.
 | `id` | bigint | sí | Clave |
 | `usuario_id` | bigint | sí | A quién. **Del usuario y no de la persona**: la campana es de quien entra al portal, y es el usuario el que tiene sesión |
 | `organizacion_id` | bigint | sí | De qué empresa viene. La misma regla que la postulación: el aviso nace en la organización **de la vacante**, que es la que hizo algo que contar |
-| `tipo` | text | sí | Qué clase de noticia es. `REMUNERACION_ACTUALIZADA` (`V55`): el sueldo cambiado desde la tarjeta del detalle. `VACANTE_ACTUALIZADA` (`V58`): la vacante corregida con el formulario, **uno solo por guardado** con todo lo que cambió, sueldo incluido. `VACANTE_ELIMINADA` (`V60`): la empresa retiró la vacante y la postulación quedó cerrada; **es el único sin enlace**, con `postulacion_id` y `vacante_id` vacíos. `RESENA_PUBLICADA`, `RESENA_EDITADA` (la empresa editó una reseña ya respondida), `REPORTE_RESENA_RESUELTO` y `RESPUESTA_RESENA_OCULTADA` (`V63`): las reseñas de empresas; también llegan con `postulacion_id` y `vacante_id` vacíos, y el portal los lleva por su tipo a la sección de reseñas del perfil. Sin CHECK: un tipo nuevo no pide migración |
+| `tipo` | text | sí | Qué clase de noticia es. `REMUNERACION_ACTUALIZADA` (`V55`): el sueldo cambiado desde la tarjeta del detalle. `VACANTE_ACTUALIZADA` (`V58`): la vacante corregida con el formulario, **uno solo por guardado** con todo lo que cambió, sueldo incluido. `VACANTE_ELIMINADA` (`V60`): la empresa retiró la vacante y la postulación quedó cerrada; **es el único sin enlace**, con `postulacion_id` y `vacante_id` vacíos. `RESENA_PUBLICADA`, `RESENA_EDITADA` (la empresa editó una reseña ya respondida), `REPORTE_RESENA_RESUELTO` y `RESPUESTA_RESENA_OCULTADA` (`V63`): las reseñas de empresas; también llegan con `postulacion_id` y `vacante_id` vacíos, y el portal los lleva por su tipo a la sección de reseñas del perfil. De las etapas (`V70`), con el mismo código que el correo al que acompañan: `PRUEBA_DISPONIBLE`, `POSTULACION_AVANZA`, `POSTULACION_NO_CONTINUA`, `POSTULACION_CERRADA` y `RETIRO_CONFIRMADO`; y los recordatorios `RECORDATORIO_EVALUACION` y `RECORDATORIO_PRUEBA` (`V70`). Todos estos llevan `postulacion_id` y `vacante_id`. Sin CHECK: un tipo nuevo no pide migración |
 | `titulo` | text | sí | El texto **ya armado** |
 | `cuerpo` | text | sí | El texto **ya armado** |
 | `postulacion_id` | bigint | no | A dónde lleva al pulsarlo |
@@ -2887,6 +2949,10 @@ leído.
 campana, que corre en cada carga del portal; y `aviso_portal_sin_leer` (`usuario_id`), **parcial
 sobre los no leídos**, para el contador del punto — los leídos son la inmensa mayoría en cuanto la
 tabla lleva un tiempo viva, y contarlos para descartarlos sería pagar por lo que ya no importa.
+
+**Para los cambios de etapa va junto al correo** (`V70`): recibe lo mismo que el correo, ni más
+ni menos —una transición «sin avisar» no deja aviso— y se escribe después de confirmarse la
+transición, en su propia transacción; si falla, el correo y la transición siguen.
 
 **Para lo que cambia en una vacante es el único canal** desde la `V58`: no sale correo. El correo
 se pierde —cae en promociones, se marca leído sin abrir, llega a una dirección que el cargador de
@@ -3444,6 +3510,8 @@ caro sale: cada consulta que filtra por el padre acaba leyendo la tabla entera.
 | `entregable_cubre_pregunta (pregunta_id)` | Qué generales cubren una pregunta (`V68`) |
 | `respuesta_prueba (intento_prueba_id, pregunta_id) WHERE pregunta_id IS NOT NULL` | **Único y parcial.** Una respuesta por pregunta del editor en cada intento (`V67`) |
 | `nota_criterio_prueba (criterio_banco_id)` | Las notas de un criterio de la prueba del editor, para recalcular o recalificar a todos (`V67`) |
+| `recordatorio_enviado (transicion_estado_id) WHERE tipo = 'TRAS_ENTRAR'` y `(transicion_estado_id, plazo_en) WHERE tipo = 'ANTES_DEL_PLAZO'` | **Únicos y parciales.** Un recordatorio de cada clase por turno, y el del plazo uno por fecha (`V70`) |
+| `recordatorio_enviado (postulacion_id)` | Los recordatorios de una postulación (`V70`) |
 
 Los índices de `organizacion_id` sueltos **no hacen falta**: van dentro de los compuestos de
 arriba, porque toda consulta filtra primero por organización.
@@ -3491,6 +3559,9 @@ Resumen de las restricciones que están repartidas por el documento:
 - Un entregable con alcance es del editor; uno de alcance `PREGUNTA` lleva su pregunta y los
   demás no; una pregunta pide como mucho un archivo; y un general no cubre dos veces la misma
   pregunta (`V68`). Lo que vale un criterio no es negativo (`V69`).
+- Un recordatorio no sale dos veces para el mismo turno (ni el del plazo para la misma fecha); el
+  del plazo lleva su fecha y el otro no; y `transicion_estado.aviso_al_candidato` es vacío,
+  `CORREO`, `NINGUNO` o `POR_LA_CAMPANA` (`V70`).
 
 ⚠️ Aquí decía «el rango del cambio inesperado cabe dentro de la duración de la prueba». **Eso no
 lo impide nada**: no hay CHECK que lo diga ni comprobación en el código. Ver

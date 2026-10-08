@@ -28,8 +28,7 @@ public class RecordatorioEnviado {
     public static final String ENVIADO = "ENVIADO";
     /**
      * Ya no sale: el del plazo salió a menos de 12 horas de él, o él caería con el turno ya
-     * vencido. Que el del plazo salga antes, sin más, no lo gasta (QA-V70-03); el comentario de
-     * la V70 lo cuenta a la antigua y no se toca por el checksum de Flyway.
+     * vencido. Que el del plazo salga antes, sin más, no lo gasta (QA-V70-03).
      */
     public static final String OMITIDO = "OMITIDO";
 
