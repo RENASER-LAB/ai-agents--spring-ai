@@ -23,8 +23,8 @@ Sirve para tres cosas:
 - **Entender el sistema.** Un modelo de datos bien contado explica el negocio mejor que
   cualquier otro documento.
 
-**La base ya está construida.** Las migraciones `V1` a `V69` viven en
-`src/main/resources/db/migration` —**119 tablas de este módulo**, 122 en la base contando la de
+**La base ya está construida.** Las migraciones `V1` a `V70` viven en
+`src/main/resources/db/migration` —**120 tablas de este módulo**, 123 en la base contando la de
 Flyway y las dos del motor de agentes— y Flyway es el dueño del esquema. Cambiar algo de aquí
 ya cuesta una migración nueva, y **una migración aplicada no se edita nunca**: se escribe otra
 encima.
@@ -51,8 +51,9 @@ lados](EL-SUELDO-DE-LOS-DOS-LADOS.md).
 
 La `V56` (14/09/2026) le da al portal **una campana**: la tabla `aviso_portal` guarda lo que pasó
 mientras el candidato no estaba, con su estado de leído. Nace con un solo tipo de aviso —el cambio
-de sueldo de la V55— y está hecha para los que vengan; la V58 suma el segundo, la V60 el tercero y
-la V63 los cuatro de las reseñas de empresas.
+de sueldo de la V55— y está hecha para los que vengan; la V58 suma el segundo, la V60 el tercero,
+la V63 los cuatro de las reseñas de empresas y la V70 los cinco de los cambios de etapa y los dos
+de los recordatorios.
 
 La `V37` convierte el esquema en **multiempresa**: `organizacion.es_plataforma` marca a la
 dueña de la plataforma (solo una puede serlo) y reemplaza al código `'RENASER'` que estaba
@@ -200,6 +201,18 @@ sus notas. Los borradores pasaron al modelo nuevo y perdieron los días: «Sin c
 `PLAZO_ABIERTO` sin días, hasta la fecha límite, que sigue en `vacante.prueba_cierra_en`. La `V69`
 (06/10/2026) añade `criterio_banco.puntos_del_criterio`: se escribe lo que vale el criterio entero y
 la parte calificada se deduce restándole las cerradas. Las publicadas de antes lo tienen vacío.
+
+La `V70` (07/10/2026) acompaña **la prueba al instante, la campana en cada etapa y los
+recordatorios**. `transicion_estado` gana `aviso_al_candidato` —cómo se enteró el candidato de
+cada paso: `CORREO`, `NINGUNO` o `POR_LA_CAMPANA`—, vacía en todo lo anterior, y es lo que impide
+que un recordatorio le cuente a alguien lo que el equipo decidió callar. Una tabla nueva,
+`recordatorio_enviado`, guarda qué recordatorio salió (o se dio por omitido) para qué turno, y dos
+índices únicos parciales impiden repetirlo. Siembra en **todas** las organizaciones los tres
+parámetros de los recordatorios y los textos `RECORDATORIO_EVALUACION` y `RECORDATORIO_PRUEBA`, y
+publica una versión nueva de los textos de `PRUEBA_DISPONIBLE` que decían «desde este correo»,
+conservando las viejas. Abrir la prueba al instante no toca el esquema. Ver
+[estados de la postulación](03-ESTADOS-POSTULACION.md) y el
+[diccionario de datos](07-DICCIONARIO-DE-DATOS.md).
 
 La `V54` (14/09/2026) **no añade ninguna tabla y cambia quién firma qué**. Hasta ella había dos
 tipos de texto —`PROCESO` y `FUTUROS_CONTACTOS`— y el de la cuenta usaba el primero, que habla de
@@ -580,7 +593,7 @@ Hay una versión dibujada de este mismo mapa en
 
 ## Las tablas
 
-Ciento dieciocho en total, agrupadas por área para poder leerlas de a poco. En cada una se nombran
+Ciento veinte en total, agrupadas por área para poder leerlas de a poco. En cada una se nombran
 las columnas que importan para entender qué hace, no todas.
 
 **Para verlas todas, con tipo y clave, está el [Diccionario de datos](07-DICCIONARIO-DE-DATOS.md).**
@@ -790,13 +803,14 @@ prospectos que podrían encajar, y eso es una búsqueda por parecido, no por igu
 
 ---
 
-### Postulación y su historia · 3 tablas
+### Postulación y su historia · 4 tablas
 
 | Tabla | Para qué existe | Columnas que importan |
 |---|---|---|
 | `estado_postulacion` | Catálogo cerrado de los 18 estados | codigo, nombre, etapa_codigo, momento_codigo, espera_a, orden, es_final |
 | `postulacion` | Un usuario en una vacante. Tiene un solo estado a la vez, nunca dos | organizacion_id, uuid, usuario_id, vacante_id, estado_codigo, grupo_prioridad, motivo_cierre, evaluacion_id, rondas_evidencia_usadas, movido_en, pretension_monto, pretension_moneda, pretension_declarada_en |
-| `transicion_estado` | Cada cambio de estado, guardado aparte. **No se modifica ni se borra nunca** | postulacion_id, estado_anterior_codigo, estado_nuevo_codigo, usuario_id, rol_id, es_sistema, es_por_lote, motivo, ocurrida_en |
+| `transicion_estado` | Cada cambio de estado, guardado aparte. **No se modifica ni se borra nunca**. Desde la `V70`, con cómo se enteró el candidato | postulacion_id, estado_anterior_codigo, estado_nuevo_codigo, usuario_id, rol_id, es_sistema, es_por_lote, motivo, ocurrida_en, aviso_al_candidato |
+| `recordatorio_enviado` | Qué recordatorio salió, o se dio por omitido, para qué turno: el turno es la transición que lo abrió (`V70`) | postulacion_id, transicion_estado_id, tipo, plazo_en, resultado |
 
 El estado guarda **etapa** y **momento** aparte, y por eso el siguiente estado se calcula en vez
 de buscarse. Los momentos son cuatro: hay que habilitarlo, le toca al candidato, está
@@ -1195,7 +1209,7 @@ Casi todo lo que el cliente cambia seguido vive aquí, no en el código.
 | `peso_componente_perfil` | Cómo se reparte el 40% entre currículum, psicométrico y evaluación | version_pesos_id, componente, peso |
 | `peso_dimension` | Cuánto pesa cada dimensión en cada nivel | version_pesos_id, nivel_puesto_codigo, dimension_codigo, peso |
 | `peso_criterio` | Cuánto vale cada criterio en cada nivel, en las tres etapas globales | version_pesos_id, nivel_puesto_codigo, criterio_id, peso |
-| `parametro` | Los valores sueltos: días sin avanzar antes de cerrar, tope de rondas de evidencia, cupo por defecto, qué datos se ocultan del currículum | organizacion_id, codigo, valor, tipo, descripcion, modificado_por_usuario_id |
+| `parametro` | Los valores sueltos: días sin avanzar antes de cerrar, tope de rondas de evidencia, cupo por defecto, qué datos se ocultan del currículum, si se mandan recordatorios y a qué horas (`V70`) | organizacion_id, codigo, valor, tipo, descripcion, modificado_por_usuario_id |
 | `plantilla_correo` | Los textos que se envían, versionados. Un código sin ninguna versión activa ya no se manda (desde la `V58`, `REMUNERACION_ACTUALIZADA`) | organizacion_id, codigo, version, asunto, cuerpo, es_activa |
 | `instruccion_ia` | Los textos que se le mandan a cada agente, versionados | agente_codigo, version, texto, publicada_por_usuario_id |
 
@@ -1441,6 +1455,9 @@ cuáles sí, porque las que no, hay que probarlas en el código.
 - **El alcance de un entregable es solo del editor y es coherente** (`V68`): el de una pregunta
   lleva su pregunta y los demás no, una pregunta pide como mucho un archivo y un general no cubre
   dos veces la misma. Lo que vale un criterio no es negativo (`V69`).
+- **Un recordatorio no sale dos veces** (`V70`): el primero, una vez por turno; el del plazo, una
+  vez por turno y por fecha. Reiniciar el servidor o dos sondeos a la vez no lo repiten. Y cómo se
+  enteró el candidato de una transición es `CORREO`, `NINGUNO`, `POR_LA_CAMPANA` o nada.
 
 ### Tienen que vivir en el código
 

@@ -1410,8 +1410,11 @@ dentro, con su marca de leído. **Complementa al correo, no lo sustituye** — e
 promociones, se marca leído sin abrir, o llega a una dirección que el cargador de currículums
 inventó y que nadie mira. **Lo que cambia en una vacante es la excepción**: desde el 19/09/2026
 se cuenta **solo** por la campana (RF-14b y RF-159), igual que lo de las reseñas (RF-178). Hoy
-tiene siete tipos de aviso —de la vacante, el cambio de sueldo hecho desde su tarjeta, la vacante
-corregida y la vacante eliminada; y los cuatro de las reseñas— y está hecha para los que vengan. El aviso
+tiene catorce tipos de aviso —de la vacante, el cambio de sueldo hecho desde su tarjeta, la vacante
+corregida y la vacante eliminada; los cuatro de las reseñas; desde el 07/10/2026 (`V70`), los
+cinco cambios de etapa que mandan correo, con el mismo código que el correo y ligados a su
+proceso, y los dos recordatorios del banco sin entregar y de la prueba sin empezar— y está hecha
+para los que vengan. Una transición movida «sin avisar» no deja aviso. El aviso
 se marca leído **al pulsarlo**, o todos a la vez con el botón de la cabecera: abrir la campana no
 es haber leído nada.
 

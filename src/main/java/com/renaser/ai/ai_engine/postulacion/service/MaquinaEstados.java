@@ -93,6 +93,10 @@ public class MaquinaEstados {
     private final ServicioParametros parametros;
     /** La prueba escrita en el editor (V67), para su aviso. Nulo en las pruebas de siempre. */
     private final VersionBancoRepository versionesBanco;
+    /** Hasta cuándo tiene esta persona su prueba (V70), para {@code {{plazo}}}. Puede ser nulo. */
+    private final FechaLimiteDeLaPersona fechasLimite;
+    /** La pareja de cada correo en la campana del portal (V70). Puede ser nulo. */
+    private final AvisoDeEtapaEnLaCampana campana;
 
     /** El constructor de siempre: el que usan las pruebas unitarias del aviso. */
     public MaquinaEstados(EstadoPostulacionRepository estados, PostulacionRepository postulaciones,
@@ -107,7 +111,7 @@ public class MaquinaEstados {
                 direcciones, enlaces, plantillasPorVacante, versionesDePrueba, parametros, null);
     }
 
-    @Autowired
+    /** El de la V67: con la prueba del editor y sin campana. */
     public MaquinaEstados(EstadoPostulacionRepository estados, PostulacionRepository postulaciones,
                           TransicionEstadoRepository transiciones, UsuarioRepository usuarios,
                           PersonaRepository personas, VacanteRepository vacantes,
@@ -116,6 +120,24 @@ public class MaquinaEstados {
                           PlantillaCorreoVacanteRepository plantillasPorVacante,
                           VersionPlantillaPruebaRepository versionesDePrueba,
                           ServicioParametros parametros, VersionBancoRepository versionesBanco) {
+        this(estados, postulaciones, transiciones, usuarios, personas, vacantes, auditoria, correo,
+                direcciones, enlaces, plantillasPorVacante, versionesDePrueba, parametros,
+                versionesBanco, null, null);
+    }
+
+    @Autowired
+    @SuppressWarnings("java:S107") // Ya los tenía: cada uno es una pieza del aviso, no un parámetro suelto.
+    public MaquinaEstados(EstadoPostulacionRepository estados, PostulacionRepository postulaciones,
+                          TransicionEstadoRepository transiciones, UsuarioRepository usuarios,
+                          PersonaRepository personas, VacanteRepository vacantes,
+                          ServicioAuditoria auditoria, ServicioCorreo correo,
+                          DireccionDelCandidato direcciones, ServicioEnlaceAcceso enlaces,
+                          PlantillaCorreoVacanteRepository plantillasPorVacante,
+                          VersionPlantillaPruebaRepository versionesDePrueba,
+                          ServicioParametros parametros, VersionBancoRepository versionesBanco,
+                          FechaLimiteDeLaPersona fechasLimite, AvisoDeEtapaEnLaCampana campana) {
+        this.fechasLimite = fechasLimite;
+        this.campana = campana;
         this.estados = estados;
         this.postulaciones = postulaciones;
         this.transiciones = transiciones;
@@ -330,6 +352,10 @@ public class MaquinaEstados {
                 .esSistema(esSistema)
                 .esPorLote(esPorLote)
                 .motivo(motivoGuardado)
+                // Cómo se enteró (V70). Es lo que mira el recordatorio para no contarle a nadie
+                // lo que el equipo decidió no contarle, y lo que separa los turnos abiertos
+                // después del despliegue de los de antes (esos lo tienen vacío).
+                .avisoAlCandidato(aviso.name())
                 .ocurridaEn(Instant.now())
                 .creadoEn(Instant.now())
                 .build());
@@ -414,8 +440,10 @@ public class MaquinaEstados {
         if (usuario == null) return;
         String nombre = personas.findById(usuario.getPersonaId())
                 .map(Persona::getNombre).orElse("");
-        String vacante = vacantes.findById(postulacion.getVacanteId())
-                .map(Vacante::getTitulo).orElse("");
+        // Una sola vez: el título va en el correo y en la campana, y la prueba lee de ella su
+        // instrumento y su fecha.
+        Vacante laVacante = vacantes.findById(postulacion.getVacanteId()).orElse(null);
+        String vacante = laVacante == null || laVacante.getTitulo() == null ? "" : laVacante.getTitulo();
 
         // La direccion de la cuenta no siempre se puede entregar: a los candidatos que
         // entraron como una carpeta de curriculums se les invento una. Ver DireccionDelCandidato.
@@ -451,11 +479,26 @@ public class MaquinaEstados {
         // Se mira el aviso que TOCABA, no el texto elegido: lo que decide qué variables hay
         // que rellenar es el momento del recorrido, no cómo se llame la plantilla.
         if ("PRUEBA_DISPONIBLE".equals(plantilla)) {
-            variables.putAll(loDeLaPrueba(postulacion));
+            variables.putAll(loDeLaPrueba(postulacion, laVacante));
         }
 
-        correo.enviar(postulacion.getOrganizacionId(), usuario.getId(), destino,
-                plantillaAUsar, variables);
+        // ⚠️ El correo y la campana son independientes (V70): si uno falla, el otro sale igual
+        // y la transición se queda hecha. Por eso el correo va en su try y la campana después,
+        // fuera de él.
+        try {
+            correo.enviar(postulacion.getOrganizacionId(), usuario.getId(), destino,
+                    plantillaAUsar, variables);
+        } catch (RuntimeException e) {
+            log.error("No se pudo mandar el correo «{}» de la postulación {}: {}. La campana "
+                    + "sale igual y la transición se queda hecha", plantillaAUsar,
+                    postulacion.getId(), e.getMessage());
+        }
+
+        // La campana recibe lo mismo que el correo, ni más ni menos: el aviso que TOCABA, con
+        // su texto corto. Se publica al confirmarse la transición, nunca antes.
+        if (campana != null) {
+            campana.publicar(postulacion, plantilla, nuevo, vacante, variables.get("plazo"));
+        }
     }
 
     /**
@@ -483,21 +526,27 @@ public class MaquinaEstados {
      * <p>Si falta el enlace el correo sale igual, con ese hueco vacio. Un aviso incompleto es
      * malo; no avisar de que le toca la prueba es peor.
      */
-    private Map<String, String> loDeLaPrueba(Postulacion postulacion) {
+    private Map<String, String> loDeLaPrueba(Postulacion postulacion, Vacante vacante) {
         String urlPdf = "";
         String plazo = "";
 
         // La prueba escrita en el editor (V67): su adjunto y su tiempo están en su versión.
-        var vacante = vacantes.findById(postulacion.getVacanteId()).orElse(null);
+        //
+        // Y {{plazo}} dice el tiempo Y la fecha límite que rige para esta persona (V70): «90
+        // minutos desde que la empieces, hasta el vie 10/10 a las 23:59». Hasta la V70 solo
+        // decía los minutos o los días, nunca la fecha —que desde el editor nuevo es la que
+        // cierra la prueba— y en una «Sin cronómetro» salía vacío.
         if (vacante != null && "PRUEBA_PROPIA".equals(vacante.getInstrumentoEtapaTecnica())
                 && versionesBanco != null) {
             var propia = versionesBanco.pruebaPropiaDe(vacante.getId(), "PUBLICADA").orElse(null);
             if (propia != null) {
                 urlPdf = propia.getUrlConsigna() == null ? "" : propia.getUrlConsigna();
-                plazo = "PLAZO_ABIERTO".equals(propia.getModalidad()) && propia.getPlazoDias() != null
-                        ? propia.getPlazoDias() + " dias"
-                        : propia.getDuracionMinutos() != null ? propia.getDuracionMinutos() + " minutos" : "";
             }
+            plazo = PlazoDeLaPrueba.dicho(
+                    propia == null ? null : propia.getModalidad(),
+                    propia == null ? null : propia.getDuracionMinutos(),
+                    propia == null ? null : propia.getPlazoDias(),
+                    fechaQueRige(postulacion, vacante));
             return Map.of("enlacePrueba", urlPdf, "plazo", plazo,
                     "whatsapp", parametros.texto(postulacion.getOrganizacionId(), "whatsapp_evidencia", ""));
         }
@@ -519,6 +568,13 @@ public class MaquinaEstados {
             }
         }
 
+        // La plantilla y el cuestionario técnico lo rellenan como siempre. Lo único que cambia
+        // (V70) es que el hueco nunca sale vacío: sin minutos ni días, la fecha que rija, y si
+        // tampoco hay, «sin fecha límite». Un «Tienes .» en un correo es peor que cualquiera.
+        if (plazo.isBlank()) {
+            plazo = PlazoDeLaPrueba.dicho(null, null, null, fechaQueRige(postulacion, vacante));
+        }
+
         return Map.of(
                 "enlacePrueba", urlPdf,
                 "plazo", plazo,
@@ -526,5 +582,16 @@ public class MaquinaEstados {
                 // texto de la plantilla: se edita desde el panel, sin desplegar.
                 "whatsapp", parametros.texto(postulacion.getOrganizacionId(),
                         "whatsapp_evidencia", ""));
+    }
+
+    /**
+     * La fecha límite que rige para esta persona: la de su intento (que ya lleva su plazo propio
+     * o la de la vacante) y, si no hay, la de la vacante. Ver {@link FechaLimiteDeLaPersona}.
+     */
+    private Instant fechaQueRige(Postulacion postulacion, Vacante vacante) {
+        if (fechasLimite != null) {
+            return fechasLimite.deSuPrueba(postulacion, vacante);
+        }
+        return vacante == null ? null : vacante.getPruebaCierraEn();
     }
 }

@@ -360,8 +360,9 @@ vacante se comporta exactamente como cuenta el resto de este documento.
 
 | Cuándo | Qué pasa sin que nadie toque nada |
 |---|---|
-| Al postular, si la vacante no lleva banco de preguntas | Se le califica el currículum |
-| Al terminar esa calificación | Pasa sola de `PERFIL_POR_CONFIRMAR` a `PRUEBA_TURNO_CANDIDATO`, se le crea lo que va a rendir y le llega su correo con el enlace |
+| Al entregar el banco de preguntas | **En ese mismo momento** (07/10/2026) pasa a `PRUEBA_TURNO_CANDIDATO`, se le crea lo que va a rendir y le llega el correo `PRUEBA_DISPONIBLE`. La calificación con IA se encola como siempre y corre por detrás |
+| Al postular, si la vacante no lleva banco de preguntas | Igual, en ese momento, si cumple los requisitos; se le encola la nota del currículum |
+| Al terminar la calificación con IA | Se guardan la nota y el grupo. Si el pase al instante no se dio —la vacante aún no tenía prueba, o algo falló—, pasa entonces de `PERFIL_POR_CONFIRMAR` a `PRUEBA_TURNO_CANDIDATO`, como antes del 07/10/2026 |
 | Al entregar la prueba del puesto | Se califica sola, y queda en `PRUEBA_POR_CONFIRMAR` |
 
 Así, **la primera vez que hace falta una persona es para decidir quién va a la simulación**,
@@ -379,8 +380,38 @@ cuatro la postulación se queda esperando a una persona, que es donde estaba ant
 - La postulación está cerrada: retirada, no continúa o contratada.
 - Algo falló al dar el pase. Lo calificado se guarda igual y no se vuelve a pagar el modelo.
 
-El pase queda escrito en el historial como una transición del sistema, con su motivo: «pase
-automático». Quien abra esa postulación dentro de seis meses puede saber que no lo movió nadie.
+El pase queda escrito en el historial como una transición del sistema, con su motivo: «Pase
+automático: esta vacante califica y avanza sola» tras la nota, y «Pase automático al entregar: la
+nota se calcula después» (o «al postular») cuando fue al instante. Quien abra esa postulación
+dentro de seis meses puede saber que no lo movió nadie.
+
+### La prueba al instante (07/10/2026)
+
+Antes, entre entregar el banco y recibir la prueba pasaban los minutos de la IA, y el candidato
+leía «te avisaremos», cerraba la página y muchas veces no volvía. **El pase nunca miró la nota**
+—con el interruptor puesto pasan todos; la nota solo decide el grupo del ranking—, así que esa
+espera no filtraba a nadie. Ahora no existe:
+
+- **El portal lo lleva directo a la portada de su prueba** (o del cuestionario técnico) con «Tu
+  prueba del puesto ya está disponible». Abrir la portada no arranca el reloj: arranca al
+  confirmar, como siempre.
+- **La máquina avanza de uno en uno.** Desde `PERFIL_CALIFICANDO` pasa por
+  `PERFIL_POR_CONFIRMAR` y en el mismo instante a `PRUEBA_TURNO_CANDIDATO`. El paso intermedio
+  no manda nada: el único correo, y el único aviso de la campana, es el de la prueba.
+- **La nota llega después y no lo mueve.** Al terminar, la IA guarda la nota del Perfil
+  Integral y el grupo, y solo movería la postulación si siguiera en el Perfil Integral. Mientras
+  tanto, la ficha y el ranking del panel la muestran **«en camino»**. Si la IA agota sus
+  intentos, el candidato sigue en su prueba y el panel enseña el fallo de siempre.
+- **El pase y su prueba van juntos o no van.** Si el pase al instante falla, lo entregado queda
+  guardado igual y la postulación espera en el Perfil Integral al pase de siempre, al terminar
+  la nota. La respuesta al candidato nunca es un error por algo que él hizo bien.
+- **Sin pase o sin prueba montada, nada cambia:** el candidato espera, y el portal le dice
+  «Evaluación entregada. Te avisaremos por correo y en la campana cuando te toque la prueba.».
+- **Dos pestañas que entregan a la vez** no crean dos pruebas: la segunda recibe un 409 «Esta
+  evaluación ya fue entregada», como si hubiera llegado después.
+
+Las postulaciones que ya esperaban en `PERFIL_POR_CONFIRMAR` el día del despliegue no se movieron
+solas por este cambio: siguen esperando a una persona, como antes.
 
 ---
 
@@ -464,6 +495,54 @@ igual y la auditoría se escribe igual. Y **que no se avisó queda escrito**: el
 postulación lo dice al final del motivo, y la auditoría lo registra aparte. Sin eso, quien abra
 esa ficha dentro de seis meses vería «no continúa» con su motivo y daría por hecho que al
 candidato se le dijo —y si llama preguntando, nadie en el equipo sabría que nunca se le avisó.
+
+**Sin aviso es sin ninguno** (07/10/2026): ni correo, ni aviso en la campana, ni recordatorios
+de ese turno —un recordatorio le contaría lo que el equipo decidió no contarle—.
+
+---
+
+## Cómo se entera el candidato de cada paso (07/10/2026)
+
+**La campana recibe lo mismo que el correo, ni más ni menos.** Cada transición que manda correo
+—`PRUEBA_DISPONIBLE` al entrar en la prueba, `POSTULACION_AVANZA` en las demás etapas que esperan
+al candidato, y `POSTULACION_NO_CONTINUA`, `POSTULACION_CERRADA` y `RETIRO_CONFIRMADO` al
+cerrar— deja también un aviso en la campana del portal, ligado a su proceso: al pulsarlo, abre ese
+proceso. El correo y el aviso son independientes: si uno falla, el otro sale y la transición no
+se deshace.
+
+Cada transición guarda **cómo se enteró** (`transicion_estado.aviso_al_candidato`): `CORREO`
+(correo y campana), `NINGUNO` (movida sin avisar) o `POR_LA_CAMPANA` (solo el aviso propio, como
+el cierre por vacante eliminada, que sigue con su aviso único y no se duplica). Las transiciones
+anteriores al 07/10/2026 la tienen vacía.
+
+### Los recordatorios
+
+Para quien se quedó a medias en dos turnos: **el banco sin entregar** (`PERFIL_TURNO_CANDIDATO`)
+y **la prueba del puesto sin empezar** (`PRUEBA_TURNO_CANDIDATO`). Quien ya entregó o empezó no
+recibe ninguno.
+
+| Recordatorio | Cuándo sale |
+|---|---|
+| El primero | A las 24 horas de entrar en el turno |
+| El del plazo | 24 horas antes de que venza el plazo que rija: el del banco, o el de la prueba (su fecha propia o la de la vacante) |
+
+- Cada uno sale **por correo y en la campana**, con el enlace al portal, y **una vez por turno**.
+  El del plazo, una vez por turno y por fecha: si la fecha se mueve después, puede volver a salir
+  para la nueva, una sola vez.
+- **Solo de 8:00 a 21:00, hora de Lima.** Lo que tocaba de noche sale a las 8:00.
+- **El primero se omite** solo si caería a menos de 12 horas del del plazo, o con el turno ya
+  vencido. A 12 horas justas salen los dos.
+- **No sale** si ya entregó o empezó, cambió de estado, la postulación se cerró, la vacante se
+  archivó o se eliminó, se le movió sin avisar, o la empresa los tiene apagados.
+- **Reiniciar el servidor no repite ninguno:** cada uno queda escrito en `recordatorio_enviado`
+  —también los omitidos— y la base no deja escribirlo dos veces.
+- **Solo cuentan los turnos abiertos con correo después del despliegue.** Los que ya llevaban
+  días esperando no recibieron una ráfaga el primer día.
+
+Los revisa el mismo sondeo que cierra los plazos vencidos, cada 60 segundos. Cada empresa tiene
+tres parámetros —`recordatorios_activos` (encendido de salida), `recordatorio_horas_tras_el_turno`
+y `recordatorio_horas_antes_del_plazo` (24 y 24)— y dos textos de correo editables,
+`RECORDATORIO_EVALUACION` y `RECORDATORIO_PRUEBA`.
 
 ---
 

@@ -27,6 +27,15 @@ public class TransicionEstado {
     private boolean esSistema;
     private boolean esPorLote;
     private String motivo;
+    /**
+     * Cómo se enteró el candidato (V70): CORREO, NINGUNO o POR_LA_CAMPANA. Vacío en las
+     * transiciones anteriores a la V70 y en la primera, la de nacer en POSTULADA.
+     *
+     * <p>Es lo que deja a los recordatorios saber si el turno se abrió avisando: a quien se movió
+     * «sin avisar» no se le recuerda nada, porque el recordatorio le contaría lo que el equipo
+     * decidió no contarle.
+     */
+    private String avisoAlCandidato;
     private Instant ocurridaEn;
     private Instant creadoEn;
 }

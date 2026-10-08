@@ -131,7 +131,10 @@ ve a los candidatos de sus vacantes, no a los de las demás.
 
 **Salvo que la vacante se haya configurado para avanzar sola**, y entonces este paso no espera a
 nadie: la candidatura pasa a la etapa siguiente por su cuenta. Es una elección de quien lleva la
-vacante, nace apagada, y el candidato lo lee en el permiso que aceptó.
+vacante, nace apagada, y el candidato lo lee en el permiso que aceptó. Desde el 07/10/2026 ni
+siquiera espera a la nota: si la vacante ya tiene su prueba montada, **la prueba se le abre en el
+mismo momento en que entrega su evaluación** (o al postular, si la vacante no lleva evaluación),
+y la máquina termina de leerlo por detrás. Su nota aparece en el panel cuando acaba.
 
 ### 8 · La prueba del puesto
 
@@ -210,8 +213,14 @@ a la persona: así se cumple la ley sin perder la trazabilidad de lo que ya se d
 
 **El portal tiene una campana.** Lo que pasó mientras el candidato no estaba le espera dentro,
 con su marca de visto. El correo se pierde —cae en promociones, llega a una dirección que ya nadie
-mira—, así que la campana no lo sustituye: lo acompaña. Hoy avisa de una sola cosa, que cambió el
-sueldo de un puesto al que postuló, y está hecha para las que vengan.
+mira—, así que la campana no lo sustituye: lo acompaña. Avisa de lo que cambió en una vacante a
+la que postuló, de las reseñas y, desde el 07/10/2026, **de cada cambio de etapa que le manda
+correo**: si el equipo lo movió sin avisarle, tampoco aparece en la campana.
+
+**Y se le recuerda lo que dejó a medias.** Si no ha entregado su evaluación o no ha empezado la
+prueba del puesto, le llega un recordatorio por correo y en la campana al día siguiente de que le
+tocara, y otro un día antes de que venza el plazo. Nunca de noche (solo de 8:00 a 21:00, hora de
+Lima), ninguno se repite, y cada empresa los puede apagar.
 
 **Y hay un plazo aunque nadie pida nada.** Si alguien pasa dos años sin postular y sin tocar su
 ficha, esa ficha se elimina. Lo que sostiene una decisión ya tomada —sus postulaciones y lo que

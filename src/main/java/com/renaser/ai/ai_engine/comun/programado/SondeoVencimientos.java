@@ -1,6 +1,7 @@
 package com.renaser.ai.ai_engine.comun.programado;
 
 import com.renaser.ai.ai_engine.perfilintegral.service.ServicioEvaluacion;
+import com.renaser.ai.ai_engine.postulacion.service.ServicioRecordatorios;
 import com.renaser.ai.ai_engine.prueba.service.ServicioPrueba;
 import com.renaser.ai.ai_engine.validacion.service.ServicioValidacion;
 
@@ -29,6 +30,7 @@ public class SondeoVencimientos {
     private final ServicioEvaluacion evaluacion;
     private final ServicioPrueba prueba;
     private final ServicioValidacion validacion;
+    private final ServicioRecordatorios recordatorios;
 
     @Scheduled(fixedDelayString = "${app.sondeo.periodo-ms:60000}")
     public void ejecutar() {
@@ -57,6 +59,15 @@ public class SondeoVencimientos {
             validacion.terminarVencidos();
         } catch (Exception e) {
             log.error("El sondeo de validaciones vencidas falló, se reintenta en el próximo ciclo", e);
+        }
+        try {
+            // Los recordatorios del banco y de la prueba (V70). Van después de cerrar lo vencido:
+            // a quien se le acaba de cerrar el plazo ya no se le recuerda nada. Sin ráfagas ni
+            // repeticiones: cada uno queda escrito al salir, y solo cuentan los turnos abiertos
+            // después de la V70. Ver ServicioRecordatorios.
+            recordatorios.enviarPendientes();
+        } catch (Exception e) {
+            log.error("El sondeo de recordatorios falló, se reintenta en el próximo ciclo", e);
         }
     }
 }

@@ -167,6 +167,33 @@ donde se escriben».
   (`RecetaRecomendacionPrueba`, «tiene parte calificada y no mira nada») no cambió: no lo lee
   nadie del panel.
 
+### La prueba al instante, su correo y sus recordatorios (V70, 07/10/2026)
+
+- **Con pase automático, la prueba se abre al entregar el banco** (o al postular, sin banco):
+  `PaseAutomatico.alInstante`, disparado por `PaseAutomaticoAlInstante` después de confirmarse la
+  entrega, crea lo que va a rendir y mueve la postulación a la prueba en el mismo gesto, sea la
+  prueba del puesto o el cuestionario técnico. El reloj no arranca hasta que el
+  candidato confirma en la portada. El detalle, en
+  [estados de la postulación](03-ESTADOS-POSTULACION.md), «La prueba al instante».
+- **`{{plazo}}` de `PRUEBA_DISPONIBLE`** en la prueba del editor lo arma `PlazoDeLaPrueba` con el
+  plazo que rija para esa persona —el `vence_en` de su intento: su plazo propio o la fecha de la
+  vacante—, en hora de Lima:
+
+  | La prueba | Lo que dice `{{plazo}}` |
+  |---|---|
+  | Cronometrada, con fecha límite | «90 minutos desde que la empieces, hasta el vie 10/10 a las 23:59» |
+  | Sin cronómetro, con fecha límite | «hasta el vie 10/10 a las 23:59» |
+  | Cronometrada, sin fecha (publicada antes del editor nuevo) | «90 minutos desde que la empieces» |
+  | Plazo abierto con días, sin fecha (publicada antes del editor nuevo) | «7 días desde que la empieces» |
+
+  Nunca sale vacío: sin minutos, días ni fecha dice «sin fecha límite». Con `PLANTILLA` o
+  `CUESTIONARIO_TECNICO` se rellena como antes. La V70 publicó una versión nueva de los textos de
+  `PRUEBA_DISPONIBLE` que decían «desde este correo» —los de cada organización y los propios de
+  una vacante— y conservó las viejas desactivadas.
+- **Recordatorio de la prueba sin empezar** (`RECORDATORIO_PRUEBA`): a las 24 horas de entrar en
+  la etapa y 24 horas antes del plazo que rija. Quien ya la empezó no recibe ninguno. Las reglas,
+  en [estados de la postulación](03-ESTADOS-POSTULACION.md), «Los recordatorios».
+
 ---
 
 ## Componer una versión antes de publicarla (V46)
@@ -308,7 +335,9 @@ decir «esta convocatoria cierra el domingo».
   ya los consume** desde el 22/09/2026, en la configuración de la vacante y en la ficha del
   candidato, así que la nota de «falta el frontend» de los plazos quedó vieja.
 - **El correo de la prueba** (`PRUEBA_DISPONIBLE`, V29) lleva el PDF del enunciado por vacante,
-  el plazo según la modalidad y el WhatsApp como parámetro.
+  el plazo según la modalidad y el WhatsApp como parámetro. Desde la V70 su `{{plazo}}` dice
+  también la fecha límite en la prueba del editor y el texto ya no dice «desde este correo» (ver
+  «La prueba al instante, su correo y sus recordatorios»).
 - **Cada vacante puede elegir sus textos de correo** (V31, tabla `plantilla_correo_vacante`):
   «para esta vacante, donde ibas a mandar el aviso X manda la plantilla Y»; sin fila, sale el de
   siempre. Vale para cualquier aviso. `POST /panel/vacantes/{id}/plantillas-correo`.

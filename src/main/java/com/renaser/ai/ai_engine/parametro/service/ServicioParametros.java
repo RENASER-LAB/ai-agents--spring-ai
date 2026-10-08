@@ -30,6 +30,24 @@ public class ServicioParametros {
     }
 
     /**
+     * Un parámetro de tipo BOOLEANO: un interruptor, como «se mandan recordatorios» (V70).
+     *
+     * <p>Solo «true» o «false» (sin importar mayúsculas ni espacios) cuentan. Cualquier otra
+     * cosa —un valor borrado a medias, un «sí»— vale lo que diga quien llama: un interruptor
+     * mal escrito no puede apagar ni encender nada por su cuenta.
+     */
+    public boolean booleano(Long organizacionId, String codigo, boolean porDefecto) {
+        return parametros.findByOrganizacionIdAndCodigo(organizacionId, codigo)
+                .map(p -> p.getValor() == null ? "" : p.getValor().trim().toLowerCase(java.util.Locale.ROOT))
+                .map(v -> switch (v) {
+                    case "true" -> true;
+                    case "false" -> false;
+                    default -> porDefecto;
+                })
+                .orElse(porDefecto);
+    }
+
+    /**
      * Un parámetro que es texto y ya está: un teléfono, una dirección, un nombre.
      *
      * <p>Se trata en blanco como si no estuviera. Un parámetro vacío casi siempre es
