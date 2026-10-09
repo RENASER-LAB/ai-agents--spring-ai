@@ -119,7 +119,9 @@ defecto, que es el 500.
 
 **Es deuda anterior a esta rama**, y es **la causa conocida de casi todos los fallos del fuzzing**
 de la API: el barrido manda cuerpos deformes a propósito y cuenta 500 donde debería contar 400.
-Comprobado a mano el **15/09/2026**.
+Comprobado a mano el **15/09/2026**, y visto otra vez el **09/10/2026** en el guardado de «Acerca
+de ti» del perfil (`PUT /api/v1/portal/perfil`): un valor de tipo equivocado en el cuerpo
+responde 500.
 
 **Qué haría falta.** Añadir a `ManejadorErrores` los `@ExceptionHandler` de las excepciones de
 Spring MVC —cuerpo ilegible, parámetro que falta, tipo que no convierte, método no permitido— con

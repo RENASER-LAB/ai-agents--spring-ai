@@ -5,6 +5,7 @@ import com.renaser.ai.ai_engine.perfilintegral.dto.DtosCalificacionIa.EducacionL
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosCalificacionIa.ExperienciaLeida;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosCalificacionIa.IdiomaLeido;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosCalificacionIa.ResultadoDatos;
+import com.renaser.ai.ai_engine.perfil.service.ServicioPropuestaPerfil;
 import com.renaser.ai.ai_engine.perfilintegral.service.PuenteCalificacionIa;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.MethodOrderer;
@@ -75,6 +76,7 @@ public class FlujoPerfilIT {
     @Autowired MockMvc mvc;
     @Autowired JdbcTemplate jdbc;
     @Autowired PuenteCalificacionIa puente;
+    @Autowired ServicioPropuestaPerfil propuesta;
     final ObjectMapper json = new ObjectMapper();
 
     static String tokenEquipo;
@@ -212,11 +214,12 @@ public class FlujoPerfilIT {
                 .andExpect(jsonPath("$.educacion[0].origen").value("CURRICULUM"))
                 .andExpect(jsonPath("$.educacion[0].confirmado").value(true));
 
-        // La cabecera con pretension completa
+        // La cabecera con pretension completa, y con un logro clave (V71)
         conToken(put("/api/v1/portal/perfil"), tokenCandidato, """
                 {"titular":"Analista de procesos","resumen":"Mi resumen","habilidades":["Excel"],
                  "experienciaMeses":96,"ubicacion":"Arequipa","disponibilidad":"Inmediata",
-                 "pretension":{"min":3500,"max":4200,"moneda":"PEN"}}""")
+                 "pretension":{"min":3500,"max":4200,"moneda":"PEN"},
+                 "logros":["Reduje a la mitad el tiempo de archivo"]}""")
                 .andExpect(status().isOk());
 
         // Y lo mal formado no entra: pretension a medias, LinkedIn falso, enlace repetido
@@ -403,7 +406,9 @@ public class FlujoPerfilIT {
                 .andExpect(status().isOk())
                 .andExpect(header().string("Content-Disposition",
                         org.hamcrest.Matchers.containsString("attachment")))
-                .andExpect(jsonPath("$.titular").value("Analista de procesos"));
+                .andExpect(jsonPath("$.titular").value("Analista de procesos"))
+                // AC-09: sus logros clave también son suyos, y van en la descarga
+                .andExpect(jsonPath("$.logros[0]").value("Reduje a la mitad el tiempo de archivo"));
     }
 
     @DisplayName("La pretensión no viaja al panel sin su permiso — ni como nombre de campo")
@@ -437,6 +442,8 @@ public class FlujoPerfilIT {
         // secas: es subcadena de PENDIENTE. Se buscan el campo y los valores con comilla.
         assertThat(sinPermiso).doesNotContain("pretension", "3500", "4200");
         assertThat(sinPermiso).contains("Analista de procesos");   // el resto si viaja
+        // Y los logros clave también: el panel los recibe aunque todavía no los pinte.
+        assertThat(sinPermiso).contains("Reduje a la mitad el tiempo de archivo");
 
         jdbc.update("""
                 insert into rol_permiso (rol_id, permiso_id, alcance)
@@ -680,6 +687,87 @@ public class FlujoPerfilIT {
                 .andExpect(jsonPath("$.lecturaCv.estado").value("SIN_CV"));
         // Y sigue sin ciudad: consultar el perfil no la inventa ni la exige.
         assertThat(laCiudadDe(correo)).isNull();
+    }
+
+    /*
+      Los logros clave (V71) de punta a punta, con una cuenta propia y SIN perfil todavía: así
+      se prueba de paso que guardar solo los logros crea el perfil, como cualquier otro campo.
+    */
+    @DisplayName("Los logros clave: se guardan limpios, un cliente viejo no los borra, los "
+            + "topes son un 400 y la lectura del CV no los toca")
+    @Test
+    @Order(14)
+    void losLogrosClave() throws Exception {
+        String correo = "logros@correo.pe";
+        String token = crearCandidatoYEntrar(correo);
+        long persona = jdbc.queryForObject(
+                "select persona_id from usuario where correo = ?", Long.class, correo);
+        assertThat(jdbc.queryForObject("select count(*) from perfil_candidato where persona_id = ?",
+                Integer.class, persona)).isZero();
+
+        // Solo los logros, con la caja 2 vacía y un salto de línea pegado: se crea el perfil y
+        // quedan dos, recortados y en su orden (AC-03).
+        conToken(put("/api/v1/portal/perfil"), token, """
+                {"logros":["  Reduje de 10 a 4 días el cierre contable ","   ",
+                           "Migré 40 servicios\\na AWS sin caídas"]}""")
+                .andExpect(status().isOk());
+        conTokenGet("/api/v1/portal/perfil", token)
+                .andExpect(jsonPath("$.logros.length()").value(2))
+                .andExpect(jsonPath("$.logros[0]").value("Reduje de 10 a 4 días el cierre contable"))
+                .andExpect(jsonPath("$.logros[1]").value("Migré 40 servicios a AWS sin caídas"));
+
+        // AC-08: el PUT de un cliente anterior, sin el campo, actualiza lo demás y no los toca.
+        conToken(put("/api/v1/portal/perfil"), token, """
+                {"titular":"Contadora","ubicacion":"Cusco"}""").andExpect(status().isOk());
+        conTokenGet("/api/v1/portal/perfil", token)
+                .andExpect(jsonPath("$.titular").value("Contadora"))
+                .andExpect(jsonPath("$.ubicacion").value("Cusco"))
+                .andExpect(jsonPath("$.logros.length()").value(2));
+
+        // AC-07: más de tres, o uno de 101 caracteres, es un 400 y no cambia nada.
+        conToken(put("/api/v1/portal/perfil"), token, """
+                {"titular":"Otra","logros":["a","b","c","d"]}""")
+                .andExpect(status().isBadRequest());
+        conToken(put("/api/v1/portal/perfil"), token,
+                "{\"titular\":\"Otra\",\"logros\":[\"%s\"]}".formatted("x".repeat(101)))
+                .andExpect(status().isBadRequest());
+        conTokenGet("/api/v1/portal/perfil", token)
+                .andExpect(jsonPath("$.titular").value("Contadora"))
+                .andExpect(jsonPath("$.logros.length()").value(2));
+
+        // AC-11: una lectura del currículum al perfil rellena huecos, pero no los logros.
+        propuesta.proponerAlPerfil(persona, new ResultadoDatos(
+                "Lucía Paz", correo, "999111222", "Contadora con diez años de cierres",
+                List.of("SAP"), 120, "Jefa de contabilidad", "Estudio Paz", 60, "Contabilidad",
+                List.of(), List.of(), List.of(), List.of()));
+        conTokenGet("/api/v1/portal/perfil", token)
+                .andExpect(jsonPath("$.resumen").value("Contadora con diez años de cierres"))
+                .andExpect(jsonPath("$.logros.length()").value(2))
+                .andExpect(jsonPath("$.logros[1]").value("Migré 40 servicios a AWS sin caídas"));
+
+        // AC-09: van en la descarga de sus datos.
+        conTokenGet("/api/v1/portal/perfil/descarga", token)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.logros[0]").value("Reduje de 10 a 4 días el cierre contable"));
+
+        // AC-04: la lista vacía los borra, y la columna vuelve a quedar en NULL.
+        conToken(put("/api/v1/portal/perfil"), token, "{\"logros\":[]}")
+                .andExpect(status().isOk());
+        conTokenGet("/api/v1/portal/perfil", token)
+                .andExpect(jsonPath("$.logros").isArray())
+                .andExpect(jsonPath("$.logros.length()").value(0));
+        assertThat(jdbc.queryForObject("select logros is null from perfil_candidato "
+                + "where persona_id = ?", Boolean.class, persona)).isTrue();
+
+        // Y la base se defiende sola de quien se salte el backend: cuatro no caben.
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbc.update(
+                        "update perfil_candidato set logros = '[\"a\",\"b\",\"c\",\"d\"]' "
+                                + "where persona_id = ?", persona))
+                .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> jdbc.update(
+                        "update perfil_candidato set logros = '\"suelto\"' where persona_id = ?",
+                        persona))
+                .isInstanceOf(org.springframework.dao.DataIntegrityViolationException.class);
     }
 
     // ==================== Apoyo ====================

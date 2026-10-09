@@ -169,6 +169,8 @@ class PintorDePerfilTest {
 
         assertThat(vacio.titular()).isNull();
         assertThat(vacio.habilidades()).isEmpty();
+        // Lista vacía y no null: la pantalla la recorre sin preguntar.
+        assertThat(vacio.logros()).isNotNull().isEmpty();
         assertThat(vacio.experiencia()).isEmpty();
         assertThat(vacio.pretension()).isNull();
     }
@@ -176,7 +178,8 @@ class PintorDePerfilTest {
     @Test
     @DisplayName("Quitar la pretensión no toca nada más del perfil")
     void sinPretensionConservaElResto() {
-        PerfilCompleto con = new PerfilCompleto("Analista", "Mi resumen", List.of("Excel"), 96,
+        PerfilCompleto con = new PerfilCompleto("Analista", "Mi resumen",
+                List.of("Migré 40 servicios a AWS"), List.of("Excel"), 96,
                 "Arequipa", "Inmediata",
                 new com.renaser.ai.ai_engine.perfil.dto.DtosPerfil.Pretension(
                         new BigDecimal("3500"), new BigDecimal("4200"), "PEN"),
@@ -190,7 +193,21 @@ class PintorDePerfilTest {
         assertThat(sin.titular()).isEqualTo("Analista");
         assertThat(sin.resumen()).isEqualTo("Mi resumen");
         assertThat(sin.habilidades()).containsExactly("Excel");
+        assertThat(sin.logros()).containsExactly("Migré 40 servicios a AWS");
         assertThat(sin.lecturaCv().estado()).isEqualTo("LISTA");
+    }
+
+    @Test
+    @DisplayName("Los logros clave se leen de la columna en su orden, y sin ella no hay ninguno")
+    void logrosClave() {
+        when(postulaciones.deLaPersona(PERSONA)).thenReturn(List.of());
+        conElPerfil(b -> b.logros("[\"Reduje de 3 s a 400 ms la API\", \"Migré 40 servicios\"]"));
+
+        assertThat(pintor.pintar(PERSONA).logros())
+                .containsExactly("Reduje de 3 s a 400 ms la API", "Migré 40 servicios");
+
+        conElPerfil(b -> b.logros(null));
+        assertThat(pintor.pintar(PERSONA).logros()).isNotNull().isEmpty();
     }
 
     @Test
@@ -212,8 +229,8 @@ class PintorDePerfilTest {
         // ⚠️ Es la decisión de la clienta del 05/09/2026 y el flanco del RF-41: si la foto
         // se cuela al panel, la persona que decide vuelve a ver la cara que el anonimizador
         // le esconde a la IA. Sin este test, añadirla de vuelta no rompería nada.
-        PerfilCompleto suyo = new PerfilCompleto("Analista", "Mi resumen", List.of("Excel"),
-                48, "Lima", "INMEDIATA", null, List.of(), List.of(), List.of(),
+        PerfilCompleto suyo = new PerfilCompleto("Analista", "Mi resumen",
+                List.of("Automaticé 5 despliegues"), List.of("Excel"), 48, "Lima", "INMEDIATA", null, List.of(), List.of(), List.of(),
                 List.of(new com.renaser.ai.ai_engine.perfil.dto.DtosPerfil.CertificacionItem(7L, "SST", "Sencico", null, null,
                         "PERSONA", true, true)),
                 List.of(), new com.renaser.ai.ai_engine.perfil.dto.DtosPerfil.LecturaCv("LISTA", null),
@@ -231,6 +248,8 @@ class PintorDePerfilTest {
         assertThat(visto.titular()).isEqualTo("Analista");
         assertThat(visto.resumen()).isEqualTo("Mi resumen");
         assertThat(visto.habilidades()).containsExactly("Excel");
+        // Los logros SÍ viajan al panel: si este constructor no los copia, se pierden callando.
+        assertThat(visto.logros()).containsExactly("Automaticé 5 despliegues");
         assertThat(visto.certificaciones()).singleElement()
                 .extracting(com.renaser.ai.ai_engine.perfil.dto.DtosPerfil.CertificacionItem::nombre).isEqualTo("SST");
         assertThat(visto.lecturaCv().estado()).isEqualTo("LISTA");
@@ -331,7 +350,8 @@ class PintorDePerfilTest {
     void loDelCandidatoSeQuedaEnElPortal() {
         // ⚠️ No es cosmética: el RF-41 esconde la cara a la IA para no sesgar por aspecto, y
         // enseñársela a quien decide desharía la regla por la puerta de al lado.
-        conElPerfil(b -> b.titular("Analista de datos").fotoArchivoId(300L)
+        conElPerfil(b -> b.titular("Analista de datos").logros("[\"Ordené el archivo\"]")
+                .fotoArchivoId(300L)
                 .portadaGaleria("CANTO_MENTA").cvArchivoId(500L));
         when(archivos.findById(500L)).thenReturn(Optional.of(
                 com.renaser.ai.ai_engine.archivo.entity.Archivo.builder()
@@ -355,5 +375,6 @@ class PintorDePerfilTest {
                 });
         // Lo demás sí pasa: quitar el diploma no puede llevarse el certificado por delante.
         assertThat(paraElPanel.titular()).isEqualTo("Analista de datos");
+        assertThat(paraElPanel.logros()).containsExactly("Ordené el archivo");
     }
 }

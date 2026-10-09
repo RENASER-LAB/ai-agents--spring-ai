@@ -79,7 +79,7 @@ class ServicioPerfilPortalImplTest {
     void pretensionAMediasEs400() {
         assertThatIllegalArgumentException().isThrownBy(() ->
                 servicio.editarCabecera(QUIEN, new EditarCabecera(null, null, null, null,
-                        null, null, new Pretension(new BigDecimal("3500"), null, null))));
+                        null, null, new Pretension(new BigDecimal("3500"), null, null), null)));
     }
 
     @Test
@@ -88,7 +88,7 @@ class ServicioPerfilPortalImplTest {
         assertThatIllegalArgumentException().isThrownBy(() ->
                 servicio.editarCabecera(QUIEN, new EditarCabecera(null, null, null, null,
                         null, null, new Pretension(new BigDecimal("4000"),
-                        new BigDecimal("3000"), "PEN"))));
+                        new BigDecimal("3000"), "PEN"), null)));
     }
 
     @Test
@@ -99,11 +99,138 @@ class ServicioPerfilPortalImplTest {
 
         servicio.editarCabecera(QUIEN, new EditarCabecera("Analista", "Mi resumen",
                 List.of("Excel", "SQL"), 60, "Arequipa", "Inmediata",
-                new Pretension(new BigDecimal("3500"), new BigDecimal("4200"), "PEN")));
+                new Pretension(new BigDecimal("3500"), new BigDecimal("4200"), "PEN"), null));
 
         assertThat(p.getPretensionMin()).isEqualByComparingTo("3500");
         assertThat(p.getPretensionMoneda()).isEqualTo("PEN");
         assertThat(p.getHabilidades()).isEqualTo("Excel | SQL");
+    }
+
+    // ==================== Los logros clave (V71) ====================
+
+    /** La cabecera de siempre con los logros que se quieran mandar. */
+    private static EditarCabecera cabeceraCon(String ubicacion, List<String> logros) {
+        return new EditarCabecera("Analista", "Mi resumen", List.of("Excel"), 60, ubicacion,
+                "Inmediata", null, logros);
+    }
+
+    @Test
+    @DisplayName("Los logros se guardan limpios, sin huecos y en el orden en que llegaron")
+    void logrosLimpiosYEnOrden() {
+        PerfilCandidato p = perfil();
+        when(perfiles.findByPersonaId(PERSONA)).thenReturn(Optional.of(p));
+
+        // La caja 2 vacía: los de la 1 y la 3 quedan como primero y segundo.
+        servicio.editarCabecera(QUIEN, cabeceraCon("Arequipa",
+                java.util.Arrays.asList("  Reduje de 10 a 4 días el cierre  ", "   ",
+                        "Migré 40\nservicios a AWS")));
+
+        assertThat(LogrosClave.deJson(p.getLogros()))
+                .containsExactly("Reduje de 10 a 4 días el cierre", "Migré 40 servicios a AWS");
+    }
+
+    @Test
+    @DisplayName("AC-08 · Un PUT sin el campo logros (cliente antiguo) no los toca")
+    void sinElCampoNoSeTocan() {
+        PerfilCandidato p = perfil();
+        p.setLogros("[\"Uno\", \"Dos\"]");
+        when(perfiles.findByPersonaId(PERSONA)).thenReturn(Optional.of(p));
+
+        servicio.editarCabecera(QUIEN, cabeceraCon("Cusco", null));
+
+        assertThat(LogrosClave.deJson(p.getLogros())).containsExactly("Uno", "Dos");
+        // Y los otros siete se actualizan como siempre.
+        assertThat(p.getUbicacion()).isEqualTo("Cusco");
+        assertThat(p.getTitular()).isEqualTo("Analista");
+    }
+
+    @Test
+    @DisplayName("AC-04 · Una lista vacía —o de cajas en blanco— los borra")
+    void listaVaciaLosBorra() {
+        PerfilCandidato p = perfil();
+        p.setLogros("[\"Uno\"]");
+        when(perfiles.findByPersonaId(PERSONA)).thenReturn(Optional.of(p));
+
+        servicio.editarCabecera(QUIEN, cabeceraCon("Lima", List.of()));
+        assertThat(p.getLogros()).isNull();
+
+        p.setLogros("[\"Uno\"]");
+        servicio.editarCabecera(QUIEN, cabeceraCon("Lima", List.of(" ", "", "\n")));
+        assertThat(p.getLogros()).isNull();
+    }
+
+    @Test
+    @DisplayName("AC-10 · Repetir los mismos logros al editar otro campo los deja igual")
+    void editarOtroCampoNoLosCambia() {
+        PerfilCandidato p = perfil();
+        when(perfiles.findByPersonaId(PERSONA)).thenReturn(Optional.of(p));
+        servicio.editarCabecera(QUIEN, cabeceraCon("Lima", List.of("Uno", "Uno")));
+        String antes = p.getLogros();
+
+        servicio.editarCabecera(QUIEN, cabeceraCon("Piura", List.of("Uno", "Uno")));
+
+        assertThat(p.getLogros()).isEqualTo(antes);
+        // Los repetidos no se deduplican: los escribió así.
+        assertThat(LogrosClave.deJson(p.getLogros())).containsExactly("Uno", "Uno");
+        assertThat(p.getUbicacion()).isEqualTo("Piura");
+    }
+
+    @Test
+    @DisplayName("AC-07 · Más de tres logros es un 400 y no cambia nada")
+    void masDeTresEs400() {
+        PerfilCandidato p = perfil();
+        p.setLogros("[\"Uno\"]");
+        lenient().when(perfiles.findByPersonaId(PERSONA)).thenReturn(Optional.of(p));
+
+        assertThatIllegalArgumentException().isThrownBy(() -> servicio.editarCabecera(QUIEN,
+                cabeceraCon("Cusco", List.of("a", "b", "c", "d"))));
+
+        assertThat(p.getLogros()).isEqualTo("[\"Uno\"]");
+        assertThat(p.getUbicacion()).isNull();
+        org.mockito.Mockito.verify(perfiles, org.mockito.Mockito.never()).save(any());
+    }
+
+    @Test
+    @DisplayName("AC-07 · Un logro de más de cien caracteres es un 400 y no cambia nada")
+    void logroLargoEs400() {
+        PerfilCandidato p = perfil();
+        lenient().when(perfiles.findByPersonaId(PERSONA)).thenReturn(Optional.of(p));
+
+        assertThatIllegalArgumentException().isThrownBy(() -> servicio.editarCabecera(QUIEN,
+                cabeceraCon("Cusco", List.of("x".repeat(101)))));
+
+        assertThat(p.getLogros()).isNull();
+        assertThat(p.getUbicacion()).isNull();
+        org.mockito.Mockito.verify(perfiles, org.mockito.Mockito.never()).save(any());
+    }
+
+    @Test
+    @DisplayName("Quien aún no tenía perfil lo estrena guardando solo sus logros")
+    void soloLogrosCreaElPerfil() {
+        when(perfiles.findByPersonaId(PERSONA)).thenReturn(Optional.empty());
+
+        servicio.editarCabecera(QUIEN, new EditarCabecera(null, null, null, null, null, null,
+                null, List.of("Automaticé el despliegue de 5 aplicaciones")));
+
+        org.mockito.ArgumentCaptor<PerfilCandidato> guardado =
+                org.mockito.ArgumentCaptor.forClass(PerfilCandidato.class);
+        org.mockito.Mockito.verify(perfiles, org.mockito.Mockito.atLeastOnce())
+                .save(guardado.capture());
+        PerfilCandidato ultimo = guardado.getValue();
+        assertThat(ultimo.getPersonaId()).isEqualTo(PERSONA);
+        assertThat(LogrosClave.deJson(ultimo.getLogros()))
+                .containsExactly("Automaticé el despliegue de 5 aplicaciones");
+    }
+
+    @Test
+    @DisplayName("Un 400 no deja creado el perfil de quien aún no lo tenía")
+    void un400NoCreaElPerfil() {
+        lenient().when(perfiles.findByPersonaId(PERSONA)).thenReturn(Optional.empty());
+
+        assertThatIllegalArgumentException().isThrownBy(() -> servicio.editarCabecera(QUIEN,
+                cabeceraCon(null, List.of("a", "b", "c", "d"))));
+
+        org.mockito.Mockito.verify(perfiles, org.mockito.Mockito.never()).save(any());
     }
 
     @Test

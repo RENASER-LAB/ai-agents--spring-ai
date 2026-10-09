@@ -2,6 +2,8 @@ package com.renaser.ai.ai_engine.perfil.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -34,6 +36,12 @@ public class PerfilCandidato {
     private BigDecimal pretensionMin;
     private BigDecimal pretensionMax;
     private String pretensionMoneda;
+    // Sus logros clave (V71): un array JSON de 1 a 3 textos, o null si no tiene ninguno. Va
+    // como texto JSON y no como lista, igual que el resto de columnas jsonb del proyecto; lo
+    // traduce LogrosClave. Solo los escribe su dueño: la lectura del CV no los toca.
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "jsonb")
+    private String logros;
 
     // La foto. ⚠️ SOLO la ve el candidato en su portal: no entra en el DTO del panel ni en
     // el texto que lee la IA (RF-41). Decidido el 05/09/2026; ensenarsela a quien decide

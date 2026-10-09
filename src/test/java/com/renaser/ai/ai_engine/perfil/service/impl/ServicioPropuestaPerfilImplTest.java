@@ -225,6 +225,24 @@ class ServicioPropuestaPerfilImplTest {
     }
 
     @Test
+    @DisplayName("AC-11 · La lectura del currículum no toca los logros clave")
+    void laLecturaNoTocaLosLogros() {
+        // Los escribe solo el candidato: ni con el perfil vacío de todo lo demás la lectura
+        // propone, rellena ni ordena sus logros.
+        PerfilCandidato conLogros = perfil();
+        String suyos = "[\"Reduje de 10 a 4 días el cierre contable\", \"Migré 40 servicios\"]";
+        conLogros.setLogros(suyos);
+        when(perfiles.findByPersonaId(PERSONA_ID)).thenReturn(Optional.of(conLogros));
+
+        servicio.proponerAlPerfil(PERSONA_ID, new ResultadoDatos(null, null, null,
+                "Resumen del modelo", List.of("Excel"), 60, "Analista senior", null, null,
+                null, null, null, null, null));
+
+        assertThat(conLogros.getLogros()).isEqualTo(suyos);
+        assertThat(conLogros.getTitular()).isEqualTo("Analista senior");   // lo demás sí entró
+    }
+
+    @Test
     @DisplayName("Las listas en null (un trabajo con el prompt viejo) no hacen nada")
     void listasNullNoHacenNada() {
         servicio.proponer(POSTULACION, new ResultadoDatos("Ana", null, null, null, null, null,

@@ -41,6 +41,8 @@ import java.util.Objects;
  * <ul>
  *   <li>El perfil se crea perezosamente: existe desde el primer escrito, no antes.</li>
  *   <li>La pretensión es todo o nada (los tres campos o ninguno) → 400 si va a medias.</li>
+ *   <li>Los logros clave (V71): sin el campo, no se tocan; con lista vacía, se borran. Más
+ *       de tres o uno de más de cien caracteres → 400.</li>
  *   <li>Editar ⇒ {@code origen=PERSONA} y confirmado; confirmar ⇒ conserva CURRICULUM.</li>
  *   <li>RF-166: los enlaces se validan por forma y por dominio → 400 si no cumplen,
  *       409 si ya existe el mismo enlace del mismo tipo.</li>
@@ -95,6 +97,9 @@ public class ServicioPerfilPortalImpl implements ServicioPerfilPortal {
             throw new IllegalArgumentException("El máximo de la pretensión no puede ser "
                     + "menor que el mínimo");
         }
+        // Se limpian y se comprueban ANTES de buscar el perfil: un 400 no puede dejar creado
+        // el perfil de quien aún no lo tenía, ni a medio escribir el de quien sí.
+        List<String> logros = datos.logros() == null ? null : LogrosClave.limpiar(datos.logros());
         PerfilCandidato perfil = elDe(quien);
         perfil.setTitular(limpio(datos.titular()));
         perfil.setResumen(limpio(datos.resumen()));
@@ -106,6 +111,13 @@ public class ServicioPerfilPortalImpl implements ServicioPerfilPortal {
         perfil.setPretensionMin(pretension == null ? null : pretension.min());
         perfil.setPretensionMax(pretension == null ? null : pretension.max());
         perfil.setPretensionMoneda(pretension == null ? null : pretension.moneda());
+        // ⚠️ La excepción deliberada a «el PUT reemplaza todo»: sin el campo (o en null) los
+        // logros guardados NO se tocan; con una lista vacía, se borran. La app de Android ya
+        // instalada y cualquier pestaña abierta antes del despliegue mandan este PUT sin
+        // `logros`, y tratarlo como «vacío» les borraría los logros a cada guardado.
+        if (logros != null) {
+            perfil.setLogros(LogrosClave.aJson(logros));
+        }
         tocar(perfil);
     }
 

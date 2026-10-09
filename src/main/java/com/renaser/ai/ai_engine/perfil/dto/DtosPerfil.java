@@ -31,6 +31,12 @@ public final class DtosPerfil {
     public record PerfilCompleto(
             String titular,
             String resumen,
+            /*
+             * Sus logros clave (V71): de 0 a 3 frases que escribe el candidato, en su orden.
+             * Nunca null —sin ninguno, lista vacía— y viajan a todas las puertas del perfil:
+             * el portal, la descarga de sus datos y el panel.
+             */
+            List<String> logros,
             List<String> habilidades,
             Integer experienciaMeses,
             String ubicacion,
@@ -68,23 +74,29 @@ public final class DtosPerfil {
                     com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
             com.renaser.ai.ai_engine.resena.dto.DtosResena.ResenasEnLaDescarga misResenas) {
 
+        public PerfilCompleto {
+            // La pantalla los recorre sin preguntar: un null aquí sería un perfil que no pinta.
+            logros = logros == null ? List.of() : logros;
+        }
+
         /** El perfil sin nada de las reseñas: lo que pinta {@code PintorDePerfil}. */
-        public PerfilCompleto(String titular, String resumen, List<String> habilidades,
+        public PerfilCompleto(String titular, String resumen, List<String> logros,
+                              List<String> habilidades,
                               Integer experienciaMeses, String ubicacion, String disponibilidad,
                               Pretension pretension, List<ExperienciaItem> experiencia,
                               List<EducacionItem> educacion, List<IdiomaItem> idiomas,
                               List<CertificacionItem> certificaciones, List<EnlaceItem> enlaces,
                               LecturaCv lecturaCv, boolean tieneFoto, Portada portada,
                               CurriculumDelPerfil cv) {
-            this(titular, resumen, habilidades, experienciaMeses, ubicacion, disponibilidad,
-                    pretension, experiencia, educacion, idiomas, certificaciones, enlaces,
-                    lecturaCv, tieneFoto, portada, cv, null, null);
+            this(titular, resumen, logros, habilidades, experienciaMeses, ubicacion,
+                    disponibilidad, pretension, experiencia, educacion, idiomas,
+                    certificaciones, enlaces, lecturaCv, tieneFoto, portada, cv, null, null);
         }
 
         /** El mismo perfil con el resumen de sus reseñas, para la cabecera del portal. */
         public PerfilCompleto conResenas(
                 com.renaser.ai.ai_engine.resena.dto.DtosResena.ResumenResenas resumenResenas) {
-            return new PerfilCompleto(titular, resumen, habilidades, experienciaMeses,
+            return new PerfilCompleto(titular, resumen, logros, habilidades, experienciaMeses,
                     ubicacion, disponibilidad, pretension, experiencia, educacion, idiomas,
                     certificaciones, enlaces, lecturaCv, tieneFoto, portada, cv, resumenResenas,
                     misResenas);
@@ -93,7 +105,7 @@ public final class DtosPerfil {
         /** El mismo perfil con sus reseñas enteras, para la descarga de sus datos. */
         public PerfilCompleto conMisResenas(
                 com.renaser.ai.ai_engine.resena.dto.DtosResena.ResenasEnLaDescarga descarga) {
-            return new PerfilCompleto(titular, resumen, habilidades, experienciaMeses,
+            return new PerfilCompleto(titular, resumen, logros, habilidades, experienciaMeses,
                     ubicacion, disponibilidad, pretension, experiencia, educacion, idiomas,
                     certificaciones, enlaces, lecturaCv, tieneFoto, portada, cv, resenas,
                     descarga);
@@ -183,7 +195,17 @@ public final class DtosPerfil {
             Integer experienciaMeses,
             @Size(max = 200) String ubicacion,
             @Size(max = 200) String disponibilidad,
-            Pretension pretension) {
+            Pretension pretension,
+            /*
+             * Sus logros clave (V71), de 0 a 3 y de hasta 100 caracteres cada uno: lo que pase
+             * de ahí es un 400. El largo lo mide el servicio sobre el texto ya limpio.
+             *
+             * ⚠️ La única excepción a «el PUT reemplaza todo»: AUSENTE O NULL = NO TOCAR lo
+             * guardado; LISTA VACÍA = BORRARLOS. La app de Android ya instalada y las pestañas
+             * abiertas antes del despliegue mandan este PUT sin el campo, y sin la excepción
+             * cada guardado suyo borraría los logros en silencio.
+             */
+            @Size(max = 3) List<String> logros) {
     }
 
     public record EditarExperiencia(
