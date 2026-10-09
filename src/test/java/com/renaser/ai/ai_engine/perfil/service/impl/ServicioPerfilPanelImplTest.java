@@ -78,7 +78,8 @@ class ServicioPerfilPanelImplTest {
     }
 
     private PerfilCompleto conPretension() {
-        return new PerfilCompleto("Analista", null, List.of(), null, null, null,
+        return new PerfilCompleto("Analista", null, List.of("Reduje el cierre a 4 días"),
+                List.of(), null, null, null,
                 new Pretension(new BigDecimal("3500"), new BigDecimal("4200"), "PEN"),
                 List.of(), List.of(), List.of(), List.of(), List.of(),
                 new LecturaCv("LISTA", null), false,
@@ -98,6 +99,8 @@ class ServicioPerfilPanelImplTest {
 
         assertThat(visto.pretension()).isNull();
         assertThat(visto.titular()).isEqualTo("Analista");
+        // Los logros clave viajan al panel con o sin el permiso de la pretensión.
+        assertThat(visto.logros()).containsExactly("Reduje el cierre a 4 días");
     }
 
     @Test
@@ -172,7 +175,7 @@ class ServicioPerfilPanelImplTest {
     /** El quitado de la pretension de verdad, sin repositorios: para no mockear al mockeado. */
     private static class PintorDePerfilPuro {
         PerfilCompleto sinPretension(PerfilCompleto c) {
-            return new PerfilCompleto(c.titular(), c.resumen(), c.habilidades(),
+            return new PerfilCompleto(c.titular(), c.resumen(), c.logros(), c.habilidades(),
                     c.experienciaMeses(), c.ubicacion(), c.disponibilidad(), null,
                     c.experiencia(), c.educacion(), c.idiomas(), c.certificaciones(),
                     c.enlaces(), c.lecturaCv(), c.tieneFoto(), c.portada(), c.cv());

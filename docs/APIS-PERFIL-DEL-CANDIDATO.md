@@ -64,6 +64,7 @@ pantalla siempre tiene algo que pintar.
 {
   "titular": "Analista de procesos",
   "resumen": "Ocho años ordenando operaciones...",
+  "logros": ["Reduje de 10 a 4 días el cierre contable", "Migré 40 procesos a Power BI"],
   "habilidades": ["Excel avanzado", "Power BI", "Gestión de procesos"],
   "experienciaMeses": 96,
   "ubicacion": "Arequipa, Perú",
@@ -112,6 +113,11 @@ para la línea «★ 4,5 · 3 reseñas» de la cabecera —`promedio` con un dec
 y la cabecera no pinta la línea. La lista entera va por su propia ruta: ver «Mis reseñas de
 empresas».
 
+**Desde el 09/10/2026 trae también `logros`** (`V71`): los logros clave, de 0 a 3 frases que
+escribe el candidato con lo que ha conseguido, en su orden. **Nunca llega `null`**: sin logros es
+una lista vacía, y la pantalla no pinta ni el rótulo. El portal los enseña en la cabecera (cada
+uno cortado a dos líneas) y enteros en «Acerca de ti».
+
 ### Editar la parte de arriba
 
 ```
@@ -119,11 +125,22 @@ PUT /api/v1/portal/perfil
 ```
 
 Campos: `titular`, `resumen`, `habilidades`, `experienciaMeses`, `ubicacion`,
-`disponibilidad`, `pretension`.
+`disponibilidad`, `pretension` y, desde el 09/10/2026, `logros`.
 
 ⚠️ **Es un PUT: reemplaza la cabecera entera.** Un campo que no mandes se guarda vacío, no se
 conserva. Manda siempre el objeto completo — lo más simple es partir de lo que devolvió el
 `GET` y cambiar encima.
+
+**La única excepción son los `logros`.** Sin el campo, o con `null`, **los guardados no se
+tocan**; con una lista vacía, `[]`, **se borran**. Es a propósito: la app de Android ya instalada
+y cualquier pestaña abierta antes del despliegue mandan este PUT sin `logros`, y sin la excepción
+cada guardado suyo los borraría en silencio. Un cliente nuevo los manda siempre, también vacíos.
+
+Al guardarlos, cada logro se recorta, los saltos de línea pegados pasan a ser espacios y los
+vacíos se quitan **conservando el orden**: `["A", "  ", "C"]` queda como `["A", "C"]`. Los
+repetidos se guardan tal cual. Caben **tres, de hasta 100 caracteres cada uno** (medidos ya
+limpios); por encima, **400** y no cambia nada. La lectura del currículum **no los propone ni
+los toca**: solo los escribe el candidato.
 
 La pretensión es **todo o nada**: o mandas `min`, `max` y `moneda`, o mandas `null`. Un mínimo
 suelto sin moneda da **400**. Para borrarla, `"pretension": null`.
@@ -194,7 +211,7 @@ GET /api/v1/portal/perfil/descarga
 ```
 
 Un JSON con todo, para el derecho de acceso de la ley 29733. La pantalla lo ofrece como
-descarga de archivo.
+descarga de archivo. Lleva los `logros` igual que el `GET` (desde el 09/10/2026).
 
 **Desde el 28/09/2026 lleva además `misResenas`**: sus reseñas de empresas, sus respuestas y sus
 reportes con el resultado. Lo que las empresas opinan de ella también es suyo. Una respuesta a
@@ -316,6 +333,9 @@ que el resto del panel, `AlcanceSobreLaVacante`.
 **Un candidato sin perfil devuelve 200 con todo vacío**, no 404: la ficha no puede romperse por
 eso.
 
+**Los logros clave sí llegan** (desde el 09/10/2026): los escribió para que los lea quien decide.
+Ninguna pantalla del panel los pinta todavía.
+
 **Y nada de lo que el candidato subió llega aquí**: ni la foto, ni la portada, ni el currículum del
 perfil, ni los diplomas (se recortan en `PintorDePerfil.sinLoDelCandidato`, con test). Ver arriba
 por qué.
@@ -348,8 +368,8 @@ este proyecto. (La excepción es el `tipo` de los enlaces, que no tiene catálog
 
 | Código | Cuándo | Qué hacer |
 |---|---|---|
-| **400** | Pretensión a medias, fecha `hasta` anterior a `desde`, enlace que no es una dirección, un LinkedIn que no es de LinkedIn, o un `tipo` que no está en la lista de seis | Enseñar el `detail`, que viene en lenguaje normal |
-| **400** | Falla la validación de un campo: `puesto` vacío, `experienciaMeses` fuera de 0-720, `titular` de más de 200 | **Trae una propiedad extra `errors`**: un mapa de campo → mensaje. Píntalo debajo de cada input, no en un aviso global |
+| **400** | Pretensión a medias, fecha `hasta` anterior a `desde`, enlace que no es una dirección, un LinkedIn que no es de LinkedIn, un `tipo` que no está en la lista de seis, o un logro clave de más de 100 caracteres | Enseñar el `detail`, que viene en lenguaje normal |
+| **400** | Falla la validación de un campo: `puesto` vacío, `experienciaMeses` fuera de 0-720, `titular` de más de 200, más de tres `logros` | **Trae una propiedad extra `errors`**: un mapa de campo → mensaje. Píntalo debajo de cada input, no en un aviso global |
 | **401** | Token vencido | Volver a entrar |
 | **403** | Sin permiso (panel) | No pintar la sección |
 | **404** | El elemento de la lista no existe o no es suyo | Refrescar |
@@ -381,7 +401,8 @@ pide en el alta va en `persona`.
 
 - **La IA propone, nunca pisa**: lo leído entra `origen=CURRICULUM` sin confirmar; lo escrito o
   confirmado por la persona no se toca. El merge vive en `ServicioPropuestaPerfilImpl` y sus
-  tests son la especificación.
+  tests son la especificación. **Los logros clave (`V71`) quedan fuera de la IA**: la lectura no
+  los propone ni los pisa, y no entran en ningún prompt.
 - **Una lectura por archivo**: `archivo.contenido_hash` (SHA-256). Postular con el mismo PDF
   copia la ficha `dato_cv` en vez de pagar otra llamada. El disparo al postular se apaga con
   `renaser.perfil.lectura-al-postular=false` (las pruebas de calificación lo usan).

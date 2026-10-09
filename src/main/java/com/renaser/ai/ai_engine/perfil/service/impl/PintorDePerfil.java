@@ -61,14 +61,15 @@ public class PintorDePerfil {
         if (perfil.isEmpty()) {
             // Un perfil que nunca se lleno responde 200 con todo vacio, no 404: la pantalla
             // siempre tiene algo que pintar.
-            return new PerfilCompleto(null, null, List.of(), null, null, null, null,
+            return new PerfilCompleto(null, null, List.of(), List.of(), null, null, null, null,
                     List.of(), List.of(), List.of(), List.of(), List.of(),
                     lecturaDe(personaId, null, null), false, Portada.NINGUNA, null);
         }
         PerfilCandidato p = perfil.get();
         Long id = p.getId();
         return new PerfilCompleto(
-                p.getTitular(), p.getResumen(), habilidadesDe(p), p.getExperienciaMeses(),
+                p.getTitular(), p.getResumen(), LogrosClave.deJson(p.getLogros()),
+                habilidadesDe(p), p.getExperienciaMeses(),
                 p.getUbicacion(), p.getDisponibilidad(), pretensionDe(p),
                 experiencias.findByPerfilCandidatoIdOrderByOrden(id).stream()
                         .map(e -> new ExperienciaItem(e.getId(), e.getPuesto(), e.getEmpresa(),
@@ -98,7 +99,7 @@ public class PintorDePerfil {
 
     /** El mismo perfil sin la pretensión: para quien no tiene el permiso de verla. */
     public PerfilCompleto sinPretension(PerfilCompleto completo) {
-        return new PerfilCompleto(completo.titular(), completo.resumen(),
+        return new PerfilCompleto(completo.titular(), completo.resumen(), completo.logros(),
                 completo.habilidades(), completo.experienciaMeses(), completo.ubicacion(),
                 completo.disponibilidad(), null, completo.experiencia(), completo.educacion(),
                 completo.idiomas(), completo.certificaciones(), completo.enlaces(),
@@ -119,9 +120,11 @@ public class PintorDePerfil {
      *
      * <p>El currículum se quita por otro motivo: el panel ya lo abre por su propia ruta, con
      * el permiso que le corresponde y sellado con la organización de la vacante.
+     *
+     * <p>Los logros clave (V71) SÍ viajan: los escribió para que los lea quien decide.
      */
     public PerfilCompleto sinLoDelCandidato(PerfilCompleto completo) {
-        return new PerfilCompleto(completo.titular(), completo.resumen(),
+        return new PerfilCompleto(completo.titular(), completo.resumen(), completo.logros(),
                 completo.habilidades(), completo.experienciaMeses(), completo.ubicacion(),
                 completo.disponibilidad(), completo.pretension(), completo.experiencia(),
                 completo.educacion(), completo.idiomas(),

@@ -23,7 +23,7 @@ Sirve para tres cosas:
 - **Entender el sistema.** Un modelo de datos bien contado explica el negocio mejor que
   cualquier otro documento.
 
-**La base ya está construida.** Las migraciones `V1` a `V70` viven en
+**La base ya está construida.** Las migraciones `V1` a `V71` viven en
 `src/main/resources/db/migration` —**120 tablas de este módulo**, 123 en la base contando la de
 Flyway y las dos del motor de agentes— y Flyway es el dueño del esquema. Cambiar algo de aquí
 ya cuesta una migración nueva, y **una migración aplicada no se edita nunca**: se escribe otra
@@ -213,6 +213,13 @@ publica una versión nueva de los textos de `PRUEBA_DISPONIBLE` que decían «de
 conservando las viejas. Abrir la prueba al instante no toca el esquema. Ver
 [estados de la postulación](03-ESTADOS-POSTULACION.md) y el
 [diccionario de datos](07-DICCIONARIO-DE-DATOS.md).
+
+La `V71` (09/10/2026) le da al perfil **los logros clave**: `perfil_candidato.logros`, hasta tres
+frases cortas que escribe el candidato con lo que ha conseguido. Van en una lista `jsonb`
+ordenada y no en un texto con separador como `habilidades`, porque un logro puede llevar dentro
+el `|` que separa las aptitudes. Los perfiles de antes arrancan sin logros y nadie los rellena:
+ni la lectura del currículum ni ninguna IA escriben ahí. Ver
+[APIs del perfil del candidato](APIS-PERFIL-DEL-CANDIDATO.md).
 
 La `V54` (14/09/2026) **no añade ninguna tabla y cambia quién firma qué**. Hasta ella había dos
 tipos de texto —`PROCESO` y `FUTUROS_CONTACTOS`— y el de la cuenta usaba el primero, que habla de
@@ -1458,6 +1465,8 @@ cuáles sí, porque las que no, hay que probarlas en el código.
 - **Un recordatorio no sale dos veces** (`V70`): el primero, una vez por turno; el del plazo, una
   vez por turno y por fecha. Reiniciar el servidor o dos sondeos a la vez no lo repiten. Y cómo se
   enteró el candidato de una transición es `CORREO`, `NINGUNO`, `POR_LA_CAMPANA` o nada.
+- **Un perfil tiene como mucho tres logros clave** (`V71`): la columna es vacía o una lista de
+  hasta tres, aunque alguien escriba directo en la base.
 
 ### Tienen que vivir en el código
 
@@ -1516,6 +1525,9 @@ cuáles sí, porque las que no, hay que probarlas en el código.
   vara se congele **en la primera rendición** y no en la primera postulación; y que una vacante no
   entre ni salga de `PRUEBA_PROPIA` por `/instrumento-tecnico`. Dependen de otras filas y del
   momento. **El enunciado ya no se exige** (`V68`).
+- **Que cada logro clave mida hasta 100 caracteres** (`V71`): un CHECK no puede recorrer los
+  elementos de la lista sin una subconsulta, así que el tope lo pone el backend al guardar, sobre
+  el texto ya limpio.
 
 ### Nunca existen, ni siquiera como opción
 

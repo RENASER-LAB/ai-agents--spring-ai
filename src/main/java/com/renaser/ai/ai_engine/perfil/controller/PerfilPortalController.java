@@ -61,7 +61,9 @@ public class PerfilPortalController {
     @PutMapping
     @Operation(summary = "Editar la cabecera: titular, resumen, habilidades, experienciaMeses "
             + "(0-720), ubicación, disponibilidad y pretensión (un rango completo con moneda, "
-            + "o nada). REEMPLAZA la cabecera entera: lo que no mandes se guarda vacío")
+            + "o nada). REEMPLAZA la cabecera entera: lo que no mandes se guarda vacío. "
+            + "Única excepción, los logros clave (0-3, de hasta 100 caracteres): sin el campo "
+            + "no se tocan; con una lista vacía se borran")
     public void editarCabecera(@Valid @RequestBody EditarCabecera datos) {
         servicio.editarCabecera(permisos.actual(), datos);
     }
