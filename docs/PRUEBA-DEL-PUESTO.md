@@ -194,6 +194,31 @@ donde se escriben».
   la etapa y 24 horas antes del plazo que rija. Quien ya la empezó no recibe ninguno. Las reglas,
   en [estados de la postulación](03-ESTADOS-POSTULACION.md), «Los recordatorios».
 
+### Nada antes del reloj (10/10/2026)
+
+Decisión del usuario en la revisión de la prueba de una pregunta por pantalla: **el caso se lee
+dentro del reloj, y no hay otra vía para leerlo antes**. Vale para la prueba del editor y para la
+de plantilla.
+
+- **El portal no recibe contenido antes de «Empezar».** Mientras el intento no tenga `iniciadoEn`,
+  la prueba viaja sin preguntas, sin caso ni enunciado, sin materiales, sin consigna y sin el
+  detalle de los entregables. Viajan el tiempo y la modalidad, la fecha límite o los días,
+  cuántas preguntas son (`totalPreguntas`), las herramientas y los entregables con su nombre, si
+  son obligatorios, su formato y en qué pregunta van (`posicionDeLaPregunta`). Todo lo demás llega
+  al empezar. El contrato, en [Las APIs](09-APIS.md), «La prueba del puesto (hito 3)».
+- **El correo tampoco lo reparte.** `{{enlacePrueba}}` de `PRUEBA_DISPONIBLE` va **siempre
+  vacía** (`MaquinaEstados.loDeLaPrueba`): llevaba `url_consigna`, firmado para toda la
+  convocatoria, que es el caso entero antes de empezar. Se sigue rellenando, vacía, para que un
+  texto viejo que la nombre no salga con «{{enlacePrueba}}» a la vista. El texto vigente
+  (PRUEBA_DISPONIBLE v3) ya no la usaba; solo la llevaba el de la `V29`.
+- ⚠️ **Lo que ya salió no se recoge.** Los correos enviados antes del 03/10/2026 llevan el enlace
+  largo de la consigna, que todavía abre el PDF sin empezar. Y en una base recién migrada el
+  texto que siembra la `V29` deja «DESCARGA AQUI EL ENUNCIADO:» seguido de una línea vacía.
+- **La pantalla previa del portal** pasó a ser una ficha corta, la misma para las dos pruebas. Cómo
+  se ve, en el `docs/02-QUE-VE-EL-CANDIDATO.md` del frontend, 2.9.
+
+Lo prueban `LoQueViajaAntesDeEmpezarTest`, `FlujoPruebaPropiaIT` y `MaquinaEstadosAvisoTest`.
+
 ---
 
 ## Componer una versión antes de publicarla (V46)
@@ -334,10 +359,11 @@ decir «esta convocatoria cierra el domingo».
   la ficha (`abrir_ficha_candidato`): quien no puede mover el plazo igualmente lo ve. **El panel
   ya los consume** desde el 22/09/2026, en la configuración de la vacante y en la ficha del
   candidato, así que la nota de «falta el frontend» de los plazos quedó vieja.
-- **El correo de la prueba** (`PRUEBA_DISPONIBLE`, V29) lleva el PDF del enunciado por vacante,
-  el plazo según la modalidad y el WhatsApp como parámetro. Desde la V70 su `{{plazo}}` dice
-  también la fecha límite en la prueba del editor y el texto ya no dice «desde este correo» (ver
-  «La prueba al instante, su correo y sus recordatorios»).
+- **El correo de la prueba** (`PRUEBA_DISPONIBLE`, V29) llevaba el PDF del enunciado por
+  vacante, el plazo según la modalidad y el WhatsApp como parámetro. Desde la V70 su `{{plazo}}`
+  dice también la fecha límite en la prueba del editor y el texto ya no dice «desde este correo»
+  (ver «La prueba al instante, su correo y sus recordatorios»). **Desde el 10/10/2026 ya no lleva
+  el enunciado**: `{{enlacePrueba}}` va siempre vacía (ver «Nada antes del reloj»).
 - **Cada vacante puede elegir sus textos de correo** (V31, tabla `plantilla_correo_vacante`):
   «para esta vacante, donde ibas a mandar el aviso X manda la plantilla Y»; sin fila, sale el de
   siempre. Vale para cualquier aviso. `POST /panel/vacantes/{id}/plantillas-correo`.

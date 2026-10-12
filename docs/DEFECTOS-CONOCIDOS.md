@@ -23,6 +23,12 @@ así que la que se cierra deja su hueco.
 **Qué le pasa a alguien.** Al candidato le llega el correo de la prueba y **el enlace al
 enunciado no abre**. No hay enunciado, no hay prueba.
 
+> ⚠️ **Desde el 10/10/2026 los correos nuevos ya no llevan ese enlace**: `{{enlacePrueba}}` va
+> siempre vacía, porque el caso se lee dentro del reloj (ver [Prueba del puesto](PRUEBA-DEL-PUESTO.md),
+> «Nada antes del reloj»). Lo de abajo sigue valiendo para lo que guarda `url_consigna` y para
+> los correos que ya salieron. Esos tienen además el problema contrario: **los enviados antes del
+> 03/10/2026 llevan el enlace largo, que todavía abre el PDF sin empezar la prueba**.
+
 **Por qué pasa.** El enunciado se sube al almacén y **el enlace se firma en ese momento, para 180
 días**, y se guarda ya firmado en `version_plantilla_prueba.url_consigna`. El correo no vuelve a
 firmar nada: pega lo que hay guardado. Así que la cuenta atrás empieza el día que alguien sube el

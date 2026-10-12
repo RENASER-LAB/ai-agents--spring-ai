@@ -1273,7 +1273,7 @@ Una versión del banco, en borrador o publicada.
 | `version_guia` | integer | sí | (`V66`) Por defecto 1. Sube cada vez que se corrigen las instrucciones de la IA de una versión publicada —la guía, el «qué evalúa» o el «qué debe tener»—. Cada nota de una abierta guarda con cuál se calculó (`nota_respuesta.version_guia`), y un resultado que llega calculado con una anterior se descarta. En la prueba del editor (`V67`), igual con `nota_criterio_prueba.version_guia` |
 | `enunciado` | text | no | (`V67`) El caso de la prueba técnica, hasta 10 000 caracteres. **Opcional desde la `V68`**, haya o no entregables |
 | `consigna_archivo_id` | bigint | no | (`V67`) El enunciado en PDF o Word, como la consigna de las plantillas |
-| `url_consigna` | text | no | (`V67`) El enlace largo de ese archivo, el que se pega en el aviso `PRUEBA_DISPONIBLE` |
+| `url_consigna` | text | no | (`V67`) El enlace largo de ese archivo. Se pegaba en el aviso `PRUEBA_DISPONIBLE`; **desde el 10/10/2026 el correo ya no lo lleva** (`{{enlacePrueba}}` va vacía) y el portal enseña el archivo solo al empezar la prueba |
 | `materiales` | text | no | (`V67`) Hasta 2000 caracteres |
 | `herramientas_permitidas` | text | no | (`V67`) Hasta 1000 caracteres |
 | `modalidad` | text | no | (`V67`) `CRONOMETRADA` o `PLAZO_ABIERTO`, que desde la `V68` es «Sin cronómetro»: se trabaja hasta la fecha límite de la vacante. **Sin cambio inesperado**. Que una cronometrada traiga sus minutos lo exige el servidor al publicar: un borrador se escribe por partes |
@@ -1961,7 +1961,7 @@ Una versión concreta. Si tiene vacante, es una copia privada de esa vacante.
 | `vacante_id` | bigint | no | Si está, es una variante de esa vacante |
 | `version` | integer | sí | |
 | `enunciado` | text | sí | |
-| `url_consigna` | text | no | Dónde vive el enunciado completo, para que **el aviso al candidato lo lleve** (`V29`). Se sube desde el panel mientras la versión está en `BORRADOR`; el enlace se firma para 180 días |
+| `url_consigna` | text | no | Dónde vive el enunciado completo, para que el aviso al candidato lo llevara (`V29`). **Desde el 10/10/2026 el aviso ya no lo lleva**: `{{enlacePrueba}}` va vacía, porque el caso se lee dentro del reloj. Se sube desde el panel mientras la versión está en `BORRADOR`; el enlace se firma para 180 días |
 | `materiales` | text | no | |
 | `herramientas_permitidas` | text | no | De dónde puede sacar información, **incluida la IA** |
 | `modalidad` | text | sí | `CRONOMETRADA` (lo normal) o `PLAZO_ABIERTO` (solo para cargar las viejas) |
@@ -2731,6 +2731,13 @@ vacante—, en hora de Lima («90 minutos desde que la empieces, hasta el vie 10
 «hasta el …», «90 minutos desde que la empieces», «7 días desde que la empieces»), y nunca sale
 vacío: sin minutos, días ni fecha dice «sin fecha límite». Con `PLANTILLA` o
 `CUESTIONARIO_TECNICO` se rellena como antes.
+
+**`{{enlacePrueba}}` va siempre vacía desde el 10/10/2026**, con cualquier instrumento. Llevaba el
+`url_consigna` de la versión, que es el caso entero antes de empezar, y la decisión es que el caso
+se lea dentro del reloj. Se sigue rellenando, vacía, para que un texto que aún la nombre no salga
+con la variable a la vista. El texto vigente de `PRUEBA_DISPONIBLE` (v3) ya no la usaba; el que
+siembra la `V29` sí, y en una base recién migrada deja «DESCARGA AQUI EL ENUNCIADO:» seguido de
+una línea vacía. Ver [Prueba del puesto](PRUEBA-DEL-PUESTO.md), «Nada antes del reloj».
 
 ## `instruccion_ia`
 

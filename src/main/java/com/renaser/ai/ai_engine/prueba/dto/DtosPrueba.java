@@ -17,6 +17,16 @@ import java.util.List;
  * <p>El minuto exacto del cambio tampoco viaja de antemano: {@code cambioTexto} solo aparece
  * en la respuesta una vez que el servidor decide que ya toca mostrarlo (RF-77 — si se supiera
  * de antemano, se aprendería el patrón).
+ *
+ * <p><b>Y antes de empezar no viaja nada que dé ventaja</b> (decisión del usuario del
+ * 10/10/2026). El caso se lee dentro del reloj: mientras el intento no tenga
+ * {@code iniciadoEn}, la prueba llega sin preguntas, sin enunciado, sin materiales, sin
+ * consigna y sin el detalle de los entregables ({@link MiPrueba#antesDeEmpezar()}). Solo
+ * viaja lo que se necesita para decidir cuándo empezar: el estado, el tiempo y la modalidad,
+ * la fecha límite o los días, cuántas preguntas son ({@code totalPreguntas}), las herramientas
+ * permitidas y qué archivos habrá que entregar —nombre, si es obligatorio, su formato y en qué
+ * pregunta va—. Todo lo demás llega en la respuesta de {@code POST /inicio} y en las lecturas
+ * posteriores.
  */
 public final class DtosPrueba {
 
@@ -45,17 +55,34 @@ public final class DtosPrueba {
     /**
      * Un entregable que tiene que subir. {@code preguntaId} (V68, solo la prueba del editor): la
      * pregunta en la que se sube su archivo; nulo en los generales, que van al final.
+     * {@code posicionDeLaPregunta} (10/10/2026): el número de esa pregunta en la prueba, el de
+     * «en la pregunta 4». Hace falta aparte porque antes de empezar las preguntas no viajan, y el
+     * número no da contenido.
      */
     public record EntregableRequeridoCandidato(
             Long id, String nombre, String detalle, String formato,
-            boolean esObligatorio, boolean entregado, Long preguntaId) {
+            boolean esObligatorio, boolean entregado, Long preguntaId, Integer posicionDeLaPregunta) {
 
         public EntregableRequeridoCandidato(Long id, String nombre, String detalle, String formato,
                                             boolean esObligatorio, boolean entregado) {
-            this(id, nombre, detalle, formato, esObligatorio, entregado, null);
+            this(id, nombre, detalle, formato, esObligatorio, entregado, null, null);
+        }
+
+        /**
+         * El mismo entregable sin su {@code detalle}: lo que se enseña antes de empezar. El nombre,
+         * si es obligatorio, el formato y la pregunta no dan contenido; el detalle a veces sí («con
+         * las partidas en tránsito separadas de los errores»), y se lee dentro del reloj.
+         */
+        public EntregableRequeridoCandidato sinDetalle() {
+            return new EntregableRequeridoCandidato(id, nombre, null, formato, esObligatorio, entregado,
+                    preguntaId, posicionDeLaPregunta);
         }
     }
 
+    /**
+     * La prueba del candidato. {@code totalPreguntas} (10/10/2026) dice cuántas son aunque
+     * {@code preguntas} llegue vacía, que es lo que pasa antes de empezar.
+     */
     public record MiPrueba(
             Long id,
             String estadoIntento,          // PENDIENTE | EN_CURSO | ENTREGADA
@@ -77,16 +104,23 @@ public final class DtosPrueba {
             boolean delEditor,
             /* La fecha límite para dar la prueba (V68, solo la prueba del editor): la de la
                vacante, o la suya si se la dieron a mano. Nula si no hay. */
-            Instant fechaLimite) {
+            Instant fechaLimite,
+            /* Cuántas preguntas tiene su prueba (10/10/2026). Viaja siempre, también antes de
+               empezar, cuando `preguntas` va vacía. */
+            int totalPreguntas) {
 
-        public MiPrueba(Long id, String estadoIntento, String modalidad, Instant iniciadoEn,
-                        Instant venceEn, Integer duracionMinutos, String enunciado,
-                        String materiales, String herramientasPermitidas, String cambioTexto,
-                        List<PreguntaCandidato> preguntas,
-                        List<EntregableRequeridoCandidato> entregables) {
-            this(id, estadoIntento, modalidad, iniciadoEn, venceEn, duracionMinutos, enunciado,
-                    materiales, herramientasPermitidas, cambioTexto, preguntas, entregables,
-                    null, false, null, false, null);
+        /**
+         * Lo que viaja antes de empezar: lo mismo sin nada que dé ventaja. Sin preguntas (solo
+         * cuántas son), sin enunciado, sin materiales, sin consigna, sin cambio inesperado y sin
+         * el detalle de cada entregable. Se quedan el estado, el tiempo y la modalidad, las
+         * fechas y los días, las herramientas permitidas y la lista de lo que habrá que
+         * entregar.
+         */
+        public MiPrueba antesDeEmpezar() {
+            return new MiPrueba(id, estadoIntento, modalidad, iniciadoEn, venceEn, duracionMinutos,
+                    null, null, herramientasPermitidas, null, List.of(),
+                    entregables.stream().map(EntregableRequeridoCandidato::sinDetalle).toList(),
+                    plazoDias, cuestionario, null, delEditor, fechaLimite, totalPreguntas);
         }
     }
 

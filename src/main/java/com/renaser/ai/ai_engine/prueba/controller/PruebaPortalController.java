@@ -30,13 +30,16 @@ public class PruebaPortalController {
     private final Permisos permisos;
 
     @GetMapping("/prueba/{uuid}")
-    @Operation(summary = "Mi prueba: enunciado, entregables pedidos y mis respuestas")
+    @Operation(summary = "Mi prueba. Antes de empezar, solo el tiempo, las fechas, cuántas preguntas "
+            + "son, las herramientas y qué archivos habrá que entregar (sin su detalle); el caso, "
+            + "los materiales, la consigna y las preguntas llegan al empezar")
     public MiPrueba ver(@PathVariable UUID uuid) {
         return servicio.ver(permisos.actual(), uuid);
     }
 
     @PostMapping("/prueba/{uuid}/inicio")
-    @Operation(summary = "Empezar. Arranca el reloj: no se detiene, ni siquiera cerrando la página")
+    @Operation(summary = "Empezar. Arranca el reloj —no se detiene, ni siquiera cerrando la página— y "
+            + "devuelve la prueba entera: el caso, los materiales, la consigna y las preguntas")
     public MiPrueba iniciar(@PathVariable UUID uuid) {
         return servicio.iniciar(permisos.actual(), uuid);
     }
