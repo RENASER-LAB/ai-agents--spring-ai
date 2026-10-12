@@ -6,6 +6,8 @@ import com.renaser.ai.ai_engine.notificacion.repository.PlantillaCorreoVacanteRe
 import com.renaser.ai.ai_engine.notificacion.service.DireccionDelCandidato;
 import com.renaser.ai.ai_engine.notificacion.service.ServicioCorreo;
 import com.renaser.ai.ai_engine.parametro.service.ServicioParametros;
+import com.renaser.ai.ai_engine.perfilintegral.entity.VersionBanco;
+import com.renaser.ai.ai_engine.perfilintegral.repository.VersionBancoRepository;
 import com.renaser.ai.ai_engine.postulacion.entity.EstadoPostulacion;
 import com.renaser.ai.ai_engine.postulacion.entity.Postulacion;
 import com.renaser.ai.ai_engine.postulacion.repository.EstadoPostulacionRepository;
@@ -40,6 +42,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -192,9 +195,10 @@ class MaquinaEstadosAvisoTest {
         // Lo que decide qué variables se rellenan es el momento del recorrido, no cómo se
         // llame la plantilla. Sin esto salió un correo con «{{plazo}}» y «{{whatsapp}}» a la
         // vista, y la plantilla era la correcta: el fallo no se veía por el código.
+        // Y «enlacePrueba» se rellena vacía (10/10/2026): el caso se abre al empezar.
         assertThat(v).containsEntry("plazo", "5 dias")
                      .containsEntry("whatsapp", "982255360")
-                     .containsEntry("enlacePrueba", PDF_ARQ);
+                     .containsEntry("enlacePrueba", "");
     }
 
     @Test
@@ -227,30 +231,65 @@ class MaquinaEstadosAvisoTest {
     }
 
     @Test
-    @DisplayName("y lleva el enunciado, el plazo y el numero al que mandar la evidencia")
+    @DisplayName("y lleva el plazo y el numero al que mandar la evidencia, pero no el enunciado")
     void llevaLoQueHaceFalta() {
         Postulacion p = vacanteCon(15L, 17L, PDF_ARQ, 3);
 
         Map<String, String> v = avisoAlMover(p, "PRUEBA_TURNO_CANDIDATO", "CANDIDATO");
 
-        assertThat(v).containsEntry("enlacePrueba", PDF_ARQ)
+        // El caso se lee dentro del reloj (decisión del 10/10/2026): el correo ya no reparte el
+        // enlace del enunciado aunque la versión lo tenga. La variable sigue, vacía, para que un
+        // texto viejo que la nombre no salga con la variable a la vista.
+        assertThat(v).containsEntry("enlacePrueba", "")
                      .containsEntry("plazo", "3 dias")
                      .containsEntry("whatsapp", "982255360");
     }
 
     @Test
-    @DisplayName("cada vacante manda el enunciado SUYO")
-    void cadaVacanteElSuyo() {
-        // Es lo que el apaño de publicar una plantilla por puesto no podia garantizar: con
-        // dos candidatos de vacantes distintas moviendose a la vez, uno recibia el PDF del
-        // otro y no habia forma de notarlo salvo leyendo el correo enviado.
-        assertThat(avisoAlMover(vacanteCon(15L, 17L, PDF_ARQ, 3),
-                                "PRUEBA_TURNO_CANDIDATO", "CANDIDATO"))
-                .containsEntry("enlacePrueba", PDF_ARQ);
+    @DisplayName("ninguna vacante manda su enunciado por correo: ni el suyo ni el de otra")
+    void ningunaMandaSuEnunciado() {
+        // Hasta el 10/10/2026 cada vacante mandaba el SUYO (V29), y eso era el caso entero antes
+        // de pulsar «Empezar»: el candidato lo podía leer y trabajar sin que corriera el reloj.
+        // Ahora no lo manda ninguna, ni el de otra: el enlace no está en ninguna variable.
+        Map<String, String> arq = avisoAlMover(vacanteCon(15L, 17L, PDF_ARQ, 3),
+                                               "PRUEBA_TURNO_CANDIDATO", "CANDIDATO");
+        assertThat(arq).containsEntry("enlacePrueba", "");
+        assertThat(arq.values()).noneMatch(valor -> valor.contains(PDF_ARQ));
 
-        assertThat(avisoAlMover(vacanteCon(16L, 18L, PDF_CIVIL, 3),
-                                "PRUEBA_TURNO_CANDIDATO", "CANDIDATO"))
-                .containsEntry("enlacePrueba", PDF_CIVIL);
+        Map<String, String> civil = avisoAlMover(vacanteCon(16L, 18L, PDF_CIVIL, 3),
+                                                 "PRUEBA_TURNO_CANDIDATO", "CANDIDATO");
+        assertThat(civil).containsEntry("enlacePrueba", "");
+        assertThat(civil.values()).noneMatch(valor -> valor.contains(PDF_CIVIL) || valor.contains(PDF_ARQ));
+    }
+
+    @Test
+    @DisplayName("la prueba del editor tampoco manda su consigna: el plazo sí, el enlace no")
+    void laDelEditorTampocoMandaSuConsigna() {
+        VersionBancoRepository versionesBanco = mock(VersionBancoRepository.class);
+        MaquinaEstados conElEditor = new MaquinaEstados(estados, postulaciones, transiciones, usuarios,
+                personas, vacantes, auditoria, correo, direcciones, enlaces, plantillasPorVacante,
+                versionesDePrueba, parametros, versionesBanco);
+        when(vacantes.findById(25L)).thenReturn(Optional.of(Vacante.builder().id(25L)
+                .titulo("Analista contable").instrumentoEtapaTecnica("PRUEBA_PROPIA").build()));
+        when(versionesBanco.pruebaPropiaDe(25L, "PUBLICADA")).thenReturn(Optional.of(
+                VersionBanco.builder().id(250L).modalidad("CRONOMETRADA").duracionMinutos(90)
+                        .urlConsigna(PDF_ARQ).build()));
+        when(estados.findById("PRUEBA_TURNO_CANDIDATO"))
+                .thenReturn(Optional.of(estado("PRUEBA_TURNO_CANDIDATO", "CANDIDATO")));
+        when(estados.findById("PERFIL_POR_CONFIRMAR"))
+                .thenReturn(Optional.of(estado("PERFIL_POR_CONFIRMAR", "TALENTO")));
+        Postulacion p = Postulacion.builder().id(125L).organizacionId(1L).usuarioId(7L)
+                .vacanteId(25L).uuid(UUID.randomUUID()).estadoCodigo("PERFIL_POR_CONFIRMAR").build();
+
+        conElEditor.transicionar(p, "PRUEBA_TURNO_CANDIDATO", null, null, true, false, null);
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, String>> variables = ArgumentCaptor.forClass(Map.class);
+        verify(correo).enviar(anyLong(), anyLong(), anyString(), anyString(), variables.capture());
+        assertThat(variables.getValue())
+                .containsEntry("enlacePrueba", "")
+                .containsEntry("plazo", "90 minutos desde que la empieces");
+        assertThat(variables.getValue().values()).noneMatch(valor -> valor.contains(PDF_ARQ));
     }
 
     @Test

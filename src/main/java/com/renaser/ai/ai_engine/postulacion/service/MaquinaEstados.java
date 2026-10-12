@@ -47,6 +47,12 @@ public class MaquinaEstados {
             List.of("POR_HABILITAR", "TURNO_CANDIDATO", "CALIFICANDO", "POR_CONFIRMAR");
 
     /**
+     * Lo que vale {@code {{enlacePrueba}}} en el aviso de la prueba: nada. El caso se abre al
+     * empezar, en el portal (10/10/2026). Ver {@code loDeLaPrueba}.
+     */
+    private static final String SIN_ENUNCIADO_EN_EL_CORREO = "";
+
+    /**
      * Cómo se entera el candidato de esta transición. Tres casos y no dos.
      *
      * <p>Hasta la V60 esto era un booleano, y el booleano confundía dos cosas muy distintas
@@ -502,35 +508,22 @@ public class MaquinaEstados {
     }
 
     /**
-     * El enunciado de la prueba y cuanto tiempo hay, para el aviso.
+     * Lo que el aviso de la prueba necesita y los demas no: el plazo y a donde mandar lo que se
+     * haga.
      *
-     * <p><b>El enlace al PDF se saca del texto de la consigna con una expresion regular, y eso
-     * es provisional.</b> Lo correcto es una columna propia en {@code version_plantilla_prueba}:
-     * asi el correo no depende de como este redactado el texto, y quien reescriba la consigna
-     * no rompe el aviso sin enterarse. Se hizo asi para poder mandar los primeros correos hoy;
-     * la columna esta pendiente.
-     *
-     * <p>Si no encuentra enlace, la variable va vacia y el correo sale igual: el candidato
-     * todavia puede entrar al portal y leer la consigna ahi. Un aviso sin enlace es peor que
-     * uno con el, pero mucho mejor que ninguno.
-     */
-    /**
-     * Lo que el aviso de la prueba necesita y los demas no: el enunciado, el plazo y a donde
-     * mandar lo que se haga.
-     *
-     * <p>El enlace sale de {@code url_consigna} de la version que le toca a SU vacante, asi
-     * que dos puestos con pruebas distintas reciben cada uno la suya. Antes esto se hacia
-     * publicando una plantilla por puesto y mandando en medio: funcionaba mientras nadie mas
-     * se moviera, y quien se moviera recibia el enunciado de otro sin que nada avisara.
-     *
-     * <p>Si falta el enlace el correo sale igual, con ese hueco vacio. Un aviso incompleto es
-     * malo; no avisar de que le toca la prueba es peor.
+     * <p>⚠️ <b>{@code {{enlacePrueba}}} va siempre vacía desde el 10/10/2026.</b> Llevaba el
+     * enlace del enunciado ({@code url_consigna}, firmado para durar toda la convocatoria), y eso
+     * es el caso entero antes de empezar: el candidato lo podía leer y trabajar sin que corriera
+     * el reloj. La decisión es que el caso se lee dentro del reloj y que no haya otra vía, así
+     * que el correo ya no lo reparte, ni en la plantilla ni en la prueba del editor; llega al
+     * pulsar «Empezar» en el portal. La variable se sigue rellenando —vacía— para que un texto
+     * viejo que aún la nombre no salga con «{{enlacePrueba}}» a la vista. Los textos activos ya
+     * no la usaban (v3 de PRUEBA_DISPONIBLE, V70).
      */
     private Map<String, String> loDeLaPrueba(Postulacion postulacion, Vacante vacante) {
-        String urlPdf = "";
         String plazo = "";
 
-        // La prueba escrita en el editor (V67): su adjunto y su tiempo están en su versión.
+        // La prueba escrita en el editor (V67): su tiempo está en su versión.
         //
         // Y {{plazo}} dice el tiempo Y la fecha límite que rige para esta persona (V70): «90
         // minutos desde que la empieces, hasta el vie 10/10 a las 23:59». Hasta la V70 solo
@@ -539,15 +532,12 @@ public class MaquinaEstados {
         if (vacante != null && "PRUEBA_PROPIA".equals(vacante.getInstrumentoEtapaTecnica())
                 && versionesBanco != null) {
             var propia = versionesBanco.pruebaPropiaDe(vacante.getId(), "PUBLICADA").orElse(null);
-            if (propia != null) {
-                urlPdf = propia.getUrlConsigna() == null ? "" : propia.getUrlConsigna();
-            }
             plazo = PlazoDeLaPrueba.dicho(
                     propia == null ? null : propia.getModalidad(),
                     propia == null ? null : propia.getDuracionMinutos(),
                     propia == null ? null : propia.getPlazoDias(),
                     fechaQueRige(postulacion, vacante));
-            return Map.of("enlacePrueba", urlPdf, "plazo", plazo,
+            return Map.of("enlacePrueba", SIN_ENUNCIADO_EN_EL_CORREO, "plazo", plazo,
                     "whatsapp", parametros.texto(postulacion.getOrganizacionId(), "whatsapp_evidencia", ""));
         }
 
@@ -556,16 +546,11 @@ public class MaquinaEstados {
                 .flatMap(versionesDePrueba::findById);
         if (version.isPresent()) {
             var v = version.get();
-            urlPdf = v.getUrlConsigna() == null ? "" : v.getUrlConsigna();
             // Las dos modalidades cuentan el tiempo distinto: una da dias para entregar y la
             // otra minutos de reloj. Se dice en las palabras de la que sea.
             plazo = v.getPlazoDias() != null ? v.getPlazoDias() + " dias"
                   : v.getDuracionMinutos() != null ? v.getDuracionMinutos() + " minutos"
                   : "";
-            if (urlPdf.isBlank()) {
-                log.warn("La version de prueba {} no tiene enunciado publicado: el aviso de la "
-                        + "postulacion {} sale sin enlace", v.getId(), postulacion.getId());
-            }
         }
 
         // La plantilla y el cuestionario técnico lo rellenan como siempre. Lo único que cambia
@@ -576,7 +561,7 @@ public class MaquinaEstados {
         }
 
         return Map.of(
-                "enlacePrueba", urlPdf,
+                "enlacePrueba", SIN_ENUNCIADO_EN_EL_CORREO,
                 "plazo", plazo,
                 // Un telefono cambia cuando cambia quien atiende, asi que es parametro y no
                 // texto de la plantilla: se edita desde el panel, sin desplegar.

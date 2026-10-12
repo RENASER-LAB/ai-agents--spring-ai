@@ -734,6 +734,14 @@ en el entregable dejar una sin responder puede ser una decisión y no un descuid
 **RF-53** El candidato **nunca** ve claves, puntajes por opción, nombres internos de dimensiones
 ni la lógica de cálculo.
 
+> **Y en la prueba del puesto, antes de empezar, tampoco ve su contenido** (decisión del usuario
+> del 10/10/2026). Hasta pulsar «Empezar» no le llegan las preguntas ni sus opciones, el caso, los
+> materiales, la consigna en PDF ni el detalle de los entregables: el caso se lee dentro del reloj.
+> Sí sabe el tiempo, la fecha límite, cuántas preguntas son, las herramientas permitidas y qué
+> archivos habrá que entregar. El correo de la prueba tampoco lleva el enunciado. Vale para la
+> prueba del editor y para la de plantilla; el detalle, en [Prueba del puesto](PRUEBA-DEL-PUESTO.md),
+> «Nada antes del reloj».
+
 ## Tipos de pregunta
 
 **RF-54** Hay cinco tipos y cada uno se corrige distinto:

@@ -776,6 +776,21 @@ responde 400 y manda a `/prueba-propia`, que es donde se ajusta. `…/prueba/cal
 vuelve a contar la nota —aquí sale sola— y responde 409 mientras falte algún criterio.
 `…/prueba/notas` y `…/prueba/respuestas` vienen vacíos: el desglose está en `/prueba-propia`.
 
+**Antes de empezar no viaja nada que dé ventaja** (decisión del usuario del 10/10/2026), en la
+prueba del editor y en la de plantilla. El caso se lee dentro del reloj, así que mientras el
+intento no tenga `iniciadoEn`, `GET /prueba/{codigo}` responde sin preguntas (`preguntas` vacía),
+sin `enunciado`, sin `materiales`, sin `consigna`, sin `cambioTexto` y con cada entregable **sin
+su `detalle`**. Sí viajan el estado, la modalidad y los minutos, `venceEn`, `fechaLimite` o
+`plazoDias`, **`totalPreguntas`** —cuántas son, aunque la lista llegue vacía—, las herramientas
+permitidas y los entregables con su nombre, si son obligatorios, su formato, `preguntaId` y
+**`posicionDeLaPregunta`**, el número de la pregunta en la que se sube («en la pregunta 4»), que
+hace falta aparte porque las preguntas no llegan. Lo demás llega en la respuesta de
+`POST /prueba/{codigo}/inicio` y en las lecturas posteriores. Es una sola regla al pintar
+(`ServicioPruebaImpl`, `empezada(intento)`; `DtosPrueba.MiPrueba.antesDeEmpezar()` y
+`EntregableRequeridoCandidato.sinDetalle()`), así que vale igual en ver y en iniciar. La de
+plantilla manda además `plazoDias` cuando se mide en días; con minutos va nulo, para no contar dos
+plazos. Lo prueban `LoQueViajaAntesDeEmpezarTest` y `FlujoPruebaPropiaIT`.
+
 ### Simulación de trabajo
 
 | Método y ruta | Qué hace | Permiso |

@@ -418,7 +418,7 @@ public class FlujoPruebaPropiaIT {
 
     // ============ Rendir ============
 
-    @DisplayName("La candidata ve el caso, el reloj y los cuatro tipos sin un solo punto (AC-08, AC-09)")
+    @DisplayName("Antes de empezar la candidata ve el reloj y cuántas son; al empezar, el caso y los cuatro tipos, sin un solo punto (AC-08, AC-09)")
     @Test
     @Order(7)
     void laCandidataVeElCasoSinPuntos() throws Exception {
@@ -431,26 +431,61 @@ public class FlujoPruebaPropiaIT {
         assertThat(prueba.get("estadoIntento").asText()).isEqualTo("PENDIENTE");
         assertThat(prueba.get("delEditor").asBoolean()).isTrue();
         assertThat(prueba.get("cuestionario").asBoolean()).isFalse();
-        assertThat(prueba.get("enunciado").asText()).contains("descuadre");
-        assertThat(prueba.get("preguntas").size()).isEqualTo(5);
-        List<String> tipos = new ArrayList<>();
-        prueba.get("preguntas").forEach(p -> tipos.add(p.get("tipo").asText()));
-        assertThat(tipos).contains("ABIERTA", "OPCION_UNICA", "OPCION_MULTIPLE", "ESCALA");
+        // Antes de empezar no viaja nada que dé ventaja (10/10/2026): el caso se lee dentro del
+        // reloj. Ni el enunciado ni las preguntas —solo cuántas son—, ni los materiales, ni la
+        // consigna, ni el detalle de los entregables; tampoco escondidos en el JSON.
+        assertThat(prueba.get("enunciado").isNull()).isTrue();
+        assertThat(prueba.get("materiales").isNull()).isTrue();
+        assertThat(prueba.get("consigna").isNull()).isTrue();
+        assertThat(prueba.get("preguntas").size()).isZero();
+        assertThat(prueba.get("totalPreguntas").asInt()).isEqualTo(5);
+        assertThat(crudo).doesNotContain("descuadre");
         // La pantalla previa sabe la fecha límite, y el archivo de una pregunta dice cuál es
         assertThat(prueba.get("fechaLimite").isNull()).isFalse();
         for (JsonNode e : prueba.get("entregables")) {
+            assertThat(e.get("detalle").isNull()).as("el detalle de «%s», al empezar", e.get("nombre")).isTrue();
             if ("Tablero.xlsx".equals(e.get("nombre").asText())) {
                 assertThat(e.get("preguntaId").asLong()).isEqualTo(pregunta.get("abiertaA"));
+                // Su número viaja aparte, para decir «en la pregunta N» sin las preguntas
+                assertThat(e.get("posicionDeLaPregunta").asInt()).isBetween(1, 5);
             } else {
                 assertThat(e.get("preguntaId").isNull()).isTrue();
+                assertThat(e.get("posicionDeLaPregunta").isNull()).isTrue();
             }
         }
 
-        JsonNode iniciada = json.readTree(mvc.perform(post("/api/v1/portal/prueba/" + codigo.get("ana") + "/inicio")
+        String crudoIniciada = mvc.perform(post("/api/v1/portal/prueba/" + codigo.get("ana") + "/inicio")
                         .header("Authorization", "Bearer " + tokenCandidata.get("ana")))
-                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        assertThat(crudoIniciada).doesNotContain("puntos", "calificador", "criterio", "queDebeTener",
+                "Mira las cifras", "La cuenta y el monto");
+        JsonNode iniciada = json.readTree(crudoIniciada);
         assertThat(iniciada.get("estadoIntento").asText()).isEqualTo("EN_CURSO");
         assertThat(iniciada.get("duracionMinutos").asInt()).isEqualTo(90);
+        // Al empezar llega todo: el caso y las preguntas en sus cuatro tipos
+        assertThat(iniciada.get("enunciado").asText()).contains("descuadre");
+        assertThat(iniciada.get("preguntas").size()).isEqualTo(5);
+        assertThat(iniciada.get("totalPreguntas").asInt()).isEqualTo(5);
+        List<String> tipos = new ArrayList<>();
+        iniciada.get("preguntas").forEach(p -> tipos.add(p.get("tipo").asText()));
+        assertThat(tipos).contains("ABIERTA", "OPCION_UNICA", "OPCION_MULTIPLE", "ESCALA");
+        // El número que se dijo antes de empezar es el de su pregunta
+        int suNumero = 0;
+        for (JsonNode p : iniciada.get("preguntas")) {
+            if (p.get("id").asLong() == pregunta.get("abiertaA")) {
+                suNumero = p.get("posicion").asInt();
+            }
+        }
+        for (JsonNode e : iniciada.get("entregables")) {
+            if ("Tablero.xlsx".equals(e.get("nombre").asText())) {
+                assertThat(e.get("posicionDeLaPregunta").asInt()).isEqualTo(suNumero).isPositive();
+            }
+        }
+        // Y lo mismo al volver a leerla, ya empezada
+        conTokenGet("/api/v1/portal/prueba/" + codigo.get("ana"), tokenCandidata.get("ana"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.preguntas.length()").value(5))
+                .andExpect(jsonPath("$.enunciado").value(org.hamcrest.Matchers.containsString("descuadre")));
         // AC-09: sin cambio inesperado
         assertThat(iniciada.get("cambioTexto").isNull()).isTrue();
         assertThat(jdbc.queryForObject("select variante_cambio_id is null and minuto_cambio is null "

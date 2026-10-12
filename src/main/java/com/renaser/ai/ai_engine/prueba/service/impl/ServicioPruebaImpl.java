@@ -596,11 +596,28 @@ public class ServicioPruebaImpl implements ServicioPrueba {
         // «Duración: 90 minutos» y justo debajo «Modalidad: PLAZO_ABIERTO», que es la misma
         // contradicción escrita dos veces. Si la vacante puso minutos, esta prueba es
         // cronometrada de hecho y así se dice.
-        return new MiPrueba(intento.getId(), estado, modalidadEfectiva(version, minutosVacante),
-                intento.getIniciadoEn(), intento.getVenceEn(),
-                minutosEfectivos(version, minutosVacante),
+        //
+        // Los días viajan solo cuando la prueba se mide en días: con minutos, el reloj es lo
+        // que rige y decir además «7 días» sería contar dos plazos.
+        Integer minutos = minutosEfectivos(version, minutosVacante);
+        MiPrueba pintada = new MiPrueba(intento.getId(), estado, modalidadEfectiva(version, minutosVacante),
+                intento.getIniciadoEn(), intento.getVenceEn(), minutos,
                 version.getEnunciado(), version.getMateriales(), version.getHerramientasPermitidas(),
-                cambioTexto, preguntas, entregablesCandidato);
+                cambioTexto, preguntas, entregablesCandidato,
+                minutos == null ? version.getPlazoDias() : null, false, null, false, null,
+                preguntas.size());
+        return empezada(intento) ? pintada : pintada.antesDeEmpezar();
+    }
+
+    /**
+     * Si ya pulsó «Empezar». Hasta entonces la prueba viaja sin nada que dé ventaja —ni el
+     * encargo, ni los materiales, ni las preguntas, ni la consigna, ni el detalle de los
+     * entregables—: el caso se lee dentro del reloj (decisión del 10/10/2026). Es la misma
+     * regla en la plantilla y en la del editor, y la misma en {@code ver} y en {@code iniciar}:
+     * por eso se mira aquí, al pintar, y no en cada puerta.
+     */
+    private static boolean empezada(IntentoPrueba intento) {
+        return intento.getIniciadoEn() != null;
     }
 
     /**
@@ -759,8 +776,10 @@ public class ServicioPruebaImpl implements ServicioPrueba {
         Resultado r = calculo.calcular(intento);
         VersionBanco v = r.version();
         List<PreguntaCandidato> preguntas = new ArrayList<>();
+        Map<Long, Integer> posicionDe = new java.util.HashMap<>();
         int posicion = 1;
         for (PreguntaDeLaPrueba pc : r.todas()) {
+            posicionDe.put(pc.pregunta().getId(), posicion);
             RespuestaPrueba resp = pc.respuesta();
             List<Long> marcadas = resp == null ? List.of()
                     : com.renaser.ai.ai_engine.perfilintegral.service.CalificacionPorPuntos.marcadasDe(
@@ -779,20 +798,24 @@ public class ServicioPruebaImpl implements ServicioPrueba {
                         e.getDetalle() == null || e.getDetalle().isBlank() ? null : e.getDetalle(),
                         e.getFormato(), e.isEsObligatorio(),
                         subidos.stream().anyMatch(s -> s.getEntregableRequeridoId().equals(e.getId())),
-                        // El archivo de una pregunta se sube dentro de ella (V68). Nunca viaja
-                        // qué criterio lo mira (RF-53).
-                        e.getPreguntaId()))
+                        // El archivo de una pregunta se sube dentro de ella (V68), y su número
+                        // viaja aparte: antes de empezar las preguntas no llegan, y la pantalla
+                        // previa dice «en la pregunta 4». Nunca viaja qué criterio lo mira (RF-53).
+                        e.getPreguntaId(), e.getPreguntaId() == null ? null : posicionDe.get(e.getPreguntaId())))
                 .toList();
         String estado = intento.isNoCompletada() ? "NO_COMPLETADA"
                 : intento.getEntregadoEn() != null ? "ENTREGADA"
                 : intento.getIniciadoEn() != null ? "EN_CURSO" : "PENDIENTE";
         boolean cronometrada = "CRONOMETRADA".equals(v.getModalidad());
-        return new MiPrueba(intento.getId(), estado, v.getModalidad(), intento.getIniciadoEn(),
+        // La consigna ni se busca antes de empezar: su enlace firmado es el caso entero.
+        MiPrueba pintada = new MiPrueba(intento.getId(), estado, v.getModalidad(), intento.getIniciadoEn(),
                 intento.getVenceEn(), cronometrada ? v.getDuracionMinutos() : null,
                 v.getEnunciado(), v.getMateriales(), v.getHerramientasPermitidas(),
                 null, preguntas, deLaPrueba,
-                cronometrada ? null : v.getPlazoDias(), r.esCuestionario(), consignaDe(v), true,
-                fechaLimiteDe(postulacion, intento));
+                cronometrada ? null : v.getPlazoDias(), r.esCuestionario(),
+                empezada(intento) ? consignaDe(v) : null, true,
+                fechaLimiteDe(postulacion, intento), preguntas.size());
+        return empezada(intento) ? pintada : pintada.antesDeEmpezar();
     }
 
     /**
