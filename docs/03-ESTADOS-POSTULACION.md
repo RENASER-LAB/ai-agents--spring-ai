@@ -568,6 +568,28 @@ tres parámetros —`recordatorios_activos` (encendido de salida), `recordatorio
 y `recordatorio_horas_antes_del_plazo` (24 y 24)— y dos textos de correo editables,
 `RECORDATORIO_EVALUACION` y `RECORDATORIO_PRUEBA`.
 
+### Por WhatsApp, si escribió primero (13/10/2026, beta)
+
+Un tercer canal, solo en las vacantes de RENASER y con el parámetro `whatsapp_novedades_activo`
+encendido —nace apagado—. Mientras espera, el portal le ofrece «Escribir por WhatsApp»; si escribe
+al bot desde el celular de su cuenta, queda vinculado y desde entonces:
+
+- **Solo le llegan los «te toca»**: `PRUEBA_DISPONIBLE` al pasar a la prueba y
+  `POSTULACION_AVANZA` en los demás turnos que lo esperan. Ni recordatorios, ni cierres, ni
+  rechazos, ni movidos «sin avisar».
+- **Salen en la misma transición que el correo y la campana, y son independientes**: el aviso se
+  encola cuando la transición ya se confirmó, en su propia transacción, y un fallo ahí no la
+  deshace ni le quita al candidato el correo ni la campana. Lo manda un sondeo con hasta 5
+  intentos, y una transición deja como mucho un aviso de cada tipo.
+- **Quien pulsó el botón pero nunca escribió no recibe nada**: el bot no escribe primero.
+- **Al llegar a un estado final el vínculo se cierra sin avisar por WhatsApp**, avise o no la
+  transición. Si escribe después, el bot le dice que no tiene procesos activos.
+
+Lo que el bot le cuenta cuando escribe son las mismas palabras del portal: el título y el texto
+de cada estado viven en el servidor (`TextosDelMomento`), y el portal tiene su copia
+amarrada a ella por un contrato compartido (`docs/contratos/textos-del-momento.json`) con una
+prueba en cada lado. Ver [el contrato con el bot](CONTRATO-NOVEDADES-POR-WHATSAPP.md).
+
 ---
 
 ## Casos especiales

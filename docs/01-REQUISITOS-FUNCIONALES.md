@@ -458,10 +458,16 @@ su cuenta vive en este sistema.
 Al crearla se pide **dónde vive**, y es obligatorio. Se elige de una lista cerrada —las 196
 provincias del Perú, más «Fuera del Perú»—, nunca se escribe a mano: quien contrata filtra la
 tanda por ciudad, y «Lima», «lima» y «Lima Cercado» escritos a mano son la misma ciudad y tres
-filtros distintos. Es el único campo que se añadió al alta, se pregunta **una sola vez** y **a
-quien ya tenía cuenta no se le pide nunca**: esos se quedan sin ciudad, que es un estado normal
-—siguen saliendo en la tanda, sin ese dato—. La lista llega hasta la provincia: el distrito no se
-pregunta, y hoy tampoco existe en el catálogo.
+filtros distintos. Se pregunta **una sola vez** y **a quien ya tenía cuenta no se le pide
+nunca**: esos se quedan sin ciudad, que es un estado normal —siguen saliendo en la tanda, sin ese
+dato—. La lista llega hasta la provincia: el distrito no se pregunta, y hoy tampoco existe en el
+catálogo.
+
+Desde el 13/10/2026 se pide también **el celular**, obligatorio: nueve cifras que empiezan por 9,
+o el número completo con su prefijo si es de otro país. Es el número desde el que el candidato
+puede escribir al bot de WhatsApp de Renaser para saber cómo va su proceso. Se cambia en «Mi
+cuenta», y cambiarlo cierra lo que estuviera vinculado al anterior. A quien ya tenía cuenta no se
+le exige: se le pide solo si quiere recibir sus novedades por WhatsApp.
 
 **RF-23** El candidato ve en todo momento su etapa actual, qué le falta, la fecha límite cuando
 exista y cuánto tiempo le tomará lo siguiente.
@@ -521,6 +527,11 @@ si luego postulaba a una vacante de Renaser firmaba dos veces el mismo texto.
 | **De la plataforma** | Con Renaser | Al crear la cuenta, marcando una casilla | Sí: sin él no hay cuenta |
 | **Del proceso** | Con **la empresa** que publica la vacante | Al postular, uno por postulación | Sí: sin él no hay postulación |
 | **De futuros contactos** | Con Renaser | Al crear la cuenta, marcando una casilla | No, y **nunca se da por supuesto** |
+
+Desde el 13/10/2026 hay un cuarto, **opcional y aparte de estos tres**: el de WhatsApp, con
+Renaser, que se da al pulsar «Escribir por WhatsApp» mientras se espera, uno por postulación, para
+recibir por ahí las novedades de ese proceso. Solo lo ofrecen las vacantes de Renaser mientras
+dure la beta.
 
 **El contenido pesado vive en el de la plataforma**: la cuenta, el perfil, la inteligencia
 artificial, las empresas de fuera que tratan los datos, la salida de datos del país, el plazo de

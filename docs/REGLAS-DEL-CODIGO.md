@@ -46,7 +46,7 @@ com.renaser.ai.ai_engine.<dominio>
 | `parametro` | Los valores que Renaser cambia sin programar |
 | `portal` | La cara del candidato: un controlador y tres servicios por tema (la cuenta y su acceso, el tablón público, la postulación) |
 | `administracion` | La cara de configuración del panel; el borrado 29733 vive aparte en `ServicioBorradoDatos` |
-| `seguridad` | Las dos puertas, tokens, contexto y permisos con alcance |
+| `seguridad` | Las puertas —portal, panel y, desde la V73, integraciones, con la firma del bot en `FiltroFirmaWhatsapp`—, tokens, contexto y permisos con alcance |
 | `comun` | El manejador de errores propio y el candado de Swagger |
 | `catalogo` | Los catálogos que el panel consulta |
 | `perfilintegral` | Evaluación, criterios, notas y el Perfil de Talento (hito 2) |
@@ -57,6 +57,7 @@ com.renaser.ai.ai_engine.<dominio>
 | `perfil` | El perfil del candidato, único por persona y transversal a organizaciones |
 | `resena` | Las reseñas de empresas a quien contrataron, sus respuestas y la moderación de reportes (V63). No puntúan |
 | `colaborador` | La gestión de personas (V64): la ficha del colaborador, sus periodos y su situación laboral, el alta, la carga por Excel, los cambios, el cese y el reingreso. Las sedes y los cargos viven en `organizacion` (`EstructuraController`) y la sesión del panel en `seguridad` |
+| `whatsapp` | Las novedades de la postulación por WhatsApp (V73): el vínculo de un número con una postulación, la cola de avisos hacia el bot (`AvisosPorWhatsapp`, `EnvioAlBot`), la integración firmada que llama el bot, el cliente hacia él en tres modos (apagado, falso y real) y el bot falso. El botón del portal entra por `PortalController`, y el sondeo vive en `comun/programado/SondeoWhatsapp`. Ver [el contrato](CONTRATO-NOVEDADES-POR-WHATSAPP.md) |
 
 Dos clases marcan la frontera con el motor de agentes y **hay que actualizarlas al añadir un
 controlador nuevo**, porque enumeran los nuestros: `comun/exception/ManejadorErrores` (para que
@@ -146,6 +147,8 @@ está en su classpath, así que `integracion/soporte/RespuestaV3` usa la 2 a pro
 | Cuándo la prueba del editor tiene nota de la etapa y pasa a «por confirmar» (`V67`) | `prueba/service/CierreDeLaPruebaPropia`. La llaman la entrega, el agente, el ajuste a mano y los recálculos: el paso lo da quien complete la rúbrica, sea la IA o una persona |
 | Qué puede guardarse y publicarse en la prueba del editor (`V67`) | `prueba/service/ReglasDeLaPrueba`. La usan guardar, publicar, cambiar los puntos y validar lo que propone la IA; las reglas de cada tipo de pregunta siguen siendo las de `ReglasDePuntos` |
 | Lo común de los dos editores de una vacante: sus preguntas propias (`V66`) y su prueba (`V67`) | `perfilintegral/service/impl/EditorDeVersionPropia`, la base de `ServicioPreguntasVacanteImpl` y `ServicioPruebaPropiaImpl`: ver, el borrador, quitar y mover criterios y preguntas, publicar, corregir las instrucciones, reintentar, copiar de otra vacante, las recomendaciones y la recalificación. Lo propio de cada uno entra por sus ganchos. Las 14 rutas comunes se declaran una vez en `perfilintegral/controller/EditorDeLaVacanteController` (interfaz `perfilintegral/service/EditorDeLaVacante`), y cada hijo —`PreguntasVacanteController`, `PruebaPropiaController`— solo fija su ruta; por eso los resúmenes de Swagger de esas rutas son genéricos. Las de la ficha, bajo `/postulaciones`, viven en `AjusteDeAbiertaController` y `prueba/controller/PruebaPropiaDelCandidatoController`. Con dos copias, un arreglo en un editor dejaba el otro roto. **La calificación no se unifica**: cada editor conserva la suya (`CalificacionPorPuntos` y `CalificacionDeLaPruebaPropia`) |
+| Lo que el candidato lee de su proceso en cada momento (`V73`) | `postulacion/service/TextosDelMomento`: el título y el texto de cada uno de los dieciocho estados, más las variantes del cuestionario técnico y de la prueba sin completar. Lo dice el bot de WhatsApp y lo pinta el portal, que tiene su copia. Las dos están amarradas a `docs/contratos/textos-del-momento.json`, igual en los dos repositorios: `TextosDelMomentoTest` aquí y `estados.test.ts` allí fallan si no coinciden. **Cambiar un texto es cambiarlo en los dos** |
+| Qué celular vale y cómo se escribe (`V73`) | `whatsapp/service/Celular`: nueve cifras que empiezan por 9 (Perú) o el número completo con su prefijo, siempre a E.164, y cómo se enseña y se enmascara. El alta, «Mi cuenta» y la integración con el bot lo usan; el portal tiene la misma regla en `src/dominio/celular.ts` y el mismo mensaje de error |
 
 ---
 

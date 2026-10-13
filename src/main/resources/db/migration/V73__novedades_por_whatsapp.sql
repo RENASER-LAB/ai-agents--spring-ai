@@ -66,6 +66,10 @@ COMMENT ON COLUMN persona.telefono IS
 --   REVOCADO   se cerró: dejó de recibir desde el portal, cambió el celular o el proceso terminó.
 --   SUPRIMIDO  escribió «BAJA» al bot: el número no vuelve a recibir nada.
 --
+-- `motivo_cierre` usa los motivos de /revocaciones del contrato con el bot (DEJAR_DE_RECIBIR,
+-- CAMBIO_CELULAR, PROCESO_TERMINADO), más BAJA, que no se revoca porque vino del bot. El cuarto
+-- motivo del contrato, BORRADO_DATOS, no se guarda: el borrado se lleva las filas.
+--
 -- `referencia` es lo que viaja al bot como `postulacionRef`: opaca a propósito, ni el id interno
 -- ni el uuid del portal.
 --
@@ -97,7 +101,7 @@ CREATE TABLE vinculo_whatsapp (
     motivo_cierre                   text
         CONSTRAINT vinculo_whatsapp_motivo_check
         CHECK (motivo_cierre IS NULL OR motivo_cierre IN
-               ('DEJAR_DE_RECIBIR', 'CAMBIO_DE_CELULAR', 'PROCESO_TERMINADO', 'BAJA')),
+               ('DEJAR_DE_RECIBIR', 'CAMBIO_CELULAR', 'PROCESO_TERMINADO', 'BAJA')),
     revocacion_enviada_en           timestamptz,
     revocacion_intentos             integer NOT NULL DEFAULT 0,
     revocacion_proximo_intento_en   timestamptz,
@@ -186,8 +190,8 @@ COMMENT ON TABLE aviso_whatsapp IS
 -- 4 · Los números dados de baja
 -- ============================================================================
 --
--- Cuando el candidato escribe «BAJA» (o «stop», «dar de baja»…), el bot lo suprime para todo y
--- para siempre, y se lo cuenta a EX con /bajas. EX desvincula todo lo de ese número y no vuelve
+-- Cuando el candidato escribe «BAJA» (solo esa palabra), el bot lo suprime para todo y para
+-- siempre, y se lo cuenta a EX con /bajas. EX desvincula todo lo de ese número y no vuelve
 -- a ofrecer el botón con él. Se guarda aparte del vínculo porque la baja es del número, no de
 -- una postulación: puede llegar cuando ya no queda ningún vínculo vivo.
 

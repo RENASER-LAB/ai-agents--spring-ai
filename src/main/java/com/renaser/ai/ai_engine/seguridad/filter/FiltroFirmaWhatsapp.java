@@ -30,7 +30,8 @@ import java.util.function.Supplier;
  * (V73). Ver {@link FirmaWhatsapp}.
  *
  * <p>Lee el cuerpo entero antes de dejar pasar —la firma es sobre él— y se lo vuelve a servir al
- * controlador tal cual. Con la firma mala, sin ella o con una marca de más de cinco minutos,
+ * controlador tal cual. La firma cubre también la ruta: la de {@code /bajas} no vale en
+ * {@code /vinculos}. Con la firma mala, sin ella o con una marca de más de cinco minutos,
  * contesta 401 aquí mismo: la petición no llega a ningún controlador, así que no se hace nada.
  *
  * <p>⚠️ No es un {@code @Component}, a propósito: Spring Boot registraría un filtro así para
@@ -58,19 +59,22 @@ public class FiltroFirmaWhatsapp extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain chain) throws ServletException, IOException {
         byte[] cuerpo = request.getInputStream().readNBytes(MAXIMO_DE_BYTES + 1);
+        // La ruta firmada es el path tal como llegó, sin host ni query.
         boolean valida = cuerpo.length <= MAXIMO_DE_BYTES && FirmaWhatsapp.esValida(secreto.get(),
                 request.getHeader(FirmaWhatsapp.CABECERA_MARCA),
-                request.getHeader(FirmaWhatsapp.CABECERA_FIRMA), cuerpo, reloj.instant());
+                request.getHeader(FirmaWhatsapp.CABECERA_FIRMA), request.getRequestURI(), cuerpo,
+                reloj.instant());
         if (!valida) {
             log.warn("Llamada de integración rechazada por firma: {} {}", request.getMethod(),
                     request.getRequestURI());
             SecurityContextHolder.clearContext();
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);
+            // Los errores de EX hacia el bot llevan {codigo, texto}, como los de /vinculos.
+            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
             response.setCharacterEncoding("UTF-8");
             response.getWriter().write("""
-                    {"title":"Firma no válida","status":401,\
-                    "detail":"Esta ruta solo acepta llamadas firmadas por el bot de WhatsApp"}""");
+                    {"codigo":"FIRMA_INVALIDA",\
+                    "texto":"Esta ruta solo acepta llamadas firmadas por el bot de WhatsApp"}""");
             return;
         }
         SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(

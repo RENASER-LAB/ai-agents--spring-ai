@@ -25,19 +25,22 @@ public class VinculoWhatsapp {
     public static final String REVOCADO = "REVOCADO";
     public static final String SUPRIMIDO = "SUPRIMIDO";
 
+    // Los motivos de cierre son los de /revocaciones en el contrato con el bot, tal cual: el
+    // que se guarda es el que viaja.
+
     /** El candidato pulsó «Dejar de recibir» en el portal. */
     public static final String POR_DEJAR_DE_RECIBIR = "DEJAR_DE_RECIBIR";
     /** Cambió el celular de su cuenta: lo del número anterior se cierra. */
-    public static final String POR_CAMBIO_DE_CELULAR = "CAMBIO_DE_CELULAR";
+    public static final String POR_CAMBIO_DE_CELULAR = "CAMBIO_CELULAR";
     /** La postulación llegó a un estado final. */
     public static final String POR_PROCESO_TERMINADO = "PROCESO_TERMINADO";
-    /** Escribió «BAJA» al bot: el número queda suprimido. */
+    /** Escribió «BAJA» al bot: el número queda suprimido. No viaja: el bot es quien lo contó. */
     public static final String POR_BAJA = "BAJA";
     /**
      * Se borraron sus datos. No llega a guardarse —las filas se borran—: es el motivo que se le
      * cuenta al bot en la revocación.
      */
-    public static final String POR_BORRADO_DE_DATOS = "BORRADO_DE_DATOS";
+    public static final String POR_BORRADO_DE_DATOS = "BORRADO_DATOS";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

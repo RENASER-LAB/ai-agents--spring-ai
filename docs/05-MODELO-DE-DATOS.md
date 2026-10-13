@@ -23,8 +23,8 @@ Sirve para tres cosas:
 - **Entender el sistema.** Un modelo de datos bien contado explica el negocio mejor que
   cualquier otro documento.
 
-**La base ya está construida.** Las migraciones `V1` a `V72` viven en
-`src/main/resources/db/migration` —**120 tablas de este módulo**, 123 en la base contando la de
+**La base ya está construida.** Las migraciones `V1` a `V73` viven en
+`src/main/resources/db/migration` —**123 tablas de este módulo**, 126 en la base contando la de
 Flyway y las dos del motor de agentes— y Flyway es el dueño del esquema. Cambiar algo de aquí
 ya cuesta una migración nueva, y **una migración aplicada no se edita nunca**: se escribe otra
 encima.
@@ -229,6 +229,17 @@ desde el despliegue**; a quien ya esperaba en «por confirmar» no se le mueve. 
 versión **1.1 del texto `PLATAFORMA`**, que dice que el pase depende de esa nota y nunca descarta;
 la 1.0 no se toca y quien la firmó sigue ligado a ella. La prueba al instante de la `V70` se retira
 sin tocar el esquema. Ver [estados de la postulación](03-ESTADOS-POSTULACION.md), «La nota mínima».
+
+La `V73` (13/10/2026) trae **las novedades de la postulación por WhatsApp**, una beta solo de
+RENASER. `persona.telefono`, que existía desde la `V2` y nadie escribía, pasa a ser **el celular
+de la cuenta en E.164**, con un CHECK de formato: lo pide el registro y sigue admitiendo vacío para
+las cuentas anteriores. Tres tablas nuevas —`vinculo_whatsapp`, `aviso_whatsapp` y
+`whatsapp_baja`— guardan qué número se vinculó a qué postulación, qué «te toca» queda por mandar al
+bot y qué números escribieron BAJA. Publica el consentimiento **`WHATSAPP` 1.0** (el `CHECK` de
+`texto_consentimiento.tipo` se amplía), la **`PLATAFORMA` 1.2** —el celular, WhatsApp y Meta
+Platforms, más lo que traía la 1.1— y el parámetro `whatsapp_novedades_activo` de la plataforma,
+apagado. Ver «Novedades por WhatsApp», más abajo, y
+[el contrato con el bot](CONTRATO-NOVEDADES-POR-WHATSAPP.md).
 
 La `V54` (14/09/2026) **no añade ninguna tabla y cambia quién firma qué**. Hasta ella había dos
 tipos de texto —`PROCESO` y `FUTUROS_CONTACTOS`— y el de la cuenta usaba el primero, que habla de
@@ -609,7 +620,7 @@ Hay una versión dibujada de este mismo mapa en
 
 ## Las tablas
 
-Ciento veinte en total, agrupadas por área para poder leerlas de a poco. En cada una se nombran
+Ciento veintitrés en total, agrupadas por área para poder leerlas de a poco. En cada una se nombran
 las columnas que importan para entender qué hace, no todas.
 
 **Para verlas todas, con tipo y clave, está el [Diccionario de datos](07-DICCIONARIO-DE-DATOS.md).**
@@ -661,6 +672,12 @@ mismo, **sigue existiendo y sigue siendo suyo**: lo que ya no hace es decidir d�
 efectos del panel, porque «Lima», «lima» y «Lima Cercado» son la misma ciudad y tres filtros
 distintos. La migración lo leyó una vez para rellenar lo que pudo y lo dejó intacto.
 
+**El celular también es de la cuenta, y por eso también vive en `persona`** (`V73`). Lo pide el
+registro, se cambia en «Mi cuenta» y se guarda siempre como `+51987654321`, con un CHECK que
+rechaza cualquier otra forma. **No es el teléfono del currículum**: ese lo lee la IA, vive en
+`dato_cv.telefono`, es texto libre y no sirve para escribir por WhatsApp. Las cuentas anteriores
+a la `V73` no lo tienen y no se les exige al entrar.
+
 El permiso guarda una etiqueta en lenguaje normal —«puede cerrar una vacante»— porque la
 pantalla donde se reparten permisos nunca debe mostrar nombres técnicos. Los permisos **no
 llevan organización**: son los mismos para todos, y lo que cambia es quién los tiene.
@@ -690,7 +707,12 @@ que los separa es **con quién se firma cada uno**:
 | `FUTUROS_CONTACTOS` | Renaser | Conservar el perfil y avisarle de otras vacantes | De la organización plataforma |
 
 El de futuros contactos nunca se da por supuesto, y `retirado_en` permite quitarlo sin tocar
-ninguno de los otros dos. **Los tres son de la plataforma, y solo ella los publica**: el panel
+ninguno de los otros dos.
+
+**Y un cuarto, solo para WhatsApp** (`V73`): `WHATSAPP`, con Renaser, que se firma al pulsar
+«Escribir por WhatsApp» y cubre recibir por ahí las novedades de **ese** proceso. Por eso va con
+`postulacion_id`, como el de `PROCESO`, una vez por postulación y versión. Solo lo ofrecen las
+vacantes de la plataforma mientras dure la beta. **Los tres son de la plataforma, y solo ella los publica**: el panel
 responde 400 a una empresa que intente publicar cualquiera de los tres.
 
 **Con quién se firma y de quién es la fila son dos cosas distintas, desde la V54.** El texto de
@@ -1426,6 +1448,44 @@ cifra; que no viaje a nadie más lo hace el servicio.
 
 ---
 
+### Novedades por WhatsApp · 3 tablas
+
+Desde la `V73` (13/10/2026). Mientras espera, el candidato pulsa «Escribir por WhatsApp», **escribe
+él primero** al bot de RENASER desde el celular de su cuenta, y desde entonces el bot le cuenta
+cómo va y le avisa cuando le toca algo. El bot vive en el CRM; EX guarda el número, el vínculo y la
+cola de lo que le debe al bot. Lo que se dicen los dos está en
+[el contrato](CONTRATO-NOVEDADES-POR-WHATSAPP.md).
+
+| Tabla | Para qué existe | Columnas que importan |
+|---|---|---|
+| `vinculo_whatsapp` | Que un número va a escribir, o ya escribió, por una postulación. Una fila por cada vez que se pulsa el botón sin un vínculo vivo | postulacion_id, persona_id, referencia, telefono, estado, consentimiento_id, anuncio_caduca_en, vinculado_en, cerrado_en, motivo_cierre, revocacion_enviada_en |
+| `aviso_whatsapp` | Un «te toca» que EX le debe al bot, uno por transición y tipo. Su `id` es el `avisoId` del contrato | postulacion_id, vinculo_whatsapp_id, transicion_estado_id, tipo, estado, telefono, nombre, vacante, texto, intentos, proximo_intento_en, ultimo_error |
+| `whatsapp_baja` | Los números que escribieron BAJA al bot | telefono, dada_en |
+
+**El vínculo vive en cuatro estados**: `PENDIENTE` (pulsó y EX anunció el número; el anuncio
+dura 24 horas y volver a pulsar lo renueva sobre la misma fila), `ACTIVO` (escribió desde ese
+número), `REVOCADO` (dejó de recibir, cambió de celular o el proceso terminó) y `SUPRIMIDO`
+(escribió BAJA). **Solo hay uno vivo por postulación**, así que el doble clic renueva y no
+duplica. Solo `ACTIVO` recibe avisos: quien pulsó y nunca escribió no recibe nada, porque el bot
+nunca escribe primero.
+
+**`referencia` es lo que viaja al bot como `postulacionRef`**, y es opaca a propósito: ni el id
+interno ni el `uuid` del portal, sino `pw_` y 32 cifras hexadecimales, una por vínculo.
+
+**El aviso guarda lo que se manda tal cual al encolarlo** —número, nombre, vacante y texto—, para
+que un reintento sea idéntico al primero aunque entretanto cambie el título de la vacante: el bot
+rechaza un `avisoId` repetido con otro contenido. Lo envía un sondeo aparte (`SondeoWhatsapp`,
+cada 10 segundos) después de la transición, hasta 5 intentos con espera creciente (30 s, 2 min,
+8 min, 32 min); luego queda `FALLIDO`. `OMITIDO` es «ya no tocaba»: el vínculo se cerró antes de
+que saliera. Las columnas `anuncio_*` y `revocacion_*` del vínculo son lo mismo para el anuncio y
+la revocación.
+
+**La baja es del número, no de una postulación**, y por eso va aparte: puede llegar cuando ya no
+queda ningún vínculo vivo. Con el número en `whatsapp_baja`, el portal no vuelve a ofrecer el
+botón con él.
+
+---
+
 ## Lo que la base impide por sí sola, y lo que no
 
 No todas las reglas del sistema caben en una restricción de base de datos. Conviene tener claro
@@ -1483,6 +1543,10 @@ cuáles sí, porque las que no, hay que probarlas en el código.
   hasta tres, aunque alguien escriba directo en la base.
 - **La nota mínima de una vacante es un entero de 0 a 100 y nunca falta** (`V72`): obligatoria,
   60 por defecto, y el CHECK rechaza decimales y valores fuera de rango.
+- **Un celular se guarda en E.164 o no se guarda** (`V73`): `persona.telefono`, el del vínculo y
+  el de la baja casan con `^\+[1-9][0-9]{7,14}$`. **Un solo vínculo vivo por postulación**; uno
+  cerrado lleva fecha y motivo, y uno activo, la fecha en que se vinculó. **Una transición deja
+  como mucho un aviso de cada tipo**, aunque el servidor se reinicie o dos sondeos se pisen.
 
 ### Tienen que vivir en el código
 
@@ -1544,6 +1608,11 @@ cuáles sí, porque las que no, hay que probarlas en el código.
 - **Que cada logro clave mida hasta 100 caracteres** (`V71`): un CHECK no puede recorrer los
   elementos de la lista sin una subconsulta, así que el tope lo pone el backend al guardar, sobre
   el texto ya limpio.
+- **Las reglas del celular y de la beta de WhatsApp** (`V73`): que un celular peruano tenga nueve
+  cifras y empiece por 9 (`Celular`, la misma regla que el portal), que el botón solo funcione en
+  vacantes de la plataforma con el parámetro encendido y el proceso sin terminar, que el anuncio
+  caduque a las 24 horas y que solo un vínculo `ACTIVO` reciba avisos. Dependen de la vacante, de
+  un parámetro y de la hora.
 
 ### Nunca existen, ni siquiera como opción
 
@@ -1584,11 +1653,14 @@ una sola tabla.
 8. **Se borran enteras sus reseñas de empresas** (`V63`), con sus respuestas y sus reportes. Son
    opiniones sobre una persona concreta y, con su nombre fuera, el texto seguiría señalándola. La
    auditoría conserva que existieron —el texto nunca se copió allí— y una fila con cuántas había.
-9. Si era prospecto del Radar, deja de estar activo.
-10. **Se conserva todo lo demás**: puntajes, historial de estados, auditoría, métricas. **Y la
+9. **Se borran enteros sus vínculos de WhatsApp y los avisos que colgaban de ellos** (`V73`), y se
+   le cuenta al bot con el motivo `BORRADO_DATOS`. La baja de su número se borra también si
+   ninguna otra cuenta usa ese celular. Su celular se vacía con el resto de `persona` (paso 2).
+10. Si era prospecto del Radar, deja de estar activo.
+11. **Se conserva todo lo demás**: puntajes, historial de estados, auditoría, métricas. **Y la
     ficha de colaborador, si llegó a trabajar en alguna empresa** (`V64`): no cuelga de
     `persona` y tiene su propia base legal (ver «Gestión de personas»).
-11. Sus postulaciones abiertas pasan a cerradas, con motivo «pidió borrar sus datos».
+12. Sus postulaciones abiertas pasan a cerradas, con motivo «pidió borrar sus datos».
 
 El resultado es que el embudo de esa vacante sigue cuadrando y la auditoría sigue completa, pero
 ya no hay forma de saber de quién se trataba.

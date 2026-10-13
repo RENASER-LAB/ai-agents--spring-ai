@@ -168,9 +168,32 @@ pasa a la etapa siguiente sin esperar a nadie cuando la empresa configuró su va
 sola y mi nota del Perfil Integral llega a la mínima que fijó; si no llega, no me descarta: una
 persona revisa mi caso». La política de privacidad del portal dice lo mismo.
 
-La firman las cuentas nuevas. **La 1.0 no se toca y a nadie se le pide aceptar otra vez**, como
-fija la spec aprobada: quien la firmó sigue ligado a un texto que dice que el pase no
-mira la nota. Es el mismo hueco del punto 3 de «Lo que sigue pendiente».
+La firmaron las cuentas nuevas hasta la 1.2. **La 1.0 no se toca y a nadie se le pide aceptar
+otra vez**, como fija la spec aprobada: quien la firmó sigue ligado a un texto que dice que el
+pase no mira la nota. Es el mismo hueco del punto 3 de «Lo que sigue pendiente».
+
+### La `PLATAFORMA` 1.2 y el permiso de WhatsApp (V73, 13/10/2026)
+
+**Ya está publicada**, con las novedades de la postulación por WhatsApp. Es la 1.1 con tres
+cambios:
+
+- **Qué datos entrego:** el celular se pide al crear la cuenta —«mi nombre, mis apellidos, mi
+  correo, mi celular y la provincia donde vivo»— y sale de la lista de lo que se da «después».
+- **Para qué se usan:** escribirle sobre el estado de sus procesos «por correo, en el portal y, si
+  yo escribo primero, por WhatsApp desde el número de Renaser».
+- **Quién más ve mis datos:** «Si escribo por WhatsApp, los mensajes pasan por Meta Platforms, que
+  puede tratarlos fuera del Perú». Va con los proveedores, así que lo cubre el mismo permiso del
+  flujo transfronterizo.
+
+La firman las cuentas nuevas; **la 1.0 y la 1.1 no se tocan** y quien firmó una sigue ligado a la
+suya, con el mismo hueco de siempre: su texto no dice nada del celular ni de WhatsApp. La página
+pública de privacidad del portal dice lo mismo que la 1.2.
+
+Llega además **un tipo nuevo, `WHATSAPP` 1.0**, con Renaser y opcional: «Al escribirnos aceptas
+recibir por WhatsApp las novedades de este proceso. Puedes dejarlo cuando quieras.». Es
+literalmente lo que el portal pinta debajo del botón «Escribir por WhatsApp», y se firma al
+pulsarlo, uno por postulación, con fecha, IP y navegador. Solo lo ofrecen las vacantes de Renaser
+mientras dure la beta. Tampoco lo ha visto un abogado.
 
 ### Los huecos que el borrador dejaba abiertos
 

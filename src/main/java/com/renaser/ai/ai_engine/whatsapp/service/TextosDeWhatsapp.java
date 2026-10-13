@@ -14,8 +14,28 @@ import java.nio.charset.StandardCharsets;
  */
 public final class TextosDeWhatsapp {
 
-    /** Lo que mide como mucho el título de la vacante en el mensaje ya escrito. */
+    /** Lo que mide como mucho el título de la vacante: en el mensaje ya escrito y en el contrato. */
     public static final int LARGO_DEL_TITULO = 60;
+
+    // Los límites del contrato con el bot (specs/novedades-por-whatsapp.md, «Reglas comunes»).
+    // Una respuesta de EX que los pasa, el bot la trata como error de protocolo.
+
+    /** {@code nombre}: el nombre de pila. */
+    public static final int LARGO_DEL_NOMBRE = 60;
+    /** {@code vacante}: el título de la vacante. */
+    public static final int LARGO_DE_LA_VACANTE = LARGO_DEL_TITULO;
+    /** {@code novedades[].titulo}: el nombre corto del momento. */
+    public static final int LARGO_DEL_MOMENTO = 80;
+    /** {@code novedades[].texto}: lo que dice el portal de ese momento. */
+    public static final int LARGO_DE_LA_NOVEDAD = 300;
+    /** El {@code texto} de un aviso o de un error. */
+    public static final int LARGO_DEL_TEXTO = 1000;
+    /** Novedades por respuesta, como mucho. */
+    public static final int MAXIMO_DE_NOVEDADES = 8;
+
+    /** El 400 de una llamada del bot que no cumple el contrato. */
+    public static final String PETICION_QUE_NO_VALE = "La petición no cumple el contrato: hace "
+            + "falta un JSON con el teléfono en formato internacional (E.164), como +51987654321";
 
     public static final String SIN_ANUNCIO = "No encontramos una postulación esperando tu "
             + "mensaje desde este número. Si quieres recibir tus novedades por aquí, entra en el "
@@ -77,14 +97,22 @@ public final class TextosDeWhatsapp {
     }
 
     static String recortar(String vacante) {
-        if (vacio(vacante)) {
-            return "";
+        return vacio(vacante) ? "" : cortar(vacante, LARGO_DEL_TITULO);
+    }
+
+    /**
+     * El texto sin espacios alrededor y, si pasa de {@code largo}, cortado con «…» dentro de ese
+     * largo. Nulo sigue nulo.
+     */
+    public static String cortar(String texto, int largo) {
+        if (texto == null) {
+            return null;
         }
-        String limpio = vacante.trim();
-        if (limpio.length() <= LARGO_DEL_TITULO) {
+        String limpio = texto.trim();
+        if (limpio.length() <= largo) {
             return limpio;
         }
-        return limpio.substring(0, LARGO_DEL_TITULO - 1).trim() + "…";
+        return limpio.substring(0, largo - 1).trim() + "…";
     }
 
     private static String codificar(String texto) {

@@ -129,8 +129,18 @@ Comprobado a mano el **15/09/2026**, y visto otra vez el **09/10/2026** en el gu
 de ti» del perfil (`PUT /api/v1/portal/perfil`): un valor de tipo equivocado en el cuerpo
 responde 500.
 
+**Lo que ya se cerró** (13/10/2026). Un **parámetro obligatorio que falta** en la dirección
+(`MissingServletRequestParameterException`) responde ya 400 con su nombre —por ejemplo `GET
+/panel/agentes-ia/instrucciones` sin `agenteCodigo`—. Y la puerta de las integraciones
+(`/api/v1/integraciones/whatsapp/…`) atrapa su propio cuerpo ilegible: ahí un JSON mal escrito es
+`400 VALIDACION`. En el resto de la API el cuerpo ilegible sigue saliendo como 500, y **el método
+equivocado también**: QA lo vio el 13/10/2026 en `GET /portal/cuenta/telefono` (la ruta solo
+admite `PUT`), en `GET /panel/postulaciones/{id}/transiciones`, y en la puerta del bot con un
+método equivocado o una barra final (`POST /vinculos/`). El bot usa `POST` y las rutas exactas,
+y para él un 5xx es reintentable, así que no le afecta.
+
 **Qué haría falta.** Añadir a `ManejadorErrores` los `@ExceptionHandler` de las excepciones de
-Spring MVC —cuerpo ilegible, parámetro que falta, tipo que no convierte, método no permitido— con
+Spring MVC que faltan —cuerpo ilegible, tipo que no convierte, método no permitido— con
 el mismo formato de error que ya usa el resto. Es un archivo y ningún cambio de contrato: lo que
 cambia es el número que se devuelve, de 500 a 400. Conviene hacerlo antes de volver a medir el
 fuzzing, porque hasta entonces su cifra no dice casi nada.

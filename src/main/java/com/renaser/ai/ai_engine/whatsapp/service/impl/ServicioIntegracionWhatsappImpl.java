@@ -11,7 +11,6 @@ import com.renaser.ai.ai_engine.usuario.entity.Persona;
 import com.renaser.ai.ai_engine.usuario.repository.PersonaRepository;
 import com.renaser.ai.ai_engine.vacante.entity.Vacante;
 import com.renaser.ai.ai_engine.vacante.repository.VacanteRepository;
-import com.renaser.ai.ai_engine.whatsapp.dto.DtosWhatsapp.Baja;
 import com.renaser.ai.ai_engine.whatsapp.dto.DtosWhatsapp.Novedad;
 import com.renaser.ai.ai_engine.whatsapp.dto.DtosWhatsapp.Novedades;
 import com.renaser.ai.ai_engine.whatsapp.dto.DtosWhatsapp.PeticionVinculo;
@@ -115,7 +114,7 @@ public class ServicioIntegracionWhatsappImpl implements ServicioIntegracionWhats
         return ResultadoVinculo.vinculado(new Vinculo(
                 activos.stream().map(c -> new PostulacionVinculada(c.vinculo().getReferencia())).toList(),
                 nombreDe(activos),
-                activos.stream().map(Contado::novedad).toList()));
+                lasNovedades(activos)));
     }
 
     @Override
@@ -126,13 +125,12 @@ public class ServicioIntegracionWhatsappImpl implements ServicioIntegracionWhats
         if (numero == null) {
             throw new IllegalArgumentException(NUMERO_QUE_NO_VALE);
         }
-        List<Contado> activos = contar(vinculos.activosDelNumero(numero), finales());
-        return new Novedades(nombreDe(activos), activos.stream().map(Contado::novedad).toList());
+        return new Novedades(lasNovedades(contar(vinculos.activosDelNumero(numero), finales())));
     }
 
     @Override
     @Transactional
-    public Baja baja(String telefono) {
+    public int baja(String telefono) {
         String numero = Celular.delBot(telefono).orElse(null);
         if (numero == null) {
             throw new IllegalArgumentException(NUMERO_QUE_NO_VALE);
@@ -151,7 +149,7 @@ public class ServicioIntegracionWhatsappImpl implements ServicioIntegracionWhats
         }
         log.info("El número {} se dio de baja de WhatsApp: {} vínculo(s) cerrado(s)",
                 Celular.enmascarado(numero), vivos.size());
-        return new Baja(vivos.size());
+        return vivos.size();
     }
 
     // ============ las novedades ============
@@ -190,10 +188,17 @@ public class ServicioIntegracionWhatsappImpl implements ServicioIntegracionWhats
             }
             TextosDelMomento.Texto momento = TextosDelMomento.de(postulacion.getEstadoCodigo(),
                     vacante.getInstrumentoEtapaTecnica(), sinCompletar.contains(postulacion.getId()));
-            contados.add(new Contado(vinculo, postulacion, new Novedad(vinculo.getReferencia(),
-                    vacante.getTitulo(), momento.titulo(), momento.texto())));
+            contados.add(new Contado(vinculo, postulacion, new Novedad(
+                    TextosDeWhatsapp.cortar(vacante.getTitulo(), TextosDeWhatsapp.LARGO_DE_LA_VACANTE),
+                    TextosDeWhatsapp.cortar(momento.titulo(), TextosDeWhatsapp.LARGO_DEL_MOMENTO),
+                    TextosDeWhatsapp.cortar(momento.texto(), TextosDeWhatsapp.LARGO_DE_LA_NOVEDAD))));
         }
         return contados;
+    }
+
+    /** Las novedades que caben en una respuesta: como mucho ocho, las de los vínculos más recientes. */
+    private static List<Novedad> lasNovedades(List<Contado> activos) {
+        return activos.stream().limit(TextosDeWhatsapp.MAXIMO_DE_NOVEDADES).map(Contado::novedad).toList();
     }
 
     /** El nombre de pila de quien vinculó el primero: con él saluda el bot. */
@@ -203,7 +208,7 @@ public class ServicioIntegracionWhatsappImpl implements ServicioIntegracionWhats
         }
         return personas.findById(activos.get(0).vinculo().getPersonaId())
                 .map(Persona::getNombre)
-                .map(String::trim)
+                .map(n -> TextosDeWhatsapp.cortar(n, TextosDeWhatsapp.LARGO_DEL_NOMBRE))
                 .filter(n -> !n.isEmpty())
                 .orElse(null);
     }

@@ -106,6 +106,12 @@ docker compose up -d                       # Postgres (5433) y RabbitMQ
   `memoria://...`, así que `GET /archivos/{id}/enlace` responde 200 con una url que nadie abre.
   Quien lo llame tiene que mirar el esquema de la url y caer a `/archivos/{id}/descarga` cuando no
   sea `http`/`https`.
+- **WhatsApp va contra un bot falso** (`V73`): `application-local.yaml` pone `WHATSAPP_MODO` en
+  `falso` y trae dos secretos de desarrollo. No sale nada; lo que el bot «recibió» se lee en
+  `GET /api/v1/integraciones/whatsapp/falso/registro?telefono=…`, firmado con el secreto «desde el
+  bot» como cualquier llamada de esa puerta. **La tarjeta del portal no sale hasta encender
+  `whatsapp_novedades_activo`** en la organización plataforma, que nace apagado. Ver
+  [el contrato](CONTRATO-NOVEDADES-POR-WHATSAPP.md).
 
 ---
 

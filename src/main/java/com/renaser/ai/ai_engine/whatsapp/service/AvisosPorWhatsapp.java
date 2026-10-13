@@ -159,9 +159,12 @@ public class AvisosPorWhatsapp {
                 .estado(AvisoWhatsapp.PENDIENTE)
                 .telefono(vinculo.getTelefono())
                 .referencia(vinculo.getReferencia())
-                .nombre(contexto.nombre() == null ? "" : contexto.nombre().trim())
-                .vacante(contexto.vacante() == null ? "" : contexto.vacante().trim())
-                .texto(texto)
+                // Con los límites del contrato: nombre y vacante hasta 60, el texto hasta 1000.
+                .nombre(contexto.nombre() == null ? ""
+                        : TextosDeWhatsapp.cortar(contexto.nombre(), TextosDeWhatsapp.LARGO_DEL_NOMBRE))
+                .vacante(contexto.vacante() == null ? ""
+                        : TextosDeWhatsapp.cortar(contexto.vacante(), TextosDeWhatsapp.LARGO_DE_LA_VACANTE))
+                .texto(TextosDeWhatsapp.cortar(texto, TextosDeWhatsapp.LARGO_DEL_TEXTO))
                 .intentos(0)
                 .proximoIntentoEn(ahora)
                 .creadoEn(ahora)

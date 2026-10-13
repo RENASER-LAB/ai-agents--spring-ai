@@ -1,5 +1,9 @@
 package com.renaser.ai.ai_engine.whatsapp.service;
 
+import com.renaser.ai.ai_engine.consentimiento.entity.Consentimiento;
+import com.renaser.ai.ai_engine.consentimiento.entity.TextoConsentimiento;
+import com.renaser.ai.ai_engine.consentimiento.repository.ConsentimientoRepository;
+import com.renaser.ai.ai_engine.consentimiento.repository.TextoConsentimientoRepository;
 import com.renaser.ai.ai_engine.whatsapp.entity.AvisoWhatsapp;
 import com.renaser.ai.ai_engine.whatsapp.entity.VinculoWhatsapp;
 import com.renaser.ai.ai_engine.whatsapp.repository.AvisoWhatsappRepository;
@@ -28,9 +32,10 @@ import java.util.UUID;
  * Aunque saliera —un reinicio en mitad del envío—, el bot lo reconoce por su {@code avisoId}.
  *
  * <p>Reintenta con espera creciente —30 s, 2 min, 8 min, 32 min— hasta
- * {@code app.whatsapp.maximo-de-intentos} y luego lo da por fallido. Un 4xx del bot es definitivo
- * a la primera: repetir lo mismo daría lo mismo. Nada de esto toca la transición: el correo y la
- * campana ya salieron.
+ * {@code app.whatsapp.maximo-de-intentos} y luego lo da por fallido. Se reintentan el tiempo
+ * agotado, los errores de red, los 5xx, el 429 y el 401; cualquier otro 4xx del bot (como
+ * {@code 409 aviso_distinto}) es definitivo a la primera: repetir lo mismo daría lo mismo. Nada
+ * de esto toca la transición: el correo y la campana ya salieron.
  */
 @Component
 @Slf4j
@@ -42,16 +47,22 @@ public class EnvioAlBot {
     private final AvisoWhatsappRepository avisos;
     private final VinculoWhatsappRepository vinculos;
     private final BajaWhatsappRepository bajas;
+    private final ConsentimientoRepository consentimientos;
+    private final TextoConsentimientoRepository textos;
     private final ClienteConversacion cliente;
     private final PropiedadesWhatsapp propiedades;
     private final TransactionTemplate enSuTransaccion;
 
+    @SuppressWarnings("java:S107") // Cada repositorio es una tabla que el envío lee o escribe.
     public EnvioAlBot(AvisoWhatsappRepository avisos, VinculoWhatsappRepository vinculos,
-                      BajaWhatsappRepository bajas, ClienteConversacion cliente,
+                      BajaWhatsappRepository bajas, ConsentimientoRepository consentimientos,
+                      TextoConsentimientoRepository textos, ClienteConversacion cliente,
                       PropiedadesWhatsapp propiedades, PlatformTransactionManager transacciones) {
         this.avisos = avisos;
         this.vinculos = vinculos;
         this.bajas = bajas;
+        this.consentimientos = consentimientos;
+        this.textos = textos;
         this.cliente = cliente;
         this.propiedades = propiedades;
         this.enSuTransaccion = new TransactionTemplate(transacciones);
@@ -153,7 +164,7 @@ public class EnvioAlBot {
         vinculo.setAnuncioIntentos(vinculo.getAnuncioIntentos() + 1);
         try {
             cliente.anunciar(new ClienteConversacion.Espera(vinculo.getTelefono(),
-                    vinculo.getReferencia(), vinculo.getAnuncioCaducaEn()));
+                    vinculo.getReferencia(), vinculo.getAnuncioCaducaEn(), consentimientoDe(vinculo)));
             vinculo.setAnuncioConfirmadoEn(ahora);
             vinculo.setAnuncioProximoIntentoEn(null);
         } catch (FalloDelBot fallo) {
@@ -186,6 +197,26 @@ public class EnvioAlBot {
                     siguiente == null ? ". No se reintenta más" : "");
         }
         vinculos.save(vinculo);
+    }
+
+    /**
+     * El consentimiento que va con el anuncio: el que firmó al pulsar el botón, con el texto
+     * exacto que vio (el pintado, si se guardó; si no, el de su versión). Sin él no se anuncia:
+     * el bot no puede guardar una espera sin su evidencia.
+     */
+    private ClienteConversacion.ConsentimientoDeLaEspera consentimientoDe(VinculoWhatsapp vinculo) {
+        Consentimiento firmado = vinculo.getConsentimientoId() == null ? null
+                : consentimientos.findById(vinculo.getConsentimientoId()).orElse(null);
+        TextoConsentimiento texto = firmado == null || firmado.getTextoConsentimientoId() == null ? null
+                : textos.findById(firmado.getTextoConsentimientoId()).orElse(null);
+        if (firmado == null || texto == null) {
+            throw new FalloDelBot("El vínculo " + vinculo.getReferencia()
+                    + " no tiene el consentimiento con que anunciarlo", false);
+        }
+        String leido = firmado.getTextoFirmado() == null || firmado.getTextoFirmado().isBlank()
+                ? texto.getTexto() : firmado.getTextoFirmado();
+        return new ClienteConversacion.ConsentimientoDeLaEspera(texto.getTipo(), texto.getVersion(),
+                leido, firmado.getAceptadoEn());
     }
 
     /**

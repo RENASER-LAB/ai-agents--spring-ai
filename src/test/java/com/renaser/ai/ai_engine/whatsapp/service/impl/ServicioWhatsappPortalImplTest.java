@@ -160,7 +160,7 @@ class ServicioWhatsappPortalImplTest {
 
         // AC-02 · cambiar el celular cierra el pendiente del anterior: el nuevo empieza sin vincular.
         VinculoWhatsapp delAnterior = VinculoWhatsapp.builder().telefono("+51911111111")
-                .estado(VinculoWhatsapp.REVOCADO).motivoCierre("CAMBIO_DE_CELULAR").build();
+                .estado(VinculoWhatsapp.REVOCADO).motivoCierre("CAMBIO_CELULAR").build();
         assertThat(ServicioWhatsappPortalImpl.tarjeta("+51987654321", false, delAnterior, ahora).estado())
                 .isEqualTo("SIN_VINCULAR");
     }
@@ -330,8 +330,8 @@ class ServicioWhatsappPortalImplTest {
 
         servicio.alCambiarElCelular(33L, "+51987654321", "+51912345678");
 
-        assertThat(activo.getMotivoCierre()).isEqualTo("CAMBIO_DE_CELULAR");
-        assertThat(pendiente.getMotivoCierre()).isEqualTo("CAMBIO_DE_CELULAR");
+        assertThat(activo.getMotivoCierre()).isEqualTo("CAMBIO_CELULAR");
+        assertThat(pendiente.getMotivoCierre()).isEqualTo("CAMBIO_CELULAR");
         verify(envio).revocarAhora(7L);
         verify(envio).revocarAhora(8L);
     }

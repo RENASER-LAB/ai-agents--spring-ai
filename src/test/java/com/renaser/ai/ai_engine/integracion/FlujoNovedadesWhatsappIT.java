@@ -272,11 +272,20 @@ class FlujoNovedadesWhatsappIT {
         assertThat(alBot).extracting(ClienteConversacionFalso.Llamada::tipo).containsExactly("ESPERA");
         assertThat(alBot.get(0).cuerpo().get("postulacionRef").toString()).startsWith("pw_")
                 .isNotEqualTo(codigo.get("ana"));
+        // Con el consentimiento que acaba de aceptar: tipo, versión, el texto exacto y cuándo.
+        @SuppressWarnings("unchecked")
+        Map<String, Object> consentimiento = (Map<String, Object>) alBot.get(0).cuerpo().get("consentimiento");
+        assertThat(consentimiento).containsEntry("tipo", "WHATSAPP").containsEntry("version", "1.0")
+                .containsEntry("texto", "Al escribirnos aceptas recibir por WhatsApp las novedades de este "
+                        + "proceso. Puedes dejarlo cuando quieras.")
+                .containsKey("aceptadoEn");
+        assertThat(alBot.get(0).cuerpo()).containsKey("caducaEn");
         // Lo mismo por la ruta del bot falso, que es como lo leen los E2E (firmada, y con el «+»
         // sin codificar, que llega como espacio).
         JsonNode registro = respuesta(firmadoGet("/api/v1/integraciones/whatsapp/falso/registro?telefono=51987650001"));
         assertThat(registro).hasSize(1);
         assertThat(registro.get(0).get("tipo").asText()).isEqualTo("ESPERA");
+        assertThat(registro.get(0).at("/cuerpo/consentimiento/tipo").asText()).isEqualTo("WHATSAPP");
         mvc.perform(get("/api/v1/integraciones/whatsapp/falso/registro"))
                 .andExpect(status().isUnauthorized());
 
@@ -297,29 +306,38 @@ class FlujoNovedadesWhatsappIT {
 
     @Test
     @Order(6)
-    @DisplayName("AC-14 · sin firma, con firma mala o con una marca vieja: 401 y no vincula")
+    @DisplayName("AC-14 · sin firma, con firma mala, de otra ruta o con una marca vieja: 401 y no vincula")
     void laPuertaFirmada() throws Exception {
+        String ruta = "/api/v1/integraciones/whatsapp/vinculos";
         String cuerpo = "{\"telefono\":\"+51987650001\",\"wamid\":\"w1\",\"texto\":\"hola\"}";
-        mvc.perform(post("/api/v1/integraciones/whatsapp/vinculos")
-                        .contentType(MediaType.APPLICATION_JSON).content(cuerpo))
-                .andExpect(status().isUnauthorized());
+        byte[] bytes = cuerpo.getBytes(StandardCharsets.UTF_8);
+        mvc.perform(post(ruta).contentType(MediaType.APPLICATION_JSON).content(cuerpo))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.codigo").value("FIRMA_INVALIDA"));
         String marca = String.valueOf(Instant.now().getEpochSecond());
-        mvc.perform(post("/api/v1/integraciones/whatsapp/vinculos")
-                        .contentType(MediaType.APPLICATION_JSON).content(cuerpo)
+        mvc.perform(post(ruta).contentType(MediaType.APPLICATION_JSON).content(cuerpo)
                         .header(FirmaWhatsapp.CABECERA_MARCA, marca)
                         .header(FirmaWhatsapp.CABECERA_FIRMA,
-                                FirmaWhatsapp.firmar("otro-secreto-que-no-es-el-del-bot", marca,
-                                        cuerpo.getBytes(StandardCharsets.UTF_8))))
+                                FirmaWhatsapp.firmar("otro-secreto-que-no-es-el-del-bot", marca, ruta, bytes)))
+                .andExpect(status().isUnauthorized());
+        // La firma de /bajas no abre /vinculos, aunque el cuerpo sea el mismo.
+        mvc.perform(post(ruta).contentType(MediaType.APPLICATION_JSON).content(cuerpo)
+                        .header(FirmaWhatsapp.CABECERA_MARCA, marca)
+                        .header(FirmaWhatsapp.CABECERA_FIRMA, FirmaWhatsapp.firmar(SECRETO_DEL_BOT, marca,
+                                "/api/v1/integraciones/whatsapp/bajas", bytes)))
                 .andExpect(status().isUnauthorized());
         String vieja = String.valueOf(Instant.now().getEpochSecond() - 301);
-        mvc.perform(post("/api/v1/integraciones/whatsapp/vinculos")
-                        .contentType(MediaType.APPLICATION_JSON).content(cuerpo)
+        mvc.perform(post(ruta).contentType(MediaType.APPLICATION_JSON).content(cuerpo)
                         .header(FirmaWhatsapp.CABECERA_MARCA, vieja)
-                        .header(FirmaWhatsapp.CABECERA_FIRMA,
-                                FirmaWhatsapp.firmar(SECRETO_DEL_BOT, vieja, cuerpo.getBytes(StandardCharsets.UTF_8))))
+                        .header(FirmaWhatsapp.CABECERA_FIRMA, FirmaWhatsapp.firmar(SECRETO_DEL_BOT, vieja, ruta, bytes)))
+                .andExpect(status().isUnauthorized());
+        String futura = String.valueOf(Instant.now().getEpochSecond() + 301);
+        mvc.perform(post(ruta).contentType(MediaType.APPLICATION_JSON).content(cuerpo)
+                        .header(FirmaWhatsapp.CABECERA_MARCA, futura)
+                        .header(FirmaWhatsapp.CABECERA_FIRMA, FirmaWhatsapp.firmar(SECRETO_DEL_BOT, futura, ruta, bytes)))
                 .andExpect(status().isUnauthorized());
         // Un token del panel tampoco abre esta puerta.
-        mvc.perform(post("/api/v1/integraciones/whatsapp/vinculos")
+        mvc.perform(post(ruta)
                         .header("Authorization", "Bearer " + tokenTalento)
                         .contentType(MediaType.APPLICATION_JSON).content(cuerpo))
                 .andExpect(status().isUnauthorized());
@@ -330,48 +348,55 @@ class FlujoNovedadesWhatsappIT {
 
     @Test
     @Order(6)
-    @DisplayName("Las novedades sin número, o con uno vacío: 400 con el formato de la casa, no 500")
-    void lasNovedadesSinNumero() throws Exception {
-        firmadoGet("/api/v1/integraciones/whatsapp/novedades")
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.type").value("https://api.renaser.com/errors/parametro-que-falta"))
-                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("«telefono»")));
-        firmadoGet("/api/v1/integraciones/whatsapp/novedades?telefono=")
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.type").value("https://api.renaser.com/errors/regla-de-negocio"));
+    @DisplayName("Sin teléfono, con uno vacío o con uno que no vale: 400 VALIDACION con {codigo, texto}, no 500")
+    void sinNumeroEs400() throws Exception {
+        for (String ruta : List.of("/api/v1/integraciones/whatsapp/novedades",
+                "/api/v1/integraciones/whatsapp/vinculos", "/api/v1/integraciones/whatsapp/bajas")) {
+            for (String cuerpo : List.of("{}", "{\"telefono\":\"\"}", "{\"telefono\":\"hola\"}", "no es json")) {
+                firmado(ruta, cuerpo)
+                        .andExpect(status().isBadRequest())
+                        .andExpect(jsonPath("$.codigo").value("VALIDACION"))
+                        .andExpect(jsonPath("$.texto").isNotEmpty());
+            }
+        }
     }
 
     @Test
     @Order(7)
     @DisplayName("AC-07 · desde otro número: 404 SIN_ANUNCIO; desde el anunciado, diga lo que diga, queda vinculado")
     void vincular() throws Exception {
-        firmado(post("/api/v1/integraciones/whatsapp/vinculos"),
+        firmado("/api/v1/integraciones/whatsapp/vinculos",
                 "{\"telefono\":\"+51900000000\",\"wamid\":\"w0\",\"texto\":\"hola\"}")
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.codigo").value("SIN_ANUNCIO"));
 
-        JsonNode vinculo = respuesta(firmado(post("/api/v1/integraciones/whatsapp/vinculos"),
-                "{\"telefono\":\"51987650001\",\"wamid\":\"wamid.A\",\"texto\":\"cualquier cosa\","
-                        + "\"recibidoEn\":\"" + Instant.now() + "\"}"));
+        String mensaje = "{\"telefono\":\"+51987650001\",\"wamid\":\"wamid.A\",\"texto\":\"cualquier cosa\","
+                + "\"recibidoEn\":\"" + Instant.now() + "\"}";
+        JsonNode vinculo = respuesta(firmado("/api/v1/integraciones/whatsapp/vinculos", mensaje));
         assertThat(vinculo.get("nombre").asText()).isEqualTo("Ana");
+        assertThat(vinculo.get("postulaciones")).hasSize(1);
         assertThat(vinculo.at("/postulaciones/0/postulacionRef").asText()).startsWith("pw_");
+        // Cada novedad: vacante, título y texto, nada más (ni la referencia ni el nombre).
+        assertThat(vinculo.at("/novedades/0").properties()).extracting(java.util.Map.Entry::getKey)
+                .containsExactlyInAnyOrder("vacante", "titulo", "texto");
         assertThat(vinculo.at("/novedades/0/vacante").asText()).isEqualTo("Asistente Contable");
         // Las mismas palabras que el portal (TextosDelMomento, comparado con el contrato).
         assertThat(vinculo.at("/novedades/0/titulo").asText()).isEqualTo("Estamos calificando tus respuestas");
         assertThat(vinculo.at("/novedades/0/texto").asText())
                 .isEqualTo("Se juntan tu currículum y tu evaluación en un solo perfil. Suele tardar poco.");
 
-        // El mismo mensaje dos veces: el mismo resultado.
-        firmado(post("/api/v1/integraciones/whatsapp/vinculos"),
-                "{\"telefono\":\"+51987650001\",\"wamid\":\"wamid.A\",\"texto\":\"cualquier cosa\"}")
-                .andExpect(status().isOk());
+        // Idempotente: el mismo mensaje dos veces, u otro con el texto vacío, devuelve lo mismo.
+        assertThat(respuesta(firmado("/api/v1/integraciones/whatsapp/vinculos", mensaje))).isEqualTo(vinculo);
+        assertThat(respuesta(firmado("/api/v1/integraciones/whatsapp/vinculos",
+                "{\"telefono\":\"+51987650001\",\"wamid\":\"wamid.B\",\"texto\":\"\"}"))).isEqualTo(vinculo);
 
         JsonNode tarjeta = miPostulacion("ana").get("whatsapp");
         assertThat(tarjeta.get("estado").asText()).isEqualTo("ACTIVO");
         assertThat(tarjeta.get("numero").asText()).isEqualTo("+51 9•• ••• 001");
 
-        JsonNode novedades = respuesta(firmadoGet("/api/v1/integraciones/whatsapp/novedades?telefono=%2B51987650001"));
-        assertThat(novedades.get("novedades")).hasSize(1);
+        JsonNode novedades = novedadesDe("+51987650001");
+        assertThat(novedades.properties()).extracting(java.util.Map.Entry::getKey).containsExactly("novedades");
+        assertThat(novedades.get("novedades")).isEqualTo(vinculo.get("novedades"));
     }
 
     // ============ Los avisos ============
@@ -436,10 +461,10 @@ class FlujoNovedadesWhatsappIT {
 
         assertThat(jdbc.queryForObject("""
                 select estado || ' ' || motivo_cierre from vinculo_whatsapp where postulacion_id = ?""",
-                String.class, postulacion.get("bea"))).isEqualTo("REVOCADO CAMBIO_DE_CELULAR");
+                String.class, postulacion.get("bea"))).isEqualTo("REVOCADO CAMBIO_CELULAR");
         List<ClienteConversacionFalso.Llamada> alBot = bot().registroDe("+51987650002");
         assertThat(alBot).extracting(ClienteConversacionFalso.Llamada::tipo).containsExactly("ESPERA", "REVOCACION");
-        assertThat(alBot.get(1).cuerpo().get("motivo")).isEqualTo("CAMBIO_DE_CELULAR");
+        assertThat(alBot.get(1).cuerpo().get("motivo")).isEqualTo("CAMBIO_CELULAR");
 
         conToken(put("/api/v1/portal/cuenta/telefono"), token.get("bea"), "{\"telefono\":\"54 123456\"}")
                 .andExpect(status().isBadRequest());
@@ -457,8 +482,7 @@ class FlujoNovedadesWhatsappIT {
         assertThat(bot().registroDe("+51987650001").stream()
                 .filter(l -> "REVOCACION".equals(l.tipo())).map(l -> l.cuerpo().get("motivo")).toList())
                 .containsExactly("DEJAR_DE_RECIBIR");
-        JsonNode novedades = respuesta(firmadoGet("/api/v1/integraciones/whatsapp/novedades?telefono=51987650001"));
-        assertThat(novedades.get("novedades")).isEmpty();
+        assertThat(novedadesDe("+51987650001").get("novedades")).isEmpty();
     }
 
     @Test
@@ -489,9 +513,15 @@ class FlujoNovedadesWhatsappIT {
         esperando("dora");
         vincularA("dora", "+51987650004");
 
-        JsonNode baja = respuesta(firmado(post("/api/v1/integraciones/whatsapp/bajas"),
-                "{\"telefono\":\"+51987650004\"}"));
-        assertThat(baja.get("desvinculadas").asInt()).isEqualTo(1);
+        firmado("/api/v1/integraciones/whatsapp/bajas", "{\"telefono\":\"+51987650004\"}")
+                .andExpect(status().isNoContent());
+        assertThat(contar("select count(*) from vinculo_whatsapp where telefono = '+51987650004' "
+                + "and estado = 'SUPRIMIDO' and motivo_cierre = 'BAJA'")).isEqualTo(1);
+        // Repetida, o de un número sin nada que desvincular: 204 igual.
+        firmado("/api/v1/integraciones/whatsapp/bajas", "{\"telefono\":\"+51987650004\"}")
+                .andExpect(status().isNoContent());
+        firmado("/api/v1/integraciones/whatsapp/bajas", "{\"telefono\":\"+51900000009\"}")
+                .andExpect(status().isNoContent());
 
         JsonNode tarjeta = miPostulacion("dora").get("whatsapp");
         assertThat(tarjeta.get("estado").asText()).isEqualTo("SUPRIMIDO");
@@ -554,7 +584,7 @@ class FlujoNovedadesWhatsappIT {
     private void vincularA(String quien, String numero) throws Exception {
         conToken(post("/api/v1/portal/postulaciones/" + codigo.get(quien) + "/whatsapp"),
                 token.get(quien), null).andExpect(status().isOk());
-        firmado(post("/api/v1/integraciones/whatsapp/vinculos"),
+        firmado("/api/v1/integraciones/whatsapp/vinculos",
                 "{\"telefono\":\"%s\",\"wamid\":\"w-%s\",\"texto\":\"hola\"}".formatted(numero, quien))
                 .andExpect(status().isOk());
     }
@@ -572,19 +602,29 @@ class FlujoNovedadesWhatsappIT {
                 .get("resumen");
     }
 
-    private ResultActions firmado(MockHttpServletRequestBuilder peticion, String cuerpo) throws Exception {
+    /** Un POST como lo haría el bot: firmado sobre la marca, la ruta y el cuerpo. */
+    private ResultActions firmado(String ruta, String cuerpo) throws Exception {
         String marca = String.valueOf(Instant.now().getEpochSecond());
-        return mvc.perform(peticion.contentType(MediaType.APPLICATION_JSON).content(cuerpo)
+        return mvc.perform(post(ruta).contentType(MediaType.APPLICATION_JSON).content(cuerpo)
                 .header(FirmaWhatsapp.CABECERA_MARCA, marca)
                 .header(FirmaWhatsapp.CABECERA_FIRMA,
-                        FirmaWhatsapp.firmar(SECRETO_DEL_BOT, marca, cuerpo.getBytes(StandardCharsets.UTF_8))));
+                        FirmaWhatsapp.firmar(SECRETO_DEL_BOT, marca, ruta, cuerpo.getBytes(StandardCharsets.UTF_8))));
     }
 
+    /** Un GET firmado (el registro del bot falso): la query no entra en la firma. */
     private ResultActions firmadoGet(String ruta) throws Exception {
         String marca = String.valueOf(Instant.now().getEpochSecond());
-        return mvc.perform(get(java.net.URI.create(ruta))
+        java.net.URI direccion = java.net.URI.create(ruta);
+        return mvc.perform(get(direccion)
                 .header(FirmaWhatsapp.CABECERA_MARCA, marca)
-                .header(FirmaWhatsapp.CABECERA_FIRMA, FirmaWhatsapp.firmar(SECRETO_DEL_BOT, marca, new byte[0])));
+                .header(FirmaWhatsapp.CABECERA_FIRMA,
+                        FirmaWhatsapp.firmar(SECRETO_DEL_BOT, marca, direccion.getRawPath(), new byte[0])));
+    }
+
+    /** Las novedades de un número, como las pide el bot: POST con el teléfono en el cuerpo. */
+    private JsonNode novedadesDe(String telefono) throws Exception {
+        return respuesta(firmado("/api/v1/integraciones/whatsapp/novedades",
+                "{\"telefono\":\"%s\"}".formatted(telefono)));
     }
 
     private int contar(String sql) {

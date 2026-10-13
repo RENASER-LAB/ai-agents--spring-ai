@@ -1,5 +1,9 @@
 package com.renaser.ai.ai_engine.whatsapp.service;
 
+import com.renaser.ai.ai_engine.consentimiento.entity.Consentimiento;
+import com.renaser.ai.ai_engine.consentimiento.entity.TextoConsentimiento;
+import com.renaser.ai.ai_engine.consentimiento.repository.ConsentimientoRepository;
+import com.renaser.ai.ai_engine.consentimiento.repository.TextoConsentimientoRepository;
 import com.renaser.ai.ai_engine.whatsapp.entity.AvisoWhatsapp;
 import com.renaser.ai.ai_engine.whatsapp.entity.VinculoWhatsapp;
 import com.renaser.ai.ai_engine.whatsapp.repository.AvisoWhatsappRepository;
@@ -42,6 +46,8 @@ class EnvioAlBotTest {
     @Mock private AvisoWhatsappRepository avisos;
     @Mock private VinculoWhatsappRepository vinculos;
     @Mock private BajaWhatsappRepository bajas;
+    @Mock private ConsentimientoRepository consentimientos;
+    @Mock private TextoConsentimientoRepository textos;
     @Mock private ClienteConversacion cliente;
     @Mock private PlatformTransactionManager transacciones;
 
@@ -52,7 +58,8 @@ class EnvioAlBotTest {
     void montar() {
         lenient().when(transacciones.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
         lenient().when(cliente.estaEncendido()).thenReturn(true);
-        envio = new EnvioAlBot(avisos, vinculos, bajas, cliente, propiedades, transacciones);
+        envio = new EnvioAlBot(avisos, vinculos, bajas, consentimientos, textos, cliente, propiedades,
+                transacciones);
     }
 
     private VinculoWhatsapp activo() {
@@ -178,8 +185,76 @@ class EnvioAlBotTest {
                 ArgumentCaptor.forClass(ClienteConversacion.Revocacion.class);
         verify(cliente).revocar(revocada.capture());
         assertThat(revocada.getValue()).isEqualTo(new ClienteConversacion.Revocacion(
-                "+51987654321", "pw_ref", "CAMBIO_DE_CELULAR"));
+                "+51987654321", "pw_ref", "CAMBIO_CELULAR"));
+        assertThat(ClienteConversacion.MOTIVOS_DE_REVOCACION).contains(revocada.getValue().motivo());
         assertThat(cerrado.getRevocacionEnviadaEn()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("Los motivos de cierre que se revocan son los del contrato, tal cual")
+    void losMotivosSonLosDelContrato() {
+        assertThat(List.of(VinculoWhatsapp.POR_DEJAR_DE_RECIBIR, VinculoWhatsapp.POR_CAMBIO_DE_CELULAR,
+                VinculoWhatsapp.POR_PROCESO_TERMINADO, VinculoWhatsapp.POR_BORRADO_DE_DATOS))
+                .containsExactlyInAnyOrderElementsOf(ClienteConversacion.MOTIVOS_DE_REVOCACION);
+    }
+
+    private VinculoWhatsapp anunciado() {
+        Instant ahora = Instant.now();
+        return VinculoWhatsapp.builder().id(8L).postulacionId(80L).referencia("pw_anuncio")
+                .telefono("+51987654321").estado(VinculoWhatsapp.PENDIENTE).consentimientoId(33L)
+                .anunciadoEn(ahora).anuncioCaducaEn(ahora.plus(Duration.ofHours(24))).build();
+    }
+
+    @Test
+    @DisplayName("El anuncio lleva el consentimiento que firmó: tipo, versión, el texto que vio y cuándo")
+    void elAnuncioLlevaSuConsentimiento() {
+        VinculoWhatsapp vinculo = anunciado();
+        Instant aceptado = Instant.parse("2026-10-13T10:00:00Z");
+        when(vinculos.paraElSondeo(8L)).thenReturn(Optional.of(vinculo));
+        when(consentimientos.findById(33L)).thenReturn(Optional.of(Consentimiento.builder().id(33L)
+                .textoConsentimientoId(44L).aceptadoEn(aceptado).build()));
+        when(textos.findById(44L)).thenReturn(Optional.of(TextoConsentimiento.builder().id(44L)
+                .tipo("WHATSAPP").version("1.0").texto("Al escribirnos aceptas…").build()));
+
+        envio.anunciarAhora(8L);
+
+        ArgumentCaptor<ClienteConversacion.Espera> espera = ArgumentCaptor.forClass(ClienteConversacion.Espera.class);
+        verify(cliente).anunciar(espera.capture());
+        assertThat(espera.getValue().postulacionRef()).isEqualTo("pw_anuncio");
+        assertThat(espera.getValue().caducaEn()).isEqualTo(vinculo.getAnuncioCaducaEn());
+        assertThat(espera.getValue().consentimiento()).isEqualTo(new ClienteConversacion.ConsentimientoDeLaEspera(
+                "WHATSAPP", "1.0", "Al escribirnos aceptas…", aceptado));
+        assertThat(vinculo.getAnuncioConfirmadoEn()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("Sin su consentimiento no se anuncia, y no se reintenta")
+    void sinConsentimientoNoSeAnuncia() {
+        VinculoWhatsapp vinculo = anunciado();
+        when(vinculos.paraElSondeo(8L)).thenReturn(Optional.of(vinculo));
+        when(consentimientos.findById(33L)).thenReturn(Optional.empty());
+
+        envio.anunciarAhora(8L);
+
+        verify(cliente, never()).anunciar(any());
+        assertThat(vinculo.getAnuncioConfirmadoEn()).isNull();
+        assertThat(vinculo.getAnuncioProximoIntentoEn()).isNull();
+    }
+
+    @Test
+    @DisplayName("Un 409 aviso_distinto es definitivo: el aviso queda FALLIDO a la primera")
+    void avisoDistintoEsDefinitivo() {
+        AvisoWhatsapp aviso = pendiente(0);
+        enLaCola(aviso);
+        when(vinculos.findById(7L)).thenReturn(Optional.of(activo()));
+        doThrow(new FalloDelBot("El bot respondió 409 aviso_distinto", false, "aviso_distinto"))
+                .when(cliente).avisar(any());
+
+        envio.enviarPendientes();
+
+        assertThat(aviso.getEstado()).isEqualTo(AvisoWhatsapp.FALLIDO);
+        assertThat(aviso.getUltimoError()).contains("aviso_distinto");
+        assertThat(aviso.getProximoIntentoEn()).isNull();
     }
 
     @Test

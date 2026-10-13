@@ -99,6 +99,25 @@ class AvisosPorWhatsappTest {
     }
 
     @Test
+    @DisplayName("El aviso cumple los límites del contrato: nombre y vacante hasta 60, texto hasta 1000")
+    void elAvisoCumpleLosLimites() {
+        when(beta.ofrecePara(RENASER)).thenReturn(true);
+        when(vinculos.vivoDe(70L)).thenReturn(Optional.of(vinculo(VinculoWhatsapp.ACTIVO)));
+        String largo = "Asistente Contable y Administrativo para la Sede Central de Arequipa, turno noche";
+
+        whatsapp.alAvisar(postulacion(), "PRUEBA_DISPONIBLE", estado("PRUEBA_TURNO_CANDIDATO", false),
+                new DeLaTransicion(900L, "María de los Ángeles Guadalupe del Carmen Fernández de Córdoba",
+                        largo, "PRUEBA_PROPIA"));
+
+        ArgumentCaptor<AvisoWhatsapp> guardado = ArgumentCaptor.forClass(AvisoWhatsapp.class);
+        verify(avisos).save(guardado.capture());
+        AvisoWhatsapp aviso = guardado.getValue();
+        assertThat(aviso.getVacante()).hasSizeLessThanOrEqualTo(60).endsWith("…");
+        assertThat(aviso.getNombre()).hasSizeLessThanOrEqualTo(60);
+        assertThat(aviso.getTexto()).hasSizeLessThanOrEqualTo(1000).contains(largo);
+    }
+
+    @Test
     @DisplayName("AC-08 · la misma transición no deja dos avisos aunque se repita")
     void laMismaTransicionNoRepite() {
         when(beta.ofrecePara(RENASER)).thenReturn(true);
@@ -188,7 +207,7 @@ class AvisosPorWhatsappTest {
         verify(vinculos).deleteAll(List.of(activo));
         verify(bajas).deleteById("+51987654321");
         // Sin transacción en curso, la revocación sale ya, con su motivo.
-        verify(envio).revocarSinFila("+51987654321", "pw_ref", "BORRADO_DE_DATOS");
+        verify(envio).revocarSinFila("+51987654321", "pw_ref", "BORRADO_DATOS");
     }
 
     @Test

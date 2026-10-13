@@ -101,9 +101,74 @@ class ServicioIntegracionWhatsappImplTest {
         assertThat(resultado.vinculo().postulaciones()).extracting(p -> p.postulacionRef())
                 .containsExactly("pw_ref");
         // Las mismas palabras que el portal.
-        assertThat(resultado.vinculo().novedades()).containsExactly(new Novedad("pw_ref",
+        assertThat(resultado.vinculo().novedades()).containsExactly(new Novedad(
                 "Asistente Contable", "Estamos calificando tus respuestas",
                 "Se juntan tu currículum y tu evaluación en un solo perfil. Suele tardar poco."));
+    }
+
+    @Test
+    @DisplayName("Es idempotente: repetida, devuelve las mismas postulaciones activas y novedades")
+    void vincularEsIdempotente() {
+        VinculoWhatsapp anunciado = anunciado();
+        when(vinculos.vivosDelNumeroParaEscribir(NUMERO)).thenReturn(List.of(anunciado));
+        when(postulaciones.findById(70L)).thenReturn(Optional.of(postulacion("PERFIL_CALIFICANDO")));
+        when(vinculos.activosDelNumero(NUMERO)).thenAnswer(i -> List.of(anunciado));
+        when(postulaciones.findAllById(any())).thenReturn(List.of(postulacion("PERFIL_CALIFICANDO")));
+
+        var primera = integracion.vincular(new PeticionVinculo(NUMERO, "wamid.1", "hola", null));
+        var repetida = integracion.vincular(new PeticionVinculo(NUMERO, "wamid.1", "hola", null));
+
+        assertThat(repetida.estadoHttp()).isEqualTo(200);
+        assertThat(repetida.vinculo()).isEqualTo(primera.vinculo());
+        assertThat(anunciado.getPrimerWamid()).isEqualTo("wamid.1");
+    }
+
+    @Test
+    @DisplayName("El texto del mensaje puede venir vacío (un Flow o un adjunto): vincula igual")
+    void textoVacio() {
+        VinculoWhatsapp anunciado = anunciado();
+        when(vinculos.vivosDelNumeroParaEscribir(NUMERO)).thenReturn(List.of(anunciado));
+        when(postulaciones.findById(70L)).thenReturn(Optional.of(postulacion("PERFIL_CALIFICANDO")));
+        when(vinculos.activosDelNumero(NUMERO)).thenAnswer(i -> List.of(anunciado));
+        when(postulaciones.findAllById(any())).thenReturn(List.of(postulacion("PERFIL_CALIFICANDO")));
+
+        assertThat(integracion.vincular(new PeticionVinculo(NUMERO, "wamid.9", "", null)).estadoHttp())
+                .isEqualTo(200);
+    }
+
+    @Test
+    @DisplayName("Los límites del contrato: nombre y vacante hasta 60, como mucho 8 novedades")
+    void losLimites() {
+        List<VinculoWhatsapp> nueve = new java.util.ArrayList<>();
+        List<Postulacion> suyas = new java.util.ArrayList<>();
+        for (long i = 0; i < 9; i++) {
+            nueve.add(VinculoWhatsapp.builder().id(100 + i).postulacionId(700 + i).personaId(33L)
+                    .referencia("pw_" + i).telefono(NUMERO).estado(VinculoWhatsapp.ACTIVO)
+                    .vinculadoEn(Instant.now()).build());
+            suyas.add(Postulacion.builder().id(700 + i).organizacionId(1L).vacanteId(5L)
+                    .estadoCodigo("PERFIL_CALIFICANDO").build());
+        }
+        when(vinculos.activosDelNumero(NUMERO)).thenReturn(nueve);
+        when(postulaciones.findAllById(any())).thenReturn(suyas);
+        when(vacantes.findAllById(any())).thenReturn(List.of(Vacante.builder().id(5L)
+                .titulo("Asistente Contable y Administrativo para la Sede Central de Arequipa, turno noche")
+                .build()));
+        when(personas.findById(33L)).thenReturn(Optional.of(Persona.builder().id(33L)
+                .nombre("María de los Ángeles Guadalupe del Carmen Fernández de Córdoba y Ponce").build()));
+        when(vinculos.vivosDelNumeroParaEscribir(NUMERO)).thenReturn(List.of());
+
+        var vinculo = integracion.vincular(new PeticionVinculo(NUMERO, "wamid.10", "hola", null)).vinculo();
+        var novedades = integracion.novedades(NUMERO).novedades();
+
+        assertThat(vinculo.postulaciones()).hasSize(9);
+        assertThat(vinculo.novedades()).hasSize(8);
+        assertThat(novedades).hasSize(8);
+        assertThat(vinculo.nombre()).hasSizeLessThanOrEqualTo(60).endsWith("…");
+        assertThat(novedades).allSatisfy(n -> {
+            assertThat(n.vacante()).hasSizeLessThanOrEqualTo(60).endsWith("…");
+            assertThat(n.titulo()).hasSizeLessThanOrEqualTo(80);
+            assertThat(n.texto()).hasSizeLessThanOrEqualTo(300);
+        });
     }
 
     @Test
@@ -169,7 +234,6 @@ class ServicioIntegracionWhatsappImplTest {
         var novedades = integracion.novedades(NUMERO);
 
         assertThat(novedades.novedades()).isEmpty();
-        assertThat(novedades.nombre()).isNull();
     }
 
     @Test
@@ -180,9 +244,9 @@ class ServicioIntegracionWhatsappImplTest {
         activo.setVinculadoEn(Instant.now());
         when(vinculos.vivosDelNumeroParaEscribir(NUMERO)).thenReturn(List.of(activo));
 
-        var baja = integracion.baja("51987654321");
+        int desvinculadas = integracion.baja("51987654321");
 
-        assertThat(baja.desvinculadas()).isEqualTo(1);
+        assertThat(desvinculadas).isEqualTo(1);
         assertThat(activo.getEstado()).isEqualTo(VinculoWhatsapp.SUPRIMIDO);
         assertThat(activo.getMotivoCierre()).isEqualTo("BAJA");
         // El bot ya lo sabe: no se le revoca de vuelta.
@@ -190,5 +254,24 @@ class ServicioIntegracionWhatsappImplTest {
         ArgumentCaptor<BajaWhatsapp> guardada = ArgumentCaptor.forClass(BajaWhatsapp.class);
         verify(bajas).save(guardada.capture());
         assertThat(guardada.getValue().getTelefono()).isEqualTo(NUMERO);
+    }
+
+    @Test
+    @DisplayName("AC-13 · una baja sin nada que desvincular no es un error, y la segunda tampoco")
+    void laBajaSinNada() {
+        when(bajas.existsById(NUMERO)).thenReturn(false, true);
+
+        assertThat(integracion.baja(NUMERO)).isZero();
+        assertThat(integracion.baja(NUMERO)).isZero();
+        verify(bajas, org.mockito.Mockito.times(1)).save(any());
+    }
+
+    @Test
+    @DisplayName("Las tres rutas: un teléfono vacío o que no es E.164 es un 400")
+    void telefonosQueNoValen() {
+        assertThatThrownBy(() -> integracion.vincular(new PeticionVinculo("", "w", "hola", null)))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> integracion.novedades(null)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> integracion.baja("12")).isInstanceOf(IllegalArgumentException.class);
     }
 }

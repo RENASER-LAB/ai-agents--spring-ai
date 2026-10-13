@@ -41,8 +41,7 @@ class FiltroFirmaWhatsappTest {
     }
 
     private static MockHttpServletRequest peticion(String marca, String firma) {
-        MockHttpServletRequest peticion = new MockHttpServletRequest("POST",
-                "/api/v1/integraciones/whatsapp/vinculos");
+        MockHttpServletRequest peticion = new MockHttpServletRequest("POST", RUTA);
         peticion.setContent(CUERPO.getBytes(StandardCharsets.UTF_8));
         if (marca != null) {
             peticion.addHeader(FirmaWhatsapp.CABECERA_MARCA, marca);
@@ -53,8 +52,10 @@ class FiltroFirmaWhatsappTest {
         return peticion;
     }
 
+    private static final String RUTA = "/api/v1/integraciones/whatsapp/vinculos";
+
     private static String firmar(String marca) {
-        return FirmaWhatsapp.firmar(SECRETO, marca, CUERPO.getBytes(StandardCharsets.UTF_8));
+        return FirmaWhatsapp.firmar(SECRETO, marca, RUTA, CUERPO.getBytes(StandardCharsets.UTF_8));
     }
 
     @Test
@@ -74,14 +75,42 @@ class FiltroFirmaWhatsappTest {
     }
 
     @Test
-    @DisplayName("Sin firma: 401 y no llega a nadie")
+    @DisplayName("Sin firma: 401 con {codigo, texto} y no llega a nadie")
     void sinFirma() throws Exception {
         MockHttpServletResponse respuesta = new MockHttpServletResponse();
 
         filtro.doFilter(peticion(null, null), respuesta, cadena);
 
         assertThat(respuesta.getStatus()).isEqualTo(401);
+        assertThat(respuesta.getContentAsString(StandardCharsets.UTF_8))
+                .contains("\"codigo\":\"FIRMA_INVALIDA\"").contains("\"texto\":");
         verify(cadena, never()).doFilter(any(), any());
+    }
+
+    @Test
+    @DisplayName("Con la firma de otra ruta: 401")
+    void firmaDeOtraRuta() throws Exception {
+        String marca = String.valueOf(AHORA.getEpochSecond());
+        MockHttpServletResponse respuesta = new MockHttpServletResponse();
+        String deBajas = FirmaWhatsapp.firmar(SECRETO, marca, "/api/v1/integraciones/whatsapp/bajas",
+                CUERPO.getBytes(StandardCharsets.UTF_8));
+
+        filtro.doFilter(peticion(marca, deBajas), respuesta, cadena);
+
+        assertThat(respuesta.getStatus()).isEqualTo(401);
+        verify(cadena, never()).doFilter(any(), any());
+    }
+
+    @Test
+    @DisplayName("La query no entra en la firma: se firma solo el path")
+    void laQueryNoCuenta() throws Exception {
+        String marca = String.valueOf(AHORA.getEpochSecond());
+        MockHttpServletRequest conQuery = peticion(marca, firmar(marca));
+        conQuery.setQueryString("telefono=%2B51987654321");
+
+        filtro.doFilter(conQuery, new MockHttpServletResponse(), cadena);
+
+        verify(cadena).doFilter(any(), any());
     }
 
     @Test
@@ -102,6 +131,18 @@ class FiltroFirmaWhatsappTest {
     @DisplayName("Con una marca de hace más de cinco minutos: 401")
     void marcaVieja() throws Exception {
         String marca = String.valueOf(AHORA.getEpochSecond() - 301);
+        MockHttpServletResponse respuesta = new MockHttpServletResponse();
+
+        filtro.doFilter(peticion(marca, firmar(marca)), respuesta, cadena);
+
+        assertThat(respuesta.getStatus()).isEqualTo(401);
+        verify(cadena, never()).doFilter(any(), any());
+    }
+
+    @Test
+    @DisplayName("Con una marca de más de cinco minutos hacia delante: 401")
+    void marcaDelFuturo() throws Exception {
+        String marca = String.valueOf(AHORA.getEpochSecond() + 301);
         MockHttpServletResponse respuesta = new MockHttpServletResponse();
 
         filtro.doFilter(peticion(marca, firmar(marca)), respuesta, cadena);

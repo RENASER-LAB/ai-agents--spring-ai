@@ -3,6 +3,7 @@ package com.renaser.ai.ai_engine.whatsapp.service;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -17,24 +18,57 @@ import java.util.UUID;
  */
 public interface ClienteConversacion {
 
-    /** {@code POST /v1/ex/esperas}: ese número va a escribir por esa postulación. Repetido, renueva. */
+    /**
+     * {@code POST /v1/ex/esperas} → 204: ese número va a escribir por esa postulación, con el
+     * consentimiento que acaba de dar. Repetido, renueva la caducidad y el consentimiento.
+     */
     void anunciar(Espera espera);
 
-    /** {@code POST /v1/ex/avisos}: un «te toca». El {@code avisoId} es la clave de idempotencia. */
+    /**
+     * {@code POST /v1/ex/avisos} → 202 {@code {avisoId}}: un «te toca». El {@code avisoId} es la
+     * clave de idempotencia; repetido con otro contenido, {@code 409 aviso_distinto}.
+     */
     void avisar(Aviso aviso);
 
-    /** {@code POST /v1/ex/revocaciones}: ese vínculo (y su anuncio, si lo había) se acabó. */
+    /**
+     * {@code POST /v1/ex/revocaciones} → 204: ese vínculo (y su anuncio, si lo había) se acabó,
+     * con uno de los motivos de {@link #MOTIVOS_DE_REVOCACION}.
+     */
     void revocar(Revocacion revocacion);
 
     /** Falso en el modo apagado: no hay a quién anunciar, así que el portal no ofrece el botón. */
     boolean estaEncendido();
 
-    record Espera(String telefono, String postulacionRef, Instant caducaEn) {
+    /** Los motivos de una revocación que entiende el bot; ningún otro. */
+    Set<String> MOTIVOS_DE_REVOCACION =
+            Set.of("DEJAR_DE_RECIBIR", "CAMBIO_CELULAR", "PROCESO_TERMINADO", "BORRADO_DATOS");
+
+    /** Los tipos de aviso que entiende el bot: los «te toca». */
+    Set<String> TIPOS_DE_AVISO = Set.of("PRUEBA_DISPONIBLE", "POSTULACION_AVANZA");
+
+    /**
+     * El consentimiento que el candidato aceptó al pulsar el botón: tipo {@code WHATSAPP}, su
+     * versión, el texto exacto que vio y cuándo.
+     */
+    record ConsentimientoDeLaEspera(String tipo, String version, String texto, Instant aceptadoEn) {
+        public Map<String, Object> comoCuerpo() {
+            Map<String, Object> cuerpo = new LinkedHashMap<>();
+            cuerpo.put("tipo", tipo);
+            cuerpo.put("version", version);
+            cuerpo.put("texto", texto);
+            cuerpo.put("aceptadoEn", aceptadoEn.toString());
+            return cuerpo;
+        }
+    }
+
+    record Espera(String telefono, String postulacionRef, Instant caducaEn,
+                  ConsentimientoDeLaEspera consentimiento) {
         public Map<String, Object> comoCuerpo() {
             Map<String, Object> cuerpo = new LinkedHashMap<>();
             cuerpo.put("telefono", telefono);
             cuerpo.put("postulacionRef", postulacionRef);
             cuerpo.put("caducaEn", caducaEn.toString());
+            cuerpo.put("consentimiento", consentimiento.comoCuerpo());
             return cuerpo;
         }
     }
@@ -67,25 +101,45 @@ public interface ClienteConversacion {
     /**
      * El bot no hizo lo que se le pidió.
      *
-     * <p>{@code reintentable}: no contestó, tardó más de la cuenta, o contestó 5xx o 429. Lo
-     * contrario —un 4xx— es definitivo: repetir la misma petición dará lo mismo (un 409 de un
-     * aviso con otro contenido, una firma que no cuadra).
+     * <p>{@code reintentable}: no contestó, tardó más de la cuenta, o contestó 5xx, 429 o 401 (un
+     * 401 puede ser un cambio de secreto a medias). Cualquier otro 4xx es definitivo: repetir la
+     * misma petición dará lo mismo ({@code 409 aviso_distinto}, {@code 400 validacion}).
+     *
+     * <p>{@code codigo}: el {@code code} con que el bot explica su error, en minúsculas
+     * ({@code firma_invalida}, {@code validacion}, {@code aviso_distinto}…), o nulo si no hubo
+     * respuesta o no lo traía.
      */
     class FalloDelBot extends RuntimeException {
         private final boolean reintentable;
+        private final String codigo;
 
         public FalloDelBot(String mensaje, boolean reintentable) {
+            this(mensaje, reintentable, (String) null);
+        }
+
+        public FalloDelBot(String mensaje, boolean reintentable, String codigo) {
             super(mensaje);
             this.reintentable = reintentable;
+            this.codigo = codigo;
         }
 
         public FalloDelBot(String mensaje, boolean reintentable, Throwable causa) {
             super(mensaje, causa);
             this.reintentable = reintentable;
+            this.codigo = null;
         }
 
         public boolean esReintentable() {
             return reintentable;
+        }
+
+        public String codigo() {
+            return codigo;
+        }
+
+        /** Lo que dice el contrato de cada estado HTTP de error: 5xx, 429 y 401 se reintentan. */
+        public static boolean seReintenta(int estadoHttp) {
+            return estadoHttp >= 500 || estadoHttp == 429 || estadoHttp == 401;
         }
     }
 }

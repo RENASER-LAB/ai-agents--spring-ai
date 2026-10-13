@@ -40,9 +40,19 @@ class ClienteConversacionHttpTest {
 
     private record Recibida(String ruta, Map<String, List<String>> cabeceras, String cuerpo) {}
 
+    private static final ClienteConversacion.ConsentimientoDeLaEspera CONSENTIMIENTO =
+            new ClienteConversacion.ConsentimientoDeLaEspera("WHATSAPP", "1.0",
+                    "Al escribirnos aceptas recibir por WhatsApp las novedades de este proceso. "
+                            + "Puedes dejarlo cuando quieras.",
+                    Instant.parse("2026-10-12T14:59:00Z"));
+
+    /** Lo que contesta el bot si la prueba no fuerza otra cosa: lo del contrato. */
+    private static final int LO_DEL_CONTRATO = -1;
+
     private HttpServer servidor;
     private final List<Recibida> recibidas = new CopyOnWriteArrayList<>();
-    private final AtomicInteger estado = new AtomicInteger(202);
+    private final AtomicInteger estado = new AtomicInteger(LO_DEL_CONTRATO);
+    private volatile String cuerpoDelError = "{}";
     private volatile long demora;
     private ClienteConversacionHttp cliente;
 
@@ -58,8 +68,17 @@ class ClienteConversacionHttpTest {
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
-            byte[] respuesta = "{}".getBytes(StandardCharsets.UTF_8);
-            intercambio.sendResponseHeaders(estado.get(), respuesta.length);
+            String ruta = intercambio.getRequestURI().getPath();
+            int forzado = estado.get();
+            if (forzado == LO_DEL_CONTRATO && !ruta.endsWith("/avisos")) {
+                intercambio.sendResponseHeaders(204, -1);
+                intercambio.close();
+                return;
+            }
+            int codigo = forzado == LO_DEL_CONTRATO ? 202 : forzado;
+            byte[] respuesta = (forzado == LO_DEL_CONTRATO ? "{\"avisoId\":\"x\"}" : cuerpoDelError)
+                    .getBytes(StandardCharsets.UTF_8);
+            intercambio.sendResponseHeaders(codigo, respuesta.length);
             intercambio.getResponseBody().write(respuesta);
             intercambio.close();
         });
@@ -79,10 +98,11 @@ class ClienteConversacionHttpTest {
     }
 
     @Test
-    @DisplayName("Cada llamada va a su ruta /v1/ex/…, con su cuerpo JSON y su firma")
+    @DisplayName("Cada llamada va a su ruta /v1/ex/…, con su cuerpo JSON y su firma sobre la ruta")
     void rutasCuerposYFirma() {
         UUID avisoId = UUID.fromString("0199d5a2-0000-7000-8000-000000000001");
-        cliente.anunciar(new ClienteConversacion.Espera("+51987654321", "pw_1", AHORA.plusSeconds(86_400)));
+        cliente.anunciar(new ClienteConversacion.Espera("+51987654321", "pw_1", AHORA.plusSeconds(86_400),
+                CONSENTIMIENTO));
         cliente.avisar(new ClienteConversacion.Aviso(avisoId, "+51987654321", "pw_1",
                 "PRUEBA_DISPONIBLE", "Ana", "Contador", "¡Felicidades, Ana!"));
         cliente.revocar(new ClienteConversacion.Revocacion("+51987654321", "pw_1", "DEJAR_DE_RECIBIR"));
@@ -91,20 +111,58 @@ class ClienteConversacionHttpTest {
                 .containsExactly("/v1/ex/esperas", "/v1/ex/avisos", "/v1/ex/revocaciones");
         assertThat(recibidas.get(0).cuerpo()).isEqualTo(
                 "{\"telefono\":\"+51987654321\",\"postulacionRef\":\"pw_1\","
-                        + "\"caducaEn\":\"2026-10-13T15:00:00Z\"}");
+                        + "\"caducaEn\":\"2026-10-13T15:00:00Z\","
+                        + "\"consentimiento\":{\"tipo\":\"WHATSAPP\",\"version\":\"1.0\","
+                        + "\"texto\":\"Al escribirnos aceptas recibir por WhatsApp las novedades de este "
+                        + "proceso. Puedes dejarlo cuando quieras.\",\"aceptadoEn\":\"2026-10-12T14:59:00Z\"}}");
+        assertThat(recibidas.get(2).cuerpo()).isEqualTo(
+                "{\"telefono\":\"+51987654321\",\"postulacionRef\":\"pw_1\",\"motivo\":\"DEJAR_DE_RECIBIR\"}");
         assertThat(recibidas.get(1).cuerpo()).contains("\"avisoId\":\"" + avisoId + "\"")
                 .contains("\"texto\":\"¡Felicidades, Ana!\"");
         for (Recibida recibida : recibidas) {
             String marca = recibida.cabeceras().get(FirmaWhatsapp.CABECERA_MARCA).get(0);
             String firma = recibida.cabeceras().get(FirmaWhatsapp.CABECERA_FIRMA).get(0);
             assertThat(marca).isEqualTo(String.valueOf(AHORA.getEpochSecond()));
-            assertThat(FirmaWhatsapp.esValida(SECRETO, marca, firma,
+            assertThat(FirmaWhatsapp.esValida(SECRETO, marca, firma, recibida.ruta(),
                     recibida.cuerpo().getBytes(StandardCharsets.UTF_8), AHORA)).isTrue();
+            // La de otra ruta no valdría: la ruta entra en la firma.
+            assertThat(FirmaWhatsapp.esValida(SECRETO, marca, firma, "/v1/ex/otra",
+                    recibida.cuerpo().getBytes(StandardCharsets.UTF_8), AHORA)).isFalse();
         }
     }
 
     @Test
-    @DisplayName("Un 5xx o un 429 se reintentan; un 4xx, como el 409 de un aviso con otro contenido, no")
+    @DisplayName("Con una dirección base con prefijo, se firma el path completo")
+    void conPrefijo() {
+        PropiedadesWhatsapp propiedades = new PropiedadesWhatsapp();
+        propiedades.setUrlServicio("http://127.0.0.1:" + servidor.getAddress().getPort() + "/conversacion/");
+        propiedades.setSecretoHaciaElBot(SECRETO);
+        propiedades.setSegundosDeEspera(1);
+        new ClienteConversacionHttp(propiedades,
+                HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(1)).build(),
+                Clock.fixed(AHORA, ZoneOffset.UTC))
+                .revocar(new ClienteConversacion.Revocacion("+51987654321", "pw_1", "PROCESO_TERMINADO"));
+
+        Recibida recibida = recibidas.get(0);
+        assertThat(recibida.ruta()).isEqualTo("/conversacion/v1/ex/revocaciones");
+        assertThat(FirmaWhatsapp.esValida(SECRETO, String.valueOf(AHORA.getEpochSecond()),
+                recibida.cabeceras().get(FirmaWhatsapp.CABECERA_FIRMA).get(0), "/conversacion/v1/ex/revocaciones",
+                recibida.cuerpo().getBytes(StandardCharsets.UTF_8), AHORA)).isTrue();
+    }
+
+    @Test
+    @DisplayName("Solo vale la respuesta del contrato: un 200 donde tocaba 204 es un fallo definitivo")
+    void otraRespuestaNoVale() {
+        estado.set(200);
+        assertThatThrownBy(() -> cliente.revocar(
+                new ClienteConversacion.Revocacion("+51987654321", "pw_1", "PROCESO_TERMINADO")))
+                .isInstanceOf(FalloDelBot.class)
+                .matches(e -> !((FalloDelBot) e).esReintentable())
+                .hasMessageContaining("204");
+    }
+
+    @Test
+    @DisplayName("Un 5xx, un 429 o un 401 se reintentan; otro 4xx, como 409 aviso_distinto, no")
     void queSeReintenta() {
         ClienteConversacion.Revocacion revocacion =
                 new ClienteConversacion.Revocacion("+51987654321", "pw_1", "PROCESO_TERMINADO");
@@ -115,11 +173,29 @@ class ClienteConversacionHttpTest {
         estado.set(429);
         assertThatThrownBy(() -> cliente.revocar(revocacion))
                 .matches(e -> ((FalloDelBot) e).esReintentable());
-        estado.set(409);
+        // Un 401 puede ser un cambio de secreto a medias: se reintenta.
+        estado.set(401);
+        cuerpoDelError = "{\"code\":\"firma_invalida\",\"message\":\"Firma no válida\",\"retryable\":false}";
         assertThatThrownBy(() -> cliente.revocar(revocacion))
+                .matches(e -> ((FalloDelBot) e).esReintentable())
+                .matches(e -> "firma_invalida".equals(((FalloDelBot) e).codigo()));
+        estado.set(408);
+        cuerpoDelError = "{}";
+        assertThatThrownBy(() -> cliente.revocar(revocacion))
+                .matches(e -> !((FalloDelBot) e).esReintentable());
+        estado.set(409);
+        cuerpoDelError = "{\"code\":\"aviso_distinto\",\"message\":\"Otro contenido\"}";
+        assertThatThrownBy(() -> cliente.avisar(new ClienteConversacion.Aviso(UUID.randomUUID(),
+                "+51987654321", "pw_1", "PRUEBA_DISPONIBLE", "Ana", "Contador", "hola")))
                 .isInstanceOf(FalloDelBot.class)
                 .matches(e -> !((FalloDelBot) e).esReintentable())
-                .hasMessageContaining("409");
+                .matches(e -> "aviso_distinto".equals(((FalloDelBot) e).codigo()))
+                .hasMessageContaining("409 aviso_distinto");
+        estado.set(400);
+        cuerpoDelError = "no es json";
+        assertThatThrownBy(() -> cliente.revocar(revocacion))
+                .matches(e -> !((FalloDelBot) e).esReintentable())
+                .matches(e -> ((FalloDelBot) e).codigo() == null);
     }
 
     @Test
@@ -127,7 +203,7 @@ class ClienteConversacionHttpTest {
     void siTardaSeReintenta() {
         demora = 1_500;
         assertThatThrownBy(() -> cliente.anunciar(
-                new ClienteConversacion.Espera("+51987654321", "pw_1", AHORA.plusSeconds(60))))
+                new ClienteConversacion.Espera("+51987654321", "pw_1", AHORA.plusSeconds(60), CONSENTIMIENTO)))
                 .isInstanceOf(FalloDelBot.class)
                 .matches(e -> ((FalloDelBot) e).esReintentable());
     }
@@ -162,7 +238,7 @@ class ClienteConversacionHttpTest {
         ClienteConversacion desconocido = configuracion.clienteConversacion(propiedades);
         assertThat(desconocido.estaEncendido()).isFalse();
         assertThatThrownBy(() -> desconocido.revocar(
-                new ClienteConversacion.Revocacion("+51987654321", "pw_1", "BAJA")))
+                new ClienteConversacion.Revocacion("+51987654321", "pw_1", "DEJAR_DE_RECIBIR")))
                 .matches(e -> !((FalloDelBot) e).esReintentable());
         propiedades.setModo("real");
         propiedades.setUrlServicio("https://bot.renaser.pe");
@@ -171,14 +247,16 @@ class ClienteConversacionHttpTest {
     }
 
     @Test
-    @DisplayName("El bot falso apunta cada llamada y, caído, falla como uno de verdad")
+    @DisplayName("El bot falso apunta cada llamada, con el consentimiento de la espera, y caído falla como uno de verdad")
     void elFalso() {
         ClienteConversacionFalso falso = new ClienteConversacionFalso();
-        falso.anunciar(new ClienteConversacion.Espera("+51987654321", "pw_1", AHORA));
-        falso.revocar(new ClienteConversacion.Revocacion("+51911111111", "pw_2", "BAJA"));
+        falso.anunciar(new ClienteConversacion.Espera("+51987654321", "pw_1", AHORA, CONSENTIMIENTO));
+        falso.revocar(new ClienteConversacion.Revocacion("+51911111111", "pw_2", "CAMBIO_CELULAR"));
 
         assertThat(falso.registroDe("+51987654321")).extracting(ClienteConversacionFalso.Llamada::tipo)
                 .containsExactly("ESPERA");
+        assertThat(falso.registroDe("+51987654321").get(0).cuerpo().get("consentimiento"))
+                .isEqualTo(CONSENTIMIENTO.comoCuerpo());
         assertThat(falso.registro()).hasSize(2);
 
         falso.fallar(true);
@@ -188,5 +266,36 @@ class ClienteConversacionHttpTest {
         falso.fallar(false);
         falso.olvidar();
         assertThat(falso.registro()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("El bot falso contesta como el contrato: 400 validacion y 409 aviso_distinto, definitivos")
+    void elFalsoCumpleElContrato() {
+        ClienteConversacionFalso falso = new ClienteConversacionFalso();
+        assertThatThrownBy(() -> falso.anunciar(
+                new ClienteConversacion.Espera("+51987654321", "pw_1", AHORA, null)))
+                .matches(e -> !((FalloDelBot) e).esReintentable())
+                .matches(e -> "validacion".equals(((FalloDelBot) e).codigo()));
+        assertThatThrownBy(() -> falso.revocar(
+                new ClienteConversacion.Revocacion("+51987654321", "pw_1", "CAMBIO_DE_CELULAR")))
+                .matches(e -> "validacion".equals(((FalloDelBot) e).codigo()));
+        assertThatThrownBy(() -> falso.revocar(
+                new ClienteConversacion.Revocacion("51987654321", "pw_1", "DEJAR_DE_RECIBIR")))
+                .matches(e -> "validacion".equals(((FalloDelBot) e).codigo()));
+        assertThatThrownBy(() -> falso.avisar(new ClienteConversacion.Aviso(UUID.randomUUID(),
+                "+51987654321", "pw_1", "PRUEBA_DISPONIBLE", "Ana", "x".repeat(61), "hola")))
+                .matches(e -> "validacion".equals(((FalloDelBot) e).codigo()));
+
+        UUID avisoId = UUID.randomUUID();
+        ClienteConversacion.Aviso aviso = new ClienteConversacion.Aviso(avisoId, "+51987654321", "pw_1",
+                "PRUEBA_DISPONIBLE", "Ana", "Contador", "hola");
+        falso.avisar(aviso);
+        falso.avisar(aviso);
+        assertThatThrownBy(() -> falso.avisar(new ClienteConversacion.Aviso(avisoId, "+51987654321",
+                "pw_1", "PRUEBA_DISPONIBLE", "Ana", "Contador", "otro texto")))
+                .matches(e -> !((FalloDelBot) e).esReintentable())
+                .matches(e -> "aviso_distinto".equals(((FalloDelBot) e).codigo()));
+        assertThat(falso.registro()).extracting(ClienteConversacionFalso.Llamada::tipo)
+                .containsExactly("AVISO", "AVISO");
     }
 }
