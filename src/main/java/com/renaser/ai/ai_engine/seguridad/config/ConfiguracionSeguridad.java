@@ -4,10 +4,13 @@ import com.renaser.ai.ai_engine.seguridad.filter.FiltroFirmaWhatsapp;
 import com.renaser.ai.ai_engine.seguridad.filter.FiltroIdentidad;
 import com.renaser.ai.ai_engine.whatsapp.service.PropiedadesWhatsapp;
 
+import jakarta.servlet.Filter;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.annotation.Order;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
@@ -17,6 +20,8 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfFilter;
 
 
 
@@ -102,7 +107,13 @@ public class ConfiguracionSeguridad {
         FiltroFirmaWhatsapp firma = new FiltroFirmaWhatsapp(whatsapp::getSecretoDesdeElBot,
                 java.time.Clock.systemUTC());
         http.securityMatcher("/api/v1/integraciones/**")
-            .csrf(csrf -> csrf.disable())
+            // El CSRF sigue encendido, pero solo mira peticiones con cookies: es la credencial que
+            // el navegador manda solo y la que una web ajena podría aprovechar. El bot firma con
+            // HMAC y nunca manda cookies, así que su llamada se salta el chequeo y sigue a la firma;
+            // una con Cookie y sin token CSRF se queda en 403. El token va en cookie y no en la
+            // sesión: esta puerta no abre ninguna.
+            .csrf(csrf -> csrf.csrfTokenRepository(new CookieCsrfTokenRepository()))
+            .addFilterBefore(sinCookiesNoHayCsrf(), CsrfFilter.class)
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .addFilterBefore(firma, UsernamePasswordAuthenticationFilter.class)
             .authorizeHttpRequests(auth -> auth.anyRequest().hasAuthority(FiltroFirmaWhatsapp.AUTORIDAD))
@@ -134,6 +145,17 @@ public class ConfiguracionSeguridad {
                 .anyRequest().permitAll())
             .exceptionHandling(e -> e.authenticationEntryPoint(entradaSinIdentidad()));
         return http.build();
+    }
+
+    /** Sin cabecera Cookie no hay credencial del navegador que falsificar: el CSRF no la mira. */
+    static Filter sinCookiesNoHayCsrf() {
+        return (request, response, chain) -> {
+            if (request instanceof HttpServletRequest peticion
+                    && peticion.getHeader(HttpHeaders.COOKIE) == null) {
+                CsrfFilter.skipRequest(peticion);
+            }
+            chain.doFilter(request, response);
+        };
     }
 
     private org.springframework.security.web.AuthenticationEntryPoint entradaSinIdentidad() {

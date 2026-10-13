@@ -19,12 +19,14 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -348,6 +350,47 @@ class FlujoNovedadesWhatsappIT {
 
     @Test
     @Order(6)
+    @DisplayName("CSRF · con Cookie y sin token CSRF, 403 aunque venga firmada; sin cookies decide la firma; ninguna abre sesión")
+    void conCookiesPideCsrf() throws Exception {
+        String ruta = "/api/v1/integraciones/whatsapp/bajas";
+        String cuerpo = "{\"telefono\":\"+51987650001\"}";
+        byte[] bytes = cuerpo.getBytes(StandardCharsets.UTF_8);
+        String marca = String.valueOf(Instant.now().getEpochSecond());
+
+        // La cookie es lo que el navegador manda solo: sin token CSRF no pasa, ni con la firma buena.
+        sinSesion(mvc.perform(post(ruta).contentType(MediaType.APPLICATION_JSON).content(cuerpo)
+                        .header(HttpHeaders.COOKIE, "SESSION=de-otra-web")
+                        .header(FirmaWhatsapp.CABECERA_MARCA, marca)
+                        .header(FirmaWhatsapp.CABECERA_FIRMA, FirmaWhatsapp.firmar(SECRETO_DEL_BOT, marca, ruta, bytes)))
+                .andExpect(status().isForbidden())
+                .andReturn());
+        sinSesion(mvc.perform(post(ruta).contentType(MediaType.APPLICATION_JSON).content(cuerpo)
+                        .header(HttpHeaders.COOKIE, "SESSION=de-otra-web"))
+                .andExpect(status().isForbidden())
+                .andReturn());
+        // Y no se hizo nada: Ana sigue con su vínculo y su número no está dado de baja.
+        assertThat(jdbc.queryForObject("select estado from vinculo_whatsapp where postulacion_id = ?",
+                String.class, postulacion.get("ana"))).isEqualTo("PENDIENTE");
+        assertThat(contar("select count(*) from whatsapp_baja where telefono = '+51987650001'")).isZero();
+
+        // Sin cookies, como llama el bot: decide la firma (401 sin ella, pasa con ella), sin sesión
+        // y sin ninguna cookie en la respuesta.
+        sinSesion(mvc.perform(post(ruta).contentType(MediaType.APPLICATION_JSON).content(cuerpo))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.codigo").value("FIRMA_INVALIDA"))
+                .andReturn());
+        String novedades = "/api/v1/integraciones/whatsapp/novedades";
+        sinSesion(mvc.perform(post(novedades).contentType(MediaType.APPLICATION_JSON).content(cuerpo)
+                        .header(FirmaWhatsapp.CABECERA_MARCA, marca)
+                        .header(FirmaWhatsapp.CABECERA_FIRMA,
+                                FirmaWhatsapp.firmar(SECRETO_DEL_BOT, marca, novedades, bytes)))
+                .andExpect(status().isOk())
+                .andExpect(header().doesNotExist(HttpHeaders.SET_COOKIE))
+                .andReturn());
+    }
+
+    @Test
+    @Order(6)
     @DisplayName("Sin teléfono, con uno vacío o con uno que no vale: 400 VALIDACION con {codigo, texto}, no 500")
     void sinNumeroEs400() throws Exception {
         for (String ruta : List.of("/api/v1/integraciones/whatsapp/novedades",
@@ -412,6 +455,15 @@ class FlujoNovedadesWhatsappIT {
         assertThat(jdbc.queryForObject("select texto from aviso_whatsapp where postulacion_id = ?",
                 String.class, postulacion.get("ana")))
                 .startsWith("¡Felicidades, Ana! Tu prueba del puesto para Asistente Contable ya está disponible.");
+        // Ligado a la transición que lo causó: el id sale de la misma fila que la máquina acaba
+        // de guardar (es lo que hace que una transición deje un solo aviso de cada tipo).
+        assertThat(jdbc.queryForObject("select transicion_estado_id from aviso_whatsapp where postulacion_id = ?",
+                Long.class, postulacion.get("ana")))
+                .isNotNull()
+                .isEqualTo(jdbc.queryForObject("""
+                        select id from transicion_estado
+                         where postulacion_id = ? and estado_nuevo_codigo = 'PRUEBA_TURNO_CANDIDATO'""",
+                        Long.class, postulacion.get("ana")));
         assertThat(contar("select count(*) from correo_enviado c join postulacion p on p.usuario_id = c.usuario_id "
                 + "where p.id = " + postulacion.get("ana") + " and c.plantilla_correo_codigo = 'PRUEBA_DISPONIBLE'"))
                 .isEqualTo(1);
@@ -625,6 +677,13 @@ class FlujoNovedadesWhatsappIT {
     private JsonNode novedadesDe(String telefono) throws Exception {
         return respuesta(firmado("/api/v1/integraciones/whatsapp/novedades",
                 "{\"telefono\":\"%s\"}".formatted(telefono)));
+    }
+
+    /** Ni sesión en el servidor ni su cookie en la respuesta: la puerta del bot no guarda estado. */
+    private static void sinSesion(MvcResult resultado) {
+        assertThat(resultado.getRequest().getSession(false)).isNull();
+        assertThat(resultado.getResponse().getHeaders(HttpHeaders.SET_COOKIE))
+                .noneMatch(c -> c.startsWith("JSESSIONID") || c.startsWith("SESSION"));
     }
 
     private int contar(String sql) {
