@@ -532,7 +532,7 @@ public class FlujoCuestionarioTecnicoIT {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                 {"correo":"%s","contrasena":"unaClaveLarga123","nombre":"Camila",
-                 "apellidos":"Reyes","ciudadUbigeo":"1501","aceptaPlataforma":true}""".formatted(correo)))
+                 "apellidos":"Reyes","ciudadUbigeo":"1501","telefono": "987654321", "aceptaPlataforma":true}""".formatted(correo)))
                 .andExpect(status().isCreated());
 
         return leer(mvc.perform(post("/api/v1/portal/auth/login")

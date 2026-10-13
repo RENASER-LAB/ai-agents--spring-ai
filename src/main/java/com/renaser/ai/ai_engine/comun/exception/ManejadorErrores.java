@@ -32,6 +32,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -83,7 +84,9 @@ import java.util.regex.Pattern;
         com.renaser.ai.ai_engine.resena.controller.ModeracionResenasController.class,
         // La gestión de personas (V64). Sedes y cargos viven en organizacion.controller y la
         // sesión del panel en seguridad.controller, que ya están cubiertos.
-        com.renaser.ai.ai_engine.colaborador.controller.ColaboradoresController.class})
+        com.renaser.ai.ai_engine.colaborador.controller.ColaboradoresController.class,
+        // Las novedades por WhatsApp (V73): la puerta firmada del bot y el registro del bot falso.
+        com.renaser.ai.ai_engine.whatsapp.controller.IntegracionWhatsappController.class})
 @Order(Ordered.HIGHEST_PRECEDENCE)
 @Slf4j
 public class ManejadorErrores {
@@ -170,6 +173,21 @@ public class ManejadorErrores {
         return problema;
     }
 
+    // El botón de WhatsApp no se puede usar ahora (V73): 409 con un `codigo` que el portal lee.
+    // SIN_CELULAR es el que importa: la tarjeta pide entonces el celular y vuelve a intentarlo.
+    @ExceptionHandler(com.renaser.ai.ai_engine.whatsapp.service.WhatsappNoDisponibleException.class)
+    public ProblemDetail whatsappNoDisponible(
+            com.renaser.ai.ai_engine.whatsapp.service.WhatsappNoDisponibleException ex,
+            WebRequest request) {
+        log.warn("WhatsApp no disponible - Path: {}, Código: {}", request.getDescription(false),
+                ex.getCodigo());
+        ProblemDetail problema = construir(HttpStatus.CONFLICT,
+                "Las novedades por WhatsApp no se pueden activar ahora", "whatsapp-no-disponible",
+                ex.getMessage());
+        problema.setProperty("codigo", ex.getCodigo());
+        return problema;
+    }
+
     // Una regla de negocio incumplida es un 400 con explicación, no un 500 opaco:
     // «toda transición manual exige motivo», «el archivo debe ser PDF o Word»…
     @ExceptionHandler(IllegalArgumentException.class)
@@ -201,6 +219,19 @@ public class ManejadorErrores {
         return construir(HttpStatus.NOT_FOUND, "Esa dirección no existe", "ruta-inexistente",
                 "No hay ningún endpoint en «" + ex.getResourcePath() + "». Revisa la ruta; "
                         + "la lista completa está en /swagger-ui.html");
+    }
+
+    /* Un parámetro obligatorio de la dirección que no llega —`telefono` en las novedades del
+       bot de WhatsApp, `agenteCodigo` en las instrucciones de un agente— se iba por el
+       manejador general como un 500, el mismo engaño que la ruta inexistente de arriba: le
+       dice a quien llama que reintente algo que nunca va a funcionar. Es un dato que falta,
+       así que 400 diciendo cuál. Con nivel de aviso y sin traza, como aquella. */
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ProblemDetail faltaUnParametro(MissingServletRequestParameterException ex, WebRequest request) {
+        log.warn("Falta un parámetro - Path: {}, Parámetro: {}", request.getDescription(false),
+                ex.getParameterName());
+        return construir(HttpStatus.BAD_REQUEST, "Falta un dato en la petición", "parametro-que-falta",
+                "Falta el parámetro «" + ex.getParameterName() + "» en la dirección.");
     }
 
     // El documento de roles exige un mensaje claro cuando falta un permiso, no un error opaco

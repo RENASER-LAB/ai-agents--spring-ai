@@ -49,8 +49,12 @@ class MigracionesSinChoqueTest {
      * <p>V64 y V65 las reclama otro trabajo que va en paralelo (30/09/2026): las preguntas
      * propias de la vacante se numeraron desde la V66 para no chocar con él. En cuanto las
      * dos ramas estén en {@code main} el hueco se cierra solo y esta línea sobra: se borra.
+     *
+     * <p>La V72 la reclama specs/umbral-del-perfil-integral.md, que va antes (12/10/2026): las
+     * novedades por WhatsApp se numeraron desde la V73. Igual que el de arriba, se cierra solo al
+     * juntarse las dos ramas, y entonces su línea sobra.
      */
-    private static final List<String> HUECOS_DELIBERADOS = List.of("entre V63 y V66");
+    private static final List<String> HUECOS_DELIBERADOS = List.of("entre V63 y V66", "entre V71 y V73");
 
     @Test
     @DisplayName("Ningún número de versión se repite: git no ve ese conflicto, Flyway sí")

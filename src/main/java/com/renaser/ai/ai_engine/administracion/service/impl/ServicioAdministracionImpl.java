@@ -174,8 +174,8 @@ public class ServicioAdministracionImpl implements ServicioAdministracion {
     @Transactional
     public Long publicarTextoConsentimiento(ContextoUsuario quien, NuevoTextoConsentimiento datos) {
         if (!TipoConsentimiento.existe(datos.tipo())) {
-            throw new IllegalArgumentException("El tipo debe ser PLATAFORMA, PROCESO o "
-                    + "FUTUROS_CONTACTOS, no «" + datos.tipo() + "»");
+            throw new IllegalArgumentException("El tipo debe ser PLATAFORMA, PROCESO, "
+                    + "FUTUROS_CONTACTOS o WHATSAPP, no «" + datos.tipo() + "»");
         }
         // ⚠️ **Los tres textos son de la plataforma, y solo ella los publica.**
         //

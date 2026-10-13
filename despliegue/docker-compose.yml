@@ -114,6 +114,15 @@ services:
       # Sin esto los correos saldrian con enlaces a localhost:5174.
       PORTAL_URL: ${PORTAL_URL}
 
+      # Las novedades por WhatsApp (V73). Apagado hasta que el numero del bot pase a NUEVO:
+      # con «real» la aplicacion no arranca sin la direccion HTTPS del servicio de
+      # conversacion y su secreto. Ver docs/CONTRATO-NOVEDADES-POR-WHATSAPP.md.
+      WHATSAPP_MODO: ${WHATSAPP_MODO:-apagado}
+      WHATSAPP_NUMERO_BOT: ${WHATSAPP_NUMERO_BOT:-51928439930}
+      WHATSAPP_URL_SERVICIO: ${WHATSAPP_URL_SERVICIO:-}
+      WHATSAPP_SECRETO_HACIA_EL_BOT: ${WHATSAPP_SECRETO_HACIA_EL_BOT:-}
+      WHATSAPP_SECRETO_DESDE_EL_BOT: ${WHATSAPP_SECRETO_DESDE_EL_BOT:-}
+
       # El Dockerfile pide el 75% de la memoria del contenedor. En una maquina de 2 GB eso
       # deja al sistema sin aire; el limite de abajo es lo que hace que ese 75% sea de 1,5 GB
       # y no de toda la maquina.

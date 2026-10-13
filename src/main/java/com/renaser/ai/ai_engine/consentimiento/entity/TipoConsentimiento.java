@@ -1,14 +1,14 @@
 package com.renaser.ai.ai_engine.consentimiento.entity;
 
 /**
- * Los tres permisos que puede firmar un candidato, y con quién firma cada uno.
+ * Los permisos que puede firmar un candidato, y con quién firma cada uno.
  *
- * <p>Son tres y no uno porque los responsables son distintos, y la ley 29733 exige que
+ * <p>Son varios y no uno porque los responsables son distintos, y la ley 29733 exige que
  * cada quien que trata datos esté nombrado y consentido. Juntarlos en una sola casilla
  * sería pedir un permiso que nadie dio.
  *
  * <p>El nombre de la constante es el que viaja a la base: {@code texto_consentimiento.tipo}
- * lo guarda tal cual y su CHECK enumera estos tres (V54). Antes de la V54 estos valores
+ * lo guarda tal cual y su CHECK los enumera (V54; WHATSAPP desde la V73). Antes de la V54 estos valores
  * andaban sueltos como literales por cuatro servicios distintos, y el de la cuenta usaba
  * {@link #PROCESO}, que habla de «esta vacante» cuando todavía no hay ninguna.
  */
@@ -33,7 +33,14 @@ public enum TipoConsentimiento {
      * El permiso opcional para conservar el perfil y avisar de otras vacantes. Es de la
      * plataforma, se retira por separado y retirarlo no toca ningún proceso en curso.
      */
-    FUTUROS_CONTACTOS;
+    FUTUROS_CONTACTOS,
+
+    /**
+     * Recibir por WhatsApp las novedades de UN proceso (V73). Se firma al pulsar «Escribir por
+     * WhatsApp», una vez por postulación y versión del texto, y es de la plataforma: mientras
+     * dure la beta, solo sus vacantes lo ofrecen.
+     */
+    WHATSAPP;
 
     /** El valor tal como viaja a la base y como lo escribe quien publica desde el panel. */
     public String codigo() {

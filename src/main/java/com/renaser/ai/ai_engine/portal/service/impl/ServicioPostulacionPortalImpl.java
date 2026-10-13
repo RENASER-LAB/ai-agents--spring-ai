@@ -12,6 +12,7 @@ import com.renaser.ai.ai_engine.organizacion.repository.OrganizacionRepository;
 import com.renaser.ai.ai_engine.perfilintegral.service.ServicioEvaluacion;
 import com.renaser.ai.ai_engine.perfilintegral.service.TurnoDelPerfilCumplido;
 import com.renaser.ai.ai_engine.portal.dto.DtosPortal;
+import com.renaser.ai.ai_engine.whatsapp.dto.DtosWhatsapp;
 import com.renaser.ai.ai_engine.portal.dto.DtosPortal.MiPostulacion;
 import com.renaser.ai.ai_engine.portal.dto.DtosPortal.MiPostulacionDetalle;
 import com.renaser.ai.ai_engine.portal.dto.DtosPortal.PasoHistorial;
@@ -103,6 +104,8 @@ public class ServicioPostulacionPortalImpl implements ServicioPostulacionPortal 
     // Para que el pase automático le abra la prueba al instante a quien postula a una vacante
     // sin banco (V70). Un evento y no una llamada: ver TurnoDelPerfilCumplido.
     private final ApplicationEventPublisher eventos;
+    // La tarjeta de WhatsApp de cada proceso (V73): si se ofrece y en qué está.
+    private final com.renaser.ai.ai_engine.whatsapp.service.ServicioWhatsappPortal whatsapp;
 
     @Override
     @Transactional
@@ -441,10 +444,13 @@ public class ServicioPostulacionPortalImpl implements ServicioPostulacionPortal 
                 mias.stream().map(Postulacion::getId).toList());
         // Las que quedaron sin completar, también de una sola consulta y por lo mismo.
         Set<Long> sinCompletar = sinCompletarEntre(mias);
+        // Y la tarjeta de WhatsApp de cada una, también de una vez (V73).
+        Map<Long, DtosWhatsapp.WhatsappDelProceso> tarjetas = whatsapp.tarjetasDe(quien.personaId(), mias);
 
         return mias.stream()
                 .map(p -> comoResumen(p, porVacante, nombreEstado, nombrePorOrganizacion,
-                        puntos.getOrDefault(p.getId(), 0L), sinCompletar.contains(p.getId())))
+                        puntos.getOrDefault(p.getId(), 0L), sinCompletar.contains(p.getId()),
+                        tarjetas.getOrDefault(p.getId(), DtosWhatsapp.WhatsappDelProceso.NO_DISPONIBLE)))
                 .toList();
     }
 
@@ -456,7 +462,7 @@ public class ServicioPostulacionPortalImpl implements ServicioPostulacionPortal 
                 .map(t -> new PasoHistorial(t.getEstadoAnteriorCodigo(), t.getEstadoNuevoCodigo(),
                         t.isEsSistema(), t.getOcurridaEn()))
                 .toList();
-        return new MiPostulacionDetalle(comoResumen(postulacion), historial);
+        return new MiPostulacionDetalle(comoResumen(postulacion, quien.personaId()), historial);
     }
 
     @Override
@@ -505,7 +511,7 @@ public class ServicioPostulacionPortalImpl implements ServicioPostulacionPortal 
     }
 
     /** Una sola: la vacante y su estado se piden sueltos porque no hay tanda con la que ir. */
-    private MiPostulacion comoResumen(Postulacion p) {
+    private MiPostulacion comoResumen(Postulacion p, Long personaId) {
         Map<Long, Vacante> unaVacante = vacantes.findById(p.getVacanteId()).stream()
                 .collect(Collectors.toMap(Vacante::getId, Function.identity()));
         Map<String, String> unEstado = estados.findById(p.getEstadoCodigo()).stream()
@@ -529,7 +535,9 @@ public class ServicioPostulacionPortalImpl implements ServicioPostulacionPortal 
                 .getOrDefault(p.getId(), 0L);
         return comoResumen(p, unaVacante, unEstado,
                 nombresDeOrganizacion(unaVacante.values().stream().toList()),
-                sinLeer, sinCompletarEntre(List.of(p)).contains(p.getId()));
+                sinLeer, sinCompletarEntre(List.of(p)).contains(p.getId()),
+                whatsapp.tarjetasDe(personaId, List.of(p))
+                        .getOrDefault(p.getId(), DtosWhatsapp.WhatsappDelProceso.NO_DISPONIBLE));
     }
 
     /**
@@ -645,7 +653,8 @@ public class ServicioPostulacionPortalImpl implements ServicioPostulacionPortal 
     private MiPostulacion comoResumen(Postulacion p, Map<Long, Vacante> porVacante,
                                       Map<String, String> nombrePorEstado,
                                       Map<Long, String> nombrePorOrganizacion,
-                                      long avisosSinLeer, boolean pruebaSinCompletar) {
+                                      long avisosSinLeer, boolean pruebaSinCompletar,
+                                      DtosWhatsapp.WhatsappDelProceso tarjetaWhatsapp) {
         Optional<Vacante> vacante = Optional.ofNullable(porVacante.get(p.getVacanteId()));
         String titulo = vacante.map(Vacante::getTitulo).orElse("");
         String empresa = vacante.map(Vacante::getOrganizacionId)
@@ -665,6 +674,7 @@ public class ServicioPostulacionPortalImpl implements ServicioPostulacionPortal 
                 vacante.map(RemuneracionQueVeElCandidato::de)
                         .orElse(DtosPortal.RemuneracionPublica.OCULTA),
                 RemuneracionQueVeElCandidato.pretensionDe(p),
-                pruebaSinCompletar);
+                pruebaSinCompletar,
+                tarjetaWhatsapp);
     }
 }

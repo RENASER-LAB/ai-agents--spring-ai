@@ -136,7 +136,7 @@ Infraestructura» parecen de prueba: habría que archivarlas para que no salgan 
 ⚠️ **Tras desplegar la V66, una vacante nueva de RENASER no rinde el banco de los 15 formatos
 si nadie lo elige.** Nace con «Preguntas propias de esta vacante», vacías, y así no se publica.
 Hay que marcar «El banco de la empresa para su nivel» en la vacante, antes de la primera
-postulación. `scripts/sembrar-datos-de-prueba.py` y `scripts/cargar-convocatoria.py` ya dan ese
+postulación. `scripts/sembrar-datos-de-prueba.py` ya da ese
 paso; **los guiones sin versionar de `scripts/` que publican vacantes —como
 `preparar-vacante-prueba.py`— todavía no**. Ver [el banco RENASER](CAZATALENTOS-BANCO-RENASER.md),
 «Qué vacantes lo rinden».

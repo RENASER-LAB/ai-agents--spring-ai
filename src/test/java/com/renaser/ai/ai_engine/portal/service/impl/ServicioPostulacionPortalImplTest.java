@@ -113,6 +113,8 @@ class ServicioPostulacionPortalImplTest {
     // El aviso de que postuló a una vacante sin banco que califica sola, para el pase al
     // instante (V70).
     @Mock private org.springframework.context.ApplicationEventPublisher eventos;
+    // La tarjeta de WhatsApp (V73): sin stub devuelve un mapa vacío, es decir, «no disponible».
+    @Mock private com.renaser.ai.ai_engine.whatsapp.service.ServicioWhatsappPortal whatsapp;
 
     private ServicioPostulacionPortalImpl servicio;
     // El tablón, armado sobre los mismos dobles: la prueba de la suspendida vigila una
@@ -129,7 +131,8 @@ class ServicioPostulacionPortalImplTest {
         servicio = new ServicioPostulacionPortalImpl(organizaciones, personas, usuarios,
                 consentimientos, vacantes, puestos, requisitos, evaluaciones, postulaciones,
                 transiciones, estados, cvs, enlaces, maquina, propuestaPerfil, lecturaCv,
-                colaIa, almacen, archivos, perfiles, correo, textoProceso, avisos, intentos, eventos);
+                colaIa, almacen, archivos, perfiles, correo, textoProceso, avisos, intentos, eventos,
+                whatsapp);
         tablon = new ServicioTablonPortalImpl(vacantes, organizaciones, requisitos, textoProceso,
                 catalogos);
     }

@@ -88,9 +88,9 @@ criterios, y **los cuatro marcados «persona»**:
 | Calidad de las preguntas | 20 |
 | Claridad | 10 |
 
-No es una decisión que alguien tomara. Viene del script de demostración
-`scripts/cargar-convocatoria.py`, que escribe `"metodoVerificacion": "PERSONA"` fijo para todos
-los criterios que crea. Es la rúbrica de una prueba de ejemplo —la de «ordena veinte
+No es una decisión que alguien tomara. Viene del antiguo cargador de convocatorias de
+demostración (retirado el 13/10/2026), que escribía `"metodoVerificacion": "PERSONA"` fijo para
+todos los criterios que creaba. Es la rúbrica de una prueba de ejemplo —la de «ordena veinte
 currículums»—, no la del cliente.
 
 **Consecuencia:** el agente que califica la prueba solo mira los criterios marcados «agente».

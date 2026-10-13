@@ -166,8 +166,12 @@ def responder(pregunta):
 
 def main():
     print(f"1. Cuenta nueva: {CORREO}")
+    # El celular (V73) y la ciudad son obligatorios al crear la cuenta: sin ellos, 400. El
+    # celular sale de la misma marca que el correo —«+51 900» y la hora—, así que no se
+    # repite entre corridas y nadie lo confunde con el de una persona real.
     pedir("/cuentas", {"nombre": "Siembra", "apellidos": f"QA {MARCA}",
-                       "correo": CORREO, "contrasena": "siembra-qa-2026",
+                       "correo": CORREO, "telefono": f"+51900{MARCA}",
+                       "contrasena": "siembra-qa-2026", "ciudadUbigeo": "0401",
                        "aceptaPlataforma": True, "aceptaFuturosContactos": False})
     token = pedir("/auth/login", {"correo": CORREO,
                                   "contrasena": "siembra-qa-2026"})["token"]

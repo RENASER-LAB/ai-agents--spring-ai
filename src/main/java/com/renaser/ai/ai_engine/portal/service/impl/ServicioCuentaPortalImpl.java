@@ -30,6 +30,7 @@ import com.renaser.ai.ai_engine.usuario.repository.PersonaRepository;
 import com.renaser.ai.ai_engine.usuario.repository.RolRepository;
 import com.renaser.ai.ai_engine.usuario.repository.UsuarioRepository;
 import com.renaser.ai.ai_engine.usuario.repository.UsuarioRolRepository;
+import com.renaser.ai.ai_engine.whatsapp.service.Celular;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -67,6 +68,8 @@ public class ServicioCuentaPortalImpl implements ServicioCuentaPortal {
     // Quién decide qué ciudades existen. Se pregunta al catálogo y no al repositorio para
     // que «válida» signifique lo mismo aquí y en el desplegable que la persona vio.
     private final CatalogosDelPerfil catalogos;
+    // Cambiar el celular cierra lo vinculado al anterior (V73).
+    private final com.renaser.ai.ai_engine.whatsapp.service.ServicioWhatsappPortal whatsapp;
 
     /**
      * Los textos de la plataforma que la política pública enseña enteros.
@@ -116,6 +119,12 @@ public class ServicioCuentaPortalImpl implements ServicioCuentaPortal {
                     "No existe la ciudad «" + datos.ciudadUbigeo() + "»: tiene que ser uno de "
                             + "los códigos que devuelve /api/v1/portal/catalogos/ubigeo");
         }
+        // El celular (V73), también antes de escribir nada: se guarda siempre en E.164, y uno que
+        // no vale es el mismo 400 que el portal pinta junto al campo.
+        String telefono = Celular.comoE164(datos.telefono()).orElse(null);
+        if (telefono == null) {
+            throw new IllegalArgumentException(Celular.MENSAJE);
+        }
         Organizacion org = duenos.plataforma();
         usuarios.buscarPorCorreo(org.getId(), datos.correo()).ifPresent(u -> {
             throw new IllegalStateException("Ya existe una cuenta con ese correo");
@@ -125,6 +134,7 @@ public class ServicioCuentaPortalImpl implements ServicioCuentaPortal {
                 .nombre(datos.nombre())
                 .apellidos(datos.apellidos())
                 .ciudadUbigeo(datos.ciudadUbigeo())
+                .telefono(telefono)
                 .creadoEn(Instant.now())
                 .build());
 
@@ -213,9 +223,44 @@ public class ServicioCuentaPortalImpl implements ServicioCuentaPortal {
      */
     @Override
     public com.renaser.ai.ai_engine.portal.dto.DtosPortal.QuienSoy quienSoy(ContextoUsuario quien) {
-        Sesion sesion = sesionDe(null, quien.usuarioId());
-        return new com.renaser.ai.ai_engine.portal.dto.DtosPortal.QuienSoy(
-                sesion.usuarioId(), sesion.nombre(), sesion.apellidos());
+        Optional<Persona> persona = usuarios.findById(quien.usuarioId())
+                .flatMap(u -> personas.findById(u.getPersonaId()));
+        return new com.renaser.ai.ai_engine.portal.dto.DtosPortal.QuienSoy(quien.usuarioId(),
+                persona.map(Persona::getNombre).orElse(null),
+                persona.map(Persona::getApellidos).orElse(null),
+                // El celular, para «Mi cuenta» (V73). Vacío en las cuentas anteriores.
+                persona.map(Persona::getTelefono).orElse(null));
+    }
+
+    /**
+     * Cambiar el celular desde «Mi cuenta» (V73), con la misma regla que el registro.
+     *
+     * <p>Si de verdad cambia, lo vinculado o anunciado con el anterior se cierra y se le cuenta
+     * al bot: el número viejo deja de recibir nada. En los procesos en espera, la tarjeta vuelve
+     * a ofrecer «Escribir por WhatsApp» desde el nuevo. La auditoría dice que cambió, nunca a
+     * cuál: es un registro inmutable y el borrado de datos no podría vaciarlo.
+     */
+    @Override
+    @Transactional
+    public com.renaser.ai.ai_engine.portal.dto.DtosPortal.MiCelular cambiarTelefono(
+            ContextoUsuario quien, String escrito) {
+        String nuevo = Celular.comoE164(escrito).orElse(null);
+        if (nuevo == null) {
+            throw new IllegalArgumentException(Celular.MENSAJE);
+        }
+        Persona persona = personas.findById(quien.personaId())
+                .orElseThrow(() -> new IllegalStateException("Esta cuenta no tiene a nadie detrás"));
+        String anterior = persona.getTelefono();
+        if (!nuevo.equals(anterior)) {
+            persona.setTelefono(nuevo);
+            personas.save(persona);
+            whatsapp.alCambiarElCelular(persona.getId(), anterior, nuevo);
+            auditoria.registrar(quien.organizacionId(), quien, "cambiar_celular", "persona",
+                    persona.getId(), null, Map.of("celular", anterior == null ? "añadido" : "cambiado"),
+                    null);
+        }
+        return new com.renaser.ai.ai_engine.portal.dto.DtosPortal.MiCelular(nuevo,
+                Celular.paraMostrar(nuevo));
     }
 
     @Override

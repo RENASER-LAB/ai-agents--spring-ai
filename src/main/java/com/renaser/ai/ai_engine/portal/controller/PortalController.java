@@ -41,6 +41,8 @@ public class PortalController {
     private final ServicioEnlaceAcceso enlaces;
     private final ServicioRecuperacionClave recuperacion;
     private final Permisos permisos;
+    // El botón de WhatsApp de cada proceso (V73).
+    private final com.renaser.ai.ai_engine.whatsapp.service.ServicioWhatsappPortal whatsapp;
 
     // ---------- público ----------
 
@@ -235,6 +237,44 @@ public class PortalController {
     @Operation(summary = "Marcar leído un aviso mío")
     public void marcarAvisoLeido(@PathVariable Long id) {
         postulaciones.marcarAvisoLeido(permisos.actual(), id);
+    }
+
+    // ---------- WhatsApp (V73) ----------
+
+    /**
+     * Cambiar el celular de la cuenta desde «Mi cuenta». Lo vinculado a WhatsApp con el anterior
+     * se cierra y se le cuenta al bot.
+     */
+    @PutMapping("/cuenta/telefono")
+    @Operation(summary = "Cambiar el celular de mi cuenta. 9 cifras que empiezan por 9 (Perú) o "
+            + "el número completo con su prefijo; se guarda en E.164. Cierra lo vinculado a "
+            + "WhatsApp con el número anterior")
+    public MiCelular cambiarTelefono(@Valid @RequestBody CambiarTelefono datos) {
+        return cuentas.cambiarTelefono(permisos.actual(), datos.telefono());
+    }
+
+    /**
+     * «Escribir por WhatsApp»: guarda el consentimiento, anuncia el celular de la cuenta al bot
+     * para esta postulación y devuelve el enlace {@code wa.me} con el mensaje ya escrito.
+     *
+     * <p>Solo el dueño de la postulación (404 si no lo es). 409 con {@code codigo}: la vacante no
+     * es de RENASER o la beta está apagada ({@code NO_DISPONIBLE}), el proceso terminó, la cuenta
+     * no tiene celular ({@code SIN_CELULAR}) o el número se dio de baja ({@code SUPRIMIDO}).
+     */
+    @PostMapping("/postulaciones/{uuid}/whatsapp")
+    @Operation(summary = "Escribir por WhatsApp: guarda mi consentimiento, anuncia mi celular al "
+            + "bot para esta postulación y devuelve el enlace wa.me con el mensaje ya escrito")
+    public com.renaser.ai.ai_engine.whatsapp.dto.DtosWhatsapp.EnlaceWhatsapp escribirPorWhatsapp(
+            @PathVariable UUID uuid, HttpServletRequest request) {
+        return whatsapp.escribir(permisos.actual(), uuid, request.getRemoteAddr(),
+                request.getHeader("User-Agent"));
+    }
+
+    @DeleteMapping("/postulaciones/{uuid}/whatsapp")
+    @Operation(summary = "Dejar de recibir por WhatsApp las novedades de esta postulación")
+    public com.renaser.ai.ai_engine.whatsapp.dto.DtosWhatsapp.WhatsappDelProceso dejarDeRecibirPorWhatsapp(
+            @PathVariable UUID uuid) {
+        return whatsapp.dejarDeRecibir(permisos.actual(), uuid);
     }
 
     @PostMapping("/consentimientos/futuros/retiro")

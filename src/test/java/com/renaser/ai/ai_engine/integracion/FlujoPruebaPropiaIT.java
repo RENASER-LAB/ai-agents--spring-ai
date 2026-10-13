@@ -1083,7 +1083,7 @@ public class FlujoPruebaPropiaIT {
 
         mvc.perform(post("/api/v1/portal/cuentas").contentType(MediaType.APPLICATION_JSON).content("""
                 {"nombre":"Dora","apellidos":"Prueba","correo":"dora.propia@correo.pe",
-                 "contrasena":"unaClaveLarga123","ciudadUbigeo":"1501","aceptaPlataforma":true,
+                 "contrasena":"unaClaveLarga123","ciudadUbigeo":"1501","telefono": "987654321", "aceptaPlataforma":true,
                  "aceptaFuturosContactos":false}""")).andExpect(status().isCreated());
         String token = leer(mvc.perform(post("/api/v1/portal/auth/login").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"correo\":\"dora.propia@correo.pe\",\"contrasena\":\"unaClaveLarga123\"}"))
@@ -1136,7 +1136,7 @@ public class FlujoPruebaPropiaIT {
     private void entrarALaPrueba(String quien, String correo) throws Exception {
         mvc.perform(post("/api/v1/portal/cuentas").contentType(MediaType.APPLICATION_JSON).content("""
                 {"nombre":"%s","apellidos":"Prueba","correo":"%s",
-                 "contrasena":"unaClaveLarga123","ciudadUbigeo":"1501","aceptaPlataforma":true,
+                 "contrasena":"unaClaveLarga123","ciudadUbigeo":"1501","telefono": "987654321", "aceptaPlataforma":true,
                  "aceptaFuturosContactos":false}""".formatted(capital(quien), correo)))
                 .andExpect(status().isCreated());
         String token = leer(mvc.perform(post("/api/v1/portal/auth/login").contentType(MediaType.APPLICATION_JSON)

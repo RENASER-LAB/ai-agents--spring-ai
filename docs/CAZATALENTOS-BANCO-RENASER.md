@@ -44,8 +44,8 @@ con el banco marcado cuando la empresa lo tiene.
 
 ⚠️ **Consecuencia operativa: cada vacante de RENASER que deba rendir los 15 formatos necesita ese
 paso a mano.** Por API es `POST /panel/vacantes/{id}/origen-preguntas` con `{"origen": "NIVEL"}`
-(ver [las APIs](09-APIS.md)). `scripts/sembrar-datos-de-prueba.py` y `scripts/cargar-convocatoria.py`
-ya lo hacen; los guiones sin versionar del árbol principal que publican vacantes —como
+(ver [las APIs](09-APIS.md)). `scripts/sembrar-datos-de-prueba.py`
+ya lo hace; los guiones sin versionar del árbol principal que publican vacantes —como
 `preparar-vacante-prueba.py`— todavía no, y sin él la vacante sale con preguntas propias vacías y
 no se puede publicar.
 

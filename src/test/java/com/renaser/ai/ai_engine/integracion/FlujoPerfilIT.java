@@ -884,7 +884,7 @@ public class FlujoPerfilIT {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                         {"nombre":"Sin","apellidos":"Ciudad","correo":"%s",
-                         "contrasena":"unaClaveLarga123",%s"aceptaPlataforma":true,
+                         "contrasena":"unaClaveLarga123",%s"telefono": "987654321", "aceptaPlataforma":true,
                          "aceptaFuturosContactos":false}"""
                         .formatted(correo, trozoDeCiudad)));
     }
@@ -906,7 +906,7 @@ public class FlujoPerfilIT {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                         {"nombre":"Camila","apellidos":"Rojas","correo":"%s",
-                         "contrasena":"unaClaveLarga123","ciudadUbigeo":"1501","aceptaPlataforma":true,
+                         "contrasena":"unaClaveLarga123","ciudadUbigeo":"1501","telefono": "987654321", "aceptaPlataforma":true,
                          "aceptaFuturosContactos":false}""".formatted(correo)))
                 .andExpect(status().isCreated());
         return leer(mvc.perform(post("/api/v1/portal/auth/login")

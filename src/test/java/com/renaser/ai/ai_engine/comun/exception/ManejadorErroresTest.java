@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.context.request.ServletWebRequest;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.mock.web.MockHttpServletRequest;
@@ -46,5 +47,27 @@ class ManejadorErroresTest {
         assertThat(problema.getDetail())
                 .contains("api/v1/panel/admin/parametros/x")
                 .contains("swagger-ui.html");
+    }
+
+    /**
+     * Un parámetro obligatorio que no llega es un dato que falta, no una avería: 400 con el
+     * formato de la casa y diciendo cuál falta.
+     *
+     * <p>Lo encontró la QA de las novedades por WhatsApp: {@code GET
+     * /api/v1/integraciones/whatsapp/novedades} sin {@code telefono} contestaba 500, igual que
+     * {@code /panel/agentes-ia/instrucciones} sin {@code agenteCodigo}.
+     */
+    @Test
+    void unParametroQueFaltaEsUn400QueDiceCual() {
+        var peticion = new MockHttpServletRequest("GET", "/api/v1/integraciones/whatsapp/novedades");
+        var ex = new MissingServletRequestParameterException("telefono", "String");
+
+        ProblemDetail problema = manejador.faltaUnParametro(ex, new ServletWebRequest(peticion));
+
+        assertThat(problema.getStatus()).isEqualTo(HttpStatus.BAD_REQUEST.value());
+        assertThat(problema.getTitle()).isEqualTo("Falta un dato en la petición");
+        assertThat(problema.getType()).hasToString("https://api.renaser.com/errors/parametro-que-falta");
+        assertThat(problema.getDetail()).contains("«telefono»");
+        assertThat(problema.getProperties()).containsKey("Timestamp");
     }
 }

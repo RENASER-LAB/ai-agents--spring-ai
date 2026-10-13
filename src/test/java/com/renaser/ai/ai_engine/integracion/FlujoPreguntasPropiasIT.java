@@ -269,7 +269,7 @@ public class FlujoPreguntasPropiasIT {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                         {"nombre":"Rosa","apellidos":"Quispe","correo":"rosa.contable@correo.pe",
-                         "contrasena":"unaClaveLarga123","ciudadUbigeo":"1501","aceptaPlataforma":true,
+                         "contrasena":"unaClaveLarga123","ciudadUbigeo":"1501","telefono": "987654321", "aceptaPlataforma":true,
                          "aceptaFuturosContactos":false}"""))
                 .andExpect(status().isCreated());
         tokenCandidato = leer(mvc.perform(post("/api/v1/portal/auth/login")

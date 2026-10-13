@@ -1130,7 +1130,7 @@ public class FlujoRemuneracionIT {
                         .content("""
                                 {"nombre": "Cande", "apellidos": "De Prueba",
                                  "correo": "%s", "contrasena": "%s",
-                                 "ciudadUbigeo": "1501", "aceptaPlataforma": true,
+                                 "ciudadUbigeo": "1501", "telefono": "987654321", "aceptaPlataforma": true,
                                  "aceptaFuturosContactos": true}""".formatted(correo, CLAVE)))
                 .andExpect(status().isCreated());
 
@@ -1163,7 +1163,7 @@ public class FlujoRemuneracionIT {
                         .content("""
                                 {"nombre": "Lucía", "apellidos": "Mendoza",
                                  "correo": "%s", "contrasena": "%s",
-                                 "ciudadUbigeo": "1501", "aceptaPlataforma": true,
+                                 "ciudadUbigeo": "1501", "telefono": "987654321", "aceptaPlataforma": true,
                                  "aceptaFuturosContactos": true}""".formatted(CORREO_CANDIDATO, CLAVE)))
                 .andExpect(status().isCreated());
 
