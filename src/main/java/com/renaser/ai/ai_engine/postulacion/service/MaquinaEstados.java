@@ -372,7 +372,7 @@ public class MaquinaEstados {
                 ? motivo
                 : motivo + " · sin avisar al candidato";
 
-        TransicionEstado guardada = transiciones.save(TransicionEstado.builder()
+        TransicionEstado transicion = TransicionEstado.builder()
                 .postulacionId(postulacion.getId())
                 .estadoAnteriorCodigo(estadoAnterior)
                 .estadoNuevoCodigo(estadoNuevoCodigo)
@@ -387,7 +387,11 @@ public class MaquinaEstados {
                 .avisoAlCandidato(aviso.name())
                 .ocurridaEn(Instant.now())
                 .creadoEn(Instant.now())
-                .build());
+                .build();
+        // Es una fila nueva (sin id), así que `save` la persiste tal cual y JPA le rellena el id
+        // a esta misma instancia: de aquí sale el id con el que el aviso por WhatsApp se liga
+        // a su transición.
+        transiciones.save(transicion);
 
         postulacion.setEstadoCodigo(estadoNuevoCodigo);
         postulacion.setMovidoEn(Instant.now());
@@ -415,8 +419,7 @@ public class MaquinaEstados {
                 motivoGuardado);
 
         if (avisar) {
-            avisarAlCandidato(postulacion, nuevo, motivoCierre,
-                    guardada == null ? null : guardada.getId());
+            avisarAlCandidato(postulacion, nuevo, motivoCierre, transicion.getId());
         }
 
         // Un proceso que termina cierra su vínculo de WhatsApp (V73), avisando o sin avisar: los
