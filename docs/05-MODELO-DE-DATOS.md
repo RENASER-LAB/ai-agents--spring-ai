@@ -23,7 +23,7 @@ Sirve para tres cosas:
 - **Entender el sistema.** Un modelo de datos bien contado explica el negocio mejor que
   cualquier otro documento.
 
-**La base ya está construida.** Las migraciones `V1` a `V71` viven en
+**La base ya está construida.** Las migraciones `V1` a `V72` viven en
 `src/main/resources/db/migration` —**120 tablas de este módulo**, 123 en la base contando la de
 Flyway y las dos del motor de agentes— y Flyway es el dueño del esquema. Cambiar algo de aquí
 ya cuesta una migración nueva, y **una migración aplicada no se edita nunca**: se escribe otra
@@ -220,6 +220,15 @@ ordenada y no en un texto con separador como `habilidades`, porque un logro pued
 el `|` que separa las aptitudes. Los perfiles de antes arrancan sin logros y nadie los rellena:
 ni la lectura del currículum ni ninguna IA escriben ahí. Ver
 [APIs del perfil del candidato](APIS-PERFIL-DEL-CANDIDATO.md).
+
+La `V72` (12/10/2026) **no crea tablas**: le da uso a `vacante.nota_minima`, que existía desde la
+`V5` y nadie leía. Es la nota del Perfil Integral que hace falta para pasar sola a la prueba con
+«calificar y avanzar sola» encendido: pasa a obligatoria, **60 por defecto**, entera y de 0 a 100
+(CHECK), y las vacías se rellenan con 60. **Las vacantes que ya avanzaban solas filtran con 60
+desde el despliegue**; a quien ya esperaba en «por confirmar» no se le mueve. Publica además la
+versión **1.1 del texto `PLATAFORMA`**, que dice que el pase depende de esa nota y nunca descarta;
+la 1.0 no se toca y quien la firmó sigue ligado a ella. La prueba al instante de la `V70` se retira
+sin tocar el esquema. Ver [estados de la postulación](03-ESTADOS-POSTULACION.md), «La nota mínima».
 
 La `V54` (14/09/2026) **no añade ninguna tabla y cambia quién firma qué**. Hasta ella había dos
 tipos de texto —`PROCESO` y `FUTUROS_CONTACTOS`— y el de la cuenta usaba el primero, que habla de
@@ -744,7 +753,7 @@ agente que la produjo.
 | `familia` | Las siete familias de trabajo | codigo, nombre |
 | `familia_afin` | Qué familias se parecen lo bastante para reutilizar evaluaciones | familia_codigo, familia_afin_codigo |
 | `puesto` | El catálogo de puestos, con su nivel y su familia. Desde la `V64` es también el catálogo de **cargos** de la gestión de personas, y se renombra y desactiva desde Configuración | organizacion_id, codigo, nombre, nivel_puesto_codigo, familia_codigo, es_activo |
-| `vacante` | Una convocatoria concreta | organizacion_id, solicitud_talento_id, puesto_id, titulo, descripcion, modalidad, ciudad_ubigeo, ubicacion, tipo_cierre, plazas, cierra_en, estado, version_pesos_id, version_plantilla_prueba_id, plantilla_evaluacion_id, responsable_usuario_id, remuneracion_tipo, remuneracion_min, remuneracion_max, remuneracion_moneda, remuneracion_actualizada_en, archivada_en, eliminada_en, aplica_evaluacion, origen_preguntas, instrumento_etapa_tecnica |
+| `vacante` | Una convocatoria concreta | organizacion_id, solicitud_talento_id, puesto_id, titulo, descripcion, modalidad, ciudad_ubigeo, ubicacion, tipo_cierre, plazas, cierra_en, estado, version_pesos_id, version_plantilla_prueba_id, plantilla_evaluacion_id, responsable_usuario_id, remuneracion_tipo, remuneracion_min, remuneracion_max, remuneracion_moneda, remuneracion_actualizada_en, archivada_en, eliminada_en, aplica_evaluacion, origen_preguntas, instrumento_etapa_tecnica, calificacion_automatica, nota_minima |
 | `requisito_objetivo` | Lo único que puede detener una postulación sin que intervenga nadie | vacante_id, descripcion, regla, es_activo |
 | `barrera_critica` | Lo que ningún promedio alto compensa, definido por vacante | vacante_id, descripcion, es_activa |
 | `evaluador_estandar` | Quién revisa que la urgencia no baje el nivel, en esta vacante | vacante_id, usuario_id, puede_bloquear, asignado_por_usuario_id |
@@ -785,6 +794,11 @@ primera postulación, el origen no cambia**: todos sus candidatos se miden con l
 vacante nueva nace con `PRUEBA_PROPIA`, también en RENASER; las de antes conservan el suyo. El
 valor por defecto de la columna sigue siendo `PLANTILLA`, que es lo que reciben las filas
 insertadas a mano: el tercero lo pone el servicio al crear.
+
+**Quién pasa sola a la prueba lo deciden dos columnas** (`V53`, `V72`): `calificacion_automatica`,
+el interruptor «calificar y avanzar sola», y `nota_minima`, la nota del Perfil Integral que hace
+falta para ese pase (60 por defecto, entera). Con el interruptor apagado la mínima no hace nada.
+Quien no llega se queda en «por confirmar»: ninguna nota descarta a nadie.
 
 ---
 
@@ -1467,6 +1481,8 @@ cuáles sí, porque las que no, hay que probarlas en el código.
   enteró el candidato de una transición es `CORREO`, `NINGUNO`, `POR_LA_CAMPANA` o nada.
 - **Un perfil tiene como mucho tres logros clave** (`V71`): la columna es vacía o una lista de
   hasta tres, aunque alguien escriba directo en la base.
+- **La nota mínima de una vacante es un entero de 0 a 100 y nunca falta** (`V72`): obligatoria,
+  60 por defecto, y el CHECK rechaza decimales y valores fuera de rango.
 
 ### Tienen que vivir en el código
 

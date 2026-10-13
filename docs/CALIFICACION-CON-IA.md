@@ -205,6 +205,12 @@ sigue viendo al lado. Se recalculan la nota del banco, la del Perfil Integral y 
 prioridad **sin llamar a la IA y sin mover a nadie de etapa**. Las cerradas no se ajustan: su nota
 sale de los puntos.
 
+⚠️ **Salvo el pase automático (`V72`).** Ajustar, recalificar y cambiar los puntos no mueven a
+nadie por sí mismos, pero al terminar se vuelve a mirar a quien espera en «por confirmar» en una
+vacante con «calificar y avanzar sola»: si su nota ahora llega a la mínima, pasa sola a la prueba,
+con su correo y su campana. A quien ya está en la prueba no se le toca aunque la nota baje. Ver
+[Estados de la postulación](03-ESTADOS-POSTULACION.md), «La nota mínima».
+
 **Corregir la guía con gente dentro: la recalificación.** Si la empresa cambia la guía, lo que
 evalúa un criterio o lo que debe tener una abierta cuando ya hay candidatos calificados, **se
 vuelve a calificar a todos los que tenían nota de la IA**, para que nadie quede medido con una
@@ -390,7 +396,8 @@ decide quién dispara cada calificación:
 | Al entregar el banco de preguntas | Se califica sola | Igual |
 | Al entregar el **cuestionario técnico** | Se califica solo | Igual |
 | Al entregar la **prueba del puesto** | Espera a que alguien pulse «calificar» | Se califica sola |
-| Al terminar el retrato | La postulación espera a una persona | Pasa sola a la etapa técnica |
+| Al terminar el retrato | La postulación espera a una persona | Pasa sola a la etapa técnica **si su nota del Perfil Integral llega a la mínima de la vacante** (60 por defecto, `V72`); si no llega, o no hay nota completa, espera a una persona |
+| Al recalcular la nota de quien espera (ajuste a mano, recalificación, cambio de puntos) | Nada se mueve | Si sigue en «por confirmar» y ahora llega a la mínima, pasa sola |
 
 **El interruptor nace apagado porque cuesta dinero.** En automático, cada persona que postule
 gasta una llamada al modelo desde el momento en que postula, y esa decisión es de quien lleva

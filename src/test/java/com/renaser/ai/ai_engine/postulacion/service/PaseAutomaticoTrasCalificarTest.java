@@ -1,5 +1,6 @@
 package com.renaser.ai.ai_engine.postulacion.service;
 
+import com.renaser.ai.ai_engine.perfilintegral.service.NotaDelPerfilRecalculada;
 import com.renaser.ai.ai_engine.perfilintegral.service.RetratoTerminado;
 
 import org.junit.jupiter.api.DisplayName;
@@ -50,6 +51,24 @@ class PaseAutomaticoTrasCalificarTest {
                 .when(pase).avanzarSiToca(POSTULACION);
 
         assertThatCode(() -> oyente.alTerminarElRetrato(new RetratoTerminado(POSTULACION)))
+                .doesNotThrowAnyException();
+    }
+
+    @Test
+    @DisplayName("al recalcular la nota, pide el pase tras recalcular de esa postulación (V72)")
+    void alRecalcularPideElPase() {
+        oyente.alRecalcularLaNota(new NotaDelPerfilRecalculada(POSTULACION));
+
+        verify(pase).avanzarTrasRecalcular(POSTULACION);
+    }
+
+    @Test
+    @DisplayName("un pase tras recalcular que falla tampoco sale: el ajuste ya está guardado")
+    void elFalloTrasRecalcularNoSeEscapa() {
+        doThrow(new IllegalStateException("la prueba no se pudo crear"))
+                .when(pase).avanzarTrasRecalcular(POSTULACION);
+
+        assertThatCode(() -> oyente.alRecalcularLaNota(new NotaDelPerfilRecalculada(POSTULACION)))
                 .doesNotThrowAnyException();
     }
 }

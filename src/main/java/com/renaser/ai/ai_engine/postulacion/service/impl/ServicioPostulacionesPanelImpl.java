@@ -16,6 +16,7 @@ import com.renaser.ai.ai_engine.parametro.service.*;
 import com.renaser.ai.ai_engine.usuario.entity.Usuario;
 import com.renaser.ai.ai_engine.usuario.repository.UsuarioRepository;
 import com.renaser.ai.ai_engine.usuario.service.NombresDeUsuarios;
+import com.renaser.ai.ai_engine.perfilintegral.service.UmbralDelPerfilIntegral;
 import com.renaser.ai.ai_engine.postulacion.service.ServicioPostulacionesPanel;
 
 import com.renaser.ai.ai_engine.simulacion.service.ServicioDisponibilidadSimulacion;
@@ -76,6 +77,8 @@ public class ServicioPostulacionesPanelImpl implements ServicioPostulacionesPane
     private final ServicioEnlaceAcceso enlacesDeAcceso;
     private final com.renaser.ai.ai_engine.decision.service.QuienPuedeContratar quienPuedeContratar;
     private final com.renaser.ai.ai_engine.colaborador.service.ContratacionEnLaFicha contratacion;
+    // Por qué espera quien no pasó sola a la prueba (V72): la misma regla que usa el pase.
+    private final UmbralDelPerfilIntegral umbral;
 
     @Override
     public List<FilaBandeja> bandeja(ContextoUsuario quien, String esperaA) {
@@ -165,7 +168,8 @@ public class ServicioPostulacionesPanelImpl implements ServicioPostulacionesPane
                 // Contratar desde la ficha (V64): la decisión en verde, con el permiso de siempre.
                 laVacante != null && laVacante.getEliminadaEn() == null
                         && quienPuedeContratar.puede(quien, p, suEstado != null && suEstado.isEsFinal()),
-                vinculo.colaboradorId(), vinculo.puedeDarDeAlta(), vinculo.puedeVerColaborador());
+                vinculo.colaboradorId(), vinculo.puedeDarDeAlta(), vinculo.puedeVerColaborador(),
+                umbral.porQueEspera(p, laVacante));
     }
 
     /**

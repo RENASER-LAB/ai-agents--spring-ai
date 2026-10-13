@@ -110,10 +110,6 @@ class ServicioPostulacionPortalImplTest {
     // Los intentos de la prueba, para saber si la del editor quedó sin completar (V67).
     @Mock private com.renaser.ai.ai_engine.prueba.repository.IntentoPruebaRepository intentos;
 
-    // El aviso de que postuló a una vacante sin banco que califica sola, para el pase al
-    // instante (V70).
-    @Mock private org.springframework.context.ApplicationEventPublisher eventos;
-
     private ServicioPostulacionPortalImpl servicio;
     // El tablón, armado sobre los mismos dobles: la prueba de la suspendida vigila una
     // sola invariante —lo que el tablón esconde, postular tampoco lo acepta— y esa
@@ -129,7 +125,7 @@ class ServicioPostulacionPortalImplTest {
         servicio = new ServicioPostulacionPortalImpl(organizaciones, personas, usuarios,
                 consentimientos, vacantes, puestos, requisitos, evaluaciones, postulaciones,
                 transiciones, estados, cvs, enlaces, maquina, propuestaPerfil, lecturaCv,
-                colaIa, almacen, archivos, perfiles, correo, textoProceso, avisos, intentos, eventos);
+                colaIa, almacen, archivos, perfiles, correo, textoProceso, avisos, intentos);
         tablon = new ServicioTablonPortalImpl(vacantes, organizaciones, requisitos, textoProceso,
                 catalogos);
     }
@@ -613,7 +609,7 @@ class ServicioPostulacionPortalImplTest {
         verify(archivos, never()).findByIdAndOrganizacionId(500L, 9L);
     }
 
-    // ============ La prueba al instante (V70) ============
+    // ============ Sin prueba al instante (V72) ============
 
     /** La vacante sin banco del arnés, con el pase automático encendido o apagado. */
     private Vacante conPaseAutomatico(boolean encendido) {
@@ -624,34 +620,35 @@ class ServicioPostulacionPortalImplTest {
     }
 
     @Test
-    @DisplayName("sin banco y con pase automático: se pide el pase al instante, antes de encolar la nota del CV (AC-2)")
-    void sinBancoConPaseSePideElPaseAlInstante() {
+    @DisplayName("sin banco y con pase automático: se queda en «por confirmar» y se encola la nota del CV, sin pasar a la prueba (AC-07)")
+    void sinBancoConPaseEsperaLaNotaDelCv() {
         conPaseAutomatico(true);
 
         servicio.postular(QUIEN, VACANTE, cv, "Ordené la caja", null, null, null, null, true,
                 null, null, "10.0.0.1", "Navegador");
 
-        // El pase se pide antes de encolar la nota: así termina antes de que la IA la reciba
-        var orden = org.mockito.Mockito.inOrder(colaIa, eventos);
-        orden.verify(eventos).publishEvent(new com.renaser.ai.ai_engine.perfilintegral.service
-                .TurnoDelPerfilCumplido(77L, com.renaser.ai.ai_engine.perfilintegral.service
-                        .TurnoDelPerfilCumplido.Momento.AL_POSTULAR));
-        orden.verify(colaIa).encolarCribaCv(77L);
+        // La criba del CV se sigue encolando: es la nota que decidirá el pase al terminar
+        verify(colaIa).encolarCribaCv(77L);
+        verify(maquina).transicionar(any(), eq("PERFIL_POR_CONFIRMAR"), any(), any(), eq(true),
+                eq(false), any());
+        // Y no se mueve a la prueba: el pase espera la nota y exige la mínima (V72)
+        verify(maquina, never()).transicionar(any(), eq("PRUEBA_TURNO_CANDIDATO"), any(), any(),
+                org.mockito.ArgumentMatchers.anyBoolean(), org.mockito.ArgumentMatchers.anyBoolean(), any());
     }
 
     @Test
-    @DisplayName("sin pase automático no se pide nada: espera a que el equipo confirme, como hoy (AC-7)")
+    @DisplayName("sin pase automático no se encola nada: espera a que el equipo confirme, como hoy (AC-08)")
     void sinPaseNoSePideNada() {
         conPaseAutomatico(false);
 
         servicio.postular(QUIEN, VACANTE, cv, "Ordené la caja", null, null, null, null, true,
                 null, null, "10.0.0.1", "Navegador");
 
-        org.mockito.Mockito.verifyNoInteractions(eventos);
+        verify(colaIa, never()).encolarCribaCv(any());
     }
 
     @Test
-    @DisplayName("con un requisito incumplido, «no continúa» y ni nota ni prueba (AC-9)")
+    @DisplayName("con un requisito incumplido, «no continúa» y ni nota ni prueba")
     void conRequisitoIncumplidoNada() {
         conPaseAutomatico(true);
         when(requisitos.findByVacanteIdAndEsActivoTrue(VACANTE)).thenReturn(List.of(
@@ -663,7 +660,6 @@ class ServicioPostulacionPortalImplTest {
 
         verify(maquina).transicionar(any(), eq("NO_CONTINUA"), any(), anyString(), eq(true),
                 eq(false), eq("REQUISITO_OBJETIVO"));
-        org.mockito.Mockito.verifyNoInteractions(eventos);
         verify(colaIa, never()).encolarCribaCv(any());
     }
 }

@@ -101,9 +101,11 @@ regla exacta que se aplicó.
 **Hay otras dos cosas que el sistema hace solo**, y conviene decirlas porque el candidato las lee
 en el permiso que acepta: si se le pasa el plazo que tenía para responder una evaluación o una
 prueba, su proceso se cierra; y en las vacantes que se configuraron para avanzar solas, pasa a la
-etapa siguiente sin esperar a que alguien lo apruebe. **Ninguna de las tres depende de una nota**:
-ninguna nota contrata ni descarta por sí sola. En cualquiera de las tres, el candidato puede
-escribir y pedir que una persona lo revise.
+etapa siguiente sin esperar a que alguien lo apruebe, si su nota del Perfil Integral llega a la
+mínima que fijó la vacante. **Solo esa tercera depende de una nota, y nunca para descartar**
+(desde el 12/10/2026): quien no llega espera a que una persona revise su caso, y ninguna nota
+contrata ni descarta por sí sola. En cualquiera de las tres, el candidato puede escribir y pedir
+que una persona lo revise.
 
 ### 5 · Una sola evaluación
 
@@ -131,10 +133,11 @@ ve a los candidatos de sus vacantes, no a los de las demás.
 
 **Salvo que la vacante se haya configurado para avanzar sola**, y entonces este paso no espera a
 nadie: la candidatura pasa a la etapa siguiente por su cuenta. Es una elección de quien lleva la
-vacante, nace apagada, y el candidato lo lee en el permiso que aceptó. Desde el 07/10/2026 ni
-siquiera espera a la nota: si la vacante ya tiene su prueba montada, **la prueba se le abre en el
-mismo momento en que entrega su evaluación** (o al postular, si la vacante no lleva evaluación),
-y la máquina termina de leerlo por detrás. Su nota aparece en el panel cuando acaba.
+vacante, nace apagada, y el candidato lo lee en el permiso que aceptó. **Desde el 12/10/2026 el
+paso espera a que la máquina termine su nota del Perfil Integral** y solo se da si llega a la
+**nota mínima** de la vacante (60 por defecto, se cambia en su configuración). Quien no llega no
+se descarta: se queda en revisión y una persona del equipo decide si sigue. Si después una
+persona corrige su nota y ahora llega, pasa solo.
 
 ### 8 · La prueba del puesto
 

@@ -2,7 +2,9 @@ package com.renaser.ai.ai_engine.vacante.repository;
 
 import com.renaser.ai.ai_engine.vacante.entity.Vacante;
 
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -178,6 +180,46 @@ public interface VacanteRepository extends JpaRepository<Vacante, Long> {
      * esas pantallas contesten 404 sin que ninguna tenga que acordarse de preguntarlo.
      */
     Optional<Vacante> findByIdAndOrganizacionIdAndEliminadaEnIsNull(Long id, Long organizacionId);
+
+    /**
+     * La misma vacante que {@link #findByIdAndOrganizacionIdAndEliminadaEnIsNull}, con su fila
+     * bloqueada ({@code FOR UPDATE}) hasta que acabe la transacción.
+     *
+     * <p><b>El problema que resuelve (QA-F04).</b> El interruptor «Calificar y avanzar sola» y
+     * la nota mínima del pase (V72) se guardan por separado, y en la tuerca salen a la vez:
+     * escribir la mínima y pulsar el interruptor dispara las dos peticiones en el mismo
+     * milisegundo. Las dos leían la vacante, cambiaban su columna y guardaban la fila entera,
+     * así que la última en confirmar reescribía la columna de la otra con el valor viejo: las
+     * dos contestaban 200 y quedaban auditadas, pero la vacante seguía con la mínima anterior
+     * o, peor, con el pase encendido tras «apagarlo».
+     *
+     * <p>Con la fila bloqueada pasan de una en una: la segunda espera y lee lo que confirmó la
+     * primera, así que guarda encima de eso y su auditoría dice «de X a Y» con el X de verdad.
+     * Si el apagado llega primero, la mínima se rechaza (409) sin auditar, como con el
+     * interruptor ya apagado.
+     *
+     * <p><b>No eran solo esos dos (QA-F05).</b> Cualquier otra escritura de la vacante —de
+     * dónde salen las preguntas, que está justo debajo en la misma tuerca, el instrumento, los
+     * pesos, publicar, cerrar…— leía sin esperar y también reescribía la mínima y el
+     * interruptor con lo que leyó. Por eso la usan TODAS las escrituras del panel (es lo que
+     * hace {@code laQueSePuedeTocar}), y la entidad lleva {@code @DynamicUpdate} para las que
+     * entran por otro lado.
+     *
+     * <p>En PostgreSQL sale como {@code FOR NO KEY UPDATE}: choca con otro guardado de la
+     * vacante y con el {@code FOR SHARE} de quien está postulando (que ya chocaba con su
+     * {@code UPDATE}), pero no con las claves foráneas, así que crear una postulación, un
+     * requisito o un intento no espera por él. El orden es siempre la vacante primero y luego
+     * lo suyo (requisitos, textos de correo, intentos): nadie que tenga ya bloqueado uno de
+     * esos pide después la vacante, y no cabe un interbloqueo.
+     *
+     * <p>⚠️ <b>Tiene que ser la primera lectura de la vacante en la transacción.</b> Si ya
+     * estuviera en el contexto de persistencia, Hibernate devolvería esa copia sin releerla y
+     * el bloqueo no serviría de nada.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select v from Vacante v where v.id = :id and v.organizacionId = :organizacionId "
+            + "and v.eliminadaEn is null")
+    Optional<Vacante> bloquear(@Param("id") Long id, @Param("organizacionId") Long organizacionId);
 
     /**
      * Si esa vacante está eliminada, sin traerse la fila.

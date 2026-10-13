@@ -119,6 +119,10 @@ public interface PuenteCalificacionIa {
      * Recalcula la nota del Perfil Integral y el grupo de prioridad <b>sin llamar a la IA y
      * sin mover a nadie de etapa</b>: el camino del ajuste a mano, del cambio de puntos y de
      * la recalificación. El grupo se decide con los hallazgos ya guardados del retrato.
+     *
+     * <p>Al terminar publica {@link NotaDelPerfilRecalculada}: si la postulación espera en «por
+     * confirmar» en una vacante que avanza sola y su nota ahora llega a la mínima, el pase
+     * automático la mueve después del commit (V72). Aquí dentro no se mueve a nadie.
      */
     void recalcularSinMover(Long postulacionId);
 

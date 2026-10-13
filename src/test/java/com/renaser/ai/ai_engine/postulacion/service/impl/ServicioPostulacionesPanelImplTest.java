@@ -88,6 +88,7 @@ class ServicioPostulacionesPanelImplTest {
     @Mock private com.renaser.ai.ai_engine.postulacion.service.ServicioEnlaceAcceso enlacesDeAcceso;
     @Mock private com.renaser.ai.ai_engine.decision.service.QuienPuedeContratar quienPuedeContratar;
     @Mock private com.renaser.ai.ai_engine.colaborador.service.ContratacionEnLaFicha contratacion;
+    @Mock private com.renaser.ai.ai_engine.perfilintegral.service.UmbralDelPerfilIntegral umbral;
 
     @InjectMocks
     private ServicioPostulacionesPanelImpl servicio;
@@ -323,6 +324,19 @@ class ServicioPostulacionesPanelImplTest {
         // Sin currículum la ficha no se cae: sale con los enlaces vacíos y sin archivo.
         assertThat(ficha.enlaces()).isEmpty();
         assertThat(ficha.archivoCvId()).isNull();
+        // Sin nada que explicar sobre la nota mínima, ese hueco viaja vacío
+        assertThat(ficha.porQueEsperaElPase()).isNull();
+    }
+
+    @Test
+    @DisplayName("La ficha dice por qué espera quien no llegó a la nota mínima, con la regla del pase (V72, AC-03)")
+    void laFichaDicePorQueEspera() {
+        prepararLaFichaDe(1L);
+        when(umbral.porQueEspera(any(), any()))
+                .thenReturn("Nota 58,20: no llega a la mínima de la vacante (60)");
+
+        assertThat(servicio.ficha(quien, 1L).porQueEsperaElPase())
+                .isEqualTo("Nota 58,20: no llega a la mínima de la vacante (60)");
     }
 
     @Test

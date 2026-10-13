@@ -34,6 +34,7 @@ import org.mockito.Mock;
 import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -145,8 +146,32 @@ class ServicioVacantesPanelImplTest {
                                 .estado("PUBLICADA").build()));
     }
 
+    /**
+     * La vacante como la leen las consultas (suelta) y las escrituras (con la fila bloqueada,
+     * QA-F05). Cada prueba usa una de las dos, así que las dos van {@code lenient}.
+     */
     private Vacante vacante(String estado, boolean aplicaEvaluacion, Long plantillaEvaluacionId) {
-        Vacante v = Vacante.builder()
+        Vacante v = nuevaVacante(estado, aplicaEvaluacion, plantillaEvaluacionId);
+        org.mockito.Mockito.lenient()
+                .when(vacantes.findByIdAndOrganizacionIdAndEliminadaEnIsNull(VACANTE, ORGANIZACION))
+                .thenReturn(Optional.of(v));
+        org.mockito.Mockito.lenient()
+                .when(vacantes.bloquear(VACANTE, ORGANIZACION)).thenReturn(Optional.of(v));
+        return v;
+    }
+
+    /**
+     * La vacante como la leen el interruptor del pase y su nota mínima: con la fila bloqueada
+     * (QA-F04). Sin bloquear, la lectura suelta devolvería vacío y el método contestaría 404.
+     */
+    private Vacante vacanteDelPase(String estado) {
+        Vacante v = nuevaVacante(estado, true, 7L);
+        when(vacantes.bloquear(VACANTE, ORGANIZACION)).thenReturn(Optional.of(v));
+        return v;
+    }
+
+    private static Vacante nuevaVacante(String estado, boolean aplicaEvaluacion, Long plantillaEvaluacionId) {
+        return Vacante.builder()
                 .id(VACANTE)
                 .organizacionId(ORGANIZACION)
                 .estado(estado)
@@ -155,8 +180,6 @@ class ServicioVacantesPanelImplTest {
                 .puestoId(PUESTO)
                 .versionPlantillaPruebaId(31L)
                 .build();
-        when(vacantes.findByIdAndOrganizacionIdAndEliminadaEnIsNull(VACANTE, ORGANIZACION)).thenReturn(Optional.of(v));
-        return v;
     }
 
     // ============ El puesto nace con la solicitud ============
@@ -355,12 +378,15 @@ class ServicioVacantesPanelImplTest {
     @Test
     @DisplayName("poner la vacante en automático queda guardado y auditado")
     void encenderElAutomaticoSeGuarda() {
-        Vacante v = vacante("PUBLICADA", true, 7L);
+        Vacante v = vacanteDelPase("PUBLICADA");
 
         servicio.activarCalificacionAutomatica(QUIEN, VACANTE, true);
 
         assertThat(v.isCalificacionAutomatica()).isTrue();
         verify(vacantes).save(v);
+        // La lee bloqueada: la mínima puede estar guardándose a la vez (QA-F04)
+        verify(vacantes).bloquear(VACANTE, ORGANIZACION);
+        verify(vacantes, never()).findByIdAndOrganizacionIdAndEliminadaEnIsNull(VACANTE, ORGANIZACION);
         verify(auditoria).registrar(ORGANIZACION, QUIEN, "activar_calificacion_automatica",
                 "vacante", VACANTE, Map.of("calificacionAutomatica", false),
                 Map.of("calificacionAutomatica", true), null);
@@ -369,13 +395,150 @@ class ServicioVacantesPanelImplTest {
     @Test
     @DisplayName("el automático no se toca en una vacante cerrada")
     void elAutomaticoDeUnaCerradaNoSeToca() {
-        vacante("CERRADA", true, 7L);
+        vacanteDelPase("CERRADA");
 
         assertThatThrownBy(() -> servicio.activarCalificacionAutomatica(QUIEN, VACANTE, true))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("cerrada");
 
         verify(vacantes, never()).save(any(Vacante.class));
+    }
+
+    // ============ La nota mínima del Perfil Integral (V72) ============
+
+    @Test
+    @DisplayName("la nota mínima se cambia con el interruptor encendido, y queda auditado de cuánto a cuánto (AC-09)")
+    void laNotaMinimaSeGuardaYSeAudita() {
+        Vacante v = vacanteDelPase("PUBLICADA");
+        v.setCalificacionAutomatica(true);
+        assertThat(v.getNotaMinima()).isEqualByComparingTo("60");
+
+        servicio.fijarNotaMinima(QUIEN, VACANTE, new BigDecimal("70"));
+
+        assertThat(v.getNotaMinima()).isEqualByComparingTo("70");
+        verify(vacantes).save(v);
+        // La lee bloqueada: el interruptor puede estar guardándose a la vez (QA-F04)
+        verify(vacantes).bloquear(VACANTE, ORGANIZACION);
+        verify(vacantes, never()).findByIdAndOrganizacionIdAndEliminadaEnIsNull(VACANTE, ORGANIZACION);
+        verify(auditoria).registrar(ORGANIZACION, QUIEN, "fijar_nota_minima", "vacante", VACANTE,
+                Map.of("notaMinima", 60), Map.of("notaMinima", 70), null);
+    }
+
+    @Test
+    @DisplayName("la nota mínima admite los extremos 0 y 100, y «70.0» es el entero 70")
+    void laNotaMinimaAdmiteLosExtremos() {
+        Vacante v = vacanteDelPase("PUBLICADA");
+        v.setCalificacionAutomatica(true);
+
+        servicio.fijarNotaMinima(QUIEN, VACANTE, BigDecimal.ZERO);
+        assertThat(v.getNotaMinima()).isEqualByComparingTo("0");
+        servicio.fijarNotaMinima(QUIEN, VACANTE, new BigDecimal("100"));
+        assertThat(v.getNotaMinima()).isEqualByComparingTo("100");
+        servicio.fijarNotaMinima(QUIEN, VACANTE, new BigDecimal("70.0"));
+        assertThat(v.getNotaMinima()).isEqualByComparingTo("70");
+    }
+
+    @Test
+    @DisplayName("la nota mínima rechaza decimales y lo que no está entre 0 y 100, sin guardar nada (AC-09)")
+    void laNotaMinimaRechazaOtrosValores() {
+        Vacante v = vacanteDelPase("PUBLICADA");
+        v.setCalificacionAutomatica(true);
+
+        for (String mala : new String[] {"70.5", "-1", "101", "59.99"}) {
+            assertThatThrownBy(() -> servicio.fijarNotaMinima(QUIEN, VACANTE, new BigDecimal(mala)))
+                    .as(mala)
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("La nota mínima es un número entero de 0 a 100");
+        }
+        assertThatThrownBy(() -> servicio.fijarNotaMinima(QUIEN, VACANTE, null))
+                .isInstanceOf(IllegalArgumentException.class);
+
+        assertThat(v.getNotaMinima()).isEqualByComparingTo("60");
+        verify(vacantes, never()).save(any(Vacante.class));
+        org.mockito.Mockito.verifyNoInteractions(auditoria);
+    }
+
+    @Test
+    @DisplayName("la nota mínima no se toca con el interruptor apagado ni en una vacante cerrada")
+    void laNotaMinimaSoloConElInterruptor() {
+        Vacante v = vacanteDelPase("PUBLICADA");
+
+        assertThatThrownBy(() -> servicio.fijarNotaMinima(QUIEN, VACANTE, new BigDecimal("70")))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Calificar y avanzar sola");
+
+        v.setCalificacionAutomatica(true);
+        v.setEstado("CERRADA");
+        assertThatThrownBy(() -> servicio.fijarNotaMinima(QUIEN, VACANTE, new BigDecimal("70")))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("cerrada");
+
+        verify(vacantes, never()).save(any(Vacante.class));
+    }
+
+    @Test
+    @DisplayName("bajar la mínima no mueve a nadie: no toca postulaciones ni la máquina (AC-10)")
+    void bajarLaMinimaNoMueveANadie() {
+        Vacante v = vacanteDelPase("PUBLICADA");
+        v.setCalificacionAutomatica(true);
+        v.setNotaMinima(new BigDecimal("70"));
+
+        servicio.fijarNotaMinima(QUIEN, VACANTE, new BigDecimal("60"));
+
+        org.mockito.Mockito.verifyNoInteractions(maquina, postulaciones);
+    }
+
+    // La tuerca desactiva la mínima con este booleano (casos límite: «sin permiso, el campo se
+    // ve desactivado»). Tiene que decir lo mismo que la puerta de los endpoints del pase: el
+    // permiso del interruptor y una vacante que aún se puede tocar. Ni más estricto —dejaría
+    // fuera a RESPONSABLE_AREA, que la fija— ni más laxo —enseñaría editable lo que da 403—.
+
+    /** RESPONSABLE_AREA: configura el pase (acotado a sus vacantes) pero no edita la vacante. */
+    private static final ContextoUsuario CONFIGURA_EL_PASE = new ContextoUsuario(
+            13L, 4L, ORGANIZACION, "EQUIPO", List.of(5L),
+            Map.of("ver_vacantes", "TODO", "elegir_plantilla_evaluacion", "SUS_VACANTES"));
+
+    /** Ve las vacantes y nada más. */
+    private static final ContextoUsuario SOLO_VE = new ContextoUsuario(
+            14L, 6L, ORGANIZACION, "EQUIPO", List.of(7L), Map.of("ver_vacantes", "TODO"));
+
+    @Test
+    @DisplayName("con el permiso del interruptor, la vacante dice que puede configurar el pase aunque no pueda editarla (QA-F03)")
+    void conElPermisoDelInterruptorConfiguraElPase() {
+        vacante("PUBLICADA", true, 7L);
+
+        var panel = servicio.detalle(CONFIGURA_EL_PASE, VACANTE);
+
+        assertThat(panel.puedeConfigurarElPase()).isTrue();
+        assertThat(panel.puedeEditar())
+                .as("sin editar_vacante: el lápiz no, la mínima sí")
+                .isFalse();
+    }
+
+    @Test
+    @DisplayName("sin el permiso del interruptor no puede configurar el pase, ni en el detalle ni en la lista (QA-F03)")
+    void sinElPermisoDelInterruptorNoConfiguraElPase() {
+        Vacante v = vacante("PUBLICADA", true, 7L);
+        when(vacantes.findByOrganizacionIdAndArchivadaEnIsNullAndEliminadaEnIsNullOrderByCreadoEnDesc(
+                ORGANIZACION)).thenReturn(List.of(v));
+        when(enCarrera.cuantasPorVacante(ORGANIZACION)).thenReturn(Map.of());
+
+        assertThat(servicio.detalle(SOLO_VE, VACANTE).puedeConfigurarElPase()).isFalse();
+        assertThat(servicio.listar(SOLO_VE, false).get(0).puedeConfigurarElPase()).isFalse();
+        assertThat(servicio.listar(CONFIGURA_EL_PASE, false).get(0).puedeConfigurarElPase())
+                .as("la fila de la lista lo calcula igual que el detalle")
+                .isTrue();
+    }
+
+    @Test
+    @DisplayName("una vacante cerrada o archivada no deja configurar el pase ni con el permiso: la API daría 409")
+    void cerradaOArchivadaNoConfiguraElPase() {
+        Vacante v = vacante("CERRADA", true, 7L);
+
+        assertThat(servicio.detalle(CONFIGURA_EL_PASE, VACANTE).puedeConfigurarElPase()).isFalse();
+
+        v.setArchivadaEn(Instant.parse("2026-10-01T12:00:00Z"));
+        assertThat(servicio.detalle(CONFIGURA_EL_PASE, VACANTE).puedeConfigurarElPase()).isFalse();
     }
 
     @Test

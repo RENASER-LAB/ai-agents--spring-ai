@@ -141,13 +141,24 @@ public interface ServicioVacantesPanel {
      *
      * <p>Encendido, la postulación viaja sola: se le califica el currículum al postular —si
      * la vacante no lleva banco—, pasa sola a la etapa técnica cuando la calificación
-     * termina, y su prueba se califica sola al entregarse. La primera persona que hace falta
+     * termina <b>si su nota del Perfil Integral llega a la mínima de la vacante</b> (V72; ver
+     * {@link #fijarNotaMinima}), y su prueba se califica sola al entregarse. La primera persona que hace falta
      * es la que decide quién va a la simulación.
      *
      * <p>Solo cambia lo que pase de aquí en adelante: a quien ya está parado en una bandeja
      * no lo mueve, y para eso está el botón de calificar la tanda.
      */
     void activarCalificacionAutomatica(ContextoUsuario quien, Long id, boolean activa);
+
+    /**
+     * La nota mínima del Perfil Integral para pasar sola a la prueba del puesto (V72).
+     *
+     * <p>Mismo permiso, mismo alcance y misma auditoría que el interruptor de
+     * {@link #activarCalificacionAutomatica}, y solo con él encendido. Un entero de 0 a 100;
+     * otro valor se rechaza. <b>No mueve a nadie</b>: vale para las notas que terminen desde
+     * ahora y para los recálculos.
+     */
+    void fijarNotaMinima(ContextoUsuario quien, Long id, java.math.BigDecimal notaMinima);
 
     /**
      * Qué versión de pesos rige la decisión de esta vacante.

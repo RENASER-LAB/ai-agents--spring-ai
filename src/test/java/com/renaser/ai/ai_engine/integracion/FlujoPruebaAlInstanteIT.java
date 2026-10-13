@@ -4,7 +4,9 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.renaser.ai.ai_engine.integracion.soporte.ImagenesDeContenedores;
 import com.renaser.ai.ai_engine.notificacion.service.FechaParaElCandidato;
+import com.renaser.ai.ai_engine.perfilintegral.dto.DtosCalificacionIa.NotaCriterioIa;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosCalificacionIa.NotaRespuestaIa;
+import com.renaser.ai.ai_engine.perfilintegral.dto.DtosCalificacionIa.ResultadoCv;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosCalificacionIa.ResultadoEvaluador;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosCalificacionIa.ResultadoPerfil;
 import com.renaser.ai.ai_engine.perfilintegral.service.PuenteCalificacionIa;
@@ -53,8 +55,13 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 /**
- * La prueba al instante, la campana en cada etapa, los recordatorios y el plazo del aviso, de
- * punta a punta (specs/la-prueba-al-instante-y-avisos-de-etapa.md, V70).
+ * El pase a la prueba con la nota, la campana en cada etapa, los recordatorios y el plazo del
+ * aviso, de punta a punta (specs/la-prueba-al-instante-y-avisos-de-etapa.md, V70).
+ *
+ * <p>⚠️ <b>Desde la V72 ya no hay prueba al instante</b> (specs/umbral-del-perfil-integral.md):
+ * entregar el banco, o postular sin banco, deja a la persona esperando a que la IA termine la
+ * nota del Perfil Integral, y solo entonces pasa, si llega a la mínima. Las notas de aquí (85 y
+ * 75) llegan; la mínima y sus casos límite los recorre {@link FlujoNotaMinimaDelPerfilIT}.
  *
  * <p>Cuatro vacantes, todas con la prueba del editor y la misma fecha límite:
  * <ul>
@@ -71,7 +78,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @Testcontainers
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-@DisplayName("La prueba al instante, la campana en cada etapa y los recordatorios")
+@DisplayName("El pase con la nota, la campana en cada etapa y los recordatorios")
 class FlujoPruebaAlInstanteIT {
 
     @Container
@@ -94,8 +101,9 @@ class FlujoPruebaAlInstanteIT {
         registro.add("renaser.ai.calificacion.habilitada", () -> "false");
     }
 
-    private static final String AL_ENTREGAR = "Pase automático al entregar: la nota se calcula después";
-    private static final String AL_POSTULAR = "Pase automático al postular: la nota se calcula después";
+    private static final List<String> CRITERIOS_CV = List.of("CV_RESULTADOS", "CV_COMPLEJIDAD",
+            "CV_SISTEMAS", "CV_PERSONAS", "CV_APRENDIZAJE", "CV_INICIATIVA", "CV_HABILIDADES",
+            "CV_EVIDENCIA");
 
     @Autowired MockMvc mvc;
     @Autowired JdbcTemplate jdbc;
@@ -162,31 +170,50 @@ class FlujoPruebaAlInstanteIT {
         publicar(conCuestionario, true);
     }
 
-    // ============ Parte A: la prueba al instante ============
+    // ============ Parte A: el pase con la nota (V72) ============
 
     @Test
     @Order(2)
-    @DisplayName("Con banco y pase automático: al entregar, en la misma respuesta queda en la prueba sin reloj (AC-1, AC-8, AC-20, AC-21)")
-    void alEntregarQuedaEnLaPrueba() throws Exception {
+    @DisplayName("Con banco y pase automático: al entregar espera la nota; cuando la IA la termina con 85, queda en la prueba sin reloj (AC-1, AC-8, AC-20, AC-21; V72)")
+    void alEntregarEsperaLaNotaYConEllaPasa() throws Exception {
         postular("ana", conBanco);
         assertThat(estado("ana")).isEqualTo("PERFIL_TURNO_CANDIDATO");
 
         responderYEntregar("ana");
 
-        // AC-1: en la misma respuesta, en la prueba, con su intento y el reloj sin arrancar
+        // V72: ya no pasa al instante. Espera a la IA, sin prueba ni correo de la prueba
+        long ana = postulacion.get("ana");
+        assertThat(estado("ana")).isEqualTo("PERFIL_CALIFICANDO");
+        assertThat(contar("select count(*) from intento_prueba where postulacion_id = " + ana)).isZero();
+        assertThat(correos("ana")).containsExactly("POSTULACION_RECIBIDA", "POSTULACION_AVANZA");
+
+        // La IA trabajando: lo que el panel pinta como «en camino» (AC-5), sin cambios
+        jdbc.update("""
+                insert into trabajo_ia (organizacion_id, agente_codigo, postulacion_id, estado, modo)
+                values (1, 'POTENCIAL_RIESGO', ?, 'PENDIENTE', 'FINA')""", ana);
+        JsonNode fila = filaDelRanking(conBanco, ana);
+        assertThat(fila.get("estado").asText()).isEqualTo("PERFIL_CALIFICANDO");
+        assertThat(fila.get("estadoCalificacion").asText()).isEqualTo("EN_CURSO");
+        assertThat(fila.get("notaEtapa").isNull()).isTrue();
+
+        // La IA termina con 85: llega a la mínima (60) y pasa sola
+        laIaCierraConElBanco("ana", "85");
+        jdbc.update("update trabajo_ia set estado = 'TERMINADO', terminado_en = now() where postulacion_id = ?", ana);
+
+        // AC-1: en la prueba, con su intento y el reloj sin arrancar
         assertThat(estado("ana")).isEqualTo("PRUEBA_TURNO_CANDIDATO");
         assertThat(jdbc.queryForObject("select count(*) from intento_prueba where postulacion_id = ? "
-                + "and iniciado_en is null", Integer.class, postulacion.get("ana"))).isEqualTo(1);
+                + "and iniciado_en is null", Integer.class, ana)).isEqualTo(1);
         JsonNode prueba = respuesta(conTokenGet("/api/v1/portal/prueba/" + codigo.get("ana"), token.get("ana")));
         assertThat(prueba.get("estadoIntento").asText()).isEqualTo("PENDIENTE");
 
-        // AC-8: el historial dice el pase con su motivo, de uno en uno
+        // AC-8: el historial dice el pase con su motivo: la nota y la mínima
         assertThat(pasos("ana")).containsExactly(
                 "POSTULADA | null",
                 "PERFIL_TURNO_CANDIDATO | null",
                 "PERFIL_CALIFICANDO | null",
-                "PERFIL_POR_CONFIRMAR | " + AL_ENTREGAR,
-                "PRUEBA_TURNO_CANDIDATO | " + AL_ENTREGAR);
+                "PERFIL_POR_CONFIRMAR | null",
+                "PRUEBA_TURNO_CANDIDATO | Pase automático: nota del Perfil Integral 85,00 (mínima 60)");
         // Y un solo correo por el pase: el de la prueba
         assertThat(correos("ana")).containsExactly(
                 "POSTULACION_RECIBIDA", "POSTULACION_AVANZA", "PRUEBA_DISPONIBLE");
@@ -221,60 +248,45 @@ class FlujoPruebaAlInstanteIT {
 
     @Test
     @Order(4)
-    @DisplayName("Con la nota pendiente el ranking lo sabe; al terminar la IA, nota y grupo sin mover a nadie (AC-4, AC-5)")
+    @DisplayName("Con la nota puesta, el ranking la enseña; y un segundo cierre con ella ya en la prueba no la mueve (AC-4, AC-5)")
     void laNotaLlegaSinMoverANadie() throws Exception {
         long ana = postulacion.get("ana");
-        // La IA trabajando: lo que el panel pinta como «en camino»
-        jdbc.update("""
-                insert into trabajo_ia (organizacion_id, agente_codigo, postulacion_id, estado, modo)
-                values (1, 'POTENCIAL_RIESGO', ?, 'PENDIENTE', 'FINA')""", ana);
-        JsonNode fila = filaDelRanking(conBanco, ana);
-        assertThat(fila.get("estado").asText()).isEqualTo("PRUEBA_TURNO_CANDIDATO");
-        assertThat(fila.get("estadoCalificacion").asText()).isEqualTo("EN_CURSO");
-        assertThat(fila.get("notaEtapa").isNull()).isTrue();
-
-        // La IA termina con el candidato ya en la prueba: califica su abierta, arma el retrato,
-        // se guarda todo y no se le mueve
-        int transicionesAntes = contar("select count(*) from transicion_estado where postulacion_id = " + ana);
-        long respuestaId = jdbc.queryForObject("""
-                select r.id from respuesta r join postulacion p on p.evaluacion_id = r.evaluacion_id
-                 where p.id = ?""", Long.class, ana);
-        puente.guardarNotasPorPuntos(ana, null, new ResultadoEvaluador(List.of(new NotaRespuestaIa(
-                respuestaId, new BigDecimal("85"), "Da el monto, la causa y el plazo", "cita",
-                new BigDecimal("80"), null, null, null, null, null))), 1, false);
-        puente.cerrarPerfilIntegral(ana, null, new ResultadoPerfil(new BigDecimal("72"),
-                new BigDecimal("65"), new BigDecimal("50"), new BigDecimal("80"),
-                "Cuadra cajas y explica sus cifras", List.of(), List.of()));
-        jdbc.update("update trabajo_ia set estado = 'TERMINADO', terminado_en = now() where postulacion_id = ?", ana);
-
-        assertThat(estado("ana")).isEqualTo("PRUEBA_TURNO_CANDIDATO");
-        assertThat(contar("select count(*) from transicion_estado where postulacion_id = " + ana))
-                .isEqualTo(transicionesAntes);
-        assertThat(contar("select count(*) from perfil_talento where postulacion_id = " + ana)).isEqualTo(1);
-        assertThat(jdbc.queryForObject("select grupo_prioridad from postulacion where id = ?",
-                String.class, ana)).isNotBlank();
         JsonNode despues = filaDelRanking(conBanco, ana);
         assertThat(despues.get("notaEtapa").isNull()).as("la nota del Perfil Integral llegó").isFalse();
         assertThat(despues.get("grupoPrioridad").asText()).isNotBlank();
         assertThat(despues.get("adecuacion").asInt()).isEqualTo(72);
         assertThat(despues.get("estadoCalificacion").asText()).isEqualTo("TERMINADA");
-        // Y no sale otro correo de la prueba
+
+        // La IA vuelve a cerrar (un recalibrado) con el candidato ya en la prueba: se guarda
+        // todo y no se le mueve, ni sale otro correo de la prueba
+        int transicionesAntes = contar("select count(*) from transicion_estado where postulacion_id = " + ana);
+        puente.cerrarPerfilIntegral(ana, null, retrato());
+        assertThat(estado("ana")).isEqualTo("PRUEBA_TURNO_CANDIDATO");
+        assertThat(contar("select count(*) from transicion_estado where postulacion_id = " + ana))
+                .isEqualTo(transicionesAntes);
+        assertThat(contar("select count(*) from perfil_talento where postulacion_id = " + ana)).isEqualTo(1);
         assertThat(correos("ana")).containsOnlyOnce("PRUEBA_DISPONIBLE");
     }
 
     @Test
     @Order(5)
-    @DisplayName("Sin banco y con pase automático: al postular queda en la prueba «Sin cronómetro» (AC-2, AC-21)")
-    void alPostularQuedaEnLaPrueba() throws Exception {
+    @DisplayName("Sin banco y con pase automático: al postular espera la nota del CV y con ella queda en la prueba «Sin cronómetro» (AC-2, AC-21; V72)")
+    void alPostularEsperaLaNotaDelCv() throws Exception {
         postular("beto", sinBanco);
+
+        // V72: espera la nota del currículum en «por confirmar», sin prueba
+        assertThat(estado("beto")).isEqualTo("PERFIL_POR_CONFIRMAR");
+        assertThat(contar("select count(*) from intento_prueba where postulacion_id = "
+                + postulacion.get("beto"))).isZero();
+        assertThat(correos("beto")).containsExactly("POSTULACION_RECIBIDA");
+
+        laIaCalificaElCv("beto");
 
         assertThat(estado("beto")).isEqualTo("PRUEBA_TURNO_CANDIDATO");
         assertThat(contar("select count(*) from intento_prueba where postulacion_id = "
                 + postulacion.get("beto"))).isEqualTo(1);
-        assertThat(pasos("beto")).containsExactly(
-                "POSTULADA | null",
-                "PERFIL_POR_CONFIRMAR | null",
-                "PRUEBA_TURNO_CANDIDATO | " + AL_POSTULAR);
+        assertThat(pasos("beto")).endsWith(
+                "PRUEBA_TURNO_CANDIDATO | Pase automático: nota del Perfil Integral 75,00 (mínima 60)");
         assertThat(correos("beto")).containsExactly("POSTULACION_RECIBIDA", "PRUEBA_DISPONIBLE");
         assertThat(cuerpoDe("beto", "PRUEBA_DISPONIBLE"))
                 .contains("Tienes hasta el " + FechaParaElCandidato.dicha(cierre) + ".")
@@ -320,9 +332,12 @@ class FlujoPruebaAlInstanteIT {
 
     @Test
     @Order(8)
-    @DisplayName("Con el cuestionario técnico también se abre al instante, con su plazo (AC-3, AC-21)")
+    @DisplayName("Con el cuestionario técnico también se abre al llegar la nota, con su plazo (AC-3, AC-21; V72)")
     void elCuestionarioTambien() throws Exception {
         postular("dani", conCuestionario);
+        assertThat(estado("dani")).isEqualTo("PERFIL_POR_CONFIRMAR");
+
+        laIaCalificaElCv("dani");
 
         assertThat(estado("dani")).isEqualTo("PRUEBA_TURNO_CANDIDATO");
         assertThat(jdbc.queryForObject("select evaluacion_tecnica_id from postulacion where id = ?",
@@ -508,7 +523,7 @@ class FlujoPruebaAlInstanteIT {
 
     @Test
     @Order(16)
-    @DisplayName("Dos pestañas entregan a la vez: la segunda falla, un solo paso a «calificando», una prueba y un correo")
+    @DisplayName("Dos pestañas entregan a la vez: la segunda falla, un solo paso a «calificando», y ninguna prueba hasta la nota")
     void dosEntregasALaVez() throws Exception {
         postular("fede", conBanco);
         String entrega = responderSinEntregar("fede");
@@ -538,13 +553,41 @@ class FlujoPruebaAlInstanteIT {
         long fede = postulacion.get("fede");
         assertThat(contar("select count(*) from transicion_estado where postulacion_id = " + fede
                 + " and estado_nuevo_codigo = 'PERFIL_CALIFICANDO'")).isEqualTo(1);
-        assertThat(estado("fede")).isEqualTo("PRUEBA_TURNO_CANDIDATO");
-        assertThat(contar("select count(*) from intento_prueba where postulacion_id = " + fede)).isEqualTo(1);
-        assertThat(correos("fede")).containsOnlyOnce("PRUEBA_DISPONIBLE");
-        assertThat(avisos("fede")).containsOnlyOnce("PRUEBA_DISPONIBLE");
+        // V72: espera la nota; ni prueba, ni correo, ni aviso de la prueba
+        assertThat(estado("fede")).isEqualTo("PERFIL_CALIFICANDO");
+        assertThat(contar("select count(*) from intento_prueba where postulacion_id = " + fede)).isZero();
+        assertThat(correos("fede")).doesNotContain("PRUEBA_DISPONIBLE");
+        assertThat(avisos("fede")).doesNotContain("PRUEBA_DISPONIBLE");
     }
 
     // ============ Ayudas ============
+
+    /** Lo que deja la IA al terminar: la abierta del banco con esa nota y el retrato cerrado. */
+    private void laIaCierraConElBanco(String quien, String nota) {
+        long id = postulacion.get(quien);
+        long respuestaId = jdbc.queryForObject("""
+                select r.id from respuesta r join postulacion p on p.evaluacion_id = r.evaluacion_id
+                 where p.id = ?""", Long.class, id);
+        puente.guardarNotasPorPuntos(id, null, new ResultadoEvaluador(List.of(new NotaRespuestaIa(
+                respuestaId, new BigDecimal(nota), "Da el monto, la causa y el plazo", "cita",
+                new BigDecimal("80"), null, null, null, null, null))), 1, false);
+        puente.cerrarPerfilIntegral(id, null, retrato());
+    }
+
+    /** Lo que deja la IA al calificar el currículum de quien postula sin banco: un 75. */
+    private void laIaCalificaElCv(String quien) {
+        long id = postulacion.get(quien);
+        puente.guardarEvidenciaCv(id, null, new ResultadoCv(CRITERIOS_CV.stream()
+                .map(c -> new NotaCriterioIa(c, new BigDecimal("75"), "Hay un resultado medido",
+                        "cuadró tres sedes"))
+                .toList(), List.of(), new BigDecimal("70")));
+        puente.cerrarPerfilIntegral(id, null, retrato());
+    }
+
+    private static ResultadoPerfil retrato() {
+        return new ResultadoPerfil(new BigDecimal("72"), new BigDecimal("65"), new BigDecimal("50"),
+                new BigDecimal("80"), "Cuadra cajas y explica sus cifras", List.of(), List.of());
+    }
 
     /** Lo que el sondeo haría a esa hora, llevado a la franja de Lima. */
     private static Instant diurno(Instant cuando) {

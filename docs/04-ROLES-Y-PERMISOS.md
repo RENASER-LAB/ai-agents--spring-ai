@@ -133,6 +133,12 @@ alcance; verlas, con `ver_vacantes`. El panel no lo sabe por su cuenta: el edito
 nota de la IA»** (`ajustar_nota`), con su motivo obligatorio de siempre; la ficha se lo dice con
 `puedeAjustar`.
 
+**El interruptor «calificar y avanzar sola» y su nota mínima (`V72`, 12/10/2026) van con ese mismo
+permiso**, sin permiso nuevo: `elegir_plantilla_evaluacion`, con la misma auditoría. No piden
+`editar_vacante`, así que el responsable del área, que no corrige la vacante, sí fija la mínima.
+La vacante del panel lo dice con `puedeConfigurarElPase`, que también es falso con la vacante
+cerrada o archivada; sin él, la tuerca enseña la mínima desactivada.
+
 **La prueba técnica de una vacante nueva (`V67`, 01/10/2026) sigue el mismo reparto, sin
 permiso nuevo.** Armarla, publicarla, copiarla, pedir recomendaciones y fijar su fecha límite
 (`V68`) es **corregir la vacante**

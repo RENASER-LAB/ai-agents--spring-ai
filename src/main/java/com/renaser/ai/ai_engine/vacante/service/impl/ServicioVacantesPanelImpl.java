@@ -22,6 +22,7 @@ import com.renaser.ai.ai_engine.perfilintegral.entity.VersionBanco;
 import com.renaser.ai.ai_engine.perfilintegral.repository.EvaluacionRepository;
 import com.renaser.ai.ai_engine.perfilintegral.repository.PlantillaEvaluacionRepository;
 import com.renaser.ai.ai_engine.perfilintegral.repository.VersionBancoRepository;
+import com.renaser.ai.ai_engine.perfilintegral.service.UmbralDelPerfilIntegral;
 import com.renaser.ai.ai_engine.pesos.entity.VersionPesos;
 import com.renaser.ai.ai_engine.pesos.repository.VersionPesosRepository;
 import com.renaser.ai.ai_engine.prueba.entity.VersionPlantillaPrueba;
@@ -45,6 +46,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.text.Normalizer;
 import java.util.HashMap;
@@ -117,6 +120,15 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
      * reparta {@code cerrar_vacante} a un rol nuevo estaría regalando esto sin enterarse.
      */
     private static final String PERMISO_ELIMINAR = "eliminar_vacante";
+
+    /**
+     * El permiso del pase automático: el interruptor y su nota mínima (V72).
+     *
+     * <p>Es el que exige el controlador a {@code calificacion-automatica} y a
+     * {@code nota-minima}, y con él se calcula {@code puedeConfigurarElPase}. Si uno cambia
+     * sin el otro, la tuerca vuelve a enseñar editable un campo que la API rechaza.
+     */
+    private static final String PERMISO_CONFIGURAR_PASE = "elegir_plantilla_evaluacion";
 
     /**
      * El motivo de cierre de quien estaba dentro cuando la vacante se retiró (V60).
@@ -741,6 +753,22 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                 && alcance.alcanzaALaVacante(quien, alcanceDeEdicion, vacante);
     }
 
+    /**
+     * Si quien mira puede tocar el pase automático de ESTA vacante: el interruptor y su nota
+     * mínima (V72).
+     *
+     * <p>⚠️ <b>La misma puerta que esos dos endpoints, y nada más</b>: el permiso que pide el
+     * controlador, una vacante que {@link #laQueSePuedeTocar} deja pasar (sin archivar) y que
+     * no esté cerrada —{@link #activarCalificacionAutomatica} y {@link #fijarNotaMinima} la
+     * rechazan con 409—. No mira el alcance porque ellos tampoco: si este booleano fuera más
+     * estricto que la API, la tuerca bloquearía a quien sí puede fijar la mínima.
+     */
+    private static boolean puedeConfigurarElPase(ContextoUsuario quien, Vacante vacante) {
+        return quien.tiene(PERMISO_CONFIGURAR_PASE)
+                && vacante.getArchivadaEn() == null
+                && !ESTADO_CERRADA.equals(vacante.getEstado());
+    }
+
     // ============ Requisitos objetivos ============
 
     @Override
@@ -947,6 +975,7 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
     @Override
     @Transactional
     public void activarCalificacionAutomatica(ContextoUsuario quien, Long id, boolean activa) {
+        // Bloqueada, como toda escritura: la mínima puede estar guardándose a la vez (QA-F04)
         Vacante vacante = laQueSePuedeTocar(quien, id);
         if ("CERRADA".equals(vacante.getEstado())) {
             throw new IllegalStateException("Una vacante cerrada no se edita");
@@ -967,6 +996,44 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
         auditoria.registrar(quien.organizacionId(), quien, "activar_calificacion_automatica",
                 "vacante", id, Map.of("calificacionAutomatica", anterior),
                 Map.of("calificacionAutomatica", activa), null);
+    }
+
+    @Override
+    @Transactional
+    public void fijarNotaMinima(ContextoUsuario quien, Long id, BigDecimal notaMinima) {
+        // Bloqueada, como toda escritura: el interruptor puede estar guardándose a la vez, y la
+        // mínima tiene que ver si sigue encendido y de cuánto parte con lo que él dejó (QA-F04)
+        Vacante vacante = laQueSePuedeTocar(quien, id);
+        if ("CERRADA".equals(vacante.getEstado())) {
+            throw new IllegalStateException("Una vacante cerrada no se edita");
+        }
+        // Solo sirve con el interruptor encendido, y por eso solo se toca con él encendido: la
+        // pantalla la enseña desactivada cuando está apagado, y la API dice lo mismo.
+        if (!vacante.isCalificacionAutomatica()) {
+            throw new IllegalStateException("La nota mínima solo se fija con «Calificar y avanzar "
+                    + "sola» encendido");
+        }
+        BigDecimal nueva = notaMinimaValida(notaMinima);
+        int anterior = UmbralDelPerfilIntegral.minimaDe(vacante);
+        /*
+         * ⚠️ **Cambiarla no mueve a nadie**, ni a quien ya esperaba en «por confirmar» con una
+         * nota que ahora sí llegaría. Vale para las notas que terminen desde ahora y para los
+         * recálculos; a quienes ya esperaban los mueve el equipo, también en lote.
+         */
+        vacante.setNotaMinima(nueva);
+        vacantes.save(vacante);
+        auditoria.registrar(quien.organizacionId(), quien, "fijar_nota_minima",
+                "vacante", id, Map.of("notaMinima", anterior),
+                Map.of("notaMinima", nueva.intValueExact()), null);
+    }
+
+    /** Un entero de 0 a 100: ni decimales, ni fuera de rango. */
+    private static BigDecimal notaMinimaValida(BigDecimal nota) {
+        if (nota == null || nota.signum() < 0 || nota.compareTo(BigDecimal.valueOf(100)) > 0
+                || nota.stripTrailingZeros().scale() > 0) {
+            throw new IllegalArgumentException("La nota mínima es un número entero de 0 a 100");
+        }
+        return nota.setScale(0, RoundingMode.UNNECESSARY);
     }
 
     @Override
@@ -1745,16 +1812,28 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
     }
 
     /**
-     * La misma vacante, pero solo si todavía se puede mover.
+     * La misma vacante, pero solo si todavía se puede mover, y con su fila bloqueada hasta el
+     * final de la transacción.
      *
      * <p>Lo usan TODAS las acciones que escriben, y por eso es un método y no una línea
      * repetida: la lista de entradas que tienen que respetar el archivo es larga —publicar,
      * cerrar, los cuatro instrumentos, los pesos, el cierre de la prueba, los requisitos, los
      * textos de correo— y la que se olvide sería un agujero que no da ninguna señal.
      * Consultar sigue entrando por {@link #laDeLaOrganizacion}: una archivada se lee entera.
+     *
+     * <p><b>Bloqueada (QA-F04, QA-F05).</b> Cada trozo de la configuración se guarda por su
+     * lado, pero en la tuerca salen juntos: escribir la mínima y pulsar «Sin evaluación» justo
+     * debajo es un solo gesto. Sin el bloqueo, la escritura que leía antes de que la otra
+     * confirmara decidía y auditaba sobre la vacante vieja. Así van de una en una y cada una
+     * parte de lo que la anterior dejó: su auditoría dice «de X a Y» con el X de verdad. Que
+     * no se pisen las columnas lo asegura además {@code @DynamicUpdate} en {@link Vacante}.
+     * Ver {@link VacanteRepository#bloquear}, también para los interbloqueos.
+     *
+     * <p>⚠️ Tiene que ser la primera lectura de la vacante en la transacción.
      */
     private Vacante laQueSePuedeTocar(ContextoUsuario quien, Long id) {
-        Vacante vacante = laDeLaOrganizacion(quien, id);
+        Vacante vacante = vacantes.bloquear(id, quien.organizacionId())
+                .orElseThrow(() -> new ResourceNotFoundException("Vacante", "id", id));
         VacanteArchivada.exigirQueNoLoEste(vacante);
         return vacante;
     }
@@ -1787,6 +1866,7 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                 v.getPlantillaEvaluacionId(), v.getVersionPlantillaPruebaId(),
                 v.getVersionPesosId(), v.getInstrumentoEtapaTecnica(),
                 v.getMinutosEtapaTecnica(), v.isCalificacionAutomatica(),
+                UmbralDelPerfilIntegral.minimaDe(v),
                 new RemuneracionDeLaVacante(Remuneracion.tipoDe(v), v.getRemuneracionMin(),
                         v.getRemuneracionMax(), v.getRemuneracionMoneda()),
                 v.getRemuneracionActualizadaEn(),
@@ -1794,6 +1874,7 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                 v.getRequisitos(), v.getModalidad(), v.getHorario(), v.getUbicacion(),
                 ciudad, v.getPlazas(), v.getAbreEn(), v.getCierraEn(),
                 postulantesEnCarrera, v.getArchivadaEn(), puedeEditar,
+                puedeConfigurarElPase(quien, v),
                 puedeArchivar, puedeDesarchivar, puedeEliminar,
                 v.getPruebaCierraEn(), plazo.modalidad(), plazo.minutos(), plazo.dias(),
                 plazo.abiertosSinPlazoPropio(), plazo.abiertosConPlazoPropio(),
