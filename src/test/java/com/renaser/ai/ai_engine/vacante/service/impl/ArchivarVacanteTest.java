@@ -155,7 +155,12 @@ class ArchivarVacanteTest {
     /** La que devuelve la búsqueda por organización, para el resto de entradas. */
     private Vacante laDeLaOrganizacion(String estado, Instant archivadaEn) {
         Vacante v = vacante(estado, archivadaEn);
-        when(vacantes.findByIdAndOrganizacionIdAndEliminadaEnIsNull(VACANTE, ORGANIZACION)).thenReturn(Optional.of(v));
+        // Las escrituras la leen con la fila bloqueada (QA-F05); las consultas, suelta
+        org.mockito.Mockito.lenient()
+                .when(vacantes.findByIdAndOrganizacionIdAndEliminadaEnIsNull(VACANTE, ORGANIZACION))
+                .thenReturn(Optional.of(v));
+        org.mockito.Mockito.lenient()
+                .when(vacantes.bloquear(VACANTE, ORGANIZACION)).thenReturn(Optional.of(v));
         return v;
     }
 

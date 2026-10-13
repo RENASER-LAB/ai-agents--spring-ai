@@ -340,8 +340,12 @@ class ArquitecturaTest {
             // por id porque el evento trae su id y nada más, y la vacante se deriva de ella,
             // que es el mismo patrón que los de arriba. Lo que sustituye al guardián es que
             // todo lo que se escribe sale de la propia postulación: su organización, su
-            // vacante y su estado. Ver PaseAutomatico.
-            "PaseAutomatico#avanzarSiToca",
+            // vacante y su estado. Ver PaseAutomatico. Desde la V72 los dos momentos del pase
+            // —al terminar la nota y tras recalcularla— comparten `avanzar`, y la vacante se
+            // lee en `laQueLoDejaAvanzar`. Inertes mientras PaseAutomatico no reciba
+            // ContextoUsuario, como las del tablón: quedan como constancia de la excepción.
+            "PaseAutomatico#avanzar",
+            "PaseAutomatico#laQueLoDejaAvanzar",
             // Cerrar el intento de la prueba, también de la V53: mira la vacante para saber
             // si califica sola. Aquí tampoco hay usuario —lo dispara el candidato al
             // entregar, o el barrido del reloj— y la vacante se deriva de la postulación

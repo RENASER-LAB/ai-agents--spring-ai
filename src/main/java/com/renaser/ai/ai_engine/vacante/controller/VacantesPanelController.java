@@ -161,12 +161,22 @@ public class VacantesPanelController {
     @PostMapping("/vacantes/{id}/calificacion-automatica")
     @PreAuthorize("@permisos.tiene('elegir_plantilla_evaluacion')")
     @Operation(summary = "Encender o apagar el recorrido automático. Encendido, la "
-            + "postulación se califica y avanza sola hasta que termina la prueba del puesto, "
-            + "y solo entonces espera a una persona")
+            + "postulación se califica sola y, si su nota del Perfil Integral llega a la "
+            + "mínima de la vacante, avanza sola hasta que termina la prueba del puesto, y "
+            + "solo entonces espera a una persona")
     public void activarCalificacionAutomatica(
             @PathVariable Long id,
             @Valid @RequestBody ActivarCalificacionAutomatica datos) {
         servicio.activarCalificacionAutomatica(permisos.actual(), id, datos.activa());
+    }
+
+    @PutMapping("/vacantes/{id}/nota-minima")
+    @PreAuthorize("@permisos.tiene('elegir_plantilla_evaluacion')")
+    @Operation(summary = "La nota mínima del Perfil Integral para pasar sola a la prueba del "
+            + "puesto: un entero de 0 a 100 (60 por defecto). Solo con el recorrido automático "
+            + "encendido. No mueve a nadie que ya espera")
+    public void fijarNotaMinima(@PathVariable Long id, @Valid @RequestBody FijarNotaMinima datos) {
+        servicio.fijarNotaMinima(permisos.actual(), id, datos.notaMinima());
     }
 
     @PostMapping("/vacantes/{id}/version-pesos")

@@ -10,7 +10,6 @@ import com.renaser.ai.ai_engine.notificacion.service.ServicioCorreo;
 import com.renaser.ai.ai_engine.organizacion.entity.Organizacion;
 import com.renaser.ai.ai_engine.organizacion.repository.OrganizacionRepository;
 import com.renaser.ai.ai_engine.perfilintegral.service.ServicioEvaluacion;
-import com.renaser.ai.ai_engine.perfilintegral.service.TurnoDelPerfilCumplido;
 import com.renaser.ai.ai_engine.portal.dto.DtosPortal;
 import com.renaser.ai.ai_engine.portal.dto.DtosPortal.MiPostulacion;
 import com.renaser.ai.ai_engine.portal.dto.DtosPortal.MiPostulacionDetalle;
@@ -42,7 +41,6 @@ import com.renaser.ai.ai_engine.vacante.service.Remuneracion;
 import com.renaser.ai.ai_engine.vacante.service.VacanteEliminada;
 import com.renaser.ai.ai_engine.notificacion.service.ServicioAvisosPortal;
 import lombok.RequiredArgsConstructor;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -100,9 +98,6 @@ public class ServicioPostulacionPortalImpl implements ServicioPostulacionPortal 
     // Para decirle al portal que su prueba del editor quedó sin completar (V67): el estado
     // no cambia y, sin esto, el portal le seguiría ofreciendo abrirla.
     private final com.renaser.ai.ai_engine.prueba.repository.IntentoPruebaRepository intentos;
-    // Para que el pase automático le abra la prueba al instante a quien postula a una vacante
-    // sin banco (V70). Un evento y no una llamada: ver TurnoDelPerfilCumplido.
-    private final ApplicationEventPublisher eventos;
 
     @Override
     @Transactional
@@ -309,16 +304,9 @@ public class ServicioPostulacionPortalImpl implements ServicioPostulacionPortal 
              * modelo por alguien que ya está fuera.
              */
             if (vacante.isCalificacionAutomatica()) {
-                // Y la prueba se le abre ya, sin esperar a esa nota (V70): el pase no la mira,
-                // y esperarla solo servía para que cerrara la página. Corre al confirmarse la
-                // postulación; si la vacante aún no tiene prueba montada, no pasa nada y espera
-                // como hasta ahora.
-                //
-                // ⚠️ Antes de encolar, y el orden importa: los dos esperan al commit y corren en
-                // el orden en que se pidieron, así que el pase termina antes de que la IA reciba
-                // el trabajo y nunca encuentra a la postulación a medio pasar.
-                eventos.publishEvent(new TurnoDelPerfilCumplido(postulacion.getId(),
-                        TurnoDelPerfilCumplido.Momento.AL_POSTULAR));
+                // Y aquí se queda, en «por confirmar», hasta que esa nota termine: el pase a la
+                // prueba la mira y exige que llegue a la mínima de la vacante (V72). Lo da
+                // PaseAutomatico al cerrarse el Perfil Integral.
                 colaIa.encolarCribaCv(postulacion.getId());
             }
         } else {

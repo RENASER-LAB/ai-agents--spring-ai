@@ -103,8 +103,10 @@ class OrigenDePreguntasTest {
         Vacante v = Vacante.builder().id(VACANTE).organizacionId(ORGANIZACION).estado(estado)
                 .aplicaEvaluacion(aplica).origenPreguntas(origen).puestoId(PUESTO)
                 .versionPlantillaPruebaId(31L).build();
-        when(vacantes.findByIdAndOrganizacionIdAndEliminadaEnIsNull(VACANTE, ORGANIZACION))
+        // Las consultas la leen suelta y las escrituras con la fila bloqueada (QA-F05)
+        lenient().when(vacantes.findByIdAndOrganizacionIdAndEliminadaEnIsNull(VACANTE, ORGANIZACION))
                 .thenReturn(Optional.of(v));
+        lenient().when(vacantes.bloquear(VACANTE, ORGANIZACION)).thenReturn(Optional.of(v));
         return v;
     }
 
@@ -150,6 +152,17 @@ class OrigenDePreguntasTest {
         assertThat(v.getOrigenPreguntas()).isEqualTo(Vacante.ORIGEN_NIVEL);
         assertThat(v.isAplicaEvaluacion()).isTrue();
         verify(vacantes).save(v);
+    }
+
+    @Test
+    @DisplayName("Elegir el origen lee la vacante con la fila bloqueada: la mínima o el interruptor pueden estar guardándose a la vez (QA-F05)")
+    void elegirElOrigenBloqueaLaVacante() {
+        vacante("BORRADOR", true, Vacante.ORIGEN_VACANTE);
+
+        servicio.elegirOrigenDePreguntas(QUIEN, VACANTE, "SIN_EVALUACION");
+
+        verify(vacantes).bloquear(VACANTE, ORGANIZACION);
+        verify(vacantes, never()).findByIdAndOrganizacionIdAndEliminadaEnIsNull(VACANTE, ORGANIZACION);
     }
 
     @Test

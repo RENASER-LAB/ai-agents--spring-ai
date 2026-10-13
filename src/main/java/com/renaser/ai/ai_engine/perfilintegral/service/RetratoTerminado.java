@@ -4,7 +4,7 @@ package com.renaser.ai.ai_engine.perfilintegral.service;
  * La calificación del Perfil Integral de esta postulación acaba de terminar y guardarse.
  *
  * <p>⚠️ <b>Es uno de los dos únicos eventos de Spring del proyecto —el otro es
- * {@link TurnoDelPerfilCumplido}, por el mismo círculo—, y eso es a propósito.</b> Aquí todo lo
+ * {@link NotaDelPerfilRecalculada}, por el mismo círculo—, y eso es a propósito.</b> Aquí todo lo
  * demás se llama por su nombre, con la dependencia escrita en el constructor y vigilada por
  * las reglas de arquitectura. Un evento es lo contrario: quien lo publica no sabe quién
  * escucha, y por eso hay que decir aquí en qué consiste todo el mecanismo.
@@ -12,7 +12,8 @@ package com.renaser.ai.ai_engine.perfilintegral.service;
  * <p><b>Quién lo publica:</b> {@code PuenteCalificacionIaImpl}, al cerrar el Perfil
  * Integral, después de guardar el retrato y la nota.
  *
- * <p><b>Quién lo escucha:</b> {@code PaseAutomaticoTrasCalificar}, y nadie más.
+ * <p><b>Quién lo escucha:</b> {@code PaseAutomaticoTrasCalificar}, y nadie más. Desde la V72
+ * el pase mira la nota: solo pasa quien llega a la mínima de la vacante.
  *
  * <p><b>Por qué no es una llamada normal.</b> Avanzar a la etapa técnica exige crear lo que
  * el candidato va a rendir, y eso pasa por {@code ServicioEvaluacion}, que a su vez usa la

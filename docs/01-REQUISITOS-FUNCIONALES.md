@@ -497,14 +497,17 @@ artículo 15 de la Ley 29733.
 **RF-29c** El texto dice **qué ocurre sin que intervenga una persona** (14/09/2026). Hasta esa
 fecha prometía que ninguna decisión se tomaba automáticamente, y **eso era falso**. Ahora dice que
 ninguna nota contrata ni descarta por sí sola —quien decide es siempre una persona de la
-empresa— y enumera las tres cosas que sí pasan solas, ninguna de las cuales depende de una nota:
+empresa— y enumera las tres cosas que sí pasan solas. Hasta el 12/10/2026 ninguna dependía de una
+nota; **desde la `V72` (texto `PLATAFORMA` 1.1) la tercera sí, y nunca para descartar**:
 
 1. Se cierra la postulación al postular, si el propio candidato declara que no cumple un
    requisito indispensable de la vacante (RF-16).
 2. Se cierra el proceso cuando se acaba el plazo que tenía para responder una evaluación o una
    prueba. Lo vigila un sondeo que corre cada 60 segundos y **no tiene interruptor**.
 3. Se pasa a la etapa siguiente sin esperar a nadie, en las vacantes que encendieron «calificar
-   y avanzar sola» (ver [Estados de la postulación](03-ESTADOS-POSTULACION.md)).
+   y avanzar sola», si la nota del Perfil Integral llega a la mínima que fijó la vacante; si no
+   llega, una persona revisa el caso (ver [Estados de la postulación](03-ESTADOS-POSTULACION.md),
+   «La nota mínima»). Quien firmó la 1.0 sigue ligado a ella.
 
 En cualquiera de las tres, el candidato puede escribir y pedir que una persona lo revise.
 

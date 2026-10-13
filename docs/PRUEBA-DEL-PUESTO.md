@@ -169,12 +169,14 @@ donde se escriben».
 
 ### La prueba al instante, su correo y sus recordatorios (V70, 07/10/2026)
 
-- **Con pase automático, la prueba se abre al entregar el banco** (o al postular, sin banco):
-  `PaseAutomatico.alInstante`, disparado por `PaseAutomaticoAlInstante` después de confirmarse la
-  entrega, crea lo que va a rendir y mueve la postulación a la prueba en el mismo gesto, sea la
-  prueba del puesto o el cuestionario técnico. El reloj no arranca hasta que el
-  candidato confirma en la portada. El detalle, en
-  [estados de la postulación](03-ESTADOS-POSTULACION.md), «La prueba al instante».
+- **La prueba al instante se retiró el 12/10/2026 (`V72`).** Del 07/10 al 12/10, con pase
+  automático, la prueba se abría al entregar el banco (o al postular, sin banco), sin esperar a la
+  nota. Desde la `V72` el pase espera la nota completa del Perfil Integral y solo se da si llega a
+  la mínima de la vacante: `PaseAutomatico.avanzarSiToca` al terminar la nota y
+  `avanzarTrasRecalcular` si una persona la recalcula mientras espera. Crea lo que va a rendir y
+  mueve la postulación a la prueba en el mismo gesto, sea la prueba del puesto o el cuestionario
+  técnico, y el reloj no arranca hasta que el candidato confirma en la portada. El detalle, en
+  [estados de la postulación](03-ESTADOS-POSTULACION.md), «La nota mínima».
 - **`{{plazo}}` de `PRUEBA_DISPONIBLE`** en la prueba del editor lo arma `PlazoDeLaPrueba` con el
   plazo que rija para esa persona —el `vence_en` de su intento: su plazo propio o la fecha de la
   vacante—, en hora de Lima:

@@ -73,7 +73,16 @@ public final class DtosPostulacion {
                                    /** Contratado, sin ficha todavía, y quien mira puede darla de alta. */
                                    boolean puedeDarDeAlta,
                                    /** Ya tiene ficha y quien mira puede abrirla. */
-                                   boolean puedeVerColaborador) {}
+                                   boolean puedeVerColaborador,
+                                   /**
+                                    * Por qué espera en «por confirmar» en vez de haber pasado
+                                    * sola a la prueba, cuando la razón es su nota (V72): «Nota
+                                    * 58,20: no llega a la mínima de la vacante (60)» o «Sin nota
+                                    * completa: revisa el Perfil Integral». Vacío en cualquier
+                                    * otro caso. Escrito aquí y no en el panel por lo mismo que
+                                    * {@code porQueSinPretension}: la regla vive en un solo sitio.
+                                    */
+                                   String porQueEsperaElPase) {}
 
     public record PasoHistorial(String estadoAnterior, String estadoNuevo, Long usuarioId,
                                 boolean fueElSistema, boolean fuePorLote, String motivo,
