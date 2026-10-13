@@ -1,6 +1,7 @@
 package com.renaser.ai.ai_engine.postulacion.service;
 
 import com.renaser.ai.ai_engine.perfilintegral.service.PuenteCalificacionIa;
+import com.renaser.ai.ai_engine.perfilintegral.service.UmbralDelPerfilIntegral;
 import com.renaser.ai.ai_engine.postulacion.entity.EstadoPostulacion;
 import com.renaser.ai.ai_engine.postulacion.entity.Postulacion;
 import com.renaser.ai.ai_engine.postulacion.repository.PostulacionRepository;
@@ -15,6 +16,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.math.BigDecimal;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -22,7 +24,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -32,9 +33,9 @@ import static org.mockito.Mockito.when;
  * El pase automático, y sobre todo dónde NO se da.
  *
  * <p>Esta clase mueve candidatos sin que nadie mire, así que lo que hay que sostener no es
- * que avance —eso es lo fácil— sino que se pare en los cinco sitios donde pararse es lo
- * correcto. Cada uno de ellos, mal resuelto, le quita a alguien un turno que le habían dado
- * o le manda a una prueba que no le toca.
+ * que avance —eso es lo fácil— sino que se pare en los sitios donde pararse es lo correcto.
+ * Cada uno de ellos, mal resuelto, le quita a alguien un turno que le habían dado o le manda
+ * a una prueba que no le toca. Desde la V72, el primero de todos: la nota mínima.
  */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("El pase automático a la etapa técnica")
@@ -48,6 +49,7 @@ class PaseAutomaticoTest {
     @Mock private MaquinaEstados maquina;
     @Mock private EntradaEtapaTecnica entradaTecnica;
     @Mock private PuenteCalificacionIa puente;
+    @Mock private UmbralDelPerfilIntegral umbral;
 
     @InjectMocks private PaseAutomatico pase;
 
@@ -74,18 +76,146 @@ class PaseAutomaticoTest {
         lenient().when(maquina.siguiente("PERFIL_POR_CONFIRMAR"))
                 .thenReturn(Optional.of(EstadoPostulacion.builder()
                         .codigo("PRUEBA_TURNO_CANDIDATO").build()));
+        // Con su nota completa por encima de la mínima de por defecto (60)
+        conNota("72.40");
+    }
+
+    private void conNota(String nota) {
+        lenient().when(umbral.notaCompleta(POSTULACION))
+                .thenReturn(nota == null ? Optional.empty() : Optional.of(new BigDecimal(nota)));
     }
 
     @Test
-    @DisplayName("con todo en su sitio, le crea la prueba y lo mueve como sistema y con motivo")
+    @DisplayName("con 72,40 y mínima 60, le crea la prueba y lo mueve como sistema, con la nota y la mínima en el motivo (AC-02)")
     void avanzaYDejaEscritoQueLoMovioLaVacante() {
-        pase.avanzarSiToca(POSTULACION);
+        assertThat(pase.avanzarSiToca(POSTULACION)).isTrue();
 
         verify(entradaTecnica).crearAlEntrar(postulacion, vacante);
         // El motivo escrito importa aunque sea del sistema: sin él, quien abra el historial
         // dentro de seis meses ve un salto sin autor y sin explicación.
-        verify(maquina).transicionar(eq(postulacion), eq("PRUEBA_TURNO_CANDIDATO"),
-                eq(null), anyString(), eq(true), eq(false), eq(null));
+        verify(maquina).transicionar(postulacion, "PRUEBA_TURNO_CANDIDATO", null,
+                "Pase automático: nota del Perfil Integral 72,40 (mínima 60)", true, false, null);
+    }
+
+    @Test
+    @DisplayName("con 59,99 y mínima 60 no pasa: se queda en «por confirmar», sin prueba (AC-03)")
+    void conMenosDeLaMinimaNoPasa() {
+        conNota("59.99");
+
+        assertThat(pase.avanzarSiToca(POSTULACION)).isFalse();
+
+        noSeMovioNada();
+    }
+
+    @Test
+    @DisplayName("60,00 justo llega: la comparación es con sus dos decimales")
+    void laMinimaJustaLlega() {
+        conNota("60.00");
+
+        assertThat(pase.avanzarSiToca(POSTULACION)).isTrue();
+    }
+
+    @Test
+    @DisplayName("sin nota completa no pasa, aunque la vacante avance sola (AC-04, AC-05)")
+    void sinNotaCompletaNoPasa() {
+        // La IA falló, las abiertas quedaron sin nota, o solo hay la provisional de lo cerrado:
+        // el umbral no da nota completa y el pase no se da.
+        conNota(null);
+
+        assertThat(pase.avanzarSiToca(POSTULACION)).isFalse();
+
+        noSeMovioNada();
+    }
+
+    @Test
+    @DisplayName("la mínima es la de la vacante: con 70, un 65 no pasa")
+    void laMinimaEsLaDeLaVacante() {
+        vacante.setNotaMinima(new BigDecimal("70"));
+        conNota("65");
+
+        assertThat(pase.avanzarSiToca(POSTULACION)).isFalse();
+
+        noSeMovioNada();
+    }
+
+    @Test
+    @DisplayName("con mínima 0 pasa con cualquier nota, también 0; sin nota completa, no (AC-11)")
+    void conMinimaCeroPasaCualquierNota() {
+        vacante.setNotaMinima(BigDecimal.ZERO);
+        conNota("0");
+        assertThat(pase.avanzarSiToca(POSTULACION)).isTrue();
+        verify(maquina).transicionar(postulacion, "PRUEBA_TURNO_CANDIDATO", null,
+                "Pase automático: nota del Perfil Integral 0,00 (mínima 0)", true, false, null);
+    }
+
+    @Test
+    @DisplayName("con mínima 0 y sin nota completa, tampoco pasa (AC-11)")
+    void conMinimaCeroSinNotaNoPasa() {
+        vacante.setNotaMinima(BigDecimal.ZERO);
+        conNota(null);
+
+        assertThat(pase.avanzarSiToca(POSTULACION)).isFalse();
+
+        noSeMovioNada();
+    }
+
+    @Test
+    @DisplayName("tras recalcular, si ahora llega, pasa y el historial dice que fue tras recalcular (AC-06)")
+    void trasRecalcularPasaConSuMotivo() {
+        conNota("63.10");
+
+        assertThat(pase.avanzarTrasRecalcular(POSTULACION)).isTrue();
+
+        verify(entradaTecnica).crearAlEntrar(postulacion, vacante);
+        verify(maquina).transicionar(postulacion, "PRUEBA_TURNO_CANDIDATO", null,
+                "Pase automático tras recalcular: nota 63,10 (mínima 60)", true, false, null);
+    }
+
+    @Test
+    @DisplayName("tras recalcular, si sigue sin llegar, no pasa")
+    void trasRecalcularSinLlegarNoPasa() {
+        conNota("55");
+
+        assertThat(pase.avanzarTrasRecalcular(POSTULACION)).isFalse();
+
+        noSeMovioNada();
+    }
+
+    @Test
+    @DisplayName("a quien ya está en la prueba no se le toca aunque su nota baje (AC-06)")
+    void enLaPruebaNoSeTocaAunqueBaje() {
+        postulacion.setEstadoCodigo("PRUEBA_TURNO_CANDIDATO");
+        conNota("40");
+
+        assertThat(pase.avanzarTrasRecalcular(POSTULACION)).isFalse();
+
+        noSeMovioNada();
+    }
+
+    @Test
+    @DisplayName("ninguna nota lleva a «No continúa»: el pase solo sabe ir a la prueba (AC-13)")
+    void ningunaNotaDescarta() {
+        for (String nota : new String[] {"0", "12.5", "59.99"}) {
+            conNota(nota);
+            pase.avanzarSiToca(POSTULACION);
+            pase.avanzarTrasRecalcular(POSTULACION);
+        }
+        conNota(null);
+        pase.avanzarSiToca(POSTULACION);
+
+        verify(maquina, never()).transicionar(any(), eq("NO_CONTINUA"), any(), any(),
+                anyBoolean(), anyBoolean(), any());
+        noSeMovioNada();
+    }
+
+    @Test
+    @DisplayName("si una persona la movió a la vez, al bloquear la fila se ve y no se toca (dos recálculos seguidos)")
+    void siLaMovieronALaVezNoSeToca() {
+        when(postulaciones.estadoBloqueandoLaFila(POSTULACION)).thenReturn("PRUEBA_TURNO_CANDIDATO");
+
+        assertThat(pase.avanzarTrasRecalcular(POSTULACION)).isFalse();
+
+        noSeMovioNada();
     }
 
     @Test
@@ -183,107 +313,15 @@ class PaseAutomaticoTest {
         noSeMovioNada();
     }
 
-    // ============ El pase al instante (V70) ============
-
-    private static final String AL_ENTREGAR = "Pase automático al entregar: la nota se calcula después";
-
     @Test
-    @DisplayName("al entregar el banco: de «calificando» a «por confirmar» y a la prueba, con su motivo (AC-1, AC-8)")
-    void alEntregarPasaPorLosDosPasos() {
-        vacante.setAplicaEvaluacion(true);
-        when(puente.tieneEvaluacionEntregada(POSTULACION)).thenReturn(true);
-        postulacion.setEstadoCodigo("PERFIL_CALIFICANDO");
-
-        assertThat(pase.alInstante(POSTULACION, AL_ENTREGAR)).isTrue();
-
-        // La máquina avanza de uno en uno: primero el paso intermedio, que no manda nada, y
-        // después la prueba, que es el único que avisa. Los dos con el motivo legible.
-        var orden = inOrder(maquina, entradaTecnica);
-        orden.verify(maquina).transicionar(postulacion, "PERFIL_POR_CONFIRMAR", null, AL_ENTREGAR,
-                true, false, null);
-        orden.verify(entradaTecnica).crearAlEntrar(postulacion, vacante);
-        orden.verify(maquina).transicionar(postulacion, "PRUEBA_TURNO_CANDIDATO", null, AL_ENTREGAR,
-                true, false, null);
-    }
-
-    @Test
-    @DisplayName("al postular sin banco: de «por confirmar» a la prueba, un solo paso (AC-2)")
-    void alPostularUnSoloPaso() {
-        assertThat(pase.alInstante(POSTULACION, "Pase automático al postular: la nota se calcula después"))
-                .isTrue();
-
-        verify(maquina, never()).transicionar(any(), eq("PERFIL_POR_CONFIRMAR"), any(), any(),
-                anyBoolean(), anyBoolean(), any());
-        verify(entradaTecnica).crearAlEntrar(postulacion, vacante);
-        verify(maquina).transicionar(eq(postulacion), eq("PRUEBA_TURNO_CANDIDATO"), eq(null),
-                eq("Pase automático al postular: la nota se calcula después"), eq(true), eq(false), eq(null));
-    }
-
-    @Test
-    @DisplayName("sin prueba montada no pasa al instante y queda como hoy (AC-7)")
-    void sinPruebaNoPasa() {
-        postulacion.setEstadoCodigo("PERFIL_CALIFICANDO");
-        vacante.setAplicaEvaluacion(true);
-        when(puente.tieneEvaluacionEntregada(POSTULACION)).thenReturn(true);
-        when(entradaTecnica.hayInstrumento(vacante)).thenReturn(false);
-
-        assertThat(pase.alInstante(POSTULACION, AL_ENTREGAR)).isFalse();
-
-        noSeMovioNada();
-    }
-
-    @Test
-    @DisplayName("sin pase automático no pasa al instante (AC-7)")
-    void sinPaseAutomaticoNoPasa() {
-        postulacion.setEstadoCodigo("PERFIL_CALIFICANDO");
-        vacante.setCalificacionAutomatica(false);
-
-        assertThat(pase.alInstante(POSTULACION, AL_ENTREGAR)).isFalse();
-
-        noSeMovioNada();
-    }
-
-    @Test
-    @DisplayName("si la IA terminó antes y ya está en la prueba, no se toca (la carrera)")
-    void siYaEstaEnLaPruebaNoSeToca() {
-        postulacion.setEstadoCodigo("PRUEBA_TURNO_CANDIDATO");
-
-        assertThat(pase.alInstante(POSTULACION, AL_ENTREGAR)).isFalse();
-
-        noSeMovioNada();
-    }
-
-    @Test
-    @DisplayName("una vacante archivada o eliminada no mueve a nadie al instante")
+    @DisplayName("una vacante archivada o eliminada no mueve a nadie, aunque la nota llegue")
     void archivadaOEliminadaNo() {
-        postulacion.setEstadoCodigo("PERFIL_POR_CONFIRMAR");
         vacante.setArchivadaEn(java.time.Instant.now());
-        assertThat(pase.alInstante(POSTULACION, AL_ENTREGAR)).isFalse();
+        assertThat(pase.avanzarSiToca(POSTULACION)).isFalse();
 
         vacante.setArchivadaEn(null);
         vacante.setEliminadaEn(java.time.Instant.now());
-        assertThat(pase.alInstante(POSTULACION, AL_ENTREGAR)).isFalse();
-
-        noSeMovioNada();
-    }
-
-    @Test
-    @DisplayName("si una persona la movió a la vez, al bloquear la fila se ve y no se toca")
-    void siLaMovieronALaVezNoSeToca() {
-        postulacion.setEstadoCodigo("PERFIL_CALIFICANDO");
-        when(postulaciones.estadoBloqueandoLaFila(POSTULACION)).thenReturn("PERFIL_POR_CONFIRMAR");
-
-        assertThat(pase.alInstante(POSTULACION, AL_ENTREGAR)).isFalse();
-
-        noSeMovioNada();
-    }
-
-    @Test
-    @DisplayName("una postulación que no existe no pasa")
-    void sinPostulacionNoPasa() {
-        when(postulaciones.findById(POSTULACION)).thenReturn(Optional.empty());
-
-        assertThat(pase.alInstante(POSTULACION, AL_ENTREGAR)).isFalse();
+        assertThat(pase.avanzarTrasRecalcular(POSTULACION)).isFalse();
 
         noSeMovioNada();
     }

@@ -815,19 +815,16 @@ public class FlujoCalificacionIaIT {
         String codigo = postularConCurriculumReal("diego@correo.pe");
         long id = idDe(codigo);
 
-        // Y esto es todo lo que hace falta. Nadie pulsa nada: desde la V70 la prueba se le
-        // abre al postular, sin esperar a la nota del currículum, que se calcula por detrás.
+        // Y esto es todo lo que hace falta. Nadie pulsa nada: la IA califica el currículum y,
+        // como su nota (75) llega a la mínima de la vacante (60), pasa sola a la prueba. Desde
+        // la V72 el pase espera esa nota: ya no se abre la prueba al postular.
         esperarA(() -> "PRUEBA_TURNO_CANDIDATO".equals(jdbc.queryForObject(
                         "select estado_codigo from postulacion where id = ?", String.class, id)),
                 "la postulación llegue sola hasta la prueba del puesto");
 
-        // Con su nota puesta cuando la IA termina, y sin moverla de la prueba (V70, AC-4)
-        esperarA(() -> jdbc.queryForObject(
-                        "select grupo_prioridad from postulacion where id = ?", String.class, id) != null,
-                "la nota del currículum llegue por detrás");
+        // Con su nota y su grupo puestos antes de pasar: es la nota la que le abrió la prueba
         assertThat(jdbc.queryForObject(
-                "select estado_codigo from postulacion where id = ?", String.class, id))
-                .isEqualTo("PRUEBA_TURNO_CANDIDATO");
+                "select grupo_prioridad from postulacion where id = ?", String.class, id)).isNotNull();
 
         // Y con su prueba ya creada: sin esto llegaría a la etapa sin nada que rendir
         assertThat(contar("select count(*) from intento_prueba where postulacion_id = %d"
@@ -841,7 +838,8 @@ public class FlujoCalificacionIaIT {
                 where postulacion_id = ? and estado_nuevo_codigo = 'PRUEBA_TURNO_CANDIDATO'""", id);
         assertThat(pase.get("es_sistema")).isEqualTo(true);
         assertThat(pase.get("usuario_id")).isNull();
-        assertThat((String) pase.get("motivo")).contains("automático");
+        assertThat((String) pase.get("motivo"))
+                .matches("Pase automático: nota del Perfil Integral \\d+,\\d{2} \\(mínima 60\\)");
     }
 
     /**

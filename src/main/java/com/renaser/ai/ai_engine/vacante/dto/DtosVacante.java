@@ -86,6 +86,9 @@ public final class DtosVacante {
                                Long plantillaEvaluacionId, Long versionPlantillaPruebaId,
                                Long versionPesosId, String instrumentoEtapaTecnica,
                                Integer minutosEtapaTecnica, boolean calificacionAutomatica,
+                               // La nota del Perfil Integral que hace falta para pasar sola a la
+                               // prueba con el interruptor encendido (V72): entera, de 0 a 100.
+                               int notaMinima,
                                // La remuneración viaja entera —con su marca de cuándo se
                                // tocó— para que la pantalla de configuración pinte el estado
                                // real sin pedir nada más.
@@ -131,6 +134,19 @@ public final class DtosVacante {
                                 * contestarlo sin repetir aquí la regla del backend.
                                 */
                                boolean puedeEditar,
+                               /**
+                                * Si quien pregunta puede configurar el pase automático de
+                                * ESTA vacante: el interruptor «Calificar y avanzar sola» y su
+                                * nota mínima (V72).
+                                *
+                                * <p>Cierto con {@code elegir_plantilla_evaluacion} —el permiso
+                                * de esos dos endpoints, no {@code editar_vacante}— y con la
+                                * vacante sin archivar ni cerrar, que es lo que ellos aceptan.
+                                * Por eso no coincide con {@code puedeEditar}: RESPONSABLE_AREA
+                                * no edita la vacante pero sí fija su mínima. Viaja en la fila
+                                * como los demás porque el panel no sabe sus permisos.
+                                */
+                               boolean puedeConfigurarElPase,
                                /**
                                 * Si quien pregunta puede archivar ESTA vacante.
                                 *
@@ -377,6 +393,15 @@ public final class DtosVacante {
      * funcionaron todas las vacantes hasta la V53.
      */
     public record ActivarCalificacionAutomatica(@NotNull Boolean activa) {}
+
+    /**
+     * La nota mínima del Perfil Integral para pasar sola a la prueba (V72).
+     *
+     * <p>Llega como número y no como entero a propósito: un entero se tragaría «70,5»
+     * redondeándolo en silencio, y la regla es rechazarlo. Lo valida el servicio: entera y de
+     * 0 a 100.
+     */
+    public record FijarNotaMinima(@NotNull java.math.BigDecimal notaMinima) {}
 
     // Qué versión de pesos rige la decisión de esta vacante. Existe para las vacantes que
     // reparten distinto —una sin banco pone todo en la prueba— sin tocar el reparto general.

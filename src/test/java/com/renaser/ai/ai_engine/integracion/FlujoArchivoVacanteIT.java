@@ -285,6 +285,11 @@ public class FlujoArchivoVacanteIT {
                 tokenEquipo, "{\"activa\": true}")
                 .andExpect(status().isConflict());
 
+        // La nota mínima del pase (V72) responde como el interruptor del que depende
+        conToken(put("/api/v1/panel/vacantes/" + vacanteId + "/nota-minima"),
+                tokenEquipo, "{\"notaMinima\": 70}")
+                .andExpect(status().isConflict());
+
         conToken(post("/api/v1/panel/vacantes/" + vacanteId + "/cierre"), tokenEquipo,
                 "{\"motivo\":\"Otra vez\"}")
                 .andExpect(status().isConflict());

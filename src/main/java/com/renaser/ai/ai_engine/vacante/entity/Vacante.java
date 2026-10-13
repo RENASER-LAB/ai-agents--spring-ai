@@ -2,6 +2,7 @@ package com.renaser.ai.ai_engine.vacante.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.DynamicUpdate;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -9,7 +10,20 @@ import java.time.Instant;
 // Una convocatoria concreta. Toda vacante cuelga de una solicitud aprobada.
 // versionPlantillaPruebaId y plantillaEvaluacionId son columnas sueltas sin FK:
 // sus tablas llegan en los hitos 2 y 3.
+//
+// ⚠️ @DynamicUpdate: cada guardado escribe SOLO las columnas que cambió (QA-F05). La vacante
+// se configura a trozos —el interruptor del pase, su nota mínima, de dónde salen las
+// preguntas, el instrumento, los pesos, la fecha de la prueba, la edición, el sueldo— y cada
+// trozo es una petición. Con el UPDATE de la fila entera, dos guardados de columnas distintas
+// que coincidían se pisaban: el último en confirmar reescribía la columna del otro con lo
+// que leyó antes, y los dos contestaban 200 y quedaban auditados. Así, la mínima recién
+// guardada volvía a 60 al elegir «Sin evaluación» en el mismo gesto, y el pase seguía
+// encendido tras apagarlo. Las escrituras del panel además bloquean la fila (ver
+// VacanteRepository#bloquear); esto cubre a las que no pasan por ahí, vengan de donde vengan.
+// Nada depende de reescribir la fila entera: no hay triggers sobre vacante, y las únicas
+// escrituras por consulta (archivar, desarchivar, eliminar) limpian el contexto al terminar.
 @Entity
+@DynamicUpdate
 @Table(name = "vacante")
 @Getter @Setter @Builder @NoArgsConstructor @AllArgsConstructor
 public class Vacante {
@@ -76,8 +90,14 @@ public class Vacante {
     private Instant abreEn;
     private Instant cierraEn;
     private String estado;
-    // Interna, nunca se publica
-    private BigDecimal notaMinima;
+    /**
+     * La nota del Perfil Integral que hace falta para pasar sola a la prueba del puesto, con
+     * el interruptor de {@link #calificacionAutomatica} encendido (V72). Entera, de 0 a 100,
+     * 60 por defecto. Interna: nunca se publica. Ver
+     * {@code perfilintegral.service.UmbralDelPerfilIntegral}.
+     */
+    @Builder.Default
+    private BigDecimal notaMinima = BigDecimal.valueOf(60);
     private Long versionPesosId;
     private Long versionPlantillaPruebaId;
     private Long plantillaEvaluacionId;

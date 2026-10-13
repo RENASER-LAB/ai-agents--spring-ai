@@ -356,62 +356,80 @@ Por eso:
 Cada vacante tiene un interruptor: **«calificar y avanzar sola»**. Nace apagado, y apagada la
 vacante se comporta exactamente como cuenta el resto de este documento.
 
-**Encendido**, tres paradas donde nadie tenía nada que decidir dejan de existir:
+**Encendido**, las paradas donde nadie tenía nada que decidir dejan de existir, **siempre que la
+nota del Perfil Integral llegue a la nota mínima de la vacante** (12/10/2026, V72):
 
 | Cuándo | Qué pasa sin que nadie toque nada |
 |---|---|
-| Al entregar el banco de preguntas | **En ese mismo momento** (07/10/2026) pasa a `PRUEBA_TURNO_CANDIDATO`, se le crea lo que va a rendir y le llega el correo `PRUEBA_DISPONIBLE`. La calificación con IA se encola como siempre y corre por detrás |
-| Al postular, si la vacante no lleva banco de preguntas | Igual, en ese momento, si cumple los requisitos; se le encola la nota del currículum |
-| Al terminar la calificación con IA | Se guardan la nota y el grupo. Si el pase al instante no se dio —la vacante aún no tenía prueba, o algo falló—, pasa entonces de `PERFIL_POR_CONFIRMAR` a `PRUEBA_TURNO_CANDIDATO`, como antes del 07/10/2026 |
+| Al entregar el banco de preguntas | Queda en `PERFIL_CALIFICANDO` y la IA se encola. **No pasa a la prueba en ese momento** |
+| Al postular, si la vacante no lleva banco de preguntas | Si cumple los requisitos, queda en `PERFIL_POR_CONFIRMAR` y se encola la nota del currículum |
+| Al terminar la nota del Perfil Integral | Se guardan la nota y el grupo y pasa a `PERFIL_POR_CONFIRMAR`. **Si la nota llega a la mínima**, pasa sola a `PRUEBA_TURNO_CANDIDATO`, se le crea lo que va a rendir y le llegan el correo `PRUEBA_DISPONIBLE` y el aviso de la campana. Si no llega, se queda en «por confirmar» |
+| Al recalcular su nota mientras espera (un ajuste a mano, una recalificación, un cambio de puntos) | Si sigue en «por confirmar» y ahora llega a la mínima, pasa sola, con el mismo correo y la misma campana |
 | Al entregar la prueba del puesto | Se califica sola, y queda en `PRUEBA_POR_CONFIRMAR` |
 
-Así, **la primera vez que hace falta una persona es para decidir quién va a la simulación**,
-con las notas de la prueba ya delante.
+Así, para quien llega a la mínima, **la primera vez que hace falta una persona es para decidir
+quién va a la simulación**, con las notas de la prueba ya delante.
 
-**Con banco de preguntas, el pase espera a que el candidato lo entregue.** Es la salvedad que
-más importa: si no esperara, a quien todavía no ha respondido se le armaría el retrato con el
-currículum a solas y se le mandaría a la prueba sin haber contestado nunca su evaluación.
+### La nota mínima (12/10/2026)
 
-Y hay cuatro sitios donde el pase **no** se da, aunque el interruptor esté puesto. En los
-cuatro la postulación se queda esperando a una persona, que es donde estaba antes:
+- **Se configura por vacante**, en la tuerca, en «Cómo avanza esta vacante»: «Nota mínima para
+  pasar el perfil integral», un número entero de 0 a 100, **60 por defecto**. Solo se edita con
+  el interruptor encendido; apagado se ve desactivada, y la API la rechaza igual. Queda auditado
+  quién la cambió y de cuánto a cuánto.
+- **«Llega» es tener esa nota o más**, comparando con sus dos decimales: 59,99 no llega a 60 y
+  60,00 sí.
+- **Solo cuenta la nota completa**: la que se calcula con el retrato de la IA ya hecho. La nota
+  provisional que se escribe al entregar un banco clásico (solo con lo cerrado) nunca da el pase.
+- **Sin nota completa, nadie pasa solo**: la IA falló, se agotó el saldo, el CV era ilegible, una
+  abierta se quedó sin nota o los pesos no le dan peso a nada que se pueda llenar.
+- **Quien no llega no se descarta.** Se queda en «Tu perfil está en revisión» y una persona del
+  equipo decide si lo pasa con «Avanzar». **Ninguna nota lleva a nadie a «No continúa».** La
+  ficha del panel lo explica junto al estado: «Nota 58,20: no llega a la mínima de la vacante
+  (60)» o «Sin nota completa: revisa el Perfil Integral».
+- **Cambiar la mínima no mueve a nadie que ya espera.** Vale para las notas que terminen desde
+  ese momento y para los recálculos. A quienes ya esperaban los mueve el equipo, también en lote.
+- **Encender el interruptor con gente esperando tampoco la mueve**: solo pasan solos si después
+  termina o se recalcula su nota. Apagarlo hace que nadie pase solo desde entonces.
+- **A quien ya está en la prueba no se le toca**, aunque su nota baje después.
+- Con el interruptor **apagado**, la mínima no aplica: el equipo confirma a mano y no bloquea
+  «Avanzar».
 
-- La vacante todavía no tiene con qué llenar la etapa técnica.
-- La postulación ya salió del perfil integral: alguien la movió mientras la IA trabajaba.
+**Con banco de preguntas, el pase espera a que el candidato lo entregue.** Si no esperara, a
+quien todavía no ha respondido se le armaría el retrato con el currículum a solas y se le
+mandaría a la prueba sin haber contestado nunca su evaluación.
+
+Y hay otros sitios donde el pase **no** se da, aunque la nota llegue. En todos la postulación se
+queda esperando a una persona:
+
+- La vacante todavía no tiene con qué llenar la etapa técnica. Al montarla nadie pasa solo: lo
+  mueve el equipo.
+- La vacante está archivada o eliminada.
+- La postulación ya salió de «por confirmar»: alguien la movió mientras la IA trabajaba.
 - La postulación está cerrada: retirada, no continúa o contratada.
 - Algo falló al dar el pase. Lo calificado se guarda igual y no se vuelve a pagar el modelo.
 
+**Dos recálculos seguidos no dan dos pases**: el pase bloquea la fila de la postulación, como
+«Avanzar», y solo pasa una vez.
+
 El pase queda escrito en el historial como una transición del sistema, con su motivo: «Pase
-automático: esta vacante califica y avanza sola» tras la nota, y «Pase automático al entregar: la
-nota se calcula después» (o «al postular») cuando fue al instante. Quien abra esa postulación
-dentro de seis meses puede saber que no lo movió nadie.
+automático: nota del Perfil Integral 72,40 (mínima 60)» al terminar la nota, y «Pase automático
+tras recalcular: nota 63,10 (mínima 60)» tras un recálculo. Quien abra esa postulación dentro de
+seis meses puede saber que no lo movió nadie, y con qué nota.
 
-### La prueba al instante (07/10/2026)
+### La prueba al instante (07/10/2026 – 12/10/2026, retirada)
 
-Antes, entre entregar el banco y recibir la prueba pasaban los minutos de la IA, y el candidato
-leía «te avisaremos», cerraba la página y muchas veces no volvía. **El pase nunca miró la nota**
-—con el interruptor puesto pasan todos; la nota solo decide el grupo del ranking—, así que esa
-espera no filtraba a nadie. Ahora no existe:
+Del 07/10 al 12/10/2026, con el interruptor puesto, el candidato pasaba a la prueba **en el mismo
+momento** de entregar el banco (o de postular sin banco), sin esperar a la IA, porque entonces el
+pase no miraba la nota. **Desde la V72 el pase mira la nota, así que esperarla es obligatorio y la
+prueba al instante ya no existe:**
 
-- **El portal lo lleva directo a la portada de su prueba** (o del cuestionario técnico) con «Tu
-  prueba del puesto ya está disponible». Abrir la portada no arranca el reloj: arranca al
-  confirmar, como siempre.
-- **La máquina avanza de uno en uno.** Desde `PERFIL_CALIFICANDO` pasa por
-  `PERFIL_POR_CONFIRMAR` y en el mismo instante a `PRUEBA_TURNO_CANDIDATO`. El paso intermedio
-  no manda nada: el único correo, y el único aviso de la campana, es el de la prueba.
-- **La nota llega después y no lo mueve.** Al terminar, la IA guarda la nota del Perfil
-  Integral y el grupo, y solo movería la postulación si siguiera en el Perfil Integral. Mientras
-  tanto, la ficha y el ranking del panel la muestran **«en camino»**. Si la IA agota sus
-  intentos, el candidato sigue en su prueba y el panel enseña el fallo de siempre.
-- **El pase y su prueba van juntos o no van.** Si el pase al instante falla, lo entregado queda
-  guardado igual y la postulación espera en el Perfil Integral al pase de siempre, al terminar
-  la nota. La respuesta al candidato nunca es un error por algo que él hizo bien.
-- **Sin pase o sin prueba montada, nada cambia:** el candidato espera, y el portal le dice
-  «Evaluación entregada. Te avisaremos por correo y en la campana cuando te toque la prueba.».
-- **Dos pestañas que entregan a la vez** no crean dos pruebas: la segunda recibe un 409 «Esta
-  evaluación ya fue entregada», como si hubiera llegado después.
-
-Las postulaciones que ya esperaban en `PERFIL_POR_CONFIRMAR` el día del despliegue no se movieron
-solas por este cambio: siguen esperando a una persona, como antes.
+- Al entregar, el portal vuelve a su proceso y dice «Evaluación entregada. Te avisaremos por
+  correo y en la campana cuando haya novedades.». Ya no lleva a la portada de la prueba.
+- Quien ya estaba en la prueba sigue ahí. Quien esperaba en «por confirmar» no se movió al
+  desplegar.
+- Lo que sí sigue de aquella entrega: la nota **«en camino»** de la ficha y el ranking mientras
+  la IA trabaja, y que **dos pestañas que entregan a la vez** no crean dos entregas (la segunda
+  recibe un 409 «Esta evaluación ya fue entregada»).
 
 ---
 
@@ -425,12 +443,18 @@ decisión sobre su candidatura se tomaba automáticamente, y era falso.
 |---|---|---|
 | La postulación se cierra al postular, porque el candidato declaró que no cumple un requisito indispensable | En el momento de enviarla | No. Es la regla de los requisitos objetivos |
 | El proceso se cierra porque se acabó el plazo de una evaluación o de una prueba | Un sondeo que corre cada 60 segundos | **No tiene interruptor** |
-| La postulación pasa a la etapa siguiente sin esperar a nadie | Solo con «calificar y avanzar sola» encendido | Sí: el interruptor de la vacante |
+| La postulación pasa a la etapa siguiente sin esperar a nadie | Solo con «calificar y avanzar sola» encendido **y si su nota del Perfil Integral llega a la mínima** de la vacante | Sí: el interruptor de la vacante |
 
-**Ninguna de las tres depende de una nota**, y eso es lo que el texto dice con las palabras
-«ninguna nota te contrata ni te descarta por sí sola». Una nota baja no cierra nada: quien
-decide continuar o no es siempre una persona de la empresa. En cualquiera de las tres, el
-candidato puede escribir y pedir que una persona lo revise.
+**Solo la tercera depende de una nota, y nunca para descartar** (desde el 12/10/2026). Una nota
+baja no cierra nada: quien no llega a la mínima espera a que una persona revise su caso. Por eso
+el texto legal sigue diciendo «ninguna nota te contrata ni te descarta por sí sola». En
+cualquiera de las tres, el candidato puede escribir y pedir que una persona lo revise.
+
+El texto legal lo dice desde la versión **1.1 de `PLATAFORMA`** (V72), que firman las cuentas
+nuevas: «me pasa a la etapa siguiente sin esperar a nadie cuando la empresa configuró su vacante
+para avanzar sola y mi nota del Perfil Integral llega a la mínima que fijó; si no llega, no me
+descarta: una persona revisa mi caso». Quien firmó la 1.0 sigue ligado a ella y no se le pide
+aceptar otra vez. La página pública de privacidad del portal dice lo mismo.
 
 ---
 

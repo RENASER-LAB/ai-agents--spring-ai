@@ -1,6 +1,7 @@
 package com.renaser.ai.ai_engine.postulacion.service;
 
 import com.renaser.ai.ai_engine.perfilintegral.service.PuenteCalificacionIa;
+import com.renaser.ai.ai_engine.perfilintegral.service.UmbralDelPerfilIntegral;
 import com.renaser.ai.ai_engine.postulacion.entity.EstadoPostulacion;
 import com.renaser.ai.ai_engine.postulacion.entity.Postulacion;
 import com.renaser.ai.ai_engine.postulacion.repository.PostulacionRepository;
@@ -13,7 +14,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.util.Optional;
+import java.util.function.BiFunction;
 
 /**
  * Pasar una postulación a la etapa técnica sin que nadie lo pida.
@@ -22,26 +25,31 @@ import java.util.Optional;
  * siempre era decir «sí» a lo que la máquina acababa de calcular. Con el interruptor de la
  * vacante encendido, el candidato recibe su prueba sin esperar a que nadie mire.
  *
- * <p><b>Dos momentos, y desde la V70 el primero es el normal.</b>
+ * <p><b>Solo con la nota completa del Perfil Integral, y solo si llega a la mínima (V72).</b>
+ * Quien no llega, o no tiene nota completa, se queda en «por confirmar» y decide una persona:
+ * ninguna nota lleva a nadie a «No continúa». Qué nota cuenta y cuándo llega lo dice
+ * {@link UmbralDelPerfilIntegral}, el mismo que usa la ficha para explicar por qué alguien
+ * espera.
+ *
+ * <p><b>Dos momentos</b>, y en los dos la postulación ya está en «por confirmar»:
  * <ul>
- *   <li>{@link #alInstante}: en cuanto el candidato hizo lo suyo —entregó el banco, o postuló a
- *       una vacante sin banco—. No espera a la IA: el pase no mira la nota (con el interruptor
- *       encendido pasan todos; la nota solo decide el grupo de prioridad), así que esperarla
- *       solo servía para que el candidato cerrara la página y no volviera. La IA sigue
- *       calificando por detrás y su nota aparece en el panel cuando termina.</li>
- *   <li>{@link #avanzarSiToca}: al terminar la calificación, el de siempre. Sigue haciendo falta
- *       para quien no pudo pasar al instante porque a su vacante le faltaba la prueba y alguien
- *       la montó mientras la IA trabajaba.</li>
+ *   <li>{@link #avanzarSiToca}: al terminar la calificación del Perfil Integral.</li>
+ *   <li>{@link #avanzarTrasRecalcular}: cuando una persona ajusta una respuesta o recalifica y
+ *       su nota cambia mientras espera. A quien ya está en la prueba no se le toca aunque la
+ *       nota baje.</li>
  * </ul>
  *
- * <p><b>Está separado de quien lo dispara a propósito.</b> Quienes escuchan son
- * {@link PaseAutomaticoTrasCalificar} y {@link PaseAutomaticoAlInstante}; si el método
- * transaccional viviera allí y se llamara a sí mismo, Spring se saltaría el proxy y la
- * transacción nueva no existiría — que es justo el fallo que este reparto evita.
+ * <p>Hasta la V72 existía un tercero, el pase al instante (V70): al entregar el banco, o al
+ * postular sin banco, se pasaba a la prueba sin esperar a la IA porque el pase no miraba la
+ * nota. Ahora la mira, así que esperarla es obligatorio y aquel momento se retiró.
  *
- * <p>⚠️ <b>Solo lo inyectan esos dos oyentes.</b> Depende, dando un rodeo largo, de la propia
- * calificación con IA y de la entrega del banco; mientras nadie de esas cadenas lo inyecte a
- * él, no hay círculo. Ver
+ * <p><b>Está separado de quien lo dispara a propósito.</b> Quien escucha es
+ * {@link PaseAutomaticoTrasCalificar}; si el método transaccional viviera allí y se llamara a
+ * sí mismo, Spring se saltaría el proxy y la transacción nueva no existiría — que es justo el
+ * fallo que este reparto evita.
+ *
+ * <p>⚠️ <b>Solo lo inyecta ese oyente.</b> Depende, dando un rodeo largo, de la propia
+ * calificación con IA; mientras nadie de esa cadena lo inyecte a él, no hay círculo. Ver
  * {@link com.renaser.ai.ai_engine.perfilintegral.service.RetratoTerminado}.
  */
 @Service
@@ -49,20 +57,19 @@ import java.util.Optional;
 @Slf4j
 public class PaseAutomatico {
 
-    /** El único estado desde el que el pase de siempre tiene sentido. */
+    /** El único estado desde el que el pase tiene sentido. */
     private static final String DE = "PERFIL_POR_CONFIRMAR";
-
-    /** Donde deja al candidato la entrega del banco. Solo el pase al instante sale de aquí. */
-    private static final String CALIFICANDO = "PERFIL_CALIFICANDO";
 
     private final PostulacionRepository postulaciones;
     private final VacanteRepository vacantes;
     private final MaquinaEstados maquina;
     private final EntradaEtapaTecnica entradaTecnica;
     private final PuenteCalificacionIa puente;
+    private final UmbralDelPerfilIntegral umbral;
 
     /**
-     * Avanza esta postulación si le toca, y no hace nada si no.
+     * Al terminar la nota del Perfil Integral: avanza esta postulación si le toca, y no hace
+     * nada si no.
      *
      * <p>⚠️ <b>{@code REQUIRES_NEW}, y sin él esto no escribiría nada.</b> Se llama justo
      * después de que la calificación confirme sus cambios, y en ese momento la transacción
@@ -75,85 +82,83 @@ public class PaseAutomatico {
      * postulación. Cada una por su lado se confirma sola, y un fallo entre medias deja el
      * examen creado con el candidato fuera de la etapa: desde ahí, volver a avanzarlo choca
      * contra la clave única y el panel solo sabe decir «ya existe un registro».
+     *
+     * @return si quedó en la prueba
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void avanzarSiToca(Long postulacionId) {
+    public boolean avanzarSiToca(Long postulacionId) {
+        return avanzar(postulacionId, UmbralDelPerfilIntegral::motivoAlTerminar);
+    }
+
+    /**
+     * Cuando su nota se recalculó mientras esperaba —un ajuste a mano, una recalificación, un
+     * cambio de puntos—: si ahora llega a la mínima, pasa con el mismo correo y la misma
+     * campana que al terminar la nota, y el historial dice que fue tras recalcular.
+     *
+     * <p>Mismas guardas y misma transacción propia que {@link #avanzarSiToca}, por lo mismo:
+     * corre después de confirmarse el recálculo.
+     *
+     * @return si quedó en la prueba
+     */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public boolean avanzarTrasRecalcular(Long postulacionId) {
+        return avanzar(postulacionId, UmbralDelPerfilIntegral::motivoTrasRecalcular);
+    }
+
+    /**
+     * Las guardas y el pase, comunes a los dos momentos.
+     *
+     * @param motivo lo que leerá el historial, a partir de la nota y la mínima
+     */
+    private boolean avanzar(Long postulacionId, BiFunction<BigDecimal, Integer, String> motivo) {
         Postulacion p = postulaciones.findById(postulacionId).orElse(null);
         if (p == null) {
-            return;
+            return false;
         }
 
         // Se compara el estado exacto y no «sigue en la etapa»: el siguiente estado se
         // calcula a partir de este, así que el punto de partida tiene que ser el que es. A
-        // quien todavía está en su turno, o a quien una persona ya movió mientras la IA
-        // trabajaba —o el pase al instante, que ya lo dejó en la prueba—, no se le toca.
+        // quien todavía está en su turno o calificando, a quien una persona ya movió mientras
+        // la IA trabajaba, o a quien ya está en la prueba, no se le toca.
         if (!DE.equals(p.getEstadoCodigo())) {
-            return;
-        }
-
-        Vacante vacante = laQueLoDejaAvanzar(p);
-        if (vacante == null) {
-            return;
-        }
-        // Con motivo escrito aunque sea del sistema: sin él, el historial del candidato
-        // enseña un salto sin autor y sin explicación, y quien lo abra dentro de seis meses
-        // no puede saber si lo movió alguien o la vacante.
-        pasarALaPrueba(p, vacante, "Pase automático: esta vacante califica y avanza sola");
-    }
-
-    /**
-     * El pase al instante (V70): en cuanto el candidato hizo lo suyo, sin esperar a la IA.
-     *
-     * <p>Lo dispara {@link PaseAutomaticoAlInstante} al confirmarse la entrega del banco (la
-     * postulación está en «calificando») o la postulación a una vacante sin banco (está en
-     * «por confirmar»). Las guardas son las mismas del pase de siempre; si alguna falla, todo
-     * sigue como hasta ahora y la nota, al terminar, vuelve a intentarlo.
-     *
-     * <p>⚠️ <b>La máquina avanza de uno en uno</b>: desde «calificando» se pasa primero por
-     * «por confirmar» y después a la prueba. Ese paso intermedio es de espera del equipo y no
-     * manda nada: el único correo —y el único aviso de la campana— es el de la prueba.
-     *
-     * <p>⚠️ <b>{@code REQUIRES_NEW} por la misma razón que el de siempre</b>: corre después de
-     * confirmarse la entrega, con aquella transacción cerrada pero atada al hilo. Y la prueba y
-     * el paso van juntos: o los dos, o ninguno.
-     *
-     * @param motivo lo que leerá el historial: «Pase automático al entregar: la nota se calcula
-     *               después»
-     * @return si quedó en la prueba
-     */
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public boolean alInstante(Long postulacionId, String motivo) {
-        Postulacion p = postulaciones.findById(postulacionId).orElse(null);
-        if (p == null) {
-            return false;
-        }
-        String desde = p.getEstadoCodigo();
-        // Solo desde los dos estados en que lo deja su propio gesto. Si la IA terminó antes
-        // (ya está en la prueba), o una persona lo movió, o la entrega no llegó a confirmarse,
-        // aquí no se toca nada.
-        if (!CALIFICANDO.equals(desde) && !DE.equals(desde)) {
             return false;
         }
         // Con la fila bloqueada, como «Avanzar» del panel: si una persona la está moviendo a la
-        // vez, se espera a que termine y se mira lo que dejó. Sin esto los dos leerían el mismo
-        // estado de partida y los dos la moverían.
-        if (!desde.equals(postulaciones.estadoBloqueandoLaFila(postulacionId))) {
+        // vez —o dos recálculos seguidos llegan a la vez—, se espera a que termine el otro y se
+        // mira lo que dejó. Sin esto los dos leerían el mismo estado de partida y los dos la
+        // moverían.
+        if (!DE.equals(postulaciones.estadoBloqueandoLaFila(postulacionId))) {
             return false;
         }
+
         Vacante vacante = laQueLoDejaAvanzar(p);
         if (vacante == null) {
             return false;
         }
-        if (CALIFICANDO.equals(desde)) {
-            maquina.transicionar(p, DE, null, motivo, true, false, null);
+
+        // La nota, leída después de bloquear la fila: es la última que se guardó.
+        Optional<BigDecimal> nota = umbral.notaCompleta(postulacionId);
+        int minima = UmbralDelPerfilIntegral.minimaDe(vacante);
+        if (nota.isEmpty()) {
+            log.info("PASE_AUTOMATICO: la postulación {} se queda en «por confirmar»: no tiene "
+                    + "nota completa del Perfil Integral", postulacionId);
+            return false;
         }
-        return pasarALaPrueba(p, vacante, motivo);
+        if (!UmbralDelPerfilIntegral.llega(nota.get(), minima)) {
+            log.info("PASE_AUTOMATICO: la postulación {} se queda en «por confirmar»: su nota {} "
+                    + "no llega a la mínima {}", postulacionId, nota.get(), minima);
+            return false;
+        }
+        // Con motivo escrito aunque sea del sistema: sin él, el historial del candidato
+        // enseña un salto sin autor y sin explicación, y quien lo abra dentro de seis meses
+        // no puede saber si lo movió alguien o la vacante, ni con qué nota.
+        return pasarALaPrueba(p, vacante, motivo.apply(nota.get(), minima));
     }
 
     /**
      * La vacante, si deja avanzar a esta postulación; {@code null} si alguna guarda lo impide.
      *
-     * <p>Las comparten los dos momentos del pase: escritas una vez, valen para los dos.
+     * <p>Las que no son la nota. Escritas una vez, valen para los dos momentos del pase.
      */
     private Vacante laQueLoDejaAvanzar(Postulacion p) {
         Long postulacionId = p.getId();

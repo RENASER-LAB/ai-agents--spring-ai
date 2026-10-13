@@ -82,8 +82,6 @@ class ServicioEvaluacionImplTest {
     @Mock private ServicioCalificacion calificacion;
     @Mock private ColaCalificacionIa colaIa;
     @Mock private ServicioParametros parametros;
-    // El aviso de que entregó, para el pase al instante (V70).
-    @Mock private org.springframework.context.ApplicationEventPublisher eventos;
 
     @InjectMocks
     private ServicioEvaluacionImpl servicio;
@@ -651,7 +649,7 @@ class ServicioEvaluacionImplTest {
 
         private void nadaSeMovio() {
             verify(evaluaciones, never()).save(any());
-            org.mockito.Mockito.verifyNoInteractions(maquina, calificacion, colaIa, eventos);
+            org.mockito.Mockito.verifyNoInteractions(maquina, calificacion, colaIa);
         }
 
         @Test

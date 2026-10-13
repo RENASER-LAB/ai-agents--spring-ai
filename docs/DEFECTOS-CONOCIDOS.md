@@ -14,7 +14,7 @@ haría falta para arreglarlo**. Sin lo tercero, una lista así solo sirve para p
 **Los números no se corren ni se reutilizan.** Otros documentos citan las entradas por su número,
 así que la que se cierra deja su hueco.
 
-Última revisión: **05/10/2026**.
+Última revisión: **13/10/2026**.
 
 ---
 
@@ -364,6 +364,26 @@ quedaron fuera. Ninguna nota se pierde ni se recalcula.
 **Qué haría falta.** Que la tabla del panel saque también las columnas de la prueba vigente, y
 decidir qué se hace con quien rindió la anterior: marcarlo, apartar su nota del orden o dejarlo
 como está. Es otra spec.
+
+---
+
+## 16 · Dos personas que corrigen el mismo dato de una vacante a la vez pueden dejar una auditoría con el «antes» equivocado
+
+**Qué le pasa a alguien.** Dos personas del equipo cambian a la vez el mismo dato de una vacante
+desde el lápiz, la tarjeta del sueldo o la fecha límite de su prueba —por ejemplo, las dos tocan
+el título—. Gana el último guardado, como siempre, pero su línea de auditoría puede decir «de X a
+Y» con una X que ya no era la que había: la del primero, que confirmó en medio.
+
+**Por qué pasa.** Desde la `V72` (12/10/2026) las escrituras de la configuración de la vacante
+—publicar, plantillas, aplicación de la evaluación, interruptor del pase, nota mínima, pesos,
+instrumento, origen de las preguntas, cerrar y el cierre de la prueba, entre otras— bloquean su fila y van de
+una en una, así que cada una audita desde lo que dejó la anterior. Editar con el lápiz, el sueldo
+y la fecha límite no bloquean: solo escriben las columnas que cambiaron (`@DynamicUpdate` en
+`Vacante`), lo que impide que pisen un dato que no tocaban, pero no ordena dos cambios del mismo
+dato. Se dejó así en esa entrega.
+
+**Qué haría falta.** Que esas tres rutas lean la vacante con el mismo bloqueo que las demás
+(`VacanteRepository.bloquear`).
 
 ---
 

@@ -50,6 +50,7 @@ import com.renaser.ai.ai_engine.perfilintegral.repository.PreguntaRepository;
 import com.renaser.ai.ai_engine.perfilintegral.repository.RespuestaRepository;
 import com.renaser.ai.ai_engine.perfilintegral.service.FormulasCazatalentos;
 import com.renaser.ai.ai_engine.perfilintegral.service.LectorBancoCazatalentos;
+import com.renaser.ai.ai_engine.perfilintegral.service.NotaDelPerfilRecalculada;
 import com.renaser.ai.ai_engine.perfilintegral.service.PuenteCalificacionIa;
 import com.renaser.ai.ai_engine.perfilintegral.service.RetratoTerminado;
 import com.renaser.ai.ai_engine.perfilintegral.service.ServicioCalificacion;
@@ -578,6 +579,11 @@ public class PuenteCalificacionIaImpl implements PuenteCalificacionIa {
         postulaciones.save(postulacion);
         log.info("La postulación {} se recalculó sin moverla de etapa: nota {} y grupo {}",
                 postulacionId, nota, postulacion.getGrupoPrioridad());
+        // Aquí no se mueve a nadie, pero si espera en «por confirmar» en una vacante que avanza
+        // sola y su nota ahora llega a la mínima, el pase la mueve al confirmarse esto (V72).
+        // Se avisa y no se llama, por el mismo círculo que el retrato. Ver
+        // NotaDelPerfilRecalculada.
+        avisos.publishEvent(new NotaDelPerfilRecalculada(postulacionId));
     }
 
     /**
@@ -832,9 +838,10 @@ public class PuenteCalificacionIaImpl implements PuenteCalificacionIa {
         if (maquina.sigueEnLaEtapa(postulacion, "PERFIL_INTEGRAL")) {
             maquina.transicionar(postulacion, "PERFIL_POR_CONFIRMAR", null, null, true, false, null);
             // Y si la vacante califica y avanza sola, alguien tiene que enterarse de que esto
-            // ya terminó. Se avisa y no se llama: avanzar pasa por crear lo que el candidato
-            // va a rendir, y ese camino vuelve hasta aquí cerrando un círculo con el que
-            // Spring no arranca. Ver RetratoTerminado.
+            // ya terminó: con la nota completa, el pase decide si llega a la mínima (V72). Se
+            // avisa y no se llama: avanzar pasa por crear lo que el candidato va a rendir, y
+            // ese camino vuelve hasta aquí cerrando un círculo con el que Spring no arranca.
+            // Ver RetratoTerminado.
             avisos.publishEvent(new RetratoTerminado(postulacionId));
         } else {
             log.info("POTENCIAL_RIESGO: la postulación {} ya salió del Perfil Integral (está en "

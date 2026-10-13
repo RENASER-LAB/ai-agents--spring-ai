@@ -1,5 +1,6 @@
 package com.renaser.ai.ai_engine.postulacion.service;
 
+import com.renaser.ai.ai_engine.perfilintegral.service.NotaDelPerfilRecalculada;
 import com.renaser.ai.ai_engine.perfilintegral.service.RetratoTerminado;
 
 import lombok.RequiredArgsConstructor;
@@ -8,7 +9,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 /**
- * Escuchar que la calificación terminó, para dar el pase automático.
+ * Escuchar que la nota del Perfil Integral terminó —o se recalculó—, para dar el pase
+ * automático.
  *
  * <p>No hace nada por su cuenta: solo llama a {@link PaseAutomatico} y se traga lo que
  * salga mal. Es fino a propósito — separar el oyente del trabajo es lo que permite que el
@@ -18,6 +20,9 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * <p>⚠️ <b>A esta clase no la inyecta nadie, y no puede hacerlo nadie.</b> Es lo que rompe
  * el círculo de dependencias que impide llamar al pase directamente desde la calificación.
  * Ver {@link RetratoTerminado}, donde está contado entero.
+ *
+ * <p>Escucha los dos eventos del proyecto, y los dos acaban en {@link PaseAutomatico}: el
+ * retrato terminado y la nota recalculada mientras la persona espera (V72).
  */
 @Component
 @RequiredArgsConstructor
@@ -48,6 +53,25 @@ public class PaseAutomaticoTrasCalificar {
         } catch (RuntimeException e) {
             log.error("PASE_AUTOMATICO: la postulación {} se queda esperando a una persona. "
                     + "Lo calificado está guardado: {}", evento.postulacionId(), e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Corre justo después de que un recálculo de la nota quede guardado (V72).
+     *
+     * <p>Por lo mismo que {@link #alTerminarElRetrato}: después del commit, para que un fallo
+     * aquí no deshaga el ajuste que una persona acaba de hacer, y tragándose cualquier error,
+     * porque el ajuste ya está bien hecho y guardado. Si el pase no se puede dar, la
+     * postulación sigue esperando a una persona.
+     */
+    @TransactionalEventListener
+    public void alRecalcularLaNota(NotaDelPerfilRecalculada evento) {
+        try {
+            pase.avanzarTrasRecalcular(evento.postulacionId());
+        } catch (RuntimeException e) {
+            log.error("PASE_AUTOMATICO: la postulación {} se queda esperando a una persona tras "
+                    + "recalcular su nota. Lo recalculado está guardado: {}",
+                    evento.postulacionId(), e.getMessage(), e);
         }
     }
 }

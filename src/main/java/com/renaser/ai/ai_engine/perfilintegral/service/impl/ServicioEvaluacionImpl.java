@@ -31,7 +31,6 @@ import com.renaser.ai.ai_engine.perfilintegral.repository.RespuestaRepository;
 import com.renaser.ai.ai_engine.perfilintegral.repository.VersionBancoRepository;
 import com.renaser.ai.ai_engine.perfilintegral.service.ServicioCalificacion;
 import com.renaser.ai.ai_engine.perfilintegral.service.ServicioEvaluacion;
-import com.renaser.ai.ai_engine.perfilintegral.service.TurnoDelPerfilCumplido;
 import com.renaser.ai.ai_engine.perfilintegral.service.ValidadorDetalleV3;
 import com.renaser.ai.ai_engine.organizacion.service.DuenoDelInstrumento;
 import com.renaser.ai.ai_engine.organizacion.service.Instrumento;
@@ -46,7 +45,6 @@ import com.renaser.ai.ai_engine.vacante.service.VacanteEliminada;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
@@ -121,9 +119,6 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
     private final DuenoDelInstrumento dueno;
     // El orden de los criterios de las preguntas propias, para armar su examen (V66).
     private final CriterioBancoRepository criteriosBanco;
-    // Para avisar de que el candidato entregó, y que el pase automático le abra la prueba al
-    // instante (V70). Un evento y no una llamada: ver TurnoDelPerfilCumplido.
-    private final ApplicationEventPublisher eventos;
 
     private final SecureRandom azar = new SecureRandom();
 
@@ -635,15 +630,9 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
         // postulación se queda en PERFIL_CALIFICANDO hasta que haya resultado, y si la IA
         // falla se reintenta sola: nunca se inventa una nota (Regla 3 del doc 03).
         //
-        // Y si la vacante califica y avanza sola, la prueba se le abre ya, sin esperar a la IA
-        // (V70). Corre al confirmarse esta entrega, en este mismo hilo: cuando el portal vuelva
-        // a pedir la postulación, la verá en la prueba. Sin pase automático, no pasa nada.
-        //
-        // ⚠️ El aviso va ANTES de encolar, y el orden importa: los dos esperan al commit y
-        // corren en el orden en que se pidieron. Así el pase termina antes de que la cola le
-        // mande el trabajo a la IA, y la IA nunca encuentra a la postulación a medio pasar.
-        eventos.publishEvent(new TurnoDelPerfilCumplido(postulacion.getId(),
-                TurnoDelPerfilCumplido.Momento.AL_ENTREGAR));
+        // Aunque la vacante califique y avance sola, aquí no se pasa a la prueba: el pase
+        // espera a que la IA termine la nota y exige que llegue a la mínima de la vacante
+        // (V72). Lo da PaseAutomatico al cerrarse el Perfil Integral.
         colaIa.encolarPerfilIntegral(postulacion.getId());
 
         return new EntregaResponse("TERMINADA", respondidas, total);

@@ -151,12 +151,26 @@ automáticamente. No era cierto. Hay tres transiciones en las que no interviene 
 |---|---|---|
 | Se cierra la postulación al postular, si el candidato declara que no cumple un requisito indispensable de la vacante | Al enviar la postulación | No |
 | Se cierra el proceso cuando se acaba el plazo para responder una evaluación o una prueba | Un sondeo que corre cada 60 segundos | **No tiene interruptor** |
-| Se pasa a la etapa siguiente sin esperar a nadie | Solo en las vacantes que encendieron «calificar y avanzar sola» (V53) | Sí, es el interruptor de la vacante |
+| Se pasa a la etapa siguiente sin esperar a nadie | Solo en las vacantes que encendieron «calificar y avanzar sola» (V53) y, desde la V72, si la nota del Perfil Integral llega a la mínima de la vacante | Sí, es el interruptor de la vacante |
 
 Los dos textos —el de la plataforma y la política de privacidad del portal— dicen ahora
 **«ninguna nota te contrata ni te descarta por sí sola»** y enumeran esas tres. Ninguna de las
-tres depende de una nota, y en las tres el candidato puede escribir y pedir que una persona lo
+tres dependía de una nota, y en las tres el candidato puede escribir y pedir que una persona lo
 revise.
+
+### La `PLATAFORMA` 1.1: la tercera depende de una nota (V72, 12/10/2026)
+
+**Ya está publicada.** Desde la `V72` el pase a la etapa siguiente solo se da si la nota del
+Perfil Integral llega a la mínima que fijó la vacante, así que la frase «ninguna de las tres
+depende de una nota» dejó de ser cierta. La 1.1 es la 1.0 con ese párrafo reescrito y nada más:
+«solo la tercera depende de una nota, y nunca para descartarme», y la tercera pasa a decir «me
+pasa a la etapa siguiente sin esperar a nadie cuando la empresa configuró su vacante para avanzar
+sola y mi nota del Perfil Integral llega a la mínima que fijó; si no llega, no me descarta: una
+persona revisa mi caso». La política de privacidad del portal dice lo mismo.
+
+La firman las cuentas nuevas. **La 1.0 no se toca y a nadie se le pide aceptar otra vez**, como
+fija la spec aprobada: quien la firmó sigue ligado a un texto que dice que el pase no
+mira la nota. Es el mismo hueco del punto 3 de «Lo que sigue pendiente».
 
 ### Los huecos que el borrador dejaba abiertos
 

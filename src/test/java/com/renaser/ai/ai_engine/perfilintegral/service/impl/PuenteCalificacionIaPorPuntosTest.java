@@ -88,6 +88,8 @@ class PuenteCalificacionIaPorPuntosTest {
     @Mock private PesoCriterioRepository pesosCriterio;
     @Mock private NotaCriterioRepository notasCriterio;
     @Mock private DatosDeLaVacanteParaIa datosDeLaVacante;
+    // El recálculo avisa al pase automático (V72): sin esto, avisos sería nulo
+    @Mock private org.springframework.context.ApplicationEventPublisher avisos;
     @InjectMocks private PuenteCalificacionIaImpl puente;
 
     private final Postulacion postulacion = Postulacion.builder().id(POSTULACION).organizacionId(1L)
@@ -198,6 +200,10 @@ class PuenteCalificacionIaPorPuntosTest {
         assertThat(postulacion.getGrupoPrioridad()).isEqualTo("ALTA");
         assertThat(postulacion.getEstadoCodigo()).isEqualTo("PERFIL_CALIFICANDO");
         verifyNoInteractions(maquina);
+        // No mueve a nadie, pero avisa: si espera en «por confirmar» y ahora llega a la mínima,
+        // el pase automático la mueve al confirmarse esto (V72, AC-06)
+        verify(avisos).publishEvent(new com.renaser.ai.ai_engine.perfilintegral.service
+                .NotaDelPerfilRecalculada(POSTULACION));
     }
 
     @Test
