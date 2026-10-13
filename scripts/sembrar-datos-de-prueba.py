@@ -65,6 +65,17 @@ ORGULLOS = [
 ]
 
 
+def celular_de(i):
+    """El celular del candidato i, en E.164: «+51 900 000 00i».
+
+    Desde la V73 crear una cuenta pide el celular, y sin él la API contesta 400. Es un celular
+    peruano válido —nueve cifras que empiezan por 9— y distinto para cada uno, porque el bot de
+    WhatsApp reconoce a la gente por el número. La serie 900 000 0xx es a propósito: nadie la
+    confunde con el número de una persona real, y con la beta apagada nadie le escribe.
+    """
+    return f"+51900000{i:03d}"
+
+
 def cv_falso(nombre):
     """Un PDF mínimo pero válido, para que la subida sea real."""
     texto = f"Curriculum de {nombre}"
@@ -75,6 +86,14 @@ def cv_falso(nombre):
         b"trailer<</Root 1 0 R>>\n%% " + texto.encode("utf-8") + b"\n%%EOF\n"
     )
     return io.BytesIO(contenido)
+
+
+class ErrorDeApi(RuntimeError):
+    """Una respuesta que no fue 2xx, con su código: no es lo mismo un 409 que un 400."""
+
+    def __init__(self, mensaje, estado):
+        super().__init__(mensaje)
+        self.estado = estado
 
 
 class Api:
@@ -93,7 +112,7 @@ class Api:
                 detalle = r.json().get("detail", r.text[:200])
             except Exception:
                 detalle = r.text[:200]
-            raise RuntimeError(f"{metodo} {ruta} → {r.status_code}: {detalle}")
+            raise ErrorDeApi(f"{metodo} {ruta} → {r.status_code}: {detalle}", r.status_code)
         if r.status_code == 204 or not r.content:
             return None
         try:
@@ -407,15 +426,22 @@ def sembrar(api, uid_equipo):
         try:
             api.post("/portal/cuentas", {
                 "nombre": nombre, "apellidos": apellidos, "correo": correo,
+                "telefono": celular_de(i),
                 "contrasena": "Demo12345!", "aceptaPlataforma": True,
                 "ciudadUbigeo": ubigeo,
                 "aceptaFuturosContactos": i % 3 != 0,
             })
-        except RuntimeError:
-            # Ya existe de una siembra anterior: se entra con ella y se postula otra
-            # vez. Postular dos veces a la misma vacante sí lo rechaza el backend, y
-            # eso es correcto: nadie se postula dos veces al mismo puesto.
-            pass
+        except ErrorDeApi as e:
+            # Solo el 409 es «ya existe una cuenta con ese correo», de una siembra anterior:
+            # se entra con ella y se postula otra vez. Postular dos veces a la misma vacante
+            # sí lo rechaza el backend, y eso es correcto: nadie se postula dos veces al
+            # mismo puesto.
+            #
+            # Cualquier otro se corta aquí. Antes se tragaba todo, y cuando la V73 hizo
+            # obligatorio el celular el 400 pasó por «ya existe» y la siembra reventó en el
+            # login con un 401 que no decía nada de la causa.
+            if e.estado != 409:
+                raise
         api.token = api.post("/portal/auth/login", {"correo": correo, "contrasena": "Demo12345!"})["token"]
 
         campos = {

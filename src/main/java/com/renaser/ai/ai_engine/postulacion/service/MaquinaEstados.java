@@ -103,6 +103,11 @@ public class MaquinaEstados {
     private final FechaLimiteDeLaPersona fechasLimite;
     /** La pareja de cada correo en la campana del portal (V70). Puede ser nulo. */
     private final AvisoDeEtapaEnLaCampana campana;
+    /**
+     * Los «te toca» por WhatsApp y el cierre del vínculo al terminar (V73). Puede ser nulo: las
+     * pruebas del correo y de la campana no lo necesitan.
+     */
+    private final com.renaser.ai.ai_engine.whatsapp.service.AvisosPorWhatsapp whatsapp;
 
     /** El constructor de siempre: el que usan las pruebas unitarias del aviso. */
     public MaquinaEstados(EstadoPostulacionRepository estados, PostulacionRepository postulaciones,
@@ -131,7 +136,7 @@ public class MaquinaEstados {
                 versionesBanco, null, null);
     }
 
-    @Autowired
+    /** El de la V70: con la campana y sin WhatsApp. Lo usan las pruebas de la campana. */
     @SuppressWarnings("java:S107") // Ya los tenía: cada uno es una pieza del aviso, no un parámetro suelto.
     public MaquinaEstados(EstadoPostulacionRepository estados, PostulacionRepository postulaciones,
                           TransicionEstadoRepository transiciones, UsuarioRepository usuarios,
@@ -142,8 +147,26 @@ public class MaquinaEstados {
                           VersionPlantillaPruebaRepository versionesDePrueba,
                           ServicioParametros parametros, VersionBancoRepository versionesBanco,
                           FechaLimiteDeLaPersona fechasLimite, AvisoDeEtapaEnLaCampana campana) {
+        this(estados, postulaciones, transiciones, usuarios, personas, vacantes, auditoria, correo,
+                direcciones, enlaces, plantillasPorVacante, versionesDePrueba, parametros,
+                versionesBanco, fechasLimite, campana, null);
+    }
+
+    @Autowired
+    @SuppressWarnings("java:S107") // Ya los tenía: cada uno es una pieza del aviso, no un parámetro suelto.
+    public MaquinaEstados(EstadoPostulacionRepository estados, PostulacionRepository postulaciones,
+                          TransicionEstadoRepository transiciones, UsuarioRepository usuarios,
+                          PersonaRepository personas, VacanteRepository vacantes,
+                          ServicioAuditoria auditoria, ServicioCorreo correo,
+                          DireccionDelCandidato direcciones, ServicioEnlaceAcceso enlaces,
+                          PlantillaCorreoVacanteRepository plantillasPorVacante,
+                          VersionPlantillaPruebaRepository versionesDePrueba,
+                          ServicioParametros parametros, VersionBancoRepository versionesBanco,
+                          FechaLimiteDeLaPersona fechasLimite, AvisoDeEtapaEnLaCampana campana,
+                          com.renaser.ai.ai_engine.whatsapp.service.AvisosPorWhatsapp whatsapp) {
         this.fechasLimite = fechasLimite;
         this.campana = campana;
+        this.whatsapp = whatsapp;
         this.estados = estados;
         this.postulaciones = postulaciones;
         this.transiciones = transiciones;
@@ -349,7 +372,7 @@ public class MaquinaEstados {
                 ? motivo
                 : motivo + " · sin avisar al candidato";
 
-        transiciones.save(TransicionEstado.builder()
+        TransicionEstado guardada = transiciones.save(TransicionEstado.builder()
                 .postulacionId(postulacion.getId())
                 .estadoAnteriorCodigo(estadoAnterior)
                 .estadoNuevoCodigo(estadoNuevoCodigo)
@@ -392,7 +415,14 @@ public class MaquinaEstados {
                 motivoGuardado);
 
         if (avisar) {
-            avisarAlCandidato(postulacion, nuevo, motivoCierre);
+            avisarAlCandidato(postulacion, nuevo, motivoCierre,
+                    guardada == null ? null : guardada.getId());
+        }
+
+        // Un proceso que termina cierra su vínculo de WhatsApp (V73), avisando o sin avisar: los
+        // cierres no van por WhatsApp, y desde ahí el bot contesta «no tienes procesos activos».
+        if (nuevo.isEsFinal() && whatsapp != null) {
+            whatsapp.alTerminar(postulacion);
         }
     }
 
@@ -413,7 +443,8 @@ public class MaquinaEstados {
                 .orElse(porDefecto);
     }
 
-    private void avisarAlCandidato(Postulacion postulacion, EstadoPostulacion nuevo, String motivoCierre) {
+    private void avisarAlCandidato(Postulacion postulacion, EstadoPostulacion nuevo, String motivoCierre,
+                                   Long transicionId) {
         String plantilla;
         if ("NO_CONTINUA".equals(nuevo.getCodigo())) {
             plantilla = "POSTULACION_NO_CONTINUA";
@@ -504,6 +535,15 @@ public class MaquinaEstados {
         // su texto corto. Se publica al confirmarse la transición, nunca antes.
         if (campana != null) {
             campana.publicar(postulacion, plantilla, nuevo, vacante, variables.get("plazo"));
+        }
+
+        // Y por WhatsApp, si es un «te toca» y ya escribió al bot (V73). Independiente de los dos
+        // de arriba: se encola después del commit, en su transacción, y nunca lanza.
+        if (whatsapp != null) {
+            whatsapp.alAvisar(postulacion, plantilla, nuevo,
+                    new com.renaser.ai.ai_engine.whatsapp.service.AvisosPorWhatsapp.DeLaTransicion(
+                            transicionId, nombre, vacante,
+                            laVacante == null ? null : laVacante.getInstrumentoEtapaTecnica()));
         }
     }
 

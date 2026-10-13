@@ -96,6 +96,8 @@ La lista completa, con de qué clave sale cada valor, está en
 | `RABBITMQ_HOST` | **`rabbitmq`**, el nombre del servicio del compose — el broker es otro contenedor de la misma máquina. Ni puerto ni TLS hacen falta aquí: `application-pruebas.yaml` ya trae 5672 en claro |
 | `JWT_SECRETO` | Una clave nueva de 32+ caracteres, **distinta** de la local: si se reutiliza, un token emitido en la máquina de cualquiera vale en producción |
 | `CORREO_TRANSPORTE` | **`smtp`**, junto con `CORREO_REMITENTE` y las credenciales del servidor de correo. Si falta, vale `log`: la aplicación arranca igual, nada sale y nada avisa. Desde el 22/09/2026 eso deja sin servicio «¿Olvidaste tu contraseña?»: la pantalla dice que el enlace salió y nadie lo recibe |
+| `WHATSAPP_MODO` (`V73`) | **`apagado`** hasta que el número del bot pase a NUEVO en el CRM: así lo deja `despliegue/docker-compose.yml` si no se pone. `falso` es solo para desarrollo y pruebas —un bot en memoria—, nunca en el servidor. Con **`real`** la aplicación **no arranca** sin `WHATSAPP_URL_SERVICIO` (la dirección HTTPS del servicio de conversación) y `WHATSAPP_SECRETO_HACIA_EL_BOT` (32 caracteres o más) |
+| `WHATSAPP_SECRETO_HACIA_EL_BOT` · `WHATSAPP_SECRETO_DESDE_EL_BOT` | Dos secretos, uno por dirección, que tienen que casar con los del bot (`CONVERSATION_EX_SECRETO_ENTRADA` y `…_SALIDA`). Sin el de «desde el bot», toda llamada a `/api/v1/integraciones/**` responde 401. `WHATSAPP_NUMERO_BOT` trae ya `51928439930`. Ver [el contrato](CONTRATO-NOVEDADES-POR-WHATSAPP.md), «Configuración de EX» |
 
 ## Configuración que se hace una sola vez
 

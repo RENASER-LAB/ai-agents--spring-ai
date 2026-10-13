@@ -335,3 +335,26 @@ app:
     # explícitamente. Encendido por defecto significaba que un despliegue que olvidara
     # apagarlo regalaba el panel entero.
     dev-login-activo: false
+  # Las novedades de la postulación por WhatsApp (V73). Ver docs/CONTRATO-NOVEDADES-POR-WHATSAPP.md.
+  #
+  # El modo es lo que hay detrás: «apagado» (no llama a nadie y el portal no ofrece el botón),
+  # «falso» (un bot en memoria, solo desarrollo y pruebas) o «real» (el servicio de conversación
+  # del CRM, por HTTPS y con firma). Apagado aquí, que es lo que hereda todo entorno de verdad:
+  # el número del bot sigue en LEGADO y el botón no debe encenderse hasta que pase a NUEVO.
+  #
+  # Además del modo, el portal solo ofrece el botón con el parámetro whatsapp_novedades_activo de
+  # la plataforma encendido (se cambia desde el panel, sin desplegar).
+  #
+  # Los dos secretos, uno por dirección, van en las variables del servidor y nunca aquí. Sin el
+  # de «desde el bot», toda llamada a /api/v1/integraciones/** es 401.
+  whatsapp:
+    modo: ${WHATSAPP_MODO:apagado}
+    numero-bot: ${WHATSAPP_NUMERO_BOT:51928439930}
+    url-servicio: ${WHATSAPP_URL_SERVICIO:}
+    secreto-hacia-el-bot: ${WHATSAPP_SECRETO_HACIA_EL_BOT:}
+    secreto-desde-el-bot: ${WHATSAPP_SECRETO_DESDE_EL_BOT:}
+    segundos-de-espera: 3
+    horas-del-anuncio: 24
+    maximo-de-intentos: 5
+    segundos-antes-del-primer-reintento: 30
+    sondeo-ms: 10000

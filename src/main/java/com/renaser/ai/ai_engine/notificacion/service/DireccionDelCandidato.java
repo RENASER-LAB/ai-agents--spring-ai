@@ -11,7 +11,7 @@ import org.springframework.stereotype.Service;
  *
  * <p>Existe porque hay dos direcciones y no siempre coinciden. Cuando alguien se postula por el
  * portal, la que escribio al crear la cuenta es la suya y no hay mas que hablar. Pero cuando una
- * convocatoria llega como una carpeta de curriculums, el cargador le inventa una
+ * convocatoria llegaba como una carpeta de curriculums, el cargador (retirado) le inventaba una
  * —{@code nombre.apellido@cv-convocatoria.local}, un dominio que no existe— porque una cuenta
  * necesita un correo para poder existir. La direccion de verdad esta escrita dentro del
  * curriculum, y el agente que lo lee la guarda en {@code dato_cv.email}.
@@ -28,8 +28,9 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class DireccionDelCandidato {
 
-    // El dominio que pone scripts/cargar-convocatoria.py cuando no sabe el correo. No resuelve
-    // en ningun sitio a proposito: asi el fallo es ruidoso y no un correo perdido en silencio.
+    // El dominio que ponia el cargador de convocatorias cuando no sabia el correo. El cargador se
+    // retiro el 13/10/2026, pero las cuentas que creo siguen ahi. No resuelve en ningun sitio a
+    // proposito: asi el fallo es ruidoso y no un correo perdido en silencio.
     private static final String DOMINIO_INVENTADO = "@cv-convocatoria.local";
 
     private final DatoCvRepository datosCv;

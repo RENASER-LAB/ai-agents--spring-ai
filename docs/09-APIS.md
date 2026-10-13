@@ -14,18 +14,21 @@ qué puerta usar y las reglas que no se ven en un esquema.
 
 ---
 
-## Las dos puertas
+## Las puertas
 
-Todo vive bajo `/api/v1/`, en dos zonas con reglas distintas:
+Todo vive bajo `/api/v1/`, en dos zonas con reglas distintas, y desde el 13/10/2026 (`V73`) una
+tercera que no es para personas:
 
 | Puerta | Quién la usa | Cómo se identifica |
 |---|---|---|
 | `/api/v1/portal/**` | El candidato | Token propio, de crear cuenta y entrar con correo y contraseña |
 | `/api/v1/panel/**` | El equipo de cada empresa, Renaser incluida | Token de equipo, con correo y contraseña. Las cuentas nacen **solo por invitación**: el panel no tiene registro público |
+| `/api/v1/integraciones/**` | Otro sistema: hoy, el bot de WhatsApp del CRM | **Sin token**: solo la firma HMAC del bot. Ver «La puerta de las integraciones» |
 
 El token va en cada llamada, en la cabecera `Authorization: Bearer <token>`.
 
-Un token de candidato **no abre** el panel, ni al revés. Y dentro del panel, cada acción exige su
+Un token de candidato **no abre** el panel, ni al revés, y ninguno de los dos abre
+`/integraciones`. Y dentro del panel, cada acción exige su
 permiso: quien no lo tiene recibe un **403 con explicación**, no un error opaco. Además el
 permiso tiene **alcance**: el responsable de un área solo ve las postulaciones de sus vacantes,
 aunque llame al mismo endpoint que Talento.
@@ -124,7 +127,7 @@ en lenguaje normal.
 
 | Código | Qué significa |
 |---|---|
-| 400 | La petición incumple una regla: «toda transición manual exige un motivo escrito» |
+| 400 | La petición incumple una regla: «toda transición manual exige un motivo escrito». También cuando falta un parámetro obligatorio de la dirección, con su nombre: «Falta el parámetro «agenteCodigo» en la dirección.» (hasta el 13/10/2026 eso salía como 500) |
 | 401 | Falta el token, venció, el correo y la contraseña no cuadran al entrar, o el enlace para elegir una contraseña nueva ya no sirve |
 | 403 | El token vale, pero ese permiso no lo tienes |
 | 404 | No existe, **o no te toca verlo**: el alcance también responde 404 |
@@ -143,15 +146,17 @@ en lenguaje normal.
 | GET `/vacantes/{id}/consentimiento` | El texto que se firma al postular a esa vacante, **ya compuesto con el nombre de la empresa** que la publica, más ese nombre aparte. Es **un solo texto para todas las empresas**, con un hueco donde va el nombre: ninguna tiene el suyo. Lo pide la pantalla de postular y también la política de privacidad cuando se llega a ella desde una vacante | Cualquiera |
 | GET `/consentimientos/textos` | Los **tres** textos vigentes de la plataforma: `PLATAFORMA` (el obligatorio de crear la cuenta), `PROCESO` (el de postular) y `FUTUROS_CONTACTOS` (el opcional). **Desde el 14/09 son tres y no dos**, y `PLATAFORMA` ocupa el sitio que tenía `PROCESO` en el registro. El de `PROCESO` sale compuesto con «la empresa que publica la vacante», porque aquí no hay ninguna concreta: **el hueco no cruza la frontera del backend**. Lo lee la política de privacidad pública, que los enseña enteros | Cualquiera |
 | GET `/catalogos/ubigeo` | Dónde se puede decir que uno vive: las **196 provincias** del Perú y «Fuera del Perú», cada una con su departamento, ordenadas por departamento y nombre. Es `{codigo, nombre, departamento}`, y el departamento viene vacío solo en `EXT` | Cualquiera, sin token |
-| POST `/cuentas` | Crear la cuenta y registrar los consentimientos. Desde el 31/08 pide además **la ciudad** (`ciudadUbigeo`), obligatoria: un código que el catálogo no ofrezca es un 400. **Desde el 14/09 la casilla obligatoria se llama `aceptaPlataforma`** y no `aceptaProceso`: es un cambio de contrato, y el portal salió con él | Cualquiera |
+| POST `/cuentas` | Crear la cuenta y registrar los consentimientos. Desde el 31/08 pide además **la ciudad** (`ciudadUbigeo`), obligatoria: un código que el catálogo no ofrezca es un 400. **Desde el 14/09 la casilla obligatoria se llama `aceptaPlataforma`** y no `aceptaProceso`: es un cambio de contrato, y el portal salió con él. **Desde el 13/10/2026 (`V73`) pide `telefono`, obligatorio**: nueve cifras que empiezan por 9 (Perú) o el número completo con su prefijo; se guarda en E.164 (`+51987654321`) y, si falta o no vale, 400 «Escribe un celular de 9 cifras que empiece por 9, o el número completo con su prefijo». Un cliente que cree cuentas sin él deja de poder hacerlo | Cualquiera |
 | POST `/auth/login` | Entrar; devuelve el token | Cualquiera |
 | POST `/auth/recuperacion` | Pedir el enlace para elegir una contraseña nueva. **202 vacío siempre**, exista o no la cuenta (22/09). Ver «Cómo entrar» | Cualquiera, sin token |
 | POST `/auth/restablecer` | Elegir la contraseña nueva con el token del enlace. 204 sin sesión; el mismo 401 para cualquier enlace que no sirva; 400 con el error en el campo | Cualquiera, sin token |
-| GET `/auth/sesion` | Cómo se llama quien tiene el token. El portal entra una vez y guarda el token; en la segunda visita nadie le había dicho el nombre (06/09) | Candidato |
+| GET `/auth/sesion` | Cómo se llama quien tiene el token. El portal entra una vez y guarda el token; en la segunda visita nadie le había dicho el nombre (06/09). Desde la `V73` trae también `telefono`, el celular de la cuenta en E.164, vacío en las cuentas anteriores: es lo que «Mi cuenta» enseña | Candidato |
+| PUT `/cuenta/telefono` | Cambiar el celular desde «Mi cuenta» (`V73`), con la misma regla que el alta. Devuelve `{telefono, paraMostrar}` («+51 987 654 321»). **Cambiarlo cierra lo vinculado a WhatsApp con el número anterior** —vínculos activos y anuncios pendientes— y se lo cuenta al bot con el motivo `CAMBIO_CELULAR` | Candidato |
 | POST `/postulaciones` | Postular: CV (PDF o Word, máx. 10 MB; **desde el 06/09 opcional si el perfil ya tiene uno**: sin adjuntar se usa el del perfil, copiado a la empresa de la vacante, y adjuntando otro ese vale solo para esa vacante y el del perfil no cambia), enlaces, el resultado del que se siente orgulloso, la confirmación de los requisitos y `aceptaTratamiento` (obligatorio): la aceptación queda firmada con IP y navegador, a nombre de esa postulación, y **con el texto tal como se le enseñó**, con el nombre de la empresa dentro. **Desde el 15/09 el portal ya no pinta una casilla para esto** —enviar la candidatura es el acto—, pero el dato se sigue exigiendo para cortarle el paso a quien llame a la API por su cuenta. **Lleva además `pretensionMonto` y `pretensionMoneda`**: obligatorios si la vacante publica lo que paga —faltando, 400—, e ignorados si no. **En una vacante sin banco con pase automático**, quien cumple los requisitos queda en `PERFIL_POR_CONFIRMAR` y se encola la nota del CV; al terminar, pasa sola a la prueba si la nota llega a la mínima de la vacante. Del 07/10 al 12/10/2026 (`V70`) salía de aquí ya en `PRUEBA_TURNO_CANDIDATO`; la `V72` lo retiró | Candidato |
-| GET `/postulaciones` | Sus postulaciones, con la empresa de cada una, estado, días sin cambio, **qué rendirá en la etapa técnica** (`instrumentoEtapaTecnica`: `PLANTILLA`, `CUESTIONARIO_TECNICO` o, desde la `V67`, `PRUEBA_PROPIA`, la prueba escrita en el editor), lo que paga la vacante hoy (`remuneracion`, con su `actualizadaEn`), lo que él pidió aquí (`miPretension`) y cuántos avisos de ese proceso sigue sin ver (`avisosSinLeer`). **Desde la `V67` trae `pruebaSinCompletar`**: su prueba del editor venció con algo sin responder o sin un entregable obligatorio y se cerró sin entregar. La postulación sigue en `PRUEBA_TURNO_CANDIDATO` hasta que el equipo cierre su proceso, así que el estado solo no lo dice. Es un booleano y nada más: ni puntos ni criterios (RF-53) | Candidato |
+| GET `/postulaciones` | Sus postulaciones, con la empresa de cada una, estado, días sin cambio, **qué rendirá en la etapa técnica** (`instrumentoEtapaTecnica`: `PLANTILLA`, `CUESTIONARIO_TECNICO` o, desde la `V67`, `PRUEBA_PROPIA`, la prueba escrita en el editor), lo que paga la vacante hoy (`remuneracion`, con su `actualizadaEn`), lo que él pidió aquí (`miPretension`) y cuántos avisos de ese proceso sigue sin ver (`avisosSinLeer`). **Desde la `V67` trae `pruebaSinCompletar`**: su prueba del editor venció con algo sin responder o sin un entregable obligatorio y se cerró sin entregar. La postulación sigue en `PRUEBA_TURNO_CANDIDATO` hasta que el equipo cierre su proceso, así que el estado solo no lo dice. Es un booleano y nada más: ni puntos ni criterios (RF-53). **Desde la `V73` trae `whatsapp`**: `{disponible, estado, numero}`, la tarjeta de WhatsApp de ese proceso (ver «Las novedades por WhatsApp», abajo) | Candidato |
 | GET `/postulaciones/{uuid}` | El detalle de una suya, con el historial completo | Candidato |
 | POST `/postulaciones/{uuid}/retiro` | Retirarla. **No borra sus datos**: eso se pide aparte | Candidato |
+| POST · DELETE `/postulaciones/{uuid}/whatsapp` | «Escribir por WhatsApp» y «Dejar de recibir» (`V73`). El POST guarda su consentimiento `WHATSAPP`, anuncia al bot el celular de la cuenta para esa postulación y devuelve `{enlace, whatsapp}`: el enlace `wa.me` con el mensaje ya escrito y cómo queda la tarjeta. **409 con `codigo`** si no se puede: `NO_DISPONIBLE` (no es de RENASER o la beta está apagada), `PROCESO_TERMINADO`, `SIN_CELULAR` (el portal pide el número y repite) o `SUPRIMIDO` (el número escribió BAJA). El DELETE cierra el vínculo, se lo cuenta al bot y devuelve la tarjeta | Candidato, sobre las suyas; la ajena es 404 |
 | GET `/avisos` | La campana (`V56`): sus avisos con los nuevos arriba, y cuántos le quedan sin ver (`{sinLeer, avisos}`). **Sin permiso propio**: todo candidato con sesión tiene campana, y el servicio filtra por el usuario del token | Candidato |
 | POST `/avisos/lectura` | Marcar leídos todos los suyos. Devuelve `{marcados}` | Candidato |
 | POST `/avisos/{id}/lectura` | Marcar leído uno | Candidato |
@@ -249,6 +254,34 @@ de cualquiera de ellas sigue en el correo, el historial del navegador y los avis
 ⚠️ **Un 404 de esas pantallas no basta para decir «vacante retirada»**: en la simulación también
 es «todavía no elegiste fecha» y en la prueba, «todavía no te toca». El portal lo confirma
 pidiendo `GET /postulaciones/{uuid}`: si ese también responde 404, la vacante ya no está.
+
+**Las novedades por WhatsApp** (`V73`, 13/10/2026, beta). Mientras espera, el candidato puede
+pedir que el bot de RENASER le cuente cómo va su proceso; **él escribe primero** y el bot lo
+reconoce solo por el número. Lo que el portal necesita saber:
+
+- **Cuándo hay tarjeta.** `whatsapp.disponible` es verdadero solo si la vacante es de la
+  plataforma, el parámetro `whatsapp_novedades_activo` de la plataforma está encendido, hay bot
+  detrás (`WHATSAPP_MODO` no es `apagado`) y el proceso no terminó. Si no, `estado` y `numero`
+  llegan vacíos. **El parámetro nace apagado** y se enciende el día que el número del bot atienda
+  desde el servicio de conversación del CRM. Que al candidato le toque algo no lo mira el backend:
+  el portal no pinta la tarjeta fuera de la espera.
+- **Sus estados**: `SIN_CELULAR` (cuenta anterior sin celular), `SIN_VINCULAR` (nunca pulsó, el
+  anuncio caducó o cambió de celular), `PENDIENTE` (pulsó y aún no escribió), `ACTIVO` (ya
+  escribió), `REVOCADO` (dejó de recibir; se le vuelve a ofrecer) y `SUPRIMIDO` (escribió BAJA).
+  `numero` va completo cuando es el de su cuenta («+51 987 654 321») y enmascarado en `ACTIVO`
+  («+51 9•• ••• 321»).
+- **El enlace** es `https://wa.me/51928439930?text=…` (el número sale de `WHATSAPP_NUMERO_BOT`)
+  con «Hola, soy {nombre} {apellidos}. Quiero saber cómo va mi postulación a {vacante}.», la
+  vacante cortada a 60 caracteres. Puede cambiar o borrar el mensaje: lo único que cuenta es el
+  número desde el que escribe.
+- **El anuncio dura 24 horas.** Volver a pulsar lo renueva sobre el mismo vínculo; si el bot no
+  responde, se reintenta solo. El consentimiento se firma una vez por postulación y versión del
+  texto, con IP y navegador.
+- **Qué le llega por WhatsApp**: solo los «te toca» —`PRUEBA_DISPONIBLE` y `POSTULACION_AVANZA`—, y
+  solo si ya escribió. Ni recordatorios, ni cierres, ni movidos «sin avisar». Salen en la misma
+  transición que el correo y la campana, encolados y sin poder deshacerla. Ver
+  [Estados de la postulación](03-ESTADOS-POSTULACION.md), «Cómo se entera el candidato de cada
+  paso».
 
 ### Guardar lo que el candidato escribe (16/09/2026)
 
@@ -1041,7 +1074,7 @@ El guion `scripts/completar-y-publicar-pesos-cazatalentos.py` recorre exactament
 | POST `/areas` · PUT `/areas/{id}` | Crear y renombrar. El nombre repetido se rechaza antes de llegar al `UNIQUE`, sensible a mayúsculas igual que la restricción | `crear_usuarios_y_asignar_roles` |
 | POST `/areas/{id}/desactivacion` · `/reactivacion` | Retirar y volver a activar. **La última área activa no se puede retirar**: sin ninguna, la empresa no puede volver a registrar una solicitud | `crear_usuarios_y_asignar_roles` |
 | GET `/areas/{id}/impacto` · POST `/areas/{id}/borrado` | Cuántas solicitudes y usuarios cuelgan del área, y borrarla. **Borrar exige reasignar**: las claves ajenas no declaran `ON DELETE`, así que se mueven primero las solicitudes y los usuarios al área de destino y se borra después, en una transacción. Sin destino solo se admite si está vacía; si no, **409 con los dos recuentos**. La auditoría del borrado lleva el nombre y los recuentos porque es lo único que sobrevive | `crear_usuarios_y_asignar_roles` |
-| GET/PUT `/parametros` | Los valores que Renaser cambia sin programar. `tope_mensual_ia` se ve pero no se edita desde aquí: lo administra la plataforma | `editar_parametros` |
+| GET/PUT `/parametros` | Los valores que Renaser cambia sin programar. `tope_mensual_ia` se ve pero no se edita desde aquí: lo administra la plataforma. Desde la `V73` la plataforma tiene aquí `whatsapp_novedades_activo` (`BOOLEANO`, apagado): el interruptor de la beta de WhatsApp | `editar_parametros` |
 | GET/POST `/plantillas-correo` | Los textos de correo. Editar = crear versión nueva. **Los retirados no salen en la lista ni admiten versión nueva (400)**: hoy solo `REMUNERACION_ACTUALIZADA`, que dejó de mandarse el 19/09. Sus filas se conservan para explicar los correos que ya salieron | `editar_textos_correo` |
 | GET/POST `/textos-consentimiento` | Los textos legales, con su historia. El POST crea la versión nueva **y la publica**. **Desde el 14/09 solo lo usa la plataforma**: los tres textos son suyos —el de postular es uno solo para todas las empresas, con el nombre de cada una puesto al leerlo— y una empresa que intente publicar cualquiera de los tres recibe un **400**. Con ello se retiró el freno que exigía texto propio para publicar una vacante | `editar_textos_correo` |
 | GET `/auditoria` | El registro, paginado. No se puede modificar ni borrar | `ver_auditoria` |
@@ -1069,7 +1102,7 @@ a la otra.
 | Método y ruta | Qué hace | Permiso |
 |---|---|---|
 | GET `/agentes-ia` | El catálogo de agentes: cuáles existen y cuáles tienen clase (hoy seis de diez) | `editar_instrucciones_ia` |
-| GET `/agentes-ia/instrucciones` | Las instrucciones de cada agente con su historia de versiones | `editar_instrucciones_ia` |
+| GET `/agentes-ia/instrucciones?agenteCodigo=` | Las instrucciones de un agente con su historia de versiones. Sin `agenteCodigo`, **400** con el nombre del parámetro (hasta el 13/10/2026 respondía 500) | `editar_instrucciones_ia` |
 | POST `/agentes-ia/instrucciones` · POST `…/{id}/publicacion` | Escribir una versión nueva de la instrucción de un agente, y publicarla. Publicada, es la que usa la siguiente calificación | `editar_instrucciones_ia` |
 
 ⚠️ **La instrucción es una para todo el mundo**: `instruccion_ia` no tiene `organizacion_id`.
@@ -1137,6 +1170,37 @@ con las reglas que Swagger no cuenta, está en
 
 ---
 
+## La puerta de las integraciones (`/api/v1/integraciones`, `V73`)
+
+Nueva desde el 13/10/2026. La usa **el bot de WhatsApp de RENASER** (el servicio de conversación
+del CRM) para preguntarle a EX por los postulantes que le escriben. **El contrato entero —cuerpos,
+límites, errores, reintentos, la firma con sus vectores de prueba y lo que EX le manda al bot—
+está en [CONTRATO-NOVEDADES-POR-WHATSAPP.md](CONTRATO-NOVEDADES-POR-WHATSAPP.md)**, que es el
+mismo que el de la spec 007 del CRM: si uno cambia, cambian los dos.
+
+| Método y ruta | Qué hace |
+|---|---|
+| POST `/whatsapp/vinculos` | Un número anunciado escribió: vincula todas sus postulaciones anunciadas y devuelve el nombre de pila y las novedades. `404 SIN_ANUNCIO`, `409 PROCESO_TERMINADO` o `409 BETA_APAGADA` con el `texto` que el bot contesta tal cual |
+| POST `/whatsapp/novedades` | Las novedades de cada proceso activo vinculado a ese número, o la lista vacía. Funciona con la beta apagada: los vínculos activos siguen recibiendo |
+| POST `/whatsapp/bajas` | El número escribió BAJA: desvincula todo lo suyo y lo marca como suprimido. 204 |
+| GET `/whatsapp/falso/registro?telefono=` | **Solo con `WHATSAPP_MODO=falso`** (desarrollo y E2E): lo que el bot falso aceptó —esperas, avisos y revocaciones—. En producción no existe |
+
+**No vale ningún token, solo la firma del bot.** Cada llamada lleva `X-Renaser-Marca` (segundos
+Unix) y `X-Renaser-Firma`, el HMAC-SHA256 en hexadecimal de `marca + "." + ruta + "." + cuerpo`
+con el secreto `WHATSAPP_SECRETO_DESDE_EL_BOT`; se compara en tiempo constante y una marca a más
+de 5 minutos de la hora del servidor se rechaza. Sin firma, con firma mala, de otra ruta o fuera
+de la ventana: **401** y no se hace nada. Sin ese secreto configurado, todo es 401.
+
+⚠️ **Esta cadena va antes de la cadena por defecto a propósito** (`ConfiguracionSeguridad`,
+`@Order(3)`, con `FiltroFirmaWhatsapp`): la por defecto deja pasar lo que no es portal ni panel,
+y una ruta de integración que cayera ahí quedaría abierta.
+
+Los errores de esta puerta no van en RFC 7807 sino en el formato del contrato, `{codigo, texto}`:
+`400 VALIDACION` con un cuerpo que no es JSON, sin `telefono` o con uno que no es internacional, y
+`401 FIRMA_INVALIDA`.
+
+---
+
 ## Lo que conviene saber antes de consumirlas
 
 **Los correos no salen todavía.** Cada aviso al candidato queda guardado con su texto exacto en
@@ -1191,3 +1255,4 @@ antes de tener token.
 | [Estados de la postulación](03-ESTADOS-POSTULACION.md) | Los estados que mueve esta API |
 | [Diccionario de datos](07-DICCIONARIO-DE-DATOS.md) | Las tablas que hay detrás |
 | [Ampliación de RR.HH.](AMPLIACION-RRHH.md) | Los apartados que se construyen después de la selección, empezando por la gestión de personas |
+| [Contrato de las novedades por WhatsApp](CONTRATO-NOVEDADES-POR-WHATSAPP.md) | Lo que se dicen EX y el bot de WhatsApp, en las dos direcciones, con la firma |

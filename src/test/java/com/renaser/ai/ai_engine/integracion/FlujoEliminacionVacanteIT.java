@@ -1015,7 +1015,7 @@ public class FlujoEliminacionVacanteIT {
                         .content("""
                                 {"nombre": "QA", "apellidos": "Candidato",
                                  "correo": "%s", "contrasena": "%s",
-                                 "ciudadUbigeo": "1501", "aceptaPlataforma": true,
+                                 "ciudadUbigeo": "1501", "telefono": "987654321", "aceptaPlataforma": true,
                                  "aceptaFuturosContactos": true}""".formatted(correo, CLAVE)))
                 .andExpect(status().isCreated());
         return jdbc.queryForObject("select id from usuario where correo = ?", Long.class, correo);

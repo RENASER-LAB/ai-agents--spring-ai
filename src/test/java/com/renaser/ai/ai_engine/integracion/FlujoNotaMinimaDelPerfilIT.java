@@ -461,14 +461,23 @@ class FlujoNotaMinimaDelPerfilIT {
 
     @Test
     @Order(14)
-    @DisplayName("Las cuentas nuevas firman PLATAFORMA 1.1, que dice que solo el pase depende de una nota; la 1.0 sigue intacta (AC-12)")
+    @DisplayName("PLATAFORMA 1.1 dice que solo el pase depende de una nota y la 1.2, que firman las cuentas nuevas, lo conserva; la 1.0 sigue intacta (AC-12)")
     void elTextoLegalNuevo() throws Exception {
+        // Las cuentas nuevas firman la vigente: la 1.2 de specs/novedades-por-whatsapp.md (V73),
+        // que lleva también el cambio de la 1.1.
         assertThat(jdbc.queryForList("""
                 select distinct t.version from consentimiento c
                   join texto_consentimiento t on t.id = c.texto_consentimiento_id
                   join usuario u on u.persona_id = c.persona_id
                  where t.tipo = 'PLATAFORMA' and u.correo like '%.umbral@correo.pe'""", String.class))
-                .containsExactly("1.1");
+                .containsExactly("1.2");
+        String vigente = jdbc.queryForObject("""
+                select texto from texto_consentimiento t join organizacion o on o.id = t.organizacion_id
+                 where o.es_plataforma and t.tipo = 'PLATAFORMA' and t.version = '1.2'""", String.class);
+        assertThat(vigente)
+                .contains("El sistema sí hace tres cosas solo, y solo la tercera depende de una nota, "
+                        + "y nunca para descartarme:")
+                .doesNotContain("ninguna de las tres depende de una nota");
 
         Map<String, Object> nuevo = jdbc.queryForMap("""
                 select texto, hash from texto_consentimiento t join organizacion o on o.id = t.organizacion_id
@@ -875,7 +884,7 @@ class FlujoNotaMinimaDelPerfilIT {
     private void postular(String quien, long vacante) throws Exception {
         String correo = quien + ".umbral@correo.pe";
         mvc.perform(post("/api/v1/portal/cuentas").contentType(MediaType.APPLICATION_JSON).content("""
-                {"nombre":"%s","apellidos":"Prueba","correo":"%s",
+                {"nombre":"%s","apellidos":"Prueba","correo":"%s","telefono":"987654321",
                  "contrasena":"unaClaveLarga123","ciudadUbigeo":"1501","aceptaPlataforma":true,
                  "aceptaFuturosContactos":false}""".formatted(capital(quien), correo)))
                 .andExpect(status().isCreated());

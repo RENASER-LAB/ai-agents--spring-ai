@@ -34,12 +34,23 @@ public final class DtosPortal {
             @NotBlank String nombre,
             @NotBlank String apellidos,
             @NotBlank @Email String correo,
+            // El celular (WhatsApp), obligatorio desde la V73. Se escribe como lo escribe la persona
+            // —«987 654 321» o «+34 612 345 678»— y el servicio lo guarda en E.164; si no vale, 400
+            // con el mismo mensaje que el portal (ver whatsapp.service.Celular).
+            @NotBlank(message = com.renaser.ai.ai_engine.whatsapp.service.Celular.MENSAJE) String telefono,
             @NotBlank @Size(min = 8, message = "La contraseña necesita al menos 8 caracteres") String contrasena,
             @NotBlank(message = "Hay que decir dónde vives") String ciudadUbigeo,
             @NotNull Boolean aceptaPlataforma,
             Boolean aceptaFuturosContactos) {}
 
     public record Login(@NotBlank String correo, @NotBlank String contrasena) {}
+
+    /** Cambiar el celular desde «Mi cuenta» (V73). Con la misma regla que el registro. */
+    public record CambiarTelefono(
+            @NotBlank(message = com.renaser.ai.ai_engine.whatsapp.service.Celular.MENSAJE) String telefono) {}
+
+    /** El celular de la cuenta: como se guarda (E.164) y como se enseña («+51 987 654 321»). */
+    public record MiCelular(String telefono, String paraMostrar) {}
 
     public record PedirBorrado(String motivo) {}
 
@@ -148,7 +159,12 @@ public final class DtosPortal {
      * iniciales vacio. No lleva token: quien pregunta ya tiene el suyo, y devolverlo solo lo
      * pondria en un cuerpo de respuesta mas.
      */
-    public record QuienSoy(Long usuarioId, String nombre, String apellidos) {}
+    public record QuienSoy(Long usuarioId, String nombre, String apellidos,
+                           /**
+                            * El celular de la cuenta en E.164, o vacío en las cuentas anteriores a
+                            * la V73. Es lo que «Mi cuenta» enseña y deja cambiar.
+                            */
+                           String telefono) {}
 
     /**
      * Lo unico que se manda para entrar con el enlace del correo: el token.
@@ -201,7 +217,12 @@ public final class DtosPortal {
                                  * le toca rendirla. Es lo único que viaja del intento: ni puntos
                                  * ni criterios (RF-53).
                                  */
-                                boolean pruebaSinCompletar) {}
+                                boolean pruebaSinCompletar,
+                                /**
+                                 * La tarjeta de WhatsApp de este proceso (V73): si se ofrece, en
+                                 * qué está y con qué número. Ver {@code WhatsappDelProceso}.
+                                 */
+                                com.renaser.ai.ai_engine.whatsapp.dto.DtosWhatsapp.WhatsappDelProceso whatsapp) {}
 
     /** Un monto con su moneda, ya escrito además en una frase para pintarlo sin traducir. */
     public record Pretension(BigDecimal monto, String moneda, String texto) {}

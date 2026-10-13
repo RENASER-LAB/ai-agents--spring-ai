@@ -78,7 +78,10 @@ public class ConfiguracionSwagger {
             com.renaser.ai.ai_engine.resena.controller.ResenasPanelController.class,
             com.renaser.ai.ai_engine.resena.controller.ResenasPortalController.class,
             com.renaser.ai.ai_engine.resena.controller.ModeracionResenasController.class,
-            com.renaser.ai.ai_engine.colaborador.controller.ColaboradoresController.class);
+            com.renaser.ai.ai_engine.colaborador.controller.ColaboradoresController.class,
+            // La integración con el bot de WhatsApp (V73). Su candado de Swagger es el de siempre,
+            // pero no lleva token: la protege la firma HMAC de su propia cadena.
+            com.renaser.ai.ai_engine.whatsapp.controller.IntegracionWhatsappController.class);
 
     /**
      * El motor de agentes, por nombre de paquete y no por clase.

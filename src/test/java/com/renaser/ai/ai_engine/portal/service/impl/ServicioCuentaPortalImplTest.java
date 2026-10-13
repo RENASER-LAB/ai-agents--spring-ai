@@ -89,6 +89,7 @@ class ServicioCuentaPortalImplTest {
     @Mock private IntentosLogin intentos;
     @Mock private PasswordEncoder codificador;
     @Mock private CatalogosDelPerfil catalogos;
+    @Mock private com.renaser.ai.ai_engine.whatsapp.service.ServicioWhatsappPortal whatsapp;
 
     private ServicioCuentaPortalImpl servicio;
 
@@ -103,7 +104,7 @@ class ServicioCuentaPortalImplTest {
                 new TextosDeConsentimiento(textosConsentimiento, new DuenoDelInstrumento(organizaciones)),
                 consentimientos,
                 solicitudesBorrado, correo, auditoria, parametros, tokens, intentos, codificador,
-                catalogos);
+                catalogos, whatsapp);
     }
 
     @Test
@@ -256,8 +257,132 @@ class ServicioCuentaPortalImplTest {
     }
 
     private CrearCuenta cuentaEn(String ciudadUbigeo) {
-        return new CrearCuenta("Camila", "Reyes", "camila@correo.pe", "unaClaveLarga123",
+        return cuenta(ciudadUbigeo, "987 654 321");
+    }
+
+    private CrearCuenta cuenta(String ciudadUbigeo, String telefono) {
+        return new CrearCuenta("Camila", "Reyes", "camila@correo.pe", telefono, "unaClaveLarga123",
                 ciudadUbigeo, true, false);
+    }
+
+    // ============ El celular (V73) ============
+
+    @ParameterizedTest(name = "telefono = [{0}]")
+    @NullSource
+    @ValueSource(strings = {"", "   "})
+    @DisplayName("AC-01 · sin celular el contrato rechaza la cuenta: 400 antes de llegar al servicio")
+    void sinCelularNoPasaElContrato(String telefono) {
+        var violaciones = VALIDADOR.validate(cuenta("0402", telefono));
+
+        assertThat(violaciones)
+                .extracting(v -> v.getPropertyPath().toString())
+                .contains("telefono");
+    }
+
+    @ParameterizedTest(name = "telefono = [{0}]")
+    @ValueSource(strings = {"12345", "812345678", "98765432", "9876543210", "+51 54 123456",
+            "+0 123 456 789", "celular", "+51 987 654 32a"})
+    @DisplayName("AC-01 · con un celular que no vale no nace nada, y el error es el del portal")
+    void unCelularQueNoValeNoCreaLaCuenta(String telefono) {
+        when(catalogos.esCiudadElegible("0402")).thenReturn(true);
+
+        assertThatThrownBy(() -> servicio.crearCuenta(cuenta("0402", telefono), "10.0.0.1", "Firefox"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage(com.renaser.ai.ai_engine.whatsapp.service.Celular.MENSAJE);
+
+        verifyNoInteractions(personas, usuarios, correo);
+    }
+
+    @ParameterizedTest(name = "{0} -> {1}")
+    @org.junit.jupiter.params.provider.CsvSource({
+            "'987 654 321', +51987654321",
+            "'+51 987-654-321', +51987654321",
+            "'51987654321', +51987654321",
+            "'+34 612 345 678', +34612345678",
+            "'0034 612 345 678', +34612345678"})
+    @DisplayName("AC-01 · el celular válido queda en la persona en formato internacional (E.164)")
+    void elCelularSeGuardaEnE164(String escrito, String guardado) {
+        when(catalogos.esCiudadElegible("0402")).thenReturn(true);
+        when(organizaciones.findByEsPlataformaTrue()).thenReturn(Optional.of(
+                com.renaser.ai.ai_engine.organizacion.entity.Organizacion.builder()
+                        .id(ORGANIZACION).esPlataforma(true).build()));
+        when(usuarios.buscarPorCorreo(ORGANIZACION, "camila@correo.pe")).thenReturn(Optional.empty());
+        when(personas.save(any(Persona.class)))
+                .thenAnswer(i -> { Persona p = i.getArgument(0); p.setId(5L); return p; });
+        when(usuarios.save(any(Usuario.class)))
+                .thenAnswer(i -> { Usuario u = i.getArgument(0); u.setId(9L); return u; });
+        when(textosConsentimiento
+                .findFirstByOrganizacionIdAndTipoAndPublicadoEnIsNotNullOrderByPublicadoEnDesc(
+                        ORGANIZACION, "PLATAFORMA"))
+                .thenReturn(Optional.of(com.renaser.ai.ai_engine.consentimiento.entity
+                        .TextoConsentimiento.builder().id(1L).tipo("PLATAFORMA").build()));
+        lenient().when(codificador.encode(anyString())).thenReturn("$hash");
+
+        servicio.crearCuenta(cuenta("0402", escrito), "10.0.0.1", "Firefox");
+
+        ArgumentCaptor<Persona> guardada = ArgumentCaptor.forClass(Persona.class);
+        verify(personas).save(guardada.capture());
+        assertThat(guardada.getValue().getTelefono()).isEqualTo(guardado);
+    }
+
+    @Test
+    @DisplayName("AC-02 · cambiar el celular lo guarda en E.164 y cierra lo vinculado al anterior")
+    void cambiarElCelularCierraLoDelAnterior() {
+        Persona camila = Persona.builder().id(33L).nombre("Camila").telefono("+51987654321").build();
+        when(personas.findById(33L)).thenReturn(Optional.of(camila));
+
+        var celular = servicio.cambiarTelefono(candidata(), "912 345 678");
+
+        assertThat(camila.getTelefono()).isEqualTo("+51912345678");
+        assertThat(celular.telefono()).isEqualTo("+51912345678");
+        assertThat(celular.paraMostrar()).isEqualTo("+51 912 345 678");
+        verify(personas).save(camila);
+        verify(whatsapp).alCambiarElCelular(33L, "+51987654321", "+51912345678");
+        // La auditoría dice que cambió, nunca a cuál: es inmutable y el borrado no la vacía.
+        verify(auditoria).registrar(any(), any(), org.mockito.ArgumentMatchers.eq("cambiar_celular"),
+                org.mockito.ArgumentMatchers.eq("persona"), org.mockito.ArgumentMatchers.eq(33L),
+                org.mockito.ArgumentMatchers.isNull(),
+                org.mockito.ArgumentMatchers.eq(java.util.Map.of("celular", "cambiado")),
+                org.mockito.ArgumentMatchers.isNull());
+    }
+
+    @Test
+    @DisplayName("AC-02 · el mismo número escrito de otra forma no es un cambio: nada se cierra")
+    void elMismoNumeroNoEsUnCambio() {
+        Persona camila = Persona.builder().id(33L).telefono("+51987654321").build();
+        when(personas.findById(33L)).thenReturn(Optional.of(camila));
+
+        var celular = servicio.cambiarTelefono(candidata(), "+51 987 654 321");
+
+        assertThat(celular.telefono()).isEqualTo("+51987654321");
+        verify(personas, never()).save(any());
+        verifyNoInteractions(whatsapp, auditoria);
+    }
+
+    @Test
+    @DisplayName("AC-02 · con un celular que no vale no se toca nada")
+    void unCelularQueNoValeNoSeGuarda() {
+        assertThatThrownBy(() -> servicio.cambiarTelefono(candidata(), "54 123456"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessage(com.renaser.ai.ai_engine.whatsapp.service.Celular.MENSAJE);
+
+        verifyNoInteractions(personas, whatsapp);
+    }
+
+    @Test
+    @DisplayName("«Mi cuenta» lee el celular en la sesión; las cuentas viejas lo tienen vacío")
+    void quienSoyTraeElCelular() {
+        when(usuarios.findById(60L)).thenReturn(Optional.of(
+                Usuario.builder().id(60L).personaId(33L).build()));
+        when(personas.findById(33L)).thenReturn(Optional.of(
+                Persona.builder().id(33L).nombre("Camila").telefono("+51987654321").build()));
+
+        assertThat(servicio.quienSoy(candidata()).telefono()).isEqualTo("+51987654321");
+    }
+
+    private static com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario candidata() {
+        return new com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario(
+                60L, 33L, ORGANIZACION, "CANDIDATO", java.util.List.of(), java.util.Map.of());
     }
 
     // ============ Quién soy ============

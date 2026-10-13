@@ -110,6 +110,9 @@ class ServicioPostulacionPortalImplTest {
     // Los intentos de la prueba, para saber si la del editor quedó sin completar (V67).
     @Mock private com.renaser.ai.ai_engine.prueba.repository.IntentoPruebaRepository intentos;
 
+    // La tarjeta de WhatsApp (V73): sin stub devuelve un mapa vacío, es decir, «no disponible».
+    @Mock private com.renaser.ai.ai_engine.whatsapp.service.ServicioWhatsappPortal whatsapp;
+
     private ServicioPostulacionPortalImpl servicio;
     // El tablón, armado sobre los mismos dobles: la prueba de la suspendida vigila una
     // sola invariante —lo que el tablón esconde, postular tampoco lo acepta— y esa
@@ -125,8 +128,8 @@ class ServicioPostulacionPortalImplTest {
         servicio = new ServicioPostulacionPortalImpl(organizaciones, personas, usuarios,
                 consentimientos, vacantes, puestos, requisitos, evaluaciones, postulaciones,
                 transiciones, estados, cvs, enlaces, maquina, propuestaPerfil, lecturaCv,
-                colaIa, almacen, archivos, perfiles, correo, textoProceso, avisos, intentos);
-        tablon = new ServicioTablonPortalImpl(vacantes, organizaciones, requisitos, textoProceso,
+                colaIa, almacen, archivos, perfiles, correo, textoProceso, avisos, intentos,
+                whatsapp);        tablon = new ServicioTablonPortalImpl(vacantes, organizaciones, requisitos, textoProceso,
                 catalogos);
     }
 

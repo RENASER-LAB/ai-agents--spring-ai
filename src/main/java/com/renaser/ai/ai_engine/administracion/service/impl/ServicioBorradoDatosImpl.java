@@ -63,6 +63,8 @@ public class ServicioBorradoDatosImpl implements ServicioBorradoDatos {
     private final MaquinaEstados maquina;
     private final ServicioCorreo correo;
     private final ServicioAuditoria auditoria;
+    // Su celular y sus vínculos de WhatsApp (V73) se van con el resto de sus datos.
+    private final com.renaser.ai.ai_engine.whatsapp.service.AvisosPorWhatsapp whatsapp;
 
     @Override
     public List<SolicitudBorradoPanel> solicitudesBorradoPendientes(ContextoUsuario quien) {
@@ -93,6 +95,11 @@ public class ServicioBorradoDatosImpl implements ServicioBorradoDatos {
             correo.enviar(quien.organizacionId(), usuario.getId(), usuario.getCorreo(),
                     "BORRADO_EJECUTADO", Map.of());
         }
+
+        // 1b · WhatsApp (V73): sus vínculos, sus avisos y la baja de su número se borran, y al bot
+        // se le cuenta después del commit. Antes de cerrar las postulaciones: así el cierre de
+        // cada una ya no encuentra un vínculo que cerrar por «proceso terminado».
+        whatsapp.alBorrarLosDatos(persona.getId(), persona.getTelefono());
 
         // 2 · Las postulaciones activas se cierran con su motivo
         if (usuario != null) {

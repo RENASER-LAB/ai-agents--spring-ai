@@ -1,7 +1,12 @@
 # La criba de currículums
 
-Cómo se carga una convocatoria con una carpeta de currículums, se pide que la IA los lea, y
-se ve en pantalla quién es el más apto.
+Cómo la IA lee los currículums de una convocatoria y se ve en pantalla quién es el más apto.
+
+⚠️ **La carga desde una carpeta de currículums se retiró el 13/10/2026.** Desde la V73 crear
+una cuenta pide el celular, y el cargador solo tenía el nombre del archivo, así que no había de
+dónde sacarlo. Los candidatos entran por el portal. La criba —los agentes, el ranking, el
+botón de calificar— no cambia; lo que aquí cuenta la carga desde una carpeta queda como
+historia de cómo se hizo.
 
 ---
 
@@ -124,61 +129,23 @@ Lo que se pierde: ya no se puede ordenar una tanda enorme barato antes de gastar
 buena. Es a propósito; si algún día aparece una convocatoria de cientos, esto habrá que
 mirarlo otra vez.
 
-## Flujo de implementación
+## Cómo se usa hoy
 
-1. **Descarga la carpeta de Drive** a `cv-convocatoria/` en la raíz del proyecto. Está en el
-   `.gitignore`: son datos de gente real y no se suben al repositorio.
-
-2. **Renombra los archivos** como `Nombre Apellido.pdf`, si no vienen así.
-
-3. **Levanta la base y la cola**, si no están:
-   ```bash
-   docker compose up -d
-   ```
-
-4. **Arranca el backend** desde IntelliJ, o:
-   ```bash
-   ./mvnw spring-boot:run
-   ```
-
-5. **Elige la convocatoria.** Están en `scripts/convocatorias.json`, una por clave. Hoy hay
-   cinco: `talento`, `asistente-admin`, `administrador`, `arquitecto` y `civil`. Se añaden ahí,
-   sin tocar código. Desde el 25/09/2026 cada una puede llevar `modalidad` —escrita igual que en
-   el desplegable del panel— y `ciudadUbigeo` (`0401` Arequipa, `1501` Lima); `ubicacion` es solo
-   la zona o referencia. Lo explica el `_lea_esto` del mismo archivo.
-
-   Para dejar la vacante montada antes de tener los currículums:
-   ```bash
-   python scripts/cargar-convocatoria.py --uid TU_UID --convocatoria asistente-admin --solo-convocatoria
-   ```
-
-6. **Carga los currículums.** La primera vez conviene mirar que la carga
-   salga bien antes de gastar llamadas al modelo:
-   ```bash
-   python scripts/cargar-convocatoria.py --uid TU_UID --convocatoria asistente-admin --carpeta cv-asistente --sin-criba
-   ```
-   Y cuando se vea la lista completa, la corrida de verdad:
-   ```bash
-   python scripts/cargar-convocatoria.py --uid TU_UID --convocatoria asistente-admin --carpeta cv-asistente --esperar
-   ```
-
-7. **Abre la pantalla**: el ranking y la ficha se ven en el panel de RENASER OS
-   (`~/Documentos/RenaserOs`, rama `feat/talento`, con su proxy de Vite hacia
-   `localhost:8080`). El `frontend/` de demostración que vivía en este repositorio se
-   retiró a propósito (2e7b176) cuando el panel de verdad quedó en RENASER OS.
-
-Para volver a mirar la tanda sin cargar nada:
-```bash
-python scripts/cargar-convocatoria.py --uid TU_UID --solo-ranking
-```
+1. **La vacante se crea y se publica desde el panel.** El texto del anuncio de cada
+   convocatoria conocida sigue en `scripts/convocatorias.json`, una por clave, para copiarlo
+   tal cual: es lo que la IA lee como «qué busca este puesto».
+2. **Los candidatos postulan desde el portal**, con su cuenta —que ya lleva el celular— y su
+   currículum.
+3. **En el ranking de la vacante, «Revisar y calificar pendientes»** pide la criba de quien
+   todavía no tiene nota (ver arriba).
 
 
 ---
 
 ## La otra pantalla: subir currículums a mano
 
-Todo lo de arriba pasa por la terminal: la carpeta, el script de Python, el `--uid`. Eso sirve
-para cargar una convocatoria entera, pero no para enseñarle el sistema a alguien de Renaser ni
+La carga desde una carpeta pasaba por la terminal: la carpeta, el script de Python, el `--uid`.
+Servía para cargar una convocatoria entera, pero no para enseñarle el sistema a alguien de Renaser ni
 para que el propio cliente pruebe con dos currículums sueltos.
 
 Para eso hay una segunda pantalla, **fuera de este repositorio**, en
@@ -190,13 +157,13 @@ node servidor.js
 
 Queda en `http://localhost:3000` y hace el camino completo desde el navegador: elegir el
 puesto, **arrastrar los currículums**, pedir la calificación y ver la tabla. Los sube por las
-mismas llamadas del portal que usa el script, así que no hay un segundo camino de entrada que
+mismas llamadas del portal, así que no hay un segundo camino de entrada que
 mantener.
 
 | | RENASER OS (panel) | `RenaserTalentoFrontend` |
 |---|---|---|
 | Para qué sirve | Trabajar sobre una tanda ya cargada | Enseñar el flujo y probar con pocos |
-| Subir currículums | No, con el script de Python | Sí, desde el navegador |
+| Subir currículums | No: postulan los candidatos desde el portal | Sí, desde el navegador |
 | Ficha del candidato | Sí, con los ocho criterios | No, solo la tabla |
 | Qué hace falta instalar | Node y `npm install` | Solo Node |
 
@@ -212,7 +179,7 @@ Tres cosas están puestas con un criterio que Renaser tiene que confirmar:
   que no es un detalle: en Dirección pesan más los resultados y la complejidad; en Supervisión,
   los sistemas creados y el desarrollo de personas. Se eligió Supervisión porque el anuncio
   pide construir el sistema y formar a otros, pero no dirigir el área. Si Renaser lo considera
-  un puesto de Dirección, se cambia en el script.
+  un puesto de Dirección, se cambia el nivel del puesto.
 
 - **Los números que separan un grupo de otro (80 y 65) siguen sin confirmarse.** Son un
   parámetro editable, no están en el código.
@@ -220,7 +187,7 @@ Tres cosas están puestas con un criterio que Renaser tiene que confirmar:
 - **Los textos de consentimiento ya nombran a DeepSeek y a Google** desde el 14/09/2026, y
   también a Supabase, Amazon Web Services y Vercel, y dicen que los datos salen del Perú. Lo
   que falta es **que un abogado los firme** antes de la primera corrida con candidatos reales.
-  Y hay un hueco que sí afecta a esta carga: **las cuentas creadas por este script antes del
+  Y hay un hueco que sí afecta a esta carga: **las cuentas que creó el cargador antes del
   14/09 firmaron el texto viejo**, que no nombra a ninguno, y no existe mecanismo para pedirles
   el nuevo. Ver [BORRADOR-CONSENTIMIENTO-v1.1.md](BORRADOR-CONSENTIMIENTO-v1.1.md).
 

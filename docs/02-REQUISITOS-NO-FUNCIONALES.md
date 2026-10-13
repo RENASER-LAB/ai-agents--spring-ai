@@ -74,6 +74,12 @@ Web Services** (los servidores) y **Vercel** (las páginas del portal donde el c
 más el proveedor de correo. Los seis están fuera del Perú, así que el texto dice también que los
 datos salen del país.
 
+**Desde la `PLATAFORMA` 1.2 (`V73`, 13/10/2026) se suma Meta Platforms**, para quien escriba al
+bot de WhatsApp de Renaser: sus mensajes pasan por Meta, que puede tratarlos fuera del Perú, y el
+texto lo dice junto a los demás proveedores, así que lo cubre el mismo permiso de flujo
+transfronterizo. Es una beta solo de las vacantes de Renaser, apagada hasta que el número del bot
+esté listo.
+
 ⚠️ **Lo que falta ahora es la firma de un abogado, no información.** Los textos cargados no están
 aprobados legalmente. Ver [BORRADOR-CONSENTIMIENTO-v1.1.md](BORRADOR-CONSENTIMIENTO-v1.1.md),
 que cuenta qué se llevó la V54 y qué sigue pendiente — incluido que **quien ya tenía cuenta nunca
@@ -174,6 +180,11 @@ y el tercero nunca se da por supuesto:
 Son tres y no uno porque los responsables son distintos, y la ley obliga a que cada quien que
 trata datos esté nombrado y consentido. Juntarlos en una casilla sería pedir un permiso que
 nadie dio.
+
+**Desde el 13/10/2026 hay un cuarto, solo para WhatsApp** (`V73`): con Renaser, para recibir por
+WhatsApp las novedades de **un** proceso. Se da al pulsar «Escribir por WhatsApp», con el texto
+debajo del botón, y se guarda como los demás —texto, versión, fecha, IP y navegador—, uno por
+postulación. Solo lo ofrecen las vacantes de Renaser mientras dure la beta.
 
 **Los tres textos son de la plataforma, y el del proceso es uno solo para todas las empresas**,
 con un hueco donde va el nombre de quien publica la vacante. Ninguna empresa tiene texto propio

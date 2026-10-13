@@ -453,7 +453,7 @@ public class FlujoRecuperacionClaveIT {
                         .content("""
                                 {"nombre": "%s", "apellidos": "Prueba", "correo": "%s",
                                  "contrasena": "%s", "ciudadUbigeo": "1501",
-                                 "aceptaPlataforma": true, "aceptaFuturosContactos": false}"""
+                                 "telefono": "987654321", "aceptaPlataforma": true, "aceptaFuturosContactos": false}"""
                                 .formatted(nombre, correo, clave)))
                 .andExpect(status().isCreated());
     }

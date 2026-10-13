@@ -24,7 +24,7 @@ Hace seis cosas, en este orden, y se puede volver a lanzar sin duplicar:
      bandeja del equipo, que decide a quién invitar a la prueba.
 
 Después de esto, el recorrido de un candidato es:
-  postula (o se carga su CV) → el equipo confirma su avance → le llega el correo con
+  postula desde el portal → el equipo confirma su avance → le llega el correo con
   su enlace de acceso → entra y responde el cuestionario → entrega → el equipo pide
   la calificación con IA → las notas quedan en el panel.
 
@@ -237,9 +237,9 @@ def la_vacante(api):
                 if v["titulo"] == TITULO_VACANTE and v["estado"] == "PUBLICADA"]
     if not vacantes:
         raise RuntimeError(
-            f"No hay una vacante «{TITULO_VACANTE}» publicada. Se monta con: "
-            "python scripts/cargar-convocatoria.py --convocatoria administrador "
-            "--solo-convocatoria")
+            f"No hay una vacante «{TITULO_VACANTE}» publicada. Créala y publícala "
+            "desde el panel, con el texto de la clave «administrador» de "
+            "scripts/convocatorias.json, y vuelve a lanzar esto")
     if len(vacantes) > 1:
         raise RuntimeError(f"Hay {len(vacantes)} vacantes «{TITULO_VACANTE}» publicadas: "
                            "decide a cuál va el cuestionario y cierra la otra")
@@ -485,11 +485,9 @@ def main():
     print(f"""
 Listo. Cómo se opera a partir de aquí:
 
-  · Los candidatos se cargan como siempre (portal o cargar-convocatoria.py) y caen
-    en la bandeja «por confirmar» del Perfil Integral, sin cuestionario del banco.
+  · Los candidatos postulan desde el portal y caen en la bandeja «por confirmar»
+    del Perfil Integral, sin cuestionario del banco.
   · La criba de currículums sigue disponible para ordenar la tanda antes de invitar.
-    Para los cargados desde una carpeta conviene pedirla primero: además de la nota,
-    saca el correo real del CV, que es adonde se manda el enlace de acceso.
   · Confirmar el avance de un candidato
     (POST /panel/postulaciones/{{id}}/confirmacion-avance) crea su intento y el
     backend le manda el correo de la prueba —con su enlace de acceso y la opción de

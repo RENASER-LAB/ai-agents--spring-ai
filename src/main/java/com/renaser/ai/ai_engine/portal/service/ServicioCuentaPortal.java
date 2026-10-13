@@ -39,6 +39,13 @@ public interface ServicioCuentaPortal {
     com.renaser.ai.ai_engine.portal.dto.DtosPortal.QuienSoy quienSoy(
             com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario quien);
 
+    /**
+     * Cambiar el celular de la cuenta (V73): 400 si no vale; si cambia, lo vinculado a WhatsApp
+     * con el anterior se cierra.
+     */
+    com.renaser.ai.ai_engine.portal.dto.DtosPortal.MiCelular cambiarTelefono(ContextoUsuario quien,
+                                                                              String telefono);
+
     void retirarConsentimientoFuturos(ContextoUsuario quien);
 
     void pedirBorrado(ContextoUsuario quien, String motivo);

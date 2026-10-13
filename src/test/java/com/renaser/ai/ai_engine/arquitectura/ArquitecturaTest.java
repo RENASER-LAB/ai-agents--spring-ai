@@ -436,7 +436,11 @@ class ArquitecturaTest {
             // diseño, como el borrado de aquí arriba: exigirPlataforma cierra la puerta antes.
             // El reporte se busca por su id, y su reseña y su respuesta derivan de él.
             "ServicioModeracionResenasImpl#resolver",
-            "ServicioModeracionResenasImpl#laResenaDelReporte");
+            "ServicioModeracionResenasImpl#laResenaDelReporte",
+            // El botón de WhatsApp del portal (V73): el portal filtra por persona, no por
+            // organización. La postulación ya pasó por laMia (es del usuario del token), y su
+            // vacante se pide por id solo para poner el título en el mensaje ya escrito.
+            "ServicioWhatsappPortalImpl#laVacanteDe");
 
     /**
      * Ningún servicio del panel busca por id suelto en un agregado con dueño.

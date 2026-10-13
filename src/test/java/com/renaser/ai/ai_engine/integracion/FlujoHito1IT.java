@@ -231,7 +231,7 @@ public class FlujoHito1IT {
                         .content("""
                                 {"nombre": "Camila", "apellidos": "Torres",
                                  "correo": "camila@ejemplo.pe", "contrasena": "Demo12345!",
-                                 "ciudadUbigeo": "1501", "aceptaPlataforma": true, "aceptaFuturosContactos": true}"""))
+                                 "ciudadUbigeo": "1501", "telefono": "987654321", "aceptaPlataforma": true, "aceptaFuturosContactos": true}"""))
                 .andExpect(status().isCreated());
 
         // Con la contraseña mal es 401, no 400: la petición está bien escrita y lo que

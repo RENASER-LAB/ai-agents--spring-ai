@@ -13,6 +13,13 @@ public interface ConsentimientoRepository extends JpaRepository<Consentimiento, 
 
     List<Consentimiento> findByPersonaId(Long personaId);
 
+    /**
+     * El que esta persona ya firmó de este texto para esta postulación (V73): el de WhatsApp se
+     * firma una vez por postulación y versión, aunque pulse el botón dos veces.
+     */
+    Optional<Consentimiento> findFirstByPersonaIdAndPostulacionIdAndTextoConsentimientoId(
+            Long personaId, Long postulacionId, Long textoConsentimientoId);
+
     // El consentimiento de futuros contactos vigente (aceptado y no retirado)
     @Query("""
             select c from Consentimiento c, TextoConsentimiento t

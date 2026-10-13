@@ -33,6 +33,13 @@ app:
     # El dev-login SOLO existe encendido aqui y en las pruebas. En application.yaml esta
     # apagado, que es lo que hereda cualquier entorno de verdad.
     dev-login-activo: true
+  # El bot de WhatsApp de mentira (V73): apunta lo que le mandaríamos y no sale nada. Los E2E
+  # lo leen en /api/v1/integraciones/whatsapp/falso/registro y simulan al bot firmando con el
+  # secreto de abajo. Los dos son de desarrollo y no abren nada fuera de esta máquina.
+  whatsapp:
+    modo: ${WHATSAPP_MODO:falso}
+    secreto-hacia-el-bot: ${WHATSAPP_SECRETO_HACIA_EL_BOT:secreto-de-desarrollo-hacia-el-bot-solo-local}
+    secreto-desde-el-bot: ${WHATSAPP_SECRETO_DESDE_EL_BOT:secreto-de-desarrollo-desde-el-bot-solo-local}
 
 # ⚠️ Aqui NO se apaga la calificacion con IA, y es a proposito. Este perfil es el que se
 # aplica cuando nadie dice nada —incluidos los tests—, asi que solo puede cambiar DONDE se

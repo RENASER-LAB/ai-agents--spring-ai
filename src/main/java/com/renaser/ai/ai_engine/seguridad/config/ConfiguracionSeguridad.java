@@ -1,6 +1,8 @@
 package com.renaser.ai.ai_engine.seguridad.config;
 
+import com.renaser.ai.ai_engine.seguridad.filter.FiltroFirmaWhatsapp;
 import com.renaser.ai.ai_engine.seguridad.filter.FiltroIdentidad;
+import com.renaser.ai.ai_engine.whatsapp.service.PropiedadesWhatsapp;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
@@ -18,9 +20,10 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 
 
-// Tres puertas, tres reglas:
+// Cuatro puertas, cuatro reglas:
 //   /api/v1/portal/**  -> candidatos: público lo de mirar y registrarse, el resto con token CANDIDATO
 //   /api/v1/panel/**   -> equipo de Renaser: todo con token EQUIPO
+//   /api/v1/integraciones/** -> otros sistemas (el bot de WhatsApp): solo su firma HMAC, sin token
 //   el resto           -> módulo de agentes IA con token EQUIPO; Swagger y el contrato, abiertos
 @Configuration
 @EnableMethodSecurity
@@ -85,8 +88,30 @@ public class ConfiguracionSeguridad {
         return http.build();
     }
 
+    /**
+     * La puerta de otros sistemas (V73): hoy, el bot de WhatsApp.
+     *
+     * <p>Va antes de la cadena por defecto a propósito: esa deja pasar todo lo que no es portal ni
+     * panel, y una ruta de integración que cayera ahí quedaría abierta. Aquí no vale ningún token
+     * —ni de candidato ni de equipo—: solo la firma HMAC del bot, que comprueba
+     * {@link FiltroFirmaWhatsapp} antes de llegar al controlador.
+     */
     @Bean
     @Order(3)
+    SecurityFilterChain integraciones(HttpSecurity http, PropiedadesWhatsapp whatsapp) throws Exception {
+        FiltroFirmaWhatsapp firma = new FiltroFirmaWhatsapp(whatsapp::getSecretoDesdeElBot,
+                java.time.Clock.systemUTC());
+        http.securityMatcher("/api/v1/integraciones/**")
+            .csrf(csrf -> csrf.disable())
+            .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .addFilterBefore(firma, UsernamePasswordAuthenticationFilter.class)
+            .authorizeHttpRequests(auth -> auth.anyRequest().hasAuthority(FiltroFirmaWhatsapp.AUTORIDAD))
+            .exceptionHandling(e -> e.authenticationEntryPoint(entradaSinIdentidad()));
+        return http.build();
+    }
+
+    @Bean
+    @Order(4)
     SecurityFilterChain agentesYDocumentacion(HttpSecurity http) throws Exception {
         // El módulo de agentes IA corrió mucho tiempo sin seguridad propia, abierto a
         // cualquiera. Lo que obligó a cerrarlo fue POST /api/v1/rag/ingest: aceptaba una ruta

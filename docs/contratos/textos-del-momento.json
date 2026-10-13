@@ -1,0 +1,95 @@
+{
+  "descripcion": "Lo que el candidato lee de su proceso en cada momento. Es igual en el backend (docs/contratos/textos-del-momento.json, comprobado por TextosDelMomentoTest) y en el portal (src/dominio/textosDelMomento.json, comprobado por estados.test.ts). Cambiar un texto es cambiarlo en los dos repositorios.",
+  "estados": {
+    "POSTULADA": {
+      "titulo": "Estamos revisando tu postulación",
+      "texto": "Comprobamos los requisitos indispensables del puesto."
+    },
+    "PERFIL_TURNO_CANDIDATO": {
+      "titulo": "Tienes una evaluación pendiente",
+      "texto": "Tus respuestas se guardan solas. Puedes salir y volver donde lo dejaste."
+    },
+    "PERFIL_CALIFICANDO": {
+      "titulo": "Estamos calificando tus respuestas",
+      "texto": "Se juntan tu currículum y tu evaluación en un solo perfil. Suele tardar poco."
+    },
+    "PERFIL_POR_CONFIRMAR": {
+      "titulo": "Tu perfil está en revisión",
+      "texto": "Una persona del equipo revisa el resultado y confirma si continúas."
+    },
+    "PRUEBA_TURNO_CANDIDATO": {
+      "titulo": "Prueba del puesto habilitada",
+      "texto": "El cronómetro empieza cuando confirmes, y no se detiene al cerrar la página."
+    },
+    "PRUEBA_CALIFICANDO": {
+      "titulo": "Estamos calificando tu prueba",
+      "texto": "Se revisa tu entregable y la explicación de tus decisiones."
+    },
+    "PRUEBA_POR_CONFIRMAR": {
+      "titulo": "Tu prueba está en revisión",
+      "texto": "Una persona del equipo revisa el resultado y confirma si continúas."
+    },
+    "SIMULACION_POR_HABILITAR": {
+      "titulo": "Esperando una fecha de simulación",
+      "texto": "Todavía no hay una sesión con cupo para tu vacante. Te avisaremos en cuanto la haya."
+    },
+    "SIMULACION_TURNO_CANDIDATO": {
+      "titulo": "Confirma tu simulación",
+      "texto": "Elige una de las fechas disponibles. La sesión es grupal y dura dos horas."
+    },
+    "SIMULACION_POR_CONFIRMAR": {
+      "titulo": "Tu simulación está en revisión",
+      "texto": "Pasó la sesión. Falta calificarla y tener la conversación final."
+    },
+    "VALIDACION_POR_HABILITAR": {
+      "titulo": "Preparando tu periodo de validación",
+      "texto": "Falta registrar los datos de la vinculación. Te avisaremos cuando empiece."
+    },
+    "VALIDACION_TURNO_CANDIDATO": {
+      "titulo": "Validación en curso",
+      "texto": "Estás trabajando el periodo acordado. Las métricas se registran solas."
+    },
+    "VALIDACION_POR_CONFIRMAR": {
+      "titulo": "Tu validación está en revisión",
+      "texto": "Terminó el periodo. El responsable del área completa las últimas métricas."
+    },
+    "DECISION_TURNO_CANDIDATO": {
+      "titulo": "Necesitamos una evidencia más",
+      "texto": "Hay una duda concreta que queremos resolver antes de decidir."
+    },
+    "DECISION_POR_CONFIRMAR": {
+      "titulo": "Decisión final en curso",
+      "texto": "Ya está todo evaluado. Falta la decisión de la persona responsable."
+    },
+    "CONTRATADO": {
+      "titulo": "Te damos la bienvenida",
+      "texto": "El proceso terminó y se te contrató. Nos pondremos en contacto contigo."
+    },
+    "NO_CONTINUA": {
+      "titulo": "Proceso finalizado",
+      "texto": "En esta oportunidad no continúas en el proceso. Gracias por participar."
+    },
+    "CERRADA": {
+      "titulo": "Postulación cerrada",
+      "texto": "Esta postulación terminó sin llegar a una decisión. Ya no recibirás avisos."
+    }
+  },
+  "cuestionarioTecnico": {
+    "PRUEBA_TURNO_CANDIDATO": {
+      "titulo": "Tu prueba técnica está lista",
+      "texto": "Son preguntas sobre este puesto, y se responden escribiendo. Si la vacante fijó un tiempo, el reloj empieza cuando la abras."
+    },
+    "PRUEBA_CALIFICANDO": {
+      "titulo": "Estamos calificando tu prueba",
+      "texto": "Se están leyendo tus respuestas, una por una."
+    }
+  },
+  "pruebaSinCompletar": {
+    "titulo": "Tu tiempo terminó y la prueba quedó sin completar",
+    "texto": "Faltaba responder alguna pregunta o subir algún entregable obligatorio, así que no se entregó ni se va a calificar. Quien lleva tu proceso lo ve y te escribirá."
+  },
+  "desconocido": {
+    "titulo": "Tu proceso sigue activo",
+    "texto": "Cuando haya una acción pendiente aparecerá aquí y te llegará un correo."
+  }
+}

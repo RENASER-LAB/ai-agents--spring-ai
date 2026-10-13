@@ -106,6 +106,12 @@ docker compose up -d                       # Postgres (5433) y RabbitMQ
   `memoria://...`, así que `GET /archivos/{id}/enlace` responde 200 con una url que nadie abre.
   Quien lo llame tiene que mirar el esquema de la url y caer a `/archivos/{id}/descarga` cuando no
   sea `http`/`https`.
+- **WhatsApp va contra un bot falso** (`V73`): `application-local.yaml` pone `WHATSAPP_MODO` en
+  `falso` y trae dos secretos de desarrollo. No sale nada; lo que el bot «recibió» se lee en
+  `GET /api/v1/integraciones/whatsapp/falso/registro?telefono=…`, firmado con el secreto «desde el
+  bot» como cualquier llamada de esa puerta. **La tarjeta del portal no sale hasta encender
+  `whatsapp_novedades_activo`** en la organización plataforma, que nace apagado. Ver
+  [el contrato](CONTRATO-NOVEDADES-POR-WHATSAPP.md).
 
 ---
 
@@ -220,7 +226,7 @@ Cada guion explica en su cabecera por qué existe; esta tabla es solo el mapa.
 |---|---|
 | **Bancos de preguntas** | `importar-banco-v3.py` convierte el PDF del cliente en JSON revisable y comprueba cinco totales (**no transcribir ítems a mano**; sale con ~11 avisos conocidos y eso es lo normal). `comparar-banco-v3-con-base.py` lee texto a texto lo que quedó en la base. `cargar-banco-desde-excel.py` es el ensayo del importador desde Excel. `importar-banco-maestro.py` es del banco v0.1, ya borrado |
 | **Bancos CAZATALENTOS** | `revisa-excel-cazatalentos.py` (solo lee), `importar-banco-cazatalentos.py` (sube los tres Excel por el endpoint real), `publicar-bancos-cazatalentos.py`, `completar-y-publicar-pesos-cazatalentos.py`, `comparar-cazatalentos-con-base.py`, `ajusta-sup-r14-r15.py` |
-| **Una convocatoria con currículums** | `cargar-convocatoria.py` (vacante + carpeta de CV + criba), `enlaces-de-drive.py`, `listar-cv-de-drive.gs`, `generar-cv-de-prueba.py` (PDF con texto extraíble; los de la siembra no sirven para la IA) |
+| **Una convocatoria con currículums** | `enlaces-de-drive.py`, `listar-cv-de-drive.gs`, `generar-cv-de-prueba.py` (PDF con texto extraíble; los de la siembra no sirven para la IA). El cargador desde una carpeta de CV se retiró el 13/10/2026: desde la V73 crear una cuenta pide el celular, y de un archivo no sale; los candidatos entran por el portal |
 | **La vacante sin banco (Administrador)** | `cargar-prueba-administrador.py` deja todo montado por la API; `genera-prueba-tecnica-administrador.py` hace el PDF del enunciado |
 | **Invitar y calificar en lote** | `invitar.py --a prueba` (`--saltar 1,2,3` deja fuera a alguien); `calificar-pruebas.py --vacante N --de-verdad` (sin `--de-verdad` solo dice a quién se le pediría; cada una cuesta una llamada al modelo); `recalificar-banco.py` |
 | **Mirar una tanda** | `lista-para-rrhh.py`, `quienes-respondieron.py`, `excel-de-la-prueba.py`, `exportar-para-demo.py` |

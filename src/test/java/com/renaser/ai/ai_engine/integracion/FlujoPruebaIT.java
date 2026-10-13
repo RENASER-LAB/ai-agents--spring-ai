@@ -950,7 +950,7 @@ public class FlujoPruebaIT {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                         {"nombre":"Valeria","apellidos":"Torres","correo":"%s",
-                         "contrasena":"unaClaveLarga123","ciudadUbigeo":"1501","aceptaPlataforma":true,
+                         "contrasena":"unaClaveLarga123","ciudadUbigeo":"1501","telefono": "987654321", "aceptaPlataforma":true,
                          "aceptaFuturosContactos":false}""".formatted(correo)))
                 .andExpect(status().isCreated());
         return leer(mvc.perform(post("/api/v1/portal/auth/login")

@@ -210,8 +210,8 @@ descarta sola. Cada una ordena, y una persona confirma. Cuando alguien no contin
 por qué. Lo único que además se cierra solo es el proceso de quien dejó pasar su plazo sin
 responder, y eso también queda escrito.
 
-**Cualquiera puede pedir que borren sus datos.** Se borran —lo que pidió ganar incluido, y los
-avisos que tuviera esperándole—. El registro de las decisiones se queda, sin nada que identifique
+**Cualquiera puede pedir que borren sus datos.** Se borran —lo que pidió ganar incluido, su
+celular y los avisos que tuviera esperándole—. El registro de las decisiones se queda, sin nada que identifique
 a la persona: así se cumple la ley sin perder la trazabilidad de lo que ya se decidió.
 
 **El portal tiene una campana.** Lo que pasó mientras el candidato no estaba le espera dentro,
@@ -224,6 +224,13 @@ correo**: si el equipo lo movió sin avisarle, tampoco aparece en la campana.
 prueba del puesto, le llega un recordatorio por correo y en la campana al día siguiente de que le
 tocara, y otro un día antes de que venza el plazo. Nunca de noche (solo de 8:00 a 21:00, hora de
 Lima), ninguno se repite, y cada empresa los puede apagar.
+
+**Y, si él escribe primero, también por WhatsApp.** Al crear la cuenta se pide el celular. Mientras
+espera, el portal le ofrece escribir al WhatsApp de Renaser desde ese número: el bot lo reconoce
+por el número, le cuenta en qué va su proceso con las mismas palabras de la pantalla y, cuando le
+toque hacer algo, se lo dice también por ahí. Nunca le escribe a quien no le escribió antes, y lo
+deja cuando él quiera. Es una prueba solo en las vacantes de Renaser y está apagada hasta que el
+número del bot esté listo.
 
 **Y hay un plazo aunque nadie pida nada.** Si alguien pasa dos años sin postular y sin tocar su
 ficha, esa ficha se elimina. Lo que sostiene una decisión ya tomada —sus postulaciones y lo que
