@@ -266,16 +266,36 @@ public class FlujoDosEmpresasIT {
                 + vacanteAcmeId, String.class)).isEqualTo("VACANTE");
         conToken(post("/api/v1/panel/vacantes/" + vacanteAcmeId + "/origen-preguntas"), tokenAcme,
                 "{\"origen\":\"NIVEL\"}").andExpect(status().isBadRequest());
-        // Lo que sigue prueba el préstamo que SÍ sigue vivo: el de una vacante de antes de la
-        // V66, que conserva el banco de Renaser hasta cerrarse (AC-01c). Se la pone en ese
-        // estado a mano, que es como la dejó la migración.
-        jdbc.update("update vacante set origen_preguntas = 'NIVEL' where id = ?", vacanteAcmeId);
-        // El panel la reconoce como prestada, para llamarla «El banco de RENASER para su nivel»
+        // Lo que sigue prueba lo que una vacante de antes de la V66 conserva del banco de
+        // Renaser (AC-01c). Desde la V74 no lo resuelve nadie en cada postulación: la vacante
+        // quedó atada a una versión fija —sin postulantes, la publicada de Renaser para su
+        // nivel en ese momento (AC-11)—. Se la pone en ese estado a mano, que es como la dejan
+        // las migraciones.
+        Long bancoDeRenaser = jdbc.queryForObject("""
+                select id from version_banco
+                 where organizacion_id = %d and tipo_banco = 'NIVEL'
+                   and nivel_puesto_codigo = 'EJECUCION' and estado = 'PUBLICADA'
+                 order by publicada_en desc limit 1""".formatted(plataformaId), Long.class);
+        jdbc.update("update vacante set origen_preguntas = 'NIVEL', version_banco_fija_id = ? "
+                + "where id = ?", bancoDeRenaser, vacanteAcmeId);
+        // El panel la reconoce como prestada, para llamarla «El banco de RENASER para su nivel»,
+        // y trae su versión fija: el banco de Renaser ya no sale en la lista de ACME
         conTokenGet("/api/v1/panel/vacantes/" + vacanteAcmeId, tokenAcme)
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.origenPreguntas").value("NIVEL"))
                 .andExpect(jsonPath("$.bancoPrestado").value(true))
-                .andExpect(jsonPath("$.bancoDelNivelPropio").value(false));
+                .andExpect(jsonPath("$.bancoDelNivelPropio").value(false))
+                .andExpect(jsonPath("$.bancoFijo.id").value(bancoDeRenaser));
+        // …ni en la configuración del banco ni pidiéndolo por id (AC-14)
+        conTokenGet("/api/v1/panel/banco-preguntas/versiones", tokenAcme)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+        conTokenGet("/api/v1/panel/banco-preguntas/versiones/" + bancoDeRenaser + "/preguntas",
+                tokenAcme)
+                .andExpect(status().isNotFound());
+        conTokenGet("/api/v1/panel/banco-preguntas/propio", tokenAcme)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.propio").value(false));
 
         // La plantilla de evaluación que ACME ve y elige es la de la plataforma
         Long plantillaId = jdbc.queryForObject("""
@@ -285,10 +305,23 @@ public class FlujoDosEmpresasIT {
         conToken(post("/api/v1/panel/vacantes/" + vacanteAcmeId + "/plantilla-evaluacion"), tokenAcme,
                 "{\"plantillaEvaluacionId\": %d}".formatted(plantillaId)).andExpect(status().isOk());
 
-        // Y la prueba del puesto también: la arma la plataforma, ACME la usa tal cual
+        // La prueba del puesto de la plataforma ya no se presta (V74, AC-14): ni se lista ni se
+        // le puede asignar a una vacante de ACME…
         Long versionPruebaId = armarUnaPruebaValida(tokenPlataforma);
         conToken(post("/api/v1/panel/vacantes/" + vacanteAcmeId + "/plantilla-prueba"), tokenAcme,
-                "{\"versionPlantillaPruebaId\": %d}".formatted(versionPruebaId)).andExpect(status().isOk());
+                "{\"versionPlantillaPruebaId\": %d}".formatted(versionPruebaId))
+                .andExpect(status().isNotFound());
+        conTokenGet("/api/v1/panel/plantillas-prueba", tokenAcme)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+        // …pero una vacante de antes que ya la tenía asignada la conserva por su id (AC-12):
+        // se la pone así a mano, como quedó, y el panel la nombra para el desplegable
+        jdbc.update("update vacante set instrumento_etapa_tecnica = 'PLANTILLA', "
+                + "version_plantilla_prueba_id = ? where id = ?", versionPruebaId, vacanteAcmeId);
+        conTokenGet("/api/v1/panel/vacantes/" + vacanteAcmeId, tokenAcme)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.pruebaPrestada.versionId").value(versionPruebaId))
+                .andExpect(jsonPath("$.pruebaPrestada.nombre").isNotEmpty());
 
         // Aquí ACME chocaba con un 409: «publica tu texto de consentimiento antes de
         // publicar la vacante». Se cayó con la V54 —el texto general ya existe y lo nombra
@@ -572,15 +605,16 @@ public class FlujoDosEmpresasIT {
         conTokenGet("/api/v1/panel/plantillas-prueba/versiones/" + versionAcme, tokenPlataforma)
                 .andExpect(status().isNotFound());
 
-        // La excepción deliberada, comprobada como tal: ACME SÍ lee las pruebas de la
-        // plataforma —bandera apagada = leerlas en solo lectura—, pero no las edita.
+        // Y desde la V74 tampoco al revés: las pruebas de la plataforma ya no se prestan, ni en
+        // solo lectura. Para ACME son una prueba ajena más (AC-14).
         Long versionPlataforma = jdbc.queryForObject("""
                 select vpp.id from version_plantilla_prueba vpp
                   join plantilla_prueba pp on pp.id = vpp.plantilla_prueba_id
-                 where pp.organizacion_id = %d and vpp.estado = 'PUBLICADA'"""
+                 where pp.organizacion_id = %d and vpp.estado = 'PUBLICADA'
+                 order by vpp.id limit 1"""
                 .formatted(plataformaId), Long.class);
         conTokenGet("/api/v1/panel/plantillas-prueba/versiones/" + versionPlataforma, tokenAcme)
-                .andExpect(status().isOk());
+                .andExpect(status().isNotFound());
     }
 
     // ============ La personalización ============
@@ -614,7 +648,8 @@ public class FlujoDosEmpresasIT {
                 .isZero();
         conTokenGet("/api/v1/panel/organizacion/personalizacion", tokenAcme)
                 .andExpect(jsonPath("$.pesosPropios").value(true))
-                .andExpect(jsonPath("$.bancoPropio").value(false));
+                // El banco ya no tiene bandera que enseñar (V74): es siempre el suyo
+                .andExpect(jsonPath("$.bancoPropio").doesNotExist());
     }
 
     @DisplayName("ACME se lleva sus plantillas de evaluación; el banco y las pruebas ya no se personalizan")
@@ -655,9 +690,9 @@ public class FlujoDosEmpresasIT {
         // Encendida la bandera de las que se pueden personalizar; la del banco y la de las
         // pruebas, no: su bandera no cambió
         conTokenGet("/api/v1/panel/organizacion/personalizacion", tokenAcme)
-                .andExpect(jsonPath("$.bancoPropio").value(false))
+                .andExpect(jsonPath("$.bancoPropio").doesNotExist())
                 .andExpect(jsonPath("$.plantillasEvaluacionPropias").value(true))
-                .andExpect(jsonPath("$.pruebasPuestoPropias").value(false));
+                .andExpect(jsonPath("$.pruebasPuestoPropias").doesNotExist());
     }
 
     // ============ El borrado ============

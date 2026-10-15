@@ -564,6 +564,26 @@ public class PuenteCalificacionIaImpl implements PuenteCalificacionIa {
     @Override
     @Transactional
     public void recalcularSinMover(Long postulacionId) {
+        recalcularNotaYGrupo(postulacionId);
+        // Aquí no se mueve a nadie, pero si espera en «por confirmar» en una vacante que avanza
+        // sola y su nota ahora llega a la mínima, el pase la mueve al confirmarse esto (V72).
+        // Se avisa y no se llama, por el mismo círculo que el retrato. Ver
+        // NotaDelPerfilRecalculada.
+        avisos.publishEvent(new NotaDelPerfilRecalculada(postulacionId));
+    }
+
+    @Override
+    @Transactional
+    public void recalcularConOtrosPesos(Long postulacionId) {
+        // Sin aviso: cambiar los pesos no mueve a nadie, ni por el pase automático (V74).
+        recalcularNotaYGrupo(postulacionId);
+    }
+
+    /**
+     * La nota del Perfil Integral con los pesos que la vacante tiene ahora, y el grupo.
+     * Ni IA ni máquina de estados: el cuerpo común de los dos recálculos sin mover.
+     */
+    private void recalcularNotaYGrupo(Long postulacionId) {
         Postulacion postulacion = postulacion(postulacionId);
         Vacante vacante = vacante(postulacion);
         Puesto puesto = puesto(vacante);
@@ -579,11 +599,6 @@ public class PuenteCalificacionIaImpl implements PuenteCalificacionIa {
         postulaciones.save(postulacion);
         log.info("La postulación {} se recalculó sin moverla de etapa: nota {} y grupo {}",
                 postulacionId, nota, postulacion.getGrupoPrioridad());
-        // Aquí no se mueve a nadie, pero si espera en «por confirmar» en una vacante que avanza
-        // sola y su nota ahora llega a la mínima, el pase la mueve al confirmarse esto (V72).
-        // Se avisa y no se llama, por el mismo círculo que el retrato. Ver
-        // NotaDelPerfilRecalculada.
-        avisos.publishEvent(new NotaDelPerfilRecalculada(postulacionId));
     }
 
     /**

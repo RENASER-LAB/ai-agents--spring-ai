@@ -248,6 +248,46 @@ class PuenteCalificacionIaPorPuntosTest {
     }
 
     @Test
+    @DisplayName("Con otros pesos, el currículum usa las notas de 0 a 100 que la IA ya puso con los "
+            + "pesos nuevos, y no avisa al pase automático: nadie cambia de etapa (V74, AC-02)")
+    void conOtrosPesosNoAvisaAlPase() {
+        // La vacante ya está en la versión nueva (3): «Gestión de personas» (2) pasa de no
+        // pesar a pesar 15 y el resto (1) deja de pesar. Su nota de 70 ya la había puesto la IA.
+        when(vacantes.findById(13L)).thenReturn(Optional.of(Vacante.builder().id(13L)
+                .versionPesosId(3L).puestoId(4L).build()));
+        when(puestos.findById(4L)).thenReturn(Optional.of(Puesto.builder().id(4L)
+                .nivelPuestoCodigo("EJECUCION").build()));
+        when(calificacion.notaDelBancoPorPuntos(POSTULACION)).thenReturn(new ServicioCalificacion.NotaDelBanco(
+                new BigDecimal("80"), true, null, 0, null, Map.of()));
+        when(pesosComponente.findByVersionPesosId(3L)).thenReturn(List.of(
+                PesoComponentePerfil.builder().componente("CV").peso(new BigDecimal("20")).build(),
+                PesoComponentePerfil.builder().componente("EVALUACION").peso(new BigDecimal("20")).build()));
+        when(criterios.findByEtapaCodigoAndVersionPlantillaPruebaIdIsNullOrderByOrden("PERFIL_INTEGRAL"))
+                .thenReturn(List.of(Criterio.builder().id(1L).build(), Criterio.builder().id(2L).build()));
+        when(pesosCriterio.findByVersionPesosIdAndNivelPuestoCodigo(3L, "EJECUCION")).thenReturn(List.of(
+                PesoCriterio.builder().criterioId(1L).peso(BigDecimal.ZERO).build(),
+                PesoCriterio.builder().criterioId(2L).peso(new BigDecimal("15")).build()));
+        when(notasCriterio.findByPostulacionId(POSTULACION)).thenReturn(List.of(
+                NotaCriterio.builder().criterioId(1L).puntaje(new BigDecimal("50")).build(),
+                NotaCriterio.builder().criterioId(2L).puntaje(new BigDecimal("70")).build()));
+        NotaEtapa vieja = NotaEtapa.builder().postulacionId(POSTULACION).etapaCodigo("PERFIL_INTEGRAL")
+                .puntaje(new BigDecimal("65")).versionPesosId(2L).build();
+        when(notasEtapa.findByPostulacionIdAndEtapaCodigo(POSTULACION, "PERFIL_INTEGRAL"))
+                .thenReturn(Optional.of(vieja));
+        when(perfiles.findByPostulacionId(POSTULACION)).thenReturn(Optional.empty());
+        when(parametros.entero(any(), any(), org.mockito.ArgumentMatchers.anyInt())).thenReturn(80, 65);
+
+        puente.recalcularConOtrosPesos(POSTULACION);
+
+        // Currículum 70 (solo pesa el criterio 2) y banco 80, a partes iguales → 75
+        assertThat(vieja.getPuntaje()).isEqualByComparingTo("75");
+        assertThat(vieja.getVersionPesosId()).isEqualTo(3L);
+        assertThat(postulacion.getGrupoPrioridad()).isEqualTo("POTENCIAL_CON_RIESGO");
+        assertThat(postulacion.getEstadoCodigo()).isEqualTo("PERFIL_CALIFICANDO");
+        verifyNoInteractions(maquina, avisos);
+    }
+
+    @Test
     @DisplayName("Ochenta preguntas con treinta abiertas: las treinta van a la IA y todas se guardan (AC-31)")
     void ochentaPreguntasTreintaAbiertas() {
         List<CalificacionPorPuntos.PreguntaCalculada> todas = new ArrayList<>();

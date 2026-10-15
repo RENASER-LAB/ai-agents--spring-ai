@@ -4,7 +4,6 @@ import com.renaser.ai.ai_engine.ai.exception.ResourceNotFoundException;
 import com.renaser.ai.ai_engine.archivo.service.AlmacenArchivos;
 import com.renaser.ai.ai_engine.auditoria.service.ServicioAuditoria;
 import com.renaser.ai.ai_engine.organizacion.service.DuenoDelInstrumento;
-import com.renaser.ai.ai_engine.organizacion.service.Instrumento;
 import com.renaser.ai.ai_engine.perfilintegral.repository.CriterioRepository;
 import com.renaser.ai.ai_engine.prueba.dto.DtosPlantillaPrueba.VersionResponse;
 import com.renaser.ai.ai_engine.prueba.entity.PlantillaPrueba;
@@ -30,6 +29,8 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -139,20 +140,17 @@ class ServicioPlantillaPruebaListadoTest {
     }
 
     @Test
-    @DisplayName("quien no personalizó ve las versiones de la plataforma")
-    void sinPersonalizarSeVenLasDeLaPlataforma() {
-        // La plantilla no es de esta organización: es de la plataforma, y el resolutor
-        // dice que de ahí salen las pruebas de quien no personalizó.
+    @DisplayName("las versiones de una plantilla de la plataforma responden 404 a otra empresa: ya no se prestan (AC-14)")
+    void lasDeLaPlataformaYaNoSePrestan() {
+        // Antes de la V74, quien no personalizó leía las pruebas de la plataforma. Ya no: la
+        // plantilla de RENASER es, para otra empresa, una plantilla ajena más, y no se pregunta
+        // a ningún resolutor.
         when(plantillas.findByIdAndOrganizacionId(PLANTILLA, ORGANIZACION))
                 .thenReturn(Optional.empty());
-        when(dueno.duenoDe(ORGANIZACION, Instrumento.PRUEBA)).thenReturn(PLATAFORMA);
-        when(plantillas.findByIdAndOrganizacionId(PLANTILLA, PLATAFORMA))
-                .thenReturn(Optional.of(plantillaDe(PLATAFORMA)));
-        when(versiones.findByPlantillaPruebaIdOrderByVersionDesc(PLANTILLA))
-                .thenReturn(List.of(version(61L, 1, "PUBLICADA")));
 
-        assertThat(servicio.listarVersiones(QUIEN, PLANTILLA))
-                .extracting(VersionResponse::id).containsExactly(61L);
+        assertThatThrownBy(() -> servicio.listarVersiones(QUIEN, PLANTILLA))
+                .isInstanceOf(ResourceNotFoundException.class);
+        verifyNoInteractions(versiones, dueno);
     }
 
     @Test
@@ -160,7 +158,6 @@ class ServicioPlantillaPruebaListadoTest {
     void unaPlantillaAjenaNoEnsenaNada() {
         when(plantillas.findByIdAndOrganizacionId(PLANTILLA, ORGANIZACION))
                 .thenReturn(Optional.empty());
-        when(dueno.duenoDe(ORGANIZACION, Instrumento.PRUEBA)).thenReturn(ORGANIZACION);
 
         assertThatThrownBy(() -> servicio.listarVersiones(QUIEN, PLANTILLA))
                 .isInstanceOf(ResourceNotFoundException.class);
@@ -168,5 +165,16 @@ class ServicioPlantillaPruebaListadoTest {
         // Que el 404 salga antes de tocar las versiones no es un detalle: si se leyeran
         // primero, un fallo de la guarda dejaría la prueba de otra empresa ya cargada.
         verifyNoInteractions(versiones);
+    }
+
+    @Test
+    @DisplayName("la lista de plantillas solo trae las de la propia empresa, nunca las de la plataforma (AC-14)")
+    void laListaSoloTraeLasPropias() {
+        when(plantillas.findByOrganizacionIdOrderByCreadoEnDesc(ORGANIZACION))
+                .thenReturn(List.of(plantillaDe(ORGANIZACION)));
+
+        assertThat(servicio.listarPlantillas(QUIEN)).hasSize(1);
+        verify(plantillas, never()).findByOrganizacionIdOrderByCreadoEnDesc(PLATAFORMA);
+        verifyNoInteractions(dueno);
     }
 }

@@ -26,7 +26,6 @@ import com.renaser.ai.ai_engine.perfilintegral.repository.RangoPreguntaRepositor
 import com.renaser.ai.ai_engine.perfilintegral.repository.VersionBancoRepository;
 import com.renaser.ai.ai_engine.perfilintegral.service.ServicioBancoPreguntas;
 import com.renaser.ai.ai_engine.organizacion.service.DuenoDelInstrumento;
-import com.renaser.ai.ai_engine.organizacion.service.Instrumento;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
 import com.renaser.ai.ai_engine.seguridad.service.Permisos;
 
@@ -89,18 +88,19 @@ public class ServicioBancoPreguntasImpl implements ServicioBancoPreguntas {
 
     @Override
     public boolean tieneBancoPropio(ContextoUsuario quien) {
-        // Propio = el resolutor contesta la propia empresa: la plataforma, o una empresa
-        // que ya se copió el banco antes de que eso dejara de ofrecerse (V66).
-        return quien.organizacionId().equals(dueno.duenoDe(quien.organizacionId(), Instrumento.BANCO));
+        // Propio = la plataforma, o una empresa que ya tiene filas de banco suyas: las que
+        // se copió antes de que eso dejara de ofrecerse (V66). Sin resolutor desde la V74:
+        // el banco de una empresa es siempre el suyo y el de RENASER ya no se presta.
+        return versiones.existsByOrganizacionIdAndVacanteIdIsNull(quien.organizacionId())
+                || quien.organizacionId().equals(dueno.plataforma().getId());
     }
 
     @Override
     public List<VersionBancoResponse> listarVersiones(ContextoUsuario quien) {
         permisos.alcanceDe("ver_banco_preguntas");
-        // El resolutor decide de quién es el banco que esta organización ve: el suyo si
-        // personalizó, el de la plataforma si no. Ya no existen filas «globales» sin dueño.
-        return versiones.findByOrganizacionIdOrderByCreadoEnDesc(
-                        dueno.duenoDe(quien.organizacionId(), Instrumento.BANCO)).stream()
+        // Solo el banco de la propia organización (V74): el de RENASER ya no se presta, ni
+        // en solo lectura. Ya no existen filas «globales» sin dueño.
+        return versiones.findByOrganizacionIdOrderByCreadoEnDesc(quien.organizacionId()).stream()
                 // Los cuestionarios de vacante no se mezclan en este panel: tienen el suyo.
                 .filter(v -> v.getVacanteId() == null)
                 .map(versionBancoMapper::toResponse)
@@ -927,19 +927,17 @@ public class ServicioBancoPreguntasImpl implements ServicioBancoPreguntas {
         }
     }
 
-    // ---------- Las dos guardas: leer resuelve, editar no ----------
-    // Con la bandera apagada, la empresa LEE el banco de la plataforma —eso contesta el
-    // resolutor— pero no lo toca: la guarda de mutación exige que la versión sea de la
-    // propia organización. Antes de la V37 el «banco global» (organizacion_id nulo) era
-    // editable desde cualquier organización; esa puerta quedó cerrada.
+    // ---------- Las dos guardas: leer y editar, solo lo propio ----------
+    // Desde la V74 el banco de RENASER ya no se presta, ni en solo lectura: una empresa ve y
+    // edita solo las versiones de su organización, y lo ajeno responde «no existe». Antes de
+    // la V37 el «banco global» (organizacion_id nulo) era editable desde cualquier
+    // organización; esa puerta quedó cerrada.
 
-    /** Visible para leer: la propia, o la del dueño que el resolutor contesta. */
+    /** Visible para leer: solo la de la propia organización. */
     private VersionBanco laVersionVisible(ContextoUsuario quien, Long id) {
         VersionBanco version = versiones.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Versión del banco", "id", id));
-        boolean propia = version.getOrganizacionId().equals(quien.organizacionId());
-        if (!propia && !version.getOrganizacionId().equals(
-                dueno.duenoDe(quien.organizacionId(), Instrumento.BANCO))) {
+        if (!version.getOrganizacionId().equals(quien.organizacionId())) {
             // Lo ajeno responde «no existe»: decir «prohibido» ya confirma que existe
             throw new ResourceNotFoundException("Versión del banco", "id", id);
         }

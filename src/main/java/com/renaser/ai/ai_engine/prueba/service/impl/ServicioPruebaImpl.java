@@ -831,7 +831,13 @@ public class ServicioPruebaImpl implements ServicioPrueba {
                 .orElse(null);
     }
 
-    /** El enunciado adjunto, con un enlace fresco para descargarlo si el almacén los reparte. */
+    /**
+     * El enunciado adjunto, con un enlace fresco para descargarlo si el almacén los reparte.
+     *
+     * <p>Si no los reparte (el de disco, en local), va el nombre sin enlace. Ya no hay plan B
+     * con un enlace guardado (V74): el editor dejó de fabricarlo y el que quedara de antes no
+     * sale por aquí.
+     */
     private ConsignaCandidato consignaDe(VersionBanco v) {
         if (v.getConsignaArchivoId() == null) {
             return null;
@@ -840,7 +846,7 @@ public class ServicioPruebaImpl implements ServicioPrueba {
                 .filter(a -> a.getBorradoEn() == null && a.getRuta() != null)
                 .map(a -> new ConsignaCandidato(a.getNombreOriginal(),
                         almacen.urlDeDescarga(a).map(AlmacenArchivos.EnlaceFirmado::url)
-                                .orElse(v.getUrlConsigna())))
+                                .orElse(null)))
                 .orElse(null);
     }
 

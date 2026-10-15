@@ -26,8 +26,9 @@ public class Organizacion {
     // Las banderas de personalización (pieza A). Apagada = la empresa lee el instrumento
     // de la plataforma; encendida = se le copió y es suyo. El único que las interpreta
     // es DuenoDelInstrumento: nadie más decide de quién son las filas.
-    private boolean bancoPropio;
+    //
+    // Las del banco y las pruebas (banco_propio, pruebas_puesto_propias) siguen en la tabla
+    // pero ya no se mapean (V74): el banco y las pruebas de una empresa son siempre los suyos.
     private boolean pesosPropios;
     private boolean plantillasEvaluacionPropias;
-    private boolean pruebasPuestoPropias;
 }

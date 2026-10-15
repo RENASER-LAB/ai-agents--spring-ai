@@ -91,6 +91,42 @@ class ServicioEvaluacionImplTest {
             new ContextoUsuario(9L, 9L, 1L, "CANDIDATO", List.of(), Map.of());
 
     @Test
+    @DisplayName("una vacante vieja con versión fija rinde esa, aunque RENASER ya la haya archivado "
+            + "al publicar otra (V74, AC-10)")
+    void conVersionFijaRindeEsa() {
+        when(plantillas.findById(3L)).thenReturn(Optional.of(
+                PlantillaEvaluacion.builder().id(3L).vigenciaMeses(6).build()));
+        when(versionesBanco.findById(16L)).thenReturn(Optional.of(VersionBanco.builder().id(16L)
+                .organizacionId(99L).tipoBanco("NIVEL").estado("ARCHIVADA").build()));
+        when(evaluaciones.save(any())).thenAnswer(i -> {
+            Evaluacion e = i.getArgument(0);
+            e.setId(70L);
+            return e;
+        });
+        when(parametros.entero(any(), any(), org.mockito.ArgumentMatchers.anyInt())).thenReturn(14);
+
+        servicio.crearAlPostular(1L, 9L, 3L, "EJECUCION", 16L);
+
+        org.mockito.ArgumentCaptor<Evaluacion> creada = org.mockito.ArgumentCaptor.forClass(Evaluacion.class);
+        verify(evaluaciones).save(creada.capture());
+        assertThat(creada.getValue().getVersionBancoNivelId()).isEqualTo(16L);
+        verify(versionesBanco, never()).laPublicadaDelNivel(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("sin versión fija rinde la publicada de su propia empresa, nunca la de RENASER (V74)")
+    void sinVersionFijaRindeLaPropia() {
+        when(plantillas.findById(3L)).thenReturn(Optional.of(
+                PlantillaEvaluacion.builder().id(3L).vigenciaMeses(6).build()));
+        when(versionesBanco.laPublicadaDelNivel(1L, "NIVEL", "EJECUCION")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> servicio.crearAlPostular(1L, 9L, 3L, "EJECUCION", null))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("No hay un banco de preguntas publicado");
+        verify(evaluaciones, never()).save(any());
+    }
+
+    @Test
     @DisplayName("Lo que respondió con detalle vuelve tal cual, para poder retomar")
     void elDetalleGuardadoVuelve() {
         prepararExamen(

@@ -300,34 +300,32 @@ class ServicioPruebaPropiaImplTest {
     }
 
     @Test
-    @DisplayName("El enunciado en PDF queda en el borrador con su enlace, y se audita")
+    @DisplayName("El enunciado en PDF queda en el borrador como archivo, sin firmar ningún enlace, y se audita (AC-17)")
     void subirElEnunciado() {
         hayBorrador();
         MockMultipartFile pdf = new MockMultipartFile("archivo", "caso.pdf", "application/pdf", "%PDF".getBytes());
         Archivo guardado = Archivo.builder().id(55L).nombreOriginal("caso.pdf").build();
         when(almacen.guardar(ORGANIZACION, pdf)).thenReturn(guardado);
-        when(almacen.urlDeConsigna(guardado)).thenReturn(Optional.of(
-                new AlmacenArchivos.EnlaceFirmado("https://enlace/caso.pdf", Instant.now())));
 
         servicio.subirConsigna(QUIEN, VACANTE, pdf);
 
         assertThat(borrador.getConsignaArchivoId()).isEqualTo(55L);
-        assertThat(borrador.getUrlConsigna()).isEqualTo("https://enlace/caso.pdf");
+        // Ni el enlace de 180 días del correo ni ningún otro (V74): se abre con uno fresco.
+        verify(almacen, never()).urlDeConsigna(any());
+        verify(almacen, never()).urlDeDescarga(any());
         verify(auditoria).registrar(eq(ORGANIZACION), eq(QUIEN), eq("subir_consigna_prueba_propia"),
                 eq("version_banco"), eq(BORRADOR), any(), any(), any());
     }
 
     @Test
-    @DisplayName("Quitar el enunciado lo suelta del borrador, enlace incluido")
+    @DisplayName("Quitar el enunciado lo suelta del borrador")
     void quitarElEnunciado() {
         hayBorrador();
         borrador.setConsignaArchivoId(55L);
-        borrador.setUrlConsigna("https://enlace/caso.pdf");
 
         servicio.quitarConsigna(QUIEN, VACANTE);
 
         assertThat(borrador.getConsignaArchivoId()).isNull();
-        assertThat(borrador.getUrlConsigna()).isNull();
         verify(versionesBanco).save(borrador);
     }
 

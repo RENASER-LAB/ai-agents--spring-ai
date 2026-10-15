@@ -97,6 +97,7 @@ class ServicioBancoPreguntasImplTest {
     @Mock private ParConsistenciaMapper parMapper;
     @Mock private ServicioAuditoria auditoria;
     @Mock private Permisos permisos;
+    @Mock private com.renaser.ai.ai_engine.organizacion.service.DuenoDelInstrumento dueno;
 
     @InjectMocks
     private ServicioBancoPreguntasImpl servicio;
@@ -819,5 +820,48 @@ class ServicioBancoPreguntasImplTest {
             assertThatThrownBy(() -> servicio.archivarVersion(quien, VERSION))
                     .isInstanceOf(com.renaser.ai.ai_engine.ai.exception.ResourceNotFoundException.class);
         }
+    }
+
+    // ============ El banco de RENASER ya no se presta (V74) ============
+
+    @Test
+    @DisplayName("una empresa cliente solo ve las versiones de su banco, nunca las de RENASER (AC-14)")
+    void soloSeVenLasVersionesPropias() {
+        VersionBanco propia = version("PUBLICADA");
+        when(versiones.findByOrganizacionIdOrderByCreadoEnDesc(ORGANIZACION)).thenReturn(List.of(propia));
+
+        servicio.listarVersiones(quien);
+
+        verify(versiones).findByOrganizacionIdOrderByCreadoEnDesc(ORGANIZACION);
+        verify(dueno, never()).duenoDe(org.mockito.ArgumentMatchers.anyLong(),
+                org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
+    @DisplayName("pedir por la API una versión de RENASER contesta 404 a otra empresa (AC-14)")
+    void laVersionDeRenaserEsAjena() {
+        when(versiones.findById(VERSION)).thenReturn(java.util.Optional.of(VersionBanco.builder()
+                .id(VERSION).organizacionId(99L).tipoBanco("NIVEL").estado("PUBLICADA").build()));
+
+        assertThatThrownBy(() -> servicio.listarPreguntas(quien, VERSION))
+                .isInstanceOf(com.renaser.ai.ai_engine.ai.exception.ResourceNotFoundException.class);
+        verify(preguntas, never()).findByVersionBancoIdOrderByOrden(any());
+    }
+
+    @Test
+    @DisplayName("sin filas de banco propias, la empresa no tiene banco; la plataforma siempre lo tiene")
+    void quienTieneBancoPropio() {
+        when(versiones.existsByOrganizacionIdAndVacanteIdIsNull(ORGANIZACION)).thenReturn(false);
+        when(dueno.plataforma()).thenReturn(com.renaser.ai.ai_engine.organizacion.entity.Organizacion
+                .builder().id(99L).esPlataforma(true).build());
+        assertThat(servicio.tieneBancoPropio(quien)).isFalse();
+
+        // Una que se lo copió cuando todavía se personalizaba sigue teniéndolo
+        when(versiones.existsByOrganizacionIdAndVacanteIdIsNull(ORGANIZACION)).thenReturn(true);
+        assertThat(servicio.tieneBancoPropio(quien)).isTrue();
+
+        ContextoUsuario renaser = new ContextoUsuario(11L, 21L, 99L, "EQUIPO", List.of(), Map.of());
+        when(versiones.existsByOrganizacionIdAndVacanteIdIsNull(99L)).thenReturn(false);
+        assertThat(servicio.tieneBancoPropio(renaser)).isTrue();
     }
 }

@@ -128,6 +128,14 @@ public class Vacante {
      */
     @Builder.Default
     private String origenPreguntas = ORIGEN_NIVEL;
+    /**
+     * La versión del banco de RENASER que rinde esta vacante, fija (V74). Solo la tiene una
+     * vacante vieja de una empresa sin banco propio que leía el de RENASER: el préstamo se
+     * borró y sus candidatos nuevos rinden la misma versión que los de antes. Vacía en el
+     * resto. Se suelta si la vacante deja el banco del nivel.
+     */
+    @Column(name = "version_banco_fija_id")
+    private Long versionBancoFijaId;
     private Long responsableUsuarioId;
     private Instant publicadaEn;
     private Instant cerradaEn;

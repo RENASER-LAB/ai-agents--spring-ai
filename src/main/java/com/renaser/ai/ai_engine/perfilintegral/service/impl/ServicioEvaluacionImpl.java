@@ -141,19 +141,13 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
     @Override
     @Transactional
     public Long crearAlPostular(Long organizacionId, Long usuarioId, Long plantillaEvaluacionId,
-                                String nivelPuestoCodigo) {
+                                String nivelPuestoCodigo, Long versionBancoFijaId) {
         PlantillaEvaluacion plantilla = laPlantilla(organizacionId, plantillaEvaluacionId,
                 nivelPuestoCodigo);
 
         // La versión del banco se fija AHORA. Si mañana se publica otra, este candidato sigue
-        // atado a la suya: su nota nunca cambia sola después (RF-138). De quién es el banco
-        // lo contesta el resolutor: sin él, una empresa evaluaría con el banco de cualquiera
-        // — el selector viejo elegía la publicada más reciente SIN mirar la organización.
-        VersionBanco banco = versionesBanco
-                .laPublicadaDelNivel(dueno.duenoDe(organizacionId, Instrumento.BANCO),
-                        "NIVEL", nivelPuestoCodigo)
-                .orElseThrow(() -> new IllegalStateException(
-                        "No hay un banco de preguntas publicado para el nivel " + nivelPuestoCodigo));
+        // atado a la suya: su nota nunca cambia sola después (RF-138).
+        VersionBanco banco = elBancoQueRinde(organizacionId, nivelPuestoCodigo, versionBancoFijaId);
 
         Evaluacion evaluacion = evaluaciones.save(Evaluacion.builder()
                 .organizacionId(organizacionId)
@@ -167,6 +161,30 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
                 .creadoEn(Instant.now())
                 .build());
         return evaluacion.getId();
+    }
+
+    /**
+     * El banco que rinde quien postula a una vacante con el banco del nivel.
+     *
+     * <p>⚠️ <b>Siempre el de la propia organización, salvo la versión fija</b> (V74). El de
+     * RENASER ya no se presta: una vacante vieja de una empresa sin banco propio quedó atada
+     * a la versión que ya usaba, y sus candidatos nuevos rinden esa aunque RENASER haya
+     * publicado otra y la haya archivado al hacerlo. Por eso la fija no se pide publicada:
+     * es la misma que rindieron los de antes, y lo que la vacante promete es esa.
+     *
+     * <p>Sin versión fija se busca la publicada del nivel de la organización, y sin ella no
+     * hay examen: es el error que {@code exigirBancoDelNivel} adelanta al publicar.
+     */
+    private VersionBanco elBancoQueRinde(Long organizacionId, String nivelPuestoCodigo,
+                                         Long versionBancoFijaId) {
+        if (versionBancoFijaId != null) {
+            return versionesBanco.findById(versionBancoFijaId)
+                    .orElseThrow(() -> new IllegalStateException(
+                            "La vacante apunta a una versión del banco que no existe"));
+        }
+        return versionesBanco.laPublicadaDelNivel(organizacionId, "NIVEL", nivelPuestoCodigo)
+                .orElseThrow(() -> new IllegalStateException(
+                        "No hay un banco de preguntas publicado para el nivel " + nivelPuestoCodigo));
     }
 
     /**

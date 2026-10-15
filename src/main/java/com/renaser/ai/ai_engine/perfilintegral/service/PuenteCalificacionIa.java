@@ -126,6 +126,18 @@ public interface PuenteCalificacionIa {
      */
     void recalcularSinMover(Long postulacionId);
 
+    /**
+     * Lo mismo que {@link #recalcularSinMover} —la nota del Perfil Integral con los pesos que
+     * la vacante tiene ahora, y el grupo con los hallazgos guardados—, para el cambio de
+     * versión de pesos con candidatos dentro (V74).
+     *
+     * <p>⚠️ <b>Sin publicar {@link NotaDelPerfilRecalculada}</b>, y es la diferencia entera:
+     * cambiar los pesos no mueve a nadie de etapa, tampoco por el pase automático de una
+     * vacante que avanza sola (decisión 2 de la spec). Quien espera en «por confirmar» con
+     * una nota que ahora llega a la mínima lo mueve el equipo, como al cambiar la mínima.
+     */
+    void recalcularConOtrosPesos(Long postulacionId);
+
     // ---------- El cuestionario técnico de la vacante (etapa 2) ----------
     // Lo mismo contra el otro examen de la postulación. El método es siempre CRITERIOS y la
     // guía de cada pregunta viaja igual, porque vive en la propia `pregunta`.

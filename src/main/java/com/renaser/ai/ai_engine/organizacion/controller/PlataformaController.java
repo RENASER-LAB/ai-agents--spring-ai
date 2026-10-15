@@ -113,11 +113,6 @@ public class PlataformaController {
     // La conversión a mano, como en PersonalizacionController y por lo mismo: un valor
     // desconocido debe ser un 400 que diga cuáles existen.
     private static Instrumento instrumento(String crudo) {
-        try {
-            return Instrumento.valueOf(crudo.trim().toUpperCase());
-        } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("No existe el instrumento «" + crudo
-                    + "»; los válidos son " + java.util.Arrays.toString(Instrumento.values()));
-        }
+        return Instrumento.deTexto(crudo);
     }
 }

@@ -59,14 +59,30 @@ class DuenoDelInstrumentoTest {
     @Test
     @DisplayName("Cada bandera manda solo sobre su instrumento: son independientes")
     void lasBanderasSonIndependientes() {
-        // Pesos propios y banco compartido: el caso que motiva la independencia —
-        // funciona porque los pesos van por dimensión y las dimensiones son globales
+        // Pesos propios y plantillas de evaluación compartidas: el caso que motiva la
+        // independencia
         laEmpresaTiene(Organizacion.builder().id(EMPRESA).pesosPropios(true).build());
 
         assertThat(resolutor.duenoDe(EMPRESA, Instrumento.PESOS)).isEqualTo(EMPRESA);
-        assertThat(resolutor.duenoDe(EMPRESA, Instrumento.BANCO)).isEqualTo(PLATAFORMA);
         assertThat(resolutor.duenoDe(EMPRESA, Instrumento.PLANTILLA_EVALUACION)).isEqualTo(PLATAFORMA);
-        assertThat(resolutor.duenoDe(EMPRESA, Instrumento.PRUEBA)).isEqualTo(PLATAFORMA);
+    }
+
+    @Test
+    @DisplayName("Solo resuelve pesos y plantillas de evaluación: el banco y las pruebas ya no se prestan (V74)")
+    void soloResuelveLoQueSePresta() {
+        // AC-15 y AC-10..14: los dos préstamos que se quedan son números y duraciones; el banco
+        // y las pruebas no son un instrumento que se le pueda preguntar al resolutor.
+        assertThat(Instrumento.values())
+                .containsExactly(Instrumento.PESOS, Instrumento.PLANTILLA_EVALUACION);
+        for (String retirado : java.util.List.of("BANCO", "banco", " PRUEBA ")) {
+            assertThatThrownBy(() -> Instrumento.deTexto(retirado))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage(Instrumento.YA_NO_EXISTE);
+        }
+        assertThat(Instrumento.deTexto(" pesos ")).isEqualTo(Instrumento.PESOS);
+        assertThatThrownBy(() -> Instrumento.deTexto("PESO"))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("los válidos son [PESOS, PLANTILLA_EVALUACION]");
     }
 
     @Test
@@ -86,7 +102,7 @@ class DuenoDelInstrumentoTest {
         laEmpresaTiene(Organizacion.builder().id(EMPRESA).build());
         when(organizaciones.findByEsPlataformaTrue()).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> resolutor.duenoDe(EMPRESA, Instrumento.BANCO))
+        assertThatThrownBy(() -> resolutor.duenoDe(EMPRESA, Instrumento.PESOS))
                 .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("plataforma");
     }

@@ -21,9 +21,10 @@ public interface VersionPlantillaPruebaRepository extends JpaRepository<VersionP
      * la línea siguiente; esto hace las dos cosas de una consulta, que es lo que deja leerla
      * sin abrir un `findById` sin filtrar en un servicio del panel.
      *
-     * <p>⚠️ <b>La organización que se pasa es la que resuelve {@code DuenoDelInstrumento}</b>,
-     * no la de quien pregunta sin más: los instrumentos pueden ser de la plataforma y
-     * compartirse, y filtrar por la empresa a secas escondería su propia prueba.
+     * <p>⚠️ <b>La organización que se pasa es la de quien pregunta</b>: desde la V74 las
+     * pruebas de la plataforma ya no se prestan. La única excepción es leer la que una
+     * vacante vieja ya tenía asignada, que se pide con la plataforma como dueña porque es de
+     * donde vino (ver {@code ServicioVacantesPanelImpl#laPruebaAsignada}).
      *
      * <p>Vacío significa «no es tuya», que en el panel se lee igual que «no existe».
      */

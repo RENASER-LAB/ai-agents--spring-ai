@@ -18,6 +18,11 @@ import org.springframework.stereotype.Service;
  * <p>Resolver es un permiso de LECTURA deliberado, no una fuga: con la bandera apagada la
  * empresa ve el instrumento de la plataforma en solo lectura. Las guardas de mutación no
  * resuelven — editar exige que la fila sea de la propia organización.
+ *
+ * <p>⚠️ <b>Solo resuelve los pesos y las plantillas de evaluación</b> (V74): son números y
+ * duraciones, y sin ellos una empresa nueva no podría calcular ninguna nota. El banco y las
+ * pruebas ya no se prestan: se piden siempre por la organización de quien pregunta, y una
+ * vacante vieja que leía el banco de RENASER lo tiene fijado en la propia vacante.
  */
 @Service
 @RequiredArgsConstructor

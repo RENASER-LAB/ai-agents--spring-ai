@@ -11,10 +11,14 @@ import java.util.Optional;
 
 public interface VersionBancoRepository extends JpaRepository<VersionBanco, Long> {
 
-    // Las versiones de UNA organización. Desde la V37 no hay filas sin dueño: el banco
-    // compartido son las filas de la plataforma, y a esta consulta se llega con el
-    // organizacionId que DuenoDelInstrumento resolvió.
+    // Las versiones de UNA organización. Desde la V37 no hay filas sin dueño, y desde la
+    // V74 el banco no se presta: a esta consulta se llega con la organización de quien
+    // pregunta, nunca con la de la plataforma en nombre de otra.
     List<VersionBanco> findByOrganizacionIdOrderByCreadoEnDesc(Long organizacionId);
+
+    // Si la organización tiene algún banco suyo que no cuelga de una vacante: el de nivel,
+    // o el copiado cuando todavía se personalizaba (V74).
+    boolean existsByOrganizacionIdAndVacanteIdIsNull(Long organizacionId);
 
     // La versión publicada más reciente de un nivel PARA UNA ORGANIZACIÓN: es la que se
     // le fija al candidato al crear su evaluación, y a la que queda atado aunque después

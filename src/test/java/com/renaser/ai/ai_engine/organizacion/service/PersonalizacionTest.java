@@ -81,43 +81,26 @@ class PersonalizacionTest {
     }
 
     @Test
-    @DisplayName("Encender o apagar el banco o las pruebas ya no existe: 400 y no se toca nada (AC-26)")
+    @DisplayName("Encender o apagar el banco o las pruebas ya no existe: 400 antes de llegar a la personalización (AC-26, V74)")
     void elBancoYLasPruebasYaNoSePersonalizan() {
-        empresa.setPruebasPuestoPropias(true);
-        for (Instrumento cual : List.of(Instrumento.BANCO, Instrumento.PRUEBA)) {
-            assertThatThrownBy(() -> servicio.encender(ADMIN, cual))
+        // Desde la V74 no son un Instrumento: el texto de la API —lo pida la empresa o la
+        // plataforma por otra— se rechaza al leerlo, con el mismo mensaje de antes, y la
+        // personalización no llega a ver nada que copiar ni que apagar.
+        for (String cual : List.of("BANCO", "PRUEBA")) {
+            assertThatThrownBy(() -> servicio.encender(ADMIN, Instrumento.deTexto(cual)))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("ya no existe");
-            assertThatThrownBy(() -> servicio.apagar(ADMIN, cual))
+            assertThatThrownBy(() -> servicio.apagarPara(ADMIN, EMPRESA, Instrumento.deTexto(cual),
+                    "la pidió"))
                     .isInstanceOf(IllegalArgumentException.class)
                     .hasMessageContaining("ya no existe");
         }
-        // Quien ya las tenía personalizadas conserva lo suyo: su bandera no cambia.
-        assertThat(empresa.isPruebasPuestoPropias()).isTrue();
-        assertThat(empresa.isBancoPropio()).isFalse();
         verify(organizaciones, never()).save(any());
         verify(auditoria, never()).registrar(any(), any(), any(), any(), any(), any(), any(), any());
-    }
-
-    @Test
-    @DisplayName("Tampoco cuando lo pide la plataforma por otra empresa (AC-26)")
-    void niSiquieraDesdeLaPlataforma() {
-        Organizacion plataforma = Organizacion.builder().id(1L).codigo("RENASER")
-                .esPlataforma(true).build();
-        when(organizaciones.findByEsPlataformaTrue()).thenReturn(Optional.of(plataforma));
-        ContextoUsuario renaser = new ContextoUsuario(
-                11L, 21L, 1L, "EQUIPO", List.of(), Map.of());
-
-        for (Instrumento cual : List.of(Instrumento.BANCO, Instrumento.PRUEBA)) {
-            assertThatThrownBy(() -> servicio.encenderPara(renaser, EMPRESA, cual, "la pidió"))
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessageContaining("ya no existe");
-            assertThatThrownBy(() -> servicio.apagarPara(renaser, EMPRESA, cual, "la pidió"))
-                    .isInstanceOf(IllegalArgumentException.class)
-                    .hasMessageContaining("ya no existe");
-        }
-        assertThat(empresa.isBancoPropio()).isFalse();
-        verify(organizaciones, never()).save(any());
+        // Y lo que se enseña de la personalización ya no habla de ellos.
+        assertThat(java.util.Arrays.stream(servicio.ver(ADMIN).getClass().getRecordComponents())
+                .map(java.lang.reflect.RecordComponent::getName))
+                .containsExactly("pesosPropios", "plantillasEvaluacionPropias");
     }
 
     @Test

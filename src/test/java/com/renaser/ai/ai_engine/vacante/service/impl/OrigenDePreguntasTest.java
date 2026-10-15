@@ -182,11 +182,15 @@ class OrigenDePreguntasTest {
     void elPrestadoDesapareceAlCambiarlo() {
         conBancoPropio(false);
         Vacante v = vacante("BORRADOR", true, Vacante.ORIGEN_NIVEL);
+        // Una vacante vieja con la versión fija del banco de RENASER (V74)
+        v.setVersionBancoFijaId(16L);
 
         servicio.elegirOrigenDePreguntas(QUIEN, VACANTE, "SIN_EVALUACION");
         assertThat(v.isAplicaEvaluacion()).isFalse();
         // No se queda guardado como NIVEL: si no, reaparecería como opción
         assertThat(v.getOrigenPreguntas()).isEqualTo(Vacante.ORIGEN_VACANTE);
+        // Y la versión fija se suelta: ya no la va a rendir
+        assertThat(v.getVersionBancoFijaId()).isNull();
 
         assertThatThrownBy(() -> servicio.elegirOrigenDePreguntas(QUIEN, VACANTE, "NIVEL"))
                 .isInstanceOf(IllegalArgumentException.class);
@@ -297,11 +301,16 @@ class OrigenDePreguntasTest {
     void elDetalleNoTraeElEstadoDeLasPropias() {
         conBancoPropio(true);
         vacante("BORRADOR", true, Vacante.ORIGEN_VACANTE);
+        // La prueba asignada no es de la empresa ni de RENASER: no hay nada prestado (V74)
+        lenient().when(dueno.plataforma()).thenReturn(
+                com.renaser.ai.ai_engine.organizacion.entity.Organizacion.builder().id(99L).build());
 
         var detalle = servicio.detalle(QUIEN, VACANTE);
 
         assertThat(detalle.estadoPreguntasPropias()).isNull();
         assertThat(detalle.bancoDelNivelPropio()).isTrue();
+        assertThat(detalle.pruebaPrestada()).isNull();
+        assertThat(detalle.bancoFijo()).isNull();
         verify(versionesBanco, never()).propiasEnCursoDe(any());
     }
 }
