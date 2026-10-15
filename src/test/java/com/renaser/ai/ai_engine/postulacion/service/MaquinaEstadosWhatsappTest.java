@@ -82,8 +82,7 @@ class MaquinaEstadosWhatsappTest {
         when(usuarios.findById(anyLong())).thenReturn(Optional.of(Usuario.builder().id(7L).personaId(7L).build()));
         when(personas.findById(anyLong())).thenReturn(Optional.of(Persona.builder().id(7L).nombre("Ana").build()));
         when(direcciones.de(any(), anyLong())).thenReturn("ana@ejemplo.test");
-        when(enlaces.generarEnlace(anyLong()))
-                .thenReturn(new ServicioEnlaceAcceso.EnlaceGenerado("https://portal.test/acceso", null));
+        when(enlaces.enlaceAlProceso(any())).thenReturn("https://portal.test/procesos/abc");
         when(parametros.texto(anyLong(), eq("whatsapp_evidencia"), anyString())).thenReturn("");
         when(vacantes.findById(40L)).thenReturn(Optional.of(Vacante.builder().id(40L)
                 .titulo("Asistente Contable").instrumentoEtapaTecnica("PLANTILLA").build()));

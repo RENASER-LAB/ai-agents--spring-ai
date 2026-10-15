@@ -106,8 +106,7 @@ class MaquinaEstadosCampanaTest {
         persona.setNombre("Ana");
         when(personas.findById(anyLong())).thenReturn(Optional.of(persona));
         when(direcciones.de(any(), anyLong())).thenReturn("ana@ejemplo.test");
-        when(enlaces.generarEnlace(anyLong()))
-                .thenReturn(new ServicioEnlaceAcceso.EnlaceGenerado("https://portal.test/acceso", null));
+        when(enlaces.enlaceAlProceso(any())).thenReturn("https://portal.test/procesos/abc");
         when(parametros.texto(anyLong(), eq("whatsapp_evidencia"), anyString())).thenReturn("");
         when(estados.findById("PERFIL_POR_CONFIRMAR")).thenReturn(Optional.of(estado(
                 "PERFIL_POR_CONFIRMAR", "PERFIL_INTEGRAL", "TALENTO", false)));

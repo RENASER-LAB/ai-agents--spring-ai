@@ -43,6 +43,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -90,8 +91,7 @@ class MaquinaEstadosAvisoTest {
         when(usuarios.findById(anyLong())).thenReturn(Optional.of(usuarioCon(7L)));
         when(personas.findById(anyLong())).thenReturn(Optional.of(personaCon("Ana")));
         when(direcciones.de(any(), anyLong())).thenReturn("ana@ejemplo.test");
-        when(enlaces.generarEnlace(anyLong()))
-                .thenReturn(new ServicioEnlaceAcceso.EnlaceGenerado("https://portal.test/acceso?token=x", null));
+        when(enlaces.enlaceAlProceso(any())).thenReturn("https://portal.test/procesos/abc");
         when(parametros.texto(anyLong(), eq("whatsapp_evidencia"), anyString())).thenReturn("982255360");
     }
 
@@ -162,6 +162,22 @@ class MaquinaEstadosAvisoTest {
 
         assertThat(plantillaAlMover(p, "PRUEBA_TURNO_CANDIDATO", "CANDIDATO"))
                 .isEqualTo("PRUEBA_DISPONIBLE");
+    }
+
+    @Test
+    @DisplayName("el aviso lleva la dirección de su proceso y nunca crea un enlace sin contraseña")
+    void elAvisoNoCreaEnlaceConToken() {
+        Postulacion p = vacanteCon(15L, 17L, PDF_ARQ, 3);
+        when(enlaces.enlaceAlProceso(p.getUuid()))
+                .thenReturn("https://portal.test/procesos/" + p.getUuid());
+
+        Map<String, String> v = avisoAlMover(p, "PRUEBA_TURNO_CANDIDATO", "CANDIDATO");
+
+        // Hasta el 15/10/2026 cada aviso creaba un enlace que abría la cuenta sin contraseña
+        // y vivía 30 días, aunque el texto ya no lo pegara.
+        assertThat(v).containsEntry("enlace", "https://portal.test/procesos/" + p.getUuid());
+        verify(enlaces, never()).generarEnlace(anyLong());
+        verify(enlaces, never()).crear(anyLong());
     }
 
     // ============ Cuando la vacante tiene texto propio (V31) ============

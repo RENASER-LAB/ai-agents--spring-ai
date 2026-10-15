@@ -96,8 +96,7 @@ class ServicioRecordatoriosTest {
         when(usuarios.findById(7L)).thenReturn(Optional.of(usuario));
         when(personas.findById(8L)).thenReturn(Optional.of(Persona.builder().id(8L).nombre("Ana").build()));
         when(direcciones.de(any(), anyLong())).thenReturn("ana@correo.pe");
-        when(enlaces.generarEnlace(anyLong()))
-                .thenReturn(new ServicioEnlaceAcceso.EnlaceGenerado("https://portal.test/acceso", null));
+        when(enlaces.enlaceAlProceso(any())).thenReturn("https://portal.test/procesos/abc");
         when(correo.plantillaConRecambio(anyLong(), any(), anyString())).thenAnswer(inv ->
                 Optional.of(PlantillaCorreo.builder().codigo(inv.getArgument(2)).version(1)
                         .asunto("{{aviso}}").cuerpo("Hola {{nombre}}: {{aviso}}.").build()));
@@ -146,7 +145,10 @@ class ServicioRecordatoriosTest {
         assertThat(variablesDelCorreo())
                 .containsEntry("aviso", "Aún no has respondido tu evaluación para Administrador de tienda")
                 .containsEntry("nombre", "Ana")
-                .containsEntry("enlace", "https://portal.test/acceso");
+                .containsEntry("enlace", "https://portal.test/procesos/abc");
+        // La dirección del proceso, que pide contraseña: nunca un enlace que abra la cuenta.
+        verify(enlaces, never()).generarEnlace(anyLong());
+        verify(enlaces, never()).crear(anyLong());
         verify(avisos).publicar(eq(EMPRESA), eq(7L), eq("RECORDATORIO_EVALUACION"),
                 eq("Aún no has respondido tu evaluación para Administrador de tienda"), anyString(),
                 eq(1L), eq(40L));

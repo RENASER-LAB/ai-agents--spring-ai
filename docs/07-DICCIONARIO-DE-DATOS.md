@@ -320,7 +320,9 @@ se tapen la una a la otra.
 ## `enlace_acceso`
 
 Cómo entra el candidato al portal **sin contraseña**: se le manda un enlace por correo. Llegó
-con la `V24`.
+con la `V24`. **Desde el 15/10/2026 solo lo crea el equipo, a mano**, con
+`POST /panel/postulaciones/{id}/enlace-acceso`: los avisos de etapa y los recordatorios ya no
+crean ninguno, y su `{{enlace}}` es la dirección del proceso, que pide la contraseña.
 
 | Columna | Tipo | Oblig. | Qué guarda |
 |---|---|---|---|
@@ -2740,6 +2742,13 @@ alguna le faltara, el recordatorio sale con el de la plataforma. El asunto es `{
 momento («Aún no has respondido tu evaluación para X», «Tu evaluación para X vence el vie 10/10 a
 las 23:59»): un solo texto por etapa sirve a los dos recordatorios. Llevan `{{nombre}}` y
 `{{enlace}}`.
+
+**`{{enlace}}` de los avisos de etapa y de los recordatorios es la dirección del proceso**
+(`…/procesos/{código}`), sin token, desde el 15/10/2026: quien la abre entra con su correo y su
+contraseña y vuelve a ese proceso. Hasta entonces era un enlace de `enlace_acceso` que abría la
+cuenta sin contraseña, y se creaba uno en cada envío aunque el texto ya no lo pegara; los
+recordatorios de la `V70` lo volvieron a poner en el correo después de que el usuario quitara
+esos enlaces el 03/10/2026. En producción se corrigieron los textos a mano con versión nueva.
 
 **`PRUEBA_DISPONIBLE` ya no dice «desde este correo»** (`V70`): el reloj arranca al abrir la
 prueba, no al recibir el correo. La migración publicó una versión nueva solo de los textos activos

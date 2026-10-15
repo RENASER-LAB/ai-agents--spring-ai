@@ -46,6 +46,20 @@ public interface ServicioEnlaceAcceso {
     record EnlaceGenerado(String url, java.time.Instant venceEn) {}
 
     /**
+     * La dirección del proceso en el portal, <b>sin token</b>: quien la abre entra con su correo
+     * y su contraseña, y al entrar vuelve a ese proceso.
+     *
+     * <p>Es la que llevan los correos automáticos —avisos de etapa y recordatorios— como
+     * {@code {{enlace}}} desde el 15/10/2026. El usuario quitó los enlaces personales de los
+     * correos el 03/10/2026, pero el código seguía creando uno en cada envío y los
+     * recordatorios de la V70 lo volvieron a pegar. Un enlace que abre la cuenta sin contraseña
+     * solo lo genera el equipo, a mano, desde el panel ({@link #generarEnlace}).
+     *
+     * <p>No escribe nada en la base.
+     */
+    String enlaceAlProceso(java.util.UUID postulacionUuid);
+
+    /**
      * Canjea el token por una sesión de candidato.
      *
      * @throws com.renaser.ai.ai_engine.seguridad.exception.CredencialesInvalidasException
