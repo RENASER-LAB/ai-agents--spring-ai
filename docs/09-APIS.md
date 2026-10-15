@@ -60,10 +60,12 @@ regalaría a un atacante la lista de correos registrados. Tras varios intentos f
 en 5), la entrada se bloquea unos minutos y responde **429** con la cabecera `Retry-After` y el
 campo `segundosDeEspera`, para que la pantalla pueda decir cuánto falta en vez de adivinarlo.
 
-**El candidato que llega por correo:** `POST /portal/auth/acceso` canjea el **enlace de acceso**
-que va en el aviso de que su postulación avanza (V26), sin contraseña. Es de un solo uso y es la
-única puerta para quien fue cargado desde una carpeta de currículums y nunca creó una cuenta. El
-equipo puede generar uno nuevo con `POST /panel/postulaciones/{id}/enlace-acceso`.
+**El candidato con un enlace de acceso:** `POST /portal/auth/acceso` canjea el **enlace de
+acceso**, sin contraseña. Es la puerta para quien fue cargado desde una carpeta de currículums y
+nunca creó una cuenta. **Desde el 15/10/2026 solo lo genera el equipo**, con
+`POST /panel/postulaciones/{id}/enlace-acceso`, y lo hace llegar a mano: los correos automáticos
+(avisos de etapa, recordatorios) llevan la dirección del proceso, que pide la contraseña. Hasta
+entonces cada aviso creaba uno (V26).
 
 **El equipo:** `POST /panel/auth/login` con correo y contraseña. Solo entran cuentas de
 equipo: un candidato con su contraseña correcta recibe el mismo 401 que un correo que no

@@ -513,10 +513,16 @@ class FlujoPruebaAlInstanteIT {
                                                es_sistema, aviso_al_candidato, ocurrida_en)
                 values (?, 'PERFIL_TURNO_CANDIDATO', 'PERFIL_TURNO_CANDIDATO', true, 'CORREO', now())""",
                 elena);
+        int enlacesAntes = contar("select count(*) from enlace_acceso");
         recordatorios.enviarPendientes(diurno(Instant.now().plus(Duration.ofHours(25))));
 
         assertThat(asuntoDe("elena", "RECORDATORIO_EVALUACION"))
                 .isEqualTo("Te esperamos: Aún no has respondido tu evaluación para Administrador de tienda");
+        // {{enlace}} es la dirección de su proceso, que pide contraseña (15/10/2026): ni el
+        // correo lleva token ni se crea un enlace que abra la cuenta sin ella.
+        assertThat(cuerpoDe("elena", "RECORDATORIO_EVALUACION"))
+                .contains("/procesos/").doesNotContain("token=");
+        assertThat(contar("select count(*) from enlace_acceso")).isEqualTo(enlacesAntes);
     }
 
     // ============ Casos límite ============

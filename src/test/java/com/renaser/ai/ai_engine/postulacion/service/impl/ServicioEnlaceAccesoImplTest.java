@@ -21,6 +21,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -31,6 +32,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
@@ -174,6 +176,26 @@ class ServicioEnlaceAccesoImplTest {
         assertThat(servicio.generarEnlace(POSTULACION).url())
                 .doesNotContain("test//acceso")
                 .startsWith("https://portal.renaser.test/acceso?token=");
+    }
+
+    // ============ La dirección del proceso, sin token ============
+
+    @Test
+    @DisplayName("la dirección del proceso no lleva token ni escribe nada en la base")
+    void laDireccionDelProcesoNoLlevaToken() {
+        ReflectionTestUtils.setField(servicio, "urlDelPortal", "https://portal.renaser.test/");
+        UUID codigo = UUID.fromString("0b6c1f0e-3f5a-4a52-9a43-6a1d2f0c7e11");
+
+        assertThat(servicio.enlaceAlProceso(codigo))
+                .isEqualTo("https://portal.renaser.test/procesos/0b6c1f0e-3f5a-4a52-9a43-6a1d2f0c7e11")
+                .doesNotContain("token");
+        verifyNoInteractions(enlaces, postulaciones, parametros);
+    }
+
+    @Test
+    @DisplayName("sin código, la dirección lleva a «Mis procesos»")
+    void sinCodigoLlevaAMisProcesos() {
+        assertThat(servicio.enlaceAlProceso(null)).isEqualTo("https://portal.renaser.test/procesos");
     }
 
     // ============ Canjear ============

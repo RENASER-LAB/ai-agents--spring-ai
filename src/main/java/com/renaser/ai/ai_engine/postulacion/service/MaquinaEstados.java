@@ -32,6 +32,7 @@ import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 
 // El estado siguiente SE CALCULA, no se busca en una tabla de transiciones: el momento
@@ -489,25 +490,16 @@ public class MaquinaEstados {
         // entraron como una carpeta de curriculums se les invento una. Ver DireccionDelCandidato.
         String destino = direcciones.de(usuario, postulacion.getId());
 
-        // Y el aviso lleva por donde entrar, no solo la noticia.
+        // Y el aviso lleva por donde entrar, no solo la noticia: la dirección de su proceso,
+        // que pide su correo y su contraseña.
         //
-        // Sin esto el correo decia «entra a tu panel» y no daba ni la direccion ni la forma:
-        // a estos candidatos les creo la cuenta el cargador de curriculums, con una
-        // contrasena que nadie les dijo. Diecinueve personas recibieron un aviso que no
-        // podian atender, y el fallo no daba ninguna senal — el correo salio, se registro
-        // como ENVIADO, y simplemente no servia para nada.
-        //
-        // El enlace se genera al avisar y no antes: cada uno reemplaza al anterior, asi que
-        // el que vale es siempre el del ultimo correo que recibio.
-        String enlace = "";
-        try {
-            enlace = enlaces.generarEnlace(postulacion.getId()).url();
-        } catch (RuntimeException e) {
-            // Que falle el enlace no puede tumbar la transicion: la postulacion ya avanzo y
-            // deshacerlo por un correo seria peor. Se avisa igual, sin enlace, y queda escrito.
-            log.error("No se pudo crear el enlace de acceso de la postulacion {}: {}",
-                    postulacion.getId(), e.getMessage());
-        }
+        // Hasta el 15/10/2026 aquí se creaba un enlace que abría la cuenta sin contraseña
+        // (V26), para los candidatos de la carga de currículums que no sabían la suya. Desde
+        // la V61 pueden recuperarla, y el usuario quitó esos enlaces de los correos el
+        // 03/10/2026; pero se seguían creando —uno vivo por correo, 30 días— y los
+        // recordatorios de la V70 los volvieron a pegar. El enlace sin contraseña ya solo lo
+        // genera el equipo desde el panel.
+        String enlace = Objects.requireNonNullElse(enlaces.enlaceAlProceso(postulacion.getUuid()), "");
 
         Map<String, String> variables = new java.util.HashMap<>(Map.of(
                 "nombre", nombre == null ? "" : nombre,
