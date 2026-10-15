@@ -24,6 +24,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Base64;
 import java.util.HexFormat;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -65,16 +66,27 @@ public class ServicioEnlaceAccesoImpl implements ServicioEnlaceAcceso {
     public EnlaceGenerado generarEnlace(Long postulacionId) {
         Recien recien = nuevoEnlace(postulacionId);
 
-        String base = urlDelPortal.endsWith("/")
-                ? urlDelPortal.substring(0, urlDelPortal.length() - 1)
-                : urlDelPortal;
-
         // El token va en la query y no en el camino porque es lo que el portal sabe leer sin
         // que su enrutador tenga que entenderlo como parte de la direccion.
-        String url = base + "/acceso?token="
+        String url = base() + "/acceso?token="
                 + URLEncoder.encode(recien.token(), StandardCharsets.UTF_8);
 
         return new EnlaceGenerado(url, recien.fila().getVenceEn());
+    }
+
+    @Override
+    public String enlaceAlProceso(UUID postulacionUuid) {
+        // Sin código, «Mis procesos»: mejor una dirección que lleva a la lista que ninguna.
+        return postulacionUuid == null
+                ? base() + "/procesos"
+                : base() + "/procesos/" + postulacionUuid;
+    }
+
+    /** La del portal, sin la barra final: así nunca sale «test//procesos». */
+    private String base() {
+        return urlDelPortal.endsWith("/")
+                ? urlDelPortal.substring(0, urlDelPortal.length() - 1)
+                : urlDelPortal;
     }
 
     /** El enlace recien creado y su token en claro, que solo existe aqui. */

@@ -38,7 +38,8 @@ import java.util.stream.Collectors;
  *
  * <p>Quien entrega el banco o abre la prueba al primer aviso no los recibe nunca. Son para el que
  * se quedó a medias: a las 24 horas de que le tocara, si no lo ha hecho, y 24 horas antes de que
- * venza. Por correo y en la campana, con el enlace para entrar.
+ * venza. Por correo y en la campana, con la dirección de su proceso (sin token: pide su
+ * contraseña).
  *
  * <p>Lo que decide CUÁNDO vive en {@link CalendarioDeRecordatorios}; a QUIÉN, en la consulta de
  * {@link TurnosParaRecordar}. Aquí se junta todo, se mira lo que ya salió y se manda.
@@ -226,7 +227,7 @@ public class ServicioRecordatorios {
                     "vacante", vacante,
                     "vence", vence,
                     "aviso", frase,
-                    "enlace", enlace(turno.postulacionId()),
+                    "enlace", enlace(turno),
                     "codigo", String.valueOf(turno.postulacionUuid())));
             // A la plataforma si a la empresa le faltara el texto: la V70 lo siembra en todas,
             // pero un recordatorio que no sale en silencio es peor que uno con el texto común.
@@ -263,14 +264,11 @@ public class ServicioRecordatorios {
                 : "Tu prueba del puesto para " + vacante + " vence el " + vence;
     }
 
-    /** Por dónde entrar, como en los avisos de etapa. Sin enlace, el correo sale igual. */
-    private String enlace(Long postulacionId) {
-        try {
-            return enlaces.generarEnlace(postulacionId).url();
-        } catch (RuntimeException e) {
-            log.error("RECORDATORIO: no se pudo crear el enlace de acceso de la postulación {}: {}",
-                    postulacionId, e.getMessage());
-            return "";
-        }
+    /**
+     * Por dónde entrar, como en los avisos de etapa: la dirección de su proceso, que pide su
+     * correo y su contraseña. Nunca un enlace que abra la cuenta sin ella (15/10/2026).
+     */
+    private String enlace(Turno turno) {
+        return Objects.requireNonNullElse(enlaces.enlaceAlProceso(turno.postulacionUuid()), "");
     }
 }

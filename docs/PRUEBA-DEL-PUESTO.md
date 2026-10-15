@@ -380,7 +380,7 @@ valga por las dos etapas de preguntas: se carga como prueba del puesto, lo calif
 
 - `vacante.aplica_evaluacion`. Apagado, quien postula **no recibe evaluación** y cae directo en
   `PERFIL_POR_CONFIRMAR`: el equipo criba los currículums y confirma el avance, que crea el
-  intento y manda el correo con el enlace de acceso.
+  intento y manda el correo (con la dirección de su proceso, sin token, desde el 15/10/2026).
 - `POST /panel/vacantes/{id}/aplicacion-evaluacion` y `POST /panel/vacantes/{id}/version-pesos`
   (los pesos de UNA vacante; no recalcula nada).
 - El guion `scripts/cargar-prueba-administrador.py` deja todo montado por la API. Invitar en
