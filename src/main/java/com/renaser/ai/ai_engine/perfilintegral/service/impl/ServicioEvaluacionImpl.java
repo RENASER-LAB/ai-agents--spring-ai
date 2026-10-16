@@ -617,6 +617,12 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
         var par = laMia(quien, uuidPostulacion);
         Postulacion postulacion = par.getLeft();
         Evaluacion evaluacion = par.getRight();
+        // La vacante antes que nada (QA-03): la nota de lo cerrado que se escribe al final dice
+        // con qué versión de pesos se calculó, y con un cambio de pesos a mitad tiene que
+        // esperar a que confirme. Pedirla allí, con la evaluación y la postulación ya escritas,
+        // sería cruzarse con ese cambio. Ver CerrojoDeLosPesos. Y la postulación, releída tras
+        // esperar (QA-04): moverla a «calificando» no le devuelve el grupo de antes del cambio.
+        vacantes.bloquearParaCalificarYReleer(postulacion);
         exigirAbierta(evaluacion);
         exigirQueNadieLaEntregoMientras(evaluacion);
 

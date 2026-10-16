@@ -52,7 +52,9 @@ import java.util.stream.Collectors;
  *   <li><b>Simulación y validación</b>: cada nota de criterio está en la escala de su peso
  *       (un 8 sobre 10), así que se lleva a la escala del peso nuevo (12 sobre 15) y la nota
  *       de la etapa se vuelve a sumar con {@link CalificacionPorCriterio#calcularNotaEtapa},
- *       que solo escribe la nota.</li>
+ *       que solo escribe la nota. Siempre desde la nota tal como se puso y su máximo de
+ *       entonces (V75), nunca desde la última reescalada: volver a una versión devuelve la
+ *       misma nota aunque por el camino se redondeara o el criterio pasara por peso 0.</li>
  *   <li><b>Prueba técnica</b>: lleva sus propios puntos y no cambia de valor. Solo pasa a
  *       decir la versión nueva.</li>
  *   <li><b>La nota final</b> no se guarda: el semáforo y el ranking la calculan al vuelo con
@@ -62,6 +64,12 @@ import java.util.stream.Collectors;
  * <p>⚠️ <b>Corre dentro de la transacción de quien cambia la versión</b>, con la vacante ya
  * bloqueada: si algo falla a mitad, no se guarda nada y la vacante sigue con la anterior. El
  * ranking no filtra por versión, pero así tampoco hay un instante con la mitad reescrita.
+ *
+ * <p>⚠️ <b>De la postulación solo escribe el grupo (QA-05).</b> Las lee todas al empezar y la
+ * transacción dura lo que tarde en recorrerlas; mientras, el equipo sigue avanzando y
+ * descartando sin esperar a la vacante. El puente relee cada una antes de rehacerle el grupo y
+ * la entidad solo escribe las columnas que cambian ({@code @DynamicUpdate}): el estado, el motivo de
+ * cierre y {@code movido_en} se quedan como el equipo los dejó.
  */
 @Service
 @RequiredArgsConstructor
@@ -103,7 +111,8 @@ public class RecalculoConOtrosPesos {
      *
      * @param vacante         la vacante, bloqueada y ya con la versión nueva
      * @param versionAnterior la que tenía: dice en qué escala están las notas de simulación y
-     *                        validación
+     *                        validación que todavía no guardan cómo se pusieron (las de antes
+     *                        de la V75)
      * @param nivel           el nivel del puesto, que elige los pesos de criterio
      * @return cuántas personas se recalcularon (las de {@link #conAlgunaNota})
      */
@@ -259,6 +268,12 @@ public class RecalculoConOtrosPesos {
      * sobre 10. Si la versión nueva le da 15, ese mismo desempeño es un 12. Se guarda así,
      * en la escala nueva, porque es la que enseña el panel al lado del máximo y la que suma
      * {@code calcularNotaEtapa}.
+     *
+     * <p>⚠️ <b>Se calcula desde la nota tal como se puso, nunca desde la última reescalada</b>
+     * (QA-01). Reescalar sobre lo reescalado acumula el redondeo (un 7 sobre 15 volvía como
+     * 7,01) y un peso 0 por el camino borraba la nota para siempre. La de partida y su máximo
+     * de entonces no cambian, y el resultado depende solo de ellos y del peso de ahora: ir y
+     * volver a la misma versión deja la misma nota.
      */
     private record Escalas(Map<Long, BigDecimal> antes, Map<Long, BigDecimal> ahora,
                            Set<Long> reescalables) {
@@ -270,10 +285,22 @@ public class RecalculoConOtrosPesos {
                 if (!reescalables.contains(nota.getCriterioId()) || nota.getPuntaje() == null) {
                     continue;
                 }
-                BigDecimal nueva = reescalada(nota.getPuntaje(), antes.get(nota.getCriterioId()),
+                boolean cambia = false;
+                if (nota.getPuntajeOriginal() == null) {
+                    // De antes de la V75 y sin reescalar nunca: está en la escala de la
+                    // versión que la vacante tenía hasta ahora. Se apunta así, antes de
+                    // tocarla, para que el próximo cambio también parta de aquí.
+                    nota.setPuntajeOriginal(nota.getPuntaje());
+                    nota.setMaximoOriginal(antes.get(nota.getCriterioId()));
+                    cambia = true;
+                }
+                BigDecimal nueva = enLaEscala(nota.getPuntajeOriginal(), nota.getMaximoOriginal(),
                         ahora.get(nota.getCriterioId()));
                 if (nueva.compareTo(nota.getPuntaje()) != 0) {
                     nota.setPuntaje(nueva);
+                    cambia = true;
+                }
+                if (cambia) {
                     cambiadas.add(nota);
                 }
             }
@@ -282,19 +309,29 @@ public class RecalculoConOtrosPesos {
     }
 
     /**
-     * Un puntaje de la escala de antes llevado a la de ahora.
+     * La nota que se puso, en la escala del peso de ahora.
      *
-     * <p>Sin peso en la versión nueva no hay escala a la que llevarlo y se queda como está.
-     * Sin peso en la de antes (o con cero) no hay de dónde sacar la proporción: el puntaje solo
-     * podía ser cero, y se acota al máximo nuevo por si acaso.
+     * <p>Depende solo de sus tres argumentos, y por eso es idempotente: con el máximo de
+     * entonces devuelve la nota tal cual, venga de donde venga la vacante.
+     * <ul>
+     *   <li>Sin peso en la versión de ahora no hay escala a la que llevarla: se queda como
+     *       se puso.</li>
+     *   <li>Puesta sin peso (o con cero) no hay de dónde sacar la proporción: solo podía ser
+     *       cero, y se acota al máximo de ahora por si acaso.</li>
+     *   <li>Con peso 0 ahora vale 0, pero la de partida no se pierde: con otro peso vuelve.</li>
+     * </ul>
      */
-    static BigDecimal reescalada(BigDecimal puntaje, BigDecimal maximoAntes, BigDecimal maximoAhora) {
+    static BigDecimal enLaEscala(BigDecimal original, BigDecimal maximoOriginal,
+                                 BigDecimal maximoAhora) {
         if (maximoAhora == null) {
-            return puntaje;
+            return original;
         }
-        if (maximoAntes == null || maximoAntes.signum() == 0) {
-            return puntaje.min(maximoAhora);
+        if (maximoOriginal == null || maximoOriginal.signum() == 0) {
+            return original.min(maximoAhora);
         }
-        return puntaje.multiply(maximoAhora).divide(maximoAntes, 2, RoundingMode.HALF_UP);
+        if (maximoOriginal.compareTo(maximoAhora) == 0) {
+            return original;
+        }
+        return original.multiply(maximoAhora).divide(maximoOriginal, 2, RoundingMode.HALF_UP);
     }
 }

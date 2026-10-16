@@ -13,7 +13,11 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
-public interface VacanteRepository extends JpaRepository<Vacante, Long> {
+/**
+ * Las vacantes. Además de las consultas, lleva el cerrojo con que se escriben las notas
+ * mientras alguien puede estar cambiando sus pesos: ver {@link CerrojoDeLosPesos}.
+ */
+public interface VacanteRepository extends JpaRepository<Vacante, Long>, CerrojoDeLosPesos {
     List<Vacante> findByOrganizacionIdAndEstadoOrderByPublicadaEnDesc(Long organizacionId, String estado);
 
     // El tablón público del portal: las publicadas de TODAS las empresas juntas. Es la

@@ -1,7 +1,7 @@
 # Diccionario de datos
 
 Sistema de selección de personal — Renaser Consulting
-Versión 3.10 · 2026-10-13 · Puesto al día con las migraciones hasta la `V73` (la V73 trae las tablas `vinculo_whatsapp`, `aviso_whatsapp` y `whatsapp_baja`, el CHECK de E.164 de `persona.telefono`, el tipo `WHATSAPP` de `texto_consentimiento` con su 1.0, la versión 1.2 del texto `PLATAFORMA` y el parámetro `whatsapp_novedades_activo` de la plataforma; la V72 no crea tablas: hace obligatoria `vacante.nota_minima`, entera de 0 a 100 y 60 por defecto, y publica la versión 1.1 del texto `PLATAFORMA`; la V71 añade `perfil_candidato.logros`, los logros clave que escribe el candidato; la V70 añade `transicion_estado.aviso_al_candidato` y la tabla `recordatorio_enviado`, siembra en todas las organizaciones tres parámetros y los correos `RECORDATORIO_EVALUACION` y `RECORDATORIO_PRUEBA`, publica una versión nueva de los textos de `PRUEBA_DISPONIBLE` que decían «desde este correo» y documenta siete tipos de aviso de la campana; la V69 añade `criterio_banco.puntos_del_criterio`, lo que vale entero un criterio de la prueba técnica; la V68 trae el alcance de los entregables de la prueba del editor —`entregable_requerido.alcance` y `pregunta_id` y la tabla `entregable_cubre_pregunta`—, desde la que «Mira» se deduce, y deja sin días los borradores de esa prueba; la V67 trae la prueba técnica escrita en el editor —las tablas `criterio_banco_entregable` y `nota_criterio_prueba`, el tercer valor `PRUEBA_PROPIA` de `vacante.instrumento_etapa_tecnica`, el propósito `PRUEBA_PUESTO` con el caso y el tiempo en `version_banco`, la parte calificada en `criterio_banco`, `entregable_requerido`, `intento_prueba` y `respuesta_prueba` colgando también de la versión del editor, `intento_prueba.no_completada` y el propósito en `propuesta_preguntas`—; la V66 trae las preguntas propias de cada vacante —las tablas `criterio_banco` y `propuesta_preguntas`, `vacante.origen_preguntas`, el propósito, el método `PUNTOS` y la guía en `version_banco`, los tres tipos nuevos con sus puntos en `pregunta`, el orden en `opcion`, la nota hasta 100 y la de la IA aparte en `nota_respuesta`, el modo `RECALIFICA` y el agente `RECOMENDADOR`—; la V64 trae la gestión de personas —`sede`, `colaborador`, `periodo_laboral`, `situacion_laboral`, `cese_anulado` y `contratado_sin_alta`— y sus cuatro permisos; la V65 añade las columnas `antes_*` de `situacion_laboral`; la V49 y la V50 solo siembran pesos; la V51 trae la tabla `lectura_cv_perfil` y los archivos del perfil; la V52 y la V53 no crean tablas; la V55 pone el sueldo en la vacante y la pretensión en la postulación; la V56 trae la tabla `aviso_portal`; la V57 no crea tablas, solo siembra los precios de los dos modelos de DeepSeek; la V58 no crea tablas: suma el aviso `VACANTE_ACTUALIZADA` y apaga el correo `REMUNERACION_ACTUALIZADA`; la V59 añade `vacante.archivada_en`; la V60 añade `vacante.eliminada_en` —el borrado lógico—, el motivo de cierre y el tipo de aviso `VACANTE_ELIMINADA`, y el permiso `eliminar_vacante`; la V61 trae la tabla `recuperacion_clave`, tres parámetros y los dos correos de «¿Olvidaste tu contraseña?»; la V62 añade `vacante.ciudad_ubigeo`; la V63 trae las tablas `resena`, `respuesta_resena` y `reporte_resena`, los tres permisos de las reseñas de empresas y cuatro tipos de aviso)
+Versión 3.11 · 2026-10-16 · Puesto al día con las migraciones hasta la `V75` (la V75 añade `nota_criterio.puntaje_original` y `maximo_original`, la nota de la simulación y la validación tal como se puso, de la que se recalcula al cambiar los pesos de la vacante; la V74 añade `vacante.version_banco_fija_id`, pasa a `PRUEBA_PROPIA` los borradores de antes con `PLANTILLA` sin prueba, deja sin uso `organizacion.banco_propio` y `pruebas_puesto_propias` y vacía `version_banco.url_consigna`; la V73 trae las tablas `vinculo_whatsapp`, `aviso_whatsapp` y `whatsapp_baja`, el CHECK de E.164 de `persona.telefono`, el tipo `WHATSAPP` de `texto_consentimiento` con su 1.0, la versión 1.2 del texto `PLATAFORMA` y el parámetro `whatsapp_novedades_activo` de la plataforma; la V72 no crea tablas: hace obligatoria `vacante.nota_minima`, entera de 0 a 100 y 60 por defecto, y publica la versión 1.1 del texto `PLATAFORMA`; la V71 añade `perfil_candidato.logros`, los logros clave que escribe el candidato; la V70 añade `transicion_estado.aviso_al_candidato` y la tabla `recordatorio_enviado`, siembra en todas las organizaciones tres parámetros y los correos `RECORDATORIO_EVALUACION` y `RECORDATORIO_PRUEBA`, publica una versión nueva de los textos de `PRUEBA_DISPONIBLE` que decían «desde este correo» y documenta siete tipos de aviso de la campana; la V69 añade `criterio_banco.puntos_del_criterio`, lo que vale entero un criterio de la prueba técnica; la V68 trae el alcance de los entregables de la prueba del editor —`entregable_requerido.alcance` y `pregunta_id` y la tabla `entregable_cubre_pregunta`—, desde la que «Mira» se deduce, y deja sin días los borradores de esa prueba; la V67 trae la prueba técnica escrita en el editor —las tablas `criterio_banco_entregable` y `nota_criterio_prueba`, el tercer valor `PRUEBA_PROPIA` de `vacante.instrumento_etapa_tecnica`, el propósito `PRUEBA_PUESTO` con el caso y el tiempo en `version_banco`, la parte calificada en `criterio_banco`, `entregable_requerido`, `intento_prueba` y `respuesta_prueba` colgando también de la versión del editor, `intento_prueba.no_completada` y el propósito en `propuesta_preguntas`—; la V66 trae las preguntas propias de cada vacante —las tablas `criterio_banco` y `propuesta_preguntas`, `vacante.origen_preguntas`, el propósito, el método `PUNTOS` y la guía en `version_banco`, los tres tipos nuevos con sus puntos en `pregunta`, el orden en `opcion`, la nota hasta 100 y la de la IA aparte en `nota_respuesta`, el modo `RECALIFICA` y el agente `RECOMENDADOR`—; la V64 trae la gestión de personas —`sede`, `colaborador`, `periodo_laboral`, `situacion_laboral`, `cese_anulado` y `contratado_sin_alta`— y sus cuatro permisos; la V65 añade las columnas `antes_*` de `situacion_laboral`; la V49 y la V50 solo siembran pesos; la V51 trae la tabla `lectura_cv_perfil` y los archivos del perfil; la V52 y la V53 no crean tablas; la V55 pone el sueldo en la vacante y la pretensión en la postulación; la V56 trae la tabla `aviso_portal`; la V57 no crea tablas, solo siembra los precios de los dos modelos de DeepSeek; la V58 no crea tablas: suma el aviso `VACANTE_ACTUALIZADA` y apaga el correo `REMUNERACION_ACTUALIZADA`; la V59 añade `vacante.archivada_en`; la V60 añade `vacante.eliminada_en` —el borrado lógico—, el motivo de cierre y el tipo de aviso `VACANTE_ELIMINADA`, y el permiso `eliminar_vacante`; la V61 trae la tabla `recuperacion_clave`, tres parámetros y los dos correos de «¿Olvidaste tu contraseña?»; la V62 añade `vacante.ciudad_ubigeo`; la V63 trae las tablas `resena`, `respuesta_resena` y `reporte_resena`, los tres permisos de las reseñas de empresas y cuatro tipos de aviso)
 
 Cada tabla con todas sus columnas, tipos y claves. **Este documento se consulta**, no se lee de
 corrido: es la base para escribir las migraciones de Flyway.
@@ -68,10 +68,19 @@ Renaser, y mañana cada cliente de consultoría.
 | `codigo` | text | sí | `RENASER` |
 | `nombre` | text | sí | |
 | `es_activa` | boolean | sí | Por defecto verdadero |
+| `pesos_propios` | boolean | sí | (`V37`) Encendida, la empresa usa su copia de las versiones de pesos; apagada, lee las de la plataforma. Por defecto apagada |
+| `plantillas_evaluacion_propias` | boolean | sí | (`V37`) Lo mismo con las plantillas de evaluación |
+| `banco_propio` | boolean | sí | (`V37`) **Sin uso desde la `V74`**: el banco de una empresa es siempre el suyo y el de RENASER ya no se presta. Se conserva con su valor como registro de quién lo había personalizado |
+| `pruebas_puesto_propias` | boolean | sí | (`V37`) **Sin uso desde la `V74`**, por lo mismo con las pruebas del puesto |
 
 **Clave primaria:** `id` · **Único:** `codigo`
 
 Arranca con una sola fila. Todo lo demás la referencia, directa o indirectamente.
+
+**Las banderas las interpreta un solo sitio**, `DuenoDelInstrumento`, y desde la `V74` solo
+resuelve los pesos y las plantillas de evaluación. Las del banco y las pruebas se dejaron en la
+tabla porque quitarlas no daba nada que valiera lo que cuesta deshacerlo; la entidad ya no las
+mapea.
 
 ---
 
@@ -707,11 +716,12 @@ Una convocatoria concreta.
 | `cierra_en` | timestamptz | no | Solo si `tipo_cierre` es `FECHA` |
 | `estado` | text | sí | `BORRADOR`, `PUBLICADA`, `CERRADA` |
 | `nota_minima` | numeric(5,2) | sí (60) | La nota del Perfil Integral que hace falta para pasar sola a la prueba del puesto con `calificacion_automatica` encendida (V72). Entera, de 0 a 100 (CHECK), 60 por defecto. Quien no llega espera en `PERFIL_POR_CONFIRMAR`: nunca se descarta por nota. Interna, nunca se publica |
-| `version_pesos_id` | bigint | sí | Qué versión de pesos rige |
+| `version_pesos_id` | bigint | sí | Qué versión de pesos rige. **Desde la `V74` se cambia también con candidatos dentro**, mientras la vacante no esté cerrada, archivada ni eliminada: en la misma transacción se recalculan las notas de todos con la versión nueva, sin IA y sin mover a nadie |
 | `version_plantilla_prueba_id` | bigint | no | |
 | `plantilla_evaluacion_id` | bigint | no | |
 | `aplica_evaluacion` | boolean | sí | Apagado, quien postula no recibe la evaluación del banco: va directo a la bandeja del equipo y su única evaluación es la prueba del puesto. Por defecto encendido. En el panel es «Sin evaluación» |
 | `origen_preguntas` | text | sí | (`V66`) De dónde salen sus preguntas cuando `aplica_evaluacion` está encendido: `NIVEL` (el banco de la empresa para el nivel del puesto) o `VACANTE` (sus preguntas propias, en un `version_banco` con propósito `PERFIL_INTEGRAL`). Por defecto `NIVEL`, que es lo que quedó en todas las anteriores a la `V66`; **las nuevas nacen con `VACANTE`**, también en RENASER. `NIVEL` solo se elige si la empresa tiene un banco **propio** publicado para ese nivel, y desde la primera postulación no cambia: las dos reglas viven en `ServicioVacantesPanelImpl` |
+| `version_banco_fija_id` | bigint | no | (`V74`) La versión del banco de RENASER que rinde esta vacante, fija. **Solo la tiene una vacante de antes de una empresa sin banco propio que leía el de RENASER**: al postular se usa esta y no la última publicada, así que sus candidatos nuevos rinden la misma que los de antes, aunque RENASER publique otra o archive esta. La migración puso la de su evaluación más reciente si ya tenía postulantes, o la publicada de RENASER para su nivel si no; un nivel sin banco publicado se quedó vacío. Se vacía si la vacante deja el banco del nivel, y no vuelve. Vacía en todas las demás |
 | `calificacion_automatica` | boolean | sí | Encendido, la postulación se califica sola y pasa sola a la prueba del puesto **si su nota completa del Perfil Integral llega a `nota_minima`** (`V72`); quien no llega espera en `PERFIL_POR_CONFIRMAR`. Tras la prueba, se califica sola y espera a una persona. La prueba al instante (07/10/2026, sin esperar a la nota) se retiró con la `V72`. Por defecto **apagado**: en automático cada postulante cuesta una llamada al modelo desde el momento en que postula |
 | `prueba_cierra_en` | timestamptz | no | Cuándo cierra la prueba de esta vacante, para todos. Vacío: se cuentan los días de la versión de la plantilla desde que cada uno empieza. **También se puede fijar sobre una versión `CRONOMETRADA`** (22/09/2026): al empezar rige el plazo que caiga antes entre el reloj y esta fecha, así que no anula el cronómetro — lo que hace es impedir empezar la prueba después de esta fecha. **Con `PRUEBA_PROPIA` (`V68`) es la fecha límite de la prueba del editor**: obligatoria y futura para publicarla, se puede poner antes de publicar y no viaja al copiar la prueba |
 | `responsable_usuario_id` | bigint | sí | Quién se hace cargo de contratar |
@@ -722,7 +732,8 @@ Una convocatoria concreta.
 
 **Clave primaria:** `id`
 **Apunta a:** `organizacion`, `solicitud_talento`, `puesto`, `version_pesos`,
-`version_plantilla_prueba`, `plantilla_evaluacion`, `usuario`, `ubigeo` (`ciudad_ubigeo`)
+`version_plantilla_prueba`, `plantilla_evaluacion`, `usuario`, `ubigeo` (`ciudad_ubigeo`),
+`version_banco` (`version_banco_fija_id`, `V74`)
 **Índice parcial (`V62`):** `vacante_ciudad_idx` sobre `ciudad_ubigeo`, solo donde no es nulo
 
 **La ciudad y la zona son dos columnas** desde la `V62`. Con el texto libre de `ubicacion`,
@@ -1135,7 +1146,9 @@ El puntaje de un criterio para una postulación, y por qué.
 | `id` | bigint | sí | Clave |
 | `postulacion_id` | bigint | sí | |
 | `criterio_id` | bigint | sí | |
-| `puntaje` | numeric(5,2) | sí | |
+| `puntaje` | numeric(5,2) | sí | En la simulación y la validación, en la escala del peso del criterio para el nivel en la versión de pesos de la vacante |
+| `puntaje_original` | numeric(5,2) | no | (`V75`) La nota tal como la puso quien califica, en la escala del máximo de entonces. Solo la usan los criterios que valen su `peso_criterio` (simulación y validación): al cambiar los pesos de la vacante, `puntaje` se recalcula desde aquí y esta no cambia. La migración la rellenó en esas dos etapas; vacía en las demás |
+| `maximo_original` | numeric(5,2) | no | (`V75`) Sobre cuánto se puso `puntaje_original`: el peso del criterio en la versión de la vacante de entonces. Vacío si ese criterio no tenía peso para el nivel |
 | `explicacion` | text | sí | **Obligatoria siempre** |
 | `origen` | text | sí | `AUTOMATICO`, `AGENTE` o `PERSONA` |
 | `confianza` | numeric(5,2) | no | Solo si la puso un agente |
@@ -1156,6 +1169,14 @@ CV, y se vacía junto con él al anonimizar. + `criterio_id`
 métrica llegó sola de RENASER OS o la puso el responsable.
 
 **Una nota sin explicación no se guarda.** No es una convención: es una restricción.
+
+**Por qué guardar la nota de partida** (`V75`). Al cambiar los pesos de una vacante con
+candidatos, un 7 sobre 15 pasa a 4,67 sobre 10. Si se reescalara desde el último `puntaje`, ir y
+volver a la versión de antes dejaba un 7,01 por el redondeo, y un criterio que pasaba por peso 0
+se quedaba en 0 para siempre. Calculado desde `puntaje_original` y `maximo_original`, el
+resultado solo depende de ellos y del peso de ahora. Cada vez que alguien pone o corrige una nota
+de la simulación o la validación (`CalificacionPorCriterio.ponerNota`), las dos se reescriben con
+el valor y el máximo de ese momento.
 
 ---
 
@@ -1275,7 +1296,7 @@ Una versión del banco, en borrador o publicada.
 | Columna | Tipo | Oblig. | Qué guarda |
 |---|---|---|---|
 | `id` | bigint | sí | Clave |
-| `organizacion_id` | bigint | no | **Vacío en la biblioteca global de Renaser** |
+| `organizacion_id` | bigint | sí | De quién es. **Obligatoria desde la `V37`**: los bancos de Renaser son filas de la plataforma, y desde la `V74` no se prestan a otras empresas |
 | `tipo_banco` | text | sí | `NIVEL`, `ALINEACION` o `VACANTE` (`V42`: un banco de una vacante; desde la `V66`, su cuestionario técnico o sus preguntas propias, según `proposito`) |
 | `nivel_puesto_codigo` | text | no | Solo si `tipo_banco` es `NIVEL` |
 | `etiqueta` | text | sí | |
@@ -1288,8 +1309,8 @@ Una versión del banco, en borrador o publicada.
 | `guia_calificacion` | text | no | (`V66`) La guía que la empresa escribe para que la IA califique las abiertas de sus preguntas propias. Hasta 2000 caracteres, como la de la prueba del puesto (`V46`), y con la misma envoltura al mandarla |
 | `version_guia` | integer | sí | (`V66`) Por defecto 1. Sube cada vez que se corrigen las instrucciones de la IA de una versión publicada —la guía, el «qué evalúa» o el «qué debe tener»—. Cada nota de una abierta guarda con cuál se calculó (`nota_respuesta.version_guia`), y un resultado que llega calculado con una anterior se descarta. En la prueba del editor (`V67`), igual con `nota_criterio_prueba.version_guia` |
 | `enunciado` | text | no | (`V67`) El caso de la prueba técnica, hasta 10 000 caracteres. **Opcional desde la `V68`**, haya o no entregables |
-| `consigna_archivo_id` | bigint | no | (`V67`) El enunciado en PDF o Word, como la consigna de las plantillas |
-| `url_consigna` | text | no | (`V67`) El enlace largo de ese archivo. Se pegaba en el aviso `PRUEBA_DISPONIBLE`; **desde el 10/10/2026 el correo ya no lo lleva** (`{{enlacePrueba}}` va vacía) y el portal enseña el archivo solo al empezar la prueba |
+| `consigna_archivo_id` | bigint | no | (`V67`) El enunciado en PDF o Word, como la consigna de las plantillas. Es lo único que se guarda del adjunto: el panel, y el portal después de «Empezar», lo abren con un enlace fresco cada vez |
+| `url_consigna` | text | no | (`V67`) **Sin uso desde la `V74`, y vacía**: ni se escribe ni se lee. Era un enlace firmado de 180 días a ese archivo, pensado para el aviso `PRUEBA_DISPONIBLE`, que dejó de llevarlo el 10/10/2026. La migración vació los que había y la columna se queda |
 | `materiales` | text | no | (`V67`) Hasta 2000 caracteres |
 | `herramientas_permitidas` | text | no | (`V67`) Hasta 1000 caracteres |
 | `modalidad` | text | no | (`V67`) `CRONOMETRADA` o `PLAZO_ABIERTO`, que desde la `V68` es «Sin cronómetro»: se trabaja hasta la fecha límite de la vacante. **Sin cambio inesperado**. Que una cronometrada traiga sus minutos lo exige el servidor al publicar: un borrador se escribe por partes |
@@ -1305,8 +1326,10 @@ hay vacante. `version_banco_propias_por_puntos_check`: el propósito `PERFIL_INT
 REDACTOR, un guion, una prueba— no deja una fila a medias, y eso es lo que eran todos hasta la
 `V66`.
 
-`organizacion_id` **vacío** significa biblioteca global de Renaser. Una organización que quiera su
-propio banco crea una versión con su identificador puesto, sin tocar el original.
+**Cada empresa lee solo su banco** (`V74`). Hasta entonces una empresa sin banco propio leía las
+versiones de la plataforma; ahora las listas y las lecturas por id usan la organización de quien
+pregunta, y una vacante de antes que rendía el de Renaser lo tiene fijado en
+`vacante.version_banco_fija_id`.
 
 **Una versión publicada no se modifica.** El borrador lo prepara Talento; publicar es de
 Dirección.
@@ -1897,7 +1920,7 @@ El retrato consolidado de una postulación. No es una nota.
 | `alto_rendimiento` | numeric(5,2) | no | |
 | `confianza_evidencia` | numeric(5,2) | sí | Cuánta evidencia respalda esto |
 | `resumen` | text | no | |
-| `version_pesos_id` | bigint | sí | |
+| `version_pesos_id` | bigint | sí | Con qué versión se lee su nota. Al cambiar los pesos de la vacante (`V74`) pasa a la nueva; el retrato no cambia |
 | `ejecucion_ia_id` | bigint | no | |
 | `actualizado_en` | timestamptz | sí | |
 
@@ -1977,7 +2000,7 @@ Una versión concreta. Si tiene vacante, es una copia privada de esa vacante.
 | `vacante_id` | bigint | no | Si está, es una variante de esa vacante |
 | `version` | integer | sí | |
 | `enunciado` | text | sí | |
-| `url_consigna` | text | no | Dónde vive el enunciado completo, para que el aviso al candidato lo llevara (`V29`). **Desde el 10/10/2026 el aviso ya no lo lleva**: `{{enlacePrueba}}` va vacía, porque el caso se lee dentro del reloj. Se sube desde el panel mientras la versión está en `BORRADOR`; el enlace se firma para 180 días |
+| `url_consigna` | text | no | Dónde vive el enunciado completo, para que el aviso al candidato lo llevara (`V29`). **Desde el 10/10/2026 el aviso ya no lo lleva**: `{{enlacePrueba}}` va vacía, porque el caso se lee dentro del reloj. Se sube desde el panel mientras la versión está en `BORRADOR`; el enlace se firma para 180 días. **La `V74` no la toca**, aunque vació la de `version_banco`: aquí no hay id de archivo y este enlace es la única pista de dónde está el PDF |
 | `materiales` | text | no | |
 | `herramientas_permitidas` | text | no | De dónde puede sacar información, **incluida la IA** |
 | `modalidad` | text | sí | `CRONOMETRADA` (lo normal) o `PLAZO_ABIERTO` (solo para cargar las viejas) |
@@ -2490,7 +2513,10 @@ La nota de cada etapa, atada a la versión de pesos con que se calculó.
 **Clave primaria:** `id` · **Único:** `postulacion_id` + `etapa_codigo`
 
 Apuntar a la versión de pesos es lo que permite reproducir la decisión tal como se tomó. **Las
-notas históricas no se recalculan.**
+notas históricas no se recalculan solas.** Solo cambian cuando la vacante cambia de versión de
+pesos (`V74`), y entonces cambian todas las de la vacante a la vez: se recalculan y pasan a decir
+la versión nueva. La de la prueba del puesto no cambia de valor —lleva sus propios puntos—, solo de
+versión. La fila de `decision` no se toca.
 
 ## `decision`
 
@@ -2502,7 +2528,7 @@ El semáforo final.
 | `postulacion_id` | bigint | sí | |
 | `semaforo` | text | sí | `VERDE`, `AMBAR`, `ROJO`, `SIN_DATOS`, `RESERVA` |
 | `nota_global` | numeric(5,2) | no | Orientativa, no decide sola |
-| `version_pesos_id` | bigint | sí | |
+| `version_pesos_id` | bigint | sí | Con qué versión se decidió. Un cambio de pesos de la vacante (`V74`) no la reescribe, ni a `nota_global`: es lo que se decidió con la vara de entonces |
 | `decidida_por_usuario_id` | bigint | no | Vacío mientras la propone el sistema |
 | `motivo` | text | no | **Obligatorio cuando decide una persona** |
 | `decidida_en` | timestamptz | no | |

@@ -148,6 +148,9 @@ public class CalificacionCuestionarioTecnico {
         if (vacante == null) {
             return;
         }
+        // Su nota no depende de los pesos, pero dice con qué versión se calculó: con un cambio
+        // a mitad, se espera y sale con la nueva (QA-02).
+        vacantes.bloquearParaCalificar(vacante);
         Evaluacion evaluacion = evaluaciones.findById(postulacion.getEvaluacionTecnicaId())
                 .orElse(null);
         VersionBanco cuestionario = evaluacion == null ? null

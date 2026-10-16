@@ -23,7 +23,7 @@ Sirve para tres cosas:
 - **Entender el sistema.** Un modelo de datos bien contado explica el negocio mejor que
   cualquier otro documento.
 
-**La base ya está construida.** Las migraciones `V1` a `V73` viven en
+**La base ya está construida.** Las migraciones `V1` a `V75` viven en
 `src/main/resources/db/migration` —**123 tablas de este módulo**, 126 en la base contando la de
 Flyway y las dos del motor de agentes— y Flyway es el dueño del esquema. Cambiar algo de aquí
 ya cuesta una migración nueva, y **una migración aplicada no se edita nunca**: se escribe otra
@@ -59,7 +59,8 @@ La `V37` convierte el esquema en **multiempresa**: `organizacion.es_plataforma` 
 dueña de la plataforma (solo una puede serlo) y reemplaza al código `'RENASER'` que estaba
 quemado en el código; cuatro banderas por organización dicen qué instrumento es propio y
 cuál se lee de la plataforma (`banco_propio`, `pesos_propios`,
-`plantillas_evaluacion_propias`, `pruebas_puesto_propias`); `usuario.es_equipo` separa las
+`plantillas_evaluacion_propias`, `pruebas_puesto_propias`; desde la `V74` solo se leen las dos
+del medio); `usuario.es_equipo` separa las
 cuentas del panel de las del portal —cae el CHECK que distinguía por el id de RENASER OS—;
 la tabla nueva `invitacion` es la única puerta de entrada al panel (se guarda el hash del
 token, nunca el token, y es de un solo uso); el banco pierde el modelo «`organizacion_id`
@@ -240,6 +241,26 @@ bot y qué números escribieron BAJA. Publica el consentimiento **`WHATSAPP` 1.0
 Platforms, más lo que traía la 1.1— y el parámetro `whatsapp_novedades_activo` de la plataforma,
 apagado. Ver «Novedades por WhatsApp», más abajo, y
 [el contrato con el bot](CONTRATO-NOVEDADES-POR-WHATSAPP.md).
+
+La `V74` (16/10/2026) **acaba con el préstamo del banco y de las pruebas** y acompaña el cambio de
+pesos con candidatos dentro, que no toca el esquema: el recálculo reescribe las notas que ya
+existen y el cambio va a la auditoría. Hasta aquí una empresa sin banco o sin pruebas propias
+leía los de RENASER. Ahora el banco y las pruebas de una empresa son siempre los suyos, y lo que
+una vacante de antes ya usaba se queda atado a ella: `vacante.version_banco_fija_id` guarda la
+versión del banco de RENASER que rinden sus candidatos nuevos —la de su evaluación más reciente,
+o la publicada de su nivel si no tenía postulantes—, y la prueba de RENASER que ya tuviera
+asignada se sigue leyendo por su id. Las vacantes de antes en borrador con `PLANTILLA` y sin prueba
+elegida pasan a `PRUEBA_PROPIA`. `organizacion.banco_propio` y `pruebas_puesto_propias` se quedan
+sin uso, con sus valores. Y `version_banco.url_consigna` se vacía: el editor ya no fabrica el
+enlace largo del enunciado. **La de `version_plantilla_prueba` no se toca**: allí no hay archivo y
+ese enlace es la única pista del PDF de las plantillas viejas. Ver
+[Una vacante, una versión](DECISION-UNA-VACANTE-UNA-VERSION.md).
+
+La `V75` (16/10/2026) le da a `nota_criterio` **la nota tal como se puso y sobre cuánto**
+(`puntaje_original`, `maximo_original`). En la simulación y la validación `puntaje` va en la
+escala del peso del criterio, y al cambiar los pesos de la vacante se recalcula desde esas dos,
+que no cambian: ir y volver a la misma versión devuelve la misma nota. La migración las rellena
+en las notas de esas dos etapas con el peso que su vacante tenía.
 
 La `V54` (14/09/2026) **no añade ninguna tabla y cambia quién firma qué**. Hasta ella había dos
 tipos de texto —`PROCESO` y `FUTUROS_CONTACTOS`— y el de la cuenta usaba el primero, que habla de
@@ -467,8 +488,9 @@ Antes había un peso por cada combinación de etapa y nivel. Ahora los pesos son
 todos —40 / 30 / 15 / 15— y lo que cambia es **qué versión de pesos rige cada vacante**.
 
 El nivel **sale de la clave** de `peso_etapa`, y `vacante` gana una columna que apunta a la
-versión aprobada que le toca. Cuando una etapa no aplica a un puesto, se aprueba otra versión
-**antes** de que empiecen los candidatos; nunca se reparte a mano por persona.
+versión aprobada que le toca. Cuando una etapa no aplica a un puesto, se aprueba otra versión y
+se elige en la vacante; nunca se reparte a mano por persona. Desde la `V74` se puede elegir
+también con candidatos dentro, y entonces se recalcula a todos a la vez con la versión nueva.
 
 Lo que sí sigue dependiendo del nivel es el peso de cada criterio y de cada dimensión: el
 currículum de un director no se puntúa igual que el de un operativo.
@@ -775,7 +797,7 @@ agente que la produjo.
 | `familia` | Las siete familias de trabajo | codigo, nombre |
 | `familia_afin` | Qué familias se parecen lo bastante para reutilizar evaluaciones | familia_codigo, familia_afin_codigo |
 | `puesto` | El catálogo de puestos, con su nivel y su familia. Desde la `V64` es también el catálogo de **cargos** de la gestión de personas, y se renombra y desactiva desde Configuración | organizacion_id, codigo, nombre, nivel_puesto_codigo, familia_codigo, es_activo |
-| `vacante` | Una convocatoria concreta | organizacion_id, solicitud_talento_id, puesto_id, titulo, descripcion, modalidad, ciudad_ubigeo, ubicacion, tipo_cierre, plazas, cierra_en, estado, version_pesos_id, version_plantilla_prueba_id, plantilla_evaluacion_id, responsable_usuario_id, remuneracion_tipo, remuneracion_min, remuneracion_max, remuneracion_moneda, remuneracion_actualizada_en, archivada_en, eliminada_en, aplica_evaluacion, origen_preguntas, instrumento_etapa_tecnica, calificacion_automatica, nota_minima |
+| `vacante` | Una convocatoria concreta | organizacion_id, solicitud_talento_id, puesto_id, titulo, descripcion, modalidad, ciudad_ubigeo, ubicacion, tipo_cierre, plazas, cierra_en, estado, version_pesos_id, version_plantilla_prueba_id, plantilla_evaluacion_id, responsable_usuario_id, remuneracion_tipo, remuneracion_min, remuneracion_max, remuneracion_moneda, remuneracion_actualizada_en, archivada_en, eliminada_en, aplica_evaluacion, origen_preguntas, version_banco_fija_id, instrumento_etapa_tecnica, calificacion_automatica, nota_minima |
 | `requisito_objetivo` | Lo único que puede detener una postulación sin que intervenga nadie | vacante_id, descripcion, regla, es_activo |
 | `barrera_critica` | Lo que ningún promedio alto compensa, definido por vacante | vacante_id, descripcion, es_activa |
 | `evaluador_estandar` | Quién revisa que la urgencia no baje el nivel, en esta vacante | vacante_id, usuario_id, puede_bloquear, asignado_por_usuario_id |
@@ -810,6 +832,9 @@ interruptor de siempre, y `origen_preguntas` —el banco de la empresa para el n
 las preguntas propias de la vacante—. Toda vacante nueva nace con las propias, también en
 RENASER; el banco del nivel se elige a mano y solo si la empresa tiene uno **suyo**. **Desde la
 primera postulación, el origen no cambia**: todos sus candidatos se miden con la misma vara.
+`version_banco_fija_id` (`V74`) solo la tiene una vacante de antes de una empresa sin banco propio
+que leía el de RENASER: es la versión que rinden sus candidatos nuevos, la misma que los de antes,
+aunque RENASER publique otra. Se suelta si la vacante deja el banco del nivel, y no vuelve.
 
 **Qué se rinde en la etapa técnica lo dice `instrumento_etapa_tecnica`** (`V43`, `V67`):
 `PLANTILLA`, `CUESTIONARIO_TECNICO` o `PRUEBA_PROPIA`, la prueba escrita en el editor. Toda
@@ -895,7 +920,7 @@ veces. Ahora son dos.
 | Tabla | Para qué existe | Columnas que importan |
 |---|---|---|
 | `criterio` | Cualquier cosa que se puntúa, de la etapa que sea | codigo, nombre, etapa_codigo, version_plantilla_prueba_id, puntos, metodo_verificacion, orden |
-| `nota_criterio` | El puntaje de un criterio para una postulación, y por qué | postulacion_id, criterio_id, puntaje, explicacion, origen, ejecucion_ia_id, calificada_por_usuario_id, ajustada_por_usuario_id, motivo_ajuste |
+| `nota_criterio` | El puntaje de un criterio para una postulación, y por qué | postulacion_id, criterio_id, puntaje, puntaje_original, maximo_original, explicacion, origen, ejecucion_ia_id, calificada_por_usuario_id, ajustada_por_usuario_id, motivo_ajuste |
 
 `metodo_verificacion` es nuevo y dice **quién puede comprobar ese criterio**: el sistema, un
 agente, o una persona. El tiempo lo mide el sistema; la argumentación la califica un agente; el
@@ -908,6 +933,11 @@ Hay dos clases de criterio. **Los globales** —currículum, simulación, valida
 para toda la empresa y su peso vive en la versión de pesos. **Los de la prueba del puesto**
 pertenecen a una versión de plantilla y varían por puesto; sus puntos van en la propia fila,
 porque esa versión ya está congelada.
+
+Como el peso de los globales vive en la versión de pesos, **la nota de un criterio de la
+simulación o la validación va en la escala de ese peso** (un 8 sobre 10). Si la vacante cambia de
+versión, `puntaje` pasa a la escala nueva, y se calcula siempre desde la nota tal como se puso y
+el máximo de entonces (`puntaje_original` y `maximo_original`, `V75`), que no cambian.
 
 ⚠️ **La prueba escrita en el editor (`V67`) no usa ninguna de estas dos tablas.** Sus criterios
 son `criterio_banco` y su nota, `nota_criterio_prueba`. `nota_criterio` mezcla las tres etapas y
@@ -983,9 +1013,10 @@ alineación personal. **El banco no es el examen**: de ahí se selecciona lo que
 `es_obligatoria` en la dimensión es nueva: trece de las veintidós son las que el sistema tiene
 que observar siempre. Las otras nueve se usan en preguntas concretas.
 
-`version_banco.organizacion_id` **va vacío en los bancos de Renaser**, que son la biblioteca
-global. Una organización que quiera el suyo crea una versión con su identificador puesto, sin
-tocar el original.
+`version_banco.organizacion_id` **nunca va vacío** desde la `V37`: los bancos de Renaser son filas
+de la plataforma. Hasta la `V74` se prestaban a las empresas sin banco propio; desde entonces cada
+empresa lee solo el suyo, y una vacante de antes que rendía el de Renaser lo tiene fijado en
+`vacante.version_banco_fija_id`.
 
 Los tipos de pregunta son seis: estilo, situación, conductual, microcaso, dilema y consistencia.
 Las de **estilo no suman nota**: solo dibujan el perfil, y el documento del cliente prohíbe

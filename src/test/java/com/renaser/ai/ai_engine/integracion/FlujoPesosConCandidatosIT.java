@@ -3,6 +3,8 @@ package com.renaser.ai.ai_engine.integracion;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.renaser.ai.ai_engine.integracion.soporte.ImagenesDeContenedores;
+import com.renaser.ai.ai_engine.perfilintegral.service.PuenteCalificacionIa;
+import com.renaser.ai.ai_engine.vacante.repository.VacanteRepository;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.MethodOrderer;
@@ -20,14 +22,27 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.rabbitmq.RabbitMQContainer;
 
+import javax.sql.DataSource;
 import java.math.BigDecimal;
+import java.sql.Connection;
+import java.sql.Statement;
+import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -81,6 +96,10 @@ class FlujoPesosConCandidatosIT {
 
     @Autowired MockMvc mvc;
     @Autowired JdbcTemplate jdbc;
+    @Autowired DataSource fuente;
+    @Autowired PlatformTransactionManager transacciones;
+    @Autowired PuenteCalificacionIa puente;
+    @Autowired VacanteRepository vacantes;
 
     final ObjectMapper json = new ObjectMapper();
 
@@ -96,6 +115,8 @@ class FlujoPesosConCandidatosIT {
     static long carla;
     /** Postuló y no tiene ninguna nota todavía. */
     static long dario;
+    /** La simulación de Carla tal como la puso el facilitador, con los pesos de antes. */
+    static BigDecimal simulacionDeCarla;
 
     @Test
     @Order(1)
@@ -155,7 +176,8 @@ class FlujoPesosConCandidatosIT {
                     : "SIM_CALIDAD".equals(codigo) ? "0" : "5";
             notaDeCriterio(carla, ((Number) criterio.get("id")).longValue(), puntaje);
         }
-        notaDeEtapa(carla, "SIMULACION", sumaDeLaSimulacion(carla).toPlainString());
+        simulacionDeCarla = sumaDeLaSimulacion(carla);
+        notaDeEtapa(carla, "SIMULACION", simulacionDeCarla.toPlainString());
         // Y ya se decidió con la vara de entonces
         jdbc.update("insert into decision (postulacion_id, semaforo, nota_global, version_pesos_id, "
                 + "decidida_por_usuario_id, motivo, decidida_en) values (?, 'VERDE', 55.00, ?, 1, "
@@ -280,6 +302,126 @@ class FlujoPesosConCandidatosIT {
 
     @Test
     @Order(6)
+    @DisplayName("QA-01 · ir a otros pesos y volver deja la simulación como la puso el facilitador, "
+            + "aunque se redondee y un criterio pase por peso 0 (AC-03)")
+    void idaYVueltaDejaLaSimulacionComoEstaba() throws Exception {
+        // Carla vuelve a la vara con que la calificaron: sus notas y su suma, tal cual
+        cambiarA(antes);
+        assertThat(notaDeSimulacion(carla, "SIM_EJECUCION")).isEqualByComparingTo("15");
+        assertThat(notaDeSimulacion(carla, "SIM_CALIDAD")).isEqualByComparingTo("0");
+        assertThat(notaDeSimulacion(carla, "SIM_APRENDIZAJE")).isEqualByComparingTo("5");
+        assertThat(nota(carla, "SIMULACION")).isEqualByComparingTo(simulacionDeCarla);
+
+        // Elena, calificada con los pesos de antes: calidad 7 de 15 y aprendizaje 6 de 10
+        long elena = candidato("Elena", "PERFIL_POR_CONFIRMAR", "50", "50", "50");
+        for (var criterio : jdbc.queryForList("""
+                select id, codigo from criterio
+                 where etapa_codigo = 'SIMULACION' and version_plantilla_prueba_id is null""")) {
+            String codigo = (String) criterio.get("codigo");
+            String puntaje = switch (codigo) {
+                case "SIM_EJECUCION" -> "15";
+                case "SIM_CALIDAD" -> "7";
+                case "SIM_APRENDIZAJE" -> "6";
+                default -> "5";
+            };
+            notaDeCriterio(elena, ((Number) criterio.get("id")).longValue(), puntaje);
+        }
+        BigDecimal puesta = sumaDeLaSimulacion(elena);
+        notaDeEtapa(elena, "SIMULACION", puesta.toPlainString());
+        long sinAprendizaje = version("Pesos sin aprendizaje (V75)", "35", "10",
+                new String[][] {{"CV_RESULTADOS", "50"}, {"CV_PERSONAS", "50"},
+                        {"SIM_EJECUCION", "20"}, {"SIM_CALIDAD", "10"}, {"SIM_APRENDIZAJE", "0"}});
+
+        // Ida: 7 de 15 son 4,67 de 10, y el aprendizaje no pesa
+        cambiarA(sinAprendizaje);
+        assertThat(notaDeSimulacion(elena, "SIM_EJECUCION")).isEqualByComparingTo("20");
+        assertThat(notaDeSimulacion(elena, "SIM_CALIDAD")).isEqualByComparingTo("4.67");
+        assertThat(notaDeSimulacion(elena, "SIM_APRENDIZAJE")).isEqualByComparingTo("0");
+        assertThat(nota(elena, "SIMULACION")).isEqualByComparingTo(sumaDeLaSimulacion(elena));
+
+        // Vuelta: ni un 7,01 ni el aprendizaje perdido
+        cambiarA(antes);
+        assertThat(notaDeSimulacion(elena, "SIM_EJECUCION")).isEqualByComparingTo("15");
+        assertThat(notaDeSimulacion(elena, "SIM_CALIDAD")).isEqualByComparingTo("7");
+        assertThat(notaDeSimulacion(elena, "SIM_APRENDIZAJE")).isEqualByComparingTo("6");
+        assertThat(nota(elena, "SIMULACION")).isEqualByComparingTo(puesta);
+        // Lo que se puso no se movió en ningún momento
+        assertThat(jdbc.queryForObject("""
+                select nc.puntaje_original || '/' || nc.maximo_original
+                  from nota_criterio nc join criterio c on c.id = nc.criterio_id
+                 where nc.postulacion_id = ? and c.codigo = 'SIM_CALIDAD'
+                   and c.version_plantilla_prueba_id is null""", String.class, elena))
+                .isEqualTo("7.00/15.00");
+
+        // Y de nuevo a la de después, donde seguía la vacante: lo mismo que la primera vez
+        cambiarA(despues);
+        assertThat(notaDeSimulacion(elena, "SIM_CALIDAD")).isEqualByComparingTo("4.67");
+        assertThat(notaDeSimulacion(elena, "SIM_APRENDIZAJE")).isEqualByComparingTo("6");
+        assertThat(nota(carla, "SIMULACION")).isEqualByComparingTo(simulacionDeCarla.add(BigDecimal.valueOf(5)));
+    }
+
+    @Test
+    @Order(7)
+    @DisplayName("QA-02 · una nota que se escribe con el cambio de pesos a mitad espera a que "
+            + "confirme y sale con la versión nueva, aunque la vacante ya se hubiera leído (AC-05)")
+    void unaNotaAMitadDelCambioSaleConLaVersionNueva() throws Exception {
+        assertThat(versionDeLaVacante()).isEqualTo(despues);
+        assertThat(nota(ines, "PERFIL_INTEGRAL")).isEqualByComparingTo("70");
+
+        // El cambio a mitad, como lo deja ServicioPesosDeLaVacanteImpl#cambiar mientras
+        // recalcula: la vacante bloqueada y ya en la de antes, y la nota de Inés recalculada
+        // con ella (40), sin confirmar todavía
+        CountDownLatch aMitad = new CountDownLatch(1);
+        ExecutorService otraSesion = Executors.newSingleThreadExecutor();
+        Future<?> cambio = otraSesion.submit(() -> {
+            try (Connection c = fuente.getConnection()) {
+                c.setAutoCommit(false);
+                try (Statement s = c.createStatement()) {
+                    s.execute("select id from vacante where id = " + vacante + " for update");
+                    s.executeUpdate("update vacante set version_pesos_id = " + antes
+                            + " where id = " + vacante);
+                    s.executeUpdate("update nota_etapa set puntaje = 40.00, version_pesos_id = "
+                            + antes + " where postulacion_id = " + ines
+                            + " and etapa_codigo = 'PERFIL_INTEGRAL'");
+                }
+                aMitad.countDown();
+                Thread.sleep(1_500);
+                c.commit();
+            }
+            return null;
+        });
+        try {
+            assertThat(aMitad.await(10, TimeUnit.SECONDS)).isTrue();
+            long desde = System.nanoTime();
+            // En ese hueco llega una nota de Inés —un ajuste a mano, la IA que estaba en
+            // curso—, en una transacción que ya había leído la vacante, como el guardián del
+            // panel antes de un ajuste
+            new TransactionTemplate(transacciones).executeWithoutResult(t -> {
+                assertThat(vacantes.findById(vacante).orElseThrow().getVersionPesosId())
+                        .isEqualTo(despues);
+                puente.recalcularSinMover(ines);
+            });
+            cambio.get(10, TimeUnit.SECONDS);
+            // Esperó al cambio en vez de calcular con lo que había leído
+            assertThat(Duration.ofNanos(System.nanoTime() - desde)).isGreaterThan(Duration.ofMillis(1_000));
+        } finally {
+            otraSesion.shutdownNow();
+        }
+
+        assertThat(versionDeLaVacante()).isEqualTo(antes);
+        assertThat(jdbc.queryForObject("select version_pesos_id from nota_etapa where postulacion_id = ? "
+                + "and etapa_codigo = 'PERFIL_INTEGRAL'", Long.class, ines)).isEqualTo(antes);
+        assertThat(nota(ines, "PERFIL_INTEGRAL")).isEqualByComparingTo("40");
+        assertThat(grupo(ines)).isEqualTo("NO_PRIORIZADO");
+
+        // La vacante vuelve a la de después por la puerta de siempre
+        cambiarA(despues);
+        assertThat(nota(ines, "PERFIL_INTEGRAL")).isEqualByComparingTo("70");
+        assertThat(grupo(ines)).isEqualTo("POTENCIAL_CON_RIESGO");
+    }
+
+    @Test
+    @Order(8)
     @DisplayName("elegir la misma no hace nada; una vacante cerrada contesta 409 (AC-06)")
     void laMismaYLaCerrada() throws Exception {
         long registros = contar("select count(*) from auditoria where accion = 'asignar_version_pesos'");
@@ -307,12 +449,14 @@ class FlujoPesosConCandidatosIT {
                 + "(?, 'SIMULACION', 15), (?, 'VALIDACION', " + validacion + ")", id, id, id, id);
         jdbc.update("insert into peso_componente_perfil (version_pesos_id, componente, peso) "
                 + "values (?, 'CV', 100), (?, 'EVALUACION', 0)", id, id);
-        // Los criterios de la simulación que no se nombran valen 10 en las dos versiones
+        // Los criterios de la simulación que no se nombran valen 10 en todas las versiones
+        String nombrados = Arrays.stream(criterios).map(c -> "'" + c[0] + "'")
+                .collect(Collectors.joining(", "));
         jdbc.update("""
                 insert into peso_criterio (version_pesos_id, nivel_puesto_codigo, criterio_id, peso)
                 select ?, 'EJECUCION', c.id, 10 from criterio c
                  where c.etapa_codigo = 'SIMULACION' and c.version_plantilla_prueba_id is null
-                   and c.codigo not in ('SIM_EJECUCION', 'SIM_CALIDAD')""", id);
+                   and c.codigo not in (%s)""".formatted(nombrados), id);
         for (String[] criterio : criterios) {
             jdbc.update("""
                     insert into peso_criterio (version_pesos_id, nivel_puesto_codigo, criterio_id, peso)
@@ -372,7 +516,19 @@ class FlujoPesosConCandidatosIT {
                 BigDecimal.class, postulacion);
     }
 
+    private void cambiarA(long version) throws Exception {
+        con(post("/api/v1/panel/vacantes/" + vacante + "/version-pesos"),
+                "{\"versionPesosId\": %d}".formatted(version), 200);
+    }
+
     // ---- Lo que se lee ----
+
+    private BigDecimal notaDeSimulacion(long postulacion, String codigo) {
+        return jdbc.queryForObject("""
+                select nc.puntaje from nota_criterio nc join criterio c on c.id = nc.criterio_id
+                 where nc.postulacion_id = ? and c.codigo = ? and c.version_plantilla_prueba_id is null""",
+                BigDecimal.class, postulacion, codigo);
+    }
 
     private BigDecimal nota(long postulacion, String etapa) {
         return jdbc.queryForObject("select puntaje from nota_etapa where postulacion_id = ? and "

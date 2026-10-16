@@ -94,10 +94,23 @@ public class CalificacionPorCriterio {
 
     /** El máximo de cada criterio de la rúbrica, resuelto para la vacante de esta postulación. */
     public Map<Long, BigDecimal> maximosDe(Long postulacionId, List<Criterio> rubrica) {
+        return maximosDe(postulacionId, rubrica, false);
+    }
+
+    /**
+     * @param paraEscribir si con esos máximos se va a poner una nota: entonces la vacante se
+     *                     pide con su cerrojo, antes que nada (QA-02, ver
+     *                     {@link VacanteRepository#bloquearParaCalificar})
+     */
+    private Map<Long, BigDecimal> maximosDe(Long postulacionId, List<Criterio> rubrica,
+                                            boolean paraEscribir) {
         Postulacion postulacion = postulaciones.findById(postulacionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Postulación", "id", postulacionId));
         Vacante vacante = vacantes.findById(postulacion.getVacanteId())
                 .orElseThrow(() -> new IllegalStateException("La vacante de esta postulación ya no existe"));
+        if (paraEscribir) {
+            vacantes.bloquearParaCalificar(vacante);
+        }
         String nivel = puestos.findById(vacante.getPuestoId())
                 .map(Puesto::getNivelPuestoCodigo)
                 .orElseThrow(() -> new IllegalStateException("La vacante apunta a un puesto que no existe"));
@@ -112,6 +125,11 @@ public class CalificacionPorCriterio {
      *
      * <p>La explicación es obligatoria siempre — lo exige el contrato y lo exige la base. Si es
      * una corrección, además queda registrado quién la cambió y por qué.
+     *
+     * <p>Además de {@code puntaje} se apunta la nota tal como se puso y sobre cuánto (V75): si
+     * después cambian los pesos de la vacante, el recálculo parte de ahí y no de la última
+     * reescalada (QA-01). El máximo se lee con la vacante bloqueada, para que un cambio de
+     * pesos a mitad no deje una nota en la escala vieja (QA-02).
      */
     @Transactional
     public void ponerNota(ContextoUsuario quien, Long postulacionId, List<Criterio> rubrica,
@@ -122,7 +140,7 @@ public class CalificacionPorCriterio {
                 .orElseThrow(() -> new IllegalArgumentException(
                         "Ese criterio no pertenece a la rúbrica de esta etapa"));
 
-        BigDecimal maximo = maximosDe(postulacionId, rubrica).get(criterioId);
+        BigDecimal maximo = maximosDe(postulacionId, rubrica, true).get(criterioId);
         BigDecimal valor = BigDecimal.valueOf(puntaje);
         if (valor.compareTo(BigDecimal.ZERO) < 0 || (maximo != null && valor.compareTo(maximo) > 0)) {
             throw new IllegalArgumentException(
@@ -137,6 +155,8 @@ public class CalificacionPorCriterio {
                         .build());
         boolean esCorreccion = fila.getId() != null;
         fila.setPuntaje(valor);
+        fila.setPuntajeOriginal(valor);
+        fila.setMaximoOriginal(maximo);
         fila.setExplicacion(explicacion);
         // Quien la pone a mano es una persona. Cuando el agente exista, entrará como AGENTE,
         // y lo que RENASER OS alimente solo, como AUTOMATICO (RF-111).
@@ -157,9 +177,17 @@ public class CalificacionPorCriterio {
      * sumar los puntajes obtenidos da directamente la nota. La nota queda atada a la versión de
      * pesos <b>de la vacante</b>, no a la última publicada: es lo que permite reconstruir una
      * decisión vieja tal como se tomó (RF-114).
+     *
+     * <p>⚠️ La vacante se pide lo primero y con su cerrojo (QA-02): si un cambio de pesos está
+     * reescalando estas mismas notas, se espera a que termine y se suman las suyas, con su
+     * versión. Leídas antes, se sumarían las de la escala vieja y se firmarían con la nueva.
      */
     @Transactional
     public BigDecimal calcularNotaEtapa(Postulacion postulacion, String etapaCodigo, List<Criterio> rubrica) {
+        Vacante vacante = vacantes.findById(postulacion.getVacanteId())
+                .orElseThrow(() -> new IllegalStateException("La vacante de esta postulación ya no existe"));
+        vacantes.bloquearParaCalificar(vacante);
+
         Map<Long, NotaCriterio> puestas = notasCriterio.findByPostulacionId(postulacion.getId()).stream()
                 .collect(Collectors.toMap(NotaCriterio::getCriterioId, Function.identity()));
 
@@ -174,9 +202,6 @@ public class CalificacionPorCriterio {
         BigDecimal nota = rubrica.stream()
                 .map(c -> puestas.get(c.getId()).getPuntaje())
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        Vacante vacante = vacantes.findById(postulacion.getVacanteId())
-                .orElseThrow(() -> new IllegalStateException("La vacante de esta postulación ya no existe"));
 
         NotaEtapa fila = notasEtapa.findByPostulacionIdAndEtapaCodigo(postulacion.getId(), etapaCodigo)
                 .orElseGet(() -> NotaEtapa.builder()

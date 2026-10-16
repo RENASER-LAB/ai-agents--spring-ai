@@ -127,6 +127,41 @@ class ServicioEvaluacionImplTest {
     }
 
     @Test
+    @DisplayName("entregar el banco pide la vacante —y relee la postulación— antes de tocar la "
+            + "evaluación o la postulación, y la nota de lo cerrado se escribe después (QA-03, QA-04)")
+    void alEntregarLaVacanteAntesQueNada() {
+        /*
+          La nota de lo cerrado dice con qué versión de pesos se calculó. Si la vacante se
+          pidiera al escribirla, con la evaluación y la postulación ya escritas, un cambio de
+          pesos —que bloquea la vacante y luego reescribe las postulaciones— y esta entrega se
+          esperarían el uno al otro.
+        */
+        when(postulaciones.findByUuid(CODIGO)).thenReturn(Optional.of(Postulacion.builder()
+                .id(50L).uuid(CODIGO).usuarioId(CANDIDATA.usuarioId()).vacanteId(40L)
+                .evaluacionId(60L).build()));
+        when(evaluaciones.findById(60L)).thenReturn(Optional.of(Evaluacion.builder()
+                .id(60L).usuarioId(CANDIDATA.usuarioId()).estado("EN_CURSO")
+                .iniciadaEn(Instant.now()).plantillaEvaluacionId(3L).build()));
+        when(evaluaciones.estadoBloqueandoLaFila(60L)).thenReturn("EN_CURSO");
+        when(ordenes.findByEvaluacionIdOrderByPosicion(60L))
+                .thenReturn(List.of(OrdenPregunta.builder().build()));
+        when(respuestas.findByEvaluacionId(60L)).thenReturn(List.of(Respuesta.builder().build()));
+
+        servicio.entregar(CANDIDATA, CODIGO);
+
+        org.mockito.InOrder orden = org.mockito.Mockito.inOrder(vacantes, evaluaciones, maquina,
+                calificacion);
+        orden.verify(vacantes).bloquearParaCalificarYReleer(
+                org.mockito.ArgumentMatchers.argThat(p -> p.getId() == 50L));
+        orden.verify(evaluaciones).estadoBloqueandoLaFila(60L);
+        orden.verify(evaluaciones).save(any());
+        orden.verify(maquina).transicionar(any(Postulacion.class),
+                org.mockito.ArgumentMatchers.eq("PERFIL_CALIFICANDO"), any(), any(),
+                org.mockito.ArgumentMatchers.eq(true), org.mockito.ArgumentMatchers.eq(false), any());
+        orden.verify(calificacion).calificarLoCerrado(50L);
+    }
+
+    @Test
     @DisplayName("Lo que respondió con detalle vuelve tal cual, para poder retomar")
     void elDetalleGuardadoVuelve() {
         prepararExamen(

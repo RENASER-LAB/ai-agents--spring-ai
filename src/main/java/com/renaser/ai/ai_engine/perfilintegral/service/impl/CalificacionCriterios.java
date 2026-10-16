@@ -151,6 +151,10 @@ public class CalificacionCriterios {
         Vacante vacante = vacantes.findById(postulacion.getVacanteId())
                 .orElseThrow(() -> new IllegalStateException(
                         "La vacante de esta postulación ya no existe"));
+        // Con su cerrojo, antes de escribir la nota: un cambio de pesos a mitad termina antes
+        // y esta sale ya con las dimensiones nuevas (QA-02). Lo leído hasta aquí son las
+        // notas de las respuestas, que no dependen de los pesos.
+        vacantes.bloquearParaCalificar(vacante);
         Map<String, BigDecimal> pesoDelIndice = pesosDimension
                 .findByVersionPesosId(vacante.getVersionPesosId()).stream()
                 .filter(pd -> banco.getNivelPuestoCodigo().equals(pd.getNivelPuestoCodigo()))

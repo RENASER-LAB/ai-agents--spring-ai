@@ -400,6 +400,12 @@ public class ServicioPruebaImpl implements ServicioPrueba {
         for (IntentoPrueba intento : vencidos) {
             Postulacion postulacion = porId.get(intento.getPostulacionId());
             if (postulacion == null) continue;
+            // Su vacante antes que su intento, en cada vuelta y para todos: la tanda es una sola
+            // transacción, y un intento ya escrito antes de pedir su vacante se cruzaría con
+            // quien la tenga bloqueada y espere a ese intento (QA-03, ver cerrarIntento). Y la
+            // postulación releída tras esperar (QA-04): la tanda la leyó al empezar, y lo que
+            // sigue —si ya terminó, moverla— se decide con la fila de ahora.
+            vacantes.bloquearParaCalificarYReleer(postulacion);
             /*
              * ⚠️ **A quien ya terminó no se le entrega nada**, y sin esto el barrido entero
              * se caía.
@@ -496,6 +502,16 @@ public class ServicioPruebaImpl implements ServicioPrueba {
     }
 
     private void cerrarIntento(IntentoPrueba intento, Postulacion postulacion, boolean automatica) {
+        // La vacante primero, antes de tocar el intento o la postulación (QA-03). Una prueba del
+        // editor puede quedar entera al entregar, y entonces su nota se escribe aquí mismo con
+        // la versión de pesos de la vacante: con un cambio de pesos a mitad, se espera a que
+        // confirme. Pedirla después de mover la postulación sería el cruce con ese cambio, que
+        // bloquea la vacante y luego reescribe las postulaciones. Ver CerrojoDeLosPesos.
+        //
+        // La postulación sale releída (QA-04): se cargó antes de esperar, y si el cambio
+        // confirmó en ese rato le reescribió el grupo. Moverla a «calificando» parte de la fila
+        // de ahora y solo escribe su estado.
+        vacantes.bloquearParaCalificarYReleer(postulacion);
         intento.setEntregadoEn(Instant.now());
         intento.setEsEntregaAutomatica(automatica);
         intentos.save(intento);

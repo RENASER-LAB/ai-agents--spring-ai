@@ -585,7 +585,7 @@ public class PuenteCalificacionIaImpl implements PuenteCalificacionIa {
      */
     private void recalcularNotaYGrupo(Long postulacionId) {
         Postulacion postulacion = postulacion(postulacionId);
-        Vacante vacante = vacante(postulacion);
+        Vacante vacante = vacanteParaCalificar(postulacion);
         Puesto puesto = puesto(vacante);
         BigDecimal nota = recalcularNotaDeLaEtapa(postulacionId, vacante, puesto);
 
@@ -808,7 +808,7 @@ public class PuenteCalificacionIaImpl implements PuenteCalificacionIa {
     public void cerrarPerfilIntegral(Long postulacionId, Long ejecucionIaId,
                                      ResultadoPerfil resultado) {
         Postulacion postulacion = postulacion(postulacionId);
-        Vacante vacante = vacante(postulacion);
+        Vacante vacante = vacanteParaCalificar(postulacion);
         Puesto puesto = puesto(vacante);
 
         if (resultado == null || resultado.confianzaEvidencia() == null) {
@@ -1179,8 +1179,30 @@ public class PuenteCalificacionIaImpl implements PuenteCalificacionIa {
     }
 
     private Vacante vacante(Postulacion postulacion) {
+        return conVersionDePesos(vacantes.findById(postulacion.getVacanteId())
+                .orElseThrow(() -> new IllegalStateException("La vacante de esta postulación ya no existe")));
+    }
+
+    /**
+     * La vacante para escribir la nota del Perfil Integral: con la versión de pesos
+     * confirmada y sin que un cambio de pesos pueda colarse a mitad (QA-02). Va lo primero,
+     * antes de leer o escribir ninguna nota: ver {@link
+     * com.renaser.ai.ai_engine.vacante.repository.CerrojoDeLosPesos}.
+     *
+     * <p>Y deja {@code postulacion} releída tras el cerrojo (QA-04): se cargó antes de esperar,
+     * y si un cambio de pesos confirmó en ese rato, su grupo en memoria es el de la versión
+     * vieja. El grupo que se calcule aquí se compara con la fila de verdad —con la foto de
+     * antes, uno que coincidiera con ella no se escribiría— y {@code sigueEnLaEtapa} mira el
+     * estado en que el equipo la dejó.
+     */
+    private Vacante vacanteParaCalificar(Postulacion postulacion) {
+        vacantes.bloquearParaCalificarYReleer(postulacion);
         Vacante vacante = vacantes.findById(postulacion.getVacanteId())
                 .orElseThrow(() -> new IllegalStateException("La vacante de esta postulación ya no existe"));
+        return conVersionDePesos(vacante);
+    }
+
+    private static Vacante conVersionDePesos(Vacante vacante) {
         if (vacante.getVersionPesosId() == null) {
             throw new IllegalStateException(
                     "La vacante no tiene versión de pesos: sin ella la nota no se puede atar a nada");

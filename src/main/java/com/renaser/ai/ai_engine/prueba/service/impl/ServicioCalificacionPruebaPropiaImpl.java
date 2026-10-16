@@ -255,6 +255,9 @@ public class ServicioCalificacionPruebaPropiaImpl implements ServicioCalificacio
             throw new IllegalStateException("Esta prueba todavía no está entregada: calificarla "
                     + "ahora sería ponerle nota a lo que lleva a medias.");
         }
+        // Antes de tocar sus notas: si con este ajuste la prueba queda entera, la nota de la
+        // etapa sale con la versión de pesos que la vacante tenga al confirmar (QA-03).
+        cierre.esperarAlCambioDePesos(intento);
         Resultado r = calculo.calcular(intento);
         CriterioDeLaPrueba criterio = r.criterios().stream()
                 .filter(c -> c.criterio().getId().equals(criterioId))

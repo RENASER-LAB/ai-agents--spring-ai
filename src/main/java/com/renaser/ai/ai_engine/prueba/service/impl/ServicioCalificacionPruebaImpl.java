@@ -461,6 +461,7 @@ public class ServicioCalificacionPruebaImpl implements ServicioCalificacionPrueb
         // palanca que tiene con la prueba del puesto — pedirlo cuando ya están las notas.
         Optional<IntentoPrueba> delEditor = delEditor(postulacion.getId());
         if (delEditor.isPresent()) {
+            cierre.esperarAlCambioDePesos(delEditor.get());
             BigDecimal nota = cierre.recalcular(delEditor.get(), false);
             if (nota == null) {
                 throw new IllegalStateException("Todavía no se puede poner la nota: falta la "

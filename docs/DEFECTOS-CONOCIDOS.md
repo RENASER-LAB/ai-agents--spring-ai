@@ -14,7 +14,7 @@ haría falta para arreglarlo**. Sin lo tercero, una lista así solo sirve para p
 **Los números no se corren ni se reutilizan.** Otros documentos citan las entradas por su número,
 así que la que se cierra deja su hueco.
 
-Última revisión: **13/10/2026**.
+Última revisión: **16/10/2026**.
 
 ---
 
@@ -28,6 +28,12 @@ enunciado no abre**. No hay enunciado, no hay prueba.
 > «Nada antes del reloj»). Lo de abajo sigue valiendo para lo que guarda `url_consigna` y para
 > los correos que ya salieron. Esos tienen además el problema contrario: **los enviados antes del
 > 03/10/2026 llevan el enlace largo, que todavía abre el PDF sin empezar la prueba**.
+>
+> **Desde la `V74` (16/10/2026) solo queda en las plantillas.** El editor de la prueba guarda el
+> archivo y ya no fabrica ningún enlace, `version_banco.url_consigna` se vació y el portal abre el
+> adjunto con uno fresco. Lo de abajo vale para `version_plantilla_prueba.url_consigna`, que la
+> `V74` no tocó porque allí no hay archivo. Y el caso de la copia ya no se da: el copiador de
+> instrumentos no copia pruebas.
 
 **Por qué pasa.** El enunciado se sube al almacén y **el enlace se firma en ese momento, para 180
 días**, y se guarda ya firmado en `version_plantilla_prueba.url_consigna`. El correo no vuelve a
@@ -394,6 +400,78 @@ dato. Se dejó así en esa entrega.
 
 **Qué haría falta.** Que esas tres rutas lean la vacante con el mismo bloqueo que las demás
 (`VacanteRepository.bloquear`).
+
+---
+
+## 17 · Muchas notas a mano a la vez dejan al backend sin conexiones, y el pase automático se pierde
+
+**Qué le pasa a alguien.** En una vacante con «calificar y avanzar sola», el equipo pone a la vez
+muchas notas del Perfil Integral —24 a 36 peticiones en paralelo—. Durante unos 30 segundos el
+backend se queda sin conexiones a la base: parte de esas notas, y cualquier otra petición que
+llegue en ese rato —el tablón público del portal incluido—, responden **500** a los 30 segundos. Y
+a quien con su nota nueva llegaba a la mínima **el pase automático no lo mueve**: se queda en «por
+confirmar» y lo tiene que pasar el equipo. Las notas que respondieron 200 quedan guardadas.
+
+**Por qué pasa.** Viene de main, del pase automático de la `V72` (PR #120), no del cambio de
+pesos. Al confirmarse una nota recalculada, `PaseAutomaticoTrasCalificar` corre con la conexión de
+esa transacción todavía atada al hilo, y `PaseAutomatico` abre otra (`REQUIRES_NEW`) para mover a
+la persona. Cada petición retiene una conexión y pide la segunda: con el pool lleno, todas esperan
+una que nadie suelta hasta que vence la espera. El registro lo dice con «Connection is not
+available, request timed out» y «PASE_AUTOMATICO: la postulación N se queda esperando a una
+persona».
+
+**Cuándo aparece.** Medido por QA el 16/10/2026 contra el clon del harness, con 10 conexiones y 30
+segundos de espera, sin ningún interbloqueo en la base: sin cambios de pesos, nunca con 9 a 12
+notas a la vez y siempre con 24 a 36. Con cambios de pesos reales al mismo tiempo apareció ya con
+12 notas sobre la misma persona (2 de 5 rondas), porque mientras el cambio corre cada nota espera
+al cerrojo de los pesos con su conexión tomada. El perfil `pruebas` pone 12 conexiones y 10
+segundos de espera, y con ese tamaño no se midió.
+
+**Qué haría falta.** Que el pase no retenga una conexión mientras pide otra —soltar la de la nota
+antes de mover a la persona, por ejemplo encolando el pase— y repetir la medición. Subir el pool
+solo mueve el umbral. Es otra spec.
+
+---
+
+## 18 · Dos escrituras del mismo dato de una postulación a la vez: gana la última, con lo que leyó
+
+**Qué le pasa a alguien.** Dos caminos que no son un cambio de pesos escriben a la vez la misma
+columna de la misma postulación —por ejemplo, dos que rehacen el grupo de prioridad de la misma
+persona— y el que confirma el último deja su valor, calculado con lo que leyó antes de que el
+otro confirmara. Ningún caso de la QA lo produjo: se sabe por cómo está construido.
+
+**Por qué pasa.** Lo que se arregló con el cambio de pesos (`V74`) ordena lo que choca con ese
+cambio: quien escribe una nota toma el cerrojo compartido de la vacante (`FOR SHARE`) y espera al
+cambio, o el cambio lo espera a él, y después relee la postulación. Pero dos cerrojos compartidos
+no se esperan entre sí, y `@DynamicUpdate` en `Postulacion` solo impide pisar columnas que el otro
+no tocaba. Dos escrituras del mismo dato siguen sin orden, como en la vacante con el defecto 16. Se
+dejó así en esa entrega. Las reglas, en [Reglas del código](REGLAS-DEL-CODIGO.md).
+
+**Qué haría falta.** Ordenar las escrituras de la misma postulación —bloquear su fila al
+escribirla, o comprobar al guardar que nadie la cambió en medio— en los caminos que escriben el
+grupo o el estado, y medir antes cuánto frena eso las notas en paralelo, que hoy no se esperan.
+
+---
+
+## 19 · La nota de la IA que cierra la prueba del editor no se ha probado con un cambio de pesos a mitad
+
+**Qué no se sabe.** Que la nota que pone la IA a la prueba del editor, si llega mientras alguien
+cambia los pesos de la vacante, salga con la versión nueva y no pise nada. Los demás caminos que
+escriben una nota con un cambio a mitad —el ajuste a mano, las entregas de la prueba y de la
+evaluación, el barrido de vencidas, el avance y el descarte del equipo— los cubren las pruebas de
+integración de carrera (`FlujoPesosConCandidatosIT`, `MientrasCambianLosPesosIT` y
+`NotasQueSeCierranConCambioDePesosIT`) o los reprodujo QA en vivo. Este no.
+
+**Por qué.** La IA va apagada en el preview del harness, así que QA no pudo ejercitarla, y no hay
+prueba de integración que la cruce con un cambio. Lo que sí se revisó en el código:
+`PuentePruebaIaImpl.guardarNotasPruebaPropia` abre su propia transacción, toma el cerrojo de los
+pesos (`CierreDeLaPruebaPropia.esperarAlCambioDePesos`) antes de tocar ninguna nota y cierra por
+`cierre.recalcular`, el mismo camino que la nota a mano que sí se probó; no escribe el grupo, y
+con `@DynamicUpdate` su paso a «por confirmar» solo escribe el estado y `movido_en`.
+
+**Qué haría falta.** Una prueba de integración con el agente simulado que entregue la nota de la
+IA mientras otra sesión retiene un cambio de pesos, como las de `MientrasCambianLosPesosIT`. O
+comprobarlo a mano con un backend local con la cola y la IA encendidas.
 
 ---
 

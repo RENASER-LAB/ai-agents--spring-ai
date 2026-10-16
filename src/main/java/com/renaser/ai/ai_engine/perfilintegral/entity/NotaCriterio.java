@@ -20,6 +20,12 @@ public class NotaCriterio {
     private Long postulacionId;
     private Long criterioId;
     private BigDecimal puntaje;
+    // La nota tal como se puso y sobre cuánto (V75). En la simulación y la validación,
+    // `puntaje` va en la escala del peso del criterio y se recalcula desde estas dos al
+    // cambiar los pesos de la vacante: ellas no cambian, y volver a la versión de antes
+    // devuelve la misma nota (QA-01). Vacías en las filas que nadie ha reescalado todavía.
+    private BigDecimal puntajeOriginal;
+    private BigDecimal maximoOriginal;
     private String explicacion;
     private String origen;
     private BigDecimal confianza;

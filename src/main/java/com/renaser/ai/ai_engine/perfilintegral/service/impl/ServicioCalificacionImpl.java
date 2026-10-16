@@ -463,6 +463,10 @@ public class ServicioCalificacionImpl implements ServicioCalificacion {
     private void guardarNota(Postulacion postulacion, BigDecimal nota) {
         Vacante vacante = vacantes.findById(postulacion.getVacanteId())
                 .orElseThrow(() -> new IllegalStateException("La vacante de esta postulación ya no existe"));
+        // Con el cerrojo de los pesos (QA-03): esta nota no depende de ellos, pero dice con qué
+        // versión se calculó, y en mitad de un cambio salía con la de antes. La entrega ya lo
+        // pidió al empezar, así que aquí no espera a nadie. Ver CerrojoDeLosPesos.
+        vacantes.bloquearParaCalificar(vacante);
         VersionPesos version = versionesPesos.findById(vacante.getVersionPesosId())
                 .orElseThrow(() -> new IllegalStateException(
                         "La versión de pesos de esta vacante ya no existe"));

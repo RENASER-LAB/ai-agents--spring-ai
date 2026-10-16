@@ -35,7 +35,7 @@ para que el navegador hable directamente con el almacén.
 |---|---|---|
 | **Enlace de descarga** | El navegador se baja el currículum del bucket. El backend no lo toca | 5 minutos |
 | **Enlace de subida** | El navegador manda el archivo al bucket. El backend no lo toca | 2 horas (lo fija Supabase) |
-| **Enlace del enunciado** | Se guarda con la versión de la prueba (`url_consigna`). El correo de la prueba lo mandaba al candidato; **desde el 10/10/2026 ya no** (`{{enlacePrueba}}` va vacía): el caso se lee al empezar, en el portal | 180 días (`dias-enlace-consigna`) |
+| **Enlace del enunciado** | Solo en las plantillas de prueba: se guarda con su versión (`version_plantilla_prueba.url_consigna`). El correo de la prueba lo mandaba al candidato; **desde el 10/10/2026 ya no** (`{{enlacePrueba}}` va vacía): el caso se lee al empezar, en el portal. **Desde la `V74` el editor de la prueba no lo fabrica**: guarda el archivo, que se abre con el enlace de descarga, fresco cada vez | 180 días (`dias-enlace-consigna`) |
 | **Enlace del Excel del ranking** | Es el que se escribe **dentro** de la hoja, en la columna «CV» | 8 horas (`horas-enlace-volcado`) |
 
 Duran poco a propósito. **El enlace no vuelve a preguntar quién eres**: el permiso se comprueba

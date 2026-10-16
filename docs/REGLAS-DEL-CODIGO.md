@@ -94,7 +94,34 @@ salgan con candado). Está escrito en el javadoc de ambas.
   dos archivos distintos y los fusiona sin avisar; quien se entera es Flyway al arrancar. Hay una
   prueba que lo caza (`MigracionesSinChoqueTest`), pero cada rama pasa el CI en verde por su
   cuenta: solo salta cuando la segunda se fusiona.
-- **Nada se recalcula hacia atrás.** Cada nota queda atada a la versión de pesos de su vacante.
+- **Nada se recalcula hacia atrás por su cuenta.** Cada nota queda atada a la versión de pesos de
+  su vacante. La única vía para cambiarla es cambiar la versión de la vacante (`V74`), que
+  recalcula a todos a la vez por `RecalculoConOtrosPesos`, sin IA, sin máquina de estados y sin
+  tocar `decision`. Ver [Una vacante, una versión](DECISION-UNA-VACANTE-UNA-VERSION.md).
+- **Quien escribe una nota que depende de los pesos, o que dice con qué versión se calculó, toma
+  primero el cerrojo de la vacante** (`VacanteRepository`, fragmento `CerrojoDeLosPesos`:
+  `bloquearParaCalificar`, `…PorId` o `…YReleer`, un `FOR SHARE` hasta el final de la
+  transacción). Cambiar los pesos bloquea la vacante, pone la versión nueva y reescribe notas y
+  postulaciones en una transacción; una nota que leyera la vacante sin esperar saldría con la
+  versión de antes y pisaría lo recalculado. Tres reglas, cada una de un ciclo de QA:
+  - **La vacante antes que nada**: antes de leer o escribir ninguna nota, intento, evaluación o
+    postulación. Pedirla después de escribir una de esas filas es el cruce con el cambio, que
+    espera a esa fila mientras tú esperas a la vacante.
+  - **Quien mueve la postulación antes de escribir la nota** —entregar la prueba o la evaluación,
+    el barrido de vencidas, el ajuste a mano y la IA que cierran la prueba del editor— toma el
+    cerrojo **al empezar**, con `bloquearParaCalificarYReleer`; el segundo, ya al escribir la
+    nota, no espera a nadie.
+  - **Lo que se escribe después de esperar parte de la fila releída**: `…YReleer` vuelca lo
+    pendiente y relee la postulación con el cerrojo puesto, porque la de memoria trae el grupo
+    de antes del cambio y no ve lo que el equipo hizo en ese rato.
+
+  Los `FOR SHARE` no se esperan entre sí: dos notas a la vez no se frenan. Un camino nuevo que
+  escriba `nota_etapa`, `nota_criterio`, `perfil_talento` o el grupo entra por el mismo sitio.
+- **`Postulacion` lleva `@DynamicUpdate`**, como `Vacante`: cada guardado escribe solo las
+  columnas que cambió. La fila la escriben a la vez la máquina de estados (estado, `movido_en`,
+  motivo de cierre) y el recálculo del Perfil Integral (grupo); con el `UPDATE` de la fila entera,
+  el último en confirmar devolvía la columna del otro a lo que leyó. **No ordena dos escrituras
+  del mismo dato**: eso sigue abierto, ver el 18 de [Defectos conocidos](DEFECTOS-CONOCIDOS.md).
 - **Los bancos y las versiones se archivan, no se borran** (RF-138). Publicada, una versión no
   vuelve a borrador; la salida a un error es una versión nueva.
 - **`ServicioContexto` no lleva caché.** Desde la V40 el reparto de permisos se edita por API y
@@ -138,7 +165,8 @@ está en su classpath, así que `integracion/soporte/RespuestaV3` usa la 2 a pro
 | La nota combinada de la evaluación | `ServicioCalificacion.notaCombinada`. Mezclar lo cerrado con lo abierto es una interpretación sin confirmar con el cliente: el día que cambie tiene que cambiar a la vez para la nota de la etapa y para lo que ve el panel |
 | Cómo se cuentan los inscritos de una sesión | `ServicioSimulacionImpl.contarInscritos`. La lista, el detalle y `/inscritos` se separaron tres veces seguidas; mientras hubiera dos implementaciones, arreglar una dejaba la otra rota |
 | El nombre de un candidato respetando la anonimización | `NombresDeUsuarios`: sin usuario, sin persona o con la persona borrada devuelve `(anonimizado)`, nunca una cadena vacía |
-| Qué instrumento (banco, pesos, plantillas, pruebas) lee cada empresa | `organizacion/service/DuenoDelInstrumento`. Es el único punto que interpreta las banderas de personalización |
+| Qué pesos y qué plantillas de evaluación lee cada empresa | `organizacion/service/DuenoDelInstrumento`. Es el único punto que interpreta las banderas de personalización. **Desde la `V74` no resuelve el banco ni las pruebas**: ya no son valores de `Instrumento`, se piden por la organización de quien pregunta, y una vacante de antes que leía el banco de RENASER lo tiene en `vacante.version_banco_fija_id` |
+| Rehacer las notas de toda una vacante cuando cambia su versión de pesos (`V74`) | `perfilintegral/service/RecalculoConOtrosPesos`, llamado solo desde `ServicioPesosDeLaVacanteImpl`, dentro de su transacción. El Perfil Integral va por `PuenteCalificacionIa.recalcularConOtrosPesos`, que es `recalcularSinMover` **sin publicar `NotaDelPerfilRecalculada`**: con el aviso, el pase automático movería a gente por un cambio de pesos. La simulación y la validación se reescalan desde `puntaje_original` (`V75`) y se suman con `calcularNotaEtapa` |
 | La nota de la etapa de la prueba | `ponderarSiLaRubricaEstaEntera`: suma solo si todos los criterios tienen puntaje. Ver [Prueba del puesto](PRUEBA-DEL-PUESTO.md) |
 | La nota de las preguntas propias de una vacante (`V66`) | `perfilintegral/service/CalificacionPorPuntos`, calculada al leer. La usan la nota de lo cerrado al entregar, la del Perfil Integral, el desglose de la ficha, lo que recibe el evaluador y el cambio de puntos: si cada uno sumara por su cuenta, la ficha y el ranking dirían cifras distintas |
 | Qué puede guardarse y publicarse en las preguntas propias (`V66`) | `perfilintegral/service/ReglasDePuntos`. Lo usan guardar una pregunta, publicar, cambiar los puntos y validar lo que propone la IA; con una copia en cada uno, el editor dejaría guardar algo que la publicación rechaza por otra razón |

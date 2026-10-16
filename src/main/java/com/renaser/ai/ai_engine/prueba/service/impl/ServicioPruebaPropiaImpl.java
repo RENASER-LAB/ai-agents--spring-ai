@@ -521,6 +521,9 @@ public class ServicioPruebaPropiaImpl extends EditorDeVersionPropia implements S
     @Transactional
     public CambioAplicado cambiarPuntos(ContextoUsuario quien, Long vacanteId, CambiarPuntosDePrueba datos) {
         Vacante vacante = laEditable(quien, vacanteId);
+        // Antes de reescribir ninguna nota: las de la etapa que se recalculan al final dicen
+        // con qué versión de pesos se calcularon (QA-03). Ver CerrojoDeLosPesos.
+        vacantes.bloquearParaCalificar(vacante);
         VersionBanco publicada = laPublicada(vacante);
         exigirQueNoHayaRecalificacionEnCurso(guiasDeLaIa(vacante, publicada).keySet());
 

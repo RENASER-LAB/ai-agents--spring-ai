@@ -169,6 +169,10 @@ class RecalculoConOtrosPesosTest {
         assertThat(ejecucion.getPuntaje()).isEqualByComparingTo("12");    // 8/10 × 15
         assertThat(resultado.getPuntaje()).isEqualByComparingTo("16");    // 20/25 × 20
         assertThat(aMitad.getPuntaje()).isEqualByComparingTo("7.5");      // 5/10 × 15
+        // Lo que se puso queda apuntado con el máximo de entonces, para el próximo cambio
+        assertThat(ejecucion.getPuntajeOriginal()).isEqualByComparingTo("8");
+        assertThat(ejecucion.getMaximoOriginal()).isEqualByComparingTo("10");
+        assertThat(delCurriculum.getPuntajeOriginal()).isNull();
         // El currículum no se reescala: la IA puso 0..100 y su peso es un peso, no un máximo
         assertThat(delCurriculum.getPuntaje()).isEqualByComparingTo("64");
         verify(porCriterio).calcularNotaEtapa(eq(conSimulacion), eq("SIMULACION"), anyList());
@@ -241,18 +245,104 @@ class RecalculoConOtrosPesosTest {
     }
 
     @Test
-    @DisplayName("reescalar: proporcional; sin peso nuevo se queda; sin peso viejo se acota")
-    void reescalar() {
-        assertThat(RecalculoConOtrosPesos.reescalada(new BigDecimal("8"), BigDecimal.TEN,
+    @DisplayName("QA-01 · ir a otros pesos y volver deja la simulación como la puso el facilitador, "
+            + "aunque se redondee y un criterio pase por peso 0 (AC-03)")
+    void idaYVueltaDejaLaSimulacionComoEstaba() {
+        // Versión 2: ejecución 15, calidad 15, aprendizaje 10. Versión 3: 20, 10 y 0.
+        Long calidad = 502L;
+        Long aprendizaje = 503L;
+        when(porCriterio.rubricaGlobalDe("SIMULACION")).thenReturn(List.of(
+                Criterio.builder().id(SIM_EJECUCION).build(), Criterio.builder().id(calidad).build(),
+                Criterio.builder().id(aprendizaje).build()));
+        when(pesosCriterio.findByVersionPesosIdAndNivelPuestoCodigo(ANTES, NIVEL)).thenReturn(List.of(
+                peso(SIM_EJECUCION, "15"), peso(calidad, "15"), peso(aprendizaje, "10")));
+        when(pesosCriterio.findByVersionPesosIdAndNivelPuestoCodigo(AHORA, NIVEL)).thenReturn(List.of(
+                peso(SIM_EJECUCION, "20"), peso(calidad, "10"), peso(aprendizaje, "0")));
+        Postulacion cata = postulacion(11L, null);
+        when(postulaciones.findByVacanteIdOrderByCreadoEnDesc(VACANTE)).thenReturn(List.of(cata));
+        when(notasEtapa.findByPostulacionIdIn(anyList()))
+                .thenReturn(List.of(nota(11L, "SIMULACION", "28")));
+        when(perfiles.findByPostulacionIdIn(anyList())).thenReturn(List.of());
+        // Filas de antes de la V75: no dicen todavía cómo se pusieron
+        NotaCriterio ejecucion = criterio(11L, SIM_EJECUCION, "15");
+        NotaCriterio enCalidad = criterio(11L, calidad, "7");
+        NotaCriterio enAprendizaje = criterio(11L, aprendizaje, "6");
+        when(notasCriterio.findByPostulacionIdIn(anyList()))
+                .thenReturn(List.of(ejecucion, enCalidad, enAprendizaje));
+
+        // Ida: de la 2 a la 3
+        recalculo.recalcular(vacante, ANTES, NIVEL);
+        assertThat(ejecucion.getPuntaje()).isEqualByComparingTo("20");
+        assertThat(enCalidad.getPuntaje()).isEqualByComparingTo("4.67");
+        assertThat(enAprendizaje.getPuntaje()).isEqualByComparingTo("0");
+        // Lo que se puso queda apuntado, con su máximo de entonces
+        assertThat(enCalidad.getPuntajeOriginal()).isEqualByComparingTo("7");
+        assertThat(enCalidad.getMaximoOriginal()).isEqualByComparingTo("15");
+        assertThat(enAprendizaje.getPuntajeOriginal()).isEqualByComparingTo("6");
+        assertThat(enAprendizaje.getMaximoOriginal()).isEqualByComparingTo("10");
+
+        // Vuelta: de la 3 a la 2, con las mismas filas ya reescaladas
+        Vacante deVuelta = Vacante.builder().id(VACANTE).versionPesosId(ANTES).build();
+        recalculo.recalcular(deVuelta, AHORA, NIVEL);
+        assertThat(ejecucion.getPuntaje()).isEqualByComparingTo("15");
+        assertThat(enCalidad.getPuntaje()).isEqualByComparingTo("7");
+        assertThat(enAprendizaje.getPuntaje()).isEqualByComparingTo("6");
+        // Y lo que se puso no se movió
+        assertThat(enCalidad.getPuntajeOriginal()).isEqualByComparingTo("7");
+        assertThat(enCalidad.getMaximoOriginal()).isEqualByComparingTo("15");
+
+        // Otra ida da exactamente lo mismo que la primera: no se acumula nada
+        recalculo.recalcular(vacante, ANTES, NIVEL);
+        assertThat(enCalidad.getPuntaje()).isEqualByComparingTo("4.67");
+        assertThat(enAprendizaje.getPuntaje()).isEqualByComparingTo("0");
+    }
+
+    @Test
+    @DisplayName("QA-01 · una nota que ya dice cómo se puso se calcula desde ahí, no desde la "
+            + "escala de la versión que la vacante dejaba (validación)")
+    void conLaNotaOriginalNoMiraLaVersionAnterior() {
+        when(postulaciones.findByVacanteIdOrderByCreadoEnDesc(VACANTE))
+                .thenReturn(List.of(postulacion(11L, null)));
+        when(notasEtapa.findByPostulacionIdIn(anyList()))
+                .thenReturn(List.of(nota(11L, "VALIDACION", "0")));
+        when(perfiles.findByPostulacionIdIn(anyList())).thenReturn(List.of());
+        // Puesta como 18 sobre 25 y hoy en 0 porque pasó por una versión con peso 0
+        NotaCriterio resultado = criterio(11L, VAL_RESULTADO, "0");
+        resultado.setPuntajeOriginal(new BigDecimal("18"));
+        resultado.setMaximoOriginal(new BigDecimal("25"));
+        when(notasCriterio.findByPostulacionIdIn(anyList())).thenReturn(List.of(resultado));
+
+        recalculo.recalcular(vacante, ANTES, NIVEL);
+
+        assertThat(resultado.getPuntaje()).isEqualByComparingTo("14.40");   // 18/25 × 20
+        assertThat(resultado.getPuntajeOriginal()).isEqualByComparingTo("18");
+        assertThat(resultado.getMaximoOriginal()).isEqualByComparingTo("25");
+        verify(notasCriterio).saveAll(List.of(resultado));
+        verify(porCriterio).calcularNotaEtapa(any(), eq("VALIDACION"), anyList());
+    }
+
+    @Test
+    @DisplayName("en la escala de ahora: proporcional; con el máximo de entonces, tal cual; sin "
+            + "peso ahora se queda como se puso; puesta sin peso se acota")
+    void enLaEscala() {
+        assertThat(RecalculoConOtrosPesos.enLaEscala(new BigDecimal("8"), BigDecimal.TEN,
                 new BigDecimal("15"))).isEqualByComparingTo("12");
-        assertThat(RecalculoConOtrosPesos.reescalada(new BigDecimal("8"), BigDecimal.TEN, null))
+        assertThat(RecalculoConOtrosPesos.enLaEscala(new BigDecimal("7"), new BigDecimal("15"),
+                BigDecimal.TEN)).isEqualByComparingTo("4.67");
+        // Con el máximo con que se puso, exactamente lo que se puso: ni un 7,01
+        assertThat(RecalculoConOtrosPesos.enLaEscala(new BigDecimal("7"), new BigDecimal("15"),
+                new BigDecimal("15"))).isEqualByComparingTo("7");
+        // Peso 0 ahora: vale 0, pero lo que se puso no se toca y vuelve con otro peso
+        assertThat(RecalculoConOtrosPesos.enLaEscala(new BigDecimal("6"), BigDecimal.TEN,
+                BigDecimal.ZERO)).isEqualByComparingTo("0");
+        assertThat(RecalculoConOtrosPesos.enLaEscala(new BigDecimal("8"), BigDecimal.TEN, null))
                 .isEqualByComparingTo("8");
-        assertThat(RecalculoConOtrosPesos.reescalada(BigDecimal.ZERO, BigDecimal.ZERO,
+        assertThat(RecalculoConOtrosPesos.enLaEscala(BigDecimal.ZERO, BigDecimal.ZERO,
                 new BigDecimal("15"))).isEqualByComparingTo("0");
-        assertThat(RecalculoConOtrosPesos.reescalada(new BigDecimal("30"), null,
+        assertThat(RecalculoConOtrosPesos.enLaEscala(new BigDecimal("30"), null,
                 new BigDecimal("15"))).isEqualByComparingTo("15");
         // Un criterio con peso 0 en las dos versiones no cambia nada
-        assertThat(RecalculoConOtrosPesos.reescalada(BigDecimal.ZERO, BigDecimal.ZERO,
+        assertThat(RecalculoConOtrosPesos.enLaEscala(BigDecimal.ZERO, BigDecimal.ZERO,
                 BigDecimal.ZERO)).isEqualByComparingTo("0");
     }
 

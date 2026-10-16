@@ -288,6 +288,55 @@ class PuenteCalificacionIaPorPuntosTest {
     }
 
     @Test
+    @DisplayName("QA-02 · un ajuste que llega con el cambio de pesos a mitad espera a que confirme "
+            + "y sale con la versión nueva, aunque la vacante se hubiera leído antes (AC-05)")
+    void unAjusteAMitadDelCambioSaleConLaVersionNueva() {
+        // El guardián del panel ya la había leído en la versión 2; el cambio a la 3 confirma
+        // mientras este ajuste espera al cerrojo, que relee la vacante y la postulación
+        Vacante leidaAntes = Vacante.builder().id(13L).versionPesosId(2L).puestoId(4L).build();
+        when(vacantes.findById(13L)).thenReturn(Optional.of(leidaAntes));
+        org.mockito.Mockito.doAnswer(i -> {
+            leidaAntes.setVersionPesosId(3L);
+            return null;
+        }).when(vacantes).bloquearParaCalificarYReleer(postulacion);
+        when(puestos.findById(4L)).thenReturn(Optional.of(Puesto.builder().id(4L)
+                .nivelPuestoCodigo("EJECUCION").build()));
+        when(calificacion.notaDelBancoPorPuntos(POSTULACION)).thenReturn(new ServicioCalificacion.NotaDelBanco(
+                new BigDecimal("80"), true, null, 0, null, Map.of()));
+        when(pesosComponente.findByVersionPesosId(3L)).thenReturn(List.of(
+                PesoComponentePerfil.builder().componente("CV").peso(new BigDecimal("20")).build(),
+                PesoComponentePerfil.builder().componente("EVALUACION").peso(new BigDecimal("20")).build()));
+        when(criterios.findByEtapaCodigoAndVersionPlantillaPruebaIdIsNullOrderByOrden("PERFIL_INTEGRAL"))
+                .thenReturn(List.of(Criterio.builder().id(1L).build(), Criterio.builder().id(2L).build()));
+        when(pesosCriterio.findByVersionPesosIdAndNivelPuestoCodigo(3L, "EJECUCION")).thenReturn(List.of(
+                PesoCriterio.builder().criterioId(1L).peso(BigDecimal.ZERO).build(),
+                PesoCriterio.builder().criterioId(2L).peso(new BigDecimal("15")).build()));
+        when(notasCriterio.findByPostulacionId(POSTULACION)).thenReturn(List.of(
+                NotaCriterio.builder().criterioId(1L).puntaje(new BigDecimal("50")).build(),
+                NotaCriterio.builder().criterioId(2L).puntaje(new BigDecimal("70")).build()));
+        // La fila, como la ve este ajuste: 61 con la versión de antes
+        NotaEtapa recalculada = NotaEtapa.builder().postulacionId(POSTULACION)
+                .etapaCodigo("PERFIL_INTEGRAL").puntaje(new BigDecimal("61")).versionPesosId(2L).build();
+        when(notasEtapa.findByPostulacionIdAndEtapaCodigo(POSTULACION, "PERFIL_INTEGRAL"))
+                .thenReturn(Optional.of(recalculada));
+        when(perfiles.findByPostulacionId(POSTULACION)).thenReturn(Optional.empty());
+        when(parametros.entero(any(), any(), org.mockito.ArgumentMatchers.anyInt())).thenReturn(80, 65);
+
+        puente.recalcularSinMover(POSTULACION);
+
+        // Con los pesos de la 3, no con los de la 2 que se leyeron antes: no pisa la recalculada
+        assertThat(recalculada.getPuntaje()).isEqualByComparingTo("75");
+        assertThat(recalculada.getVersionPesosId()).isEqualTo(3L);
+        assertThat(postulacion.getGrupoPrioridad()).isEqualTo("POTENCIAL_CON_RIESGO");
+        // El cerrojo va antes de leer ninguna nota
+        org.mockito.InOrder orden = org.mockito.Mockito.inOrder(vacantes, calificacion, notasEtapa);
+        orden.verify(vacantes).bloquearParaCalificarYReleer(postulacion);
+        orden.verify(calificacion).notaDelBancoPorPuntos(POSTULACION);
+        orden.verify(notasEtapa).save(recalculada);
+        verify(pesosComponente, never()).findByVersionPesosId(2L);
+    }
+
+    @Test
     @DisplayName("Ochenta preguntas con treinta abiertas: las treinta van a la IA y todas se guardan (AC-31)")
     void ochentaPreguntasTreintaAbiertas() {
         List<CalificacionPorPuntos.PreguntaCalculada> todas = new ArrayList<>();

@@ -570,6 +570,9 @@ public class PuentePruebaIaImpl implements PuentePruebaIa {
                     + "guarda nada", postulacionId);
             return;
         }
+        // Antes de escribir ninguna nota: si con estas la prueba queda entera, la de la etapa
+        // sale con la versión de pesos que la vacante tenga al confirmar (QA-03).
+        cierre.esperarAlCambioDePesos(intento);
         var version = versionesBanco.findById(intento.getVersionBancoId())
                 .orElseThrow(() -> new IllegalStateException("La versión de esta prueba ya no existe"));
         int vigente = version.getVersionGuia() == null ? 1 : version.getVersionGuia();
