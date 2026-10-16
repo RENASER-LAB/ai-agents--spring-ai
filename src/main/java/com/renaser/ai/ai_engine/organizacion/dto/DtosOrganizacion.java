@@ -37,9 +37,9 @@ public final class DtosOrganizacion {
     public record TopeIa(String tope) {}
 
     // Qué tiene personalizado la organización de quien pregunta: una casilla por bandera.
-    public record Personalizacion(boolean bancoPropio, boolean pesosPropios,
-                                  boolean plantillasEvaluacionPropias,
-                                  boolean pruebasPuestoPropias) {}
+    // Solo las dos que se pueden personalizar (V74): el banco y las pruebas de una empresa
+    // son siempre los suyos y ya no tienen bandera que enseñar.
+    public record Personalizacion(boolean pesosPropios, boolean plantillasEvaluacionPropias) {}
 
     // El consumo de IA de un mes, por organización y desglosado por agente (pieza E):
     // contesta la pregunta útil — ¿el dinero se va en leer currículums o en calificar

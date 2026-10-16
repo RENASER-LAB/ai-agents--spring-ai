@@ -239,17 +239,26 @@ public class FlujoPlataformaIT {
                 .andReturn().getResponse().getContentAsString(), "id"));
         // Desde la V66 una vacante nueva de ACME (sin banco propio) nace con preguntas propias.
         // Esta prueba mira el costo y el tope de la IA, no el banco: se la deja como una
-        // vacante de antes de la V66, que sigue rindiendo el banco de Renaser (AC-01c).
-        jdbc.update("update vacante set origen_preguntas = 'NIVEL' where id = ?", vacanteAcmeId);
+        // vacante de antes de la V66, que sigue rindiendo el banco de Renaser (AC-01c) atada a
+        // su versión fija, como la dejan las migraciones (V74).
+        jdbc.update("""
+                update vacante set origen_preguntas = 'NIVEL', version_banco_fija_id = (
+                    select id from version_banco
+                     where organizacion_id = ? and tipo_banco = 'NIVEL'
+                       and nivel_puesto_codigo = 'EJECUCION' and estado = 'PUBLICADA'
+                     order by publicada_en desc limit 1)
+                 where id = ?""", plataformaId, vacanteAcmeId);
         Long plantillaId = jdbc.queryForObject("""
                 select id from plantilla_evaluacion
                  where organizacion_id = %d and nivel_puesto_codigo = 'EJECUCION'"""
                 .formatted(plataformaId), Long.class);
         conToken(post("/api/v1/panel/vacantes/" + vacanteAcmeId + "/plantilla-evaluacion"), tokenAcme,
                 "{\"plantillaEvaluacionId\": %d}".formatted(plantillaId)).andExpect(status().isOk());
+        // La prueba de Renaser ya no se le asigna a ACME (V74): una vacante de antes que ya la
+        // tenía la conserva, y así se la deja, a mano
         Long versionPruebaId = armarUnaPruebaValida(tokenPlataforma);
-        conToken(post("/api/v1/panel/vacantes/" + vacanteAcmeId + "/plantilla-prueba"), tokenAcme,
-                "{\"versionPlantillaPruebaId\": %d}".formatted(versionPruebaId)).andExpect(status().isOk());
+        jdbc.update("update vacante set instrumento_etapa_tecnica = 'PLANTILLA', "
+                + "version_plantilla_prueba_id = ? where id = ?", versionPruebaId, vacanteAcmeId);
         conToken(post("/api/v1/panel/vacantes/" + vacanteAcmeId + "/publicacion"), tokenAcme, null)
                 .andExpect(status().isOk());
     }
@@ -396,7 +405,9 @@ public class FlujoPlataformaIT {
                 .andExpect(jsonPath("$[0].codigo").value("ACME"))
                 .andExpect(jsonPath("$[0].esActiva").value(true))
                 .andExpect(jsonPath("$[0].topeMensualIa").value("100"))
-                .andExpect(jsonPath("$[0].personalizacion.bancoPropio").value(false));
+                .andExpect(jsonPath("$[0].personalizacion.pesosPropios").isBoolean())
+                // El banco y las pruebas ya no tienen bandera (V74): son siempre los suyos
+                .andExpect(jsonPath("$[0].personalizacion.bancoPropio").doesNotExist());
         // El total del mes lleva las dos siembras y las lecturas de verdad: más de 12.50
         String consumo = conTokenGet("/api/v1/panel/plataforma/consumo?mes=" + MES, tokenPlataforma)
                 .andReturn().getResponse().getContentAsString();

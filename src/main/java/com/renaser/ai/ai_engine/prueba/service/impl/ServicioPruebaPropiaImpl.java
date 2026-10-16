@@ -252,11 +252,10 @@ public class ServicioPruebaPropiaImpl extends EditorDeVersionPropia implements S
         TiposDeArchivo.exigirValido(archivo.getOriginalFilename(), archivo.getContentType());
         VersionBanco borrador = elBorrador(vacante);
         Archivo guardado = almacen.guardar(vacante.getOrganizacionId(), archivo);
+        // Solo el archivo (V74): ni se firma ni se guarda ningún enlace. El correo de la prueba
+        // ya no lo lleva, y el panel y el portal —este, después de «Empezar»— lo abren con
+        // un enlace fresco cada vez.
         borrador.setConsignaArchivoId(guardado.getId());
-        // El enlace largo que pega el aviso PRUEBA_DISPONIBLE. Un almacén sin enlaces (el de
-        // memoria de las pruebas) deja el aviso sin él, igual que con las plantillas.
-        borrador.setUrlConsigna(almacen.urlDeConsigna(guardado)
-                .map(AlmacenArchivos.EnlaceFirmado::url).orElse(null));
         versionesBanco.save(borrador);
         auditoria.registrar(quien.organizacionId(), quien, "subir_consigna_prueba_propia",
                 "version_banco", borrador.getId(), null,
@@ -271,7 +270,6 @@ public class ServicioPruebaPropiaImpl extends EditorDeVersionPropia implements S
         Vacante vacante = laEditable(quien, vacanteId);
         VersionBanco borrador = elBorradorQueYaExiste(vacante);
         borrador.setConsignaArchivoId(null);
-        borrador.setUrlConsigna(null);
         versionesBanco.save(borrador);
         return editor(quien, vacante);
     }
@@ -523,6 +521,9 @@ public class ServicioPruebaPropiaImpl extends EditorDeVersionPropia implements S
     @Transactional
     public CambioAplicado cambiarPuntos(ContextoUsuario quien, Long vacanteId, CambiarPuntosDePrueba datos) {
         Vacante vacante = laEditable(quien, vacanteId);
+        // Antes de reescribir ninguna nota: las de la etapa que se recalculan al final dicen
+        // con qué versión de pesos se calcularon (QA-03). Ver CerrojoDeLosPesos.
+        vacantes.bloquearParaCalificar(vacante);
         VersionBanco publicada = laPublicada(vacante);
         exigirQueNoHayaRecalificacionEnCurso(guiasDeLaIa(vacante, publicada).keySet());
 
@@ -1171,8 +1172,8 @@ public class ServicioPruebaPropiaImpl extends EditorDeVersionPropia implements S
     protected void copiarContenido(VersionBanco origen, VersionBanco destino) {
         destino.setGuiaCalificacion(origen.getGuiaCalificacion());
         destino.setEnunciado(origen.getEnunciado());
+        // El archivo, no un enlace (V74): la copia lo abre igual, con uno fresco.
         destino.setConsignaArchivoId(origen.getConsignaArchivoId());
-        destino.setUrlConsigna(origen.getUrlConsigna());
         destino.setMateriales(origen.getMateriales());
         destino.setHerramientasPermitidas(origen.getHerramientasPermitidas());
         destino.setModalidad(origen.getModalidad());

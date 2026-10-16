@@ -875,9 +875,15 @@ public class FlujoPruebaPropiaIT {
         vista.at("/prueba/entregables").forEach(e -> alcances.add(e.get("alcance").asText()));
         assertThat(alcances).containsExactlyInAnyOrder("PREGUNTA", "PREGUNTAS");
 
+        // Un enlace largo guardado antes de la V74 en la de origen no viaja a la copia (AC-18)
+        jdbc.update("update version_banco set url_consigna = 'https://almacen.test/viejo.pdf?firma=1' "
+                + "where id = ?", publicadaId(vacanteId));
         JsonNode copiado = json.readTree(conToken(post(base(otra) + "/copia"), tokenTalento,
                         "{\"vacanteOrigenId\":%d}".formatted(vacanteId))
                 .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        assertThat(jdbc.queryForObject("select count(*) from version_banco where vacante_id = ? "
+                + "and url_consigna is not null", Long.class, otra)).isZero();
+        assertThat(copiado.toString()).doesNotContain("viejo.pdf");
         JsonNode borrador = copiado.get("borrador");
         assertThat(borrador.at("/prueba/enunciado").asText()).contains("descuadre");
         assertThat(borrador.at("/prueba/modalidad").asText()).isEqualTo("CRONOMETRADA");
@@ -1294,6 +1300,11 @@ public class FlujoPruebaPropiaIT {
         editor = respuesta(mvc.perform(multipart(base(taller) + "/borrador/consigna").file(pdf)
                 .header("Authorization", "Bearer " + tokenTalento)));
         assertThat(editor.at("/borrador/prueba/consigna/nombre").asText()).isEqualTo("caso.pdf");
+        // Se guarda el archivo y nada más: ningún enlace largo que caduque (V74, AC-17)
+        assertThat(jdbc.queryForObject("""
+                select count(*) from version_banco
+                 where vacante_id = ? and consigna_archivo_id is not null and url_consigna is null""",
+                Long.class, taller)).isEqualTo(1L);
         editor = respuesta(conToken(delete(base(taller) + "/borrador/consigna"), tokenTalento, null));
         assertThat(editor.at("/borrador/prueba/consigna").isNull()
                 || editor.at("/borrador/prueba/consigna").isMissingNode()).isTrue();

@@ -99,9 +99,10 @@ frontend debe depender de él.
   porque el texto general ya existe y nombra a la empresa. La pantalla de vacantes puede dejar
   de avisar de eso.
 - **Personalización de instrumentos**: `POST/DELETE /panel/organizacion/personalizacion/{instrumento}`
-  (BANCO, PESOS, PLANTILLA_EVALUACION, PRUEBA). Apagada = usa el método de Renaser (solo
-  lectura); encendida = copia propia editable. La pantalla debe distinguir «esto es de
-  Renaser, se mira» de «esto es tuyo, se edita».
+  (PESOS, PLANTILLA_EVALUACION; BANCO y PRUEBA responden 400 desde la `V67`). Apagada = usa el
+  método de Renaser (solo lectura); encendida = copia propia editable. La pantalla debe
+  distinguir «esto es de Renaser, se mira» de «esto es tuyo, se edita». **Desde la `V74` el
+  banco y las pruebas de Renaser ya no se ven desde otra empresa**, ni en solo lectura.
 - El parámetro `tope_mensual_ia` **se ve pero no se edita** desde la empresa: lo administra
   la plataforma. No pintar el lápiz.
 
@@ -110,8 +111,8 @@ frontend debe depender de él.
 Sección aparte del panel, visible solo con el permiso `administrar_plataforma` **y** siendo
 la organización plataforma:
 
-- `GET /panel/plataforma/empresas` — la ficha de cada empresa: estado, tope, banderas,
-  consumo del mes. **No hay ni habrá** una vista de los candidatos de otra empresa: Renaser
+- `GET /panel/plataforma/empresas` — la ficha de cada empresa: estado, tope, banderas (desde la
+  `V74`, solo las de pesos y plantillas de evaluación), consumo del mes. **No hay ni habrá** una vista de los candidatos de otra empresa: Renaser
   administra el continente, no el contenido.
 - `POST /panel/plataforma/empresas` — alta con invitación al primer administrador.
 - `POST …/{id}/suspension` y `…/reactivacion` (con motivo), `PUT …/{id}/tope-ia`,
@@ -158,6 +159,13 @@ que hay que saber antes de escribir una línea:
   ya no existe» y no copia nada. La prueba técnica de una vacante nueva se escribe en su editor.
   Quien ya las tenía encendidas conserva lo copiado, y el préstamo sigue para las vacantes de
   antes que lo usan. Pesos y plantillas de evaluación se personalizan como siempre.
+  ⚠️ **Desde la `V74` (16/10/2026) el préstamo del banco y de las pruebas se acabó.**
+  `DuenoDelInstrumento` solo resuelve pesos y plantillas de evaluación: `BANCO` y `PRUEBA` ya no
+  son valores de `Instrumento`, y el banco y las pruebas se piden siempre con la organización de
+  quien pregunta. Las vacantes de antes no pierden nada: la que leía el banco de RENASER lo tiene
+  fijado en `vacante.version_banco_fija_id`, y la que tenía una prueba de RENASER asignada la sigue
+  rindiendo por su id. Las banderas `banco_propio` y `pruebas_puesto_propias` siguen en la tabla,
+  sin uso.
 - **Dos logins separados**: el portal del candidato y el panel de empresas
   (`POST /panel/auth/login`), que solo autentica cuentas con `usuario.es_equipo`. Las cuentas
   del panel nacen SOLO por invitación (tabla `invitacion`, token de un solo uso, se guarda el

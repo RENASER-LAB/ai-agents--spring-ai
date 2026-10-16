@@ -15,4 +15,8 @@ public interface NotaEtapaRepository extends JpaRepository<NotaEtapa, Long> {
     // En bloque, para el ranking. Pedirlo de una en una son once consultas por
     // candidato, y esa pantalla existe justamente para ver la tanda entera.
     List<NotaEtapa> findByPostulacionIdInAndEtapaCodigo(List<Long> postulacionIds, String etapaCodigo);
+
+    // Todas las de una tanda, de cualquier etapa: quién tiene alguna nota cuando la vacante
+    // cambia de pesos (V74).
+    List<NotaEtapa> findByPostulacionIdIn(List<Long> postulacionIds);
 }

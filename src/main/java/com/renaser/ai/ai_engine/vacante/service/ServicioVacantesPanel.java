@@ -160,14 +160,8 @@ public interface ServicioVacantesPanel {
      */
     void fijarNotaMinima(ContextoUsuario quien, Long id, java.math.BigDecimal notaMinima);
 
-    /**
-     * Qué versión de pesos rige la decisión de esta vacante.
-     *
-     * <p>Al crearse, la vacante toma la última publicada; esto permite apuntarla a otra
-     * —una vacante sin banco pone todo el peso en la prueba—. No recalcula nada hacia
-     * atrás: las notas ya guardadas conservan la versión con la que se calcularon.
-     */
-    void asignarVersionPesos(ContextoUsuario quien, Long id, Long versionPesosId);
+    // Qué versión de pesos rige la decisión, y cambiarla con candidatos dentro: en
+    // ServicioPesosDeLaVacante (V74), que recalcula a todos a la vez.
 
     /**
      * Los textos de correo propios de esta vacante. Vacío quiere decir «los de siempre».

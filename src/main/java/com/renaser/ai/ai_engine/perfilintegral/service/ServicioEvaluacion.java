@@ -21,9 +21,14 @@ public interface ServicioEvaluacion {
      *
      * <p>La versión se fija aquí y no después a propósito: es lo que permite reproducir el
      * examen tal como se rindió aunque el banco cambie (RF-138).
+     *
+     * @param versionBancoFijaId la versión fija de la vacante, si la tiene (V74): una vacante
+     *                           vieja que leía el banco de RENASER rinde siempre esa, aunque
+     *                           RENASER haya publicado otra. Vacía, la publicada del nivel de
+     *                           la propia organización
      */
     Long crearAlPostular(Long organizacionId, Long usuarioId, Long plantillaEvaluacionId,
-                         String nivelPuestoCodigo);
+                         String nivelPuestoCodigo, Long versionBancoFijaId);
 
     /**
      * La evaluación del Perfil Integral de una vacante con preguntas propias (V66).

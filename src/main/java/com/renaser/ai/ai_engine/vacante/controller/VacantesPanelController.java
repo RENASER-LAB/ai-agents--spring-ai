@@ -1,6 +1,7 @@
 package com.renaser.ai.ai_engine.vacante.controller;
 
 import com.renaser.ai.ai_engine.vacante.service.ServicioFichaVacante;
+import com.renaser.ai.ai_engine.vacante.service.ServicioPesosDeLaVacante;
 import com.renaser.ai.ai_engine.vacante.service.ServicioVacantesPanel;
 
 import com.renaser.ai.ai_engine.vacante.dto.DtosFichaVacante.FichaResponse;
@@ -26,6 +27,7 @@ public class VacantesPanelController {
 
     private final ServicioVacantesPanel servicio;
     private final ServicioFichaVacante fichaVacante;
+    private final ServicioPesosDeLaVacante pesosDeLaVacante;
     private final Permisos permisos;
 
     // ---------- Puestos ----------
@@ -179,13 +181,24 @@ public class VacantesPanelController {
         servicio.fijarNotaMinima(permisos.actual(), id, datos.notaMinima());
     }
 
+    @GetMapping("/vacantes/{id}/version-pesos/cambio")
+    @PreAuthorize("@permisos.tiene('publicar_version_pesos')")
+    @Operation(summary = "Lo que pasaría al cambiar la versión de pesos de esta vacante: a "
+            + "cuántas personas se les recalcularía la nota y qué pesos cambian, antes y "
+            + "después. No escribe nada")
+    public CambioDePesosPrevisto preverCambioDePesos(@PathVariable Long id,
+                                                     @RequestParam Long versionPesosId) {
+        return pesosDeLaVacante.preverCambio(permisos.actual(), id, versionPesosId);
+    }
+
     @PostMapping("/vacantes/{id}/version-pesos")
     @PreAuthorize("@permisos.tiene('publicar_version_pesos')")
-    @Operation(summary = "Elegir qué versión de pesos rige la decisión de esta vacante. "
-            + "No recalcula nada hacia atrás")
-    public void asignarVersionPesos(@PathVariable Long id,
-                                    @Valid @RequestBody AsignarVersionPesos datos) {
-        servicio.asignarVersionPesos(permisos.actual(), id, datos.versionPesosId());
+    @Operation(summary = "Elegir qué versión de pesos rige la decisión de esta vacante, también "
+            + "con candidatos dentro: recalcula a todos a la vez, sin IA y sin mover a nadie "
+            + "de etapa. 409 con la vacante cerrada, archivada o eliminada")
+    public CambioDePesosHecho asignarVersionPesos(@PathVariable Long id,
+                                                  @Valid @RequestBody AsignarVersionPesos datos) {
+        return pesosDeLaVacante.cambiar(permisos.actual(), id, datos.versionPesosId());
     }
 
     @PostMapping("/vacantes/{id}/cierre-prueba")

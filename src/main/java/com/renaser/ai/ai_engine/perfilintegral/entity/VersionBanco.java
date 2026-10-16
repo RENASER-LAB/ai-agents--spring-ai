@@ -64,9 +64,12 @@ public class VersionBanco {
     /** El caso. Obligatorio para publicar si hay entregables; sin ellos es un cuestionario. */
     private String enunciado;
 
-    /** El enunciado en PDF o Word, si se adjuntó: el archivo y el enlace largo del aviso. */
+    /**
+     * El enunciado en PDF o Word, si se adjuntó: el archivo, que se abre con un enlace fresco.
+     * La columna {@code url_consigna} sigue en la tabla, vacía y sin mapear (V74): el enlace
+     * largo que se guardaba para el correo ya no se fabrica.
+     */
     private Long consignaArchivoId;
-    private String urlConsigna;
 
     private String materiales;
     private String herramientasPermitidas;

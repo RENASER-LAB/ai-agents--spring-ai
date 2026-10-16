@@ -5,6 +5,12 @@
 Una vacante nace con su versión de banco y su versión de pesos, y muere con ellas. Mientras
 esté abierta no se le cambia ninguna de las dos.
 
+> **Desde la `V74` (16/10/2026) la versión de pesos sí se cambia con candidatos dentro, pero para
+> todos a la vez**: en la misma operación se recalcula a cada candidato con nota, sin IA y sin
+> mover a nadie de etapa. La regla de fondo no cambia —todos los de una vacante medidos con la
+> misma vara—; lo que se permite es cambiar la vara entera. Ver «La tercera excepción: los
+> pesos», más abajo.
+
 ---
 
 ## Por qué
@@ -66,8 +72,10 @@ Las dos garantías son compatibles: esta regla **añade** una, no niega la otra.
 
 ## Cómo quedó implementada (la guarda `exigirVaraQuieta`)
 
-Los tres asignadores de `ServicioVacantesPanelImpl` —`asignarVersionPesos`,
-`asignarPlantillaEvaluacion` y `asignarVersionPlantillaPrueba`— pasan por la misma guarda:
+Los dos asignadores de `ServicioVacantesPanelImpl` que quedan —`asignarPlantillaEvaluacion` y
+`asignarVersionPlantillaPrueba`— pasan por la misma guarda. Hasta la `V74` también pasaba
+`asignarVersionPesos`; ahora la versión de pesos se cambia en `ServicioPesosDeLaVacante`, que
+recalcula a todos en vez de frenar (ver «La tercera excepción: los pesos»).
 
 - **La línea es la primera postulación, no la publicación.** Una vacante publicada a la que
   nadie ha postulado todavía puede terminar de configurarse (el flujo sin banco asigna sus
@@ -81,13 +89,57 @@ Los tres asignadores de `ServicioVacantesPanelImpl` —`asignarVersionPesos`,
 rendición.** La prueba se rinde en la segunda etapa, así que postular no es haberla visto: hasta
 que alguien la abra se puede abrir un borrador y publicar otra versión, que archiva la anterior.
 Desde la primera rendición el contenido queda congelado —publicar otra es 409— y cada candidato
-queda atado a la versión con que empezó (RF-138). Las dos excepciones son las de las preguntas
+queda atado a la versión con que empezó (RF-138). Dos excepciones son las de las preguntas
 propias: **las instrucciones de la IA** (recalifica a todos con la guía nueva) y **los puntos**
-(recalcula a todos al instante, sin IA); las dos cambian la vara para todos a la vez. **La fecha
+(recalcula a todos al instante, sin IA); las dos cambian la vara para todos a la vez. La tercera,
+**los pesos** (`V74`), tiene sección propia más abajo. **La fecha
 límite** (`V68`) tampoco se congela, pero no es de la versión sino de la vacante: se cambia en
 cualquier momento, con motivo si alguien ya está en la etapa técnica, y no viaja al copiar la
 prueba. Con la misma línea, asignar una plantilla por la API a una vacante nueva la pasa a `PLANTILLA` solo mientras
 nadie haya empezado a rendir.
+
+---
+
+## La tercera excepción: los pesos, para todos a la vez (`V74`, 16/10/2026)
+
+Hasta la `V74` la versión de pesos de una vacante no se cambiaba desde la primera postulación
+(409): cambiarla solo movía las notas futuras y dejaba a unos medidos con una vara y a otros con
+otra. Ahora se cambia **y en la misma operación se recalcula a todos los que tienen alguna nota**,
+así que nadie queda con la vara de antes. Es el mismo principio que las instrucciones de la IA y
+los puntos. Lo hacen `ServicioPesosDeLaVacante` y `RecalculoConOtrosPesos`; las rutas, en
+[Las APIs](09-APIS.md), «Vacantes».
+
+- **La IA nunca hace la cuenta con los pesos**, y por eso no hace falta llamarla. El currículum
+  guarda la nota de 0 a 100 que la IA puso a cada uno de sus ocho criterios, y el código la vuelve
+  a ponderar con el peso del nivel en la versión nueva. Igual el banco `CRITERIOS` con sus
+  dimensiones, el Perfil Integral con su reparto entre currículum y evaluación, y el grupo de
+  prioridad con los hallazgos guardados.
+- **La simulación y la validación también cambian**: cada nota de criterio va sobre el peso de
+  su criterio (un 8 sobre 10) y pasa a la escala nueva (12 sobre 15). Se calcula **siempre desde
+  la nota tal como se puso** y su máximo de entonces (`nota_criterio.puntaje_original` y
+  `maximo_original`, `V75`), nunca desde la última reescalada: ir y volver a la misma versión
+  devuelve la misma nota, aunque por el camino el criterio pase por peso 0.
+- **La prueba técnica no cambia de valor**: lleva sus propios puntos. Solo pasa a decir la
+  versión nueva. La nota final no se guarda: el ranking y su Excel la calculan al vuelo.
+- **No se mueve a nadie**: ni la máquina de estados, ni trabajos de IA, ni **el pase automático**
+  (`V72`). Quien espera en «por confirmar» y con la nota nueva llega a la mínima lo mueve el
+  equipo, como al cambiar la mínima.
+- **Las decisiones ya tomadas no se tocan**: la fila de `decision` conserva la nota y la versión
+  con que se decidió, que es lo que se decidió con la vara de entonces.
+- **Todo o nada.** Va en una transacción con la vacante bloqueada: si una nota no se puede
+  recalcular, la vacante sigue con la versión anterior y ninguna nota cambia. Dos cambios
+  seguidos van de uno en uno, y elegir la que ya tiene no hace nada.
+- **Lo que llega a mitad** —una nota de la IA en curso, un ajuste a mano, una entrega— espera a
+  que el cambio confirme y sale con la versión nueva; si llega antes, es el cambio quien la
+  espera. Ver la regla del cerrojo de los pesos en [Reglas del código](REGLAS-DEL-CODIGO.md),
+  «Reglas que no se negocian».
+- **No con la vacante cerrada, archivada o eliminada** (409): sus notas se quedan con los pesos
+  que tenía.
+- **Queda en la auditoría** (`asignar_version_pesos`): quién, cuándo, las dos versiones y
+  cuántas personas se recalcularon.
+
+Sigue sin hacerse: editar una versión de pesos publicada —se crea otra y se elige— y volver a
+«los pesos generales» desde la vacante.
 
 ---
 
@@ -116,7 +168,7 @@ clase de cambio es cada cosa:
 | Lo que cambia | ¿Invalida lo ya respondido? | Qué se hace |
 |---|---|---|
 | Señal de 0 · C3 esperado · C4 esperado | **No** — el texto del candidato sigue ahí | corrección editorial (auditada) → **recalificar** |
-| Pesos de pilar · cortes | **No** | versión de pesos nueva (en la siguiente vacante) → **recalcular** |
+| Pesos de pilar · cortes | **No** | versión de pesos nueva, elegida en la misma vacante aunque tenga candidatos (`V74`) → **se recalcula a todos** |
 | Añadir o quitar una pregunta | **Sí** — falta la respuesta | versión de banco nueva |
 | Cambiar un enunciado | **Sí** — mide otra cosa | versión de banco nueva. **Línea roja** |
 
@@ -142,8 +194,8 @@ instrumento y exige versión nueva del banco.
   señales se midió a cada persona, sin construir nada.
 - `version_banco` ya se archiva en vez de borrarse (RF-138).
 
-Toda la maquinaria de versionado está, y las guardas también: `exigirVaraQuieta` en los tres
-asignadores, la recalificación en lote (`scripts/recalificar-banco.py`, que además se niega a
+Toda la maquinaria de versionado está, y las guardas también: `exigirVaraQuieta` en los dos
+asignadores que quedan (el de pesos recalcula a todos desde la `V74`), la recalificación en lote (`scripts/recalificar-banco.py`, que además se niega a
 tocar una vacante donde ya se contrató) y el reencolado forzoso del evaluador
 (`ColaCalificacionIa.reencolarEvaluador`).
 
@@ -166,5 +218,8 @@ contrario. Las dos razones, dichas en la propia migración:
    combinan de aquí en adelante.
 
 No es un precedente: con alguien ya contratado o descartado, el reparto nuevo se estrenaría en la
-siguiente convocatoria. Y el criterio de «la última publicada» hay que cambiarlo antes de publicar
+siguiente convocatoria. Desde la `V74` hay además un camino sin editar nada en sitio: publicar otra
+versión y elegirla en la vacante, que recalcula a todos y deja las decisiones tomadas como
+estaban (ver «La tercera excepción: los pesos»). Publicarla sigue teniendo el problema del punto
+1. Y el criterio de «la última publicada» hay que cambiarlo antes de publicar
 ninguna versión más; está en [Estado del proyecto](ESTADO-DEL-PROYECTO.md).

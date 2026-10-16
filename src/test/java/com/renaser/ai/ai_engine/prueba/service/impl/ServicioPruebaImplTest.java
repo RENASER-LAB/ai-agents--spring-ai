@@ -26,6 +26,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -41,6 +42,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -184,6 +187,30 @@ class ServicioPruebaImplTest {
         servicio.entregar(QUIEN, UUID_POSTULACION);
 
         verify(cola, never()).encolarPruebaPuesto(anyLong());
+    }
+
+    @Test
+    @DisplayName("entregar pide la vacante —y relee la postulación— antes de tocar el intento o la "
+            + "postulación (QA-03, QA-04)")
+    void laVacanteAntesQueElIntentoYLaPostulacion() {
+        /*
+          Una prueba del editor que queda entera al entregar escribe aquí su nota con la versión
+          de pesos de la vacante. Si la vacante se pidiera después de mover la postulación, un
+          cambio de pesos —que bloquea la vacante y luego reescribe las postulaciones— y esta
+          entrega se esperarían el uno al otro.
+        */
+        IntentoPrueba intento = intentoSinEmpezar();
+        intento.setIniciadoEn(Instant.now().minus(10, ChronoUnit.MINUTES));
+        laVacanteEnAutomatico(false);
+
+        servicio.entregar(QUIEN, UUID_POSTULACION);
+
+        InOrder orden = inOrder(vacantes, intentos, maquina);
+        orden.verify(vacantes).bloquearParaCalificarYReleer(
+                org.mockito.ArgumentMatchers.argThat(p -> VACANTE.equals(p.getVacanteId())));
+        orden.verify(intentos).save(intento);
+        orden.verify(maquina).transicionar(any(Postulacion.class), eq("PRUEBA_CALIFICANDO"), any(),
+                any(), eq(true), eq(false), any());
     }
 
     /** La vacante que `cerrarIntento` mira para saber si la nota se pide sola. */

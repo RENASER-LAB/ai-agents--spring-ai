@@ -18,8 +18,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.Arrays;
-
 // Las banderas de personalización de la propia organización (pieza A): encender copia el
 // instrumento de la plataforma y pasa a leer lo propio; apagar vuelve a la plataforma.
 @RestController
@@ -57,13 +55,9 @@ public class PersonalizacionController {
     }
 
     // La conversión a mano y no con el enum en la firma: un valor desconocido debe ser un
-    // 400 que diga cuáles existen, no el error genérico de conversión de Spring.
+    // 400 que diga cuáles existen, no el error genérico de conversión de Spring. El banco y
+    // las pruebas, retirados, contestan por qué (ver Instrumento#deTexto).
     private static Instrumento instrumento(String crudo) {
-        try {
-            return Instrumento.valueOf(crudo.trim().toUpperCase());
-        } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("No existe el instrumento «" + crudo
-                    + "»; los válidos son " + Arrays.toString(Instrumento.values()));
-        }
+        return Instrumento.deTexto(crudo);
     }
 }

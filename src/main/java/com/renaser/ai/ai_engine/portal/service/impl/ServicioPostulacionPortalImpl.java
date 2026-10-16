@@ -325,9 +325,12 @@ public class ServicioPostulacionPortalImpl implements ServicioPostulacionPortal 
                 Puesto puesto = puestos.findById(vacante.getPuestoId())
                         .orElseThrow(() -> new IllegalStateException(
                                 "La vacante apunta a un puesto que no existe"));
+                // Con la versión fija de la vacante, si es una vieja que leía el banco de
+                // RENASER (V74): rinde la misma que los de antes.
                 postulacion.setEvaluacionId(evaluaciones.crearAlPostular(
                         organizacionDeLaVacante, quien.usuarioId(),
-                        vacante.getPlantillaEvaluacionId(), puesto.getNivelPuestoCodigo()));
+                        vacante.getPlantillaEvaluacionId(), puesto.getNivelPuestoCodigo(),
+                        vacante.getVersionBancoFijaId()));
             }
             postulaciones.save(postulacion);
 

@@ -557,7 +557,8 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                 .map(v -> comoPanel(v, porVacante.getOrDefault(v.getId(), 0),
                         puedeEditar(quien, alcanceDeEdicion, v),
                         alcanceDeArchivo, alcanceDeEliminacion, quien,
-                        PlazoDeLaPrueba.SIN_DATO, ciudadDe(v, ciudades), preguntas.apply(v)))
+                        PlazoDeLaPrueba.SIN_DATO, ciudadDe(v, ciudades), preguntas.apply(v),
+                        LoPrestado.SIN_DATO))
                 .toList();
     }
 
@@ -629,7 +630,8 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                 loQueRigeHoy(quien, vacante),
                 ciudadDe(vacante, ciudadesDe(vacante.getCiudadUbigeo())),
                 // El estado de las propias no: el detalle lo lee del editor, con sus puntos.
-                new PreguntasDeLaFila(tieneBancoPropioDelNivel(vacante), null));
+                new PreguntasDeLaFila(tieneBancoPropioDelNivel(vacante), null),
+                new LoPrestado(bancoFijoDe(vacante), pruebaPrestadaDe(vacante)));
     }
 
     /**
@@ -646,12 +648,11 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
      * {@code ServicioPruebaImpl} al arrancar el reloj. Si esta pantalla leyera la modalidad
      * de la fila de la plantilla, diría «N días» sobre una prueba que cierra en una hora.
      *
-     * <p>⚠️ <b>La versión se pide con su dueño resuelto, no por id suelto.</b> Una versión de
-     * prueba no sabe de organizaciones —eso vive en su plantilla—, así que se busca por el
-     * guardián que deriva al padre ({@code laDeLaOrganizacion}) con el dueño que resuelve
-     * {@link DuenoDelInstrumento}, igual que al asignarla. La que no sea de esta empresa se
-     * lee como «sin dato» y no como el plazo de otra: con una sola organización las dos
-     * formas funcionan idéntico, y eso es justo lo que nadie nota hasta que hay dos.
+     * <p>⚠️ <b>La versión se pide con su dueño, no por id suelto.</b> Una versión de prueba
+     * no sabe de organizaciones —eso vive en su plantilla—, así que se busca por el guardián
+     * que deriva al padre ({@code laDeLaOrganizacion}): ver {@link #laPruebaAsignada}. La que
+     * no sea de esta empresa ni la que la plataforma le prestó se lee como «sin dato» y no
+     * como el plazo de otra.
      */
     private PlazoDeLaPrueba loQueRigeHoy(ContextoUsuario quien, Vacante v) {
         Integer minutosVacante = v.getMinutosEtapaTecnica();
@@ -683,9 +684,7 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                             .orElse(null);
             return new PlazoDeLaPrueba(null, minutos, null, 0, 0);
         }
-        VersionPlantillaPrueba version = v.getVersionPlantillaPruebaId() == null ? null
-                : versionesPrueba.laDeLaOrganizacion(v.getVersionPlantillaPruebaId(),
-                        dueno.duenoDe(quien.organizacionId(), Instrumento.PRUEBA)).orElse(null);
+        VersionPlantillaPrueba version = laPruebaAsignada(v).orElse(null);
         String modalidad = minutosVacante != null ? "CRONOMETRADA"
                 : version == null ? null : version.getModalidad();
         Integer minutos = minutosVacante != null ? minutosVacante
@@ -705,6 +704,54 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
             }
         }
         return new PlazoDeLaPrueba(modalidad, minutos, dias, sinPlazoPropio, conPlazoPropio);
+    }
+
+    /**
+     * La versión de prueba que la vacante tiene asignada: de su propia empresa o, en una
+     * vacante vieja, la de la plataforma que se le prestó antes de la V74 y que conserva por su
+     * id (AC-12). Las pruebas de RENASER ya no se listan ni se asignan a otra empresa, pero la
+     * que ya estaba puesta se sigue rindiendo y leyendo. Nunca por id suelto: solo esas dos
+     * dueñas.
+     */
+    private java.util.Optional<VersionPlantillaPrueba> laPruebaAsignada(Vacante v) {
+        Long id = v.getVersionPlantillaPruebaId();
+        if (id == null) {
+            return java.util.Optional.empty();
+        }
+        return versionesPrueba.laDeLaOrganizacion(id, v.getOrganizacionId())
+                .or(() -> versionesPrueba.laDeLaOrganizacion(id, dueno.plataforma().getId()));
+    }
+
+    /**
+     * La prueba de RENASER que esta vacante vieja ya tenía asignada, con su nombre (V74).
+     * Vacía si la asignada es de la propia empresa, si no hay ninguna o si la vacante es de
+     * la plataforma.
+     */
+    private PruebaPrestada pruebaPrestadaDe(Vacante v) {
+        Long id = v.getVersionPlantillaPruebaId();
+        if (id == null || versionesPrueba.laDeLaOrganizacion(id, v.getOrganizacionId()).isPresent()) {
+            return null;
+        }
+        Long plataforma = dueno.plataforma().getId();
+        if (plataforma.equals(v.getOrganizacionId())) {
+            return null;
+        }
+        return versionesPrueba.laDeLaOrganizacion(id, plataforma)
+                .flatMap(version -> plantillasPrueba
+                        .findByIdAndOrganizacionId(version.getPlantillaPruebaId(), plataforma)
+                        .map(plantilla -> new PruebaPrestada(version.getId(), plantilla.getId(),
+                                plantilla.getNombre(), version.getVersion())))
+                .orElse(null);
+    }
+
+    /** La versión fija del banco de una vacante vieja (V74), con su nombre y sus minutos. */
+    private BancoFijo bancoFijoDe(Vacante v) {
+        if (v.getVersionBancoFijaId() == null) {
+            return null;
+        }
+        return versionesBanco.findById(v.getVersionBancoFijaId())
+                .map(b -> new BancoFijo(b.getId(), b.getEtiqueta(), b.getMinutosObjetivo()))
+                .orElse(null);
     }
 
     /**
@@ -895,11 +942,12 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
         VersionPlantillaPrueba version = versionesPrueba.findById(versionPlantillaPruebaId)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Versión de prueba", "id", versionPlantillaPruebaId));
-        // La versión no sabe de organizaciones: se deriva a su plantilla y se valida
-        // contra el dueño resuelto. Sin esto, una vacante podía colgarse la prueba de
-        // otra empresa — y ese examen se le sirve al candidato al postular.
+        // La versión no sabe de organizaciones: se deriva a su plantilla y se valida contra
+        // la propia empresa. Sin esto, una vacante podía colgarse la prueba de otra empresa —
+        // y ese examen se le sirve al candidato al postular. Desde la V74 tampoco las de
+        // RENASER: ya no se prestan.
         plantillasPrueba.findByIdAndOrganizacionId(version.getPlantillaPruebaId(),
-                        dueno.duenoDe(quien.organizacionId(), Instrumento.PRUEBA))
+                        quien.organizacionId())
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Versión de prueba", "id", versionPlantillaPruebaId));
         if (!"PUBLICADA".equals(version.getEstado())) {
@@ -952,6 +1000,8 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
         if (aplica != anterior && Vacante.ORIGEN_NIVEL.equals(origenAntes)
                 && !yaTienePostulantes(vacante) && !tieneBancoPropioDelNivel(vacante)) {
             vacante.setOrigenPreguntas(Vacante.ORIGEN_VACANTE);
+            // Y suelta la versión fija del banco de RENASER (V74): ya no la va a rendir.
+            vacante.setVersionBancoFijaId(null);
         }
         // Encenderla en una vacante ya publicada sin de dónde sacar sus preguntas dejaría al
         // siguiente candidato chocando contra un error al postular: el aviso tiene que salir aquí.
@@ -1036,34 +1086,8 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
         return nota.setScale(0, RoundingMode.UNNECESSARY);
     }
 
-    @Override
-    @Transactional
-    public void asignarVersionPesos(ContextoUsuario quien, Long id, Long versionPesosId) {
-        Vacante vacante = laQueSePuedeTocar(quien, id);
-        VersionPesos version = versionesPesos
-                .findByIdAndOrganizacionId(versionPesosId,
-                        dueno.duenoDe(quien.organizacionId(), Instrumento.PESOS))
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "Versión de pesos", "id", versionPesosId));
-        // La misma regla que al crear la vacante (RF-114): rige una versión aprobada.
-        if (!"PUBLICADA".equals(version.getEstado())) {
-            throw new IllegalStateException(
-                    "Esa versión de pesos todavía está en borrador: solo se puede usar una publicada");
-        }
-
-        // Nada se recalcula hacia atrás: cada nota guardada conserva la versión con la que
-        // se calculó. Pero eso protege el pasado, no la competencia: dos candidatos de la
-        // misma vacante medidos con varas distintas no se pueden ordenar en la misma lista.
-        // Por eso la versión solo se cambia en borrador (docs/DECISION-UNA-VACANTE-UNA-VERSION.md).
-        Long anterior = vacante.getVersionPesosId();
-        exigirVaraQuieta(vacante, anterior, versionPesosId, "su versión de pesos");
-        vacante.setVersionPesosId(versionPesosId);
-        vacantes.save(vacante);
-        auditoria.registrar(quien.organizacionId(), quien, "asignar_version_pesos",
-                "vacante", id,
-                anterior == null ? null : Map.of("versionPesosId", String.valueOf(anterior)),
-                Map.of("versionPesosId", String.valueOf(versionPesosId)), null);
-    }
+    // La versión de pesos se elige y se cambia en ServicioPesosDeLaVacante (V74): con
+    // candidatos dentro recalcula a todos, así que ya no frena en la primera postulación.
 
     /**
      * Qué rinde esta vacante en su etapa técnica, y cuánto tiempo tiene el candidato.
@@ -1235,9 +1259,11 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                 .orElseThrow(() -> new IllegalStateException(
                         "La vacante apunta a un puesto que no existe"));
         String nivel = puesto.getNivelPuestoCodigo();
-        if (versionesBanco.laPublicadaDelNivel(
-                dueno.duenoDe(vacante.getOrganizacionId(), Instrumento.BANCO), "NIVEL", nivel)
-                .isEmpty()) {
+        // Su propio banco, o la versión fija de una vacante vieja que leía el de RENASER
+        // (V74): el préstamo ya no existe y esa es la que rinden sus candidatos.
+        if (vacante.getVersionBancoFijaId() == null
+                && versionesBanco.laPublicadaDelNivel(vacante.getOrganizacionId(), "NIVEL", nivel)
+                        .isEmpty()) {
             throw new IllegalStateException("No hay ningún banco de preguntas publicado para el "
                     + "nivel " + nivel + ": quien postule no tendría evaluación que responder. "
                     + "Publica uno en Configuración, o apaga la evaluación del banco en esta "
@@ -1285,10 +1311,8 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
     /**
      * Si la empresa tiene un banco PROPIO publicado para ese nivel (V66).
      *
-     * <p>⚠️ <b>No pasa por {@link DuenoDelInstrumento}, y es a propósito</b>: el resolutor
-     * contesta el banco de RENASER a una empresa sin banco propio, y eso es justo el préstamo
-     * que deja de ofrecerse a las vacantes nuevas. Aquí se miran solo las filas de la propia
-     * empresa. RENASER lo tiene porque es suyo, no por ser una excepción.
+     * <p>Se miran solo las filas de la propia empresa: el banco de RENASER ya no se presta
+     * (V74), y RENASER lo tiene porque es suyo, no por ser una excepción.
      */
     private boolean tieneBancoPropioDelNivel(Long organizacionId, String nivel) {
         return nivel != null
@@ -1353,6 +1377,11 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
         }
         vacante.setAplicaEvaluacion(aplica);
         vacante.setOrigenPreguntas(nuevo);
+        // La versión fija del banco de RENASER (V74) solo vale mientras rinda el del nivel: al
+        // dejarlo se suelta, y no vuelve.
+        if (!Vacante.ORIGEN_NIVEL.equals(nuevo)) {
+            vacante.setVersionBancoFijaId(null);
+        }
         if (aplica && "PUBLICADA".equals(vacante.getEstado())) {
             exigirDeDondeSalenSusPreguntas(vacante);
         }
@@ -1842,7 +1871,7 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                                    FiltroAlcance alcanceDeArchivo,
                                    FiltroAlcance alcanceDeEliminacion, ContextoUsuario quien,
                                    PlazoDeLaPrueba plazo, CiudadDeLaVacante ciudad,
-                                   PreguntasDeLaFila preguntas) {
+                                   PreguntasDeLaFila preguntas, LoPrestado prestado) {
         Boolean bancoPropio = preguntas.bancoPropio();
         boolean alcanzaParaArchivar = alcanceDeArchivo != null
                 && alcance.alcanzaALaVacante(quien, alcanceDeArchivo, v);
@@ -1884,7 +1913,15 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                         : v.isAplicaEvaluacion()
                                 && Vacante.ORIGEN_NIVEL.equals(v.getOrigenPreguntas())
                                 && Boolean.FALSE.equals(bancoPropio),
-                preguntas.estadoPropias());
+                preguntas.estadoPropias(), prestado.banco(), prestado.prueba());
+    }
+
+    /**
+     * Lo que una vacante vieja conserva de RENASER (V74): su versión fija del banco y la
+     * prueba que ya tenía asignada. Solo lo resuelve el detalle; la lista lo deja vacío.
+     */
+    private record LoPrestado(BancoFijo banco, PruebaPrestada prueba) {
+        static final LoPrestado SIN_DATO = new LoPrestado(null, null);
     }
 
     // ============ La remuneración ============

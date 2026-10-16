@@ -289,7 +289,7 @@ class MaquinaEstadosAvisoTest {
                 .titulo("Analista contable").instrumentoEtapaTecnica("PRUEBA_PROPIA").build()));
         when(versionesBanco.pruebaPropiaDe(25L, "PUBLICADA")).thenReturn(Optional.of(
                 VersionBanco.builder().id(250L).modalidad("CRONOMETRADA").duracionMinutos(90)
-                        .urlConsigna(PDF_ARQ).build()));
+                        .consignaArchivoId(900L).build()));
         when(estados.findById("PRUEBA_TURNO_CANDIDATO"))
                 .thenReturn(Optional.of(estado("PRUEBA_TURNO_CANDIDATO", "CANDIDATO")));
         when(estados.findById("PERFIL_POR_CONFIRMAR"))

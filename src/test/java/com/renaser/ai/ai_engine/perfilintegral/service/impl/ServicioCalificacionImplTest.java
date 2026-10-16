@@ -3,6 +3,7 @@ package com.renaser.ai.ai_engine.perfilintegral.service.impl;
 import com.renaser.ai.ai_engine.pesos.entity.VersionPesos;
 import com.renaser.ai.ai_engine.pesos.repository.VersionPesosRepository;
 import com.renaser.ai.ai_engine.perfilintegral.entity.Evaluacion;
+import com.renaser.ai.ai_engine.perfilintegral.entity.NotaEtapa;
 import com.renaser.ai.ai_engine.perfilintegral.entity.Opcion;
 import com.renaser.ai.ai_engine.perfilintegral.entity.ParConsistencia;
 import com.renaser.ai.ai_engine.perfilintegral.entity.Pregunta;
@@ -22,6 +23,8 @@ import com.renaser.ai.ai_engine.vacante.repository.VacanteRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -31,9 +34,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -148,6 +154,41 @@ class ServicioCalificacionImplTest {
         // el conteo de arriba sigue en 1 y solo esto lo delata.
         verify(opciones, never()).findByPreguntaIdOrderByLetra(any());
         verify(opciones, never()).findById(any());
+    }
+
+    @Test
+    @DisplayName("QA-03 · la nota de lo cerrado sale con la versión de pesos que la vacante tiene "
+            + "cuando el cambio a mitad confirma, no con la que se leyó antes")
+    void laNotaDeLoCerradoSaleConLaVersionConfirmada() {
+        when(postulaciones.findById(50L)).thenReturn(Optional.of(
+                Postulacion.builder().id(50L).evaluacionId(60L).vacanteId(5L).build()));
+        when(evaluaciones.findById(60L)).thenReturn(Optional.of(
+                Evaluacion.builder().id(60L).versionBancoNivelId(30L).build()));
+        when(respuestas.findByEvaluacionId(60L)).thenReturn(List.of(
+                Respuesta.builder().evaluacionId(60L).preguntaId(1L).opcionId(11L).build()));
+        when(preguntas.findByIdIn(anyList())).thenReturn(List.of(
+                Pregunta.builder().id(1L).tipo("PC").peso((short) 1).esPuntuable(false).build()));
+        when(opciones.findByPreguntaIdIn(anyList())).thenReturn(List.of(
+                Opcion.builder().id(11L).preguntaId(1L).letra("A").puntaje(BigDecimal.ONE).build()));
+        // Leída con la 7; el cambio a la 8 confirmó mientras esperaba al cerrojo, que la relee
+        Vacante vacante = Vacante.builder().id(5L).versionPesosId(7L).build();
+        when(vacantes.findById(5L)).thenReturn(Optional.of(vacante));
+        doAnswer(i -> {
+            ((Vacante) i.getArgument(0)).setVersionPesosId(8L);
+            return null;
+        }).when(vacantes).bloquearParaCalificar(vacante);
+        when(versionesPesos.findById(8L)).thenReturn(Optional.of(VersionPesos.builder().id(8L).build()));
+        when(notasEtapa.findByPostulacionIdAndEtapaCodigo(50L, "PERFIL_INTEGRAL"))
+                .thenReturn(Optional.empty());
+
+        servicio.calificarLoCerrado(50L);
+
+        ArgumentCaptor<NotaEtapa> guardada = ArgumentCaptor.forClass(NotaEtapa.class);
+        verify(notasEtapa).save(guardada.capture());
+        assertThat(guardada.getValue().getVersionPesosId()).isEqualTo(8L);
+        InOrder orden = inOrder(vacantes, notasEtapa);
+        orden.verify(vacantes).bloquearParaCalificar(vacante);
+        orden.verify(notasEtapa).save(any());
     }
 
     @Test

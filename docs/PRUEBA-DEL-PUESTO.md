@@ -216,6 +216,12 @@ de plantilla.
 - ⚠️ **Lo que ya salió no se recoge.** Los correos enviados antes del 03/10/2026 llevan el enlace
   largo de la consigna, que todavía abre el PDF sin empezar. Y en una base recién migrada el
   texto que siembra la `V29` deja «DESCARGA AQUI EL ENUNCIADO:» seguido de una línea vacía.
+- **El editor ya no fabrica ese enlace** (`V74`, 16/10/2026). Subir el enunciado guarda el archivo
+  y nada más, y «copiar de otra vacante» copia el archivo. El panel y el portal —este, después de
+  «Empezar»— lo abren con un enlace fresco cada vez; si el almacén no sabe firmar (el de disco, en
+  local), el portal enseña el nombre del adjunto sin enlace: el plan B que leía el enlace guardado
+  se quitó. `version_banco.url_consigna` se vació. **La de las plantillas no se tocó**: allí no hay
+  archivo y su enlace es la única pista del PDF.
 - **La pantalla previa del portal** pasó a ser una ficha corta, la misma para las dos pruebas. Cómo
   se ve, en el `docs/02-QUE-VE-EL-CANDIDATO.md` del frontend, 2.9.
 

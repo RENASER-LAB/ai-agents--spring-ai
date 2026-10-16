@@ -42,6 +42,12 @@ una versión de pesos que no la calculó.
 **Van en fila y no a la vez** porque el tercero necesita lo que dejaron los dos primeros. Y
 así hay un solo trabajo vivo por candidato, que es lo que hace fácil reintentar.
 
+**Si la vacante cambia de pesos con candidatos dentro (`V74`), la IA no vuelve a calificar.** Lo
+que ella pone no depende de los pesos —la nota de 0 a 100 de cada criterio del currículum, lo que
+vio en cada abierta, los hallazgos—, y la cuenta con los pesos la hace el código, que la rehace
+para todos con la versión nueva. Una calificación que esté en curso durante el cambio lo espera
+y sale ya con la versión nueva. Ver [Una vacante, una versión](DECISION-UNA-VACANTE-UNA-VERSION.md).
+
 ---
 
 ## Antes de que la IA lea nada: el currículum recortado
@@ -209,7 +215,9 @@ sale de los puntos.
 nadie por sí mismos, pero al terminar se vuelve a mirar a quien espera en «por confirmar» en una
 vacante con «calificar y avanzar sola»: si su nota ahora llega a la mínima, pasa sola a la prueba,
 con su correo y su campana. A quien ya está en la prueba no se le toca aunque la nota baje. Ver
-[Estados de la postulación](03-ESTADOS-POSTULACION.md), «La nota mínima».
+[Estados de la postulación](03-ESTADOS-POSTULACION.md), «La nota mínima». **Cambiar la versión de
+pesos de la vacante (`V74`) no lo dispara**: recalcula a todos, pero a quien ahora llega a la
+mínima lo mueve el equipo.
 
 **Corregir la guía con gente dentro: la recalificación.** Si la empresa cambia la guía, lo que
 evalúa un criterio o lo que debe tener una abierta cuando ya hay candidatos calificados, **se
@@ -398,6 +406,7 @@ decide quién dispara cada calificación:
 | Al entregar la **prueba del puesto** | Espera a que alguien pulse «calificar» | Se califica sola |
 | Al terminar el retrato | La postulación espera a una persona | Pasa sola a la etapa técnica **si su nota del Perfil Integral llega a la mínima de la vacante** (60 por defecto, `V72`); si no llega, o no hay nota completa, espera a una persona |
 | Al recalcular la nota de quien espera (ajuste a mano, recalificación, cambio de puntos) | Nada se mueve | Si sigue en «por confirmar» y ahora llega a la mínima, pasa sola |
+| Al cambiar la versión de pesos de la vacante (`V74`) | Se recalcula a todos, sin IA, y nada se mueve | Igual: **nada se mueve**, tampoco por la mínima |
 
 **El interruptor nace apagado porque cuesta dinero.** En automático, cada persona que postule
 gasta una llamada al modelo desde el momento en que postula, y esa decisión es de quien lleva

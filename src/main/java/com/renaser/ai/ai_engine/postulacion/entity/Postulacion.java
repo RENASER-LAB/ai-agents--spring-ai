@@ -2,12 +2,28 @@ package com.renaser.ai.ai_engine.postulacion.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.DynamicUpdate;
 
 import java.time.Instant;
 import java.util.UUID;
 
 // Un usuario en una vacante. Un solo estado a la vez, nunca dos.
+//
+// ⚠️ @DynamicUpdate: cada guardado escribe SOLO las columnas que cambió (QA-04, QA-05 de
+// specs/pesos-con-candidatos-y-fin-del-prestamo.md). La fila la escriben a la vez caminos que
+// tocan columnas distintas: la máquina de estados (estado, movido_en, motivo_cierre) y el
+// recálculo del Perfil Integral (grupo_prioridad), que un cambio de pesos corre para toda la
+// vacante en una sola transacción. Con el UPDATE de la fila entera, el último en confirmar
+// reescribía la columna del otro con lo que leyó antes: la entrega que esperaba al cambio le
+// devolvía a la persona el grupo de la versión vieja, y el cambio devolvía a su etapa de antes
+// a quien el equipo había movido o descartado mientras corría.
+//
+// Lo que se calcula después de esperar al cerrojo de los pesos parte además de la fila releída
+// (CerrojoDeLosPesos#bloquearParaCalificarYReleer): con la foto de antes, un grupo que vuelve a
+// coincidir con ella no se escribiría. No hay triggers sobre postulacion, y las escrituras por
+// consulta no dependen de reescribir la fila entera.
 @Entity
+@DynamicUpdate
 @Table(name = "postulacion")
 @Getter @Setter @Builder @NoArgsConstructor @AllArgsConstructor
 public class Postulacion {

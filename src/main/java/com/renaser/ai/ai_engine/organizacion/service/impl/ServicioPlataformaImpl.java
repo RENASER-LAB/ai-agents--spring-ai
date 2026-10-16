@@ -115,8 +115,7 @@ public class ServicioPlataformaImpl implements ServicioPlataforma {
                 .map(o -> new EmpresaPanel(o.getId(), o.getCodigo(), o.getNombre(),
                         o.isEsActiva(),
                         topes.get(o.getId()),
-                        new Personalizacion(o.isBancoPropio(), o.isPesosPropios(),
-                                o.isPlantillasEvaluacionPropias(), o.isPruebasPuestoPropias()),
+                        new Personalizacion(o.isPesosPropios(), o.isPlantillasEvaluacionPropias()),
                         consumoPorOrganizacion.getOrDefault(o.getId(), BigDecimal.ZERO),
                         o.getCreadoEn()))
                 .toList();

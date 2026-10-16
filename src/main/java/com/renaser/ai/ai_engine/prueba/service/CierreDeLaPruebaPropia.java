@@ -47,6 +47,26 @@ public class CierreDeLaPruebaPropia {
     private final MaquinaEstados maquina;
 
     /**
+     * Lo primero de cualquier camino que pueda acabar escribiendo la nota de la etapa —un
+     * ajuste a mano, la nota de la IA, «calcular la nota»—, antes de tocar el intento o sus
+     * notas: la vacante, compartida hasta el final de la transacción (QA-03).
+     *
+     * <p>La nota de la prueba no depende de los pesos, pero dice con qué versión se calculó.
+     * Con un cambio de pesos a mitad, esto espera a que confirme y la nota sale con la versión
+     * nueva; si el cambio llega después, es él quien espera y la ve. Ver {@link
+     * com.renaser.ai.ai_engine.vacante.repository.CerrojoDeLosPesos}.
+     *
+     * <p>La postulación sale releída (QA-04): quien llama suele tenerla cargada de antes —el
+     * guardián del panel, la cola de la IA— y, si el cambio confirmó mientras esperaba, la de
+     * memoria trae el grupo de la versión vieja. Desde aquí, el mismo contexto la devuelve ya
+     * como está en la base, y moverla a «por confirmar» no le toca el grupo.
+     */
+    public void esperarAlCambioDePesos(IntentoPrueba intento) {
+        postulaciones.findById(intento.getPostulacionId())
+                .ifPresent(vacantes::bloquearParaCalificarYReleer);
+    }
+
+    /**
      * Recién entregada (a mano, o sola al vencer con todo respondido) y ya en «calificando».
      *
      * <p>Las cerradas las cuenta el sistema ahora mismo (se calculan al leer). Si con eso ya
@@ -55,6 +75,10 @@ public class CierreDeLaPruebaPropia {
      * <p>⚠️ <b>No encola a la IA: lo dice.</b> Quien llama decide si la vacante califica sola.
      * Esta clase la usa también el puente del agente, y depender de la cola cerraría un
      * círculo de dependencias (cola → agentes → puente → esto → cola).
+     *
+     * <p>⚠️ Quien entrega ya movió la postulación: tiene que haber pedido la vacante antes
+     * ({@code bloquearParaCalificarYReleer}), o la nota que se escribe aquí se cruza con un
+     * cambio de pesos (QA-03).
      *
      * @return si faltan criterios de IA por calificar
      */
@@ -99,8 +123,12 @@ public class CierreDeLaPruebaPropia {
 
     private BigDecimal cerrar(Postulacion postulacion, Resultado r, boolean mover) {
         BigDecimal nota = r.nota().setScale(2, RoundingMode.HALF_UP);
-        Long versionPesosId = vacantes.findById(postulacion.getVacanteId())
-                .map(Vacante::getVersionPesosId).orElse(null);
+        // La versión con que se escribe, leída con el cerrojo de los pesos (QA-03): sin él, una
+        // nota que cerraba la prueba en mitad de un cambio salía con la versión de antes y así
+        // se quedaba. Quien llama ya lo pidió al empezar, así que aquí no espera a nadie.
+        Vacante vacante = vacantes.findById(postulacion.getVacanteId()).orElse(null);
+        vacantes.bloquearParaCalificar(vacante);
+        Long versionPesosId = vacante == null ? null : vacante.getVersionPesosId();
         NotaEtapa fila = notasEtapa.findByPostulacionIdAndEtapaCodigo(postulacion.getId(), ETAPA)
                 .orElseGet(() -> NotaEtapa.builder()
                         .postulacionId(postulacion.getId())

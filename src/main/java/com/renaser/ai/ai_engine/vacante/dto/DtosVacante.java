@@ -243,7 +243,57 @@ public final class DtosVacante {
                                 * para todas las filas; el detalle lo lee del editor, que trae
                                 * además los puntos.
                                 */
-                               String estadoPreguntasPropias) {}
+                               String estadoPreguntasPropias,
+                               /**
+                                * La versión del banco de RENASER fijada en esta vacante vieja
+                                * (V74), con lo que el panel dice de ella: «Qué evaluación
+                                * responderá». El banco de RENASER ya no sale en la lista de
+                                * versiones de una empresa cliente, así que el panel no tiene
+                                * otro sitio donde leerla. Vacío si no tiene versión fija.
+                                *
+                                * <p>⚠️ <b>Solo viaja en el detalle.</b>
+                                */
+                               BancoFijo bancoFijo,
+                               /**
+                                * La prueba de RENASER que esta vacante vieja ya tenía asignada
+                                * (V74): la conserva por su id, pero las pruebas de RENASER ya
+                                * no se listan para una empresa cliente, y sin esto el
+                                * desplegable no tendría con qué nombrarla. Vacía si la
+                                * asignada es de la propia empresa o no hay ninguna.
+                                *
+                                * <p>⚠️ <b>Solo viaja en el detalle.</b>
+                                */
+                               PruebaPrestada pruebaPrestada) {}
+
+    /** La versión fija del banco de una vacante vieja (V74). */
+    public record BancoFijo(Long id, String etiqueta, Integer minutosObjetivo) {}
+
+    /** La prueba de RENASER que una vacante vieja ya tenía asignada (V74). */
+    public record PruebaPrestada(Long versionId, Long plantillaPruebaId, String nombre,
+                                 Integer version) {}
+
+    /**
+     * Lo que pasaría al cambiar la versión de pesos de una vacante (V74), para la
+     * confirmación del panel: a cuántas personas se les recalcula la nota y qué pesos
+     * cambian, antes y después.
+     *
+     * @param personasConNota cuántas tienen alguna nota: sin ninguna, se guarda sin preguntar
+     * @param cambia          falso si la versión pedida es la que ya tiene
+     * @param etapas          cuánto pesa cada etapa en la nota final, en el orden del proceso
+     * @param perfilIntegral  cómo se reparte el Perfil Integral: currículum y evaluación
+     */
+    public record CambioDePesosPrevisto(Long versionAnteriorId, String etiquetaAnterior,
+                                        Long versionNuevaId, String etiquetaNueva,
+                                        int personasConNota, boolean cambia,
+                                        java.util.List<PesoAntesYDespues> etapas,
+                                        java.util.List<PesoAntesYDespues> perfilIntegral) {}
+
+    /** Un peso, antes y después. Vacío donde esa versión no lo trae. */
+    public record PesoAntesYDespues(String codigo, String nombre, BigDecimal antes,
+                                    BigDecimal despues) {}
+
+    /** Lo que contesta el cambio: la versión que rige ya y a cuántas personas se recalculó. */
+    public record CambioDePesosHecho(Long versionPesosId, int personasRecalculadas) {}
 
     /**
      * Una ciudad del catálogo, como la ve el panel: el código que se guarda y el nombre que

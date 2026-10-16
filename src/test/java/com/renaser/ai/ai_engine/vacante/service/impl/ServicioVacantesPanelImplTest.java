@@ -17,6 +17,8 @@ import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
 import com.renaser.ai.ai_engine.solicitud.entity.SolicitudTalento;
 import com.renaser.ai.ai_engine.solicitud.repository.SolicitudTalentoRepository;
 import com.renaser.ai.ai_engine.vacante.dto.DtosVacante.AsignarPlantillaCorreo;
+import com.renaser.ai.ai_engine.vacante.dto.DtosVacante.BancoFijo;
+import com.renaser.ai.ai_engine.vacante.dto.DtosVacante.PruebaPrestada;
 import com.renaser.ai.ai_engine.vacante.dto.DtosVacante.DefinirCierrePrueba;
 import com.renaser.ai.ai_engine.vacante.dto.DtosVacante.GuardarPuesto;
 import com.renaser.ai.ai_engine.vacante.dto.DtosVacante.GuardarVacante;
@@ -71,6 +73,7 @@ class ServicioVacantesPanelImplTest {
     private static final Long ORGANIZACION = 1L;
     private static final Long VACANTE = 40L;
     private static final Long VERSION_PESOS = 9L;
+    private static final Long PLATAFORMA = 99L;
     private static final Long PUESTO = 5L;
     private static final String NIVEL = "EJECUCION";
 
@@ -119,6 +122,10 @@ class ServicioVacantesPanelImplTest {
                 .when(dueno.duenoDe(org.mockito.ArgumentMatchers.eq(ORGANIZACION),
                         org.mockito.ArgumentMatchers.any()))
                 .thenReturn(ORGANIZACION);
+        // RENASER, de donde vino lo que una vacante vieja conserva prestado (V74).
+        org.mockito.Mockito.lenient().when(dueno.plataforma()).thenReturn(
+                com.renaser.ai.ai_engine.organizacion.entity.Organizacion.builder()
+                        .id(PLATAFORMA).esPlataforma(true).build());
         // El puesto de la vacante y el banco publicado de su nivel: sin los dos, publicar
         // con la evaluacion encendida falla, y eso lo comprueba su propia prueba apagando
         // este mock. Lenient porque la mitad de estas pruebas no llegan a mirarlos.
@@ -627,7 +634,7 @@ class ServicioVacantesPanelImplTest {
         // Rinde el banco prestado y ya hay alguien medido con él: apagarla y volver a
         // encenderla tiene que devolverle ese mismo banco, como antes de la V66.
         Vacante v = vacante("PUBLICADA", true, null);
-        elBancoDelNivelEsPrestado();
+        elBancoDelNivelEsPrestado(v);
         when(postulaciones.countByVacanteId(VACANTE)).thenReturn(1L);
 
         servicio.definirAplicacionEvaluacion(QUIEN, VACANTE, false);
@@ -650,34 +657,35 @@ class ServicioVacantesPanelImplTest {
             + "el origen")
     void conPostulantesEncenderUnaApagadaConservaElOrigen() {
         Vacante v = vacante("PUBLICADA", false, null);
-        elBancoDelNivelEsPrestado();
+        elBancoDelNivelEsPrestado(v);
         when(postulaciones.countByVacanteId(VACANTE)).thenReturn(2L);
 
         servicio.definirAplicacionEvaluacion(QUIEN, VACANTE, true);
 
         assertThat(v.isAplicaEvaluacion()).isTrue();
         assertThat(v.getOrigenPreguntas()).isEqualTo(Vacante.ORIGEN_NIVEL);
+        // Encenderla publicada exige banco: le basta su versión fija, aunque RENASER ya la
+        // haya archivado al publicar otra (V74).
+        assertThat(v.getVersionBancoFijaId()).isEqualTo(16L);
+        verify(versionesBanco, never()).laPublicadaDelNivel(PLATAFORMA, "NIVEL", NIVEL);
         verify(vacantes).save(v);
     }
 
     /**
-     * Sin banco PROPIO del nivel, el que rinde es el de RENASER: el resolutor contesta a otra
-     * organización para el banco, y ella sí lo tiene publicado.
+     * Sin banco PROPIO del nivel, el que rinde es el de RENASER: desde la V74 no lo resuelve
+     * nadie en cada postulación, la vacante vieja lo tiene fijado en su versión fija.
      */
-    private void elBancoDelNivelEsPrestado() {
-        Long renaser = 99L;
+    private void elBancoDelNivelEsPrestado(Vacante v) {
         org.mockito.Mockito.lenient()
                 .when(versionesBanco.laPublicadaDelNivel(ORGANIZACION, "NIVEL", NIVEL))
                 .thenReturn(Optional.empty());
+        v.setVersionBancoFijaId(16L);
         org.mockito.Mockito.lenient()
-                .when(dueno.duenoDe(ORGANIZACION,
-                        com.renaser.ai.ai_engine.organizacion.service.Instrumento.BANCO))
-                .thenReturn(renaser);
-        org.mockito.Mockito.lenient()
-                .when(versionesBanco.laPublicadaDelNivel(renaser, "NIVEL", NIVEL))
+                .when(versionesBanco.findById(16L))
                 .thenReturn(Optional.of(com.renaser.ai.ai_engine.perfilintegral.entity.VersionBanco
-                        .builder().id(16L).tipoBanco("NIVEL").nivelPuestoCodigo(NIVEL)
-                        .estado("PUBLICADA").minutosObjetivo(35).build()));
+                        .builder().id(16L).organizacionId(PLATAFORMA).tipoBanco("NIVEL")
+                        .nivelPuestoCodigo(NIVEL).etiqueta("Banco RENASER v3")
+                        .estado("ARCHIVADA").minutosObjetivo(35).build()));
     }
 
     @Test
@@ -690,11 +698,68 @@ class ServicioVacantesPanelImplTest {
         when(versionesBanco.laPublicadaDelNivel(ORGANIZACION, "NIVEL", NIVEL))
                 .thenReturn(Optional.empty());
         when(postulaciones.countByVacanteId(VACANTE)).thenReturn(0L);
+        v.setVersionBancoFijaId(16L);
 
         servicio.definirAplicacionEvaluacion(QUIEN, VACANTE, false);
 
         assertThat(v.isAplicaEvaluacion()).isFalse();
         assertThat(v.getOrigenPreguntas()).isEqualTo(Vacante.ORIGEN_VACANTE);
+        // Y suelta la versión fija del banco de RENASER: ya no la va a rendir (V74)
+        assertThat(v.getVersionBancoFijaId()).isNull();
+    }
+
+    @Test
+    @DisplayName("una vacante sin banco propio ni versión fija no se publica con el banco del nivel: "
+            + "el de RENASER ya no se presta (V74)")
+    void sinBancoPropioNiFijaNoHayExamen() {
+        Vacante v = vacante("BORRADOR", true, null);
+        when(versionesBanco.laPublicadaDelNivel(ORGANIZACION, "NIVEL", NIVEL))
+                .thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> servicio.publicar(QUIEN, VACANTE))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("No hay ningún banco de preguntas publicado");
+        assertThat(v.getEstado()).isEqualTo("BORRADOR");
+        // Y no se busca en el de RENASER: el banco no es un instrumento prestable
+        verify(versionesBanco, never()).laPublicadaDelNivel(PLATAFORMA, "NIVEL", NIVEL);
+    }
+
+    @Test
+    @DisplayName("el detalle de una vacante vieja trae su versión fija del banco y la prueba de "
+            + "RENASER que ya tenía, con su nombre (V74)")
+    void elDetalleTraeLoQueConservaDeRenaser() {
+        Vacante v = vacante("PUBLICADA", true, null);
+        elBancoDelNivelEsPrestado(v);
+        when(versionesPrueba.laDeLaOrganizacion(31L, ORGANIZACION)).thenReturn(Optional.empty());
+        when(versionesPrueba.laDeLaOrganizacion(31L, PLATAFORMA)).thenReturn(Optional.of(
+                VersionPlantillaPrueba.builder().id(31L).plantillaPruebaId(300L).version(2)
+                        .modalidad("CRONOMETRADA").duracionMinutos(60).build()));
+        when(plantillasPrueba.findByIdAndOrganizacionId(300L, PLATAFORMA)).thenReturn(Optional.of(
+                com.renaser.ai.ai_engine.prueba.entity.PlantillaPrueba.builder().id(300L)
+                        .organizacionId(PLATAFORMA).nombre("Prueba de Administrador").build()));
+
+        var panel = servicio.detalle(QUIEN, VACANTE);
+
+        assertThat(panel.bancoFijo()).isEqualTo(
+                new BancoFijo(16L, "Banco RENASER v3", 35));
+        assertThat(panel.pruebaPrestada()).isEqualTo(
+                new PruebaPrestada(31L, 300L, "Prueba de Administrador", 2));
+        // La etapa técnica sigue leyendo esa misma prueba por su id: su plazo no se pierde (AC-12)
+        assertThat(panel.modalidadPrueba()).isEqualTo("CRONOMETRADA");
+        assertThat(panel.minutosPruebaVigentes()).isEqualTo(60);
+    }
+
+    @Test
+    @DisplayName("con su propia prueba asignada, el detalle no habla de nada prestado")
+    void conSuPropiaPruebaNadaPrestado() {
+        vacante("PUBLICADA", false, null);
+        laVersionDeLaEmpresa(VersionPlantillaPrueba.builder().id(31L)
+                .modalidad("CRONOMETRADA").duracionMinutos(30).build());
+
+        var panel = servicio.detalle(QUIEN, VACANTE);
+
+        assertThat(panel.pruebaPrestada()).isNull();
+        assertThat(panel.bancoFijo()).isNull();
     }
 
     @Test
@@ -719,75 +784,7 @@ class ServicioVacantesPanelImplTest {
     }
 
     // ============ Los pesos de la vacante ============
-
-    @Test
-    @DisplayName("los pesos solo se cambian a una versión publicada")
-    void losPesosExigenVersionPublicada() {
-        vacante("PUBLICADA", false, null);
-        when(versionesPesos.findByIdAndOrganizacionId(VERSION_PESOS, ORGANIZACION))
-                .thenReturn(Optional.of(VersionPesos.builder()
-                        .id(VERSION_PESOS).estado("BORRADOR").build()));
-
-        assertThatThrownBy(() -> servicio.asignarVersionPesos(QUIEN, VACANTE, VERSION_PESOS))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("borrador");
-    }
-
-    @Test
-    @DisplayName("asignar una versión publicada queda guardado y auditado")
-    void asignarUnaPublicadaSeGuarda() {
-        // En borrador: publicada la vacante, la vara ya no se cambia (ver el test siguiente).
-        Vacante v = vacante("BORRADOR", false, null);
-        v.setVersionPesosId(2L);
-        when(versionesPesos.findByIdAndOrganizacionId(VERSION_PESOS, ORGANIZACION))
-                .thenReturn(Optional.of(VersionPesos.builder()
-                        .id(VERSION_PESOS).estado("PUBLICADA").build()));
-
-        servicio.asignarVersionPesos(QUIEN, VACANTE, VERSION_PESOS);
-
-        assertThat(v.getVersionPesosId()).isEqualTo(VERSION_PESOS);
-        verify(vacantes).save(v);
-        verify(auditoria).registrar(ORGANIZACION, QUIEN, "asignar_version_pesos",
-                "vacante", VACANTE, Map.of("versionPesosId", "2"),
-                Map.of("versionPesosId", String.valueOf(VERSION_PESOS)), null);
-    }
-
-    @Test
-    @DisplayName("con postulantes dentro, la versión de pesos ya no se cambia: una vacante, una versión")
-    void conPostulantesLosPesosNoSeCambian() {
-        // Todos los candidatos de una vacante se miden con la misma vara
-        // (docs/DECISION-UNA-VACANTE-UNA-VERSION.md). Cambiarla a mitad dejaría a unos
-        // calificados con la v1 y a otros con la v2, ordenados juntos en el mismo ranking.
-        Vacante v = vacante("PUBLICADA", false, null);
-        v.setVersionPesosId(2L);
-        when(versionesPesos.findByIdAndOrganizacionId(VERSION_PESOS, ORGANIZACION))
-                .thenReturn(Optional.of(VersionPesos.builder()
-                        .id(VERSION_PESOS).estado("PUBLICADA").build()));
-        when(postulaciones.countByVacanteId(VACANTE)).thenReturn(1L);
-
-        assertThatThrownBy(() -> servicio.asignarVersionPesos(QUIEN, VACANTE, VERSION_PESOS))
-                .isInstanceOf(IllegalStateException.class)
-                .hasMessageContaining("misma vara");
-        verify(vacantes, org.mockito.Mockito.never()).save(v);
-    }
-
-    @Test
-    @DisplayName("publicada pero sin postulantes, la vacante todavía se termina de configurar")
-    void publicadaSinPostulantesSeConfigura() {
-        // La línea es la primera postulación, no la publicación: el flujo sin banco asigna
-        // sus pesos después de publicar, antes de abrir la puerta a nadie.
-        Vacante v = vacante("PUBLICADA", false, null);
-        v.setVersionPesosId(2L);
-        when(versionesPesos.findByIdAndOrganizacionId(VERSION_PESOS, ORGANIZACION))
-                .thenReturn(Optional.of(VersionPesos.builder()
-                        .id(VERSION_PESOS).estado("PUBLICADA").build()));
-        when(postulaciones.countByVacanteId(VACANTE)).thenReturn(0L);
-
-        servicio.asignarVersionPesos(QUIEN, VACANTE, VERSION_PESOS);
-
-        assertThat(v.getVersionPesosId()).isEqualTo(VERSION_PESOS);
-        verify(vacantes).save(v);
-    }
+    // Se eligen y se cambian en ServicioPesosDeLaVacante (V74): ver su propia prueba.
 
     // ============ Cuándo cierra la prueba de la vacante ============
 
@@ -1002,9 +999,12 @@ class ServicioVacantesPanelImplTest {
         // pintar el reloj de la prueba de otra empresa.
         vacante("PUBLICADA", false, null);
         when(versionesPrueba.laDeLaOrganizacion(31L, ORGANIZACION)).thenReturn(Optional.empty());
+        // Ni la que RENASER le hubiera prestado: es de una tercera
+        when(versionesPrueba.laDeLaOrganizacion(31L, PLATAFORMA)).thenReturn(Optional.empty());
 
         var panel = servicio.detalle(QUIEN, VACANTE);
 
+        assertThat(panel.pruebaPrestada()).isNull();
         assertThat(panel.modalidadPrueba()).isNull();
         assertThat(panel.minutosPruebaVigentes()).isNull();
         assertThat(panel.diasPruebaVigentes()).isNull();
@@ -1113,17 +1113,6 @@ class ServicioVacantesPanelImplTest {
         verify(auditoria).registrar(ORGANIZACION, QUIEN, "asignar_plantilla_correo_vacante",
                 "vacante", VACANTE, null,
                 Map.of("PRUEBA_DISPONIBLE", "PRUEBA_DISPONIBLE_ADMINISTRADOR"), null);
-    }
-
-    @Test
-    @DisplayName("una versión de pesos de otra organización no existe para quien pregunta")
-    void losPesosDeOtraOrganizacionNoExisten() {
-        vacante("PUBLICADA", false, null);
-        when(versionesPesos.findByIdAndOrganizacionId(VERSION_PESOS, ORGANIZACION))
-                .thenReturn(Optional.empty());
-
-        assertThatThrownBy(() -> servicio.asignarVersionPesos(QUIEN, VACANTE, VERSION_PESOS))
-                .isInstanceOf(ResourceNotFoundException.class);
     }
 
     @Test

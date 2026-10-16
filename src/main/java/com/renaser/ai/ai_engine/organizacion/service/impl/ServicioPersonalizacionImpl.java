@@ -29,29 +29,19 @@ public class ServicioPersonalizacionImpl implements ServicioPersonalizacion {
     @Override
     public Personalizacion ver(ContextoUsuario quien) {
         Organizacion organizacion = laDe(quien);
-        return new Personalizacion(organizacion.isBancoPropio(), organizacion.isPesosPropios(),
-                organizacion.isPlantillasEvaluacionPropias(), organizacion.isPruebasPuestoPropias());
+        return new Personalizacion(organizacion.isPesosPropios(),
+                organizacion.isPlantillasEvaluacionPropias());
     }
 
-    /**
-     * Personalizar el banco o las pruebas ya no existe (V67, decisión 13): encenderlo o
-     * apagarlo, lo pida la empresa o la plataforma, contesta 400 y no copia ni cambia nada.
-     * Cada empresa escribe sus preguntas y su prueba técnica en cada vacante. Quien ya las
-     * tenía personalizadas conserva lo suyo, y su bandera no se toca.
+    /*
+     * Personalizar el banco o las pruebas ya no existe (V67, decisión 13), y desde la V74
+     * tampoco son un Instrumento: el texto «BANCO» o «PRUEBA» de la API contesta 400 con
+     * Instrumento.YA_NO_EXISTE antes de llegar aquí, y no copia ni cambia nada.
      */
-    static final String YA_NO_EXISTE = "Esta personalización ya no existe: cada empresa "
-            + "escribe sus preguntas y su prueba técnica en cada vacante.";
-
-    private static void exigirQueExista(Instrumento instrumento) {
-        if (instrumento == Instrumento.BANCO || instrumento == Instrumento.PRUEBA) {
-            throw new IllegalArgumentException(YA_NO_EXISTE);
-        }
-    }
 
     @Override
     @Transactional
     public void encender(ContextoUsuario quien, Instrumento instrumento) {
-        exigirQueExista(instrumento);
         encender(quien, laDe(quien), instrumento, null);
     }
 
@@ -60,7 +50,6 @@ public class ServicioPersonalizacionImpl implements ServicioPersonalizacion {
     public void encenderPara(ContextoUsuario quien, Long organizacionId, Instrumento instrumento,
                              String motivo) {
         Organizacion objetivo = laObjetivo(quien, organizacionId);
-        exigirQueExista(instrumento);
         encender(quien, objetivo, instrumento, motivo);
     }
 
@@ -69,7 +58,6 @@ public class ServicioPersonalizacionImpl implements ServicioPersonalizacion {
     public void apagarPara(ContextoUsuario quien, Long organizacionId, Instrumento instrumento,
                            String motivo) {
         Organizacion objetivo = laObjetivo(quien, organizacionId);
-        exigirQueExista(instrumento);
         apagar(quien, objetivo, instrumento, motivo);
     }
 
@@ -89,8 +77,6 @@ public class ServicioPersonalizacionImpl implements ServicioPersonalizacion {
         Map<String, Integer> copiado = switch (instrumento) {
             case PESOS -> copiador.copiarPesos(organizacion.getId());
             case PLANTILLA_EVALUACION -> copiador.copiarPlantillasEvaluacion(organizacion.getId());
-            // Ya rechazados en exigirQueExista: nunca llegan aquí.
-            case BANCO, PRUEBA -> throw new IllegalArgumentException(YA_NO_EXISTE);
         };
         instrumento.poner(organizacion, true);
         organizaciones.save(organizacion);
@@ -103,7 +89,6 @@ public class ServicioPersonalizacionImpl implements ServicioPersonalizacion {
     @Override
     @Transactional
     public void apagar(ContextoUsuario quien, Instrumento instrumento) {
-        exigirQueExista(instrumento);
         apagar(quien, laDe(quien), instrumento, null);
     }
 

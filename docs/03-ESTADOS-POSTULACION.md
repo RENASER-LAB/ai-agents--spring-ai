@@ -388,6 +388,9 @@ quién va a la simulación**, con las notas de la prueba ya delante.
   (60)» o «Sin nota completa: revisa el Perfil Integral».
 - **Cambiar la mínima no mueve a nadie que ya espera.** Vale para las notas que terminen desde
   ese momento y para los recálculos. A quienes ya esperaban los mueve el equipo, también en lote.
+- **Cambiar la versión de pesos tampoco** (`V74`): recalcula la nota de todos a la vez, pero no es
+  uno de los recálculos que dan el pase. Quien con la nota nueva llega a la mínima lo mueve el
+  equipo, como al cambiar la mínima.
 - **Encender el interruptor con gente esperando tampoco la mueve**: solo pasan solos si después
   termina o se recalcula su nota. Apagarlo hace que nadie pase solo desde entonces.
 - **A quien ya está en la prueba no se le toca**, aunque su nota baje después.

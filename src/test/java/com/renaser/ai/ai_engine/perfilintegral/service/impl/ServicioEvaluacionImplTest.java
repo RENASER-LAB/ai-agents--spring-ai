@@ -91,6 +91,77 @@ class ServicioEvaluacionImplTest {
             new ContextoUsuario(9L, 9L, 1L, "CANDIDATO", List.of(), Map.of());
 
     @Test
+    @DisplayName("una vacante vieja con versión fija rinde esa, aunque RENASER ya la haya archivado "
+            + "al publicar otra (V74, AC-10)")
+    void conVersionFijaRindeEsa() {
+        when(plantillas.findById(3L)).thenReturn(Optional.of(
+                PlantillaEvaluacion.builder().id(3L).vigenciaMeses(6).build()));
+        when(versionesBanco.findById(16L)).thenReturn(Optional.of(VersionBanco.builder().id(16L)
+                .organizacionId(99L).tipoBanco("NIVEL").estado("ARCHIVADA").build()));
+        when(evaluaciones.save(any())).thenAnswer(i -> {
+            Evaluacion e = i.getArgument(0);
+            e.setId(70L);
+            return e;
+        });
+        when(parametros.entero(any(), any(), org.mockito.ArgumentMatchers.anyInt())).thenReturn(14);
+
+        servicio.crearAlPostular(1L, 9L, 3L, "EJECUCION", 16L);
+
+        org.mockito.ArgumentCaptor<Evaluacion> creada = org.mockito.ArgumentCaptor.forClass(Evaluacion.class);
+        verify(evaluaciones).save(creada.capture());
+        assertThat(creada.getValue().getVersionBancoNivelId()).isEqualTo(16L);
+        verify(versionesBanco, never()).laPublicadaDelNivel(any(), any(), any());
+    }
+
+    @Test
+    @DisplayName("sin versión fija rinde la publicada de su propia empresa, nunca la de RENASER (V74)")
+    void sinVersionFijaRindeLaPropia() {
+        when(plantillas.findById(3L)).thenReturn(Optional.of(
+                PlantillaEvaluacion.builder().id(3L).vigenciaMeses(6).build()));
+        when(versionesBanco.laPublicadaDelNivel(1L, "NIVEL", "EJECUCION")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> servicio.crearAlPostular(1L, 9L, 3L, "EJECUCION", null))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("No hay un banco de preguntas publicado");
+        verify(evaluaciones, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("entregar el banco pide la vacante —y relee la postulación— antes de tocar la "
+            + "evaluación o la postulación, y la nota de lo cerrado se escribe después (QA-03, QA-04)")
+    void alEntregarLaVacanteAntesQueNada() {
+        /*
+          La nota de lo cerrado dice con qué versión de pesos se calculó. Si la vacante se
+          pidiera al escribirla, con la evaluación y la postulación ya escritas, un cambio de
+          pesos —que bloquea la vacante y luego reescribe las postulaciones— y esta entrega se
+          esperarían el uno al otro.
+        */
+        when(postulaciones.findByUuid(CODIGO)).thenReturn(Optional.of(Postulacion.builder()
+                .id(50L).uuid(CODIGO).usuarioId(CANDIDATA.usuarioId()).vacanteId(40L)
+                .evaluacionId(60L).build()));
+        when(evaluaciones.findById(60L)).thenReturn(Optional.of(Evaluacion.builder()
+                .id(60L).usuarioId(CANDIDATA.usuarioId()).estado("EN_CURSO")
+                .iniciadaEn(Instant.now()).plantillaEvaluacionId(3L).build()));
+        when(evaluaciones.estadoBloqueandoLaFila(60L)).thenReturn("EN_CURSO");
+        when(ordenes.findByEvaluacionIdOrderByPosicion(60L))
+                .thenReturn(List.of(OrdenPregunta.builder().build()));
+        when(respuestas.findByEvaluacionId(60L)).thenReturn(List.of(Respuesta.builder().build()));
+
+        servicio.entregar(CANDIDATA, CODIGO);
+
+        org.mockito.InOrder orden = org.mockito.Mockito.inOrder(vacantes, evaluaciones, maquina,
+                calificacion);
+        orden.verify(vacantes).bloquearParaCalificarYReleer(
+                org.mockito.ArgumentMatchers.argThat(p -> p.getId() == 50L));
+        orden.verify(evaluaciones).estadoBloqueandoLaFila(60L);
+        orden.verify(evaluaciones).save(any());
+        orden.verify(maquina).transicionar(any(Postulacion.class),
+                org.mockito.ArgumentMatchers.eq("PERFIL_CALIFICANDO"), any(), any(),
+                org.mockito.ArgumentMatchers.eq(true), org.mockito.ArgumentMatchers.eq(false), any());
+        orden.verify(calificacion).calificarLoCerrado(50L);
+    }
+
+    @Test
     @DisplayName("Lo que respondió con detalle vuelve tal cual, para poder retomar")
     void elDetalleGuardadoVuelve() {
         prepararExamen(

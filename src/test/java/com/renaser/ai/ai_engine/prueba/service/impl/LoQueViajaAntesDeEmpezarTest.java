@@ -179,7 +179,7 @@ class LoQueViajaAntesDeEmpezarTest {
             VersionBanco version = VersionBanco.builder().id(VERSION).organizacionId(ORGANIZACION)
                     .estado("PUBLICADA").enunciado(CASO).materiales(MATERIALES)
                     .herramientasPermitidas(HERRAMIENTAS).modalidad("CRONOMETRADA").duracionMinutos(90)
-                    .consignaArchivoId(CONSIGNA).urlConsigna(URL_CONSIGNA).build();
+                    .consignaArchivoId(CONSIGNA).build();
             when(versionesBanco.findById(VERSION)).thenReturn(Optional.of(version));
             when(versionesBanco.pruebaPropiaDe(VACANTE, "PUBLICADA")).thenReturn(Optional.of(version));
             when(vacantes.findByIdAndOrganizacionId(VACANTE, ORGANIZACION)).thenReturn(Optional.of(
@@ -276,6 +276,20 @@ class LoQueViajaAntesDeEmpezarTest {
             assertThat(prueba.consigna().url()).isEqualTo(URL_CONSIGNA);
             assertThat(prueba.preguntas()).hasSize(2);
             assertThat(prueba.entregables().get(0).detalle()).isEqualTo(DETALLE);
+        }
+
+        @Test
+        @DisplayName("con un almacén que no firma, tras empezar va el nombre del adjunto sin enlace: "
+                + "ya no hay plan B con un enlace guardado (AC-19)")
+        void sinFirmaVaElNombreSinEnlace() {
+            when(almacen.urlDeDescarga(any(Archivo.class))).thenReturn(Optional.empty());
+            sinEmpezar();
+
+            MiPrueba prueba = servicio.iniciar(QUIEN, UUID_POSTULACION);
+
+            assertThat(prueba.consigna().nombre()).isEqualTo("caso.pdf");
+            assertThat(prueba.consigna().url()).isNull();
+            assertThat(enJson(prueba)).doesNotContain("https://");
         }
 
         @Test

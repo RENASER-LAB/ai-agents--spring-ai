@@ -21,7 +21,6 @@ import com.renaser.ai.ai_engine.prueba.repository.VarianteCambioRepository;
 import com.renaser.ai.ai_engine.prueba.repository.VersionPlantillaPruebaRepository;
 import com.renaser.ai.ai_engine.prueba.service.ServicioPlantillaPrueba;
 import com.renaser.ai.ai_engine.organizacion.service.DuenoDelInstrumento;
-import com.renaser.ai.ai_engine.organizacion.service.Instrumento;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
 
 import lombok.RequiredArgsConstructor;
@@ -96,10 +95,9 @@ public class ServicioPlantillaPruebaImpl implements ServicioPlantillaPrueba {
 
     @Override
     public List<PlantillaResponse> listarPlantillas(ContextoUsuario quien) {
-        // El resolutor decide de quién son las pruebas que esta organización ve: las
-        // suyas si personalizó, las de la plataforma si no.
-        return plantillas.findByOrganizacionIdOrderByCreadoEnDesc(
-                        dueno.duenoDe(quien.organizacionId(), Instrumento.PRUEBA)).stream()
+        // Solo las de la propia organización (V74): las pruebas de RENASER ya no se prestan,
+        // ni en solo lectura.
+        return plantillas.findByOrganizacionIdOrderByCreadoEnDesc(quien.organizacionId()).stream()
                 .map(p -> new PlantillaResponse(p.getId(), p.getNombre(), p.getPuestoId(), p.isEsActiva()))
                 .toList();
     }
@@ -607,13 +605,12 @@ public class ServicioPlantillaPruebaImpl implements ServicioPlantillaPrueba {
 
     // ============ Apoyo ============
 
-    // Leer resuelve, editar no: con la bandera apagada la organización VE las pruebas de
-    // la plataforma —eso contesta el resolutor— pero solo edita las suyas.
+    // Leer y editar, solo lo propio (V74): las pruebas de RENASER ya no se prestan, ni en
+    // solo lectura. Una vacante vieja que ya tenía una asignada la sigue rindiendo por su id,
+    // que se lee desde la vacante y no desde aquí.
 
     private PlantillaPrueba laPlantillaVisible(ContextoUsuario quien, Long id) {
         return plantillas.findByIdAndOrganizacionId(id, quien.organizacionId())
-                .or(() -> plantillas.findByIdAndOrganizacionId(
-                        id, dueno.duenoDe(quien.organizacionId(), Instrumento.PRUEBA)))
                 .orElseThrow(() -> new ResourceNotFoundException("Plantilla de prueba", "id", id));
     }
 
