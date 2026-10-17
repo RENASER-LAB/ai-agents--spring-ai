@@ -99,3 +99,14 @@ verify*.log
 # tocado a la vez hace fallar cada `git pull` que lo traiga cambiado. La plantilla
 # portable es .claude/launch.example.json: se copia a launch.json y ya.
 .claude/launch.json
+
+# Claude harness: datos locales
+.harness/
+.worktrees/
+harness/**/__pycache__/
+.claude/settings.local.json
+
+# Claude harness: datos locales
+.migration-private/
+harness/config.json
+harness/claude-settings.json

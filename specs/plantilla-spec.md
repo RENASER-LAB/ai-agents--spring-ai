@@ -1,6 +1,6 @@
 # [Nombre de la funcionalidad]
 
-Estado: lista para implementar | borrador
+Estado: borrador
 
 ## Objetivo
 ¿Qué problema resuelve y para quién?

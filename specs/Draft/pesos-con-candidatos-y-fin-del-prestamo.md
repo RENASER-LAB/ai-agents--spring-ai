@@ -1,6 +1,6 @@
 # Cambiar los pesos con candidatos dentro y dejar de prestar el banco y las pruebas
 
-Estado: lista para implementar.
+Estado: borrador
 
 Revisada el 12/10/2026 contra main (V71, hasta el #118) y contra la rama de
 `specs/prueba-una-pregunta-por-pantalla.md`, que estaba en QA y cambia el correo y la consigna
@@ -151,7 +151,7 @@ las filas de la plataforma (RENASER). Para el banco y las pruebas se usa aquí:
 - `specs/Done/fuga-del-catalogo-de-preguntas.md` (#112): retiró `/admin/pruebas` y deja las
   plantillas y sus endpoints para «la limpieza del préstamo».
 - `specs/prueba-una-pregunta-por-pantalla.md`: la decisión 8.
-- `specs/pruebas-indice-de-la-empresa.md` (borrador): vuelve a ocupar `/admin/pruebas`, solo con
+- `specs/Draft/pruebas-indice-de-la-empresa.md` (borrador): vuelve a ocupar `/admin/pruebas`, solo con
   versiones del editor de la propia empresa.
 
 ## Alcance
@@ -244,7 +244,7 @@ las filas de la plataforma (RENASER). Para el banco y las pruebas se usa aquí:
       empresa son siempre los suyos.
     - Una empresa cliente ya no ve el banco de RENASER en la configuración del banco, ni sus
       plantillas en el desplegable de pruebas de una vacante vieja ni en ningún otro sitio.
-      (`/admin/pruebas` ya no existe; si vuelve con `specs/pruebas-indice-de-la-empresa.md`,
+      (`/admin/pruebas` ya no existe; si vuelve con `specs/Draft/pruebas-indice-de-la-empresa.md`,
       solo enseña versiones del editor de la propia empresa.)
     - Desaparecen las banderas de personalización del banco y de las pruebas: nada las lee.
       Quitar las columnas o dejarlas lo decide quien implemente.
@@ -466,7 +466,7 @@ Sin fijar el número de migración: main va por la V71 (12/10/2026), y hay sesio
   - la rama de `specs/prueba-una-pregunta-por-pantalla.md` fusionada (en QA el 12/10/2026): trae
     la decisión 8 y toca los mismos archivos que la Parte C. Empezar después, o sincronizar antes
     de verificar.
-- **No choca con** `specs/pruebas-indice-de-la-empresa.md` ni `specs/pruebas-modelo.md`
+- **No choca con** `specs/Draft/pruebas-indice-de-la-empresa.md` ni `specs/Draft/pruebas-modelo.md`
   (borradores): dejan fuera las vacantes del sistema antiguo y el banco de RENASER. Si el índice
   llega antes, el AC-14 se comprueba también en su `/admin/pruebas`. `pruebas-modelo` dice que la
   copia lleva `consignaArchivoId` y `urlConsigna`: tras esta spec, `copiarContenido` solo lleva el

@@ -53,7 +53,7 @@ la vacante, que mantiene sus reglas de siempre.
 - Decisiones del 02/10/2026:
   - Índice de solo lectura y sin pruebas sueltas. Se mantiene la decisión del 29/09: la
     biblioteca son las vacantes de la propia empresa. Las pruebas modelo, sin vacante, van
-    aparte en `specs/pruebas-modelo.md`, que está en borrador.
+    aparte en `specs/Draft/pruebas-modelo.md`, que está en borrador.
   - Dos pestañas: preguntas del Perfil Integral y prueba del puesto.
   - Las vacantes del sistema antiguo no aparecen.
   - Hay filtros y un botón «Usar en otra vacante».
@@ -87,7 +87,7 @@ la vacante, que mantiene sus reglas de siempre.
     pueden recibir la copia.
 - Queda fuera:
   - Crear, editar o borrar desde esta pantalla: todo eso se hace en la vacante.
-  - Las pruebas sin vacante, que van en `specs/pruebas-modelo.md`.
+  - Las pruebas sin vacante, que van en `specs/Draft/pruebas-modelo.md`.
   - Las vacantes del sistema antiguo: las que responden el banco de RENASER por nivel, las que
     rinden una plantilla (`PLANTILLA`) y las del cuestionario técnico del REDACTOR
     (`CUESTIONARIO_TECNICO`).
@@ -312,7 +312,7 @@ Los textos exactos de los estados quedan a criterio de quien implementa.
     no hay, el borrador, con el `VersionDePreguntas` de siempre.
   - `GET /api/v1/panel/pruebas/destinos?tipo=…&excluir={vacanteId}` devuelve las vacantes que
     pueden recibir la copia y, para las que no, el motivo. No depende de una vacante de origen:
-    `excluir` es opcional, para que `specs/pruebas-modelo.md` reutilice el diálogo desde un
+    `excluir` es opcional, para que `specs/Draft/pruebas-modelo.md` reutilice el diálogo desde un
     modelo sin vacante.
 - La copia reutiliza `POST /api/v1/panel/vacantes/{destino}/preguntas-propias/copia` y
   `.../prueba-propia/copia`, con un solo cambio: rechazar una destino que no usa el editor para
@@ -326,7 +326,7 @@ Los textos exactos de los estados quedan a criterio de quien implementa.
   vacantes que usan el editor para esa pestaña: en las preguntas, `aplica_evaluacion = true` y
   `origen_preguntas = VACANTE`; en la prueba, `instrumento_etapa_tecnica = PRUEBA_PROPIA`. Es el
   mismo criterio que para los destinos.
-- `specs/pesos-con-candidatos-y-fin-del-prestamo.md` (pendiente) no cambia esto: guarda la
+- `specs/Draft/pesos-con-candidatos-y-fin-del-prestamo.md` (pendiente) no cambia esto: guarda la
   versión fija de las vacantes viejas en una columna de la vacante, apuntando a filas de
   RENASER sin `vacante_id` ni `proposito`. Sí pasa a `PRUEBA_PROPIA` las vacantes viejas en
   borrador, que con ello se vuelven destinos válidos.
@@ -355,7 +355,7 @@ Los textos exactos de los estados quedan a criterio de quien implementa.
 ## Dependencias y dudas
 - Requisitos ya cumplidos: `specs/Done/fuga-del-catalogo-de-preguntas.md` (#112 y #73) y
   `specs/Done/editor-de-la-prueba-mas-simple.md` (#113 y #75), los dos fusionados.
-- Relacionada: `specs/pruebas-modelo.md` (borrador), que añadiría modelos sin vacante a esta
+- Relacionada: `specs/Draft/pruebas-modelo.md` (borrador), que añadiría modelos sin vacante a esta
   misma pantalla y reutilizaría el diálogo de destinos.
 - Decidido por el usuario el 12/10/2026:
   1. Los filtros y el reparto en columnas, como en `/vacantes` (#76), con Tailwind y shadcn/ui.

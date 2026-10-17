@@ -28,11 +28,11 @@ molde ensucia la lista de vacantes.
   - No hay catálogo compartido entre empresas.
   - Cambiar el modelo no altera las vacantes que ya lo copiaron.
 - Pantallas o procesos afectados:
-  - La pantalla «Pruebas» de `specs/pruebas-indice-de-la-empresa.md`, que pasa a enseñar
+  - La pantalla «Pruebas» de `specs/Draft/pruebas-indice-de-la-empresa.md`, que pasa a enseñar
     modelos y gana el botón para crearlos.
   - El editor, que se abre también para un modelo.
   - «Copiar de otra vacante», que pasa a ofrecer también modelos.
-- Referencias: `specs/pruebas-indice-de-la-empresa.md`,
+- Referencias: `specs/Draft/pruebas-indice-de-la-empresa.md`,
   `specs/Done/preguntas-propias-de-la-vacante.md` y
   `specs/Done/prueba-del-puesto-con-el-editor.md`.
 
@@ -193,7 +193,7 @@ de postulantes y nunca está «quieto».
   crear una vacante y cargarle ese modelo con un clic.
 
 ## Dependencias y dudas
-- Requiere: `specs/pruebas-indice-de-la-empresa.md` desplegada, y
+- Requiere: `specs/Draft/pruebas-indice-de-la-empresa.md` desplegada, y
   `specs/editor-de-la-prueba-mas-simple.md`, porque el modelo reutiliza ese editor (entregables
   por pregunta o generales, «Mira» deducido y configuración sin fecha límite).
 - Decisiones pendientes:
