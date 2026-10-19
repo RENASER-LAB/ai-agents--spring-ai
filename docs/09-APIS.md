@@ -16,14 +16,14 @@ qué puerta usar y las reglas que no se ven en un esquema.
 
 ## Las puertas
 
-Todo vive bajo `/api/v1/`, en dos zonas con reglas distintas, y desde el 13/10/2026 (`V73`) una
-tercera que no es para personas:
+Todo vive bajo `/api/v1/` —salvo la consulta v2 del bot, bajo `/api/v2/` (`V76`)—, en dos zonas
+con reglas distintas, y desde el 13/10/2026 (`V73`) una tercera que no es para personas:
 
 | Puerta | Quién la usa | Cómo se identifica |
 |---|---|---|
 | `/api/v1/portal/**` | El candidato | Token propio, de crear cuenta y entrar con correo y contraseña |
 | `/api/v1/panel/**` | El equipo de cada empresa, Renaser incluida | Token de equipo, con correo y contraseña. Las cuentas nacen **solo por invitación**: el panel no tiene registro público |
-| `/api/v1/integraciones/**` | Otro sistema: hoy, el bot de WhatsApp del CRM | **Sin token**: solo la firma HMAC del bot. Ver «La puerta de las integraciones» |
+| `/api/v1/integraciones/**` y, desde la `V76`, `/api/v2/integraciones/**` | Otro sistema: hoy, el bot de WhatsApp del CRM | **Sin token**: solo la firma HMAC del bot. Ver «La puerta de las integraciones» |
 
 El token va en cada llamada, en la cabecera `Authorization: Bearer <token>`.
 
@@ -283,7 +283,9 @@ reconoce solo por el número. Lo que el portal necesita saber:
   solo si ya escribió. Ni recordatorios, ni cierres, ni movidos «sin avisar». Salen en la misma
   transición que el correo y la campana, encolados y sin poder deshacerla. Ver
   [Estados de la postulación](03-ESTADOS-POSTULACION.md), «Cómo se entera el candidato de cada
-  paso».
+  paso». Desde el 19/10/2026 su texto va en bloques con negritas y termina con el enlace fijo a
+  «Mis procesos», sin token ([el formato](CONTRATO-NOVEDADES-POR-WHATSAPP.md)). El resultado final
+  y el cierre de la convocatoria solo llegarán con el contrato v2, que no está activo.
 
 ### Guardar lo que el candidato escribe (16/09/2026)
 
@@ -1210,6 +1212,22 @@ Los errores de esta puerta no van en RFC 7807 sino en el formato del contrato, `
 `400 VALIDACION` con un cuerpo que no es JSON, sin `telefono` o con uno que no es internacional, y
 `401 FIRMA_INVALIDA`.
 
+### La consulta v2 (`/api/v2/integraciones/whatsapp/contexto`, `V76`, 19/10/2026)
+
+Misma cadena, misma firma y mismo formato de error; la firma va sobre la ruta completa, así que
+una de `/api/v1/…` no vale aquí. Su contrato está en
+[CONTRATO-CONTEXTO-Y-RESULTADOS-POR-WHATSAPP-V2.md](CONTRATO-CONTEXTO-Y-RESULTADOS-POR-WHATSAPP-V2.md),
+C-3, que **todavía no está activo**: EX ya la responde, pero el bot no la llama hasta C-10.
+
+| Método y ruta | Qué hace |
+|---|---|
+| POST `/whatsapp/contexto` | Cuerpo `{telefono, postulacionRef?, cursor?}`. Sin referencia, el listado de las postulaciones consultables de ese número, de 9 en 9, las más recientes primero, con un `cursor` atado a ese número. Con referencia, su contexto público: ficha, procedimiento, situación, acción y resultado. **Solo lee**: no mueve estados, intentos, relojes ni consentimiento. `400 VALIDACION` si se combinan referencia y cursor o pasan de su largo (64 y 200); `404 SIN_ACCESO`, el mismo, para una referencia o un cursor inexistente, ajeno o sin acceso |
+
+Consultable es lo que sigue en carrera con el vínculo `ACTIVO`, y lo que terminó con el vínculo
+activo durante 30 días desde el resultado. `revisionContexto` es la fecha real del último cambio
+(`actualizadoEn`) en milisegundos, distinta de `consultadoEn`. Lo que EX eligió donde el contrato
+lo deja abierto está al final de ese documento, «Cómo lo cumple EX».
+
 ---
 
 ## Lo que conviene saber antes de consumirlas
@@ -1267,3 +1285,4 @@ antes de tener token.
 | [Diccionario de datos](07-DICCIONARIO-DE-DATOS.md) | Las tablas que hay detrás |
 | [Ampliación de RR.HH.](AMPLIACION-RRHH.md) | Los apartados que se construyen después de la selección, empezando por la gestión de personas |
 | [Contrato de las novedades por WhatsApp](CONTRATO-NOVEDADES-POR-WHATSAPP.md) | Lo que se dicen EX y el bot de WhatsApp, en las dos direcciones, con la firma |
+| [Contrato v2 de WhatsApp](CONTRATO-CONTEXTO-Y-RESULTADOS-POR-WHATSAPP-V2.md) | La consulta del contexto y los resultados finales hacia el bot. Aún no activo |

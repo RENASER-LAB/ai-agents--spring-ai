@@ -4,7 +4,6 @@ import com.renaser.ai.ai_engine.notificacion.entity.AvisoPortal;
 import com.renaser.ai.ai_engine.postulacion.entity.EstadoPostulacion;
 import com.renaser.ai.ai_engine.postulacion.entity.Postulacion;
 import com.renaser.ai.ai_engine.postulacion.service.AvisoDeEtapaEnLaCampana;
-import com.renaser.ai.ai_engine.postulacion.service.TextosDelMomento;
 import com.renaser.ai.ai_engine.usuario.repository.PersonaRepository;
 import com.renaser.ai.ai_engine.whatsapp.entity.AvisoWhatsapp;
 import com.renaser.ai.ai_engine.whatsapp.entity.VinculoWhatsapp;
@@ -29,12 +28,14 @@ import java.util.Set;
  *   <li><b>Un «te toca»</b> ({@code PRUEBA_DISPONIBLE} o {@code POSTULACION_AVANZA}) con un
  *       vínculo ACTIVO deja un aviso en la cola, ligado a su transición. Lo manda después
  *       {@link EnvioAlBot}.</li>
- *   <li><b>Un estado final</b> cierra el vínculo, sin avisar por WhatsApp: los cierres no van
- *       por aquí.</li>
- *   <li><b>El borrado de datos</b> se lleva el número y los vínculos.</li>
+ *   <li><b>Un estado final</b> cierra el vínculo. Desde la V76, si estaba ACTIVO, deja además
+ *       —<b>dentro</b> de la transacción de la transición— su resultado consultable y, con el
+ *       productor v2 encendido, el evento RESULTADO ({@link ResultadosPorWhatsapp}). Los avisos
+ *       «te toca» siguen sin incluir cierres.</li>
+ *   <li><b>El borrado de datos</b> se lleva el número, los vínculos, sus resultados y sus eventos.</li>
  * </ul>
  *
- * <p>⚠️ Los dos primeros ocurren <b>después de que la transición se confirme</b> y en su propia
+ * <p>⚠️ El aviso y el cierre del vínculo ocurren <b>después de que la transición se confirme</b> y en su propia
  * transacción, como la campana ({@link AvisoDeEtapaEnLaCampana#alConfirmar}): un aviso de una
  * transición que se deshace sería mentira, y un fallo aquí no puede deshacer la transición ni
  * quitarle el correo y la campana al candidato. Si algo falla, se anota y se sigue.
@@ -53,18 +54,23 @@ public class AvisosPorWhatsapp {
     private final PersonaRepository personas;
     private final BetaWhatsapp beta;
     private final EnvioAlBot envio;
+    private final RedaccionDelAviso redaccion;
+    private final ResultadosPorWhatsapp resultados;
     private final TransactionTemplate enSuTransaccion;
 
+    @SuppressWarnings("java:S107") // Cada uno es una tabla o una pieza del aviso que esto toca.
     public AvisosPorWhatsapp(VinculoWhatsappRepository vinculos, AvisoWhatsappRepository avisos,
                              BajaWhatsappRepository bajas, PersonaRepository personas,
-                             BetaWhatsapp beta, EnvioAlBot envio,
-                             PlatformTransactionManager transacciones) {
+                             BetaWhatsapp beta, EnvioAlBot envio, RedaccionDelAviso redaccion,
+                             ResultadosPorWhatsapp resultados, PlatformTransactionManager transacciones) {
         this.vinculos = vinculos;
         this.avisos = avisos;
         this.bajas = bajas;
         this.personas = personas;
         this.beta = beta;
         this.envio = envio;
+        this.redaccion = redaccion;
+        this.resultados = resultados;
         this.enSuTransaccion = new TransactionTemplate(transacciones);
         this.enSuTransaccion.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
     }
@@ -93,8 +99,19 @@ public class AvisosPorWhatsapp {
                 "WhatsApp " + aviso, postulacionId);
     }
 
-    /** La postulación llegó a un estado final: su vínculo se cierra. Nunca lanza. */
-    public void alTerminar(Postulacion postulacion) {
+    /**
+     * La postulación llegó a un estado final.
+     *
+     * <p>Primero, <b>en la transacción de la transición</b>, lo de v2: si el vínculo estaba
+     * ACTIVO, su resultado consultable y su evento RESULTADO (bandeja de salida: si la transición
+     * se deshace, ellos también; si confirma, un reinicio no los pierde). Después del commit, el
+     * cierre ordinario del vínculo, que nunca lanza.
+     *
+     * @param ocurridaEn cuándo ocurrió la transición: la fecha del resultado
+     * @param seLeAvisa  falso si el equipo decidió no contárselo por ningún canal
+     */
+    public void alTerminar(Postulacion postulacion, Instant ocurridaEn, boolean seLeAvisa) {
+        resultados.alTerminar(postulacion, ocurridaEn, seLeAvisa);
         Long postulacionId = postulacion.getId();
         AvisoDeEtapaEnLaCampana.alConfirmar(
                 () -> enSuTransaccion.executeWithoutResult(t -> cerrarPorFin(postulacionId)),
@@ -112,10 +129,14 @@ public class AvisosPorWhatsapp {
         List<VinculoWhatsapp> suyos = vinculos.findByPersonaId(personaId);
         if (!suyos.isEmpty()) {
             List<Long> ids = suyos.stream().map(VinculoWhatsapp::getId).toList();
+            // Sus resultados y sus eventos v2 (V76) se van también; un aviso final que el bot ya
+            // aceptó y aún puede salir se le cancela contándole el borrado.
+            Set<Long> conAvisoFinal = resultados.alBorrarLosDatos(ids);
             avisos.borrarDe(ids);
             // Al bot solo le importan los que conoce y no se cerraron ya por su lado (BAJA).
             List<VinculoWhatsapp> porContarle = suyos.stream()
-                    .filter(v -> v.estaVivo() || v.getRevocacionEnviadaEn() == null)
+                    .filter(v -> v.estaVivo() || v.getRevocacionEnviadaEn() == null
+                            || conAvisoFinal.contains(v.getId()))
                     .toList();
             vinculos.deleteAll(suyos);
             vinculos.flush();
@@ -144,11 +165,8 @@ public class AvisosPorWhatsapp {
                 || avisos.existsByTransicionEstadoIdAndTipo(contexto.transicionId(), aviso)) {
             return;
         }
-        boolean esCuestionario = TextosDelMomento.CUESTIONARIO_TECNICO.equals(contexto.instrumento());
-        String texto = AvisoPortal.PRUEBA_DISPONIBLE.equals(aviso)
-                ? TextosDeWhatsapp.pruebaDisponible(contexto.nombre(), contexto.vacante(), esCuestionario)
-                : TextosDeWhatsapp.avance(contexto.nombre(), contexto.vacante(),
-                        TextosDelMomento.de(estado, contexto.instrumento(), false));
+        // El formato de la regla 19 (V76): bloques, negritas y el enlace fijo a «Mis procesos».
+        String texto = redaccion.texto(postulacionId, aviso, estado, contexto);
         Instant ahora = Instant.now();
         avisos.save(AvisoWhatsapp.builder()
                 .id(UuidV7.nuevo())
@@ -176,6 +194,8 @@ public class AvisosPorWhatsapp {
         vinculos.vivoParaEscribir(postulacionId).ifPresent(vinculo -> {
             Instant ahora = Instant.now();
             vinculo.cerrar(VinculoWhatsapp.REVOCADO, VinculoWhatsapp.POR_PROCESO_TERMINADO, ahora);
+            // Con su evento RESULTADO de por medio, la revocación la hace el evento (C-7).
+            resultados.alCerrarElVinculo(vinculo, ahora);
             vinculos.save(vinculo);
             avisos.omitirPendientesDe(List.of(vinculo.getId()), ahora);
         });

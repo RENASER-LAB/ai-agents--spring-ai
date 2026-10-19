@@ -43,4 +43,11 @@ public class Evaluacion {
     private Instant terminadaEn;
     private Instant vigenteHasta;
     private Instant creadoEn;
+    /**
+     * Cuándo cambió por última vez lo que la evaluación cuenta a quien postula: su estado, su
+     * vencimiento, su inicio o su término (V77). La fechan la base (un DEFAULT al nacer y un
+     * trigger al cambiar); aquí solo se lee. Vacía en las evaluaciones anteriores.
+     */
+    @Column(insertable = false, updatable = false)
+    private Instant contextoActualizadoEn;
 }

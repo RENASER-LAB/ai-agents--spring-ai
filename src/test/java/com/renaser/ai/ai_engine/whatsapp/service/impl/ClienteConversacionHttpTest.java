@@ -70,7 +70,7 @@ class ClienteConversacionHttpTest {
             }
             String ruta = intercambio.getRequestURI().getPath();
             int forzado = estado.get();
-            if (forzado == LO_DEL_CONTRATO && !ruta.endsWith("/avisos")) {
+            if (forzado == LO_DEL_CONTRATO && !ruta.endsWith("/avisos") && !ruta.endsWith("/resultados")) {
                 intercambio.sendResponseHeaders(204, -1);
                 intercambio.close();
                 return;
@@ -297,5 +297,113 @@ class ClienteConversacionHttpTest {
                 .matches(e -> "aviso_distinto".equals(((FalloDelBot) e).codigo()));
         assertThat(falso.registro()).extracting(ClienteConversacionFalso.Llamada::tipo)
                 .containsExactly("AVISO", "AVISO");
+    }
+
+    // ============ los eventos v2 (V76) ============
+
+    private static final UUID EVENTO_ID = UUID.fromString("0199d5a2-0000-7000-8000-0000000000e1");
+
+    private static ClienteConversacion.Evento resultado(UUID id, String tipo) {
+        Instant ocurrido = Instant.parse("2026-10-12T14:00:00Z");
+        return new ClienteConversacion.Evento(id, "RESULTADO", "+51987654321", "pw_1", "Ana", "Contador",
+                ocurrido, new ClienteConversacion.ResultadoDelEvento(tipo, ocurrido, 1, null, false,
+                        ocurrido.plus(Duration.ofDays(30))),
+                null, true, ocurrido.plus(Duration.ofHours(24)), true);
+    }
+
+    private static ClienteConversacion.Evento convocatoria(UUID id) {
+        Instant cerrada = Instant.parse("2026-10-12T14:00:00Z");
+        return new ClienteConversacion.Evento(id, "CONVOCATORIA_CERRADA", "+51987654321", "pw_1", "Ana",
+                "Contador", cerrada, null, new ClienteConversacion.ConvocatoriaDelEvento(cerrada, 1), true,
+                cerrada.plus(Duration.ofHours(24)), false);
+    }
+
+    @Test
+    @DisplayName("C-4 · el evento va a /v1/ex/resultados, firmado sobre esa ruta, con el cuerpo del contrato")
+    void elEventoVaASuRuta() {
+        cliente.publicarEvento(resultado(EVENTO_ID, "NO_CONTINUA"));
+
+        Recibida recibida = recibidas.get(0);
+        assertThat(recibida.ruta()).isEqualTo("/v1/ex/resultados");
+        assertThat(recibida.cuerpo()).isEqualTo("{\"eventoId\":\"" + EVENTO_ID + "\",\"tipo\":\"RESULTADO\","
+                + "\"telefono\":\"+51987654321\",\"postulacionRef\":\"pw_1\",\"nombre\":\"Ana\","
+                + "\"vacante\":\"Contador\",\"ocurridoEn\":\"2026-10-12T14:00:00Z\","
+                + "\"resultado\":{\"tipo\":\"NO_CONTINUA\",\"fecha\":\"2026-10-12T14:00:00Z\",\"revision\":1,"
+                + "\"explicacion\":null,\"esCorreccion\":false,\"consultableHasta\":\"2026-11-11T14:00:00Z\"},"
+                + "\"aviso\":{\"autorizado\":true,\"caducaEn\":\"2026-10-13T14:00:00Z\"},\"cierraVinculo\":true}");
+        String marca = recibida.cabeceras().get(FirmaWhatsapp.CABECERA_MARCA).get(0);
+        String firma = recibida.cabeceras().get(FirmaWhatsapp.CABECERA_FIRMA).get(0);
+        assertThat(FirmaWhatsapp.esValida(SECRETO, marca, firma, "/v1/ex/resultados",
+                recibida.cuerpo().getBytes(StandardCharsets.UTF_8), AHORA)).isTrue();
+        assertThat(FirmaWhatsapp.esValida(SECRETO, marca, firma, "/v1/ex/avisos",
+                recibida.cuerpo().getBytes(StandardCharsets.UTF_8), AHORA)).isFalse();
+    }
+
+    @Test
+    @DisplayName("C-4/C-10 · un bot en v1 (404 ruta_no_disponible) o un 409 evento_distinto son definitivos; un 503 se reintenta")
+    void losFallosDelEvento() {
+        estado.set(404);
+        cuerpoDelError = "{\"code\":\"ruta_no_disponible\",\"message\":\"v1\",\"retryable\":false}";
+        assertThatThrownBy(() -> cliente.publicarEvento(resultado(EVENTO_ID, "CERRADA")))
+                .isInstanceOf(FalloDelBot.class)
+                .matches(e -> !((FalloDelBot) e).esReintentable())
+                .matches(e -> "ruta_no_disponible".equals(((FalloDelBot) e).codigo()));
+
+        estado.set(409);
+        cuerpoDelError = "{\"code\":\"evento_distinto\"}";
+        assertThatThrownBy(() -> cliente.publicarEvento(convocatoria(EVENTO_ID)))
+                .matches(e -> !((FalloDelBot) e).esReintentable())
+                .matches(e -> "evento_distinto".equals(((FalloDelBot) e).codigo()));
+
+        estado.set(503);
+        cuerpoDelError = "{\"code\":\"ex_cuenta_no_disponible\"}";
+        assertThatThrownBy(() -> cliente.publicarEvento(convocatoria(EVENTO_ID)))
+                .matches(e -> ((FalloDelBot) e).esReintentable());
+    }
+
+    @Test
+    @DisplayName("C-9 · el bot falso valida el evento, lo reconoce por su eventoId y en v1 contesta 404")
+    void elFalsoConEventos() {
+        ClienteConversacionFalso falso = new ClienteConversacionFalso();
+        UUID id = com.renaser.ai.ai_engine.whatsapp.service.UuidV7.nuevo();
+        falso.publicarEvento(resultado(id, "CONTRATADO"));
+        falso.publicarEvento(resultado(id, "CONTRATADO"));
+        assertThatThrownBy(() -> falso.publicarEvento(resultado(id, "NO_CONTINUA")))
+                .matches(e -> !((FalloDelBot) e).esReintentable())
+                .matches(e -> "evento_distinto".equals(((FalloDelBot) e).codigo()));
+        assertThat(falso.registroDe("+51987654321")).extracting(ClienteConversacionFalso.Llamada::tipo)
+                .containsExactly("EVENTO", "EVENTO");
+
+        // Fuera de contrato: un id que no es UUIDv7, una caducidad de más de 24 horas, un resultado
+        // que no existe o una convocatoria que dice cerrar el vínculo.
+        assertThatThrownBy(() -> falso.publicarEvento(resultado(UUID.randomUUID(), "CONTRATADO")))
+                .matches(e -> "validacion".equals(((FalloDelBot) e).codigo()));
+        ClienteConversacion.Evento largo = resultado(com.renaser.ai.ai_engine.whatsapp.service.UuidV7.nuevo(),
+                "CONTRATADO");
+        assertThatThrownBy(() -> falso.publicarEvento(new ClienteConversacion.Evento(largo.eventoId(),
+                largo.tipo(), largo.telefono(), largo.postulacionRef(), largo.nombre(), largo.vacante(),
+                largo.ocurridoEn(), largo.resultado(), null, true, largo.ocurridoEn().plus(Duration.ofHours(25)),
+                true))).matches(e -> "validacion".equals(((FalloDelBot) e).codigo()));
+        assertThatThrownBy(() -> falso.publicarEvento(resultado(
+                com.renaser.ai.ai_engine.whatsapp.service.UuidV7.nuevo(), "DESCARTADO")))
+                .matches(e -> "validacion".equals(((FalloDelBot) e).codigo()));
+        ClienteConversacion.Evento cierre = convocatoria(com.renaser.ai.ai_engine.whatsapp.service.UuidV7.nuevo());
+        assertThatThrownBy(() -> falso.publicarEvento(new ClienteConversacion.Evento(cierre.eventoId(),
+                cierre.tipo(), cierre.telefono(), cierre.postulacionRef(), cierre.nombre(), cierre.vacante(),
+                cierre.ocurridoEn(), null, cierre.convocatoria(), true, cierre.avisoCaducaEn(), true)))
+                .matches(e -> "validacion".equals(((FalloDelBot) e).codigo()));
+
+        falso.responderComoVersion(1);
+        assertThatThrownBy(() -> falso.publicarEvento(convocatoria(
+                com.renaser.ai.ai_engine.whatsapp.service.UuidV7.nuevo())))
+                .matches(e -> !((FalloDelBot) e).esReintentable())
+                .matches(e -> "ruta_no_disponible".equals(((FalloDelBot) e).codigo()));
+    }
+
+    @Test
+    @DisplayName("El modo apagado no publica eventos: definitivo, no hay a quién reintentárselo")
+    void apagadoSinEventos() {
+        assertThatThrownBy(() -> new ClienteConversacionApagado().publicarEvento(convocatoria(EVENTO_ID)))
+                .matches(e -> !((FalloDelBot) e).esReintentable());
     }
 }

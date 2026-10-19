@@ -1,9 +1,14 @@
 # Contrato: novedades de la postulación por WhatsApp (EX ↔ bot)
 
 Lo que se dicen EX (este backend) y el bot de RENASER (el servicio de conversación del CRM, rama
-`new-chatbot-harness`). Repite «El contrato entre EX y el bot» de `specs/novedades-por-whatsapp.md`,
+`new-chatbot-harness`). Repite «El contrato entre EX y el bot» de `specs/Done/novedades-por-whatsapp.md`,
 que es el mismo que el de la spec 007 del CRM (`specs/007-novedades-de-postulantes/spec.md`). Si
 uno cambia, cambian los dos, y este documento con ellos.
+
+Es el contrato **v1, el que está activo**. La ampliación —el bot consulta la ficha, el
+procedimiento y el resultado, y EX le manda los resultados finales— es el
+[contrato v2](CONTRATO-CONTEXTO-Y-RESULTADOS-POR-WHATSAPP-V2.md), que hereda de aquí la firma,
+los límites, los errores y los reintentos, y **no está activo** hasta su C-10.
 
 ## La idea en una línea
 
@@ -79,6 +84,10 @@ Tiempo máximo de espera: 3 s.
 | `POST /v1/ex/avisos` | `{avisoId, telefono, postulacionRef, tipo, nombre, vacante, texto}` | `202 {avisoId}`. Repetida igual: `202 {avisoId}`. Repetida distinta: `409 aviso_distinto`. |
 | `POST /v1/ex/revocaciones` | `{telefono, postulacionRef, motivo}` | `204`, aunque no hubiera nada que cerrar. |
 
+Con el productor v2 encendido (`WHATSAPP_PRODUCTOR_V2`, apagado por defecto), EX llama además a
+`POST /v1/ex/resultados`: ver el [contrato v2](CONTRATO-CONTEXTO-Y-RESULTADOS-POR-WHATSAPP-V2.md),
+C-4 a C-7.
+
 ### `POST /v1/ex/esperas` — ese número va a escribir
 
 ```json
@@ -97,11 +106,34 @@ responde, EX lo reintenta (30 s, 2 min, 8 min, 32 min) mientras no caduque.
 ```json
 {"avisoId": "0199d5a2-…-7…", "telefono": "+51987654321", "postulacionRef": "pw_9f…",
  "tipo": "PRUEBA_DISPONIBLE", "nombre": "Ana", "vacante": "Asistente Contable",
- "texto": "¡Felicidades, Ana! Tu prueba del puesto para Asistente Contable ya está disponible.\nEntra en el portal con tu correo y tu contraseña y abre «Mis procesos»."}
+ "texto": "¡Felicidades, Ana! 🎉\n\n📌 *Asistente Contable*\nTu *prueba del puesto* ya está disponible.\n⏰ Puedes empezarla hasta el *20 de octubre a las 23:59* (hora de Lima).\n\n👉 https://…/procesos\nInicia sesión con tu correo y contraseña y abre «Mis procesos»."}
 ```
 
 - `tipo`: `PRUEBA_DISPONIBLE` o `POSTULACION_AVANZA`. Nunca recordatorios, cierres, rechazos ni
   movidos «sin avisar».
+- **El `texto`** (desde el 19/10/2026, regla 19 de la spec de EX
+  `contexto-y-resultados-por-whatsapp.md`) va en bloques con las negritas de WhatsApp: el saludo, la vacante en negrita tras 📌, lo que toca y, al final, el
+  enlace fijo a «Mis procesos» con «Inicia sesión con tu correo y contraseña y abre «Mis
+  procesos».». En `PRUEBA_DISPONIBLE` dice «Tu *prueba del puesto*» —«Tu *prueba técnica*» con el
+  cuestionario técnico— y la línea ⏰ solo sale si EX sabe hasta cuándo puede empezarla y esa
+  fecha no pasó (con el año, si no es el de hoy). `POSTULACION_AVANZA` lleva el título y el texto
+  del momento que pinta el portal (`TextosDelMomento`, sin cambiarlos):
+
+  ```
+  Hola, Ana 👋
+
+  📌 *Contador*
+  Te toca: *{título del momento}*
+  {texto del momento}
+
+  👉 https://…/procesos
+  Inicia sesión con tu correo y contraseña y abre «Mis procesos».
+  ```
+
+  Sin nombre, «¡Felicidades! 🎉» u «Hola 👋». El enlace es `WHATSAPP_ENLACE_MIS_PROCESOS`, igual
+  para todos y **sin token**: si no es `https`, lleva usuario, parámetros (`?`) o fragmento (`#`),
+  o pasa de 300 caracteres, la línea 👉 no sale y queda solo la de cómo entrar. Los tipos, la
+  firma, el límite de 1000 caracteres y la plantilla de fuera de ventana no cambian.
 - `avisoId` (UUIDv7) es la clave de idempotencia. EX reintenta **siempre con el mismo** y el mismo
   contenido; un `409 aviso_distinto` es definitivo y el aviso queda fallido.
 - `nombre` es el nombre de pila; `vacante`, el título cortado a 60 caracteres; `texto`, el
@@ -186,9 +218,11 @@ solo lo usa en el registro.
 - **El bot falso**: con `WHATSAPP_MODO=falso` (desarrollo y E2E), EX no llama a nadie. Contesta
   como el bot de verdad —`400 validacion` si a una espera le falta el consentimiento o una
   revocación trae otro motivo, `409 aviso_distinto` si un `avisoId` vuelve con otro contenido— y
-  apunta lo que acepta (esperas con su consentimiento, avisos y revocaciones) en
+  apunta lo que acepta (esperas con su consentimiento, avisos, revocaciones y, desde la `V76`, los
+  eventos v2 de `/v1/ex/resultados`) en
   `GET /api/v1/integraciones/whatsapp/falso/registro?telefono=…`, firmado como el resto. En
-  producción esa ruta no existe.
+  producción esa ruta no existe. Contesta como un bot en la versión 2; las pruebas pueden ponerlo
+  en la 1, y entonces los eventos reciben `404 ruta_no_disponible`.
 
 ## Configuración de EX
 
@@ -199,6 +233,8 @@ solo lo usa en el registro.
 | `WHATSAPP_URL_SERVICIO` | La dirección HTTPS del servicio de conversación | (vacía; obligatoria en `real`) |
 | `WHATSAPP_SECRETO_HACIA_EL_BOT` | Con lo que firma EX (32 caracteres o más) | (vacío; obligatorio en `real`) |
 | `WHATSAPP_SECRETO_DESDE_EL_BOT` | Con lo que firma el bot | (vacío: todo 401) |
+| `WHATSAPP_ENLACE_MIS_PROCESOS` (`V76`) | El enlace fijo a «Mis procesos» de los avisos y de la consulta v2: `https`, sin parámetros, fragmento ni token | `PORTAL_URL` + `/procesos` |
+| `WHATSAPP_PRODUCTOR_V2` (`V76`) | Los eventos v2 hacia `/v1/ex/resultados`. Solo se enciende tras el bot, en el orden de C-10 del contrato v2 | `false` (EX se comporta como v1) |
 
 Además, el portal solo ofrece el botón con el parámetro `whatsapp_novedades_activo` de la
 plataforma encendido (se cambia desde el panel) y en vacantes de RENASER.

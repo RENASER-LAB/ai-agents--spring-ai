@@ -52,13 +52,23 @@ class AvisosPorWhatsappTest {
     @Mock private BetaWhatsapp beta;
     @Mock private EnvioAlBot envio;
     @Mock private PlatformTransactionManager transacciones;
+    @Mock private com.renaser.ai.ai_engine.postulacion.repository.PostulacionRepository postulaciones;
+    @Mock private com.renaser.ai.ai_engine.vacante.repository.VacanteRepository vacantes;
+    @Mock private LoQueLeToca acciones;
+    @Mock private ResultadosPorWhatsapp resultados;
+
+    private static final String MIS_PROCESOS = "https://portal.renaser.pe/procesos";
 
     private AvisosPorWhatsapp whatsapp;
 
     @BeforeEach
     void montar() {
         lenient().when(transacciones.getTransaction(any())).thenReturn(new SimpleTransactionStatus());
-        whatsapp = new AvisosPorWhatsapp(vinculos, avisos, bajas, personas, beta, envio, transacciones);
+        PropiedadesWhatsapp propiedades = new PropiedadesWhatsapp();
+        propiedades.setEnlaceMisProcesos(MIS_PROCESOS);
+        whatsapp = new AvisosPorWhatsapp(vinculos, avisos, bajas, personas, beta, envio,
+                new RedaccionDelAviso(postulaciones, vacantes, acciones, propiedades), resultados,
+                transacciones);
     }
 
     private static Postulacion postulacion() {
@@ -94,8 +104,33 @@ class AvisosPorWhatsappTest {
         assertThat(aviso.getId().version()).isEqualTo(7);
         assertThat(aviso.getTelefono()).isEqualTo("+51987654321");
         assertThat(aviso.getReferencia()).isEqualTo("pw_ref");
-        assertThat(aviso.getTexto()).startsWith("¡Felicidades, Ana! Tu prueba del puesto para "
-                + "Asistente Contable ya está disponible.");
+        // El formato de la regla 19 (V76): bloques, negritas y el enlace fijo a «Mis procesos».
+        assertThat(aviso.getTexto()).startsWith("¡Felicidades, Ana! 🎉\n\n📌 *Asistente Contable*\n"
+                + "Tu *prueba del puesto* ya está disponible.")
+                .contains("👉 " + MIS_PROCESOS)
+                .doesNotContain("token").doesNotContain("?");
+    }
+
+    @Test
+    @DisplayName("V76 · con fecha para empezar, el aviso de la prueba la dice en hora de Lima")
+    void laPruebaConSuPlazo() {
+        when(beta.ofrecePara(RENASER)).thenReturn(true);
+        when(vinculos.vivoDe(70L)).thenReturn(Optional.of(vinculo(VinculoWhatsapp.ACTIVO)));
+        Postulacion suya = Postulacion.builder().id(70L).organizacionId(RENASER).vacanteId(5L).build();
+        when(postulaciones.findById(70L)).thenReturn(Optional.of(suya));
+        com.renaser.ai.ai_engine.vacante.entity.Vacante vacante =
+                com.renaser.ai.ai_engine.vacante.entity.Vacante.builder().id(5L).build();
+        when(vacantes.findById(5L)).thenReturn(Optional.of(vacante));
+        Instant cierre = Instant.now().plus(java.time.Duration.ofDays(3));
+        when(acciones.empezarAntesDe(suya, vacante)).thenReturn(cierre);
+
+        whatsapp.alAvisar(postulacion(), "PRUEBA_DISPONIBLE", estado("PRUEBA_TURNO_CANDIDATO", false),
+                new DeLaTransicion(900L, "Ana", "Asistente Contable", "PRUEBA_PROPIA"));
+
+        ArgumentCaptor<AvisoWhatsapp> guardado = ArgumentCaptor.forClass(AvisoWhatsapp.class);
+        verify(avisos).save(guardado.capture());
+        assertThat(guardado.getValue().getTexto()).contains("⏰ Puedes empezarla hasta el *"
+                + TextosDeWhatsapp.fechaYHora(cierre, Instant.now()) + "* (hora de Lima).");
     }
 
     @Test
@@ -176,7 +211,8 @@ class AvisosPorWhatsappTest {
 
         ArgumentCaptor<AvisoWhatsapp> guardado = ArgumentCaptor.forClass(AvisoWhatsapp.class);
         verify(avisos).save(guardado.capture());
-        assertThat(guardado.getValue().getTexto()).contains("Confirma tu simulación");
+        assertThat(guardado.getValue().getTexto()).contains("Te toca: *Confirma tu simulación*")
+                .contains("👉 " + MIS_PROCESOS);
     }
 
     @Test
@@ -185,12 +221,17 @@ class AvisosPorWhatsappTest {
         VinculoWhatsapp activo = vinculo(VinculoWhatsapp.ACTIVO);
         when(vinculos.vivoParaEscribir(70L)).thenReturn(Optional.of(activo));
 
-        whatsapp.alTerminar(postulacion());
+        Instant ocurrida = Instant.now();
+        whatsapp.alTerminar(postulacion(), ocurrida, true);
 
         assertThat(activo.getEstado()).isEqualTo(VinculoWhatsapp.REVOCADO);
         assertThat(activo.getMotivoCierre()).isEqualTo("PROCESO_TERMINADO");
         assertThat(activo.getRevocacionProximoIntentoEn()).isNotNull();
         verify(avisos).omitirPendientesDe(any(), any());
+        // V76 · el resultado y su evento se guardan con el hecho; el cierre pregunta por el evento.
+        verify(resultados).alTerminar(any(Postulacion.class), org.mockito.ArgumentMatchers.eq(ocurrida),
+                org.mockito.ArgumentMatchers.eq(true));
+        verify(resultados).alCerrarElVinculo(org.mockito.ArgumentMatchers.eq(activo), any());
     }
 
     @Test
@@ -204,9 +245,26 @@ class AvisosPorWhatsappTest {
         whatsapp.alBorrarLosDatos(33L, "+51987654321");
 
         verify(avisos).borrarDe(List.of(7L));
+        // V76 · sus resultados y sus eventos se van con ellos.
+        verify(resultados).alBorrarLosDatos(List.of(7L));
         verify(vinculos).deleteAll(List.of(activo));
         verify(bajas).deleteById("+51987654321");
         // Sin transacción en curso, la revocación sale ya, con su motivo.
+        verify(envio).revocarSinFila("+51987654321", "pw_ref", "BORRADO_DATOS");
+    }
+
+    @Test
+    @DisplayName("V76 · el borrado cancela también un aviso final que el bot ya aceptó, aunque el vínculo esté cerrado")
+    void elBorradoCancelaElAvisoFinalAceptado() {
+        VinculoWhatsapp cerrado = vinculo(VinculoWhatsapp.REVOCADO);
+        cerrado.setCerradoEn(Instant.now());
+        cerrado.setMotivoCierre(VinculoWhatsapp.POR_PROCESO_TERMINADO);
+        cerrado.setRevocacionEnviadaEn(Instant.now());
+        when(vinculos.findByPersonaId(33L)).thenReturn(List.of(cerrado));
+        when(resultados.alBorrarLosDatos(List.of(7L))).thenReturn(java.util.Set.of(7L));
+
+        whatsapp.alBorrarLosDatos(33L, null);
+
         verify(envio).revocarSinFila("+51987654321", "pw_ref", "BORRADO_DATOS");
     }
 

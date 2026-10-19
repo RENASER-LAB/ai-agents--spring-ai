@@ -1,7 +1,7 @@
 # Diccionario de datos
 
 Sistema de selección de personal — Renaser Consulting
-Versión 3.11 · 2026-10-16 · Puesto al día con las migraciones hasta la `V75` (la V75 añade `nota_criterio.puntaje_original` y `maximo_original`, la nota de la simulación y la validación tal como se puso, de la que se recalcula al cambiar los pesos de la vacante; la V74 añade `vacante.version_banco_fija_id`, pasa a `PRUEBA_PROPIA` los borradores de antes con `PLANTILLA` sin prueba, deja sin uso `organizacion.banco_propio` y `pruebas_puesto_propias` y vacía `version_banco.url_consigna`; la V73 trae las tablas `vinculo_whatsapp`, `aviso_whatsapp` y `whatsapp_baja`, el CHECK de E.164 de `persona.telefono`, el tipo `WHATSAPP` de `texto_consentimiento` con su 1.0, la versión 1.2 del texto `PLATAFORMA` y el parámetro `whatsapp_novedades_activo` de la plataforma; la V72 no crea tablas: hace obligatoria `vacante.nota_minima`, entera de 0 a 100 y 60 por defecto, y publica la versión 1.1 del texto `PLATAFORMA`; la V71 añade `perfil_candidato.logros`, los logros clave que escribe el candidato; la V70 añade `transicion_estado.aviso_al_candidato` y la tabla `recordatorio_enviado`, siembra en todas las organizaciones tres parámetros y los correos `RECORDATORIO_EVALUACION` y `RECORDATORIO_PRUEBA`, publica una versión nueva de los textos de `PRUEBA_DISPONIBLE` que decían «desde este correo» y documenta siete tipos de aviso de la campana; la V69 añade `criterio_banco.puntos_del_criterio`, lo que vale entero un criterio de la prueba técnica; la V68 trae el alcance de los entregables de la prueba del editor —`entregable_requerido.alcance` y `pregunta_id` y la tabla `entregable_cubre_pregunta`—, desde la que «Mira» se deduce, y deja sin días los borradores de esa prueba; la V67 trae la prueba técnica escrita en el editor —las tablas `criterio_banco_entregable` y `nota_criterio_prueba`, el tercer valor `PRUEBA_PROPIA` de `vacante.instrumento_etapa_tecnica`, el propósito `PRUEBA_PUESTO` con el caso y el tiempo en `version_banco`, la parte calificada en `criterio_banco`, `entregable_requerido`, `intento_prueba` y `respuesta_prueba` colgando también de la versión del editor, `intento_prueba.no_completada` y el propósito en `propuesta_preguntas`—; la V66 trae las preguntas propias de cada vacante —las tablas `criterio_banco` y `propuesta_preguntas`, `vacante.origen_preguntas`, el propósito, el método `PUNTOS` y la guía en `version_banco`, los tres tipos nuevos con sus puntos en `pregunta`, el orden en `opcion`, la nota hasta 100 y la de la IA aparte en `nota_respuesta`, el modo `RECALIFICA` y el agente `RECOMENDADOR`—; la V64 trae la gestión de personas —`sede`, `colaborador`, `periodo_laboral`, `situacion_laboral`, `cese_anulado` y `contratado_sin_alta`— y sus cuatro permisos; la V65 añade las columnas `antes_*` de `situacion_laboral`; la V49 y la V50 solo siembran pesos; la V51 trae la tabla `lectura_cv_perfil` y los archivos del perfil; la V52 y la V53 no crean tablas; la V55 pone el sueldo en la vacante y la pretensión en la postulación; la V56 trae la tabla `aviso_portal`; la V57 no crea tablas, solo siembra los precios de los dos modelos de DeepSeek; la V58 no crea tablas: suma el aviso `VACANTE_ACTUALIZADA` y apaga el correo `REMUNERACION_ACTUALIZADA`; la V59 añade `vacante.archivada_en`; la V60 añade `vacante.eliminada_en` —el borrado lógico—, el motivo de cierre y el tipo de aviso `VACANTE_ELIMINADA`, y el permiso `eliminar_vacante`; la V61 trae la tabla `recuperacion_clave`, tres parámetros y los dos correos de «¿Olvidaste tu contraseña?»; la V62 añade `vacante.ciudad_ubigeo`; la V63 trae las tablas `resena`, `respuesta_resena` y `reporte_resena`, los tres permisos de las reseñas de empresas y cuatro tipos de aviso)
+Versión 3.12 · 2026-10-19 · Puesto al día con las migraciones hasta la `V77` (la V77 añade `contexto_actualizado_en` a `vacante`, `intento_prueba` y `evaluacion`, que fechan triggers solo cuando cambia un dato que viaja en la consulta v2 del bot de WhatsApp; la V76 trae las tablas `resultado_whatsapp` y `evento_whatsapp` del contrato v2 con el bot, todavía no activo; la V75 añade `nota_criterio.puntaje_original` y `maximo_original`, la nota de la simulación y la validación tal como se puso, de la que se recalcula al cambiar los pesos de la vacante; la V74 añade `vacante.version_banco_fija_id`, pasa a `PRUEBA_PROPIA` los borradores de antes con `PLANTILLA` sin prueba, deja sin uso `organizacion.banco_propio` y `pruebas_puesto_propias` y vacía `version_banco.url_consigna`; la V73 trae las tablas `vinculo_whatsapp`, `aviso_whatsapp` y `whatsapp_baja`, el CHECK de E.164 de `persona.telefono`, el tipo `WHATSAPP` de `texto_consentimiento` con su 1.0, la versión 1.2 del texto `PLATAFORMA` y el parámetro `whatsapp_novedades_activo` de la plataforma; la V72 no crea tablas: hace obligatoria `vacante.nota_minima`, entera de 0 a 100 y 60 por defecto, y publica la versión 1.1 del texto `PLATAFORMA`; la V71 añade `perfil_candidato.logros`, los logros clave que escribe el candidato; la V70 añade `transicion_estado.aviso_al_candidato` y la tabla `recordatorio_enviado`, siembra en todas las organizaciones tres parámetros y los correos `RECORDATORIO_EVALUACION` y `RECORDATORIO_PRUEBA`, publica una versión nueva de los textos de `PRUEBA_DISPONIBLE` que decían «desde este correo» y documenta siete tipos de aviso de la campana; la V69 añade `criterio_banco.puntos_del_criterio`, lo que vale entero un criterio de la prueba técnica; la V68 trae el alcance de los entregables de la prueba del editor —`entregable_requerido.alcance` y `pregunta_id` y la tabla `entregable_cubre_pregunta`—, desde la que «Mira» se deduce, y deja sin días los borradores de esa prueba; la V67 trae la prueba técnica escrita en el editor —las tablas `criterio_banco_entregable` y `nota_criterio_prueba`, el tercer valor `PRUEBA_PROPIA` de `vacante.instrumento_etapa_tecnica`, el propósito `PRUEBA_PUESTO` con el caso y el tiempo en `version_banco`, la parte calificada en `criterio_banco`, `entregable_requerido`, `intento_prueba` y `respuesta_prueba` colgando también de la versión del editor, `intento_prueba.no_completada` y el propósito en `propuesta_preguntas`—; la V66 trae las preguntas propias de cada vacante —las tablas `criterio_banco` y `propuesta_preguntas`, `vacante.origen_preguntas`, el propósito, el método `PUNTOS` y la guía en `version_banco`, los tres tipos nuevos con sus puntos en `pregunta`, el orden en `opcion`, la nota hasta 100 y la de la IA aparte en `nota_respuesta`, el modo `RECALIFICA` y el agente `RECOMENDADOR`—; la V64 trae la gestión de personas —`sede`, `colaborador`, `periodo_laboral`, `situacion_laboral`, `cese_anulado` y `contratado_sin_alta`— y sus cuatro permisos; la V65 añade las columnas `antes_*` de `situacion_laboral`; la V49 y la V50 solo siembran pesos; la V51 trae la tabla `lectura_cv_perfil` y los archivos del perfil; la V52 y la V53 no crean tablas; la V55 pone el sueldo en la vacante y la pretensión en la postulación; la V56 trae la tabla `aviso_portal`; la V57 no crea tablas, solo siembra los precios de los dos modelos de DeepSeek; la V58 no crea tablas: suma el aviso `VACANTE_ACTUALIZADA` y apaga el correo `REMUNERACION_ACTUALIZADA`; la V59 añade `vacante.archivada_en`; la V60 añade `vacante.eliminada_en` —el borrado lógico—, el motivo de cierre y el tipo de aviso `VACANTE_ELIMINADA`, y el permiso `eliminar_vacante`; la V61 trae la tabla `recuperacion_clave`, tres parámetros y los dos correos de «¿Olvidaste tu contraseña?»; la V62 añade `vacante.ciudad_ubigeo`; la V63 trae las tablas `resena`, `respuesta_resena` y `reporte_resena`, los tres permisos de las reseñas de empresas y cuatro tipos de aviso)
 
 Cada tabla con todas sus columnas, tipos y claves. **Este documento se consulta**, no se lee de
 corrido: es la base para escribir las migraciones de Flyway.
@@ -11,8 +11,8 @@ Lo que llegó después de la versión 2.0 va marcado con su migración entre par
 ⚠️ **Tres tablas de la base no tienen ficha aquí.** `agent_run` es del motor de agentes y no de
 selección, así que no la tendrá nunca. `invitacion` (`V37`) y `tarifa_modelo` (`V38`) sí
 deberían tenerla: llegaron con el multiempresa y su ficha está pendiente. Hasta que se
-escriban, para esas dos manda la migración. De las **121 tablas de selección y de gestión de
-personas** que existen hoy, aquí hay ficha de 119, más otras diez que están solo diseñadas y
+escriban, para esas dos manda la migración. De las **123 tablas de selección y de gestión de
+personas** que existen hoy, aquí hay ficha de 121, más otras diez que están solo diseñadas y
 todavía no existen.
 
 Para entender *por qué* el modelo es así, está el [Modelo de datos](05-MODELO-DE-DATOS.md).
@@ -728,6 +728,7 @@ Una convocatoria concreta.
 | `publicada_en` | timestamptz | no | |
 | `cerrada_en` | timestamptz | no | |
 | `archivada_en` | timestamptz | no | (`V59`) Cuándo se retiró de la lista habitual del panel. Vacío = no archivada, y es lo que trae por defecto `/admin`. **No es un estado**: la vacante sigue `CERRADA` y sus postulaciones quedan como estaban. Desarchivar la vuelve a dejar vacía. Quién la archivó no está aquí: eso lo guarda `auditoria`, con persona, fecha y acción |
+| `contexto_actualizado_en` | timestamptz | no | (`V77`) Cuándo cambió por última vez lo que la vacante cuenta a quien postula por WhatsApp: ficha pública, requisitos indispensables, empresa, convocatoria, procedimiento y plazos de la prueba. La fechan triggers; vacía si no cambió desde la `V77`. Ver abajo |
 | `eliminada_en` | timestamptz | no | (`V60`) Cuándo se eliminó por **borrado lógico**. Vacío = existe, como todas las anteriores a la `V60`. Con fecha, deja de salir en el panel (lista habitual, Archivadas y su contador), el tablón, «Mis procesos», los rankings, las exportaciones, la selección de sesiones de simulación y los procesos automáticos, y consultarla por id responde 404. **No se borra ninguna fila**. Persona y motivo van en `auditoria`, acción `eliminar_vacante`. No hay vuelta desde el panel: soporte la restaura vaciando la fecha en la base |
 
 **Clave primaria:** `id`
@@ -778,6 +779,19 @@ más se abre y sustituye al `ix_vacante_sin_archivar` de la `V59`; `ix_vacante_a
 (`organizacion_id`, `archivada_en DESC`) `WHERE archivada_en IS NOT NULL AND eliminada_en IS
 NULL` es el de Archivadas. Ninguno es único, así que archivar o eliminar no tiene ningún orden de
 escritura que respetar.
+
+**`contexto_actualizado_en` la escriben triggers, nunca la aplicación** (`V77`). Es una de las
+fuentes de `actualizadoEn` y `revisionContexto` de la consulta v2 del bot de WhatsApp. La pone
+el trigger `vacante_contexto_actualizado` cuando cambia de verdad alguna de las columnas que esa
+consulta cuenta —la ficha pública (`titulo`, `descripcion`, `proposito`, `responsabilidades`,
+`requisitos`, `modalidad`, `horario`, `ubicacion`, `ciudad_ubigeo`), el sueldo (`remuneracion_*`),
+la convocatoria (`estado`, `publicada_en`, `cerrada_en`) y el procedimiento y los plazos de la
+prueba (`aplica_evaluacion`, `instrumento_etapa_tecnica`, `minutos_etapa_tecnica`,
+`version_plantilla_prueba_id`, `prueba_cierra_en`)—; guardar lo mismo no la mueve. También la
+tocan los triggers de `requisito_objetivo` (un requisito indispensable activo), de `version_banco`
+(la prueba propia `PRUEBA_PUESTO` publicada: estado, modalidad, minutos y días) y de
+`organizacion` (su `nombre`, en todas sus vacantes). **Si la consulta empieza a contar otra
+columna de la vacante, se añade al trigger.**
 
 **`eliminada_en` no lleva CHECK, a propósito** (`V60`): una vacante mal creada se elimina esté
 donde esté —borrador, publicada, cerrada o archivada—. Quién puede hacerlo lo decide el permiso
@@ -1698,6 +1712,7 @@ Las respuestas de un usuario a una plantilla concreta.
 | `iniciada_en` | timestamptz | no | |
 | `terminada_en` | timestamptz | no | |
 | `vigente_hasta` | timestamptz | no | Hasta cuándo se puede reutilizar |
+| `contexto_actualizado_en` | timestamptz | no | (`V77`) Cuándo cambió por última vez lo que la evaluación cuenta por WhatsApp. Nace con `now()` y el trigger `evaluacion_contexto_actualizado` la mueve solo si cambian `estado`, `vence_en`, `iniciada_en` o `terminada_en`. Vacía en las anteriores a la `V77`. La aplicación la lee y nunca la escribe |
 
 **Clave primaria:** `id`
 **Apunta a:** `organizacion`, `usuario`, `plantilla_evaluacion`, `version_banco`, `evaluacion`
@@ -2169,6 +2184,7 @@ Cuando un candidato rinde.
 | `variante_cambio_id` | bigint | no | Cuál le tocó. Nunca en la prueba del editor, que no tiene cambio inesperado |
 | `minuto_cambio` | integer | no | El sorteado dentro del rango |
 | `cambio_mostrado_en` | timestamptz | no | |
+| `contexto_actualizado_en` | timestamptz | no | (`V77`) Cuándo cambió por última vez lo que el intento cuenta por WhatsApp. Nace con `now()` y el trigger `intento_prueba_contexto_actualizado` la mueve solo si cambian `iniciado_en`, `vence_en`, `plazo_propio`, `entregado_en`, `no_completada` o la versión. Vacía en los anteriores a la `V77`. La aplicación la lee y nunca la escribe |
 
 **Clave primaria:** `id` · **Único:** `postulacion_id`
 **Restricciones (`V67`):** `intento_prueba_de_una_version_check` —de una plantilla o de una
@@ -3526,16 +3542,18 @@ Solo la saca del aviso de contratados pendientes de alta: la postulación sigue 
 
 ---
 
-# 23 · Novedades por WhatsApp (`V73`)
+# 23 · Novedades por WhatsApp (`V73`, `V76`)
 
 El candidato escribe primero al bot de RENASER desde el celular de su cuenta, y el bot le cuenta
 cómo va su proceso y le avisa cuando le toca algo. Es una beta solo de las vacantes de la
 plataforma, con el parámetro `whatsapp_novedades_activo`. El porqué del diseño está en el
 [Modelo de datos](05-MODELO-DE-DATOS.md), «Novedades por WhatsApp»; lo que se dicen EX y el bot,
-en [el contrato](CONTRATO-NOVEDADES-POR-WHATSAPP.md).
+en [el contrato](CONTRATO-NOVEDADES-POR-WHATSAPP.md). `resultado_whatsapp` y `evento_whatsapp`
+(`V76`) son del [contrato v2](CONTRATO-CONTEXTO-Y-RESULTADOS-POR-WHATSAPP-V2.md), todavía no
+activo.
 
-Ninguna borra en cascada: el borrado de datos se lleva los vínculos y los avisos de la persona a
-mano, dentro de su transacción.
+Ninguna borra en cascada: el borrado de datos se lleva los vínculos, los avisos, los resultados
+y los eventos de la persona a mano, dentro de su transacción.
 
 ## `vinculo_whatsapp`
 
@@ -3600,6 +3618,62 @@ Es del número, no de una postulación: con él aquí, el portal no vuelve a ofr
 número y no sale ningún aviso. El borrado de datos la quita si ninguna otra cuenta usa ese
 celular.
 
+## `resultado_whatsapp` (`V76`)
+
+El resultado de una postulación que terminó con el vínculo `ACTIVO`: lo que el bot puede consultar
+durante 30 días. Solo la proyección pública mínima, nunca notas, el motivo de cierre ni la ficha.
+Se guarda aunque el productor v2 esté apagado. Los vínculos legados ya cerrados no se convierten
+en resultados.
+
+| Columna | Tipo | Oblig. | Qué guarda |
+|---|---|---|---|
+| `id` | bigint | sí | Clave |
+| `postulacion_id` | bigint | sí | **Única**: un resultado por postulación |
+| `vinculo_whatsapp_id` | bigint | sí | El vínculo que estaba `ACTIVO` al terminar: solo ese número lo consulta |
+| `tipo` | text | sí | `CONTRATADO`, `NO_CONTINUA` o `CERRADA` (CHECK) |
+| `fecha` | timestamptz | sí | Cuándo ocurrió: la de la transición |
+| `revision` | integer | sí (1) | Mayor que 0 (CHECK). Crece con cada corrección del mismo resultado; va aparte de la de la convocatoria. Hoy EX no corrige resultados: siempre 1 |
+| `es_correccion` | boolean | sí (false) | Hoy siempre falso |
+| `consultable_hasta` | timestamptz | sí | `fecha` + 30 días, nunca más (CHECK). Una corrección no lo alarga |
+| `acceso_revocado_en` · `acceso_revocado_motivo` | timestamptz · text | no | Cuándo y por qué dejó de consultarse antes de tiempo: `BAJA`, `CAMBIO_CELULAR` o `DEJAR_DE_RECIBIR` (CHECK). Los dos o ninguno (CHECK) |
+| `actualizado_en` | timestamptz | sí | Por defecto, ahora. Es una de las fuentes de `actualizadoEn` de la consulta |
+
+**Clave primaria:** `id` · **Única:** `resultado_whatsapp_una_por_postulacion` (`postulacion_id`)
+· **Apunta a:** `postulacion`, `vinculo_whatsapp`
+
+El sondeo borra las filas que pasaron su `consultable_hasta`, y el borrado de datos las de la
+persona: el expediente de selección no se toca.
+
+## `evento_whatsapp` (`V76`)
+
+La bandeja de salida de los eventos v2 hacia el bot (`POST /v1/ex/resultados`): un `RESULTADO` al
+terminar o un `CONVOCATORIA_CERRADA` al cerrar la vacante. Se escribe en la misma transacción
+que el hecho y solo con el productor v2 encendido (`WHATSAPP_PRODUCTOR_V2`); lo envía después
+el sondeo.
+
+| Columna | Tipo | Oblig. | Qué guarda |
+|---|---|---|---|
+| `id` | uuid | sí | Clave. **Es el `eventoId` del contrato v2** (UUIDv7): un reintento manda el mismo |
+| `postulacion_id` | bigint | sí | |
+| `vinculo_whatsapp_id` | bigint | sí | |
+| `tipo` | text | sí | `RESULTADO` o `CONVOCATORIA_CERRADA` (CHECK) |
+| `revision` | integer | sí | Mayor que 0 (CHECK). La del resultado o la de la convocatoria, según `tipo` |
+| `estado` | text | sí | `PENDIENTE`, `ACEPTADO` (el bot respondió 202: aceptado, no entregado), `FALLIDO` u `OMITIDO` (CHECK) |
+| `telefono` · `referencia` · `nombre` · `vacante` | text | sí | **Lo que se manda, congelado al escribirlo**, como en `aviso_whatsapp` |
+| `ocurrido_en` | timestamptz | sí | Cuándo ocurrió el hecho |
+| `resultado_tipo` · `resultado_fecha` · `resultado_consultable_hasta` | text · timestamptz · timestamptz | no | Solo en `RESULTADO`, y entonces los tres (CHECK). El tipo, `CONTRATADO`, `NO_CONTINUA` o `CERRADA` (CHECK) |
+| `resultado_es_correccion` | boolean | sí (false) | |
+| `convocatoria_cerrada_en` | timestamptz | no | Solo en `CONVOCATORIA_CERRADA`, y siempre en él (CHECK) |
+| `aviso_autorizado` · `aviso_caduca_en` | boolean · timestamptz | sí | La autorización limitada del aviso final: solo con el vínculo `ACTIVO` al confirmarse el hecho, y caduca como mucho 24 horas después de `ocurrido_en` (CHECK) |
+| `cierra_vinculo` | boolean | sí | Verdadero en `RESULTADO` y falso en `CONVOCATORIA_CERRADA` (CHECK) |
+| `intentos` · `proximo_intento_en` · `ultimo_error` | integer · timestamptz · text | sí (0) · no · no | Los reintentos, con la misma espera que los avisos |
+| `motivo` | text | no | Por qué quedó `FALLIDO` (el código del bot, como `ruta_no_disponible`) u `OMITIDO` (`autorizacion_caducada`, `suprimido` o `revocado`) |
+| `aceptado_en` | timestamptz | no | Cuando el bot respondió 202 |
+| `actualizado_en` | timestamptz | sí | Por defecto, ahora |
+
+**Clave primaria:** `id` · **Única:** `evento_whatsapp_uno_por_revision` (`postulacion_id`, `tipo`,
+`revision`) · **Apunta a:** `postulacion`, `vinculo_whatsapp`
+
 ---
 
 # Índices
@@ -3658,6 +3732,11 @@ caro sale: cada consulta que filtra por el padre acaba leyendo la tabla entera.
 | `vinculo_whatsapp (revocacion_proximo_intento_en) WHERE cerrado_en IS NOT NULL AND revocacion_enviada_en IS NULL` | **Índice parcial.** Las revocaciones que el sondeo aún le debe al bot (`V73`) |
 | `aviso_whatsapp (proximo_intento_en) WHERE estado = 'PENDIENTE'` | **Índice parcial.** La cola de avisos que lee el sondeo (`V73`) |
 | `aviso_whatsapp (postulacion_id)` | Los avisos de una postulación (`V73`) |
+| `resultado_whatsapp (vinculo_whatsapp_id)` | Los resultados de un vínculo: BAJA, cambio de celular y borrado de datos (`V76`) |
+| `resultado_whatsapp (consultable_hasta) WHERE acceso_revocado_en IS NULL` | **Índice parcial.** Los resultados que aún se consultan, y los vencidos que el sondeo retira (`V76`) |
+| `evento_whatsapp (proximo_intento_en) WHERE estado = 'PENDIENTE'` | **Índice parcial.** La cola de eventos v2 que lee el sondeo (`V76`) |
+| `evento_whatsapp (vinculo_whatsapp_id)` | Los eventos de un vínculo: su cierre, la BAJA, el cambio de celular y el borrado (`V76`) |
+| `evento_whatsapp (telefono) WHERE estado = 'PENDIENTE'` | **Índice parcial.** Los pendientes de un número (`V76`) |
 
 Los índices de `organizacion_id` sueltos **no hacen falta**: van dentro de los compuestos de
 arriba, porque toda consulta filtra primero por organización.
@@ -3716,6 +3795,12 @@ Resumen de las restricciones que están repartidas por el documento:
   `whatsapp_baja`); un solo vínculo de WhatsApp vivo por postulación; uno cerrado lleva fecha y
   motivo, y uno activo, la fecha en que se vinculó; y una transición deja como mucho un aviso de
   cada tipo (`V73`).
+- Un resultado de WhatsApp por postulación, consultable como mucho 30 días desde el hecho, y uno
+  revocado lleva fecha y motivo; un solo evento v2 por postulación, tipo y revisión; un
+  `RESULTADO` lleva su resultado completo y cierra el vínculo, un `CONVOCATORIA_CERRADA` lleva su
+  fecha y no lo cierra; y la autorización de aviso caduca como mucho 24 horas después del hecho
+  (`V76`). `contexto_actualizado_en` de `vacante`, `intento_prueba` y `evaluacion` la fechan sus
+  triggers —la aplicación nunca la escribe—, y solo con un cambio real (`V77`).
 
 ⚠️ Aquí decía «el rango del cambio inesperado cabe dentro de la duración de la prueba». **Eso no
 lo impide nada**: no hay CHECK que lo diga ni comprobación en el código. Ver

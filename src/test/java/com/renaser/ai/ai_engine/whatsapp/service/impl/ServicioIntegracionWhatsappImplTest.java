@@ -54,13 +54,14 @@ class ServicioIntegracionWhatsappImplTest {
     @Mock private IntentoPruebaRepository intentos;
     @Mock private PersonaRepository personas;
     @Mock private BetaWhatsapp beta;
+    @Mock private com.renaser.ai.ai_engine.whatsapp.service.ResultadosPorWhatsapp resultados;
 
     private ServicioIntegracionWhatsappImpl integracion;
 
     @BeforeEach
     void montar() {
         integracion = new ServicioIntegracionWhatsappImpl(vinculos, avisos, bajas, postulaciones,
-                vacantes, estados, intentos, personas, beta);
+                vacantes, estados, intentos, personas, beta, resultados);
         lenient().when(estados.findAllByOrderByOrden()).thenReturn(List.of(
                 EstadoPostulacion.builder().codigo("PERFIL_CALIFICANDO").esFinal(false).build(),
                 EstadoPostulacion.builder().codigo("NO_CONTINUA").esFinal(true).build()));
@@ -254,6 +255,8 @@ class ServicioIntegracionWhatsappImplTest {
         ArgumentCaptor<BajaWhatsapp> guardada = ArgumentCaptor.forClass(BajaWhatsapp.class);
         verify(bajas).save(guardada.capture());
         assertThat(guardada.getValue().getTelefono()).isEqualTo(NUMERO);
+        // V76 · también lo ya cerrado: sus resultados y sus eventos pendientes.
+        verify(resultados).alDarseDeBaja(org.mockito.ArgumentMatchers.eq(NUMERO), any());
     }
 
     @Test

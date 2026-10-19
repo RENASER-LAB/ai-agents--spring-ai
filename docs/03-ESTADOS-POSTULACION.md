@@ -587,6 +587,11 @@ al bot desde el celular de su cuenta, queda vinculado y desde entonces:
 - **Quien pulsó el botón pero nunca escribió no recibe nada**: el bot no escribe primero.
 - **Al llegar a un estado final el vínculo se cierra sin avisar por WhatsApp**, avise o no la
   transición. Si escribe después, el bot le dice que no tiene procesos activos.
+- **Desde el 19/10/2026 (`V76`) EX ya guarda el resultado** de quien terminó con el vínculo
+  `ACTIVO`, para que el bot lo consulte 30 días, y tiene listo el aviso del resultado y del cierre
+  de la convocatoria. Las dos cosas son del [contrato v2](CONTRATO-CONTEXTO-Y-RESULTADOS-POR-WHATSAPP-V2.md),
+  que **no está activo**: hasta su C-10 el candidato sigue como dicen los puntos de arriba. Una
+  transición movida «sin avisar» nunca autoriza ese aviso.
 
 Lo que el bot le cuenta cuando escribe son las mismas palabras del portal: el título y el texto
 de cada estado viven en el servidor (`TextosDelMomento`), y el portal tiene su copia

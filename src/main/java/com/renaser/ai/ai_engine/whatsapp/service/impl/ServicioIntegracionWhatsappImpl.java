@@ -65,6 +65,7 @@ public class ServicioIntegracionWhatsappImpl implements ServicioIntegracionWhats
     private final IntentoPruebaRepository intentos;
     private final PersonaRepository personas;
     private final BetaWhatsapp beta;
+    private final com.renaser.ai.ai_engine.whatsapp.service.ResultadosPorWhatsapp resultados;
 
     @Override
     @Transactional
@@ -144,6 +145,9 @@ public class ServicioIntegracionWhatsappImpl implements ServicioIntegracionWhats
         if (!vivos.isEmpty()) {
             avisos.omitirPendientesDe(vivos.stream().map(VinculoWhatsapp::getId).toList(), ahora);
         }
+        // También lo ya cerrado (V76): sus resultados dejan de consultarse y sus eventos
+        // pendientes —el aviso final incluido— ya no salen.
+        resultados.alDarseDeBaja(numero, ahora);
         if (!bajas.existsById(numero)) {
             bajas.save(BajaWhatsapp.builder().telefono(numero).dadaEn(ahora).build());
         }

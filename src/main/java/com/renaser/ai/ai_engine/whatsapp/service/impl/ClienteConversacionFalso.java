@@ -29,7 +29,8 @@ import java.util.regex.Pattern;
  * nada a nadie: es lo que permite comprobar en un E2E que llegó un solo aviso, o que cambiar el
  * celular revocó el número anterior.
  *
- * <p>{@link #fallar(boolean)} lo pone a contestar como un bot caído, para probar los reintentos.
+ * <p>{@link #fallar(boolean)} lo pone a contestar como un bot caído, para probar los reintentos, y
+ * {@link #responderComoVersion(int)} como un bot que todavía no tiene los eventos v2 (V76).
  */
 @Slf4j
 public class ClienteConversacionFalso implements ClienteConversacion {
@@ -37,6 +38,8 @@ public class ClienteConversacionFalso implements ClienteConversacion {
     public static final String ESPERA = "ESPERA";
     public static final String AVISO = "AVISO";
     public static final String REVOCACION = "REVOCACION";
+    /** Un evento v2 de {@code /v1/ex/resultados} (V76). */
+    public static final String EVENTO = "EVENTO";
 
     /** Lo que se le pidió al bot, en el orden en que llegó. */
     public record Llamada(String tipo, Instant recibidaEn, Map<String, Object> cuerpo) {}
@@ -53,7 +56,14 @@ public class ClienteConversacionFalso implements ClienteConversacion {
     private final List<Llamada> registro = new CopyOnWriteArrayList<>();
     /** El contenido de cada aviso aceptado, por su avisoId: la idempotencia del bot. */
     private final Map<String, Map<String, Object>> avisosAceptados = new ConcurrentHashMap<>();
+    /** Lo mismo para los eventos v2, por su eventoId. */
+    private final Map<String, Map<String, Object>> eventosAceptados = new ConcurrentHashMap<>();
     private volatile boolean caido;
+    /**
+     * Con qué versión del contrato contesta, como {@code CONVERSATION_EX_VERSION} en el bot: con
+     * 1, {@code /v1/ex/resultados} responde {@code 404 ruta_no_disponible}.
+     */
+    private volatile int version = 2;
 
     @Override
     public void anunciar(Espera espera) {
@@ -98,9 +108,62 @@ public class ClienteConversacionFalso implements ClienteConversacion {
         apuntar(REVOCACION, revocacion.comoCuerpo());
     }
 
+    /**
+     * {@code /v1/ex/resultados} como el bot (C-4): el mismo orden de comprobación que
+     * {@code /v1/ex/avisos} —primero la versión, después el cuerpo, después la idempotencia— y los
+     * mismos límites que la consulta.
+     */
+    @Override
+    public void publicarEvento(Evento evento) {
+        caidoSiToca();
+        if (version < 2) {
+            throw new FalloDelBot("El bot falso respondió 404 ruta_no_disponible: está en la versión "
+                    + version + " del contrato", false, "ruta_no_disponible");
+        }
+        comun(evento.telefono(), evento.postulacionRef());
+        exigir(evento.eventoId() != null && evento.eventoId().version() == 7, "eventoId");
+        exigir(TIPOS_DE_EVENTO.contains(evento.tipo()), "tipo");
+        exigir(cabe(evento.nombre(), LARGO_DEL_NOMBRE), "nombre");
+        exigir(cabe(evento.vacante(), LARGO_DE_LA_VACANTE), "vacante");
+        exigir(evento.ocurridoEn() != null, "ocurridoEn");
+        exigir(evento.avisoCaducaEn() != null && !evento.avisoCaducaEn()
+                .isAfter(evento.ocurridoEn().plus(java.time.Duration.ofHours(24))), "aviso.caducaEn");
+        if ("RESULTADO".equals(evento.tipo())) {
+            ResultadoDelEvento resultado = evento.resultado();
+            exigir(resultado != null && TIPOS_DE_RESULTADO.contains(resultado.tipo())
+                    && resultado.fecha() != null && resultado.revision() > 0
+                    && resultado.consultableHasta() != null
+                    && (resultado.explicacion() == null || resultado.explicacion().length() <= 300),
+                    "resultado");
+            exigir(evento.convocatoria() == null, "convocatoria");
+            exigir(evento.cierraVinculo(), "cierraVinculo");
+        } else {
+            ConvocatoriaDelEvento convocatoria = evento.convocatoria();
+            exigir(convocatoria != null && convocatoria.cerradaEn() != null
+                    && convocatoria.revision() > 0, "convocatoria");
+            exigir(evento.resultado() == null, "resultado");
+            exigir(!evento.cierraVinculo(), "cierraVinculo");
+        }
+        Map<String, Object> cuerpo = evento.comoCuerpo();
+        if (eventosAceptados.size() >= MAXIMO) {
+            eventosAceptados.clear();
+        }
+        Map<String, Object> anterior = eventosAceptados.putIfAbsent(evento.eventoId().toString(), cuerpo);
+        if (anterior != null && !anterior.equals(cuerpo)) {
+            throw new FalloDelBot("El bot falso respondió 409 evento_distinto: el evento "
+                    + evento.eventoId() + " ya llegó con otro contenido", false, "evento_distinto");
+        }
+        apuntar(EVENTO, cuerpo);
+    }
+
     @Override
     public boolean estaEncendido() {
         return true;
+    }
+
+    /** Para las pruebas: contestar como un bot en la versión 1 (404 en los eventos) o en la 2. */
+    public void responderComoVersion(int versionDelContrato) {
+        this.version = versionDelContrato;
     }
 
     /** Las llamadas recibidas, las más viejas primero. */
@@ -123,6 +186,7 @@ public class ClienteConversacionFalso implements ClienteConversacion {
     public void olvidar() {
         registro.clear();
         avisosAceptados.clear();
+        eventosAceptados.clear();
     }
 
     // ============ como el bot de verdad ============

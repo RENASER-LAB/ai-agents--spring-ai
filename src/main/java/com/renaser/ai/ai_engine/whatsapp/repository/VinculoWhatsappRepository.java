@@ -100,6 +100,30 @@ public interface VinculoWhatsappRepository extends JpaRepository<VinculoWhatsapp
     List<Long> revocacionesPorEnviar(@Param("ahora") Instant ahora,
                                      org.springframework.data.domain.Pageable tanda);
 
+    /** Todos los de un número, vivos o cerrados: la consulta v2 y la BAJA miran también los cerrados. */
+    List<VinculoWhatsapp> findByTelefono(String telefono);
+
+    /**
+     * Los ACTIVOS de las postulaciones de una vacante que siguen en carrera (V76): a quién contarle
+     * que la convocatoria cerró. Una postulación ya terminada no recibe ese aviso: su resultado
+     * manda.
+     */
+    @Query("""
+            select v from VinculoWhatsapp v, Postulacion p, EstadoPostulacion e
+            where p.id = v.postulacionId and e.codigo = p.estadoCodigo
+              and p.vacanteId = :vacanteId and v.estado = 'ACTIVO' and e.esFinal = false
+            order by v.id
+            """)
+    List<VinculoWhatsapp> activosEnCarreraDeLaVacante(@Param("vacanteId") Long vacanteId);
+
+    /**
+     * Uno, bloqueando su fila y esperando a quien la tenga (V76): el cierre del vínculo y el
+     * envío de su evento final se ponen de acuerdo sobre la revocación, uno detrás del otro.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select v from VinculoWhatsapp v where v.id = :id")
+    Optional<VinculoWhatsapp> paraEscribir(@Param("id") Long id);
+
     /** Una fila para el sondeo, bloqueada y sin esperar: si otro la tiene, se salta. */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @org.springframework.data.jpa.repository.QueryHints(

@@ -23,8 +23,8 @@ Sirve para tres cosas:
 - **Entender el sistema.** Un modelo de datos bien contado explica el negocio mejor que
   cualquier otro documento.
 
-**La base ya está construida.** Las migraciones `V1` a `V75` viven en
-`src/main/resources/db/migration` —**123 tablas de este módulo**, 126 en la base contando la de
+**La base ya está construida.** Las migraciones `V1` a `V77` viven en
+`src/main/resources/db/migration` —**125 tablas de este módulo**, 128 en la base contando la de
 Flyway y las dos del motor de agentes— y Flyway es el dueño del esquema. Cambiar algo de aquí
 ya cuesta una migración nueva, y **una migración aplicada no se edita nunca**: se escribe otra
 encima.
@@ -261,6 +261,16 @@ La `V75` (16/10/2026) le da a `nota_criterio` **la nota tal como se puso y sobre
 escala del peso del criterio, y al cambiar los pesos de la vacante se recalcula desde esas dos,
 que no cambian: ir y volver a la misma versión devuelve la misma nota. La migración las rellena
 en las notas de esas dos etapas con el peso que su vacante tenía.
+
+La `V76` (19/10/2026) prepara **el contrato v2 con el bot de WhatsApp**, que todavía no está
+activo: dos tablas nuevas, sin tocar las de la `V73`. `resultado_whatsapp` guarda el resultado
+de una postulación que terminó con el vínculo `ACTIVO` —tipo, fecha y revisión, nada más— para
+que el bot pueda consultarlo 30 días; `evento_whatsapp` es la bandeja de salida de los eventos
+`RESULTADO` y `CONVOCATORIA_CERRADA`, escrita en la misma transacción que el hecho. La `V77`
+(19/10/2026) añade `contexto_actualizado_en` a `vacante`, `intento_prueba` y `evaluacion`, y unos
+triggers que la mueven **solo cuando cambia de verdad un dato que la consulta del bot cuenta**:
+así la consulta sabe la fecha real del último cambio. Ver «Novedades por WhatsApp», más abajo, y
+[el contrato v2](CONTRATO-CONTEXTO-Y-RESULTADOS-POR-WHATSAPP-V2.md).
 
 La `V54` (14/09/2026) **no añade ninguna tabla y cambia quién firma qué**. Hasta ella había dos
 tipos de texto —`PROCESO` y `FUTUROS_CONTACTOS`— y el de la cuenta usaba el primero, que habla de
@@ -642,7 +652,7 @@ Hay una versión dibujada de este mismo mapa en
 
 ## Las tablas
 
-Ciento veintitrés en total, agrupadas por área para poder leerlas de a poco. En cada una se nombran
+Ciento veinticinco en total, agrupadas por área para poder leerlas de a poco. En cada una se nombran
 las columnas que importan para entender qué hace, no todas.
 
 **Para verlas todas, con tipo y clave, está el [Diccionario de datos](07-DICCIONARIO-DE-DATOS.md).**
@@ -1479,9 +1489,9 @@ cifra; que no viaje a nadie más lo hace el servicio.
 
 ---
 
-### Novedades por WhatsApp · 3 tablas
+### Novedades por WhatsApp · 5 tablas
 
-Desde la `V73` (13/10/2026). Mientras espera, el candidato pulsa «Escribir por WhatsApp», **escribe
+Desde la `V73` (13/10/2026); las dos últimas, desde la `V76` (19/10/2026). Mientras espera, el candidato pulsa «Escribir por WhatsApp», **escribe
 él primero** al bot de RENASER desde el celular de su cuenta, y desde entonces el bot le cuenta
 cómo va y le avisa cuando le toca algo. El bot vive en el CRM; EX guarda el número, el vínculo y la
 cola de lo que le debe al bot. Lo que se dicen los dos está en
@@ -1492,6 +1502,8 @@ cola de lo que le debe al bot. Lo que se dicen los dos está en
 | `vinculo_whatsapp` | Que un número va a escribir, o ya escribió, por una postulación. Una fila por cada vez que se pulsa el botón sin un vínculo vivo | postulacion_id, persona_id, referencia, telefono, estado, consentimiento_id, anuncio_caduca_en, vinculado_en, cerrado_en, motivo_cierre, revocacion_enviada_en |
 | `aviso_whatsapp` | Un «te toca» que EX le debe al bot, uno por transición y tipo. Su `id` es el `avisoId` del contrato | postulacion_id, vinculo_whatsapp_id, transicion_estado_id, tipo, estado, telefono, nombre, vacante, texto, intentos, proximo_intento_en, ultimo_error |
 | `whatsapp_baja` | Los números que escribieron BAJA al bot | telefono, dada_en |
+| `resultado_whatsapp` | El resultado de una postulación que terminó con el vínculo `ACTIVO`, lo que el bot puede consultar 30 días (`V76`). Uno por postulación | postulacion_id, vinculo_whatsapp_id, tipo, fecha, revision, es_correccion, consultable_hasta, acceso_revocado_en, acceso_revocado_motivo |
+| `evento_whatsapp` | Un evento v2 que EX le debe al bot: `RESULTADO` o `CONVOCATORIA_CERRADA` (`V76`). Su `id` es el `eventoId` del contrato v2 | postulacion_id, vinculo_whatsapp_id, tipo, revision, estado, telefono, referencia, nombre, vacante, ocurrido_en, resultado_*, convocatoria_cerrada_en, aviso_autorizado, aviso_caduca_en, cierra_vinculo, intentos, motivo |
 
 **El vínculo vive en cuatro estados**: `PENDIENTE` (pulsó y EX anunció el número; el anuncio
 dura 24 horas y volver a pulsar lo renueva sobre la misma fila), `ACTIVO` (escribió desde ese
@@ -1514,6 +1526,31 @@ la revocación.
 **La baja es del número, no de una postulación**, y por eso va aparte: puede llegar cuando ya no
 queda ningún vínculo vivo. Con el número en `whatsapp_baja`, el portal no vuelve a ofrecer el
 botón con él.
+
+**Lo de la `V76` es del contrato v2, que todavía no está activo**, y separa tres cosas que en la
+`V73` eran una sola —cerrar el vínculo—: el cierre ordinario, que sigue igual; **el derecho a
+consultar el resultado**, en `resultado_whatsapp`; y **la autorización de avisarlo**, en el
+evento. El resultado solo guarda la proyección pública mínima (tipo, fecha y revisión), nunca
+notas ni el motivo de cierre, y **se guarda aunque el productor v2 esté apagado**: la consulta es
+de EX y no manda nada. Lo revocan una BAJA, un cambio de celular o dejar de recibir, y el sondeo
+lo retira al pasar sus 30 días.
+
+**El evento se escribe en la misma transacción que el hecho** —la transición a un estado final o
+el cierre de la convocatoria—, así que un reinicio después de confirmar no lo pierde, y guarda
+tal cual lo que viaja para que un reintento sea idéntico. Solo nace con el productor v2 encendido
+(`WHATSAPP_PRODUCTOR_V2`). Su autorización de aviso caduca como mucho 24 horas después del hecho.
+La revisión del resultado y la de la convocatoria viven en la misma columna, separadas por el
+tipo. Estados: `PENDIENTE`, `ACEPTADO` (el bot respondió 202: aceptado, no entregado),
+`FALLIDO` y `OMITIDO` (caducó, BAJA o acceso retirado; `motivo` dice cuál).
+
+**La fecha real del último cambio** (`V77`). La consulta del bot devuelve cuándo cambió de verdad
+lo que cuenta, y antes EX solo sabía fechar el estado, la convocatoria y el sueldo. Corregir el
+horario, los requisitos o la fecha límite de la prueba, o ampliar un plazo, no movía nada. Ahora
+`contexto_actualizado_en` de `vacante`, `intento_prueba` y `evaluacion` la ponen **triggers, no la
+aplicación**: la vacante se configura a trozos desde muchos sitios, y un sitio olvidado repetiría
+el fallo. Solo cuentan los cambios reales de las columnas que viajan; guardar lo mismo no mueve
+nada. Los requisitos indispensables, la prueba propia publicada y el nombre de la empresa también
+tocan la de su vacante. Las filas anteriores a la `V77` quedan vacías: no se inventa una fecha.
 
 ---
 
@@ -1578,6 +1615,11 @@ cuáles sí, porque las que no, hay que probarlas en el código.
   el de la baja casan con `^\+[1-9][0-9]{7,14}$`. **Un solo vínculo vivo por postulación**; uno
   cerrado lleva fecha y motivo, y uno activo, la fecha en que se vinculó. **Una transición deja
   como mucho un aviso de cada tipo**, aunque el servidor se reinicie o dos sondeos se pisen.
+- **Un resultado de WhatsApp por postulación, consultable como mucho 30 días** (`V76`), y uno
+  revocado lleva fecha y motivo. **Un solo evento v2 por postulación, tipo y revisión**: el mismo
+  hecho dos veces no deja dos pendientes. Un `RESULTADO` lleva su resultado completo y cierra el
+  vínculo; un `CONVOCATORIA_CERRADA` lleva su fecha y no lo cierra; y la autorización de aviso
+  caduca como mucho 24 horas después del hecho.
 
 ### Tienen que vivir en el código
 
@@ -1684,8 +1726,9 @@ una sola tabla.
 8. **Se borran enteras sus reseñas de empresas** (`V63`), con sus respuestas y sus reportes. Son
    opiniones sobre una persona concreta y, con su nombre fuera, el texto seguiría señalándola. La
    auditoría conserva que existieron —el texto nunca se copió allí— y una fila con cuántas había.
-9. **Se borran enteros sus vínculos de WhatsApp y los avisos que colgaban de ellos** (`V73`), y se
-   le cuenta al bot con el motivo `BORRADO_DATOS`. La baja de su número se borra también si
+9. **Se borran enteros sus vínculos de WhatsApp y los avisos que colgaban de ellos** (`V73`), y
+   también sus resultados consultables y sus eventos v2 (`V76`), y se le cuenta al bot con el
+   motivo `BORRADO_DATOS`. La baja de su número se borra también si
    ninguna otra cuenta usa ese celular. Su celular se vacía con el resto de `persona` (paso 2).
 10. Si era prospecto del Radar, deja de estar activo.
 11. **Se conserva todo lo demás**: puntajes, historial de estados, auditoría, métricas. **Y la

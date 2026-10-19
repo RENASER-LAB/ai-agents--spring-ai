@@ -181,6 +181,18 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
     // pieza que usa la configuración del editor de la prueba (V68).
     private final com.renaser.ai.ai_engine.prueba.service.FechaLimiteDeLaVacante fechaLimite;
 
+    /**
+     * El aviso de convocatoria cerrada por WhatsApp (V76, contrato v2). Por setter y opcional, como
+     * el WhatsApp de la máquina de estados: las pruebas de la vacante no lo necesitan, y con el
+     * productor v2 apagado no escribe nada.
+     */
+    private com.renaser.ai.ai_engine.whatsapp.service.ResultadosPorWhatsapp whatsapp;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setWhatsapp(com.renaser.ai.ai_engine.whatsapp.service.ResultadosPorWhatsapp whatsapp) {
+        this.whatsapp = whatsapp;
+    }
+
     /** Lo que contesta la API a un código de ciudad que el catálogo no ofrece (V62). */
     static final String CIUDAD_FUERA_DEL_CATALOGO = "Esa ciudad no está en el catálogo";
 
@@ -1556,6 +1568,11 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
         vacantes.save(vacante);
         auditoria.registrar(quien.organizacionId(), quien, "cerrar_vacante",
                 "vacante", id, Map.of("estado", anterior), Map.of("estado", "CERRADA"), motivo);
+        // A quien sigue en carrera con WhatsApp activo le queda, en esta misma transacción, el
+        // aviso de que la convocatoria cerró: su postulación sigue y su vínculo también (V76).
+        if (whatsapp != null) {
+            whatsapp.alCerrarLaConvocatoria(vacante);
+        }
     }
 
     // ============ Archivar y desarchivar ============

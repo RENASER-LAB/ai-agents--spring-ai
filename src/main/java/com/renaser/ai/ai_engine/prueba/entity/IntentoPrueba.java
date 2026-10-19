@@ -40,6 +40,13 @@ public class IntentoPrueba {
      * {@code entregadoEn} guarda cuándo se cerró. No se califica ni sale en el ranking.
      */
     private boolean noCompletada;
+    /**
+     * Cuándo cambió por última vez lo que el intento cuenta a quien postula: su inicio, su
+     * plazo, su entrega o su cierre sin completar (V77). La fechan la base (un DEFAULT al
+     * nacer y un trigger al cambiar); aquí solo se lee. Vacía en los intentos anteriores.
+     */
+    @Column(insertable = false, updatable = false)
+    private Instant contextoActualizadoEn;
 
     /** Si es una prueba escrita en el editor y no una plantilla. */
     public boolean esDelEditor() {

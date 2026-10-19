@@ -1,6 +1,5 @@
 # Contexto de vacantes y resultados por WhatsApp
-
-Estado: lista para implementar
+Estado: TERMINADO
 
 Crear o revisar esta spec no autoriza implementarla. El controlador del harness
 solo puede marcarla lista tras `/harness ready <ruta-spec>` y la confirmación real
@@ -30,13 +29,14 @@ con mensajes claros y responde a la pregunta concreta.
   [contrato vigente](../../docs/CONTRATO-NOVEDADES-POR-WHATSAPP.md),
   [estados de postulación](../../docs/03-ESTADOS-POSTULACION.md),
   [reglas del código](../../docs/REGLAS-DEL-CODIGO.md) y
-  [spec complementaria del chatbot](../../../CRM/specs/014-postulantes-hacia-eventos/spec.md).
+  spec complementaria del chatbot (repositorio del CRM,
+  `specs/Ready/014-postulantes-hacia-eventos/spec.md`).
 - El contrato vigente y la funcionalidad histórica de
-  [novedades por WhatsApp](../Done/novedades-por-whatsapp.md) siguen describiendo v1.
+  [novedades por WhatsApp](novedades-por-whatsapp.md) siguen describiendo v1.
   Este documento propone la ampliación; no declara que ya esté disponible.
 - **Contrato v2:** es único y está en la sección «Contrato EX v2» de la
-  [spec 014 del CRM](../../../CRM/specs/014-postulantes-hacia-eventos/spec.md#contrato-ex-v2)
-  (puntos C-1 a C-10). Esta spec implementa el lado de EX; ante cualquier
+  spec 014 del CRM (puntos C-1 a C-10; copia en
+  [el contrato v2](../../docs/CONTRATO-CONTEXTO-Y-RESULTADOS-POR-WHATSAPP-V2.md)). Esta spec implementa el lado de EX; ante cualquier
   diferencia de rutas, campos o límites, prevalece ese contrato y se cambian
   las dos specs a la vez.
 

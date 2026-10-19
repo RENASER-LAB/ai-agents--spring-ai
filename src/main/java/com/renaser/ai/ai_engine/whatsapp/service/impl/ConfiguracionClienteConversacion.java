@@ -2,6 +2,7 @@ package com.renaser.ai.ai_engine.whatsapp.service.impl;
 
 import com.renaser.ai.ai_engine.whatsapp.service.ClienteConversacion;
 import com.renaser.ai.ai_engine.whatsapp.service.PropiedadesWhatsapp;
+import com.renaser.ai.ai_engine.whatsapp.service.TextosDeWhatsapp;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Bean;
@@ -27,6 +28,13 @@ public class ConfiguracionClienteConversacion {
     ClienteConversacion clienteConversacion(PropiedadesWhatsapp propiedades) {
         String modo = propiedades.getModo() == null ? ""
                 : propiedades.getModo().trim().toLowerCase(Locale.ROOT);
+        if (!PropiedadesWhatsapp.APAGADO.equals(modo)
+                && TextosDeWhatsapp.enlaceFijo(propiedades.getEnlaceMisProcesos()) == null) {
+            // Sin un enlace fijo válido (https, sin parámetros ni credenciales) los avisos salen sin
+            // él y la consulta v2 no puede dar el de la acción: se dice al arrancar (V76).
+            log.warn("app.whatsapp.enlace-mis-procesos no es una dirección https fija sin parámetros: "
+                    + "los avisos y la consulta v2 saldrán sin el enlace a «Mis procesos»");
+        }
         switch (modo) {
             case PropiedadesWhatsapp.REAL -> {
                 ClienteConversacionHttp.exigirConfiguracion(propiedades);
