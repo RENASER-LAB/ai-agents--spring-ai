@@ -50,4 +50,19 @@ public class PropiedadesWhatsapp {
 
     /** La espera antes del segundo intento; las siguientes crecen por cuatro. */
     private int segundosAntesDelPrimerReintento = 30;
+
+    /**
+     * El productor v2 (V76): los eventos RESULTADO y CONVOCATORIA_CERRADA hacia
+     * {@code /v1/ex/resultados}. <b>Apagado por defecto</b>, y apagado EX se comporta como v1:
+     * no escribe eventos y al terminar una postulación revoca su vínculo como siempre. Se
+     * enciende después de que el bot tenga {@code CONVERSATION_EX_VERSION=2} (contrato v2, C-10).
+     */
+    private boolean productorV2 = false;
+
+    /**
+     * La dirección pública fija de «Mis procesos» en el portal: la misma para todas las personas,
+     * en https, sin parámetros, fragmento, credenciales ni identificadores. No da acceso por sí
+     * sola: el portal pide iniciar sesión. Va en los avisos y en la acción de la consulta v2.
+     */
+    private String enlaceMisProcesos;
 }

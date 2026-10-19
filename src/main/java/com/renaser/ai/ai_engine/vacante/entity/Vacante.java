@@ -20,8 +20,9 @@ import java.time.Instant;
 // guardada volvía a 60 al elegir «Sin evaluación» en el mismo gesto, y el pase seguía
 // encendido tras apagarlo. Las escrituras del panel además bloquean la fila (ver
 // VacanteRepository#bloquear); esto cubre a las que no pasan por ahí, vengan de donde vengan.
-// Nada depende de reescribir la fila entera: no hay triggers sobre vacante, y las únicas
-// escrituras por consulta (archivar, desarchivar, eliminar) limpian el contexto al terminar.
+// Nada depende de reescribir la fila entera: el único trigger sobre vacante (V77) solo fecha
+// contextoActualizadoEn cuando cambia de verdad una columna pública, y las únicas escrituras
+// por consulta (archivar, desarchivar, eliminar) limpian el contexto al terminar.
 @Entity
 @DynamicUpdate
 @Table(name = "vacante")
@@ -163,6 +164,18 @@ public class Vacante {
      */
     private Instant eliminadaEn;
     private Instant creadoEn;
+    /**
+     * Cuándo cambió por última vez lo que la vacante cuenta a quien postula (V77): su ficha
+     * pública, sus requisitos indispensables, la empresa, la convocatoria y el procedimiento
+     * y los plazos de su prueba. Es una de las fuentes de la vigencia del contexto que consulta
+     * el bot de WhatsApp.
+     *
+     * <p>⚠️ <b>La fecha la base, nunca la aplicación</b>: un trigger la mueve solo cuando
+     * cambia de verdad una de esas columnas, venga el cambio de donde venga. Por eso aquí es
+     * de solo lectura. Vacía si no cambió nada desde la V77.
+     */
+    @Column(insertable = false, updatable = false)
+    private Instant contextoActualizadoEn;
 
     @PrePersist
     void antesDeGuardar() {

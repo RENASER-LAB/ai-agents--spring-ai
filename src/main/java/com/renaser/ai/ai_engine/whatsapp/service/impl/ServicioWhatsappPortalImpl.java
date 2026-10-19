@@ -78,6 +78,7 @@ public class ServicioWhatsappPortalImpl implements ServicioWhatsappPortal {
     private final BetaWhatsapp beta;
     private final EnvioAlBot envio;
     private final PropiedadesWhatsapp propiedades;
+    private final com.renaser.ai.ai_engine.whatsapp.service.ResultadosPorWhatsapp resultados;
     private final TransactionTemplate enUnaTransaccion;
 
     @SuppressWarnings("java:S107") // Cada uno es una tabla o una regla que el botón toca.
@@ -87,6 +88,7 @@ public class ServicioWhatsappPortalImpl implements ServicioWhatsappPortal {
                                       BajaWhatsappRepository bajas, ConsentimientoRepository consentimientos,
                                       TextosDeConsentimiento textos, DuenoDelInstrumento duenos,
                                       BetaWhatsapp beta, EnvioAlBot envio, PropiedadesWhatsapp propiedades,
+                                      com.renaser.ai.ai_engine.whatsapp.service.ResultadosPorWhatsapp resultados,
                                       PlatformTransactionManager transacciones) {
         this.postulaciones = postulaciones;
         this.vacantes = vacantes;
@@ -101,6 +103,7 @@ public class ServicioWhatsappPortalImpl implements ServicioWhatsappPortal {
         this.beta = beta;
         this.envio = envio;
         this.propiedades = propiedades;
+        this.resultados = resultados;
         this.enUnaTransaccion = new TransactionTemplate(transacciones);
     }
 
@@ -306,10 +309,13 @@ public class ServicioWhatsappPortalImpl implements ServicioWhatsappPortal {
             return;
         }
         List<VinculoWhatsapp> vivos = vinculos.vivosDeLaPersonaParaEscribir(personaId);
+        Instant ahora = Instant.now();
+        // Lo ya terminado también (V76): sus resultados dejan de consultarse por el número
+        // anterior y sus avisos finales se cancelan.
+        resultados.alCambiarElCelular(personaId, nuevo, ahora);
         if (vivos.isEmpty()) {
             return;
         }
-        Instant ahora = Instant.now();
         for (VinculoWhatsapp vivo : vivos) {
             vivo.cerrar(VinculoWhatsapp.REVOCADO, VinculoWhatsapp.POR_CAMBIO_DE_CELULAR, ahora);
         }

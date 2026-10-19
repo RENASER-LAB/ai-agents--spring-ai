@@ -2,8 +2,14 @@ package com.renaser.ai.ai_engine.whatsapp.service;
 
 import com.renaser.ai.ai_engine.postulacion.service.TextosDelMomento;
 
+import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.Locale;
 
 /**
  * Lo que EX le da escrito al bot y al portal (V73): el mensaje ya preparado del enlace, el
@@ -48,8 +54,21 @@ public final class TextosDeWhatsapp {
     public static final String BETA_APAGADA = "Por ahora no enviamos las novedades de los "
             + "procesos por WhatsApp. Puedes ver cómo va el tuyo en el portal, en «Mis procesos».";
 
-    private static final String COMO_ENTRAR =
-            "Entra en el portal con tu correo y tu contraseña y abre «Mis procesos».";
+    /** La zona en que se dicen las fechas: la de quien postula en el Perú. */
+    public static final ZoneId ZONA = ZoneId.of("America/Lima");
+
+    /** El largo máximo del enlace fijo a «Mis procesos» (contrato v2, C-3). */
+    public static final int LARGO_DEL_ENLACE = 300;
+
+    /** Cómo se entra: con la cuenta de siempre. Ni el enlace ni el chat dan acceso por sí solos. */
+    public static final String COMO_ENTRAR =
+            "Inicia sesión con tu correo y contraseña y abre «Mis procesos».";
+
+    private static final Locale ESPANOL = Locale.forLanguageTag("es-PE");
+    private static final DateTimeFormatter DIA_Y_HORA =
+            DateTimeFormatter.ofPattern("d 'de' MMMM 'a las' HH:mm", ESPANOL);
+    private static final DateTimeFormatter DIA_ANO_Y_HORA =
+            DateTimeFormatter.ofPattern("d 'de' MMMM 'de' yyyy 'a las' HH:mm", ESPANOL);
 
     private TextosDeWhatsapp() {}
 
@@ -75,25 +94,113 @@ public final class TextosDeWhatsapp {
     }
 
     /**
-     * El aviso de la prueba: «¡Felicidades, Ana! Tu prueba del puesto para Asistente Contable ya
-     * está disponible.», y cómo entrar.
+     * El aviso de la prueba (regla 19 de specs/Ready/contexto-y-resultados-por-whatsapp.md): el
+     * saludo, la vacante en negrita, qué prueba es, hasta cuándo puede empezarla —solo si EX lo
+     * sabe— y el enlace fijo a «Mis procesos». Nada de la prueba en sí: eso llega al pulsar
+     * «Empezar» en el portal.
+     *
+     * <pre>
+     * ¡Felicidades, Ana! 🎉
+     *
+     * 📌 *Asistente Contable*
+     * Tu *prueba del puesto* ya está disponible.
+     * ⏰ Puedes empezarla hasta el *20 de octubre a las 23:59* (hora de Lima).
+     *
+     * 👉 https://…/procesos
+     * Inicia sesión con tu correo y contraseña y abre «Mis procesos».
+     * </pre>
+     *
+     * @param empezarAntesDe el último momento para empezarla, o nulo si no hay uno: entonces la
+     *                       línea del plazo no sale
+     * @param enlace         el enlace fijo a «Mis procesos»; si no vale, la línea no sale
      */
-    public static String pruebaDisponible(String nombre, String vacante, boolean esCuestionario) {
-        String saludo = vacio(nombre) ? "¡Felicidades!" : "¡Felicidades, " + nombre.trim() + "!";
-        String cual = esCuestionario ? "Tu prueba técnica" : "Tu prueba del puesto";
-        String para = vacio(vacante) ? "" : " para " + vacante.trim();
-        return saludo + " " + cual + para + " ya está disponible.\n" + COMO_ENTRAR;
+    public static String pruebaDisponible(String nombre, String vacante, boolean esCuestionario,
+                                          Instant empezarAntesDe, String enlace) {
+        StringBuilder texto = new StringBuilder(vacio(nombre) ? "¡Felicidades! 🎉"
+                : "¡Felicidades, " + sinNegritas(nombre.trim()) + "! 🎉");
+        texto.append("\n\n");
+        if (!vacio(vacante)) {
+            texto.append("📌 *").append(sinNegritas(vacante.trim())).append("*\n");
+        }
+        texto.append(esCuestionario ? "Tu *prueba técnica*" : "Tu *prueba del puesto*")
+                .append(" ya está disponible.");
+        if (empezarAntesDe != null) {
+            texto.append("\n⏰ Puedes empezarla hasta el *").append(fechaYHora(empezarAntesDe, Instant.now()))
+                    .append("* (hora de Lima).");
+        }
+        return cortar(texto + alFinal(enlace), LARGO_DEL_TEXTO);
     }
 
     /**
-     * El aviso de un avance en que le toca algo: lo que dice el portal de ese momento, y cómo
-     * entrar. «Hola, Ana. En tu postulación a X te toca: Confirma tu simulación. Elige una de…»
+     * El aviso de un avance en que le toca algo (regla 19): el saludo, la vacante en negrita, lo
+     * que dice el portal de ese momento ({@link TextosDelMomento}, sin cambiarlo) y el enlace fijo.
+     *
+     * <pre>
+     * Hola, Ana 👋
+     *
+     * 📌 *Contador*
+     * Te toca: *Confirma tu simulación*
+     * Elige una de las fechas disponibles. La sesión es grupal y dura dos horas.
+     *
+     * 👉 https://…/procesos
+     * Inicia sesión con tu correo y contraseña y abre «Mis procesos».
+     * </pre>
      */
-    public static String avance(String nombre, String vacante, TextosDelMomento.Texto momento) {
-        String saludo = vacio(nombre) ? "Hola." : "Hola, " + nombre.trim() + ".";
-        String donde = vacio(vacante) ? "En tu postulación" : "En tu postulación a " + vacante.trim();
-        return saludo + " " + donde + " te toca: " + momento.titulo() + ". " + momento.texto()
-                + "\n" + COMO_ENTRAR;
+    public static String avance(String nombre, String vacante, TextosDelMomento.Texto momento,
+                                String enlace) {
+        StringBuilder texto = new StringBuilder(vacio(nombre) ? "Hola 👋"
+                : "Hola, " + sinNegritas(nombre.trim()) + " 👋");
+        texto.append("\n\n");
+        if (!vacio(vacante)) {
+            texto.append("📌 *").append(sinNegritas(vacante.trim())).append("*\n");
+        }
+        texto.append("Te toca: *").append(sinNegritas(momento.titulo())).append("*\n")
+                .append(momento.texto());
+        return cortar(texto + alFinal(enlace), LARGO_DEL_TEXTO);
+    }
+
+    /**
+     * El enlace fijo a «Mis procesos», o {@code null} si lo configurado no lo es: tiene que ser
+     * https, sin usuario ni contraseña, sin parámetros ({@code ?}) ni fragmento ({@code #}) y de
+     * hasta 300 caracteres. Un enlace con un token o un identificador no sale nunca.
+     */
+    public static String enlaceFijo(String configurado) {
+        if (vacio(configurado)) {
+            return null;
+        }
+        String enlace = configurado.trim();
+        if (enlace.length() > LARGO_DEL_ENLACE || enlace.indexOf('?') >= 0 || enlace.indexOf('#') >= 0
+                || enlace.indexOf('@') >= 0 || enlace.indexOf(' ') >= 0) {
+            return null;
+        }
+        try {
+            URI uri = URI.create(enlace);
+            return "https".equals(uri.getScheme()) && uri.getHost() != null && uri.getUserInfo() == null
+                    ? enlace : null;
+        } catch (IllegalArgumentException noEsUnaDireccion) {
+            return null;
+        }
+    }
+
+    /**
+     * «20 de octubre a las 23:59», en hora de Lima. Con el año solo si no es el de {@code ahora}:
+     * un plazo del año que viene no puede leerse como de este.
+     */
+    public static String fechaYHora(Instant momento, Instant ahora) {
+        ZonedDateTime enLima = momento.atZone(ZONA);
+        boolean otroAno = enLima.getYear() != ahora.atZone(ZONA).getYear();
+        return (otroAno ? DIA_ANO_Y_HORA : DIA_Y_HORA).format(enLima);
+    }
+
+    /** El enlace y cómo entrar, en su bloque; sin enlace válido, solo cómo entrar. */
+    private static String alFinal(String enlace) {
+        String fijo = enlaceFijo(enlace);
+        return fijo == null ? "\n\n" + COMO_ENTRAR : "\n\n👉 " + fijo + "\n" + COMO_ENTRAR;
+    }
+
+    /** Un asterisco suelto en un título rompería las negritas de WhatsApp. */
+    private static String sinNegritas(String texto) {
+        return texto == null ? "" : texto.replace("*", "");
     }
 
     static String recortar(String vacante) {

@@ -112,6 +112,14 @@ docker compose up -d                       # Postgres (5433) y RabbitMQ
   bot» como cualquier llamada de esa puerta. **La tarjeta del portal no sale hasta encender
   `whatsapp_novedades_activo`** en la organización plataforma, que nace apagado. Ver
   [el contrato](CONTRATO-NOVEDADES-POR-WHATSAPP.md).
+- **El contrato v2 de WhatsApp está apagado también en local** (`V76`): `WHATSAPP_PRODUCTOR_V2`
+  vale `false` y no nace ningún evento hacia `/v1/ex/resultados`; con `true` y la beta encendida,
+  el bot falso los apunta en el mismo registro. La consulta `POST /api/v2/integraciones/whatsapp/contexto` responde
+  siempre, firmada con el secreto «desde el bot» sobre su ruta completa. El enlace a «Mis
+  procesos» de los avisos y de la consulta es `WHATSAPP_ENLACE_MIS_PROCESOS`, por defecto
+  `PORTAL_URL` + `/procesos`: **con un `PORTAL_URL` en `http://localhost` no sale** —los avisos van
+  sin la línea 👉 y la consulta lo manda vacío—; para verlo, pon uno `https`. Ver
+  [el contrato v2](CONTRATO-CONTEXTO-Y-RESULTADOS-POR-WHATSAPP-V2.md).
 
 ---
 

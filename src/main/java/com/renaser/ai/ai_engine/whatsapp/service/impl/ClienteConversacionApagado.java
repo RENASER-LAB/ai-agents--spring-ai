@@ -28,6 +28,11 @@ public class ClienteConversacionApagado implements ClienteConversacion {
     }
 
     @Override
+    public void publicarEvento(Evento evento) {
+        throw new FalloDelBot(SIN_BOT, false);
+    }
+
+    @Override
     public boolean estaEncendido() {
         return false;
     }

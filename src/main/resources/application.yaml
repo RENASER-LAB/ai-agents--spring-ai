@@ -358,3 +358,10 @@ app:
     maximo-de-intentos: 5
     segundos-antes-del-primer-reintento: 30
     sondeo-ms: 10000
+    # El productor v2 (V76): avisos de resultado y de convocatoria cerrada hacia /v1/ex/resultados.
+    # Apagado: EX se comporta como v1. Se enciende solo cuando el bot tenga
+    # CONVERSATION_EX_VERSION=2 (contrato v2, C-10); al encenderlo no salen hechos anteriores.
+    productor-v2: ${WHATSAPP_PRODUCTOR_V2:false}
+    # «Mis procesos» del portal: el enlace fijo de los avisos y de la consulta v2, sin token ni
+    # identificadores. Por defecto, el del portal configurado arriba.
+    enlace-mis-procesos: ${WHATSAPP_ENLACE_MIS_PROCESOS:${renaser.portal.url}/procesos}

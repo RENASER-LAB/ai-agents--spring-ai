@@ -83,6 +83,8 @@ class FlujoNovedadesWhatsappIT {
         registro.add("renaser.ai.calificacion.habilitada", () -> "false");
         registro.add("app.whatsapp.modo", () -> "falso");
         registro.add("app.whatsapp.secreto-desde-el-bot", () -> SECRETO_DEL_BOT);
+        // El enlace fijo a «Mis procesos» de los avisos (V76), fijo aquí para no depender del entorno.
+        registro.add("app.whatsapp.enlace-mis-procesos", () -> "https://portal.pruebas.renaser.pe/procesos");
         // El sondeo lo corre la prueba a mano: así sabe cuándo ha salido cada cosa.
         registro.add("app.whatsapp.sondeo-ms", () -> "3600000");
     }
@@ -452,9 +454,15 @@ class FlujoNovedadesWhatsappIT {
 
         assertThat(contar("select count(*) from aviso_whatsapp where postulacion_id = "
                 + postulacion.get("ana"))).isEqualTo(1);
+        // El formato de la regla 19 (V76): la vacante en negrita, el plazo para empezarla —la
+        // prueba cierra en 10 días— y el enlace fijo a «Mis procesos», sin token.
         assertThat(jdbc.queryForObject("select texto from aviso_whatsapp where postulacion_id = ?",
                 String.class, postulacion.get("ana")))
-                .startsWith("¡Felicidades, Ana! Tu prueba del puesto para Asistente Contable ya está disponible.");
+                .startsWith("¡Felicidades, Ana! 🎉\n\n📌 *Asistente Contable*\nTu *prueba del puesto* ya "
+                        + "está disponible.\n⏰ Puedes empezarla hasta el *")
+                .contains("(hora de Lima).\n\n👉 https://portal.pruebas.renaser.pe/procesos\n"
+                        + "Inicia sesión con tu correo y contraseña y abre «Mis procesos».")
+                .doesNotContain("token");
         // Ligado a la transición que lo causó: el id sale de la misma fila que la máquina acaba
         // de guardar (es lo que hace que una transición deje un solo aviso de cada tipo).
         assertThat(jdbc.queryForObject("select transicion_estado_id from aviso_whatsapp where postulacion_id = ?",

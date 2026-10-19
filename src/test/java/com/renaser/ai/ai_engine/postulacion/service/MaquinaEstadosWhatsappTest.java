@@ -37,6 +37,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
@@ -119,7 +120,7 @@ class MaquinaEstadosWhatsappTest {
                 any(EstadoPostulacion.class), contexto.capture());
         assertThat(contexto.getValue()).isEqualTo(
                 new DeLaTransicion(900L, "Ana", "Asistente Contable", "PLANTILLA"));
-        verify(whatsapp, never()).alTerminar(any());
+        verify(whatsapp, never()).alTerminar(any(), any(), anyBoolean());
     }
 
     @Test
@@ -150,7 +151,8 @@ class MaquinaEstadosWhatsappTest {
         maquina.transicionar(postulacionEn("PERFIL_POR_CONFIRMAR"), "NO_CONTINUA",
                 null, "No cumple", false, false, null, false);
 
-        verify(whatsapp).alTerminar(any(Postulacion.class));
+        // Con la fecha de la transición y sin autorización de aviso: se movió «sin avisar».
+        verify(whatsapp).alTerminar(any(Postulacion.class), any(java.time.Instant.class), eq(false));
         verify(whatsapp, never()).alAvisar(any(), any(), any(), any());
     }
 }

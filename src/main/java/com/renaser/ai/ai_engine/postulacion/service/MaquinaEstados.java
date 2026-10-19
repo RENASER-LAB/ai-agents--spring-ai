@@ -424,9 +424,13 @@ public class MaquinaEstados {
         }
 
         // Un proceso que termina cierra su vínculo de WhatsApp (V73), avisando o sin avisar: los
-        // cierres no van por WhatsApp, y desde ahí el bot contesta «no tienes procesos activos».
+        // avisos «te toca» no llevan cierres, y desde ahí el bot contesta «no tienes procesos
+        // activos». Desde la V76, si el vínculo estaba activo, deja aquí mismo —en esta
+        // transacción— su resultado consultable y su evento final. Si el equipo decidió no
+        // contárselo (NINGUNO), el evento sale sin autorización de aviso.
         if (nuevo.isEsFinal() && whatsapp != null) {
-            whatsapp.alTerminar(postulacion);
+            whatsapp.alTerminar(postulacion, transicion.getOcurridaEn(),
+                    aviso != AvisoDeLaTransicion.NINGUNO);
         }
     }
 

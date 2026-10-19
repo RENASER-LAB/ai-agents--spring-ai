@@ -5,9 +5,13 @@ import com.renaser.ai.ai_engine.postulacion.service.TextosDelMomento;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+
 import java.net.URI;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -42,24 +46,91 @@ class TextosDeWhatsappTest {
                 .isEqualTo("Hola. Quiero saber cómo va mi postulación.");
     }
 
+    private static final String MIS_PROCESOS = "https://portal.renaser.pe/procesos";
+
     @Test
-    @DisplayName("El «felicidades» de la prueba, como el ejemplo del punto 10")
+    @DisplayName("AC-23 · el «felicidades» de la prueba con el formato de la regla 19")
     void laPruebaDisponible() {
-        assertThat(TextosDeWhatsapp.pruebaDisponible("Ana", "Asistente Contable", false))
-                .isEqualTo("¡Felicidades, Ana! Tu prueba del puesto para Asistente Contable ya está "
-                        + "disponible.\nEntra en el portal con tu correo y tu contraseña y abre "
-                        + "«Mis procesos».");
-        assertThat(TextosDeWhatsapp.pruebaDisponible("Ana", "Contador", true))
-                .startsWith("¡Felicidades, Ana! Tu prueba técnica para Contador ya está disponible.");
+        Instant cierre = java.time.ZonedDateTime.now(TextosDeWhatsapp.ZONA).plusDays(2)
+                .withHour(23).withMinute(59).withSecond(0).withNano(0).toInstant();
+        String aviso = TextosDeWhatsapp.pruebaDisponible("Ana", "Asistente Contable", false, cierre,
+                MIS_PROCESOS);
+
+        assertThat(aviso).isEqualTo("¡Felicidades, Ana! 🎉\n\n"
+                + "📌 *Asistente Contable*\n"
+                + "Tu *prueba del puesto* ya está disponible.\n"
+                + "⏰ Puedes empezarla hasta el *" + TextosDeWhatsapp.fechaYHora(cierre, Instant.now())
+                + "* (hora de Lima).\n\n"
+                + "👉 " + MIS_PROCESOS + "\n"
+                + "Inicia sesión con tu correo y contraseña y abre «Mis procesos».");
+        assertThat(TextosDeWhatsapp.fechaYHora(cierre, Instant.now())).endsWith("a las 23:59")
+                .doesNotContain("T").doesNotContain("Z");
     }
 
     @Test
-    @DisplayName("Un avance cuenta lo que dice el portal de ese momento")
+    @DisplayName("AC-23 · sin plazo conocido no hay línea del plazo; con cuestionario dice «prueba técnica»; sin nombre, «¡Felicidades!»")
+    void laPruebaSinPlazo() {
+        String aviso = TextosDeWhatsapp.pruebaDisponible(null, "Contador", true, null, MIS_PROCESOS);
+
+        assertThat(aviso).startsWith("¡Felicidades! 🎉\n\n📌 *Contador*\nTu *prueba técnica* ya está disponible.")
+                .doesNotContain("⏰").doesNotContain("Puedes empezarla")
+                .endsWith("👉 " + MIS_PROCESOS + "\nInicia sesión con tu correo y contraseña y abre «Mis procesos».");
+    }
+
+    @Test
+    @DisplayName("AC-23 · un avance cuenta lo que dice el portal de ese momento, con el formato de la regla 19")
     void unAvance() {
-        String aviso = TextosDeWhatsapp.avance("Ana", "Contador",
-                TextosDelMomento.de("SIMULACION_TURNO_CANDIDATO", null, false));
-        assertThat(aviso).startsWith("Hola, Ana. En tu postulación a Contador te toca: Confirma tu "
-                + "simulación. Elige una de las fechas disponibles.");
-        assertThat(aviso).endsWith("abre «Mis procesos».");
+        TextosDelMomento.Texto momento = TextosDelMomento.de("SIMULACION_TURNO_CANDIDATO", null, false);
+        String aviso = TextosDeWhatsapp.avance("Ana", "Contador", momento, MIS_PROCESOS);
+
+        assertThat(aviso).isEqualTo("Hola, Ana 👋\n\n"
+                + "📌 *Contador*\n"
+                + "Te toca: *Confirma tu simulación*\n"
+                + momento.texto() + "\n\n"
+                + "👉 " + MIS_PROCESOS + "\n"
+                + "Inicia sesión con tu correo y contraseña y abre «Mis procesos».");
+        assertThat(TextosDeWhatsapp.avance(null, "Contador", momento, MIS_PROCESOS)).startsWith("Hola 👋\n\n");
+    }
+
+    @Test
+    @DisplayName("AC-23 · con los textos al máximo el aviso no pasa de 1000 caracteres y conserva el enlace")
+    void cabenEnMilCaracteres() {
+        String nombre = "N".repeat(60);
+        String vacante = "V".repeat(60);
+        TextosDelMomento.Texto largo = new TextosDelMomento.Texto("T".repeat(80), "x".repeat(300));
+        String enlace = "https://portal.renaser.pe/" + "p".repeat(274);
+
+        String avance = TextosDeWhatsapp.avance(nombre, vacante, largo, enlace);
+        String prueba = TextosDeWhatsapp.pruebaDisponible(nombre, vacante, false,
+                Instant.now().plus(java.time.Duration.ofDays(1)), enlace);
+
+        assertThat(avance).hasSizeLessThanOrEqualTo(1000).contains("👉 " + enlace);
+        assertThat(prueba).hasSizeLessThanOrEqualTo(1000).contains("👉 " + enlace);
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @ValueSource(strings = {"http://portal.renaser.pe/procesos", "https://portal.renaser.pe/procesos?token=abc",
+            "https://portal.renaser.pe/procesos#ana", "https://ana:clave@portal.renaser.pe/procesos",
+            "/procesos", " "})
+    @DisplayName("AC-23 · el enlace fijo solo vale en https, sin parámetros, fragmento ni credenciales")
+    void elEnlaceFijo(String configurado) {
+        assertThat(TextosDeWhatsapp.enlaceFijo(configurado)).isNull();
+        // Y el aviso no lo pega: sale solo cómo entrar.
+        assertThat(TextosDeWhatsapp.avance("Ana", "Contador",
+                TextosDelMomento.de("SIMULACION_TURNO_CANDIDATO", null, false), configurado))
+                .doesNotContain("👉").doesNotContain("token")
+                .endsWith("Inicia sesión con tu correo y contraseña y abre «Mis procesos».");
+    }
+
+    @Test
+    @DisplayName("Un plazo de otro año lleva el año; los asteriscos del título no rompen las negritas")
+    void elAnoYLasNegritas() {
+        Instant ahora = Instant.now();
+        Instant elAnoQueViene = ahora.atZone(TextosDeWhatsapp.ZONA).plusYears(1).toInstant();
+        assertThat(TextosDeWhatsapp.fechaYHora(elAnoQueViene, ahora))
+                .contains("de " + elAnoQueViene.atZone(TextosDeWhatsapp.ZONA).getYear() + " a las");
+        assertThat(TextosDeWhatsapp.avance("Ana", "*Contador* senior",
+                TextosDelMomento.de("SIMULACION_TURNO_CANDIDATO", null, false), MIS_PROCESOS))
+                .contains("📌 *Contador senior*\n");
     }
 }

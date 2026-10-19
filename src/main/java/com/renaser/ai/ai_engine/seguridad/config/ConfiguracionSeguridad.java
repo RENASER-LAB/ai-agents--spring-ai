@@ -28,7 +28,8 @@ import org.springframework.security.web.csrf.CsrfFilter;
 // Cuatro puertas, cuatro reglas:
 //   /api/v1/portal/**  -> candidatos: público lo de mirar y registrarse, el resto con token CANDIDATO
 //   /api/v1/panel/**   -> equipo de Renaser: todo con token EQUIPO
-//   /api/v1/integraciones/** -> otros sistemas (el bot de WhatsApp): solo su firma HMAC, sin token
+//   /api/v1/integraciones/** y /api/v2/integraciones/** -> otros sistemas (el bot de WhatsApp):
+//                               solo su firma HMAC, sin token
 //   el resto           -> módulo de agentes IA con token EQUIPO; Swagger y el contrato, abiertos
 @Configuration
 @EnableMethodSecurity
@@ -106,7 +107,8 @@ public class ConfiguracionSeguridad {
     SecurityFilterChain integraciones(HttpSecurity http, PropiedadesWhatsapp whatsapp) throws Exception {
         FiltroFirmaWhatsapp firma = new FiltroFirmaWhatsapp(whatsapp::getSecretoDesdeElBot,
                 java.time.Clock.systemUTC());
-        http.securityMatcher("/api/v1/integraciones/**")
+        // La consulta v2 (V76) entra por la misma puerta: misma firma, mismo secreto, sin token.
+        http.securityMatcher("/api/v1/integraciones/**", "/api/v2/integraciones/**")
             // El CSRF sigue encendido, pero solo mira peticiones con cookies: es la credencial que
             // el navegador manda solo y la que una web ajena podría aprovechar. El bot firma con
             // HMAC y nunca manda cookies, así que su llamada se salta el chequeo y sigue a la firma;

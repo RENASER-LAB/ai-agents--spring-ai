@@ -72,6 +72,7 @@ class ServicioWhatsappPortalImplTest {
     @Mock private OrganizacionRepository organizaciones;
     @Mock private BetaWhatsapp beta;
     @Mock private EnvioAlBot envio;
+    @Mock private com.renaser.ai.ai_engine.whatsapp.service.ResultadosPorWhatsapp resultados;
     @Mock private PlatformTransactionManager transacciones;
 
     private ServicioWhatsappPortalImpl servicio;
@@ -89,7 +90,7 @@ class ServicioWhatsappPortalImplTest {
         DuenoDelInstrumento duenos = new DuenoDelInstrumento(organizaciones);
         servicio = new ServicioWhatsappPortalImpl(postulaciones, vacantes, estados, personas, vinculos,
                 avisos, bajas, consentimientos, new TextosDeConsentimiento(textos, duenos), duenos,
-                beta, envio, new PropiedadesWhatsapp(), transacciones);
+                beta, envio, new PropiedadesWhatsapp(), resultados, transacciones);
     }
 
     private static ContextoUsuario ana() {
@@ -334,5 +335,20 @@ class ServicioWhatsappPortalImplTest {
         assertThat(pendiente.getMotivoCierre()).isEqualTo("CAMBIO_CELULAR");
         verify(envio).revocarAhora(7L);
         verify(envio).revocarAhora(8L);
+        // V76 · lo ya terminado por el número anterior deja de consultarse.
+        verify(resultados).alCambiarElCelular(org.mockito.ArgumentMatchers.eq(33L),
+                org.mockito.ArgumentMatchers.eq("+51912345678"), any());
+    }
+
+    @Test
+    @DisplayName("V76 · cambiar el celular sin nada vivo también retira lo ya terminado del anterior")
+    void otroCelularSinNadaVivo() {
+        when(vinculos.vivosDeLaPersonaParaEscribir(33L)).thenReturn(List.of());
+
+        servicio.alCambiarElCelular(33L, "+51987654321", "+51912345678");
+
+        verify(resultados).alCambiarElCelular(org.mockito.ArgumentMatchers.eq(33L),
+                org.mockito.ArgumentMatchers.eq("+51912345678"), any());
+        verify(envio, never()).revocarAhora(any());
     }
 }

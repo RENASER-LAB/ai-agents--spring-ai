@@ -21,7 +21,7 @@ import java.util.Map;
  *
  * <p>Cada llamada lleva su firma ({@link FirmaWhatsapp}, sobre la marca, la ruta y el cuerpo) y
  * espera como mucho {@code app.whatsapp.segundos-de-espera}. Solo vale la respuesta del contrato
- * —204 en esperas y revocaciones, 202 en avisos—; cualquier otra es un fallo, que dice si se
+ * —204 en esperas y revocaciones, 202 en avisos y en eventos—; cualquier otra es un fallo, que dice si se
  * reintenta ({@link FalloDelBot#seReintenta}) y con qué {@code code} lo explicó el bot. No
  * reintenta por su cuenta: lo decide quien la llama, que sabe si es un botón con alguien delante
  * o un sondeo que puede volver más tarde.
@@ -71,6 +71,13 @@ public class ClienteConversacionHttp implements ClienteConversacion {
     @Override
     public void revocar(Revocacion revocacion) {
         mandar("/v1/ex/revocaciones", revocacion.comoCuerpo(), 204);
+    }
+
+    @Override
+    public void publicarEvento(Evento evento) {
+        // Un bot en v1 contesta 404 ruta_no_disponible: es un 4xx, así que es definitivo y el
+        // evento queda fallido a la primera, sin reintentos en bucle (C-4, C-10).
+        mandar("/v1/ex/resultados", evento.comoCuerpo(), 202);
     }
 
     @Override
