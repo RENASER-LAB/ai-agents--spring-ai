@@ -123,6 +123,13 @@ services:
       WHATSAPP_SECRETO_HACIA_EL_BOT: ${WHATSAPP_SECRETO_HACIA_EL_BOT:-}
       WHATSAPP_SECRETO_DESDE_EL_BOT: ${WHATSAPP_SECRETO_DESDE_EL_BOT:-}
 
+      # Los avisos de resultado y de convocatoria cerrada del contrato v2 (V76). Apagado
+      # hasta que el bot tenga CONVERSATION_EX_VERSION=2 (C-10 del contrato v2): con el bot
+      # en v1 cada evento recibe un 404 y EX lo da por fallido sin reintentar, asi que ese
+      # aviso ya no sale nunca. El enlace a «Mis procesos» no se pasa a proposito: vale
+      # PORTAL_URL + /procesos, y una variable vacia lo dejaria en blanco.
+      WHATSAPP_PRODUCTOR_V2: ${WHATSAPP_PRODUCTOR_V2:-false}
+
       # El Dockerfile pide el 75% de la memoria del contenedor. En una maquina de 2 GB eso
       # deja al sistema sin aire; el limite de abajo es lo que hace que ese 75% sea de 1,5 GB
       # y no de toda la maquina.
