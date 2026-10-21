@@ -1,6 +1,6 @@
 # Cambiar los pesos con candidatos dentro y dejar de prestar el banco y las pruebas
 
-Estado: borrador
+Estado: TERMINADO
 
 Revisada el 12/10/2026 contra main (V71, hasta el #118) y contra la rama de
 `specs/prueba-una-pregunta-por-pantalla.md`, que estaba en QA y cambia el correo y la consigna
