@@ -326,7 +326,7 @@ Los textos exactos de los estados quedan a criterio de quien implementa.
   vacantes que usan el editor para esa pestaña: en las preguntas, `aplica_evaluacion = true` y
   `origen_preguntas = VACANTE`; en la prueba, `instrumento_etapa_tecnica = PRUEBA_PROPIA`. Es el
   mismo criterio que para los destinos.
-- `specs/Draft/pesos-con-candidatos-y-fin-del-prestamo.md` (pendiente) no cambia esto: guarda la
+- `specs/Done/pesos-con-candidatos-y-fin-del-prestamo.md` (terminada, PR #124) no cambia esto: guarda la
   versión fija de las vacantes viejas en una columna de la vacante, apuntando a filas de
   RENASER sin `vacante_id` ni `proposito`. Sí pasa a `PRUEBA_PROPIA` las vacantes viejas en
   borrador, que con ello se vuelven destinos válidos.
