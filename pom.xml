@@ -28,7 +28,7 @@
 	</scm>
 	<properties>
 		<java.version>25</java.version>
-		<spring-ai.version>2.0.0</spring-ai.version>
+		<spring-ai.version>2.0.2</spring-ai.version>
 		<org.mapstruct.version>1.6.3</org.mapstruct.version>
 		<!-- springdoc 3.x es la linea para Spring Boot 4. La 2.x es de Boot 3 y no arranca aqui -->
 		<springdoc.version>3.1.0</springdoc.version>
