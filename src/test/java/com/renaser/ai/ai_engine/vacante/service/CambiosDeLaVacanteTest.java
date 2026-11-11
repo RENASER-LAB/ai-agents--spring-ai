@@ -306,8 +306,9 @@ class CambiosDeLaVacanteTest {
         @DisplayName("cambiar la forma de cierre sí limpia lo que ya no rige, y se audita")
         void cambiarLaFormaLimpiaLoQueSobra() {
             Vacante v = laVacante();
-            v.setTipoCierre("PLAZAS");
+            v.setTipoCierre("FECHA");
             v.setPlazas(5);
+            v.setCierraEn(FormaDeCierre.alFinalDelDia(Instant.parse("2026-12-01T15:00:00Z")));
 
             GuardarVacante aPermanente = new GuardarVacante(30L, 5L, v.getTitulo(),
                     v.getDescripcion(), v.getProposito(), v.getResponsabilidades(),
@@ -318,46 +319,62 @@ class CambiosDeLaVacanteTest {
                     CambiosDeLaVacante.entre(v, aPermanente, "S/ 3 000", "S/ 3 000", "", "");
 
             assertThat(cambios.plazasQueQuedan()).isNull();
+            assertThat(cambios.cierreQueQueda()).isNull();
             assertThat(cambios.hayVisibles()).as("la forma de cierre es interna").isFalse();
-            assertThat(cambios.anterior()).containsEntry("plazas", "5");
-            assertThat(cambios.nuevo()).containsEntry("plazas", "");
+            assertThat(cambios.anterior()).containsEntry("plazas", "5")
+                    .containsEntry("tipoCierre", "FECHA");
+            assertThat(cambios.nuevo()).containsEntry("plazas", "").containsEntry("cierraEn", "");
         }
 
         /**
-         * La regresión del hallazgo QA-02.
+         * La regresión del hallazgo QA-02, con la regla de la V78.
          *
-         * <p>El formulario enseña el día y devuelve su medianoche UTC. Escribir eso tal cual
-         * movía a las 00:00 una vacante que cerraba a las 18:30, decía «Cambios guardados» y
-         * lo auditaba — y el cierre por plazo vencido, que corre solo, se adelantaba.
+         * <p>El formulario enseña el día. Lo que vuelve —la medianoche UTC del panel de antes, o
+         * las 23:59:59 de Lima del de ahora— se guarda como las 23:59:59 de Lima de ese día, así
+         * que guardar sin tocar el campo no es un cambio, no se audita ni mueve la hora.
          */
         @Test
-        @DisplayName("la fecha de cierre se compara por día: guardar sin tocarla no le quita la hora")
+        @DisplayName("la fecha de cierre se compara por día: guardar sin tocarla no es un cambio")
         void laFechaDeCierreSeComparaPorDia() {
-            Vacante v = laVacante();
-            v.setTipoCierre("FECHA");
-            v.setCierraEn(Instant.parse("2026-12-01T18:30:00Z"));
+            Instant guardada = Instant.parse("2026-12-02T04:59:59Z"); // 01/12, 23:59:59 de Lima
+            for (String comoLlega : new String[] {"2026-12-01T00:00:00Z", "2026-12-02T04:59:59Z",
+                    "2026-12-01T15:30:00Z"}) {
+                Vacante v = laVacante();
+                v.setTipoCierre("FECHA");
+                v.setCierraEn(guardada);
 
-            CambiosDeLaVacante cambios = CambiosDeLaVacante.entre(v,
-                    porFecha("2026-12-01T00:00:00Z"), "S/ 3 000", "S/ 3 000", "", "");
+                CambiosDeLaVacante cambios = CambiosDeLaVacante.entre(v, porFecha(comoLlega),
+                        "S/ 3 000", "S/ 3 000", "", "");
 
-            assertThat(cambios.hayCambios()).isFalse();
-            assertThat(cambios.cierreQueQueda()).isEqualTo(Instant.parse("2026-12-01T18:30:00Z"));
+                assertThat(cambios.hayCambios()).as("llegando como %s", comoLlega).isFalse();
+                assertThat(cambios.cierreQueQueda()).isEqualTo(guardada);
+            }
         }
 
         @Test
-        @DisplayName("cambiar el día sí es un cambio, y se guarda lo que llega")
+        @DisplayName("cambiar el día sí es un cambio, y se guarda ese día a las 23:59:59 de Lima")
         void cambiarElDiaSiEsUnCambio() {
             Vacante v = laVacante();
             v.setTipoCierre("FECHA");
-            v.setCierraEn(Instant.parse("2026-12-01T18:30:00Z"));
+            v.setCierraEn(Instant.parse("2026-12-02T04:59:59Z"));
 
             CambiosDeLaVacante cambios = CambiosDeLaVacante.entre(v,
                     porFecha("2026-12-15T00:00:00Z"), "S/ 3 000", "S/ 3 000", "", "");
 
             assertThat(cambios.hayCambios()).isTrue();
             assertThat(cambios.hayVisibles()).as("la fecha de cierre es interna").isFalse();
-            assertThat(cambios.cierreQueQueda()).isEqualTo(Instant.parse("2026-12-15T00:00:00Z"));
-            assertThat(cambios.anterior()).containsEntry("cierraEn", "2026-12-01T18:30:00Z");
+            assertThat(cambios.cierreQueQueda()).isEqualTo(Instant.parse("2026-12-16T04:59:59Z"));
+            assertThat(cambios.anterior()).containsEntry("cierraEn", "2026-12-02T04:59:59Z");
+        }
+
+        @Test
+        @DisplayName("de Permanente a Fecha límite se guarda el día elegido, a las 23:59:59 de Lima")
+        void dePermanenteAFecha() {
+            CambiosDeLaVacante cambios = CambiosDeLaVacante.entre(laVacante(),
+                    porFecha("2026-12-02T04:59:59Z"), "S/ 3 000", "S/ 3 000", "", "");
+
+            assertThat(cambios.cierreQueQueda()).isEqualTo(Instant.parse("2026-12-02T04:59:59Z"));
+            assertThat(cambios.nuevo()).containsEntry("tipoCierre", "FECHA");
         }
 
         /** El formulario con forma «por fecha» y el día que se le diga, como lo manda el panel. */
@@ -370,22 +387,21 @@ class CambiosDeLaVacanteTest {
         }
 
         @Test
-        @DisplayName("con la forma que sí las enseña, vaciarlas es una decisión de quien edita")
-        void conLaFormaQueLasEnsenaSeObedeceAlFormulario() {
+        @DisplayName("unas plazas que lleguen en el cuerpo ya no se leen: ninguna forma las enseña")
+        void lasPlazasYaNoSeLeen() {
             Vacante v = laVacante();
-            v.setTipoCierre("PLAZAS");
             v.setPlazas(5);
 
-            GuardarVacante sinPlazas = new GuardarVacante(30L, 5L, v.getTitulo(),
+            GuardarVacante conPlazas = new GuardarVacante(30L, 5L, v.getTitulo(),
                     v.getDescripcion(), v.getProposito(), v.getResponsabilidades(),
                     v.getRequisitos(), v.getModalidad(), v.getHorario(), v.getUbicacion(), null,
-                    null, "PLAZAS", null, null, null, v.getResponsableUsuarioId(), null);
+                    null, "PERMANENTE", 9, null, null, v.getResponsableUsuarioId(), null);
 
             CambiosDeLaVacante cambios =
-                    CambiosDeLaVacante.entre(v, sinPlazas, "S/ 3 000", "S/ 3 000", "", "");
+                    CambiosDeLaVacante.entre(v, conPlazas, "S/ 3 000", "S/ 3 000", "", "");
 
-            assertThat(cambios.plazasQueQuedan()).isNull();
-            assertThat(cambios.hayCambios()).isTrue();
+            assertThat(cambios.plazasQueQuedan()).isEqualTo(5);
+            assertThat(cambios.hayCambios()).isFalse();
         }
     }
 
@@ -394,22 +410,22 @@ class CambiosDeLaVacanteTest {
     class LoInterno {
 
         @Test
-        @DisplayName("cambiar solo el responsable, las plazas o la fecha no le dice nada al candidato")
+        @DisplayName("cambiar solo el responsable, la forma de cierre o la fecha no le dice nada al candidato")
         void loInternoNoEsVisible() {
             GuardarVacante datos = new GuardarVacante(30L, 5L, "Coordinador de sede",
                     "Lleva la operación de la sede", "Sostener el servicio",
                     "Coordinar al equipo", "Tres años de experiencia", "Presencial",
-                    "L-V de 9 a 6", "Lima", null, null, "PLAZAS", 4,
-                    null, null, 9L, null);
+                    "L-V de 9 a 6", "Lima", null, null, "FECHA", null,
+                    null, Instant.parse("2026-12-02T04:59:59Z"), 9L, null);
 
             CambiosDeLaVacante cambios = comparar(datos);
 
             assertThat(cambios.hayCambios()).isTrue();
             assertThat(cambios.hayVisibles()).isFalse();
             // Pero queda todo escrito para la auditoría: que no se avise no es que no importe.
-            assertThat(cambios.anterior()).containsKeys("tipoCierre", "plazas",
+            assertThat(cambios.anterior()).containsKeys("tipoCierre", "cierraEn",
                     "responsableUsuarioId");
-            assertThat(cambios.nuevo()).containsEntry("plazas", "4")
+            assertThat(cambios.nuevo()).containsEntry("cierraEn", "2026-12-02T04:59:59Z")
                     .containsEntry("responsableUsuarioId", "9");
         }
     }

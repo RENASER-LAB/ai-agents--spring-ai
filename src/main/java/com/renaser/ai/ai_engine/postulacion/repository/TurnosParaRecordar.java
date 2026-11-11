@@ -28,6 +28,10 @@ import java.util.UUID;
  *       transición es la que lo metió en él.</li>
  * </ul>
  * Los parámetros de la empresa, las horas y lo que ya salió los decide quien llama.
+ *
+ * <p>⚠️ El banco ya no tiene fecha desde la V78 —dura hasta que la vacante se cierra—, así que su
+ * {@code vence_en} llega vacío y solo le toca el primer recordatorio: nunca uno que diga «vence
+ * el». La prueba del puesto conserva los dos.
  */
 @Repository
 @RequiredArgsConstructor

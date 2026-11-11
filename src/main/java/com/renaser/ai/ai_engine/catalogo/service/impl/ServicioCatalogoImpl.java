@@ -33,10 +33,11 @@ public class ServicioCatalogoImpl implements ServicioCatalogo {
             new Opcion("PRIORITARIA", "Prioritaria"),
             new Opcion("URGENTE", "Urgente"));
 
+    // Dos formas desde la V78. La restricción de la base admite todavía PLAZAS por las filas
+    // de antes, pero ninguna vacante nueva la guarda: por eso no se ofrece.
     private static final List<Opcion> TIPOS_CIERRE = List.of(
             new Opcion("PERMANENTE", "Permanente"),
-            new Opcion("PLAZAS", "Por plazas"),
-            new Opcion("FECHA", "Por fecha"));
+            new Opcion("FECHA", "Fecha límite"));
 
     private static final List<Opcion> MOTIVOS_CIERRE = List.of(
             new Opcion("REQUISITO_OBJETIVO", "No cumple un requisito indispensable"),

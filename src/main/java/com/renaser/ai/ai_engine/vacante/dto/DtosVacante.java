@@ -43,14 +43,16 @@ public final class DtosVacante {
              * primer minuto, cuando todavía no está tomada.
              */
             RemuneracionDeLaVacante remuneracion,
+            /**
+             * Cómo se cierra: {@code PERMANENTE} (la cierra alguien del equipo) o
+             * {@code FECHA} (se cierra sola en {@code cierraEn}). «Por plazas» ya no se admite
+             * (V78): la API la rechaza con «Elige cómo se cierra la vacante…».
+             */
             @NotBlank String tipoCierre,
             /**
-             * Cuántas plazas, cuando la forma de cierre es {@code PLAZAS}.
-             *
-             * <p>Al editar solo se lee si esa es la forma elegida, que es cuando el
-             * formulario la enseña. Con cualquier otra forma, lo que haya guardado se
-             * conserva —el formulario no lo mostraba— salvo que la forma de cierre acabe de
-             * cambiar, y entonces se limpia porque ya no rige nada.
+             * Ya no se lee (V78): «Por plazas» desapareció. Se conserva en el contrato para no
+             * romper a quien todavía lo mande; lo que haya guardado se queda, salvo que la forma
+             * de cierre cambie.
              */
             Integer plazas,
             /**
@@ -61,7 +63,16 @@ public final class DtosVacante {
              * vaciaba en silencio cada vez que alguien guardaba sin tocar nada.
              */
             Instant abreEn,
-            /** Cuándo cierra. Misma regla que {@code plazas}, con la forma {@code FECHA}. */
+            /**
+             * El día en que se cierra sola, con la forma {@code FECHA} (V78). Obligatorio con
+             * ella y no anterior a hoy en Lima: sin día, «Elige el día en que cierra la
+             * vacante.»; pasado, «Esa fecha ya pasó: elige un día a partir de hoy.».
+             *
+             * <p>Solo cuenta el día, el de Lima: se guarda a las 23:59:59 de Lima de ese día,
+             * llegue con la hora que llegue. La medianoche UTC exacta se lee como ese día UTC,
+             * que es como lo mandaba el panel antes. Con {@code PERMANENTE} no se lee: lo
+             * guardado se conserva, salvo que la forma de cierre acabe de cambiar.
+             */
             Instant cierraEn,
             @NotNull Long responsableUsuarioId,
             /**

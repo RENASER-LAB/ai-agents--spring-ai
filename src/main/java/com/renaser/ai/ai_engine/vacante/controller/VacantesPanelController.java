@@ -288,7 +288,8 @@ public class VacantesPanelController {
 
     @PostMapping("/vacantes/{id}/cierre")
     @PreAuthorize("@permisos.tiene('cerrar_vacante')")
-    @Operation(summary = "Cerrar: detiene postulaciones nuevas; las que están en marcha se deciden una a una")
+    @Operation(summary = "Cerrar: detiene postulaciones nuevas; el Perfil Integral sin terminar "
+            + "vence y quien lo esperaba queda cerrado; las demás en marcha se deciden una a una")
     public void cerrar(@PathVariable Long id, @Valid @RequestBody CerrarVacante datos) {
         servicio.cerrar(permisos.actual(), id, datos.motivo());
     }

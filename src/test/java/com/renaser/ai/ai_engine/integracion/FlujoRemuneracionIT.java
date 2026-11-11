@@ -654,33 +654,33 @@ public class FlujoRemuneracionIT {
     void loInternoNoSeAvisa() throws Exception {
         long avisosAntes = contar("select count(*) from aviso_portal");
 
-        // Cuántas plazas hay es cómo se organiza la empresa por dentro: al candidato no le
-        // dice nada sobre lo que aceptó al postular.
+        // Cuándo se cierra es cómo se organiza la empresa por dentro: al candidato no le
+        // dice nada sobre lo que aceptó al postular (y el portal no le enseña la fecha).
         //
-        // Va con su forma de cierre —«por plazas»— y no suelto: las plazas solo se escriben
-        // cuando esa es la forma elegida, que es cuando el formulario las enseña. Mandarlas
-        // con una vacante PERMANENTE no cambia nada, y así no puede volver a colarse un
-        // campo que se borra sin que nadie lo haya tocado. Por eso este paso no usa
-        // `guardarLaVacante`, que siempre manda PERMANENTE.
+        // Va con su forma de cierre —«Fecha límite»— y no suelto: la fecha solo se escribe
+        // cuando esa es la forma elegida, que es cuando el formulario la enseña. Por eso este
+        // paso no usa `guardarLaVacante`, que siempre manda PERMANENTE. El día va relativo a
+        // hoy: una fecha escrita a mano caduca y el servidor rechaza un día que ya pasó (V78).
+        java.time.LocalDate dia = java.time.LocalDate.now(LIMA).plusDays(20);
         conToken(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
                         .put("/api/v1/panel/vacantes/" + vacanteConBanda), tokenEquipo, """
                 {"solicitudTalentoId": %d, "titulo": "Desarrollador web",
                  "descripcion": "Portal de talento, con foco en accesibilidad",
                  "horario": "L-V de 9 a 6",
                  "remuneracion": {"tipo": "FIJA", "min": 5200, "moneda": "PEN"},
-                 "tipoCierre": "PLAZAS", "plazas": 3, "responsableUsuarioId": 1}"""
-                .formatted(solicitudDeLaVacante))
+                 "tipoCierre": "FECHA", "cierraEn": "%sT00:00:00Z", "responsableUsuarioId": 1}"""
+                .formatted(solicitudDeLaVacante, dia))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.huboCambios").value(true))
                 .andExpect(jsonPath("$.postulantesAvisados").value(0));
 
         assertThat(contar("select count(*) from aviso_portal")).isEqualTo(avisosAntes);
-        assertThat(jdbc.queryForObject("select plazas from vacante where id = ?",
-                Integer.class, vacanteConBanda)).isEqualTo(3);
+        assertThat(jdbc.queryForObject("select cierra_en from vacante where id = ?",
+                Instant.class, vacanteConBanda)).isEqualTo(finDelDiaEnLima(dia));
         assertThat(contar("""
                 select count(*) from auditoria
                  where accion = 'editar_vacante' and entidad_id = %d
-                   and valor_nuevo::text like '%%plazas%%'
+                   and valor_nuevo::text like '%%cierraEn%%'
                 """.formatted(vacanteConBanda)))
                 .as("lo interno no se avisa, pero sí se audita")
                 .isEqualTo(1);
@@ -929,11 +929,13 @@ public class FlujoRemuneracionIT {
     @Order(21)
     @DisplayName("si la vacante se cierra mientras se edita, el guardado se rechaza entero")
     void cerrarlaAMitadDeUnaEdicionRechazaElGuardado() throws Exception {
-        long avisosAntes = contar("select count(*) from aviso_portal");
-
         conToken(post("/api/v1/panel/vacantes/" + vacanteConBanda + "/cierre"), tokenEquipo,
                 "{\"motivo\":\"Se cubrió el puesto\"}")
                 .andExpect(status().isOk());
+        // Se cuenta después de cerrar: el cierre sí avisa a quien seguía con el Perfil
+        // Integral sin terminar, que queda cerrado (V78). Lo que no puede avisar a nadie es el
+        // guardado rechazado de abajo.
+        long avisosAntes = contar("select count(*) from aviso_portal");
 
         // El formulario ya estaba abierto cuando alguien cerró la vacante: llega tarde.
         guardarLaVacante("""
@@ -1007,8 +1009,8 @@ public class FlujoRemuneracionIT {
                 {"solicitudTalentoId": %d, "titulo": "Analista de datos",
                  "descripcion": "Portal de talento",
                  "remuneracion": {"tipo": "OCULTA", "min": null, "max": null, "moneda": null},
-                 "tipoCierre": "FECHA", "cierraEn": "2026-12-01T00:00:00Z",
-                 "responsableUsuarioId": 1}""".formatted(solicitud))
+                 "tipoCierre": "FECHA", "cierraEn": "%sT00:00:00Z",
+                 "responsableUsuarioId": 1}""".formatted(solicitud, DIA_DEL_CIERRE))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.huboCambios").value(true))
                 .andExpect(jsonPath("$.postulantesAvisados").value(0));
@@ -1024,64 +1026,81 @@ public class FlujoRemuneracionIT {
     }
 
     /**
-     * La regresión del hallazgo QA-02, contra la base de verdad.
+     * La regresión del hallazgo QA-02, contra la base de verdad y con la regla de la V78.
      *
-     * <p>El paso anterior dejó esta vacante cerrando por FECHA el 1 de diciembre. Se le pone
-     * una hora por SQL —ninguna vacante nacida en el panel la tiene, porque el alta escribe
-     * siempre la medianoche UTC del día elegido— y se guarda el formulario tal cual, que es
-     * lo que hace quien abre el lápiz y pulsa guardar.
+     * <p>El paso anterior dejó esta vacante cerrando por FECHA en {@link #DIA_DEL_CIERRE}, ya
+     * guardada a las 23:59:59 de Lima de ese día. Se guarda el formulario tal cual, que es lo
+     * que hace quien abre el lápiz y pulsa guardar: el formulario solo enseña el día, y lo
+     * devuelve como lo mandaba el panel de antes (su medianoche UTC) o como lo manda el de
+     * ahora (las 23:59:59 de Lima). Ninguno de los dos es un cambio.
      */
     @Test
     @Order(23)
-    @DisplayName("guardar sin tocar la fecha de cierre no le quita la hora a la que cerraba")
+    @DisplayName("guardar sin tocar la fecha de cierre no la mueve; cambiar el día sí, a las 23:59:59 de Lima")
     void guardarSinTocarLaFechaNoLeQuitaLaHora() throws Exception {
-        jdbc.update("update vacante set cierra_en = timestamptz '2026-12-01 18:30:00+00'"
-                + " where id = ?", vacanteOculta);
         Long solicitud = jdbc.queryForObject(
                 "select solicitud_talento_id from vacante where id = ?", Long.class, vacanteOculta);
         long avisosAntes = contar("select count(*) from aviso_portal");
         long auditoriasAntes = contar(
                 "select count(*) from auditoria where accion = 'editar_vacante'");
+        assertThat(jdbc.queryForObject("select cierra_en from vacante where id = ?",
+                Instant.class, vacanteOculta))
+                .as("el día elegido, a las 23:59:59 de Lima (AC-03)")
+                .isEqualTo(finDelDiaEnLima(DIA_DEL_CIERRE));
 
-        // El formulario solo enseña el día, así que devuelve su medianoche UTC.
         String comoLoMandaElPanel = """
                 {"solicitudTalentoId": %d, "titulo": "Analista de datos",
                  "descripcion": "Portal de talento",
                  "remuneracion": {"tipo": "OCULTA", "min": null, "max": null, "moneda": null},
                  "tipoCierre": "FECHA", "cierraEn": "%s", "responsableUsuarioId": 1}""";
 
-        conToken(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
-                        .put("/api/v1/panel/vacantes/" + vacanteOculta), tokenEquipo,
-                        comoLoMandaElPanel.formatted(solicitud, "2026-12-01T00:00:00.000Z"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.huboCambios").value(false))
-                .andExpect(jsonPath("$.postulantesAvisados").value(0));
+        for (String mismoDia : new String[] {DIA_DEL_CIERRE + "T00:00:00.000Z",
+                finDelDiaEnLima(DIA_DEL_CIERRE).toString()}) {
+            conToken(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                            .put("/api/v1/panel/vacantes/" + vacanteOculta), tokenEquipo,
+                            comoLoMandaElPanel.formatted(solicitud, mismoDia))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.huboCambios").value(false))
+                    .andExpect(jsonPath("$.postulantesAvisados").value(0));
+        }
 
         assertThat(jdbc.queryForObject("select cierra_en from vacante where id = ?",
                 Instant.class, vacanteOculta))
                 .as("el formulario enseña el día: guardar no puede mover la hora")
-                .isEqualTo(Instant.parse("2026-12-01T18:30:00Z"));
+                .isEqualTo(finDelDiaEnLima(DIA_DEL_CIERRE));
         assertThat(contar("select count(*) from auditoria where accion = 'editar_vacante'"))
                 .isEqualTo(auditoriasAntes);
         assertThat(contar("select count(*) from aviso_portal")).isEqualTo(avisosAntes);
 
-        // Y cambiar el DÍA sí se guarda y se audita: lo que se conserva es la hora de un día
-        // que nadie tocó, no la fecha entera.
+        // Y cambiar el DÍA sí se guarda y se audita, también a las 23:59:59 de Lima.
+        java.time.LocalDate otroDia = DIA_DEL_CIERRE.plusDays(14);
         conToken(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
                         .put("/api/v1/panel/vacantes/" + vacanteOculta), tokenEquipo,
-                        comoLoMandaElPanel.formatted(solicitud, "2026-12-15T00:00:00.000Z"))
+                        comoLoMandaElPanel.formatted(solicitud, otroDia + "T00:00:00.000Z"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.huboCambios").value(true))
                 .andExpect(jsonPath("$.postulantesAvisados").value(0));
 
         assertThat(jdbc.queryForObject("select cierra_en from vacante where id = ?",
                 Instant.class, vacanteOculta))
-                .isEqualTo(Instant.parse("2026-12-15T00:00:00Z"));
+                .isEqualTo(finDelDiaEnLima(otroDia));
         assertThat(contar("select count(*) from auditoria where accion = 'editar_vacante'"))
                 .isEqualTo(auditoriasAntes + 1);
         assertThat(contar("select count(*) from aviso_portal"))
                 .as("la fecha de cierre es interna: no sale del equipo")
                 .isEqualTo(avisosAntes);
+    }
+
+    /** Lima, para los días de la fecha límite (V78). */
+    private static final java.time.ZoneId LIMA = java.time.ZoneId.of("America/Lima");
+
+    /** El día de cierre de la vacante oculta, relativo a hoy para que no caduque. */
+    private static final java.time.LocalDate DIA_DEL_CIERRE =
+            java.time.LocalDate.now(LIMA).plusDays(21);
+
+    /** Como se guarda la fecha límite: las 23:59:59 de Lima de ese día. */
+    private static Instant finDelDiaEnLima(java.time.LocalDate dia) {
+        return dia.atTime(23, 59, 59).atZone(LIMA).toInstant();
     }
 
     // ============ Andamios ============

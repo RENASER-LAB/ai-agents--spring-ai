@@ -145,11 +145,10 @@ public class PostulacionesPanelController {
     @PostMapping("/postulaciones/{id}/reapertura-evaluacion")
     @PreAuthorize("@permisos.tiene('mover_postulacion')")
     @Operation(summary = "Volver a abrir la evaluación de un candidato y devolverle el turno. "
-            + "Hace falta para los 249 que la migración del banco v3 dejó vencidos sin haber "
-            + "respondido: hoy entran al portal y solo ven «el plazo ya pasó»")
+            + "Queda abierta sin fecha hasta que la vacante se cierre; con la vacante cerrada, 409")
     public com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.EvaluacionReabierta
             reabrirEvaluacion(@PathVariable Long id, @Valid @RequestBody ReabrirEvaluacion datos) {
-        return perfilIntegral.reabrirEvaluacion(permisos.actual(), id, datos.dias(), datos.motivo());
+        return perfilIntegral.reabrirEvaluacion(permisos.actual(), id, datos.motivo());
     }
 
     @PatchMapping("/postulaciones/{id}/contacto")

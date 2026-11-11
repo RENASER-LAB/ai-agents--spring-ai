@@ -37,7 +37,8 @@ convierte en una convocatoria.
 
 ### 2 · Se abre la convocatoria
 
-Dice qué puesto es y cuánto dura cada parte del proceso. Dice qué cosas son **de verdad
+Dice qué puesto es y cuánto dura cada parte del proceso, y **cómo se cierra**: a mano, cuando
+alguien del equipo lo decide, o sola, en la fecha que fijó el equipo. Dice qué cosas son **de verdad
 indispensables**: una licencia obligatoria por ley, estar en cierto sitio. Y dice qué fallos no
 los compensa ningún promedio alto: alguien puede sacar buena nota en todo y aun así no servir
 para ese puesto por una sola cosa.
@@ -60,8 +61,8 @@ convocatoria y se abre otra.
 
 **La convocatoria se puede corregir después de abierta**: el horario, la ubicación, los textos o
 el sueldo. Si ya está publicada, a cada candidato que sigue en carrera le llega **un solo aviso
-en su portal** con lo que cambió, y ningún correo. Quién lleva el proceso, cuántas plazas quedan
-o cuándo cierra se cambian sin avisar a nadie: no salen de la empresa.
+en su portal** con lo que cambió, y ningún correo. Quién lleva el proceso o cuándo cierra se
+cambian sin avisar a nadie: no salen de la empresa.
 
 ### 3 · La gente postula
 
@@ -100,7 +101,8 @@ regla exacta que se aplicó.
 
 **Hay otras dos cosas que el sistema hace solo**, y conviene decirlas porque el candidato las lee
 en el permiso que acepta: si se le pasa el plazo que tenía para responder una evaluación o una
-prueba, su proceso se cierra; y en las vacantes que se configuraron para avanzar solas, pasa a la
+prueba, su proceso se cierra —y desde el 10/11/2026 el plazo de la evaluación es el cierre de la
+vacante: si la vacante se cierra antes de que la termine, su proceso se cierra con ella—; y en las vacantes que se configuraron para avanzar solas, pasa a la
 etapa siguiente sin esperar a que alguien lo apruebe, si su nota del Perfil Integral llega a la
 mínima que fijó la vacante. **Solo esa tercera depende de una nota, y nunca para descartar**
 (desde el 12/10/2026): quien no llega espera a que una persona revise su caso, y ninguna nota
@@ -113,6 +115,11 @@ El candidato ve la ficha real del puesto —lo bueno y lo difícil, sin adornos�
 sola vez. Ahí va su currículum, unas preguntas iguales para todos y otras propias del puesto.
 
 Si hace poco ya respondió parte de esto para un puesto parecido, **no lo repite**.
+
+**No tiene fecha a la vista** (desde el 10/11/2026): la responde mientras la vacante esté
+abierta, puede salir y volver cuantas veces quiera, y no ve ninguna cuenta atrás, como en los
+portales de empleo habituales. Antes tenía catorce días desde que postulaba, aunque la vacante
+siguiera abierta.
 
 ### 6 · La máquina lee y ordena, pero no decide
 
@@ -208,7 +215,8 @@ el orden de nadie: sirve para que quien trabajó bien lo pueda demostrar.
 **Nadie se cae en silencio.** Salvo el requisito indispensable de la entrada, ninguna etapa
 descarta sola. Cada una ordena, y una persona confirma. Cuando alguien no continúa, queda escrito
 por qué. Lo único que además se cierra solo es el proceso de quien dejó pasar su plazo sin
-responder, y eso también queda escrito.
+responder —en la evaluación, que la vacante se cerrara antes de que la terminara—, y eso también
+queda escrito.
 
 **Cualquiera puede pedir que borren sus datos.** Se borran —lo que pidió ganar incluido, su
 celular y los avisos que tuviera esperándole—. El registro de las decisiones se queda, sin nada que identifique
@@ -222,7 +230,8 @@ correo**: si el equipo lo movió sin avisarle, tampoco aparece en la campana.
 
 **Y se le recuerda lo que dejó a medias.** Si no ha entregado su evaluación o no ha empezado la
 prueba del puesto, le llega un recordatorio por correo y en la campana al día siguiente de que le
-tocara, y otro un día antes de que venza el plazo. Nunca de noche (solo de 8:00 a 21:00, hora de
+tocara y, en la prueba, otro un día antes de que venza el plazo; la evaluación no tiene fecha, así
+que solo recibe el primero. Nunca de noche (solo de 8:00 a 21:00, hora de
 Lima), ninguno se repite, y cada empresa los puede apagar.
 
 **Y, si él escribe primero, también por WhatsApp.** Al crear la cuenta se pide el celular. Mientras

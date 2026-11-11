@@ -155,6 +155,14 @@ No es parte de la copia: es lo que EX hace donde el contrato le deja elegir. Las
   `404 ruta_no_disponible` (bot en versión 1) es definitivo: `FALLIDO` a la primera. Un
   `RESULTADO` que no llega a aceptarse devuelve al vínculo la revocación `PROCESO_TERMINADO` de v1,
   para que el bot lo cierre igual.
+- **El Perfil Integral dura hasta que la vacante se cierra** (`V78`, 10/11/2026). Mientras está
+  abierta, la acción `EVALUACION_INICIAL` va sin `empezarAntesDe` ni `entregarAntesDe`, que el
+  contrato ya admite vacíos; al cerrarse la vacante, la que no se entregó pasa a `VENCIDA` con el
+  momento del cierre como `entregarAntesDe`. Quien seguía esperándola queda `CERRADA` y recibe su
+  `RESULTADO`, y **no** el `CONVOCATORIA_CERRADA` de ese mismo cierre: ese se escribe después,
+  solo para quien sigue en carrera. El motivo del cierre no viaja, como en cualquier otro
+  `CERRADA`. Ver [Estados de la postulación](03-ESTADOS-POSTULACION.md), «Se cierra la
+  convocatoria».
 - **El interruptor**: `WHATSAPP_PRODUCTOR_V2`, apagado por defecto. Apagado no nace ningún evento y
   EX se comporta como v1; al encenderlo no sale ningún hecho anterior; si se vuelve a apagar, los
   pendientes esperan y caducan `OMITIDO`. Ver [CI/CD](CI-CD.md) para encenderlo en el servidor.
