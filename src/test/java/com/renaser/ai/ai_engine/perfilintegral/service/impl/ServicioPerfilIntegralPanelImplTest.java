@@ -1502,7 +1502,7 @@ class ServicioPerfilIntegralPanelImplTest {
         @DisplayName("Sin motivo escrito no se reabre: es lo único que queda de por qué se hizo")
         void exigeMotivo() {
             org.assertj.core.api.Assertions.assertThatIllegalArgumentException()
-                    .isThrownBy(() -> servicio.reabrirEvaluacion(quien, POSTULACION, 7, "  "))
+                    .isThrownBy(() -> servicio.reabrirEvaluacion(quien, POSTULACION, "  "))
                     .withMessageContaining("motivo");
             verifyNoInteractions(maquina);
         }
@@ -1515,7 +1515,7 @@ class ServicioPerfilIntegralPanelImplTest {
             when(maquina.yaTermino(p)).thenReturn(true);
 
             org.assertj.core.api.Assertions.assertThatIllegalStateException()
-                    .isThrownBy(() -> servicio.reabrirEvaluacion(quien, POSTULACION, 7, "se equivocó"))
+                    .isThrownBy(() -> servicio.reabrirEvaluacion(quien, POSTULACION, "se equivocó"))
                     .withMessageContaining("ya terminó");
         }
 
@@ -1525,7 +1525,7 @@ class ServicioPerfilIntegralPanelImplTest {
             hayPostulacion(postulacionConEvaluacion(LE_TOCA, null));
 
             org.assertj.core.api.Assertions.assertThatIllegalStateException()
-                    .isThrownBy(() -> servicio.reabrirEvaluacion(quien, POSTULACION, 7, "se equivocó"))
+                    .isThrownBy(() -> servicio.reabrirEvaluacion(quien, POSTULACION, "se equivocó"))
                     .withMessageContaining("no tiene evaluación");
         }
 
@@ -1536,43 +1536,52 @@ class ServicioPerfilIntegralPanelImplTest {
             when(evaluaciones.findById(9L)).thenReturn(Optional.of(evaluacion("TERMINADA", null)));
 
             org.assertj.core.api.Assertions.assertThatIllegalStateException()
-                    .isThrownBy(() -> servicio.reabrirEvaluacion(quien, POSTULACION, 7, "se equivocó"))
+                    .isThrownBy(() -> servicio.reabrirEvaluacion(quien, POSTULACION, "se equivocó"))
                     .withMessageContaining("invalidaría su nota");
         }
 
+        /** La vacante de la postulación, bloqueada al reabrir, en el estado que se diga. */
+        private void laVacanteEsta(String estado) {
+            when(vacantes.bloquear(VACANTE, ORGANIZACION)).thenReturn(Optional.of(Vacante.builder()
+                    .id(VACANTE).organizacionId(ORGANIZACION).estado(estado).build()));
+        }
+
         @Test
-        @DisplayName("La que nunca empezó vuelve a PENDIENTE, con el plazo que se le diga")
+        @DisplayName("La que nunca empezó vuelve a PENDIENTE, sin fecha: dura hasta que la vacante "
+                + "se cierre (V78, AC-15)")
         void laQueNoEmpezoVuelveAPendiente() {
             Postulacion p = postulacionConEvaluacion("PERFIL_VENCIDO", 9L);
             hayPostulacion(p);
+            laVacanteEsta("PUBLICADA");
             var eva = evaluacion("VENCIDA", null);
             when(evaluaciones.findById(9L)).thenReturn(Optional.of(eva));
 
-            var salida = servicio.reabrirEvaluacion(quien, POSTULACION, 5, "el correo no le llegó");
+            var salida = servicio.reabrirEvaluacion(quien, POSTULACION, "el correo no le llegó");
 
             assertThat(eva.getEstado()).isEqualTo("PENDIENTE");
-            assertThat(salida.diasDePlazo()).isEqualTo(5);
-            assertThat(salida.venceEn()).isAfter(java.time.Instant.now());
-            // La vigencia se estira con el plazo: de nada sirve poder responder si el
-            // resultado ya no vale cuando responda.
-            assertThat(eva.getVigenteHasta()).isEqualTo(eva.getVenceEn());
+            assertThat(eva.getVenceEn()).isNull();
+            assertThat(salida.venceEn()).isNull();
             verify(maquina).transicionar(eq(p), eq(LE_TOCA), eq(quien), eq("el correo no le llegó"),
                     eq(false), eq(false), isNull());
             verify(auditoria).registrar(eq(ORGANIZACION), eq(quien), eq("reabrir_evaluacion"),
                     eq("postulacion"), eq(POSTULACION), anyMap(), anyMap(),
                     eq("el correo no le llegó"));
+            // Ningún parámetro de días: el Perfil Integral ya no lo lee
+            verifyNoInteractions(parametros);
         }
 
         @Test
         @DisplayName("La que ya había empezado vuelve a EN_CURSO y conserva lo respondido")
         void laEmpezadaConservaLoRespondido() {
             hayPostulacion(postulacionConEvaluacion(LE_TOCA, 9L));
+            laVacanteEsta("PUBLICADA");
             var eva = evaluacion("EN_CURSO", java.time.Instant.parse("2020-01-02T00:00:00Z"));
             when(evaluaciones.findById(9L)).thenReturn(Optional.of(eva));
 
-            servicio.reabrirEvaluacion(quien, POSTULACION, 3, "se le cayó internet");
+            servicio.reabrirEvaluacion(quien, POSTULACION, "se le cayó internet");
 
             assertThat(eva.getEstado()).isEqualTo("EN_CURSO");
+            assertThat(eva.getVenceEn()).isNull();
             // Ya estaba en el estado que le toca: no se le mueve por moverlo, porque cada
             // transición deja rastro y un rastro falso confunde a quien lo lea después.
             verify(maquina, never()).transicionar(any(), anyString(), any(), anyString(),
@@ -1580,26 +1589,17 @@ class ServicioPerfilIntegralPanelImplTest {
         }
 
         @Test
-        @DisplayName("Sin días, el plazo sale del parámetro de la organización")
-        void sinDiasUsaElParametro() {
+        @DisplayName("Con la vacante cerrada se rechaza, sin tocar la evaluación (V78, AC-15)")
+        void conLaVacanteCerradaSeRechaza() {
             hayPostulacion(postulacionConEvaluacion(LE_TOCA, 9L));
-            when(evaluaciones.findById(9L)).thenReturn(Optional.of(evaluacion("PENDIENTE", null)));
-            when(parametros.entero(ORGANIZACION, "dias_plazo_evaluacion", 14)).thenReturn(21);
+            laVacanteEsta("CERRADA");
 
-            var salida = servicio.reabrirEvaluacion(quien, POSTULACION, null, "ampliación acordada");
-
-            assertThat(salida.diasDePlazo()).isEqualTo(21);
-        }
-
-        @Test
-        @DisplayName("Un número de días absurdo se ignora y manda el parámetro")
-        void diasNoPositivosCaenAlParametro() {
-            hayPostulacion(postulacionConEvaluacion(LE_TOCA, 9L));
-            when(evaluaciones.findById(9L)).thenReturn(Optional.of(evaluacion("PENDIENTE", null)));
-            when(parametros.entero(ORGANIZACION, "dias_plazo_evaluacion", 14)).thenReturn(14);
-
-            assertThat(servicio.reabrirEvaluacion(quien, POSTULACION, 0, "cero días").diasDePlazo())
-                    .isEqualTo(14);
+            org.assertj.core.api.Assertions.assertThatIllegalStateException()
+                    .isThrownBy(() -> servicio.reabrirEvaluacion(quien, POSTULACION, "otra oportunidad"))
+                    .withMessage("La vacante está cerrada: su evaluación ya no se puede reabrir");
+            verify(evaluaciones, never()).findById(anyLong());
+            verify(evaluaciones, never()).save(any());
+            verifyNoInteractions(auditoria);
         }
     }
 
@@ -1900,7 +1900,7 @@ class ServicioPerfilIntegralPanelImplTest {
         @Test
         @DisplayName("reabrir la evaluación contesta 404, antes de mirar si ya terminó")
         void reabrirLaEvaluacion() {
-            contestaComoLaVacante(() -> servicio.reabrirEvaluacion(quien, POSTULACION, 7,
+            contestaComoLaVacante(() -> servicio.reabrirEvaluacion(quien, POSTULACION,
                     "Se le cortó la luz"));
         }
     }

@@ -914,7 +914,7 @@ public class FlujoEliminacionVacanteIT {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.Resource").value("Vacante"));
         conToken(post(deA + "/reapertura-evaluacion"), tokenEquipo, """
-                {"dias": 7, "motivo": "Otra oportunidad"}""").andExpect(status().isNotFound())
+                {"motivo": "Otra oportunidad"}""").andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.Resource").value("Vacante"));
 
         // Su contacto y su enlace para entrar al portal.

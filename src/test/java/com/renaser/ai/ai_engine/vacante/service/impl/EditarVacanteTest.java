@@ -217,71 +217,128 @@ class EditarVacanteTest {
         verifyNoInteractions(auditoria, avisos);
     }
 
+    // ---------- la fecha de cierre (V78) ----------
+
+    private static final java.time.ZoneId LIMA = java.time.ZoneId.of("America/Lima");
+
+    /** Un día de Lima a tantos días de hoy: las fechas quemadas caducan solas. */
+    private static java.time.LocalDate enDias(int dias) {
+        return java.time.LocalDate.now(LIMA).plusDays(dias);
+    }
+
+    /** Como mandaba el día el panel de antes: su medianoche UTC. */
+    private static Instant medianocheUtc(java.time.LocalDate dia) {
+        return dia.atStartOfDay(java.time.ZoneOffset.UTC).toInstant();
+    }
+
+    /** Como se guarda: las 23:59:59 de Lima de ese día. */
+    private static Instant finDelDiaEnLima(java.time.LocalDate dia) {
+        return dia.atTime(23, 59, 59).atZone(LIMA).toInstant();
+    }
+
+    private GuardarVacante conCierre(String tipoCierre, Instant cierraEn, Long responsable) {
+        return new GuardarVacante(30L, 5L, "Coordinador de sede",
+                "Lleva la operación de la sede", null, null, null, null, "L-V de 9 a 6",
+                "Lima", null, new RemuneracionDeLaVacante("FIJA", new BigDecimal("3000"), null, "PEN"),
+                tipoCierre, null, null, cierraEn, responsable, null);
+    }
+
     /**
-     * La regresión del hallazgo QA-02, del lado del servicio: una vacante que cierra a una
-     * hora concreta no puede perderla porque el formulario solo enseñe el día.
+     * La regresión del hallazgo QA-02, con la regla de la V78: la fecha se guarda a las
+     * 23:59:59 de Lima de su día, así que el formulario, que solo enseña el día, devuelve lo
+     * mismo que hay guardado.
      */
     @Test
-    @DisplayName("guardar sin tocar la fecha de cierre no le quita la hora a la que cerraba")
+    @DisplayName("guardar sin tocar la fecha de cierre no la mueve ni lo cuenta como un cambio")
     void laHoraDelCierreNoSePierde() {
         Vacante v = laVacante("PUBLICADA");
         v.setTipoCierre("FECHA");
-        v.setCierraEn(Instant.parse("2026-12-01T18:30:00Z"));
+        v.setCierraEn(finDelDiaEnLima(enDias(20)));
         hayEnCarrera(2);
 
-        GuardarVacante comoLoMandaElPanel = new GuardarVacante(30L, 5L, "Coordinador de sede",
-                "Lleva la operación de la sede", null, null, null, null, "L-V de 9 a 6",
-                "Lima", null, new RemuneracionDeLaVacante("FIJA", new BigDecimal("3000"), null, "PEN"),
-                "FECHA", null, null, Instant.parse("2026-12-01T00:00:00Z"), 7L, null);
-
-        VacanteActualizadaResponse respuesta = servicio.editar(QUIEN, VACANTE, comoLoMandaElPanel);
+        VacanteActualizadaResponse respuesta = servicio.editar(QUIEN, VACANTE,
+                conCierre("FECHA", medianocheUtc(enDias(20)), 7L));
 
         assertThat(respuesta.huboCambios()).isFalse();
-        assertThat(v.getCierraEn()).isEqualTo(Instant.parse("2026-12-01T18:30:00Z"));
+        assertThat(v.getCierraEn()).isEqualTo(finDelDiaEnLima(enDias(20)));
         verify(vacantes, never()).save(any());
         verifyNoInteractions(auditoria, avisos);
     }
 
     @Test
-    @DisplayName("cambiar el día de cierre sí se guarda, y sigue sin avisar a nadie")
+    @DisplayName("cambiar el día de cierre se guarda a las 23:59:59 de Lima, y sigue sin avisar a nadie (AC-03)")
     void cambiarElDiaDeCierreSeGuarda() {
         Vacante v = laVacante("PUBLICADA");
         v.setTipoCierre("FECHA");
-        v.setCierraEn(Instant.parse("2026-12-01T18:30:00Z"));
+        v.setCierraEn(finDelDiaEnLima(enDias(20)));
         hayEnCarrera(2);
 
-        GuardarVacante otroDia = new GuardarVacante(30L, 5L, "Coordinador de sede",
-                "Lleva la operación de la sede", null, null, null, null, "L-V de 9 a 6",
-                "Lima", null, new RemuneracionDeLaVacante("FIJA", new BigDecimal("3000"), null, "PEN"),
-                "FECHA", null, null, Instant.parse("2026-12-15T00:00:00Z"), 7L, null);
-
-        VacanteActualizadaResponse respuesta = servicio.editar(QUIEN, VACANTE, otroDia);
+        VacanteActualizadaResponse respuesta = servicio.editar(QUIEN, VACANTE,
+                conCierre("FECHA", finDelDiaEnLima(enDias(35)), 7L));
 
         assertThat(respuesta.huboCambios()).isTrue();
         assertThat(respuesta.postulantesAvisados()).isZero();
-        assertThat(v.getCierraEn()).isEqualTo(Instant.parse("2026-12-15T00:00:00Z"));
+        assertThat(v.getCierraEn()).isEqualTo(finDelDiaEnLima(enDias(35)));
         verify(vacantes).save(v);
         verifyNoInteractions(avisos);
     }
 
     @Test
-    @DisplayName("cambiar la forma de cierre sí limpia lo que ya no rige, y se guarda auditado")
+    @DisplayName("hoy vale: la vacante se cierra a las 23:59:59 de hoy")
+    void hoyVale() {
+        Vacante v = laVacante("PUBLICADA");
+        hayEnCarrera(0);
+
+        servicio.editar(QUIEN, VACANTE, conCierre("FECHA", medianocheUtc(enDias(0)), 7L));
+
+        assertThat(v.getTipoCierre()).isEqualTo("FECHA");
+        assertThat(v.getCierraEn()).isEqualTo(finDelDiaEnLima(enDias(0)));
+    }
+
+    @Test
+    @DisplayName("con «Fecha límite», sin día o con un día pasado no se guarda nada (AC-02)")
+    void sinDiaOConUnDiaPasadoNoSeGuarda() {
+        laVacante("PUBLICADA");
+
+        org.assertj.core.api.Assertions.assertThatIllegalArgumentException()
+                .isThrownBy(() -> servicio.editar(QUIEN, VACANTE, conCierre("FECHA", null, 7L)))
+                .withMessage("Elige el día en que cierra la vacante.");
+        org.assertj.core.api.Assertions.assertThatIllegalArgumentException()
+                .isThrownBy(() -> servicio.editar(QUIEN, VACANTE,
+                        conCierre("FECHA", finDelDiaEnLima(enDias(-1)), 7L)))
+                .withMessage("Esa fecha ya pasó: elige un día a partir de hoy.");
+        verify(vacantes, never()).save(any());
+        verifyNoInteractions(auditoria, avisos);
+    }
+
+    @Test
+    @DisplayName("«Por plazas» ya no se admite (V78)")
+    void porPlazasYaNoSeAdmite() {
+        laVacante("PUBLICADA");
+
+        org.assertj.core.api.Assertions.assertThatIllegalArgumentException()
+                .isThrownBy(() -> servicio.editar(QUIEN, VACANTE, conCierre("PLAZAS", null, 7L)))
+                .withMessage("Elige cómo se cierra la vacante: Permanente o Fecha límite.");
+        verify(vacantes, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("pasar a Permanente limpia la fecha y lo que ya no rige, y se guarda auditado")
     void cambiarLaFormaDeCierreLimpiaLoQueSobra() {
         Vacante v = laVacante("PUBLICADA");
-        v.setTipoCierre("PLAZAS");
+        v.setTipoCierre("FECHA");
+        v.setCierraEn(finDelDiaEnLima(enDias(20)));
         v.setPlazas(5);
         v.setAbreEn(Instant.parse("2026-09-23T03:35:54Z"));
         hayEnCarrera(2);
 
-        GuardarVacante aPermanente = new GuardarVacante(30L, 5L, "Coordinador de sede",
-                "Lleva la operación de la sede", null, null, null, null, "L-V de 9 a 6",
-                "Lima", null, new RemuneracionDeLaVacante("FIJA", new BigDecimal("3000"), null, "PEN"),
-                "PERMANENTE", null, null, null, 7L, null);
-
-        VacanteActualizadaResponse respuesta = servicio.editar(QUIEN, VACANTE, aPermanente);
+        VacanteActualizadaResponse respuesta = servicio.editar(QUIEN, VACANTE,
+                conCierre("PERMANENTE", null, 7L));
 
         assertThat(respuesta.huboCambios()).isTrue();
         assertThat(respuesta.postulantesAvisados()).as("la forma de cierre es interna").isZero();
+        assertThat(v.getTipoCierre()).isEqualTo("PERMANENTE");
+        assertThat(v.getCierraEn()).isNull();
         assertThat(v.getPlazas()).isNull();
         // Y la apertura sigue intacta: no se limpia lo que no se enseñó.
         assertThat(v.getAbreEn()).isEqualTo(Instant.parse("2026-09-23T03:35:54Z"));
@@ -362,10 +419,7 @@ class EditarVacanteTest {
         Vacante v = laVacante("PUBLICADA");
         hayEnCarrera(2);
 
-        GuardarVacante datos = new GuardarVacante(30L, 5L, "Coordinador de sede",
-                "Lleva la operación de la sede", null, null, null, null, "L-V de 9 a 6", "Lima", null,
-                new RemuneracionDeLaVacante("FIJA", new BigDecimal("3000"), null, "PEN"),
-                "PLAZAS", 3, null, null, 9L, null);
+        GuardarVacante datos = conCierre("FECHA", medianocheUtc(enDias(15)), 9L);
 
         VacanteActualizadaResponse respuesta = servicio.editar(QUIEN, VACANTE, datos);
 
@@ -373,7 +427,7 @@ class EditarVacanteTest {
         assertThat(respuesta.postulantesAvisados()).isZero();
         verifyNoInteractions(avisos);
         verify(vacantes).save(v);
-        assertThat(v.getPlazas()).isEqualTo(3);
+        assertThat(v.getCierraEn()).isEqualTo(finDelDiaEnLima(enDias(15)));
         assertThat(v.getResponsableUsuarioId()).isEqualTo(9L);
         verify(auditoria).registrar(anyLong(), any(), eq("editar_vacante"), anyString(),
                 anyLong(), any(), any(), eq(null));

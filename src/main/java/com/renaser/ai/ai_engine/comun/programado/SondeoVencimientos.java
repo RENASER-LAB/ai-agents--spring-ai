@@ -3,6 +3,7 @@ package com.renaser.ai.ai_engine.comun.programado;
 import com.renaser.ai.ai_engine.perfilintegral.service.ServicioEvaluacion;
 import com.renaser.ai.ai_engine.postulacion.service.ServicioRecordatorios;
 import com.renaser.ai.ai_engine.prueba.service.ServicioPrueba;
+import com.renaser.ai.ai_engine.vacante.service.CierreDeLaVacante;
 import com.renaser.ai.ai_engine.validacion.service.ServicioValidacion;
 
 import lombok.RequiredArgsConstructor;
@@ -27,6 +28,7 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class SondeoVencimientos {
 
+    private final CierreDeLaVacante cierreDeLaVacante;
     private final ServicioEvaluacion evaluacion;
     private final ServicioPrueba prueba;
     private final ServicioValidacion validacion;
@@ -35,6 +37,17 @@ public class SondeoVencimientos {
     @Scheduled(fixedDelayString = "${app.sondeo.periodo-ms:60000}")
     public void ejecutar() {
         try {
+            // Las vacantes con fecha límite se cierran solas a las 23:59 de Lima de ese día
+            // (V78). Va lo primero: cerrarlas vence su Perfil Integral sin terminar en la misma
+            // transacción, y así a nadie se le recuerda una evaluación que ya no puede responder.
+            cierreDeLaVacante.cerrarLasQueLlegaronASuFecha();
+        } catch (Exception e) {
+            log.error("El sondeo de vacantes que llegaron a su fecha de cierre falló, se "
+                    + "reintenta en el próximo ciclo", e);
+        }
+        try {
+            // El Perfil Integral que quedó abierto en una vacante ya cerrada (V78). Ya no vence
+            // por días: lo vence el cierre de su vacante.
             evaluacion.cerrarVencidas();
         } catch (Exception e) {
             log.error("El sondeo de evaluaciones vencidas falló, se reintenta en el próximo ciclo", e);

@@ -244,7 +244,7 @@ Estas no pasan siempre. Son excepciones, y son las que aparecen en la pantalla d
 | No está de acuerdo con una nota | La ajusta, escribiendo por qué |
 | Alguien **falta a la simulación** | Le da otra fecha o cierra su postulación |
 | La decisión sale **ámbar** | Pide una evidencia dirigida |
-| Se cierra la convocatoria con gente a mitad | Decide uno por uno: seguir, parar o al Radar |
+| Se cierra la convocatoria con gente a mitad | Decide uno por uno: seguir, parar o al Radar. Quien seguía sin entregar el Perfil Integral se cierra solo (`V78`) |
 
 ### La forma que tiene esto
 
@@ -335,6 +335,13 @@ Tecnología/Producto, Creativo/Experiencia, Talento/Personas y Seguridad crític
 **RF-09** Una vacante se cierra de tres formas: **con fecha** de inicio y cierre, **hasta cubrir
 un número de plazas**, o **permanente** para alimentar el Radar de Talento.
 
+> **Implementado de otra manera** (10/11/2026, `V78`): son **dos** formas. **Permanente**, la de
+> por defecto, la cierra alguien del equipo; **Fecha límite** se cierra sola ese día a las 23:59 de
+> Lima, con el sistema como autor. «Hasta cubrir plazas» se retiró y las vacantes que lo tenían
+> pasaron a Permanente. Lo decidió el usuario el 20/10/2026, junto con que el Perfil Integral dure
+> hasta el cierre (RF-14). Ver [Estados de la postulación](03-ESTADOS-POSTULACION.md), «Se cierra
+> la convocatoria».
+
 **RF-10** El nivel y la familia deciden qué preguntas responde el candidato. Los bancos
 disponibles son 90 preguntas para Dirección, 60 para Supervisión y 50 para Ejecución, más el
 banco de alineación personal.
@@ -359,6 +366,12 @@ marcha**. El equipo decide candidato por candidato: continuar, detener, o mandar
 cuando hay consentimiento válido. **Eliminar** una vacante mal creada es otra acción y sí cierra
 a quienes siguen en carrera (RF-14d).
 
+> **Con una excepción desde el 10/11/2026 (`V78`), por decisión del usuario:** el Perfil Integral
+> ya no vence a los 14 días de postular, sino cuando la vacante se cierra, a mano o por su fecha
+> límite. Al cerrarse, la evaluación sin entregar vence y la postulación que seguía esperándola
+> (`PERFIL_TURNO_CANDIDATO`) se cierra con `PLAZO_VENCIDO` y los avisos de siempre. Quien ya
+> entregó o está en otra etapa sigue como dice el requisito.
+
 **RF-14b** **Una vacante en borrador o publicada se corrige desde la lista del panel**
 (19/09/2026), con el mismo formulario con que se creó. Una cerrada no se edita. La solicitud y el
 puesto no se cambian: el puesto decide el nivel y la familia de la evaluación, y para cambiarlo se
@@ -366,8 +379,8 @@ crea otra vacante. Si la vacante está publicada y cambió algo que ve quien pos
 descripción, propósito, responsabilidades, requisitos, modalidad, horario, ciudad, zona o sueldo—,
 cada postulante **en carrera** recibe **un solo aviso en la campana de su portal, sin correo**, con
 lo que cambió. En carrera es toda postulación que no esté contratada, cerrada ni en «no
-continúa». Lo interno —responsable, forma de cierre, plazas y fecha de cierre— se guarda sin
-avisar a nadie. Cada campo cambiado queda en la auditoría con su valor de antes y el nuevo.
+continúa». Lo interno —responsable, forma de cierre y fecha de cierre (las plazas ya no, desde
+la `V78`)— se guarda sin avisar a nadie. Cada campo cambiado queda en la auditoría con su valor de antes y el nuevo.
 **Guardar sin cambios**, o solo con espacios de más al principio o al final, **no guarda ni
 avisa nada**.
 

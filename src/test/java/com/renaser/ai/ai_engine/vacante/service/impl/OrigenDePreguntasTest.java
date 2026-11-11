@@ -119,7 +119,7 @@ class OrigenDePreguntasTest {
                 .thenReturn(Optional.of(VersionPesos.builder().id(9L).build()));
         when(vacantes.save(any())).thenAnswer(i -> i.getArgument(0));
         servicio.crear(QUIEN, new GuardarVacante(30L, null, "Analista", "Descripción", null, null,
-                null, null, null, null, null, null, "MANUAL", 1, null, null, QUIEN.usuarioId(), null));
+                null, null, null, null, null, null, "PERMANENTE", null, null, null, QUIEN.usuarioId(), null));
         ArgumentCaptor<Vacante> guardada = ArgumentCaptor.forClass(Vacante.class);
         verify(vacantes).save(guardada.capture());
         return guardada.getValue();

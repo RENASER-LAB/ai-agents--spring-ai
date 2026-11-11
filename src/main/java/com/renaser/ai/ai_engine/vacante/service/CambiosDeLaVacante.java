@@ -4,7 +4,6 @@ import com.renaser.ai.ai_engine.vacante.dto.DtosVacante.GuardarVacante;
 import com.renaser.ai.ai_engine.vacante.entity.Vacante;
 
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -26,22 +25,23 @@ import java.util.Objects;
  *   <li><b>Visibles largos</b> —descripción, propósito, responsabilidades y requisitos—: solo
  *       se nombran. Pegar dos párrafos enteros en una campana no informa, tapa; quien quiera
  *       leerlos entra a la vacante, que es a donde lleva el aviso.
- *   <li><b>Internos</b> —responsable, forma de cierre, plazas y fechas—: se guardan y se
+ *   <li><b>Internos</b> —responsable, forma de cierre y su fecha—: se guardan y se
  *       auditan, y no se avisan. Al candidato no le dicen nada: son cómo se organiza la
  *       empresa por dentro, no lo que él aceptó al postular.
  * </ul>
  *
  * <p><b>Lo que el formulario no ofrece, no se toca.</b> El cuerpo del PUT es el formulario
- * de edición, y ese formulario no enseña la fecha de apertura ni —cuando la forma de cierre
- * no las usa— las plazas o la fecha de cierre. Un campo ausente ahí significa «no te lo he
- * enseñado», no «bórralo»: leerlo como un nulo hacía que abrir el lápiz y pulsar guardar sin
- * tocar nada vaciara en silencio datos que nadie vio. Por eso esta clase no compara la
- * apertura y calcula las otras dos con la regla de abajo — y el servicio escribe justo lo
- * que ella dice, para que lo comparado y lo guardado no puedan separarse.
+ * de edición, y ese formulario no enseña la fecha de apertura, ni las plazas —«Por plazas» ya no
+ * es una forma de cierre (V78)—, ni la fecha de cierre cuando la vacante es Permanente. Un campo
+ * ausente ahí significa «no te lo he enseñado», no «bórralo»: leerlo como un nulo hacía que
+ * abrir el lápiz y pulsar guardar sin tocar nada vaciara en silencio datos que nadie vio. Por
+ * eso esta clase no compara la apertura y calcula las otras dos con la regla de abajo — y el
+ * servicio escribe justo lo que ella dice, para que lo comparado y lo guardado no puedan
+ * separarse.
  *
- * <p><b>Cambiar la forma de cierre SÍ limpia lo que sobra.</b> Pasar de «por plazas» a «por
- * fecha» deja unas plazas que ya no rigen nada, y eso es una decisión que alguien tomó en la
- * pantalla: se limpia y se audita como cambio interno. Lo que no se admite es limpiarlas sin
+ * <p><b>Cambiar la forma de cierre SÍ limpia lo que sobra.</b> Pasar de «Fecha límite» a
+ * «Permanente» deja una fecha que ya no rige nada, y eso es una decisión que alguien tomó en la
+ * pantalla: se limpia y se audita como cambio interno. Lo que no se admite es limpiarla sin
  * que nadie lo haya pedido.
  *
  * <p><b>Los espacios del principio y del final no cuentan como un cambio.</b> El panel manda
@@ -88,10 +88,6 @@ public final class CambiosDeLaVacante {
      * son dos ciudades— y se cuenta por su nombre, que es lo que el candidato entiende.
      */
     public static final String CIUDAD = "ciudadUbigeo";
-
-    /** Las dos formas de cierre que traen un dato detrás. La tercera, PERMANENTE, no. */
-    private static final String CIERRE_POR_PLAZAS = "PLAZAS";
-    private static final String CIERRE_POR_FECHA = "FECHA";
 
     private static final String SIN_INDICAR = "sin indicar";
 
@@ -179,53 +175,31 @@ public final class CambiosDeLaVacante {
     /**
      * Cuántas plazas quedan después de guardar.
      *
-     * <ul>
-     *   <li>La forma de cierre elegida es «por plazas»: manda lo que diga el formulario, que
-     *       es quien las enseña — vaciarlas ahí es una decisión de quien edita.
-     *   <li>La forma de cierre cambió: las plazas de antes ya no rigen nada y se limpian.
-     *   <li>Ni una cosa ni la otra: el formulario no las enseñaba, así que se quedan como
-     *       estaban. Es lo que impide que guardar sin tocar nada las borre.
-     * </ul>
+     * <p>Ninguna forma de cierre las enseña desde que «Por plazas» desapareció (V78), así que
+     * el formulario nunca las trae: se quedan como estaban, salvo que la forma de cierre acabe
+     * de cambiar, y entonces ya no rigen nada y se limpian.
      */
     private static Integer plazasQueQuedarian(Vacante vacante, GuardarVacante datos) {
-        if (CIERRE_POR_PLAZAS.equals(limpio(datos.tipoCierre()))) {
-            return datos.plazas();
-        }
         return cambioLaFormaDeCierre(vacante, datos) ? null : vacante.getPlazas();
     }
 
     /**
-     * Lo mismo para la fecha de cierre, que solo enseña la forma «por fecha».
+     * La fecha de cierre que queda, que solo enseña «Fecha límite».
      *
-     * <p><b>Y con la precisión que el formulario enseña, que es el DÍA.</b> La pantalla
-     * pinta «2026-12-01» y devuelve la medianoche UTC de ese día, así que una vacante que
-     * cerraba a las 18:30 volvía guardada a las 00:00 sin que nadie tocara el campo —con su
-     * fila de auditoría y su «Cambios guardados»—, y el cierre por plazo vencido, que corre
-     * solo, se le adelantaba esas horas.
+     * <p><b>Con «Fecha límite», el día que llega a las 23:59:59 de Lima</b> ({@link
+     * FormaDeCierre#alFinalDelDia}). El formulario enseña el día, no la hora: guardar sin tocar
+     * el campo devuelve el mismo día y da el mismo instante, así que no es un cambio ni se
+     * audita; cambiar el día sí escribe el nuevo, también a las 23:59:59. Comparar y escribir con
+     * la misma regla es lo que impide que vuelva a haber un campo que se mueve solo (QA-02).
      *
-     * <p>Mientras el formulario ofrezca solo el día, <b>si el día no cambia, se conserva el
-     * instante guardado</b>; cambiar el día sí escribe lo que llega. Comparar y escribir con
-     * la misma regla es lo que impide que vuelva a haber un campo que se mueve solo.
+     * <p>Con «Permanente», el formulario no la enseña y se queda como estaba, salvo que la forma
+     * acabe de cambiar.
      */
     private static Instant cierreQueQuedaria(Vacante vacante, GuardarVacante datos) {
-        if (CIERRE_POR_FECHA.equals(limpio(datos.tipoCierre()))) {
-            return elMismoDia(vacante.getCierraEn(), datos.cierraEn())
-                    ? vacante.getCierraEn() : datos.cierraEn();
+        if (FormaDeCierre.esPorFecha(datos.tipoCierre())) {
+            return FormaDeCierre.alFinalDelDia(datos.cierraEn());
         }
         return cambioLaFormaDeCierre(vacante, datos) ? null : vacante.getCierraEn();
-    }
-
-    /**
-     * Si dos instantes caen en el mismo día UTC.
-     *
-     * <p>UTC y no la hora de Lima porque es el día que el propio formulario enseña: recorta
-     * los diez primeros caracteres del instante en UTC. Leerlo en otro huso haría que la
-     * pantalla dijera un día y esta comparación pensara en otro.
-     */
-    private static boolean elMismoDia(Instant guardado, Instant queLlega) {
-        return guardado != null && queLlega != null
-                && guardado.truncatedTo(ChronoUnit.DAYS)
-                        .equals(queLlega.truncatedTo(ChronoUnit.DAYS));
     }
 
     private static boolean cambioLaFormaDeCierre(Vacante vacante, GuardarVacante datos) {

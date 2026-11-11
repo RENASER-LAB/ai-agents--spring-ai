@@ -83,9 +83,13 @@ public interface ServicioPerfilIntegralPanel {
      *
      * <p>Lo que NO hace: tocar una evaluación ya entregada. Reabrir esa borraría el sentido de
      * una nota que alguien ya usó para decidir.
+     *
+     * <p><b>Sin días desde la V78.</b> La evaluación queda abierta sin fecha, como nace, hasta
+     * que la vacante se cierre. Con la vacante ya cerrada se rechaza: «La vacante está cerrada:
+     * su evaluación ya no se puede reabrir».
      */
     EvaluacionReabierta reabrirEvaluacion(ContextoUsuario quien, Long postulacionId,
-                                          Integer dias, String motivo);
+                                          String motivo);
 
     RankingVacante ranking(ContextoUsuario quien, Long vacanteId);
 

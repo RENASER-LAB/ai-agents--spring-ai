@@ -2,7 +2,9 @@ package com.renaser.ai.ai_engine.perfilintegral.repository;
 
 import com.renaser.ai.ai_engine.perfilintegral.entity.Evaluacion;
 
+import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -64,4 +66,46 @@ public interface EvaluacionRepository extends JpaRepository<Evaluacion, Long> {
      */
     @Query(value = "select estado from evaluacion where id = :id for update", nativeQuery = true)
     String estadoBloqueandoLaFila(@Param("id") Long id);
+
+    /**
+     * Las evaluaciones del Perfil Integral sin terminar de una vacante —sin empezar o a
+     * medias—, <b>bloqueando sus filas</b> hasta que acabe la transacción (V78).
+     *
+     * <p>Para vencerlas cuando la vacante se cierra. El bloqueo es lo que ordena el cierre con
+     * una entrega que llega en el mismo instante: si la entrega confirma antes, al conseguir
+     * la fila Postgres vuelve a mirar el {@code where}, la encuentra {@code TERMINADA} y no la
+     * devuelve; si llega después, espera y la encuentra {@code VENCIDA}.
+     *
+     * <p>Como la de {@link #algunaTecnicaEmpezadaDeLaVacante}, va por la postulación: la
+     * evaluación cuelga del usuario, no de la vacante.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            select e from Evaluacion e
+            where e.proposito = 'PERFIL_INTEGRAL'
+              and e.estado in ('PENDIENTE', 'EN_CURSO')
+              and e.id in (select p.evaluacionId from Postulacion p
+                           where p.vacanteId = :vacanteId and p.evaluacionId is not null)
+            order by e.id
+            """)
+    List<Evaluacion> sinTerminarDelPerfilDeLaVacante(@Param("vacanteId") Long vacanteId);
+
+    /**
+     * Las vacantes cerradas que todavía tienen alguna evaluación del Perfil Integral sin
+     * terminar, con el momento en que se cerraron: {@code [vacanteId, cerradaEn]} (V78).
+     *
+     * <p>Lo que el sondeo recoge cada minuto. Casi siempre no devuelve nada, porque cerrar la
+     * vacante vence las suyas en la misma transacción; quedan las de una postulación que
+     * entró en el mismo instante del cierre y, el primer minuto tras desplegar la V78, las
+     * que seguían abiertas en vacantes cerradas desde antes. Una vacante eliminada sigue su
+     * propio camino (V60) y no sale aquí.
+     */
+    @Query("""
+            select distinct v.id, v.cerradaEn from Evaluacion e, Postulacion p, Vacante v
+            where p.evaluacionId = e.id and v.id = p.vacanteId
+              and e.proposito = 'PERFIL_INTEGRAL'
+              and e.estado in ('PENDIENTE', 'EN_CURSO')
+              and v.estado = 'CERRADA' and v.eliminadaEn is null
+            """)
+    List<Object[]> vacantesCerradasConPerfilSinTerminar();
 }

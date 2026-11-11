@@ -128,7 +128,6 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
     private final CriterioRepository criterios;
     private final CvRepository cvs;
     private final DatoCvRepository datosCv;
-    private final com.renaser.ai.ai_engine.parametro.service.ServicioParametros parametros;
     private final PesoCriterioRepository pesosCriterio;
     private final EstadoPostulacionRepository estados;
     private final UsuarioRepository usuarios;
@@ -359,10 +358,14 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
     /** El estado en el que le toca al candidato responder su evaluación. */
     private static final String LE_TOCA = "PERFIL_TURNO_CANDIDATO";
 
+    /** Lo que se contesta al pedir reabrir con la vacante ya cerrada (V78). */
+    static final String VACANTE_CERRADA_NO_SE_REABRE =
+            "La vacante está cerrada: su evaluación ya no se puede reabrir";
+
     @Override
     @Transactional
     public com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.EvaluacionReabierta
-            reabrirEvaluacion(ContextoUsuario quien, Long postulacionId, Integer dias, String motivo) {
+            reabrirEvaluacion(ContextoUsuario quien, Long postulacionId, String motivo) {
 
         if (motivo == null || motivo.isBlank()) {
             throw new IllegalArgumentException("Reabrir una evaluación exige un motivo escrito");
@@ -380,6 +383,16 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
         if (postulacion.getEvaluacionId() == null) {
             throw new IllegalStateException("Esta postulación no tiene evaluación que reabrir");
         }
+        // La vacante, bloqueada y antes que la evaluación (V78): la evaluación dura hasta que
+        // la vacante se cierre, así que con la vacante cerrada no hay hasta cuándo reabrirla. El
+        // cierre la bloquea también: si llega a la vez, uno espera al otro, y si reabrir va
+        // primero, el cierre encuentra la evaluación abierta y la vence como a las demás.
+        boolean cerrada = vacantes.bloquear(postulacion.getVacanteId(), postulacion.getOrganizacionId())
+                .map(v -> "CERRADA".equals(v.getEstado()))
+                .orElse(false);
+        if (cerrada) {
+            throw new IllegalStateException(VACANTE_CERRADA_NO_SE_REABRE);
+        }
 
         var evaluacion = evaluaciones.findById(postulacion.getEvaluacionId())
                 .orElseThrow(() -> new IllegalStateException(
@@ -392,22 +405,12 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
                     "Esa evaluación ya fue entregada: reabrirla invalidaría su nota");
         }
 
-        int plazo = dias != null && dias > 0
-                ? dias
-                : parametros.entero(postulacion.getOrganizacionId(), "dias_plazo_evaluacion", 14);
-
-        java.time.Instant vence = java.time.Instant.now()
-                .plus(plazo, java.time.temporal.ChronoUnit.DAYS);
         String venceAntes = String.valueOf(evaluacion.getVenceEn());
 
-        // Si ya la había empezado se respeta: vuelve a EN_CURSO y conserva lo respondido.
+        // Si ya la había empezado se respeta: vuelve a EN_CURSO y conserva lo respondido. Sin
+        // fecha, como nace: dura hasta que la vacante se cierre (V78).
         evaluacion.setEstado(evaluacion.getIniciadaEn() == null ? "PENDIENTE" : "EN_CURSO");
-        evaluacion.setVenceEn(vence);
-        // La vigencia manda sobre el plazo: de nada sirve poder responder si el resultado ya
-        // no vale. Se estira solo si se quedaría corta.
-        if (evaluacion.getVigenteHasta() == null || evaluacion.getVigenteHasta().isBefore(vence)) {
-            evaluacion.setVigenteHasta(vence);
-        }
+        evaluacion.setVenceEn(null);
         evaluaciones.save(evaluacion);
 
         if (!LE_TOCA.equals(postulacion.getEstadoCodigo())) {
@@ -417,11 +420,11 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
         auditoria.registrar(postulacion.getOrganizacionId(), quien,
                 "reabrir_evaluacion", "postulacion", postulacion.getId(),
                 java.util.Map.of("venceEn", venceAntes),
-                java.util.Map.of("venceEn", vence.toString(), "dias", String.valueOf(plazo)),
+                java.util.Map.of("venceEn", "hasta que la vacante se cierre"),
                 motivo);
 
         return new com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.EvaluacionReabierta(
-                postulacion.getId(), postulacion.getEstadoCodigo(), vence, plazo);
+                postulacion.getId(), postulacion.getEstadoCodigo(), null);
     }
 
 

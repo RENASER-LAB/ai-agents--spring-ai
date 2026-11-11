@@ -21,6 +21,7 @@ import com.renaser.ai.ai_engine.perfilintegral.entity.VersionBanco;
 import com.renaser.ai.ai_engine.perfilintegral.repository.CampoCasoRepository;
 import com.renaser.ai.ai_engine.perfilintegral.repository.CriterioBancoRepository;
 import com.renaser.ai.ai_engine.perfilintegral.service.CalificacionPorPuntos;
+import com.renaser.ai.ai_engine.perfilintegral.service.FinDelPerfilIntegral;
 import com.renaser.ai.ai_engine.perfilintegral.service.ReglasDePuntos;
 import com.renaser.ai.ai_engine.perfilintegral.repository.EvaluacionRepository;
 import com.renaser.ai.ai_engine.perfilintegral.repository.OpcionRepository;
@@ -83,15 +84,16 @@ import java.util.stream.Collectors;
 public class ServicioEvaluacionImpl implements ServicioEvaluacion {
 
     /**
-     * Cuántos días tiene el candidato para responder, y de dónde sale ese número.
+     * Cuántos días tiene el candidato para responder el cuestionario técnico CAZATALENTOS, y
+     * de dónde sale ese número.
      *
-     * <p>Estuvo escrito aquí como constante hasta la V22. Cambiarlo obligaba a recompilar y
-     * desplegar, y es justo la clase de número que se mueve: entre que se reabre una tanda y
-     * que sale la invitación pasan días, y cada uno de esos días se le come al candidato.
+     * <p>Estuvo escrito aquí como constante hasta la V22. El valor de verdad vive en el
+     * parámetro {@code dias_plazo_evaluacion} y Renaser lo cambia desde el panel. Este es solo
+     * el respaldo para una base anterior a la V22.
      *
-     * <p>El valor de verdad vive en el parámetro {@code dias_plazo_evaluacion} y Renaser lo
-     * cambia desde el panel. Este es solo el respaldo para una base anterior a la V22, para
-     * que ninguna evaluación nazca sin plazo.
+     * <p>⚠️ <b>Desde la V78 el Perfil Integral ya no lo lee</b>: su evaluación nace sin fecha y
+     * dura hasta que la vacante se cierra ({@code FinDelPerfilIntegral}). El parámetro se queda
+     * solo para el cuestionario técnico, que sigue con sus días y su cronómetro.
      */
     public static final String PARAMETRO_PLAZO = "dias_plazo_evaluacion";
     static final int DIAS_DE_PLAZO_POR_DEFECTO = 14;
@@ -99,6 +101,12 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
     /** Los dos propósitos de un examen: el banco por nivel, o el cuestionario de una vacante (V43). */
     public static final String PERFIL_INTEGRAL = "PERFIL_INTEGRAL";
     public static final String CUESTIONARIO_TECNICO = "CUESTIONARIO_TECNICO";
+
+    /** Lo que lee quien intenta responder o entregar el Perfil Integral de una vacante cerrada (V78). */
+    public static final String VACANTE_CERRADA =
+            "La vacante se cerró y esta evaluación ya no se puede responder.";
+    /** Y quien llega tarde a su cuestionario técnico, que sigue venciendo por su plazo. */
+    static final String PLAZO_PASADO = "El plazo para responder esta evaluación ya pasó";
 
     private final EvaluacionRepository evaluaciones;
     private final PlantillaEvaluacionRepository plantillas;
@@ -119,6 +127,9 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
     private final DuenoDelInstrumento dueno;
     // El orden de los criterios de las preguntas propias, para armar su examen (V66).
     private final CriterioBancoRepository criteriosBanco;
+    // Lo que pasa con el Perfil Integral cuando su vacante se cierra (V78): el sondeo recoge
+    // aquí lo que quedó abierto en una vacante ya cerrada.
+    private final FinDelPerfilIntegral finDelPerfil;
 
     private final SecureRandom azar = new SecureRandom();
 
@@ -129,10 +140,10 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
     // ============ Crear ============
 
     /**
-     * Los días de plazo que rigen ahora mismo para esta organización.
+     * Los días de plazo del cuestionario técnico que rigen ahora mismo para esta organización.
      *
-     * <p>Se lee en cada llamada y no se guarda: si Renaser lo cambia en el panel, la siguiente
-     * evaluación ya nace con el plazo nuevo, sin reiniciar nada.
+     * <p>Se lee en cada llamada y no se guarda: si Renaser lo cambia en el panel, el siguiente
+     * cuestionario ya nace con el plazo nuevo, sin reiniciar nada.
      */
     int diasDePlazo(Long organizacionId) {
         return parametros.entero(organizacionId, PARAMETRO_PLAZO, DIAS_DE_PLAZO_POR_DEFECTO);
@@ -149,13 +160,14 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
         // atado a la suya: su nota nunca cambia sola después (RF-138).
         VersionBanco banco = elBancoQueRinde(organizacionId, nivelPuestoCodigo, versionBancoFijaId);
 
+        // Sin fecha de vencimiento (V78): se responde mientras la vacante esté abierta, y la
+        // vence su cierre. Ver FinDelPerfilIntegral.
         Evaluacion evaluacion = evaluaciones.save(Evaluacion.builder()
                 .organizacionId(organizacionId)
                 .usuarioId(usuarioId)
                 .plantillaEvaluacionId(plantilla.getId())
                 .versionBancoNivelId(banco.getId())
                 .estado("PENDIENTE")
-                .venceEn(Instant.now().plus(diasDePlazo(organizacionId), ChronoUnit.DAYS))
                 .vigenteHasta(Instant.now().plus(
                         plantilla.getVigenciaMeses() * 30L, ChronoUnit.DAYS))
                 .creadoEn(Instant.now())
@@ -206,13 +218,13 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
                 .orElseThrow(() -> new IllegalStateException(
                         "Esta vacante tiene preguntas propias y ninguna versión publicada: no "
                                 + "hay con qué armar la evaluación"));
+        // Sin fecha de vencimiento, como la del banco del nivel (V78).
         Evaluacion evaluacion = evaluaciones.save(Evaluacion.builder()
                 .organizacionId(organizacionId)
                 .usuarioId(usuarioId)
                 .versionBancoNivelId(propias.getId())
                 .proposito(PERFIL_INTEGRAL)
                 .estado("PENDIENTE")
-                .venceEn(Instant.now().plus(diasDePlazo(organizacionId), ChronoUnit.DAYS))
                 .creadoEn(Instant.now())
                 .build());
         return evaluacion.getId();
@@ -320,8 +332,10 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
     @Override
     @Transactional
     public EvaluacionCandidato iniciar(ContextoUsuario quien, UUID uuidPostulacion) {
-        Evaluacion evaluacion = laMia(quien, uuidPostulacion).getRight();
+        var par = laMia(quien, uuidPostulacion);
+        Evaluacion evaluacion = par.getRight();
         exigirAbierta(evaluacion);
+        exigirVacanteAbierta(par.getLeft());
 
         if (evaluacion.getIniciadaEn() == null) {
             armarOrden(evaluacion);
@@ -432,25 +446,29 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
     @Transactional
     public void responderTecnico(ContextoUsuario quien, UUID uuidPostulacion, Long preguntaId,
                                  Responder datos) {
-        responderEn(laMia(quien, uuidPostulacion, CUESTIONARIO_TECNICO).getRight(),
-                preguntaId, datos);
+        Evaluacion evaluacion = laMia(quien, uuidPostulacion, CUESTIONARIO_TECNICO).getRight();
+        exigirAbierta(evaluacion);
+        responderEn(evaluacion, preguntaId, datos);
     }
 
     @Override
     @Transactional
     public void responder(ContextoUsuario quien, UUID uuidPostulacion, Long preguntaId,
                           Responder datos) {
-        responderEn(laMia(quien, uuidPostulacion).getRight(), preguntaId, datos);
+        var par = laMia(quien, uuidPostulacion);
+        exigirAbierta(par.getRight());
+        exigirVacanteAbierta(par.getLeft());
+        responderEn(par.getRight(), preguntaId, datos);
     }
 
     /**
      * Guardar una respuesta en el examen que sea.
      *
      * <p>Lo comparten los dos instrumentos: las reglas de qué se puede responder y cómo son
-     * del formato de la pregunta, no de para qué etapa es el examen.
+     * del formato de la pregunta, no de para qué etapa es el examen. Que siga abierto lo
+     * comprueba antes cada uno, porque cada uno vence por lo suyo (V78).
      */
     private void responderEn(Evaluacion evaluacion, Long preguntaId, Responder datos) {
-        exigirAbierta(evaluacion);
         if (evaluacion.getIniciadaEn() == null) {
             throw new IllegalStateException("Hay que empezar la evaluación antes de responder");
         }
@@ -624,6 +642,10 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
         // esperar (QA-04): moverla a «calificando» no le devuelve el grupo de antes del cambio.
         vacantes.bloquearParaCalificarYReleer(postulacion);
         exigirAbierta(evaluacion);
+        // Ya con la vacante compartida (V78): cerrarla la bloquea, así que si el cierre confirmó
+        // mientras se esperaba, aquí se ve cerrada y la entrega no vale. Si la entrega llegó
+        // antes, es el cierre el que espera, y la encuentra TERMINADA.
+        exigirVacanteAbierta(postulacion);
         exigirQueNadieLaEntregoMientras(evaluacion);
 
         int total = ordenes.findByEvaluacionIdOrderByPosicion(evaluacion.getId()).size();
@@ -744,28 +766,20 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
         }
     }
 
+    /**
+     * El Perfil Integral que quedó abierto en una vacante ya cerrada (V78).
+     *
+     * <p>Hasta la V78 esto vencía las evaluaciones a los 14 días de postular. Ya no tienen fecha:
+     * las vence el cierre de su vacante, en la misma transacción. Lo que recoge el sondeo es lo
+     * que se escapó a eso —una postulación que entró en el mismo instante del cierre— y, la
+     * primera vez tras desplegar, lo que seguía abierto en vacantes cerradas desde antes.
+     *
+     * <p>⚠️ Solo las del perfil integral. Las técnicas tienen su propio barrido, que las ENTREGA
+     * en vez de darlas por vencidas, y siguen con sus días.
+     */
     @Override
-    @Transactional
     public void cerrarVencidas() {
-        // ⚠️ Solo las del perfil integral. Las técnicas tienen su propio barrido, que las
-        // ENTREGA en vez de darlas por vencidas: si cayeran aquí, se marcarían VENCIDA, su
-        // `findByEvaluacionId` no encontraría postulación —cuelgan de la otra columna— y el
-        // candidato se quedaría sin nota y sin cierre, en silencio.
-        for (Evaluacion evaluacion : evaluaciones.findByPropositoAndEstadoInAndVenceEnBefore(
-                PERFIL_INTEGRAL, List.of("PENDIENTE", "EN_CURSO"), Instant.now())) {
-            evaluacion.setEstado("VENCIDA");
-            evaluaciones.save(evaluacion);
-
-            // Solo se cierra lo que sigue vivo. Un candidato que se retiró deja su
-            // evaluación sin responder, y esa evaluación vence igual: sin esta comprobación
-            // se intentaría cerrar una postulación ya cerrada y se le mandaría un segundo
-            // correo diciéndole algo que ya sabe.
-            postulaciones.findByEvaluacionId(evaluacion.getId())
-                    .filter(postulacion -> !maquina.yaTermino(postulacion))
-                    .ifPresent(postulacion ->
-                            maquina.transicionar(postulacion, "CERRADA", null, null,
-                                    true, false, "PLAZO_VENCIDO"));
-        }
+        finDelPerfil.enLasVacantesCerradas();
     }
 
     // ============ Armar el examen ============
@@ -1015,10 +1029,35 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
         return new Par(postulacion, evaluacion);
     }
 
+    /**
+     * Que el examen se pueda seguir respondiendo.
+     *
+     * <p>El cuestionario técnico vence por su fecha: los días de plazo o su cronómetro. El
+     * Perfil Integral no tiene fecha desde la V78 —lo vence el cierre de su vacante, ver
+     * {@link #exigirVacanteAbierta}—, así que de él solo se mira el estado.
+     */
     private void exigirAbierta(Evaluacion evaluacion) {
-        exigirEstadoAbierto(evaluacion.getEstado());
-        if (evaluacion.getVenceEn() != null && Instant.now().isAfter(evaluacion.getVenceEn())) {
-            throw new IllegalStateException("El plazo para responder esta evaluación ya pasó");
+        exigirEstadoAbierto(evaluacion.getEstado(), evaluacion.getProposito());
+        if (CUESTIONARIO_TECNICO.equals(evaluacion.getProposito())
+                && evaluacion.getVenceEn() != null && Instant.now().isAfter(evaluacion.getVenceEn())) {
+            throw new IllegalStateException(PLAZO_PASADO);
+        }
+    }
+
+    /**
+     * Que la vacante del Perfil Integral siga abierta (V78), leído de la base.
+     *
+     * <p>Cerrarla vence la evaluación en la misma transacción, así que casi siempre ya lo dice
+     * su estado. Esto cubre el instante entre los dos y la entrega que esperaba al cerrojo de
+     * la vacante. Una vacante que no se encuentra no frena a nadie: eso lo contesta
+     * {@code laMia} con su 404.
+     */
+    private void exigirVacanteAbierta(Postulacion postulacion) {
+        boolean cerrada = vacantes.estadoDe(postulacion.getVacanteId(), postulacion.getOrganizacionId())
+                .map("CERRADA"::equals)
+                .orElse(false);
+        if (cerrada) {
+            throw new IllegalStateException(VACANTE_CERRADA);
         }
     }
 
@@ -1029,15 +1068,21 @@ public class ServicioEvaluacionImpl implements ServicioEvaluacion {
      * la primera confirme y falla con el mismo error que si hubiera llegado después.
      */
     private void exigirQueNadieLaEntregoMientras(Evaluacion evaluacion) {
-        exigirEstadoAbierto(evaluaciones.estadoBloqueandoLaFila(evaluacion.getId()));
+        exigirEstadoAbierto(evaluaciones.estadoBloqueandoLaFila(evaluacion.getId()),
+                evaluacion.getProposito());
     }
 
-    private static void exigirEstadoAbierto(String estado) {
+    /**
+     * Una vencida se dice distinto según el examen (V78): el cuestionario técnico vence por su
+     * plazo; el Perfil Integral, porque su vacante se cerró.
+     */
+    private static void exigirEstadoAbierto(String estado, String proposito) {
         if ("TERMINADA".equals(estado)) {
             throw new IllegalStateException("Esta evaluación ya fue entregada");
         }
         if ("VENCIDA".equals(estado)) {
-            throw new IllegalStateException("El plazo para responder esta evaluación ya pasó");
+            throw new IllegalStateException(CUESTIONARIO_TECNICO.equals(proposito)
+                    ? PLAZO_PASADO : VACANTE_CERRADA);
         }
     }
 

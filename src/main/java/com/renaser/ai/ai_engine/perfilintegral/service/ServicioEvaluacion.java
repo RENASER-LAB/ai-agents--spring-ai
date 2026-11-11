@@ -22,6 +22,8 @@ public interface ServicioEvaluacion {
      * <p>La versión se fija aquí y no después a propósito: es lo que permite reproducir el
      * examen tal como se rindió aunque el banco cambie (RF-138).
      *
+     * <p>Nace sin fecha de vencimiento (V78): se responde mientras la vacante esté abierta.
+     *
      * @param versionBancoFijaId la versión fija de la vacante, si la tiene (V74): una vacante
      *                           vieja que leía el banco de RENASER rinde siempre esa, aunque
      *                           RENASER haya publicado otra. Vacía, la publicada del nivel de
@@ -63,8 +65,12 @@ public interface ServicioEvaluacion {
     EntregaResponse entregar(ContextoUsuario quien, UUID uuidPostulacion);
 
     /**
-     * Llamado por el sondeo: cierra las evaluaciones cuyo plazo pasó sin que nadie las
-     * entregara. La postulación se cierra con motivo PLAZO_VENCIDO (docs/03-ESTADOS-POSTULACION.md).
+     * Llamado por el sondeo: vence el Perfil Integral que sigue abierto en una vacante ya
+     * cerrada, y cierra con motivo PLAZO_VENCIDO la postulación que lo seguía esperando
+     * (docs/03-ESTADOS-POSTULACION.md).
+     *
+     * <p>Desde la V78 la evaluación no tiene fecha: dura hasta que la vacante se cierra, y es
+     * el cierre el que la vence. Esto recoge lo que se le escapara.
      *
      * <p>Solo las del perfil integral: los cuestionarios técnicos tienen su propio barrido,
      * que los entrega en vez de darlos por vencidos.
