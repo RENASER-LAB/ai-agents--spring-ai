@@ -213,7 +213,7 @@ class FlujoNovedadesWhatsappIT {
 
     @Test
     @Order(3)
-    @DisplayName("AC-16 · la cuenta nueva firma PLATAFORMA 1.2, que nombra el celular, WhatsApp y a Meta")
+    @DisplayName("AC-16 · la cuenta nueva firma la vigente (PLATAFORMA 1.3, V79), que conserva el celular, WhatsApp y Meta de la 1.2")
     void firmaLaVersionNueva() {
         Map<String, Object> firmado = jdbc.queryForMap("""
                 select t.version, t.texto, t.hash, encode(digest(t.texto, 'sha256'), 'hex') as calculado
@@ -222,8 +222,12 @@ class FlujoNovedadesWhatsappIT {
                   join persona p on p.id = c.persona_id
                   join usuario u on u.persona_id = p.id
                  where u.correo = 'ana.whatsapp@correo.pe' and t.tipo = 'PLATAFORMA'""");
-        assertThat(firmado.get("version")).isEqualTo("1.2");
+        assertThat(firmado.get("version")).isEqualTo("1.3");
         assertThat((String) firmado.get("texto"))
+                // La 1.3 solo cambia la cosa (2): el proceso se cierra cuando se cierra la vacante.
+                .contains("(2) cierra mi proceso si la vacante se cierra antes de que termine mi evaluación, "
+                        + "o si se me pasa el plazo que tenía para dar una prueba;")
+                .doesNotContain("para responder una evaluación o una prueba")
                 .contains("mi nombre, mis apellidos, mi correo, mi celular y la provincia donde vivo")
                 .contains("por correo, en el portal y, si yo escribo primero, por WhatsApp desde el número de Renaser")
                 // Con los proveedores, y por eso dentro del permiso del flujo transfronterizo.

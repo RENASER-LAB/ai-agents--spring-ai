@@ -522,8 +522,9 @@ class FlujoPruebaAlInstanteIT {
         conToken(post("/api/v1/panel/plantillas-correo"), tokenTalento, """
                 {"codigo":"RECORDATORIO_EVALUACION","asunto":"Te esperamos: {{aviso}}",
                  "cuerpo":"Hola {{nombre}}. {{aviso}}. Entra: {{enlace}}"}""").andExpect(status().isCreated());
+        // La 1 es la de la V70 y la 2 la de la V79 (sin «siempre antes de que venza»): la del panel es la 3
         assertThat(contar("select count(*) from plantilla_correo where organizacion_id = 1 "
-                + "and codigo = 'RECORDATORIO_EVALUACION' and es_activa and version = 2")).isEqualTo(1);
+                + "and codigo = 'RECORDATORIO_EVALUACION' and es_activa and version = 3")).isEqualTo(1);
 
         // Un turno nuevo para Elena —se le reabre la evaluación— y su recordatorio sale con el texto nuevo
         long elena = postulacion.get("elena");
