@@ -136,11 +136,12 @@ public final class DtosPerfilIntegral {
      * alguien con 88 y ninguno, y ordenar solo por número escondería justo eso.
      */
     /**
-     * Lo que devuelve reabrir una evaluación: hasta cuándo tiene ahora, y en qué estado
-     * quedó la postulación.
+     * Lo que devuelve reabrir una evaluación: en qué estado quedó la postulación. Desde la V78
+     * {@code venceEn} viaja vacío —la evaluación dura hasta que la vacante se cierre— y los
+     * días de plazo ya no existen.
      */
     public record EvaluacionReabierta(Long postulacionId, String estado,
-                                      java.time.Instant venceEn, int diasDePlazo) {}
+                                      java.time.Instant venceEn) {}
 
     /**
      * La tanda entera de una vacante, ordenada de más apto a menos.

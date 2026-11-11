@@ -23,7 +23,7 @@ Sirve para tres cosas:
 - **Entender el sistema.** Un modelo de datos bien contado explica el negocio mejor que
   cualquier otro documento.
 
-**La base ya está construida.** Las migraciones `V1` a `V77` viven en
+**La base ya está construida.** Las migraciones `V1` a `V78` viven en
 `src/main/resources/db/migration` —**125 tablas de este módulo**, 128 en la base contando la de
 Flyway y las dos del motor de agentes— y Flyway es el dueño del esquema. Cambiar algo de aquí
 ya cuesta una migración nueva, y **una migración aplicada no se edita nunca**: se escribe otra
@@ -271,6 +271,17 @@ que el bot pueda consultarlo 30 días; `evento_whatsapp` es la bandeja de salida
 triggers que la mueven **solo cuando cambia de verdad un dato que la consulta del bot cuenta**:
 así la consulta sabe la fecha real del último cambio. Ver «Novedades por WhatsApp», más abajo, y
 [el contrato v2](CONTRATO-CONTEXTO-Y-RESULTADOS-POR-WHATSAPP-V2.md).
+
+La `V78` (10/11/2026) **no añade ninguna columna**: hace que el Perfil Integral dure hasta que la
+vacante se cierre. `vacante.cierra_en` pasa a mandar con `tipo_cierre = 'FECHA'` —las 23:59:59 de
+Lima del día elegido, cuando el sondeo la cierra sola— y `PLAZAS` deja de guardarse. La migración
+pasa a Permanente las vacantes «Por plazas» y las publicadas con la fecha ya pasada, lleva las
+fechas guardadas a las 23:59:59 de Lima de su día, quita la fecha a las evaluaciones del Perfil
+Integral abiertas en vacantes publicadas y reescribe la descripción de `dias_plazo_evaluacion`,
+que queda para el cuestionario técnico. Las evaluaciones abiertas en vacantes ya cerradas las
+vence la aplicación, no la migración, porque cerrar su postulación lleva los avisos de siempre.
+Ver [Estados de la postulación](03-ESTADOS-POSTULACION.md), «Se cierra la convocatoria», y el
+[Diccionario de datos](07-DICCIONARIO-DE-DATOS.md).
 
 La `V54` (14/09/2026) **no añade ninguna tabla y cambia quién firma qué**. Hasta ella había dos
 tipos de texto —`PROCESO` y `FUTUROS_CONTACTOS`— y el de la cuenta usaba el primero, que habla de
@@ -812,11 +823,14 @@ agente que la produjo.
 | `barrera_critica` | Lo que ningún promedio alto compensa, definido por vacante | vacante_id, descripcion, es_activa |
 | `evaluador_estandar` | Quién revisa que la urgencia no baje el nivel, en esta vacante | vacante_id, usuario_id, puede_bloquear, asignado_por_usuario_id |
 
-`tipo_cierre` tiene tres valores: con fecha, hasta cubrir plazas, o permanente para alimentar el
-Radar.
+`tipo_cierre` tiene dos valores desde la `V78`: `PERMANENTE`, que cierra a mano alguien del
+equipo, y `FECHA`, que se cierra sola en `cierra_en`. El tercero, hasta cubrir plazas, ya no se
+guarda; el CHECK lo admite por las filas de antes y la migración las pasó a Permanente.
 
-Cerrar una vacante **detiene las postulaciones nuevas pero no cierra las que van a mitad**. Eso
-lo decide una persona, candidato por candidato.
+Cerrar una vacante **detiene las postulaciones nuevas y no mueve a quien ya está en otra etapa**:
+eso lo decide una persona, candidato por candidato. Desde la `V78` sí cierra, con
+`PLAZO_VENCIDO`, a quien seguía esperando su Perfil Integral sin entregar, y vence esas
+evaluaciones.
 
 El `requisito_objetivo` guarda la **regla exacta** que se aplicó, no solo su descripción: hay que
 poder demostrar por qué se detuvo esa postulación.
@@ -1068,7 +1082,9 @@ Esta área es la que cuelga del usuario y no de la postulación.
 | `resultado_alineacion` | El semáforo de cada uno de los tres bloques | evaluacion_id, bloque, semaforo |
 | `alerta` | Contradicciones y respuestas demasiado ideales | postulacion_id, tipo, descripcion, pregunta_a_id, pregunta_b_id, confirmada_por_usuario_id |
 
-`vence_en` es nuevo: la evaluación ahora **tiene plazo**, que fija quien crea la convocatoria.
+`vence_en` es el plazo de la evaluación. **Desde la `V78` el Perfil Integral nace sin él**: dura
+hasta que la vacante se cierra, y al cerrarse la que no se entregó queda `VENCIDA` con el momento
+del cierre aquí. El cuestionario técnico CAZATALENTOS sigue con sus días.
 `vigente_hasta` es distinto: dice hasta cuándo se puede reutilizar lo respondido en otra vacante.
 
 Las repreguntas son dos tablas y no columnas sueltas porque puede haber varias por respuesta, y

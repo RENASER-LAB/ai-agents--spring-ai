@@ -241,6 +241,28 @@ public interface VacanteRepository extends JpaRepository<Vacante, Long>, Cerrojo
     boolean existsBySolicitudTalentoId(Long solicitudTalentoId);
 
     /**
+     * Las publicadas con fecha límite que ya llegó a su fecha (V78): las que el sondeo cierra.
+     *
+     * <p>Solo para saber cuáles mirar: cada una se cierra después con su fila bloqueada y todo
+     * vuelto a comprobar ({@code CierreDeLaVacante}). Una eliminada no sale (V60); una en
+     * borrador tampoco, porque no se cierra sola.
+     */
+    @Query("select v from Vacante v where v.estado = 'PUBLICADA' and v.tipoCierre = 'FECHA' "
+            + "and v.cierraEn <= :ahora and v.eliminadaEn is null order by v.cierraEn, v.id")
+    List<Vacante> queLlegaronASuFecha(@Param("ahora") Instant ahora);
+
+    /**
+     * El estado de esa vacante de esa empresa, leído de la base y no de la entidad cargada
+     * (V78).
+     *
+     * <p>Para quien responde o entrega el Perfil Integral: después de esperar al cerrojo de la
+     * vacante tiene que ver si el cierre confirmó mientras tanto, y una entidad ya cargada en
+     * la transacción diría lo de antes.
+     */
+    @Query("select v.estado from Vacante v where v.id = :id and v.organizacionId = :organizacionId")
+    Optional<String> estadoDe(@Param("id") Long id, @Param("organizacionId") Long organizacionId);
+
+    /**
      * Cuántas vacantes vivas usa cada cargo de la empresa: el aviso de renombrar lo dice antes
      * de guardar, porque el nombre nuevo sale en todas (V64).
      */

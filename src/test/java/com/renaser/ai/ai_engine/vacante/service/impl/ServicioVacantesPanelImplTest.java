@@ -33,6 +33,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.junit.jupiter.api.Nested;
 import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -285,7 +286,7 @@ class ServicioVacantesPanelImplTest {
 
     private GuardarVacante guardar(Long puestoId) {
         return new GuardarVacante(30L, puestoId, "Coordinador de sede", "Descripción",
-                null, null, null, null, null, null, null, null, "MANUAL", 1,
+                null, null, null, null, null, null, null, null, "PERMANENTE", null,
                 null, null, QUIEN.usuarioId(), null);
     }
 
@@ -1360,5 +1361,152 @@ class ServicioVacantesPanelImplTest {
         assertThat(v.getInstrumentoEtapaTecnica()).isEqualTo("PRUEBA_PROPIA");
         assertThat(v.getVersionPlantillaPruebaId()).isNull();
         verify(vacantes, never()).save(any(Vacante.class));
+    }
+
+    // ============ Cómo se cierra (V78) ============
+
+    /**
+     * «Cómo se cierra» con dos formas, Permanente y Fecha límite, y la fecha guardada a las
+     * 23:59:59 de Lima de su día (specs/Ready/perfil-integral-hasta-el-cierre-de-la-vacante).
+     * La API rechaza lo mismo que el formulario, también si el pedido no pasa por él (AC-02).
+     */
+    @Nested
+    @DisplayName("Cómo se cierra la vacante (V78)")
+    class ComoSeCierra {
+
+        private final java.time.ZoneId lima = java.time.ZoneId.of("America/Lima");
+
+        /** Un día de Lima a tantos días de hoy: las fechas quemadas caducan solas. */
+        private java.time.LocalDate enDias(int dias) {
+            return java.time.LocalDate.now(lima).plusDays(dias);
+        }
+
+        private Instant finDelDiaEnLima(java.time.LocalDate dia) {
+            return dia.atTime(23, 59, 59).atZone(lima).toInstant();
+        }
+
+        private GuardarVacante conCierre(String tipoCierre, Instant cierraEn) {
+            return new GuardarVacante(30L, null, "Coordinador de sede", "Descripción",
+                    null, null, null, null, null, null, null, null, tipoCierre, 3,
+                    null, cierraEn, QUIEN.usuarioId(), null);
+        }
+
+        private void sePuedeCrear() {
+            when(solicitudes.findByIdAndOrganizacionId(30L, ORGANIZACION))
+                    .thenReturn(Optional.of(solicitud(PUESTO)));
+            when(puestos.findByIdAndOrganizacionId(PUESTO, ORGANIZACION))
+                    .thenReturn(Optional.of(puestoActivo()));
+            when(versionesPesos.findFirstByOrganizacionIdAndEstadoOrderByPublicadaEnDesc(
+                    ORGANIZACION, "PUBLICADA"))
+                    .thenReturn(Optional.of(VersionPesos.builder().id(VERSION_PESOS).build()));
+        }
+
+        private Vacante creada(GuardarVacante datos) {
+            sePuedeCrear();
+            when(vacantes.save(any())).thenAnswer(invocacion -> invocacion.getArgument(0));
+            servicio.crear(QUIEN, datos);
+            ArgumentCaptor<Vacante> guardada = ArgumentCaptor.forClass(Vacante.class);
+            verify(vacantes).save(guardada.capture());
+            return guardada.getValue();
+        }
+
+        @Test
+        @DisplayName("con fecha límite se guarda ese día a las 23:59:59 de Lima, llegue como llegue (AC-03)")
+        void conFechaSeGuardaAlFinalDelDiaEnLima() {
+            java.time.LocalDate dia = enDias(21);
+            // Como lo mandaba el panel de antes: la medianoche UTC de ese día
+            Vacante v = creada(conCierre("FECHA", dia.atStartOfDay(java.time.ZoneOffset.UTC).toInstant()));
+
+            assertThat(v.getTipoCierre()).isEqualTo("FECHA");
+            assertThat(v.getCierraEn()).isEqualTo(finDelDiaEnLima(dia));
+            // «Por plazas» desapareció: unas plazas en el cuerpo no se guardan
+            assertThat(v.getPlazas()).isNull();
+        }
+
+        @Test
+        @DisplayName("Permanente no guarda ninguna fecha, aunque llegue una")
+        void permanenteSinFecha() {
+            Vacante v = creada(conCierre("PERMANENTE", finDelDiaEnLima(enDias(5))));
+
+            assertThat(v.getTipoCierre()).isEqualTo("PERMANENTE");
+            assertThat(v.getCierraEn()).isNull();
+        }
+
+        @Test
+        @DisplayName("sin día, con un día pasado o «Por plazas», no se crea nada (AC-01, AC-02)")
+        void loQueNoSeAdmite() {
+            sePuedeCrear();
+
+            assertThatThrownBy(() -> servicio.crear(QUIEN, conCierre("FECHA", null)))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("Elige el día en que cierra la vacante.");
+            assertThatThrownBy(() -> servicio.crear(QUIEN,
+                    conCierre("FECHA", finDelDiaEnLima(enDias(-1)))))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("Esa fecha ya pasó: elige un día a partir de hoy.");
+            assertThatThrownBy(() -> servicio.crear(QUIEN, conCierre("PLAZAS", null)))
+                    .isInstanceOf(IllegalArgumentException.class)
+                    .hasMessage("Elige cómo se cierra la vacante: Permanente o Fecha límite.");
+            verify(vacantes, never()).save(any());
+            verify(solicitudes, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("al publicar se exige una fecha que no haya pasado: el borrador no se cerró solo")
+        void publicarConLaFechaPasada() {
+            Vacante v = vacante("BORRADOR", false, null);
+            v.setTipoCierre("FECHA");
+            v.setCierraEn(finDelDiaEnLima(enDias(-2)));
+
+            assertThatThrownBy(() -> servicio.publicar(QUIEN, VACANTE))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("Esa fecha ya pasó: elige un día a partir de hoy.");
+            assertThat(v.getEstado()).isEqualTo("BORRADOR");
+
+            v.setCierraEn(null);
+            assertThatThrownBy(() -> servicio.publicar(QUIEN, VACANTE))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("Elige el día en que cierra la vacante.");
+            verify(vacantes, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("con la fecha de hoy se publica: se cierra esta noche a las 23:59")
+        void publicarConLaFechaDeHoy() {
+            Vacante v = vacante("BORRADOR", false, null);
+            v.setTipoCierre("FECHA");
+            v.setCierraEn(finDelDiaEnLima(enDias(0)));
+
+            servicio.publicar(QUIEN, VACANTE);
+
+            assertThat(v.getEstado()).isEqualTo("PUBLICADA");
+        }
+
+        @Test
+        @DisplayName("cerrar a mano lo hace la pieza del cierre, con quien la cierra y su motivo")
+        void cerrarDelegaEnElCierre() {
+            Vacante v = vacante("PUBLICADA", true, null);
+            com.renaser.ai.ai_engine.vacante.service.CierreDeLaVacante cierre =
+                    org.mockito.Mockito.mock(com.renaser.ai.ai_engine.vacante.service.CierreDeLaVacante.class);
+            servicio.setCierre(cierre);
+
+            servicio.cerrar(QUIEN, VACANTE, "Ya contratamos");
+
+            verify(cierre).cerrar(v, QUIEN, "Ya contratamos");
+        }
+
+        @Test
+        @DisplayName("cerrar una ya cerrada se rechaza como siempre, sin volver a cerrarla")
+        void cerrarUnaCerradaSeRechaza() {
+            vacante("CERRADA", true, null);
+            com.renaser.ai.ai_engine.vacante.service.CierreDeLaVacante cierre =
+                    org.mockito.Mockito.mock(com.renaser.ai.ai_engine.vacante.service.CierreDeLaVacante.class);
+            servicio.setCierre(cierre);
+
+            assertThatThrownBy(() -> servicio.cerrar(QUIEN, VACANTE, "otra vez"))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("La vacante ya está cerrada");
+            org.mockito.Mockito.verifyNoInteractions(cierre);
+        }
     }
 }

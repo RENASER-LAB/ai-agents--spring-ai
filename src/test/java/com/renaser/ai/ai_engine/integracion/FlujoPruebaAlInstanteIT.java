@@ -469,15 +469,29 @@ class FlujoPruebaAlInstanteIT {
         assertThat(asuntoDe("ana", "RECORDATORIO_PRUEBA")).endsWith(FechaParaElCandidato.dicha(nueva));
     }
 
+    /**
+     * Desde la V78 el banco no tiene fecha —dura hasta que la vacante se cierra—, así que su
+     * recordatorio «vence el …» no sale nunca: solo el primero. El interruptor de la empresa y
+     * el archivo se siguen comprobando con ese primero, sobre un turno nuevo de Elena.
+     */
     @Test
     @Order(14)
-    @DisplayName("Con la empresa apagada o la vacante archivada no sale; encendida, sale el del banco (AC-14, AC-16)")
+    @DisplayName("Con la empresa apagada o la vacante archivada no sale; encendida, sale el del banco, "
+            + "y nunca uno que diga «vence el» (AC-14, AC-16; V78 AC-08)")
     void apagadosOArchivadaNada() {
         long elena = postulacion.get("elena");
-        Instant vence = jdbc.queryForObject("""
+        assertThat(jdbc.queryForObject("""
                 select e.vence_en from evaluacion e join postulacion p on p.evaluacion_id = e.id
-                 where p.id = ?""", Timestamp.class, elena).toInstant();
-        Instant ahora = CalendarioDeRecordatorios.enFranja(vence.minus(Duration.ofHours(24)));
+                 where p.id = ?""", Timestamp.class, elena)).as("el banco nace sin fecha (V78)").isNull();
+        jdbc.update("""
+                insert into transicion_estado (postulacion_id, estado_anterior_codigo, estado_nuevo_codigo,
+                                               es_sistema, aviso_al_candidato, ocurrida_en)
+                values (?, 'PERFIL_TURNO_CANDIDATO', 'PERFIL_TURNO_CANDIDATO', true, 'CORREO', now())""",
+                elena);
+        Instant ahora = diurno(Instant.now().plus(Duration.ofHours(25)));
+        String suyos = "select count(*) from recordatorio_enviado where postulacion_id = " + elena
+                + " and tipo = 'TRAS_ENTRAR'";
+        int antes = contar(suyos);
 
         jdbc.update("update parametro set valor = 'false' where organizacion_id = 1 "
                 + "and codigo = 'recordatorios_activos'");
@@ -487,13 +501,18 @@ class FlujoPruebaAlInstanteIT {
         jdbc.update("update vacante set estado = 'CERRADA', archivada_en = now() where id = ?", conBanco);
         recordatorios.enviarPendientes(ahora);
         jdbc.update("update vacante set estado = 'PUBLICADA', archivada_en = null where id = ?", conBanco);
-        assertThat(contar("select count(*) from recordatorio_enviado where postulacion_id = " + elena
-                + " and tipo = 'ANTES_DEL_PLAZO'")).isZero();
+        assertThat(contar(suyos)).isEqualTo(antes);
 
         recordatorios.enviarPendientes(ahora);
+        assertThat(contar(suyos)).isEqualTo(antes + 1);
         assertThat(asuntoDe("elena", "RECORDATORIO_EVALUACION"))
-                .isEqualTo("Tu evaluación para Administrador de tienda vence el "
-                        + FechaParaElCandidato.dicha(vence));
+                .isEqualTo("Aún no has respondido tu evaluación para Administrador de tienda");
+
+        // Ni a los diez días: sin fecha no hay «vence el»
+        recordatorios.enviarPendientes(diurno(Instant.now().plus(Duration.ofDays(10))));
+        assertThat(contar("select count(*) from recordatorio_enviado where postulacion_id = " + elena
+                + " and tipo = 'ANTES_DEL_PLAZO'")).isZero();
+        assertThat(asuntoDe("elena", "RECORDATORIO_EVALUACION")).doesNotContain("vence el");
     }
 
     @Test

@@ -102,8 +102,11 @@ se aplicó. **El currículum no descarta a nadie.**
 El currículum, el módulo psicométrico y la evaluación son **una sola etapa**, no tres filtros.
 Para el candidato es una sola experiencia.
 
-Esta etapa **sí tiene fecha límite**: quien crea la convocatoria fija hasta cuándo se puede
-empezar y hasta cuándo se puede terminar.
+**Desde la `V78` (10/11/2026) la evaluación de esta etapa no tiene fecha propia: se responde
+mientras la vacante esté abierta.** Nace sin vencimiento y la vence el cierre de la vacante, a
+mano o por su fecha límite (ver «Se cierra la convocatoria»). Hasta entonces vencía a los 14 días
+de postular (`dias_plazo_evaluacion`), aunque la vacante siguiera recibiendo gente; ese parámetro
+queda solo para el cuestionario técnico CAZATALENTOS. El candidato no ve ninguna fecha.
 
 ### Etapa 3 — Prueba del puesto
 
@@ -222,7 +225,7 @@ Cada uno guarda además su **motivo**:
 | Estado | Motivos posibles |
 |---|---|
 | `NO_CONTINUA` | Requisito objetivo no cumplido · Barrera crítica confirmada · Decisión roja · Decisión de una persona · **Pasa a reserva** |
-| `CERRADA` | Sin avanzar 60 días (configurable) · Cierre manual · **El candidato se retiró** · Se acabó el plazo de la evaluación · Pidió borrar sus datos · **Se eliminó la vacante** |
+| `CERRADA` | Sin avanzar 60 días (configurable) · Cierre manual · **El candidato se retiró** · Se acabó el plazo de la evaluación (desde la `V78`, la vacante se cerró sin que la terminara) · Pidió borrar sus datos · **Se eliminó la vacante** |
 
 Así son 2 estados con motivo, en vez de 10 estados.
 
@@ -445,19 +448,29 @@ decisión sobre su candidatura se tomaba automáticamente, y era falso.
 | Qué se mueve solo | Cuándo | ¿Se puede apagar? |
 |---|---|---|
 | La postulación se cierra al postular, porque el candidato declaró que no cumple un requisito indispensable | En el momento de enviarla | No. Es la regla de los requisitos objetivos |
-| El proceso se cierra porque se acabó el plazo de una evaluación o de una prueba | Un sondeo que corre cada 60 segundos | **No tiene interruptor** |
+| El proceso se cierra porque la vacante se cerró —a mano o por su fecha— sin que terminara el Perfil Integral (desde la `V78`; antes, a los 14 días de postular), o porque se acabó el plazo de una prueba | Al cerrarse la vacante, o como mucho en la vuelta siguiente del sondeo, que corre cada 60 segundos | **No tiene interruptor** |
 | La postulación pasa a la etapa siguiente sin esperar a nadie | Solo con «calificar y avanzar sola» encendido **y si su nota del Perfil Integral llega a la mínima** de la vacante | Sí: el interruptor de la vacante |
+| La vacante se cierra sola al llegar su fecha límite, a las 23:59 de Lima del día elegido (`V78`), con el sistema como autor y el motivo «Llegó la fecha de cierre» | El mismo sondeo, cada 60 segundos | Sí, por vacante: con «Permanente» no se cierra sola |
 
 **Solo la tercera depende de una nota, y nunca para descartar** (desde el 12/10/2026). Una nota
 baja no cierra nada: quien no llega a la mínima espera a que una persona revise su caso. Por eso
 el texto legal sigue diciendo «ninguna nota te contrata ni te descarta por sí sola». En
-cualquiera de las tres, el candidato puede escribir y pedir que una persona lo revise.
+cualquiera de ellas, el candidato puede escribir y pedir que una persona lo revise.
 
 El texto legal lo dice desde la versión **1.1 de `PLATAFORMA`** (V72), que firman las cuentas
 nuevas: «me pasa a la etapa siguiente sin esperar a nadie cuando la empresa configuró su vacante
 para avanzar sola y mi nota del Perfil Integral llega a la mínima que fijó; si no llega, no me
 descarta: una persona revisa mi caso». Quien firmó la 1.0 sigue ligado a ella y no se le pide
 aceptar otra vez. La página pública de privacidad del portal dice lo mismo.
+
+⚠️ **Desde la `V78` la página pública dice algo más preciso que el texto firmado.** La página
+dice que el proceso se cierra «si la vacante se cierra antes de que termines tu evaluación, o si
+se te pasa el plazo que tenías para dar una prueba». El texto `PLATAFORMA` vigente (1.2, `V73`)
+sigue diciendo «si se me pasa el plazo que tenía para responder una evaluación o una prueba»: para
+el Perfil Integral ese plazo es ahora el cierre de la vacante. Ninguno de los dos nombra la
+cuarta fila, el cierre de la vacante por su fecha: lo que le llega al candidato es su efecto, que
+es la segunda. Cambiar las palabras firmadas exige publicar una versión nueva del texto, y eso
+quedó fuera de esta entrega.
 
 ---
 
@@ -551,7 +564,7 @@ recibe ninguno.
 | Recordatorio | Cuándo sale |
 |---|---|
 | El primero | A las 24 horas de entrar en el turno |
-| El del plazo | 24 horas antes de que venza el plazo que rija: el del banco, o el de la prueba (su fecha propia o la de la vacante) |
+| El del plazo | 24 horas antes de que venza el plazo de la prueba (su fecha propia o la de la vacante). **Desde la `V78` el banco no recibe este**: el Perfil Integral no tiene fecha, y un recordatorio que diga «vence el…» no sale nunca |
 
 - Cada uno sale **por correo y en la campana**, con el enlace al portal, y **una vez por turno**.
   El del plazo, una vez por turno y por fecha: si la fecha se mueve después, puede volver a salir
@@ -698,16 +711,58 @@ Hay tres formas de cerrarla sola o a mano:
 3. **El candidato la retira** desde su portal.
 
 En los tres casos termina en `CERRADA` con su motivo. Y hay una cuarta que sí depende del
-candidato: si se acaba el plazo para completar la evaluación sin que la haya terminado.
+candidato: si la vacante se cierra sin que haya terminado el Perfil Integral (desde la `V78`;
+antes, si se le acababan los 14 días para completarlo). Ver «Se cierra la convocatoria».
 
 ### Se cierra la convocatoria
 
-Cerrar una vacante **detiene las postulaciones nuevas, pero no cierra las que están en marcha**.
-El equipo decide, candidato por candidato, si continúa el proceso, lo detiene, o lo manda al
-Radar de Talento cuando hay consentimiento válido para futuros contactos.
+Cerrar una vacante **detiene las postulaciones nuevas, y la vacante sale del tablón**. A quien
+ya entregó el Perfil Integral o está en otra etapa no lo mueve: el equipo decide, candidato por
+candidato, si continúa el proceso, lo detiene, o lo manda al Radar de Talento cuando hay
+consentimiento válido para futuros contactos. La prueba del puesto conserva su propia fecha
+límite.
 
-Esto cambió respecto de versiones anteriores de este documento, donde el cierre de la vacante
-arrastraba a todas las postulaciones a la vez.
+**Se cierra de dos formas** (`V78`, 10/11/2026), según lo que el equipo eligió en «Cómo se
+cierra» al crear la vacante:
+
+| Forma | Quién la cierra |
+|---|---|
+| **Permanente** (por defecto) | Alguien del equipo, a mano, con su motivo |
+| **Fecha límite** | Alguien del equipo, a mano, o **sola**: ese día a las 23:59:59 de Lima, como mucho un minuto después, por el sondeo de vencimientos, con el sistema como autor y el motivo «Llegó la fecha de cierre» en la auditoría |
+
+«Por plazas» ya no existe: la `V78` pasó a Permanente las vacantes que lo tenían, y también las
+publicadas cuya fecha ya había pasado, para que no se cerraran solas al desplegar. Una vacante en
+borrador no se cierra sola; al publicarla se le exige una fecha que no haya pasado.
+
+**Al cerrarse, por cualquiera de las dos vías, el Perfil Integral sin terminar vence.** En la
+misma transacción del cierre:
+
+- cada evaluación del Perfil Integral de esa vacante sin entregar —sin empezar o a medias— pasa a
+  `VENCIDA`, con el momento del cierre como su límite. Lo respondido a medias no se califica;
+- la postulación que seguía esperándola (`PERFIL_TURNO_CANDIDATO`) pasa a `CERRADA` con
+  `PLAZO_VENCIDO`, como transición del sistema, con los avisos de siempre: el correo
+  `POSTULACION_CERRADA` y la campana. Con el productor v2 de WhatsApp encendido recibe el
+  resultado de su cierre, y no el aviso `CONVOCATORIA_CERRADA` («tu postulación sigue»), que ya
+  no sería cierto: ese sale después, solo a quien sigue en carrera;
+- si el equipo ya la había movido a otra etapa, o la persona se retiró o quedó fuera, su
+  evaluación pasa a `VENCIDA` y la postulación no se toca ni se avisa a nadie.
+
+Repetirlo no hace nada: cerrar una vacante ya cerrada se rechaza, y si el sondeo pasa dos veces
+nadie recibe dos avisos. Lo que quedara abierto en una vacante ya cerrada —una postulación que
+entró en el mismo instante, o las evaluaciones que seguían abiertas al desplegar la `V78`— lo
+vence el sondeo en su vuelta siguiente, con la misma regla y los mismos avisos. Las postulaciones
+que ya se habían cerrado por los 14 días de antes no se reabren.
+
+**Quien tenía la evaluación abierta** y guarda, empieza o entrega después del cierre recibe un
+409: «La vacante se cerró y esta evaluación ya no se puede responder.». Si su entrega se confirmó
+antes que el cierre, vale y su postulación sigue. Reabrir una evaluación —solo por la API del
+panel, sin pantalla— la deja abierta sin fecha, hasta que la vacante se cierre; con la vacante
+cerrada se rechaza (ver [Las APIs](09-APIS.md), «Postulaciones»).
+
+Hasta la `V78`, cerrar la vacante solo frenaba las postulaciones nuevas: quien estaba
+respondiendo conservaba sus 14 días y podía terminar después del cierre. Y en versiones más
+antiguas de este documento el cierre arrastraba a todas las postulaciones a la vez; eso no ha
+vuelto: solo se cierra a quien seguía esperando el Perfil Integral.
 
 ### Se elimina la convocatoria
 

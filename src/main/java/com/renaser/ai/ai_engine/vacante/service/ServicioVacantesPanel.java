@@ -197,7 +197,11 @@ public interface ServicioVacantesPanel {
     CierrePruebaResponse definirCierrePrueba(ContextoUsuario quien, Long vacanteId,
                                              DefinirCierrePrueba datos);
 
-    // Cerrar detiene postulaciones nuevas; las que están en marcha se deciden una a una
+    /**
+     * Cerrar detiene postulaciones nuevas y retira la vacante del tablón. Las que están en
+     * otra etapa se deciden una a una; el Perfil Integral sin terminar vence y quien lo seguía
+     * esperando queda cerrado con {@code PLAZO_VENCIDO} (V78). Ver {@code CierreDeLaVacante}.
+     */
     void cerrar(ContextoUsuario quien, Long id, String motivo);
 
     /**

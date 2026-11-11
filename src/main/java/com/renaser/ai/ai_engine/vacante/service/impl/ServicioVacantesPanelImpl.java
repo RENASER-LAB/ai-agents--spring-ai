@@ -13,6 +13,8 @@ import com.renaser.ai.ai_engine.postulacion.service.MaquinaEstados;
 import com.renaser.ai.ai_engine.postulacion.service.PostulacionesEnCarrera;
 import com.renaser.ai.ai_engine.vacante.service.AlcanceSobreLaVacante;
 import com.renaser.ai.ai_engine.vacante.service.CambiosDeLaVacante;
+import com.renaser.ai.ai_engine.vacante.service.CierreDeLaVacante;
+import com.renaser.ai.ai_engine.vacante.service.FormaDeCierre;
 import com.renaser.ai.ai_engine.vacante.service.Remuneracion;
 import com.renaser.ai.ai_engine.vacante.service.ServicioVacantesPanel;
 import com.renaser.ai.ai_engine.vacante.service.VacanteArchivada;
@@ -182,15 +184,18 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
     private final com.renaser.ai.ai_engine.prueba.service.FechaLimiteDeLaVacante fechaLimite;
 
     /**
-     * El aviso de convocatoria cerrada por WhatsApp (V76, contrato v2). Por setter y opcional, como
-     * el WhatsApp de la máquina de estados: las pruebas de la vacante no lo necesitan, y con el
-     * productor v2 apagado no escribe nada.
+     * Cerrar la vacante y lo que arrastra (V78): el Perfil Integral sin terminar vence, quien lo
+     * esperaba queda cerrado y, después, el aviso de convocatoria cerrada por WhatsApp a quien
+     * sigue. La misma pieza cierra las de fecha límite desde el sondeo.
+     *
+     * <p>Por setter, como el WhatsApp que tenía antes este servicio: las pruebas de la vacante
+     * construyen el servicio a mano y la mayoría no cierra nada.
      */
-    private com.renaser.ai.ai_engine.whatsapp.service.ResultadosPorWhatsapp whatsapp;
+    private CierreDeLaVacante cierre;
 
-    @org.springframework.beans.factory.annotation.Autowired(required = false)
-    void setWhatsapp(com.renaser.ai.ai_engine.whatsapp.service.ResultadosPorWhatsapp whatsapp) {
-        this.whatsapp = whatsapp;
+    @org.springframework.beans.factory.annotation.Autowired
+    void setCierre(CierreDeLaVacante cierre) {
+        this.cierre = cierre;
     }
 
     /** Lo que contesta la API a un código de ciudad que el catálogo no ofrece (V62). */
@@ -293,6 +298,14 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
         // La ciudad, también antes de construir nada: un código que no es del catálogo no
         // deja ni media vacante guardada (V62).
         String ciudad = ciudadValidada(opcional(datos.ciudadUbigeo()), null);
+        // Y cómo se cierra (V78): Permanente o Fecha límite, con un día que no haya pasado. Se
+        // guarda a las 23:59:59 de Lima de ese día, que es cuando el sondeo la cerrará.
+        String faltaDelCierre = FormaDeCierre.falta(datos.tipoCierre(), datos.cierraEn(),
+                Instant.now());
+        if (faltaDelCierre != null) {
+            throw new IllegalArgumentException(faltaDelCierre);
+        }
+        boolean porFecha = FormaDeCierre.esPorFecha(datos.tipoCierre());
 
         Vacante vacante = vacantes.save(Vacante.builder()
                 .organizacionId(quien.organizacionId())
@@ -312,10 +325,9 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                 .remuneracionMax(sueldoOculto || Remuneracion.FIJA.equals(sueldo.tipo())
                         ? null : sueldo.max())
                 .remuneracionMoneda(monedaSueldo)
-                .tipoCierre(datos.tipoCierre())
-                .plazas(datos.plazas())
+                .tipoCierre(porFecha ? FormaDeCierre.FECHA : FormaDeCierre.PERMANENTE)
                 .abreEn(datos.abreEn())
-                .cierraEn(datos.cierraEn())
+                .cierraEn(porFecha ? FormaDeCierre.alFinalDelDia(datos.cierraEn()) : null)
                 .estado("BORRADOR")
                 .versionPesosId(pesos.getId())
                 // De dónde salen sus preguntas (V66): toda vacante nueva nace con sus preguntas
@@ -397,6 +409,13 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
         if (ESTADO_CERRADA.equals(vacante.getEstado())) {
             throw new IllegalStateException("Una vacante cerrada no se edita");
         }
+        // Cómo se cierra, también antes de tocar nada (V78). La fecha se puede mover o quitar
+        // con la vacante publicada, pero no a un día que ya pasó.
+        String faltaDelCierre = FormaDeCierre.falta(datos.tipoCierre(), datos.cierraEn(),
+                Instant.now());
+        if (faltaDelCierre != null) {
+            throw new IllegalArgumentException(faltaDelCierre);
+        }
 
         // El sueldo, validado ANTES de tocar la entidad: si el rango está al revés o la
         // vacante publicada intenta esconder lo que paga, no se guarda ni una coma del resto.
@@ -439,7 +458,7 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
             // guardado le anunciaría al candidato una novedad que no existe.
             escribirRemuneracion(vacante, sueldo, Instant.now());
         }
-        vacante.setTipoCierre(datos.tipoCierre());
+        vacante.setTipoCierre(CambiosDeLaVacante.limpio(datos.tipoCierre()));
         // Las dos que dependen de la forma de cierre se escriben tal como las calculó la
         // comparación, y no leyendo otra vez el cuerpo: si lo comparado y lo guardado se
         // decidieran por separado, volvería a caber un campo que se borra sin salir en la
@@ -899,6 +918,14 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
         // sin ninguna de las dos, porque entonces el candidato llega a su etapa técnica y no
         // encuentra nada que rendir.
         exigirInstrumentoTecnico(vacante);
+        // Con fecha límite, una fecha que no haya pasado (V78): una vacante en borrador no se
+        // cierra sola, y publicarla con el día ya pasado la cerraría al minuto siguiente.
+        if (FormaDeCierre.esPorFecha(vacante.getTipoCierre())) {
+            String faltaDeLaFecha = FormaDeCierre.faltaDeLaFecha(vacante.getCierraEn(), Instant.now());
+            if (faltaDeLaFecha != null) {
+                throw new IllegalStateException(faltaDeLaFecha);
+            }
+        }
         // Aquí había un freno más: sin texto legal publicado con SU nombre, la empresa no
         // recibía candidatos. Se cayó con la V54, que dejó UN SOLO texto de PROCESO para
         // todas, con un hueco donde va el nombre de la empresa: el texto ya existe siempre
@@ -1560,19 +1587,10 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
         if ("CERRADA".equals(vacante.getEstado())) {
             throw new IllegalStateException("La vacante ya está cerrada");
         }
-        String anterior = vacante.getEstado();
-        // Cerrar NO arrastra las postulaciones en marcha: cada una se decide una a una
-        // desde la bandeja. Esto cambió con el documento nuevo del cliente.
-        vacante.setEstado("CERRADA");
-        vacante.setCerradaEn(Instant.now());
-        vacantes.save(vacante);
-        auditoria.registrar(quien.organizacionId(), quien, "cerrar_vacante",
-                "vacante", id, Map.of("estado", anterior), Map.of("estado", "CERRADA"), motivo);
-        // A quien sigue en carrera con WhatsApp activo le queda, en esta misma transacción, el
-        // aviso de que la convocatoria cerró: su postulación sigue y su vínculo también (V76).
-        if (whatsapp != null) {
-            whatsapp.alCerrarLaConvocatoria(vacante);
-        }
+        // Cerrar NO arrastra a quien está en otra etapa: cada una se decide una a una desde la
+        // bandeja. Lo único que arrastra es el Perfil Integral sin terminar, que dura hasta que
+        // la vacante se cierra (V78): vence, y quien lo seguía esperando queda cerrado.
+        cierre.cerrar(vacante, quien, motivo);
     }
 
     // ============ Archivar y desarchivar ============

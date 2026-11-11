@@ -82,6 +82,7 @@ class ServicioEvaluacionImplTest {
     @Mock private ServicioCalificacion calificacion;
     @Mock private ColaCalificacionIa colaIa;
     @Mock private ServicioParametros parametros;
+    @Mock private com.renaser.ai.ai_engine.perfilintegral.service.FinDelPerfilIntegral finDelPerfil;
 
     @InjectMocks
     private ServicioEvaluacionImpl servicio;
@@ -103,7 +104,6 @@ class ServicioEvaluacionImplTest {
             e.setId(70L);
             return e;
         });
-        when(parametros.entero(any(), any(), org.mockito.ArgumentMatchers.anyInt())).thenReturn(14);
 
         servicio.crearAlPostular(1L, 9L, 3L, "EJECUCION", 16L);
 
@@ -111,6 +111,9 @@ class ServicioEvaluacionImplTest {
         verify(evaluaciones).save(creada.capture());
         assertThat(creada.getValue().getVersionBancoNivelId()).isEqualTo(16L);
         verify(versionesBanco, never()).laPublicadaDelNivel(any(), any(), any());
+        // Sin fecha de vencimiento: dura hasta que la vacante se cierre (V78, AC-04)
+        assertThat(creada.getValue().getVenceEn()).isNull();
+        org.mockito.Mockito.verifyNoInteractions(parametros);
     }
 
     @Test
@@ -736,14 +739,14 @@ class ServicioEvaluacionImplTest {
         }
 
         @Test
-        @DisplayName("el banco: si mientras esperaba la cerró el plazo, dice que el plazo pasó")
+        @DisplayName("el banco: si mientras esperaba la venció el cierre de la vacante, lo dice (V78)")
         void elBancoVencidoMientras() {
             abiertaEnMemoria(60L);
             when(evaluaciones.estadoBloqueandoLaFila(60L)).thenReturn("VENCIDA");
 
             assertThatThrownBy(() -> servicio.entregar(CANDIDATA, CODIGO))
                     .isInstanceOf(IllegalStateException.class)
-                    .hasMessage("El plazo para responder esta evaluación ya pasó");
+                    .hasMessage("La vacante se cerró y esta evaluación ya no se puede responder.");
             nadaSeMovio();
         }
 
@@ -757,6 +760,173 @@ class ServicioEvaluacionImplTest {
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessage("Esta evaluación ya fue entregada");
             nadaSeMovio();
+        }
+    }
+
+    // ============ El Perfil Integral dura hasta que la vacante se cierre (V78) ============
+
+    /**
+     * La evaluación del Perfil Integral nace sin fecha y la vence el cierre de su vacante
+     * (specs/Ready/perfil-integral-hasta-el-cierre-de-la-vacante). El cuestionario técnico
+     * CAZATALENTOS sigue con sus días.
+     */
+    @Nested
+    @DisplayName("El Perfil Integral dura hasta que la vacante se cierre (V78)")
+    class HastaElCierreDeLaVacante {
+
+        private static final long VACANTE = 40L;
+        private static final long ORGANIZACION = 1L;
+
+        private void suPostulacion() {
+            when(postulaciones.findByUuid(CODIGO)).thenReturn(Optional.of(Postulacion.builder()
+                    .id(50L).uuid(CODIGO).usuarioId(CANDIDATA.usuarioId()).vacanteId(VACANTE)
+                    .organizacionId(ORGANIZACION).evaluacionId(60L).evaluacionTecnicaId(61L).build()));
+        }
+
+        private Evaluacion suEvaluacion(long id, String proposito, String estado) {
+            Evaluacion evaluacion = Evaluacion.builder().id(id).usuarioId(CANDIDATA.usuarioId())
+                    .proposito(proposito).estado(estado).versionBancoNivelId(500L)
+                    .iniciadaEn("PENDIENTE".equals(estado) ? null : Instant.now()).build();
+            when(evaluaciones.findById(id)).thenReturn(Optional.of(evaluacion));
+            return evaluacion;
+        }
+
+        private void laVacanteEsta(String estado) {
+            when(vacantes.estadoDe(VACANTE, ORGANIZACION)).thenReturn(Optional.of(estado));
+        }
+
+        @Test
+        @DisplayName("la de preguntas propias nace sin fecha de vencimiento (AC-04)")
+        void lasPropiasNacenSinFecha() {
+            when(versionesBanco.preguntasPropiasDe(VACANTE, "PUBLICADA")).thenReturn(Optional.of(
+                    VersionBanco.builder().id(77L).build()));
+            when(evaluaciones.save(any())).thenAnswer(i -> i.getArgument(0));
+
+            servicio.crearDePreguntasPropias(ORGANIZACION, 9L, VACANTE);
+
+            org.mockito.ArgumentCaptor<Evaluacion> creada =
+                    org.mockito.ArgumentCaptor.forClass(Evaluacion.class);
+            verify(evaluaciones).save(creada.capture());
+            assertThat(creada.getValue().getVenceEn()).isNull();
+            assertThat(creada.getValue().getProposito()).isEqualTo("PERFIL_INTEGRAL");
+            org.mockito.Mockito.verifyNoInteractions(parametros);
+        }
+
+        @Test
+        @DisplayName("el cuestionario técnico sigue venciendo a los días de dias_plazo_evaluacion (AC-16)")
+        void elCuestionarioTecnicoSigueConSusDias() {
+            when(versionesBanco.cuestionarioTecnicoDe(VACANTE, "PUBLICADA")).thenReturn(Optional.of(
+                    VersionBanco.builder().id(78L).build()));
+            when(parametros.entero(ORGANIZACION, "dias_plazo_evaluacion", 14)).thenReturn(5);
+            when(evaluaciones.save(any())).thenAnswer(i -> i.getArgument(0));
+
+            Instant antes = Instant.now();
+            servicio.crearTecnicaAlEntrar(ORGANIZACION, 9L, VACANTE);
+
+            org.mockito.ArgumentCaptor<Evaluacion> creada =
+                    org.mockito.ArgumentCaptor.forClass(Evaluacion.class);
+            verify(evaluaciones).save(creada.capture());
+            assertThat(creada.getValue().getVenceEn())
+                    .isBetween(antes.plus(5, java.time.temporal.ChronoUnit.DAYS),
+                            Instant.now().plus(5, java.time.temporal.ChronoUnit.DAYS));
+        }
+
+        @Test
+        @DisplayName("con la vacante cerrada, guardar una respuesta se rechaza con su mensaje (AC-12)")
+        void guardarConLaVacanteCerrada() {
+            suPostulacion();
+            suEvaluacion(60L, "PERFIL_INTEGRAL", "EN_CURSO");
+            laVacanteEsta("CERRADA");
+
+            assertThatThrownBy(() -> servicio.responder(CANDIDATA, CODIGO, 1L,
+                    new Responder(null, "Mi respuesta", null, 30)))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("La vacante se cerró y esta evaluación ya no se puede responder.");
+            verify(respuestas, never()).saveAndFlush(any());
+        }
+
+        @Test
+        @DisplayName("con la vacante cerrada, empezar tampoco se puede")
+        void empezarConLaVacanteCerrada() {
+            suPostulacion();
+            Evaluacion evaluacion = suEvaluacion(60L, "PERFIL_INTEGRAL", "PENDIENTE");
+            laVacanteEsta("CERRADA");
+
+            assertThatThrownBy(() -> servicio.iniciar(CANDIDATA, CODIGO))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("La vacante se cerró y esta evaluación ya no se puede responder.");
+            assertThat(evaluacion.getIniciadaEn()).isNull();
+            verify(evaluaciones, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("si el cierre confirmó mientras esperaba al cerrojo, la entrega no vale y no "
+                + "escribe nada (AC-12, entrega simultánea al cierre)")
+        void entregarConLaVacanteCerrada() {
+            suPostulacion();
+            suEvaluacion(60L, "PERFIL_INTEGRAL", "EN_CURSO");
+            laVacanteEsta("CERRADA");
+
+            assertThatThrownBy(() -> servicio.entregar(CANDIDATA, CODIGO))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("La vacante se cerró y esta evaluación ya no se puede responder.");
+            org.mockito.InOrder orden = org.mockito.Mockito.inOrder(vacantes);
+            orden.verify(vacantes).bloquearParaCalificarYReleer(any());
+            orden.verify(vacantes).estadoDe(VACANTE, ORGANIZACION);
+            verify(evaluaciones, never()).save(any());
+            org.mockito.Mockito.verifyNoInteractions(maquina, calificacion, colaIa);
+        }
+
+        @Test
+        @DisplayName("una evaluación ya vencida por el cierre lo dice con el mensaje nuevo, aunque la "
+                + "vacante no se encuentre")
+        void vencidaDiceQueLaVacanteSeCerro() {
+            suPostulacion();
+            suEvaluacion(60L, "PERFIL_INTEGRAL", "VENCIDA");
+
+            assertThatThrownBy(() -> servicio.responder(CANDIDATA, CODIGO, 1L,
+                    new Responder(null, "Mi respuesta", null, 30)))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("La vacante se cerró y esta evaluación ya no se puede responder.");
+        }
+
+        @Test
+        @DisplayName("con la vacante publicada y sin fecha, se responde aunque hayan pasado 14 días (AC-07)")
+        void sinFechaSeSigueRespondiendo() {
+            suPostulacion();
+            Evaluacion evaluacion = suEvaluacion(60L, "PERFIL_INTEGRAL", "EN_CURSO");
+            evaluacion.setCreadoEn(Instant.now().minus(20, java.time.temporal.ChronoUnit.DAYS));
+            laVacanteEsta("PUBLICADA");
+            when(ordenes.findByEvaluacionIdOrderByPosicion(60L)).thenReturn(List.of(
+                    OrdenPregunta.builder().evaluacionId(60L).preguntaId(1L).posicion(1).build()));
+            when(preguntas.findById(1L)).thenReturn(Optional.of(
+                    Pregunta.builder().id(1L).tipo("ABIERTA").enunciado("¿Cómo lo harías?").build()));
+            when(respuestas.findByEvaluacionIdAndPreguntaId(60L, 1L)).thenReturn(Optional.empty());
+
+            servicio.responder(CANDIDATA, CODIGO, 1L, new Responder(null, "Así", null, 30));
+
+            verify(respuestas).saveAndFlush(any());
+        }
+
+        @Test
+        @DisplayName("el cuestionario técnico vencido sigue diciendo que su plazo pasó")
+        void elTecnicoVencidoHablaDeSuPlazo() {
+            suPostulacion();
+            suEvaluacion(61L, "CUESTIONARIO_TECNICO", "VENCIDA");
+
+            assertThatThrownBy(() -> servicio.responderTecnico(CANDIDATA, CODIGO, 1L,
+                    new Responder(null, "Lo resolvería así", null, 30)))
+                    .isInstanceOf(IllegalStateException.class)
+                    .hasMessage("El plazo para responder esta evaluación ya pasó");
+        }
+
+        @Test
+        @DisplayName("el sondeo recoge lo que quedó abierto en vacantes cerradas, sin mirar días")
+        void elSondeoDelegaEnElCierre() {
+            servicio.cerrarVencidas();
+
+            verify(finDelPerfil).enLasVacantesCerradas();
+            verify(evaluaciones, never()).findByPropositoAndEstadoInAndVenceEnBefore(any(), any(), any());
         }
     }
 }

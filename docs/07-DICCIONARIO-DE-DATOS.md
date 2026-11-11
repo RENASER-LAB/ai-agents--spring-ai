@@ -710,10 +710,10 @@ Una convocatoria concreta.
 | `remuneracion_max` | numeric(12,2) | no | (`V55`) Solo con `RANGO`, y nunca menor que `remuneracion_min` |
 | `remuneracion_moneda` | text | no | (`V55`) `PEN` o `USD`. Vacío con `OCULTA` |
 | `remuneracion_actualizada_en` | timestamptz | no | (`V55`) Cuándo se cambió el sueldo por última vez. Vacío: nunca se tocó desde que se creó. El portal lo usa para pintar «actualizado el …» sobre el monto nuevo |
-| `tipo_cierre` | text | sí | `FECHA`, `PLAZAS` o `PERMANENTE` |
-| `plazas` | integer | no | Solo si `tipo_cierre` es `PLAZAS` |
+| `tipo_cierre` | text | sí | Cómo se cierra: `PERMANENTE` (la cierra alguien del equipo) o `FECHA` (se cierra sola en `cierra_en`). **Desde la `V78` ninguna vacante guarda `PLAZAS`**: la migración pasó las que había a `PERMANENTE`, el servidor rechaza cualquier otro valor con 400 y el CHECK lo sigue admitiendo solo por las filas de antes |
+| `plazas` | integer | no | **Ya no se lee** (`V78`): era el número de «Por plazas». Las que tenía una vacante se quedaron en la columna; se vacían si cambia su forma de cierre |
 | `abre_en` | timestamptz | no | |
-| `cierra_en` | timestamptz | no | Solo si `tipo_cierre` es `FECHA` |
+| `cierra_en` | timestamptz | no | Con `tipo_cierre = 'FECHA'`, **cuándo se cierra sola** (`V78`): las 23:59:59 de Lima del día elegido. El servidor pone la hora —toma el día de Lima del instante recibido; la medianoche UTC exacta se lee como ese día UTC, que es como la mandaba el panel antes— y exige un día no anterior a hoy al crear, al editar y al publicar. El sondeo de vencimientos cierra la vacante publicada como mucho un minuto después, con el sistema como autor, y eso vence su Perfil Integral sin terminar. La `V78` pasó las fechas guardadas a las 23:59:59 de Lima de su día. Con `PERMANENTE` no rige nada, y pasar a `PERMANENTE` la vacía |
 | `estado` | text | sí | `BORRADOR`, `PUBLICADA`, `CERRADA` |
 | `nota_minima` | numeric(5,2) | sí (60) | La nota del Perfil Integral que hace falta para pasar sola a la prueba del puesto con `calificacion_automatica` encendida (V72). Entera, de 0 a 100 (CHECK), 60 por defecto. Quien no llega espera en `PERFIL_POR_CONFIRMAR`: nunca se descarta por nota. Interna, nunca se publica |
 | `version_pesos_id` | bigint | sí | Qué versión de pesos rige. **Desde la `V74` se cambia también con candidatos dentro**, mientras la vacante no esté cerrada, archivada ni eliminada: en la misma transacción se recalculan las notas de todos con la versión nueva, sin IA y sin mover a nadie |
@@ -1027,6 +1027,10 @@ adivinar cuántas postulaciones hay.
 `VACANTE_ELIMINADA` (`V60`) no es un `CIERRE_MANUAL`, aunque también lo decide una persona: es el
 cierre que provoca eliminar la vacante entera, y se separa para que «¿por qué se cerró?» pueda
 contestar «porque se retiró la convocatoria» en cualquier informe de motivos.
+
+`PLAZO_VENCIDO` cambió de causa con la `V78` y conserva el nombre: antes, se acabaron los 14 días
+del Perfil Integral; desde entonces, **la vacante se cerró —a mano o por su fecha— sin que lo
+terminara**. Para separar unas de otras en un informe hay que mirar la fecha de la transición.
 
 `movido_en` es lo que alimenta «cuántos días lleva sin avanzar» y el cierre por inactividad.
 
@@ -1708,7 +1712,7 @@ Las respuestas de un usuario a una plantilla concreta.
 | `version_banco_alineacion_id` | bigint | no | |
 | `reutiliza_de_evaluacion_id` | bigint | no | De cuál sacó el núcleo ya respondido |
 | `estado` | text | sí | `PENDIENTE`, `EN_CURSO`, `TERMINADA`, `VENCIDA` |
-| `vence_en` | timestamptz | no | Plazo para completarla |
+| `vence_en` | timestamptz | no | Plazo para completarla. **En el Perfil Integral, vacío mientras está abierta** (`V78`): nace sin fecha y dura hasta que la vacante se cierra; al cerrarse, la que no se entregó pasa a `VENCIDA` con el momento del cierre aquí, que es el límite que cuenta la consulta de WhatsApp. El cuestionario técnico CAZATALENTOS sigue naciendo con `dias_plazo_evaluacion` |
 | `iniciada_en` | timestamptz | no | |
 | `terminada_en` | timestamptz | no | |
 | `vigente_hasta` | timestamptz | no | Hasta cuándo se puede reutilizar |
@@ -1719,6 +1723,12 @@ Las respuestas de un usuario a una plantilla concreta.
 
 `vence_en` y `vigente_hasta` son **dos cosas distintas**: el primero es el plazo para terminarla;
 el segundo, hasta cuándo sirve para otra vacante.
+
+**La `V78` quitó la fecha a las del Perfil Integral abiertas** (`PENDIENTE` o `EN_CURSO`) en
+vacantes publicadas: hasta entonces vencían a los 14 días de postular. A nadie se le avisó: solo
+ganaron tiempo. Las que seguían abiertas en vacantes ya cerradas no las tocó la migración: las
+vence el sondeo en su primera vuelta tras desplegar, con los avisos de siempre (ver
+[Estados de la postulación](03-ESTADOS-POSTULACION.md), «Se cierra la convocatoria»).
 
 **`reutiliza_de_evaluacion_id` es lo que hace posible la reutilización parcial.** La regla no es
 todo o nada: el núcleo común se reutiliza y las preguntas propias del puesto se vuelven a
@@ -2741,7 +2751,14 @@ La `V70` suma tres, **en todas las organizaciones** —un parámetro que no exis
 desde el panel—: `recordatorios_activos` (`BOOLEANO`, `true`: si se mandan los recordatorios del
 banco y de la prueba), `recordatorio_horas_tras_el_turno` (`ENTERO`, 24: horas desde que le toca
 hasta el primero) y `recordatorio_horas_antes_del_plazo` (`ENTERO`, 24: horas antes de vencer en
-que sale el segundo). Las empresas dadas de alta después los copian de la plataforma.
+que sale el segundo; desde la `V78` solo lo recibe la prueba, porque el Perfil Integral no tiene
+fecha). Las empresas dadas de alta después los copian de la plataforma.
+
+`dias_plazo_evaluacion` (`ENTERO`, 14, de la `V22`) **solo rige ya el cuestionario técnico
+CAZATALENTOS**: cuántos días tiene el candidato para responderlo desde que se le habilita. Hasta
+la `V78` fijaba también el plazo del Perfil Integral; desde entonces el Perfil Integral no lo lee
+—dura hasta que la vacante se cierra— y la migración reescribió su `descripcion` para decirlo.
+No se borra porque ese cuestionario lo sigue usando.
 
 La `V73` suma uno, **solo de la plataforma**: `whatsapp_novedades_activo` (`BOOLEANO`, `false`),
 el interruptor de la beta de WhatsApp. Encendido —y con `WHATSAPP_MODO` distinto de `apagado`—,
@@ -3649,7 +3666,9 @@ persona: el expediente de selección no se toca.
 La bandeja de salida de los eventos v2 hacia el bot (`POST /v1/ex/resultados`): un `RESULTADO` al
 terminar o un `CONVOCATORIA_CERRADA` al cerrar la vacante. Se escribe en la misma transacción
 que el hecho y solo con el productor v2 encendido (`WHATSAPP_PRODUCTOR_V2`); lo envía después
-el sondeo.
+el sondeo. Desde la `V78`, a quien el cierre de la vacante le cierra la postulación —seguía con el
+Perfil Integral sin entregar— le queda su `RESULTADO` y no un `CONVOCATORIA_CERRADA`: este se
+escribe después, solo para quien sigue en carrera.
 
 | Columna | Tipo | Oblig. | Qué guarda |
 |---|---|---|---|

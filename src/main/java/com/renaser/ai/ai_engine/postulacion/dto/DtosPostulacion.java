@@ -127,10 +127,10 @@ public final class DtosPostulacion {
     public record ConfirmarAvance(@NotBlank String motivo) {}
 
     /**
-     * Reabrir una evaluación. Los días son opcionales: sin ellos manda el parámetro
-     * {@code dias_plazo_evaluacion}, que es donde Renaser lo cambia sin desplegar.
+     * Reabrir una evaluación. Sin días desde la V78: queda abierta hasta que la vacante se
+     * cierre, como cualquier evaluación del Perfil Integral.
      */
-    public record ReabrirEvaluacion(Integer dias, @NotBlank String motivo) {}
+    public record ReabrirEvaluacion(@NotBlank String motivo) {}
 
     public record ConteoEmbudo(Map<String, Long> porEstado) {}
 
