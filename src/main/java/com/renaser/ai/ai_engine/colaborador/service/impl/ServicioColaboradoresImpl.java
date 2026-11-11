@@ -66,6 +66,7 @@ import com.renaser.ai.ai_engine.vacante.entity.Vacante;
 import com.renaser.ai.ai_engine.vacante.repository.PuestoRepository;
 import com.renaser.ai.ai_engine.vacante.repository.VacanteRepository;
 import com.renaser.ai.ai_engine.vacante.service.Remuneracion;
+import com.renaser.ai.ai_engine.whatsapp.service.Celular;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.AccessDeniedException;
@@ -205,8 +206,12 @@ public class ServicioColaboradoresImpl implements ServicioColaboradores {
         if (correo != null && correo.toLowerCase(Locale.ROOT).endsWith(DOMINIO_DE_LA_CARGA_DE_CV)) {
             correo = null;
         }
-        String celular = borrada ? null : datosCv.findByPostulacionId(postulacionId)
-                .map(DatoCv::getTelefono).map(ReglasDelColaborador::texto).orElse(null);
+        // El celular de su cuenta; si no tiene, el que la IA leyó del CV, pero solo si cumple la
+        // regla. En formato internacional, como se guarda en la ficha.
+        String celular = borrada ? null : Celular.comoE164(persona.getTelefono())
+                .or(() -> datosCv.findByPostulacionId(postulacionId).map(DatoCv::getTelefono)
+                        .flatMap(Celular::comoE164))
+                .orElse(null);
 
         Long cargo = puestos.findByIdAndOrganizacionId(vacante.getPuestoId(), quien.organizacionId())
                 .filter(Puesto::isEsActivo).map(Puesto::getId).orElse(null);
@@ -406,7 +411,7 @@ public class ServicioColaboradoresImpl implements ServicioColaboradores {
     public Long darDeAlta(ContextoUsuario quien, AltaColaborador datos) {
         exigirTodo(quien, EDITAR);
         LocalDate hoy = reloj.hoy();
-        PersonaLimpia persona = validarPersona(datos.persona(), hoy);
+        PersonaLimpia persona = validarPersona(datos.persona(), hoy, null);
 
         Long postulacionId = datos.postulacionId();
         if (postulacionId != null) {
@@ -449,7 +454,7 @@ public class ServicioColaboradoresImpl implements ServicioColaboradores {
     public void editarPerfil(ContextoUsuario quien, Long id, DatosPersonales datos) {
         Colaborador c = laFichaParaEscribir(quien, id);
         LocalDate hoy = reloj.hoy();
-        PersonaLimpia persona = validarPersona(datos, hoy);
+        PersonaLimpia persona = validarPersona(datos, hoy, c.getCelular());
         if (!persona.tipo().equals(c.getTipoDocumento()) || !persona.numero().equals(c.getNumeroDocumento())) {
             colaboradores.esperarTurno(claveDelDocumento(c.getOrganizacionId(), persona.tipo(), persona.numero()));
             exigirDocumentoLibre(c.getOrganizacionId(), persona.tipo(), persona.numero(), c.getId(), hoy);
@@ -758,7 +763,11 @@ public class ServicioColaboradoresImpl implements ServicioColaboradores {
         }
     }
 
-    private PersonaLimpia validarPersona(DatosPersonales d, LocalDate hoy) {
+    /**
+     * @param celularGuardado el de la ficha que se edita, o null en un alta: si vuelve igual, se
+     *                        conserva aunque sea de antes de la regla del celular.
+     */
+    private PersonaLimpia validarPersona(DatosPersonales d, LocalDate hoy, String celularGuardado) {
         String tipo = d.tipoDocumento();
         String numero = ReglasDelColaborador.limpiarDocumento(d.numeroDocumento());
         String errorDocumento = ReglasDelColaborador.errorDelDocumento(tipo, numero);
@@ -782,6 +791,8 @@ public class ServicioColaboradoresImpl implements ServicioColaboradores {
         if (errorCorreoPersonal != null) throw new IllegalArgumentException(errorCorreoPersonal);
         String errorCorreoCorporativo = ReglasDelColaborador.errorDelCorreo(correoCorporativo);
         if (errorCorreoCorporativo != null) throw new IllegalArgumentException(errorCorreoCorporativo);
+        String errorCelular = ReglasDelColaborador.errorDelCelular(d.celular(), celularGuardado);
+        if (errorCelular != null) throw new IllegalArgumentException(errorCelular);
         String provincia = ReglasDelColaborador.texto(d.provinciaUbigeo());
         if (provincia != null && !catalogosDelPerfil.esCiudadElegible(provincia)) {
             throw new IllegalArgumentException("Esa provincia no está en el catálogo");
@@ -794,8 +805,8 @@ public class ServicioColaboradoresImpl implements ServicioColaboradores {
         return new PersonaLimpia(tipo, numero, nombres, paterno,
                 ReglasDelColaborador.texto(d.apellidoMaterno()), d.fechaNacimiento(), d.sexo(),
                 estadoCivil, ReglasDelColaborador.texto(d.nacionalidad()),
-                ReglasDelColaborador.texto(d.celular()), correoPersonal, correoCorporativo,
-                ReglasDelColaborador.texto(d.direccion()), provincia, nivel);
+                ReglasDelColaborador.celularParaGuardar(d.celular(), celularGuardado), correoPersonal,
+                correoCorporativo, ReglasDelColaborador.texto(d.direccion()), provincia, nivel);
     }
 
     /** Dónde y en qué condiciones, comprobado contra la empresa. */
