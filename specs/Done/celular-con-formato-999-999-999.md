@@ -1,6 +1,5 @@
 # Celular con formato 999 999 999
-
-Estado: lista para implementar
+Estado: TERMINADO
 
 ## Objetivo
 Que nadie pueda dejar mal escrito un celular, ni en el portal ni en el panel. El campo solo
@@ -40,7 +39,7 @@ cualquier texto y el error aparece recién al enviar el formulario.
     [ServicioCargaColaboradoresImpl](../../src/main/java/com/renaser/ai/ai_engine/colaborador/service/impl/ServicioCargaColaboradoresImpl.java)
     (lectura de cada fila del Excel).
   - Spec que introdujo la regla del celular (V73):
-    [novedades-por-whatsapp](../Done/novedades-por-whatsapp.md).
+    [novedades-por-whatsapp](novedades-por-whatsapp.md).
 
 ## Alcance
 - Incluye:
