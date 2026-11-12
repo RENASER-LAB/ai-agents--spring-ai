@@ -441,7 +441,8 @@ public class FlujoColaboradoresIT {
         assertThat(precarga.get("nombres").asText()).isEqualTo("Carla");
         assertThat(precarga.get("apellidoPaterno").asText()).isEqualTo("De la Cruz Pérez");
         assertThat(precarga.get("correoPersonal").asText()).isEqualTo("carla@correo.pe");
-        assertThat(precarga.get("celular").asText()).isEqualTo("987654321");
+        // El celular de su cuenta, en formato internacional, aunque el CV diga otra cosa.
+        assertThat(precarga.get("celular").asText()).isEqualTo("+51987654321");
         assertThat(precarga.get("cargoId").asLong()).isEqualTo(cargoAsistente);
         assertThat(precarga.get("areaId").asLong()).isEqualTo(areaFinanzas);
         assertThat(precarga.has("sueldoBase")).isFalse();
@@ -549,7 +550,7 @@ public class FlujoColaboradoresIT {
         assertThat(resultado.get("altas").asInt()).isZero();
         assertThat(resultado.get("actualizados").asInt()).isEqualTo(1);
         assertThat(jdbc.queryForObject("select celular from colaborador where id = ?", String.class, colaboradorA))
-                .isEqualTo("999888777");
+                .isEqualTo("+51999888777");
         assertThat(jdbc.queryForObject("select nombres from colaborador where id = ?", String.class, colaboradorA))
                 .isEqualTo("Luis");
 
@@ -558,7 +559,7 @@ public class FlujoColaboradoresIT {
                 .andExpect(jsonPath("$.errores[0].columna").value("Cargo"))
                 .andExpect(jsonPath("$.errores[0].mensaje").value("Los cambios de puesto y contrato se registran en su ficha"));
         assertThat(jdbc.queryForObject("select celular from colaborador where id = ?", String.class, colaboradorA))
-                .isEqualTo("999888777");
+                .isEqualTo("+51999888777");
     }
 
     // ============ 13. Los cambios de la situación laboral ============
@@ -1165,6 +1166,100 @@ public class FlujoColaboradoresIT {
         assertThat(lineasDelAnulado(otra, tokenTalento)).containsExactly("Área: Operaciones → Finanzas");
     }
 
+    // ============ 29. El celular de la ficha ============
+
+    @Test
+    @Order(29)
+    @DisplayName("el celular de la ficha cumple la regla de la cuenta y se guarda como ella; el de antes no se toca si no se cambia (celular 999 999 999)")
+    void elCelularDeLaFicha() throws Exception {
+        String regla = "Escribe un celular de 9 cifras que empiece por 9, o el número completo con su prefijo";
+        // AC-13: una petición directa con un celular que no vale es un 400 y no guarda nada.
+        int antes = contar("select count(*) from colaborador");
+        Map<String, Object> alta = altaComoMapa("01", "44200001", "Mario", "Celular", HOY, sedeLima, areaFinanzas,
+                cargoAnalista, null, "01", null, null);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> persona = (Map<String, Object>) alta.get("persona");
+        persona.put("celular", "abc");
+        conToken(post(COLABORADORES), tokenTalento, json.writeValueAsString(alta))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value(regla));
+        assertThat(contar("select count(*) from colaborador")).isEqualTo(antes);
+
+        // AC-09: «987 654 321» se guarda como el de la cuenta.
+        persona.put("celular", "987 654 321");
+        long mario = id(conToken(post(COLABORADORES), tokenTalento, json.writeValueAsString(alta))
+                .andExpect(status().isCreated()));
+        assertThat(celularDe(mario)).isEqualTo("+51987654321");
+
+        // AC-10: uno de antes de la regla. Editar otro dato sin tocarlo lo deja como estaba.
+        jdbc.update("update colaborador set celular = '01-4567890' where id = ?", mario);
+        persona.put("celular", "01-4567890");
+        persona.put("apellidoMaterno", "Rojas");
+        conToken(put(COLABORADORES + "/" + mario + "/perfil"), tokenTalento, json.writeValueAsString(persona))
+                .andExpect(status().isNoContent());
+        assertThat(celularDe(mario)).isEqualTo("01-4567890");
+        assertThat(jdbc.queryForObject("select apellido_materno from colaborador where id = ?", String.class, mario))
+                .isEqualTo("Rojas");
+        // Cambiado, tiene que cumplir la regla; y también se puede vaciar.
+        persona.put("celular", "01-4567891");
+        conToken(put(COLABORADORES + "/" + mario + "/perfil"), tokenTalento, json.writeValueAsString(persona))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value(regla));
+        assertThat(celularDe(mario)).isEqualTo("01-4567890");
+        persona.put("celular", "");
+        conToken(put(COLABORADORES + "/" + mario + "/perfil"), tokenTalento, json.writeValueAsString(persona))
+                .andExpect(status().isNoContent());
+        assertThat(celularDe(mario)).isNull();
+
+        // AC-12: en el Excel, uno que no vale es un error de su fila y su columna, con su valor.
+        jdbc.update("update colaborador set celular = '01-4567890' where id = ?", mario);
+        List<String> cabeceras = List.of("Tipo de documento *", "Número de documento *", "Celular");
+        cargar(tokenTalento, cabeceras, List.of(List.of("DNI", "44200001", "12345")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.errores[0].fila").value(2))
+                .andExpect(jsonPath("$.errores[0].columna").value("Celular"))
+                .andExpect(jsonPath("$.errores[0].valor").value("12345"))
+                .andExpect(jsonPath("$.errores[0].mensaje").value(regla));
+        assertThat(celularDe(mario)).isEqualTo("01-4567890");
+        // El mismo que ya tiene no es error ni cambio; una celda vacía no lo toca.
+        JsonNode igual = cuerpo(cargar(tokenTalento, cabeceras, List.of(List.of("DNI", "44200001", "01-4567890")))
+                .andExpect(status().isOk()));
+        assertThat(igual.get("actualizados").asInt()).isZero();
+        cargar(tokenTalento, List.of("Tipo de documento *", "Número de documento *", "Celular", "Nombres *"),
+                List.of(List.of("DNI", "44200001", "", "Mario José"))).andExpect(status().isOk());
+        assertThat(celularDe(mario)).isEqualTo("01-4567890");
+        // Uno válido, escrito o como cifra de Excel, se guarda en formato internacional.
+        cargar(tokenTalento, cabeceras, List.of(List.of("DNI", "44200001", "987 654 321"))).andExpect(status().isOk());
+        assertThat(celularDe(mario)).isEqualTo("+51987654321");
+        cargar(tokenTalento, cabeceras, List.of(List.of("DNI", "44200001", 912345678L))).andExpect(status().isOk());
+        assertThat(celularDe(mario)).isEqualTo("+51912345678");
+        // Y un alta por Excel con celular, igual.
+        List<String> conCelular = new ArrayList<>(CABECERAS);
+        conCelular.add("Celular");
+        List<Object> nora = new ArrayList<>(fila("44200002", "Nora", "Celular", "Sede Lima", "Finanzas", "Analista",
+                "", "", "A plazo indeterminado", "", "General"));
+        nora.add("+34 612 345 678");
+        cargar(tokenTalento, conCelular, List.of(nora)).andExpect(status().isOk());
+        assertThat(jdbc.queryForObject("select celular from colaborador where numero_documento = '44200002' "
+                + "and organizacion_id = ?", String.class, plataforma)).isEqualTo("+34612345678");
+
+        // Paso 8: sin celular en la cuenta, el del CV, pero solo si cumple la regla.
+        jdbc.update("update persona set telefono = null where id = "
+                + "(select persona_id from usuario where correo = 'dante@correo.pe')");
+        jdbc.update("insert into dato_cv (postulacion_id, telefono) values (?, '812 345 678')", enDecision);
+        JsonNode sinCuenta = cuerpo(conToken(get(COLABORADORES + "/precarga?postulacion=" + enDecision),
+                tokenTalento, null).andExpect(status().isOk()));
+        assertThat(sinCuenta.get("celular").isNull()).isTrue();
+        jdbc.update("update dato_cv set telefono = '987-111-222' where postulacion_id = ?", enDecision);
+        JsonNode delCv = cuerpo(conToken(get(COLABORADORES + "/precarga?postulacion=" + enDecision),
+                tokenTalento, null).andExpect(status().isOk()));
+        assertThat(delCv.get("celular").asText()).isEqualTo("+51987111222");
+    }
+
+    private String celularDe(long colaborador) {
+        return jdbc.queryForObject("select celular from colaborador where id = ?", String.class, colaborador);
+    }
+
     // ============ Ayudantes ============
 
     /** Un alta de Dirección de hace 60 días en Lima, Operaciones, como Analista. */
@@ -1245,7 +1340,10 @@ public class FlujoColaboradoresIT {
             for (int f = 0; f < filas.size(); f++) {
                 Row fila = hoja.createRow(f + 1);
                 for (int i = 0; i < filas.get(f).size(); i++) {
-                    fila.createCell(i).setCellValue(String.valueOf(filas.get(f).get(i)));
+                    // Una cifra va como cifra, como la deja Excel; lo demás, como texto.
+                    Object valor = filas.get(f).get(i);
+                    if (valor instanceof Number cifra) fila.createCell(i).setCellValue(cifra.doubleValue());
+                    else fila.createCell(i).setCellValue(String.valueOf(valor));
                 }
             }
             libro.write(salida);

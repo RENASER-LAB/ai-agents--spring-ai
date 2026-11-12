@@ -1701,7 +1701,9 @@ cuáles sí, porque las que no, hay que probarlas en el código.
   cifras y empiece por 9 (`Celular`, la misma regla que el portal), que el botón solo funcione en
   vacantes de la plataforma con el parámetro encendido y el proceso sin terminar, que el anuncio
   caduque a las 24 horas y que solo un vínculo `ACTIVO` reciba avisos. Dependen de la vacante, de
-  un parámetro y de la hora.
+  un parámetro y de la hora. **Desde el 12/11/2026 la misma regla vale para `colaborador.celular`**,
+  que también se guarda en E.164, pero sin CHECK: los de antes siguen como se escribieron y,
+  mientras vuelvan iguales, no se comprueban.
 
 ### Nunca existen, ni siquiera como opción
 

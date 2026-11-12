@@ -3,9 +3,21 @@ package com.renaser.ai.ai_engine.whatsapp.service;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.CsvSource;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -39,6 +51,27 @@ class CelularTest {
         assertThat(Celular.comoE164(escrito)).isEmpty();
         assertThat(Celular.MENSAJE).isEqualTo("Escribe un celular de 9 cifras que empiece por 9, o "
                 + "el número completo con su prefijo");
+    }
+
+    /**
+     * Los casos del contrato que comparte con el portal ({@code docs/contratos/celular-casos.json},
+     * igual que {@code src/dominio/celularCasos.json} allí, donde lo comprueba
+     * {@code celular.test.ts}). Si una regla cambia y la otra no, falla una de las dos pruebas.
+     */
+    static Stream<Arguments> casosDelContrato() throws IOException {
+        JsonNode contrato = new ObjectMapper().readTree(
+                Files.readString(Path.of("docs/contratos/celular-casos.json")));
+        List<Arguments> casos = new ArrayList<>();
+        contrato.get("casos").forEach(caso -> casos.add(Arguments.of(caso.get("escrito").asString(),
+                caso.get("e164").isNull() ? null : caso.get("e164").asString())));
+        return casos.stream();
+    }
+
+    @ParameterizedTest(name = "«{0}» -> {1}")
+    @MethodSource("casosDelContrato")
+    @DisplayName("Da lo mismo que celular.ts del portal para cada caso del contrato compartido")
+    void loMismoQueElPortal(String escrito, String e164) {
+        assertThat(Celular.comoE164(escrito)).isEqualTo(Optional.ofNullable(e164));
     }
 
     @Test
