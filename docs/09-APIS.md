@@ -987,7 +987,7 @@ anularlo —aunque ya esté anulado— responde 404, como un cambio que no hay.
 | GET `/colaboradores/opciones` | Lo que ofrecen los formularios hoy: catálogos, sedes, áreas y cargos activos, y si quien pregunta puede editar y ver sueldos | `ver_colaboradores` |
 | GET `/colaboradores/pendientes` | Las postulaciones `CONTRATADO` de la empresa sin ficha, anteriores a la `V64` y hechas por la API incluidas. Quedan fuera las de vacantes eliminadas y las marcadas como «No dar de alta» | `ver_colaboradores` |
 | POST `/colaboradores/pendientes/{postulacionId}/descarte` | «No dar de alta», con `motivo`: la saca del aviso y queda en la auditoría. La postulación sigue `CONTRATADO` | `editar_colaboradores` |
-| GET `/colaboradores/precarga?postulacion=` | Lo que ya se sabe de un contratado para precargar su alta: nombres, apellidos (enteros, en el paterno), correo de la cuenta —salvo los inventados por la carga de CV—, celular, cargo y área de la vacante y, solo con `ver_sueldos`, el sueldo fijo que publicaba | `editar_colaboradores` |
+| GET `/colaboradores/precarga?postulacion=` | Lo que ya se sabe de un contratado para precargar su alta: nombres, apellidos (enteros, en el paterno), correo de la cuenta —salvo los inventados por la carga de CV—, celular —el de su cuenta; si no tiene, el que la IA leyó del CV solo si cumple la regla del celular; siempre en E.164— (12/11/2026), cargo y área de la vacante y, solo con `ver_sueldos`, el sueldo fijo que publicaba | `editar_colaboradores` |
 | POST `/colaboradores` | Dar de alta: ficha, primer periodo y primera situación con motivo `INGRESO`, en una transacción. Con `postulacionId`, queda enlazada a esa contratación, que da como mucho un alta. **409 con `colaboradorId`** si el documento ya tiene ficha en la empresa, activa o cesada | `editar_colaboradores` |
 | GET `/colaboradores/plantilla` | La plantilla `.xlsx` con tres hojas —«Colaboradores», «Instrucciones» y «Valores»—, generada con los valores válidos de hoy. La columna de sueldo solo sale con `ver_sueldos` | `editar_colaboradores` |
 | POST `/colaboradores/carga` | Cargar el Excel (`multipart`, campo `archivo`; `.xlsx` de hasta 10 MB y 5.000 filas). **Todo o nada**: si hay algún error, **400 con la lista entera** —fila, columna, valor y qué pasa— y no se guarda nada. Cada fila se identifica por tipo y número de documento: si no existe es un alta (motivo `CARGA_INICIAL`), si está activa actualiza los datos personales y un puesto o contrato distinto del vigente es error, y si está cesada es error. Sin `ver_sueldos`, un archivo con columna de sueldo se rechaza entero. En la auditoría queda una fila con el nombre del archivo y los dos recuentos | `editar_colaboradores` |
@@ -1000,6 +1000,19 @@ anularlo —aunque ya esté anulado— responde 404, como un cambio que no hay.
 | GET `/sedes` · `/cargos` | Las sedes y el catálogo de cargos —que son los puestos—, activos y desactivados. **Los lee cualquiera del equipo**: Configuración las enseña sin acciones a quien no puede editarlas | cualquier cuenta del equipo |
 | POST `/sedes` · PUT `/sedes/{id}` · POST `/sedes/{id}/desactivacion` · `/reactivacion` | Crear, editar, desactivar y reactivar una sede. Nombre único en la empresa sin distinguir mayúsculas; código de establecimiento de SUNAT opcional, de 4 cifras. No se borran | `editar_estructura` |
 | POST `/cargos` · PUT `/cargos/{id}` · POST `/cargos/{id}/desactivacion` · `/reactivacion` | Crear (nombre, nivel y familia), renombrar —el nombre nuevo sale en todas partes, vacantes incluidas— y desactivar o reactivar. Un cargo desactivado no se elige en altas, cambios, cargas ni solicitudes nuevas, y quien ya lo usa lo conserva | `editar_estructura` |
+
+**El celular de la ficha sigue la regla del de la cuenta** (12/11/2026). En `POST /colaboradores`,
+`PUT /colaboradores/{id}/perfil` y la carga por Excel, `celular` es opcional, pero si llega tiene
+que valer lo mismo que en el registro del portal —nueve cifras que empiezan por 9, con o sin el
+51, o el número completo con su prefijo (`whatsapp/service/Celular`)— y se guarda en E.164
+(`+51987654321`). Si no vale, la petición responde **400** con el mensaje de la regla («Escribe un
+celular de 9 cifras que empiece por 9, o el número completo con su prefijo») y no guarda nada; en
+la carga es un error más de la lista —esa fila, la columna Celular, el valor y el mensaje— y el
+archivo entero se rechaza. **El valor que ya estaba guardado y vuelve tal cual no se comprueba**:
+un celular de antes de esta regla no obliga a corregirlo para guardar el resto de la ficha ni para
+repetir el mismo Excel, y en la carga no cuenta como cambio. Una celda vacía no toca el celular
+de una ficha que ya existe, y un número que Excel guardó como cifra (`987654321`) vale igual que
+escrito como texto. Los celulares guardados antes no se convirtieron.
 
 **Cómo se lee la auditoría de un cambio.** Guarda **qué campos cambiaron, nunca el importe del
 sueldo**: la auditoría la lee quien tiene `ver_auditoria`, que no es lo mismo que `ver_sueldos`.

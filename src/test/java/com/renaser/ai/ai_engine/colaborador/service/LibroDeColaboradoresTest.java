@@ -59,6 +59,27 @@ class LibroDeColaboradoresTest {
     }
 
     @Test
+    @DisplayName("un celular que Excel guardó como cifra se lee igual que escrito como texto")
+    void elCelularComoCifra() throws IOException {
+        try (XSSFWorkbook libro = new XSSFWorkbook(); ByteArrayOutputStream salida = new ByteArrayOutputStream()) {
+            Sheet hoja = libro.createSheet("Colaboradores");
+            Row cabecera = hoja.createRow(0);
+            cabecera.createCell(0).setCellValue("Tipo de documento");
+            cabecera.createCell(1).setCellValue("Número de documento");
+            cabecera.createCell(2).setCellValue("Celular");
+            Row fila = hoja.createRow(1);
+            fila.createCell(0).setCellValue("DNI");
+            fila.createCell(1).setCellValue("45123456");
+            fila.createCell(2).setCellValue(987654321d);
+            libro.write(salida);
+            String celular = LibroDeColaboradores.leer(salida.toByteArray(), "carga.xlsx").filas().get(0)
+                    .de(Columna.CELULAR).texto();
+            assertThat(celular).isEqualTo("987654321");
+            assertThat(ReglasDelColaborador.celularParaGuardar(celular, null)).isEqualTo("+51987654321");
+        }
+    }
+
+    @Test
     @DisplayName("un encabezado desconocido es un error con su columna")
     void encabezadoDesconocido() throws IOException {
         byte[] archivo = libro(List.of("Tipo de documento", "Número de documento", "Talla de polo"),

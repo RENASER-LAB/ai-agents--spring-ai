@@ -1,5 +1,6 @@
 package com.renaser.ai.ai_engine.colaborador.service;
 
+import com.renaser.ai.ai_engine.whatsapp.service.Celular;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -42,6 +43,31 @@ class ReglasDelColaboradorTest {
         assertThat(ReglasDelColaborador.errorDelNacimiento(HOY.minusYears(14).plusDays(1), HOY))
                 .contains("14 años");
         assertThat(ReglasDelColaborador.errorDelNacimiento(HOY.minusYears(14), HOY)).isNull();
+    }
+
+    @Test
+    @DisplayName("el celular es opcional y, si viene, cumple la regla de la cuenta y se guarda en formato internacional")
+    void elCelular() {
+        assertThat(ReglasDelColaborador.errorDelCelular(null, null)).isNull();
+        assertThat(ReglasDelColaborador.errorDelCelular("   ", "+51987654321")).isNull();
+        assertThat(ReglasDelColaborador.celularParaGuardar("   ", "+51987654321")).isNull();
+        assertThat(ReglasDelColaborador.errorDelCelular("987 654 321", null)).isNull();
+        assertThat(ReglasDelColaborador.celularParaGuardar("987 654 321", null)).isEqualTo("+51987654321");
+        assertThat(ReglasDelColaborador.celularParaGuardar("+34 612 345 678", null)).isEqualTo("+34612345678");
+        assertThat(ReglasDelColaborador.errorDelCelular("abc", null)).isEqualTo(Celular.MENSAJE);
+        assertThat(ReglasDelColaborador.errorDelCelular("12345", "+51987654321")).isEqualTo(Celular.MENSAJE);
+        assertThat(ReglasDelColaborador.celularParaGuardar("abc", null)).isNull();
+    }
+
+    @Test
+    @DisplayName("un celular de antes de la regla que vuelve igual no es error ni cambio; tocado, sí se comprueba")
+    void elCelularDeAntes() {
+        assertThat(ReglasDelColaborador.errorDelCelular(" 01-4567890 ", "01-4567890")).isNull();
+        assertThat(ReglasDelColaborador.celularParaGuardar(" 01-4567890 ", "01-4567890")).isEqualTo("01-4567890");
+        assertThat(ReglasDelColaborador.errorDelCelular("01-4567891", "01-4567890")).isEqualTo(Celular.MENSAJE);
+        // El guardado, tal como lo enseña el campo con la máscara, vuelve al mismo formato.
+        assertThat(ReglasDelColaborador.celularParaGuardar("987 654 321", "+51987654321"))
+                .isEqualTo("+51987654321");
     }
 
     @Test

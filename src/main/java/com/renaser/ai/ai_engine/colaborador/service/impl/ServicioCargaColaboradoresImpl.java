@@ -47,6 +47,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -208,6 +209,8 @@ public class ServicioCargaColaboradoresImpl implements ServicioCargaColaboradore
         final Map<String, List<Puesto>> cargosPorNombre;
         final Map<String, List<String>> provinciasPorNombre = new HashMap<>();
         final Map<String, String> nivelesPorNombre = new HashMap<>();
+        /** El celular que ya tiene cada ficha que el archivo actualiza: si vuelve igual, no es error. */
+        final Map<Long, String> celularesGuardados = new HashMap<>();
 
         Validacion(Long org, LocalDate hoy, boolean sueldos, Lectura lectura) {
             this.org = org;
@@ -284,6 +287,7 @@ public class ServicioCargaColaboradoresImpl implements ServicioCargaColaboradore
             }
 
             // 3 · Cada fila, alta o actualización.
+            celularesDeLasFichas(claveDe.values());
             for (Fila fila : lectura.filas()) {
                 String clave = claveDe.get(fila);
                 if (clave == null) continue;
@@ -331,7 +335,7 @@ public class ServicioCargaColaboradoresImpl implements ServicioCargaColaboradore
             v.sexo = deLista(f, Columna.SEXO, CatalogosDePersonas.SEXOS, alta && !faltan.contains(Columna.SEXO));
             v.estadoCivil = deLista(f, Columna.ESTADO_CIVIL, CatalogosDePersonas.ESTADOS_CIVILES, false);
             v.nacionalidad = ReglasDelColaborador.texto(f.de(Columna.NACIONALIDAD).texto());
-            v.celular = ReglasDelColaborador.texto(f.de(Columna.CELULAR).texto());
+            v.celular = celular(f, alta ? null : celularesGuardados.get(v.existente.id()));
             v.correoPersonal = correo(f, Columna.CORREO_PERSONAL);
             v.correoCorporativo = correo(f, Columna.CORREO_CORPORATIVO);
             v.direccion = ReglasDelColaborador.texto(f.de(Columna.DIRECCION).texto());
@@ -684,6 +688,30 @@ public class ServicioCargaColaboradoresImpl implements ServicioCargaColaboradore
                 return null;
             }
             return encontrados.get(0);
+        }
+
+        /**
+         * Lo que ya tienen guardado las fichas que el archivo actualiza, solo si trae la columna
+         * Celular. Un HashMap y no un {@code toMap}: una ficha sin celular guarda un null.
+         */
+        private void celularesDeLasFichas(Collection<String> claves) {
+            if (!lectura.columnas().contains(Columna.CELULAR)) return;
+            List<Long> ids = claves.stream().map(actualPorClave::get).filter(Objects::nonNull)
+                    .map(Actual::id).distinct().toList();
+            if (ids.isEmpty()) return;
+            colaboradores.findByOrganizacionIdAndIdIn(org, ids)
+                    .forEach(c -> celularesGuardados.put(c.getId(), c.getCelular()));
+        }
+
+        /** El celular de la fila con la regla de la ficha; el mismo que ya tiene no es error ni cambio. */
+        private String celular(Fila f, String guardado) {
+            String escrito = f.de(Columna.CELULAR).texto();
+            String error = ReglasDelColaborador.errorDelCelular(escrito, guardado);
+            if (error != null) {
+                errorEn(f, Columna.CELULAR, error);
+                return null;
+            }
+            return ReglasDelColaborador.celularParaGuardar(escrito, guardado);
         }
 
         private String correo(Fila f, Columna columna) {

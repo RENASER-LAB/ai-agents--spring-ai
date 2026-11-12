@@ -1,5 +1,7 @@
 package com.renaser.ai.ai_engine.colaborador.service;
 
+import com.renaser.ai.ai_engine.whatsapp.service.Celular;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Locale;
@@ -77,6 +79,35 @@ public final class ReglasDelColaborador {
     public static String errorDelCorreo(String correo) {
         if (correo == null) return null;
         return CORREO.matcher(correo).matches() ? null : "El correo «" + correo + "» no es válido";
+    }
+
+    /**
+     * El celular de la ficha, con la misma regla que el de la cuenta ({@link Celular}). Vacío vale:
+     * es opcional.
+     *
+     * <p>Lo que ya estaba guardado y vuelve tal cual tampoco da error aunque no la cumpla: un
+     * celular de antes de esta regla no obliga a corregirlo para guardar el resto de la ficha ni
+     * para volver a cargar el mismo Excel. Se comprueba en cuanto alguien lo cambia.
+     */
+    public static String errorDelCelular(String escrito, String guardado) {
+        String limpio = texto(escrito);
+        if (limpio == null || limpio.equals(guardado) || Celular.comoE164(limpio).isPresent()) {
+            return null;
+        }
+        return Celular.MENSAJE;
+    }
+
+    /**
+     * Lo que se guarda del celular de la ficha: en formato internacional, como el de la cuenta
+     * («+51987654321»); lo de antes tal cual si vuelve igual; y null si viene vacío. Lo que no
+     * cumple la regla se para antes con {@link #errorDelCelular}: aquí daría null.
+     */
+    public static String celularParaGuardar(String escrito, String guardado) {
+        String limpio = texto(escrito);
+        if (limpio == null || limpio.equals(guardado)) {
+            return limpio;
+        }
+        return Celular.comoE164(limpio).orElse(null);
     }
 
     /**
