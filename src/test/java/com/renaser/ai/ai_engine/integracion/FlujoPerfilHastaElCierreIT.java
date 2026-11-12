@@ -256,6 +256,12 @@ class FlujoPerfilHastaElCierreIT {
                 + "and tipo = 'RECORDATORIO_EVALUACION'", String.class, usuarioDe("ana")))
                 .containsExactly("Aún no has respondido tu evaluación para Cajero principal");
         assertThat(contar("select count(*) from aviso_portal where titulo like '%vence el%'")).isZero();
+        // V79: el correo ya no promete una fecha que el Perfil Integral no tiene
+        assertThat(jdbc.queryForList("select cuerpo from correo_enviado where usuario_id = ? "
+                + "and plantilla_correo_codigo = 'RECORDATORIO_EVALUACION'", String.class, usuarioDe("ana")))
+                .singleElement().asString()
+                .contains("puedes empezar ahora y terminarla después.")
+                .doesNotContain("antes de que venza");
     }
 
     // ============ El cierre a mano ============

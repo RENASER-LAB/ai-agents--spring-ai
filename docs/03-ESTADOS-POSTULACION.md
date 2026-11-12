@@ -463,14 +463,13 @@ para avanzar sola y mi nota del Perfil Integral llega a la mínima que fijó; si
 descarta: una persona revisa mi caso». Quien firmó la 1.0 sigue ligado a ella y no se le pide
 aceptar otra vez. La página pública de privacidad del portal dice lo mismo.
 
-⚠️ **Desde la `V78` la página pública dice algo más preciso que el texto firmado.** La página
-dice que el proceso se cierra «si la vacante se cierra antes de que termines tu evaluación, o si
-se te pasa el plazo que tenías para dar una prueba». El texto `PLATAFORMA` vigente (1.2, `V73`)
-sigue diciendo «si se me pasa el plazo que tenía para responder una evaluación o una prueba»: para
-el Perfil Integral ese plazo es ahora el cierre de la vacante. Ninguno de los dos nombra la
-cuarta fila, el cierre de la vacante por su fecha: lo que le llega al candidato es su efecto, que
-es la segunda. Cambiar las palabras firmadas exige publicar una versión nueva del texto, y eso
-quedó fuera de esta entrega.
+Desde la **`V79` (11/11/2026)** las cuentas nuevas firman la **1.3 de `PLATAFORMA`**, que dice lo
+mismo que la página pública: el sistema «cierra mi proceso si la vacante se cierra antes de que
+termine mi evaluación, o si se me pasa el plazo que tenía para dar una prueba». Es la 1.2 palabra
+por palabra salvo esa frase; quien firmó la 1.2 (que decía «si se me pasa el plazo que tenía para
+responder una evaluación o una prueba») sigue ligado a ella y no se le pide aceptar otra vez.
+Ninguno de los textos nombra la cuarta fila, el cierre de la vacante por su fecha: lo que le llega
+al candidato es su efecto, que es la segunda.
 
 ---
 

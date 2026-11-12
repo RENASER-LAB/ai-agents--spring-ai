@@ -424,7 +424,10 @@ El texto que se acepta, versionado y con su huella.
 activo»: publicar una versión nueva no despublica la anterior, y `publicado_en` vacío es un
 borrador que no rige. Así entró la `PLATAFORMA` 1.1 (`V72`, 12/10/2026), y así la 1.2 (`V73`,
 13/10/2026), que suma el celular, WhatsApp y Meta Platforms a lo que decía la 1.1: la firman las
-cuentas nuevas, y las firmas de la 1.0 y la 1.1 siguen apuntando a la suya. ⚠️ La 1.2 se publica
+cuentas nuevas, y las firmas de la 1.0 y la 1.1 siguen apuntando a la suya. Y así la 1.3 (`V79`,
+11/11/2026), que es la 1.2 con una sola frase cambiada: el proceso se cierra «si la vacante se
+cierra antes de que termine mi evaluación, o si se me pasa el plazo que tenía para dar una
+prueba». ⚠️ Cada versión se publica
 **al menos un segundo después** de la última de su tipo: si dos migraciones corrieran en la misma
 transacción tendrían el mismo `now()`, y el vigente quedaría al azar.
 
