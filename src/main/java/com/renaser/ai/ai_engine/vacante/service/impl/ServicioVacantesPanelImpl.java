@@ -198,6 +198,19 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
         this.cierre = cierre;
     }
 
+    /**
+     * Las líneas de «Qué buscar en el CV» (V80): guardarlas al crear y al editar, y lo que
+     * arrastra cambiarlas con candidatos dentro. Por setter, como {@code cierre}: las pruebas de
+     * la vacante construyen el servicio a mano y la mayoría no las toca; sin él, el formulario se
+     * guarda como antes y las filas salen sin líneas.
+     */
+    private com.renaser.ai.ai_engine.vacante.service.QueBuscarEnElCvDeLaVacante queBuscar;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void setQueBuscar(com.renaser.ai.ai_engine.vacante.service.QueBuscarEnElCvDeLaVacante queBuscar) {
+        this.queBuscar = queBuscar;
+    }
+
     /** Lo que contesta la API a un código de ciudad que el catálogo no ofrece (V62). */
     static final String CIUDAD_FUERA_DEL_CATALOGO = "Esa ciudad no está en el catálogo";
 
@@ -342,6 +355,13 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                 .creadoEn(Instant.now())
                 .build());
 
+        // «Qué buscar en el CV» (V80): sin nadie dentro todavía, se guardan sin preguntar. Una
+        // línea prohibida o larguísima es un 400 y no deja nada guardado: la transacción entera
+        // se deshace.
+        if (queBuscar != null) {
+            queBuscar.alCrear(vacante.getId(), datos.queBuscarEnElCv());
+        }
+
         solicitud.setEstado("CON_VACANTE");
         solicitudes.save(solicitud);
 
@@ -438,8 +458,17 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                 sueldoAhora, nombreDeCiudad(vacante.getCiudadUbigeo(), ciudades),
                 nombreDeCiudad(ciudad, ciudades));
 
+        // «Qué buscar en el CV» (V80) va aparte de los textos públicos: no es un cambio visible
+        // —no se avisa a nadie ni toca el contexto de WhatsApp— y un cuerpo sin el campo no las
+        // toca. Antes de mirar si lo demás cambió: cambiar solo las líneas también es guardar.
+        com.renaser.ai.ai_engine.vacante.service.QueBuscarEnElCvDeLaVacante.Cambio lineas =
+                queBuscar == null
+                        ? com.renaser.ai.ai_engine.vacante.service.QueBuscarEnElCvDeLaVacante.Cambio.SIN_CAMBIOS
+                        : queBuscar.alEditar(quien, vacante, datos.queBuscarEnElCv(),
+                                Boolean.TRUE.equals(datos.confirmarNuevaBusqueda()));
+
         if (!cambios.hayCambios()) {
-            return new VacanteActualizadaResponse(false, 0);
+            return new VacanteActualizadaResponse(lineas.cambiaron(), 0, lineas.cvsABuscar());
         }
         String motivo = exigirMotivoSiCambiaElSueldo(vacante, cambios, datos);
 
@@ -475,7 +504,19 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
         auditoria.registrar(quien.organizacionId(), quien, "editar_vacante",
                 "vacante", id, cambios.anterior(), cambios.nuevo(), motivo);
 
-        return new VacanteActualizadaResponse(true, avisarDeLaEdicion(vacante, cambios));
+        return new VacanteActualizadaResponse(true, avisarDeLaEdicion(vacante, cambios),
+                lineas.cvsABuscar());
+    }
+
+    @Override
+    public QueBuscarEnElCvActual queBuscarEnElCv(ContextoUsuario quien, Long id) {
+        // El permiso del lápiz: esto existe para que el formulario de edición sepa si pregunta.
+        Vacante vacante = alcance.laVacanteVisible(quien, id, PERMISO_EDITAR);
+        if (queBuscar == null) {
+            return new QueBuscarEnElCvActual(List.of(), 0);
+        }
+        return new QueBuscarEnElCvActual(queBuscar.vigentes(vacante.getId()),
+                queBuscar.paraVolverABuscar(vacante.getId()).size());
     }
 
     /**
@@ -579,6 +620,10 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
         Map<String, OpcionUbigeo> ciudades =
                 ciudadesDe(filas.stream().map(Vacante::getCiudadUbigeo).toArray(String[]::new));
         Function<Vacante, PreguntasDeLaFila> preguntas = preguntasDeLaLista(quien.organizacionId());
+        // «Qué buscar en el CV» (V80) de toda la lista en una consulta: el lápiz de la fila abre el
+        // formulario con lo que la fila trae.
+        Map<Long, List<String>> queBuscarDeLaLista = queBuscar == null ? Map.of()
+                : queBuscar.vigentesDe(filas.stream().map(Vacante::getId).toList());
         return filas.stream()
                 // ⚠️ Sin el plazo vigente, y es deliberado: resolverlo pide la versión de la
                 // plantilla y los intentos abiertos de CADA vacante, o sea dos consultas por
@@ -589,7 +634,7 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                         puedeEditar(quien, alcanceDeEdicion, v),
                         alcanceDeArchivo, alcanceDeEliminacion, quien,
                         PlazoDeLaPrueba.SIN_DATO, ciudadDe(v, ciudades), preguntas.apply(v),
-                        LoPrestado.SIN_DATO))
+                        LoPrestado.SIN_DATO, queBuscarDeLaLista.getOrDefault(v.getId(), List.of())))
                 .toList();
     }
 
@@ -662,7 +707,8 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                 ciudadDe(vacante, ciudadesDe(vacante.getCiudadUbigeo())),
                 // El estado de las propias no: el detalle lo lee del editor, con sus puntos.
                 new PreguntasDeLaFila(tieneBancoPropioDelNivel(vacante), null),
-                new LoPrestado(bancoFijoDe(vacante), pruebaPrestadaDe(vacante)));
+                new LoPrestado(bancoFijoDe(vacante), pruebaPrestadaDe(vacante)),
+                queBuscar == null ? List.of() : queBuscar.vigentes(vacante.getId()));
     }
 
     /**
@@ -1906,7 +1952,8 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                                    FiltroAlcance alcanceDeArchivo,
                                    FiltroAlcance alcanceDeEliminacion, ContextoUsuario quien,
                                    PlazoDeLaPrueba plazo, CiudadDeLaVacante ciudad,
-                                   PreguntasDeLaFila preguntas, LoPrestado prestado) {
+                                   PreguntasDeLaFila preguntas, LoPrestado prestado,
+                                   List<String> queBuscarEnElCv) {
         Boolean bancoPropio = preguntas.bancoPropio();
         boolean alcanzaParaArchivar = alcanceDeArchivo != null
                 && alcance.alcanzaALaVacante(quien, alcanceDeArchivo, v);
@@ -1948,7 +1995,7 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                         : v.isAplicaEvaluacion()
                                 && Vacante.ORIGEN_NIVEL.equals(v.getOrigenPreguntas())
                                 && Boolean.FALSE.equals(bancoPropio),
-                preguntas.estadoPropias(), prestado.banco(), prestado.prueba());
+                preguntas.estadoPropias(), prestado.banco(), prestado.prueba(), queBuscarEnElCv);
     }
 
     /**

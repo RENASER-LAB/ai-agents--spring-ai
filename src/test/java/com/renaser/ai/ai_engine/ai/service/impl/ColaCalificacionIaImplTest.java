@@ -369,7 +369,7 @@ class ColaCalificacionIaImplTest {
 
         verify(registro).crearElRetratoSiLosDemasAcabaron(1L, POSTULACION,
                 List.of(AgenteDatosCv.CODIGO_AGENTE, AgenteEvidenciaCv.CODIGO_AGENTE,
-                        AgenteEvaluador.CODIGO_AGENTE),
+                        AgenteEvaluador.CODIGO_AGENTE, AgenteBusquedaCv.CODIGO_AGENTE),
                 AgentePotencialRiesgo.CODIGO_AGENTE, "FINA", 6L);
     }
 
@@ -432,7 +432,7 @@ class ColaCalificacionIaImplTest {
 
         verify(registro).crearElRetratoSiLosDemasAcabaron(1L, POSTULACION,
                 List.of(AgenteDatosCv.CODIGO_AGENTE, AgenteEvidenciaCv.CODIGO_AGENTE,
-                        AgenteEvaluador.CODIGO_AGENTE),
+                        AgenteEvaluador.CODIGO_AGENTE, AgenteBusquedaCv.CODIGO_AGENTE),
                 AgentePotencialRiesgo.CODIGO_AGENTE, "FINA", 1L);
         // Y nadie encola a nadie por su cuenta: eso duplicaría trabajos.
         verify(registro, never()).crearSiHaceFalta(

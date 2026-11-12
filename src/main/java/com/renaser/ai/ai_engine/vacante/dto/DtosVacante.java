@@ -84,7 +84,38 @@ public final class DtosVacante {
              * llegar la noticia, y la auditoría tiene que poder contestar por qué—, y queda
              * como motivo de la fila de auditoría, nunca en el aviso del candidato.
              */
-            String motivoRemuneracion) {}
+            String motivoRemuneracion,
+            /**
+             * «Qué buscar en el CV» (V80): hasta seis cosas concretas que la IA busca en cada
+             * CV. Privadas: no las ve el candidato ni ningún agente que escriba para él.
+             *
+             * <p>Opcional a propósito: si falta, no cambia nada —un formulario que no las enseña
+             * no las borra—; una lista vacía las quita. Las vacías no cuentan, las repetidas
+             * cuentan una vez y se guardan las seis primeras. Una línea que pida algo que no
+             * sirve para elegir a nadie, o de más de 200 caracteres, es un 400 y no se guarda
+             * nada.
+             */
+            java.util.List<String> queBuscarEnElCv,
+            /**
+             * Si quien edita ya confirmó volver a buscar en los CV calificados (V80). Cambiar las
+             * líneas con CV calificados sin esto es un 409: el panel pregunta antes.
+             */
+            Boolean confirmarNuevaBusqueda) {
+
+        /** Sin «Qué buscar en el CV» (V80): no se tocan las líneas. */
+        public GuardarVacante(Long solicitudTalentoId, Long puestoId, String titulo,
+                              String descripcion, String proposito, String responsabilidades,
+                              String requisitos, String modalidad, String horario,
+                              String ubicacion, String ciudadUbigeo,
+                              RemuneracionDeLaVacante remuneracion, String tipoCierre,
+                              Integer plazas, Instant abreEn, Instant cierraEn,
+                              Long responsableUsuarioId, String motivoRemuneracion) {
+            this(solicitudTalentoId, puestoId, titulo, descripcion, proposito, responsabilidades,
+                    requisitos, modalidad, horario, ubicacion, ciudadUbigeo, remuneracion,
+                    tipoCierre, plazas, abreEn, cierraEn, responsableUsuarioId,
+                    motivoRemuneracion, null, null);
+        }
+    }
 
     // Los últimos campos son la configuración de la vacante: qué evaluación y qué prueba
     // tiene asignadas, qué pesos la rigen, si la evaluación del banco está encendida, y qué
@@ -274,7 +305,21 @@ public final class DtosVacante {
                                 *
                                 * <p>⚠️ <b>Solo viaja en el detalle.</b>
                                 */
-                               PruebaPrestada pruebaPrestada) {}
+                               PruebaPrestada pruebaPrestada,
+                               /**
+                                * Las líneas vigentes de «Qué buscar en el CV» (V80), en su
+                                * orden; vacía si no busca nada. Viaja en la lista y en el
+                                * detalle —la lista lo resuelve de una vez para todas las filas—
+                                * porque el lápiz de la lista abre el formulario con lo de la fila.
+                                */
+                               java.util.List<String> queBuscarEnElCv) {}
+
+    /**
+     * Lo que el formulario de edición necesita para decidir si pregunta antes de guardar las
+     * líneas de «Qué buscar en el CV» (V80): las vigentes y a cuántas personas habría que volver
+     * a buscar, sin contar las de «CV sin texto».
+     */
+    public record QueBuscarEnElCvActual(java.util.List<String> lineas, int cvsParaVolverABuscar) {}
 
     /** La versión fija del banco de una vacante vieja (V74). */
     public record BancoFijo(Long id, String etiqueta, Integer minutosObjetivo) {}
@@ -297,7 +342,24 @@ public final class DtosVacante {
                                         Long versionNuevaId, String etiquetaNueva,
                                         int personasConNota, boolean cambia,
                                         java.util.List<PesoAntesYDespues> etapas,
-                                        java.util.List<PesoAntesYDespues> perfilIntegral) {}
+                                        java.util.List<PesoAntesYDespues> perfilIntegral,
+                                        /**
+                                         * Cuánto pesa «Qué buscar en el CV» dentro de la nota
+                                         * del CV, antes y después, en % (V80). Solo si la
+                                         * vacante tiene líneas: si no, nulo, y el panel no
+                                         * pinta la fila.
+                                         */
+                                        PesoAntesYDespues queBuscarEnElCv) {
+
+        public CambioDePesosPrevisto(Long versionAnteriorId, String etiquetaAnterior,
+                                     Long versionNuevaId, String etiquetaNueva,
+                                     int personasConNota, boolean cambia,
+                                     java.util.List<PesoAntesYDespues> etapas,
+                                     java.util.List<PesoAntesYDespues> perfilIntegral) {
+            this(versionAnteriorId, etiquetaAnterior, versionNuevaId, etiquetaNueva,
+                    personasConNota, cambia, etapas, perfilIntegral, null);
+        }
+    }
 
     /** Un peso, antes y después. Vacío donde esa versión no lo trae. */
     public record PesoAntesYDespues(String codigo, String nombre, BigDecimal antes,
@@ -330,7 +392,18 @@ public final class DtosVacante {
      * merece «no había cambios que guardar» y no un «guardado» que no guardó nada— y a
      * cuánta gente le llegó el aviso, que es el mismo contador que ya da el sueldo.
      */
-    public record VacanteActualizadaResponse(boolean huboCambios, int postulantesAvisados) {}
+    public record VacanteActualizadaResponse(boolean huboCambios, int postulantesAvisados,
+                                             /**
+                                              * A cuántas personas se mandó volver a buscar
+                                              * porque cambiaron las líneas de «Qué buscar en el
+                                              * CV» (V80). 0 si no cambiaron.
+                                              */
+                                             int cvsABuscar) {
+
+        public VacanteActualizadaResponse(boolean huboCambios, int postulantesAvisados) {
+            this(huboCambios, postulantesAvisados, 0);
+        }
+    }
 
     /**
      * Lo que la vacante dice sobre el dinero.

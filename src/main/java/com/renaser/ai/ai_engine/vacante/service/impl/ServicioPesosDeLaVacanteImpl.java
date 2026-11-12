@@ -68,6 +68,18 @@ public class ServicioPesosDeLaVacanteImpl implements ServicioPesosDeLaVacante {
     private final RecalculoConOtrosPesos recalculo;
     private final ServicioAuditoria auditoria;
 
+    /**
+     * «Qué buscar en el CV» (V80): si la vacante tiene líneas, la confirmación enseña también su
+     * peso antes y después. Por setter: las pruebas construyen el servicio a mano, y sin él la
+     * confirmación sale como antes.
+     */
+    private com.renaser.ai.ai_engine.perfilintegral.service.LoBuscadoEnElCv loBuscado;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void setLoBuscado(com.renaser.ai.ai_engine.perfilintegral.service.LoBuscadoEnElCv loBuscado) {
+        this.loBuscado = loBuscado;
+    }
+
     @Override
     public CambioDePesosPrevisto preverCambio(ContextoUsuario quien, Long vacanteId,
                                               Long versionPesosId) {
@@ -81,7 +93,8 @@ public class ServicioPesosDeLaVacanteImpl implements ServicioPesosDeLaVacante {
         return new CambioDePesosPrevisto(anterior, etiquetaDe(quien, anterior),
                 nueva.getId(), nueva.getEtiqueta(), personas, cambia,
                 pesosDeEtapa(anterior, nueva.getId()),
-                pesosDelPerfilIntegral(anterior, nueva.getId()));
+                pesosDelPerfilIntegral(anterior, nueva.getId()),
+                pesoDeLoBuscado(vacanteId, anterior, nueva));
     }
 
     @Override
@@ -172,6 +185,21 @@ public class ServicioPesosDeLaVacanteImpl implements ServicioPesosDeLaVacante {
                         dueno.plataforma().getId()))
                 .map(VersionPesos::getEtiqueta)
                 .orElse(null);
+    }
+
+    /**
+     * El peso de «Qué buscar en el CV», antes y después (V80), solo si la vacante tiene líneas: sin
+     * ellas no cambia ninguna nota y la fila no diría nada. Dos versiones que solo difieren en
+     * este número son un cambio como cualquier otro y recalculan a todos.
+     */
+    private PesoAntesYDespues pesoDeLoBuscado(Long vacanteId, Long anterior, VersionPesos nueva) {
+        if (loBuscado == null || loBuscado.vigentes(vacanteId).isEmpty()) {
+            return null;
+        }
+        return new PesoAntesYDespues("QUE_BUSCAR_EN_EL_CV", "Qué buscar en el CV",
+                anterior == null ? null : loBuscado.pesoDe(anterior),
+                nueva.getPesoBusquedaCv() == null
+                        ? VersionPesos.PESO_BUSQUEDA_CV_POR_DEFECTO : nueva.getPesoBusquedaCv());
     }
 
     /** Cuánto pesa cada etapa en la nota final, antes y después, en el orden del proceso. */

@@ -1,5 +1,6 @@
 package com.renaser.ai.ai_engine.postulacion.service.impl;
 
+import com.renaser.ai.ai_engine.postulacion.service.CvSinTexto;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
@@ -46,7 +47,7 @@ public class ExtractorTextoCv {
         if ("docx".equals(extension)) {
             return deDocx(contenido);
         }
-        throw new IllegalStateException(
+        throw new CvSinTexto(
                 ("No se puede leer el texto de «%s». La IA solo puede calificar currículums en "
                         + "PDF o .docx; el formato .doc antiguo hay que volver a subirlo como PDF.")
                         .formatted(nombreOriginal));
@@ -103,7 +104,7 @@ public class ExtractorTextoCv {
         // Un currículum de menos de 40 caracteres no es un currículum. Mejor fallar y que el
         // trabajo quede pendiente que mandarle basura al modelo y guardar la nota que salga.
         if (limpio.length() < 40) {
-            throw new IllegalStateException(queja);
+            throw new CvSinTexto(queja);
         }
         return limpio;
     }

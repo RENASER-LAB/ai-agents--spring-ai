@@ -60,6 +60,10 @@ public class CopiadorDeInstrumentosImpl implements CopiadorDeInstrumentos {
                 .publicadaEn(ahora)
                 .creadoEn(ahora)
                 .copiadaDeVersionId(vigente.getId())
+                // El peso de «Qué buscar en el CV» (V80) se copia con lo demás: la copia de la
+                // empresa nace pesando lo mismo que la versión de la que sale.
+                .pesoBusquedaCv(vigente.getPesoBusquedaCv() == null
+                        ? VersionPesos.PESO_BUSQUEDA_CV_POR_DEFECTO : vigente.getPesoBusquedaCv())
                 .build());
 
         // Las cuatro tablas de reparto, al estilo V17: cuelgan de la versión y de

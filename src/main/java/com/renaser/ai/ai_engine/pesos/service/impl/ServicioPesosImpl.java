@@ -50,11 +50,20 @@ public class ServicioPesosImpl implements ServicioPesos {
     @Override
     @Transactional
     public Long crearVersion(ContextoUsuario quien, CrearVersionPesos datos) {
+        // El peso de «Qué buscar en el CV» (V80): opcional, 25 si falta, y de 0 a 50. La base
+        // tiene el mismo CHECK; aquí se dice antes y con palabras.
+        java.math.BigDecimal pesoBusqueda = datos.pesoBusquedaCv() == null
+                ? VersionPesos.PESO_BUSQUEDA_CV_POR_DEFECTO : datos.pesoBusquedaCv();
+        if (pesoBusqueda.signum() < 0 || pesoBusqueda.compareTo(java.math.BigDecimal.valueOf(50)) > 0) {
+            throw new IllegalArgumentException(
+                    "El peso de «Qué buscar en el CV» va de 0 a 50; llegó " + pesoBusqueda);
+        }
         VersionPesos version = versiones.save(VersionPesos.builder()
                 .organizacionId(quien.organizacionId())
                 .etiqueta(datos.etiqueta())
                 .estado("BORRADOR")
                 .creadoEn(Instant.now())
+                .pesoBusquedaCv(pesoBusqueda)
                 .build());
         auditoria.registrar(quien.organizacionId(), quien, "crear_version_pesos",
                 "version_pesos", version.getId(), null, Map.of("etiqueta", datos.etiqueta()), null);

@@ -115,6 +115,14 @@ public class VacantesPanelController {
         return servicio.editar(permisos.actual(), id, datos);
     }
 
+    @GetMapping("/vacantes/{id}/que-buscar-en-el-cv")
+    @PreAuthorize("@permisos.tiene('editar_vacante')")
+    @Operation(summary = "«Qué buscar en el CV» de la vacante y a cuántas personas habría que "
+            + "volver a buscar si cambia: lo que el formulario de edición mira antes de guardar")
+    public QueBuscarEnElCvActual queBuscarEnElCv(@PathVariable Long id) {
+        return servicio.queBuscarEnElCv(permisos.actual(), id);
+    }
+
     @PostMapping("/vacantes/{id}/plantilla-evaluacion")
     @PreAuthorize("@permisos.tiene('elegir_plantilla_evaluacion')")
     @Operation(summary = "Elegir qué evaluación responderá quien postule. Hace falta antes de publicar")

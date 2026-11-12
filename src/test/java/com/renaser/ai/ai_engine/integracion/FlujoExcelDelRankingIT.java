@@ -209,12 +209,19 @@ public class FlujoExcelDelRankingIT {
         assertThat(nombresDeCriterio(ranking, m.ana())).containsExactlyElementsOf(nombres(ADMINISTRADOR));
         // La rúbrica vigente no viaja en la respuesta del panel: la pide solo el Excel.
         // «puedeVerResenas» es el permiso de la columna de reseñas, no de la rúbrica.
+        // Las tres últimas son de «Qué buscar en el CV» (V80), no del Excel: las líneas de la
+        // vacante, su peso en la nota del CV y el permiso de «Volver a buscar».
         List<String> campos = new ArrayList<>();
         ranking.fieldNames().forEachRemaining(campos::add);
         assertThat(campos).containsExactlyInAnyOrder("vacanteId", "vacante", "puesto",
                 "nivelPuesto", "total", "conPasadaFina", "calificados", "enCurso", "fallidos",
                 "puedeVerPretension", "puedeMoverPostulacion", "vacanteMuestraSueldo",
-                "puedeVerResenas", "filas");
+                "puedeVerResenas", "filas",
+                "queBuscarEnElCv", "pesoQueBuscarEnElCv", "puedeVolverABuscar");
+        // Y esta vacante no busca nada en el CV: sin líneas, sin peso y sin nada en las filas.
+        assertThat(ranking.get("queBuscarEnElCv")).isEmpty();
+        assertThat(ranking.get("pesoQueBuscarEnElCv").isNull()).isTrue();
+        ranking.get("filas").forEach(f -> assertThat(f.get("busqueda").isNull()).isTrue());
     }
 
     @Test

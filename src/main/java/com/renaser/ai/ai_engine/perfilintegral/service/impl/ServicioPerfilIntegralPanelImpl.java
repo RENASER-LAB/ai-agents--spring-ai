@@ -37,7 +37,11 @@ import com.renaser.ai.ai_engine.perfilintegral.repository.NotaCriterioRepository
 import com.renaser.ai.ai_engine.perfilintegral.repository.NotaEtapaRepository;
 import com.renaser.ai.ai_engine.perfilintegral.repository.PerfilTalentoRepository;
 import com.renaser.ai.ai_engine.perfilintegral.repository.PesoCriterioRepository;
+import com.renaser.ai.ai_engine.perfilintegral.service.LoBuscadoEnElCv;
+import com.renaser.ai.ai_engine.perfilintegral.service.NotaDelCurriculum;
 import com.renaser.ai.ai_engine.perfilintegral.service.ServicioPerfilIntegralPanel;
+import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.BusquedaEnElCv;
+import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.LineaBuscadaEnElCv;
 import com.renaser.ai.ai_engine.postulacion.entity.Cv;
 import com.renaser.ai.ai_engine.postulacion.entity.DatoCv;
 import com.renaser.ai.ai_engine.postulacion.entity.EstadoPostulacion;
@@ -152,6 +156,10 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
     private final com.renaser.ai.ai_engine.prueba.service.CalificacionDeLaPruebaPropia calculoPropio;
     private final com.renaser.ai.ai_engine.perfilintegral.service.CalificacionPorPuntos porPuntos;
     private final com.renaser.ai.ai_engine.perfilintegral.repository.VersionBancoRepository versionesBanco;
+    // «Qué buscar en el CV» (V80): los puntos, el orden y el bloque de la ficha, y lo buscado
+    // dentro de la nota del CV. Nulo en las pruebas unitarias que no lo montan: entonces la tanda
+    // sale sin nada de eso y la nota del CV es la de los criterios, como antes.
+    private final com.renaser.ai.ai_engine.perfilintegral.service.LoBuscadoEnElCv loBuscado;
 
     // El orden de la tanda. Manda el grupo, no la nota: quien llega a la nota arrastrando un
     // riesgo crítico no va por delante de quien llega sin ninguno, y ordenar por número
@@ -340,6 +348,34 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
                         ? "No había nadie sin calificar en «" + vacante.getTitulo() + "»."
                         : encolados + " currículums en cola. Tarda alrededor de un minuto y "
                           + "medio por cada diez: vuelve a mirar el ranking en un rato.");
+    }
+
+    @Override
+    @Transactional
+    public CalificacionEncoladaResponse volverABuscarEnElCv(ContextoUsuario quien, Long postulacionId) {
+        Postulacion postulacion = laQueSePuedeTocar(quien, postulacionId, "ajustar_nota");
+        Vacante vacante = vacantes.findByIdAndOrganizacionId(postulacion.getVacanteId(),
+                        quien.organizacionId())
+                .orElseThrow(() -> new ResourceNotFoundException("Postulación", "id", postulacionId));
+        // Con la vacante cerrada o archivada lo ya buscado se sigue viendo, pero no se vuelve a
+        // buscar: la tanda quedó como estaba al cerrarse.
+        VacanteArchivada.exigirQueNoLoEste(vacante);
+        if ("CERRADA".equals(vacante.getEstado())) {
+            throw new IllegalStateException(
+                    "La vacante está cerrada: ya no se vuelve a buscar en los CV");
+        }
+        if (loBuscado == null || loBuscado.vigentes(vacante.getId()).isEmpty()) {
+            throw new IllegalStateException(
+                    "Esta vacante no tiene nada en «Qué buscar en el CV»: no hay qué buscar");
+        }
+        if (!cola.buscarDeNuevoEnElCv(postulacionId)) {
+            return new CalificacionEncoladaResponse("SIN_CAMBIOS",
+                    "Ya se está buscando en su CV: cuando termine, se verá en la ficha.");
+        }
+        auditoria.registrar(quien.organizacionId(), quien, "volver_a_buscar_en_el_cv",
+                "postulacion", postulacionId, null, Map.of(), null);
+        return new CalificacionEncoladaResponse("ENCOLADA",
+                "La búsqueda quedó en cola. Tarda unos segundos: vuelve a mirar la ficha en un rato.");
     }
 
     /**
@@ -624,6 +660,22 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
          * permiso, el dato no llega a existir en esta respuesta. Y solo se pintan: el orden
          * de abajo, las notas, el Excel y el pase automático no las leen.
          */
+        /*
+         * «Qué buscar en el CV» (V80), también en bloque: las líneas vigentes, lo guardado de la
+         * tanda y en qué punto va el trabajo de cada uno. Sin líneas no se consulta nada más y
+         * ninguna fila trae nada nuevo. La frase, la nota y la pregunta solo viajan con el permiso
+         * de abrir la ficha, que es donde se leen.
+         */
+        List<LoBuscadoEnElCv.LineaVigente> lineasVigentes =
+                loBuscado == null ? List.of() : loBuscado.vigentes(vacanteId);
+        BigDecimal pesoBusqueda = lineasVigentes.isEmpty() ? null
+                : loBuscado.pesoDe(vacante.getVersionPesosId());
+        Map<Long, LoBuscadoEnElCv.DeUnaPersona> buscadoPorPostulacion = lineasVigentes.isEmpty()
+                ? Map.of() : loBuscado.deLaTanda(lineasVigentes, ids);
+        Map<Long, String> comoVaLaBusqueda = lineasVigentes.isEmpty()
+                ? Map.of() : cola.comoVaLaBusqueda(ids);
+        boolean conDetalleDeLaBusqueda = quien.tiene("abrir_ficha_candidato");
+
         boolean puedeVerResenas = puedeVerResenasDe(quien, vacante);
         Map<Long, com.renaser.ai.ai_engine.resena.dto.DtosResena.PromedioResenas> resenasPorPersona =
                 puedeVerResenas ? resenas.promediosDe(personasPorId.keySet()) : Map.of();
@@ -698,7 +750,14 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
             PerfilCandidato suPerfil = persona == null ? null
                     : perfilPorPersona.get(persona.getId());
 
-            BigDecimal notaDelCurriculum = notaCurriculum(notaPorCriterio.values(), pesos, idsDelCurriculum);
+            // La nota del CV: los criterios generales y, con la búsqueda terminada, lo buscado con
+            // el peso de la versión. La misma cuenta que el Perfil Integral (NotaDelCurriculum).
+            BigDecimal criteriosGenerales = NotaDelCurriculum.deLosCriterios(
+                    notaPorCriterio.values(), pesos, idsDelCurriculum);
+            LoBuscadoEnElCv.DeUnaPersona suBusqueda = buscadoPorPostulacion.get(p.getId());
+            BigDecimal loBuscadoDeLaFila = LoBuscadoEnElCv.notaDeLoBuscado(lineasVigentes, suBusqueda);
+            BigDecimal notaDelCurriculum = NotaDelCurriculum.combinar(
+                    criteriosGenerales, loBuscadoDeLaFila, pesoBusqueda);
 
             filas.add(new FilaRanking(
                     0,
@@ -754,7 +813,11 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
                     // El nulo se pregunta aquí y no dentro del mapa: Map.of() revienta al
                     // buscarle una clave nula, y una fila sin persona es posible.
                     persona == null ? null : resenasPorPersona.get(persona.getId()),
-                    recalificando));
+                    recalificando,
+                    lineasVigentes.isEmpty() ? null
+                            : busquedaDeLaFila(lineasVigentes, suBusqueda,
+                                    comoVaLaBusqueda.get(p.getId()), loBuscadoDeLaFila,
+                                    criteriosGenerales, conDetalleDeLaBusqueda)));
         }
 
         filas.sort(Comparator
@@ -785,7 +848,7 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
                     f.pretensionMin(), f.pretensionMax(), f.pretensionMoneda(),
                     f.pretensionDeclarada(), f.pretensionDeclaradaMoneda(),
                     f.ponderado(), f.estadoPrueba(), f.postuladoEn(), f.resenas(),
-                    f.recalificando()));
+                    f.recalificando(), f.busqueda()));
         }
 
         return new RankingVacante(vacanteId, vacante.getTitulo(),
@@ -798,7 +861,50 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
                 quien.tiene("ver_pretension"), quien.tiene("mover_postulacion"),
                 laVacanteEnsenaSuSueldo,
                 puedeVerResenas,
-                numeradas);
+                numeradas,
+                lineasVigentes.stream().map(LoBuscadoEnElCv.LineaVigente::texto).toList(),
+                pesoBusqueda,
+                quien.tiene("ajustar_nota"));
+    }
+
+    /**
+     * «Qué buscar en el CV» de una fila (V80). Lo guardado con las líneas vigentes manda: terminada
+     * o CV sin texto. Si no hay nada guardado, lo dice la cola: buscando, fallida, o pendiente —
+     * que es también la espera por el tope de IA, y quien todavía no tiene el CV calificado—.
+     */
+    static BusquedaEnElCv busquedaDeLaFila(List<LoBuscadoEnElCv.LineaVigente> vigentes,
+                                           LoBuscadoEnElCv.DeUnaPersona guardada,
+                                           String segunLaCola, BigDecimal notaLoBuscado,
+                                           BigDecimal criteriosGenerales, boolean conDetalle) {
+        String estado;
+        if (guardada != null) {
+            estado = guardada.estado();
+        } else if ("BUSCANDO".equals(segunLaCola) || "FALLIDA".equals(segunLaCola)) {
+            estado = segunLaCola;
+        } else {
+            estado = "PENDIENTE";
+        }
+        boolean terminada = guardada != null && guardada.terminada();
+        List<LineaBuscadaEnElCv> lineas = new ArrayList<>();
+        int tiene = 0;
+        int menciona = 0;
+        for (LoBuscadoEnElCv.LineaVigente linea : vigentes) {
+            LoBuscadoEnElCv.Encontrado encontrado = terminada ? guardada.porLinea().get(linea.id()) : null;
+            String suEstado = !terminada ? null
+                    : encontrado == null ? "NO_APARECE" : encontrado.estado();
+            if ("TIENE".equals(suEstado)) {
+                tiene++;
+            } else if ("MENCIONA".equals(suEstado)) {
+                menciona++;
+            }
+            boolean conTexto = conDetalle && encontrado != null;
+            lineas.add(new LineaBuscadaEnElCv(linea.orden(), linea.texto(), suEstado,
+                    conTexto ? encontrado.frase() : null,
+                    conTexto ? encontrado.nota() : null,
+                    conTexto ? encontrado.pregunta() : null));
+        }
+        return new BusquedaEnElCv(estado, tiene, menciona, vigentes.size(), notaLoBuscado,
+                criteriosGenerales, lineas);
     }
 
     // ============ Las columnas por id (V67) ============
@@ -1011,40 +1117,13 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
      * no es un cero.
      */
     /**
-     * La nota del currículum de una fila del ranking.
-     *
-     * <p><b>Solo suma los criterios del currículum</b>, y hay que decirlo explícitamente
-     * porque la versión de pesos ya no es solo suya: desde que existen la simulación y la
-     * validación, la misma versión trae también los diez criterios de una y los nueve de la
-     * otra. Sumar «todo lo que tenga peso» hacía que esta columna cambiara en cuanto un
-     * facilitador calificaba una simulación, y dos currículums idénticos mostraban notas
-     * distintas sin que nadie hubiera tocado un currículum.
-     */
-    private BigDecimal notaCurriculum(java.util.Collection<NotaCriterio> notas,
-                                      Map<Long, BigDecimal> pesos,
-                                      Set<Long> idsDelCurriculum) {
-        BigDecimal suma = BigDecimal.ZERO;
-        BigDecimal pesoTotal = BigDecimal.ZERO;
-        for (NotaCriterio nota : notas) {
-            if (!idsDelCurriculum.contains(nota.getCriterioId())) continue;
-            BigDecimal peso = pesos.get(nota.getCriterioId());
-            if (peso == null || nota.getPuntaje() == null) continue;
-            suma = suma.add(nota.getPuntaje().multiply(peso));
-            pesoTotal = pesoTotal.add(peso);
-        }
-        return pesoTotal.compareTo(BigDecimal.ZERO) == 0
-                ? null
-                : suma.divide(pesoTotal, 2, RoundingMode.HALF_UP);
-    }
-
-    /**
      * Lo que el candidato lleva rendido, sobre 100.
      *
      * <p>El embudo pesa cuatro etapas y a estas alturas solo han ocurrido dos. Sumar sus dos
      * notas y dividir entre 100 —como hace el cálculo de la decisión, que es correcto
      * <b>ahí</b> porque cuenta con las cuatro— daría 70 puntos disfrazados de 100 y un
      * candidato excelente parecería mediocre. Así que se divide entre la suma de ESOS dos
-     * pesos. Es el mismo patrón de {@link #notaCurriculum}: denominador variable, nunca 100
+     * pesos. Es el mismo patrón de la nota del CV ({@link NotaDelCurriculum}): denominador variable, nunca 100
      * fijo, y los pesos leídos de la versión de la vacante — en las que siguen en la v3 el
      * reparto es 57.14/42.86 y un 70 escrito a mano daría el número equivocado.
      *

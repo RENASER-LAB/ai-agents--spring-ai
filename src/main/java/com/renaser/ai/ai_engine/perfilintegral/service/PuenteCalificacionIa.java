@@ -155,6 +155,24 @@ public interface PuenteCalificacionIa {
      */
     void cerrarNotaTecnica(Long postulacionId);
 
+    // ==================== «Qué buscar en el CV» (V80) ====================
+
+    /**
+     * Si hay que buscar en el CV de esta persona: su vacante tiene líneas en «Qué buscar en el
+     * CV» y todavía no hay una búsqueda guardada con las vigentes. Lo pregunta la cola antes de
+     * encolar la búsqueda junto a EVIDENCIA_CV: sin líneas no se encola nada y no se gasta IA.
+     */
+    boolean hayQueBuscarEnElCv(Long postulacionId);
+
+    /**
+     * Rehace la nota del Perfil Integral y el grupo de quien ya los tiene, sin IA, sin mover a
+     * nadie de etapa y sin publicar eventos (V80). La llaman la rebúsqueda al llegar y el cambio
+     * de las líneas al archivar lo encontrado: en los dos casos la nota del CV cambia y nadie
+     * cambia de etapa por eso. A quien todavía no tiene nota no le hace nada: su retrato la
+     * calculará con lo que haya.
+     */
+    void recalcularSiYaTieneNota(Long postulacionId);
+
     // ==================== POTENCIAL_RIESGO ====================
 
     /** Todo lo ya calificado, que es de donde sale el Perfil de Talento. */

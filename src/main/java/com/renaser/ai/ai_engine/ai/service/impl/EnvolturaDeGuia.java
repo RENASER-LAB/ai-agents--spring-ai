@@ -44,16 +44,24 @@ final class EnvolturaDeGuia {
      * @param cierra el rótulo de cierre, con un {@code %s} donde va la marca
      */
     static String envolver(String guia, String abre, String cierra, String formato) {
-        String limpia = guia == null ? "" : guia.trim();
+        String envuelta = envolverSolo(guia, abre, cierra);
+        return envuelta.isEmpty() ? formato : envuelta + "\n\n" + formato;
+    }
+
+    /**
+     * Solo el texto envuelto, sin formato detrás: vacío si no hay texto. Lo usa «Qué buscar en
+     * el CV» (V80), cuyas líneas van en el mensaje de datos y no en el {@code system}.
+     */
+    static String envolverSolo(String texto, String abre, String cierra) {
+        String limpia = texto == null ? "" : texto.trim();
         if (limpia.isEmpty()) {
-            return formato;
+            return "";
         }
         if (limpia.length() > MAXIMO_GUIA) {
             limpia = limpia.substring(0, MAXIMO_GUIA) + "\n[...cortada por lo larga]";
         }
         // Ni se recorta ni se sanea el texto: lo que lo acota es el rótulo irrepetible.
         String marca = new BigInteger(40, AZAR).toString(36);
-        return abre.formatted(marca) + "\n\n" + limpia + "\n\n"
-                + cierra.formatted(marca) + "\n\n" + formato;
+        return abre.formatted(marca) + "\n\n" + limpia + "\n\n" + cierra.formatted(marca);
     }
 }
