@@ -1,6 +1,5 @@
 # Qué buscar en el CV
-
-Estado: lista para implementar
+Estado: TERMINADO
 
 Escrita el 21/10/2026 contra `main` (backend hasta V77 y el #126; frontend hasta el #88).
 

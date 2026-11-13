@@ -675,6 +675,16 @@ versiones se envió, para poder demostrar que la regla se cumplió.
 Ese puntaje es **interno, explicable y versionado**, y aporta 10 de los 40 puntos del Perfil
 Integral.
 
+**RF-43b** **Cada vacante puede buscar además lo suyo en el CV** (13/11/2026): al crearla o
+editarla, el equipo escribe en «Qué buscar en el CV» hasta seis cosas concretas, y la IA dice de
+cada persona si **lo tiene**, con la frase del CV que lo prueba, si **lo menciona** sin detalle o
+si **no aparece**. Lo buscado entra **dentro** de la nota del CV con el peso que fija la versión de
+pesos de la vacante (25 % por defecto, de 0 a 50); el peso del CV en el Perfil Integral no cambia.
+Las líneas son **privadas**: el candidato no las ve nunca. No se puede buscar nada que no sirva
+para elegir a nadie —la edad, el sexo, el estado civil, los hijos, la salud, la religión o el
+origen—, aunque sí los documentos que pide la ley para el puesto. Cambiar las líneas con
+candidatos dentro vuelve a buscar en todos los CV, tras confirmarlo, sin mover a nadie de etapa.
+
 **RF-44** La antigüedad no da puntos por sí sola.
 
 **RF-45** Cada afirmación del currículum se clasifica en una de cuatro: **demostrada**,
@@ -1526,6 +1536,7 @@ tocar código y sin volver a publicar el sistema:
 | Los pesos de cada etapa y el reparto interno del Perfil Integral | Dirección |
 | Las barreras críticas de cada vacante | Talento |
 | Los requisitos objetivos de cada vacante | Talento |
+| Qué buscar en el CV de cada vacante | Talento |
 | Las plantillas de evaluación por nivel y familia | Talento |
 | Qué familias son afines y cuánto dura la vigencia de cada componente | Dirección |
 | El reparto de tiempos de la simulación | Talento |

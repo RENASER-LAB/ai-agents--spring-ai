@@ -475,6 +475,26 @@ comprobarlo a mano con un backend local con la cola y la IA encendidas.
 
 ---
 
+## 20 · «Qué buscar en el CV» deja pasar las formas de pedir algo prohibido que no conoce
+
+**Qué le pasa a alguien.** Quien crea una vacante escribe en «Qué buscar en el CV» algo que no
+sirve para elegir a nadie, pero con una forma que la lista no tiene, y se guarda: la IA lo busca
+en cada CV y entra en la nota. Se conocen tres: «Madres de familia» (en plural; «Madre de familia»
+sí se bloquea), «Entre 18 y 35» (una edad sin «años» ni «menor» o «mayor») y «Testigo de Jehová»
+(una religión que no está en la lista).
+
+**Por qué pasa.** Es lo decidido: el filtro es una lista cerrada (decisión de alcance del
+13/11/2026). Bloquea los ejemplos de la spec y los casos que probó QA, y deja fuera cualquier otra
+forma de decirlo. Lo que no cambia: la instrucción del agente le prohíbe deducir esos datos del
+nombre, las fechas, los lugares o la foto, y el CV le llega recortado como siempre. Las reglas, en
+[Calificación con IA](CALIFICACION-CON-IA.md), «Qué buscar en el CV».
+
+**Qué haría falta.** Añadir cada forma nueva a las dos listas —`ReglasQueBuscarEnElCv` en el
+backend y `reglasQueBuscar.ts` en el panel— con su caso en las pruebas de las dos. Las líneas
+escritas se pueden revisar en `linea_busqueda_cv`.
+
+---
+
 ## Documentos relacionados
 
 - [El modelo cambió de nombre](EL-MODELO-CAMBIO-DE-NOMBRE.md) — de dónde salen el 8 y el 9
