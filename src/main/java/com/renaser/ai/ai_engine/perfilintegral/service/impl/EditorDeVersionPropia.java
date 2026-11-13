@@ -3,6 +3,9 @@ package com.renaser.ai.ai_engine.perfilintegral.service.impl;
 import com.renaser.ai.ai_engine.ai.exception.ResourceNotFoundException;
 import com.renaser.ai.ai_engine.ai.service.ColaCalificacionIa;
 import com.renaser.ai.ai_engine.auditoria.service.ServicioAuditoria;
+import com.renaser.ai.ai_engine.perfilintegral.dto.DtosIndiceDePruebas;
+import com.renaser.ai.ai_engine.perfilintegral.dto.DtosIndiceDePruebas.FilaDePrueba;
+import com.renaser.ai.ai_engine.perfilintegral.dto.DtosIndiceDePruebas.VacanteDestino;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPreguntasVacante.CambioAplicado;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPreguntasVacante.CopiarDeOtraVacante;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPreguntasVacante.EditorDePreguntas;
@@ -24,6 +27,7 @@ import com.renaser.ai.ai_engine.perfilintegral.repository.PropuestaPreguntasRepo
 import com.renaser.ai.ai_engine.perfilintegral.repository.VersionBancoRepository;
 import com.renaser.ai.ai_engine.perfilintegral.service.CalificacionPorPuntos;
 import com.renaser.ai.ai_engine.perfilintegral.service.EditorDeLaVacante;
+import com.renaser.ai.ai_engine.perfilintegral.service.FiltrosDelIndice;
 import com.renaser.ai.ai_engine.perfilintegral.service.PreguntasInvalidasException;
 import com.renaser.ai.ai_engine.perfilintegral.service.ReglasDePuntos;
 import com.renaser.ai.ai_engine.perfilintegral.service.ReglasDePuntos.OpcionAValidar;
@@ -35,6 +39,7 @@ import com.renaser.ai.ai_engine.vacante.entity.Vacante;
 import com.renaser.ai.ai_engine.vacante.repository.PuestoRepository;
 import com.renaser.ai.ai_engine.vacante.repository.VacanteRepository;
 import com.renaser.ai.ai_engine.vacante.service.AlcanceSobreLaVacante;
+import com.renaser.ai.ai_engine.vacante.service.LugarDeLaVacante;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -45,6 +50,8 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -77,6 +84,7 @@ public abstract class EditorDeVersionPropia implements EditorDeLaVacante {
     private static final String PERMISO_VER = "ver_vacantes";
     private static final String PERMISO_EDITAR = "editar_vacante";
     private static final String EN_CURSO = "EN_CURSO";
+    private static final String CERRADA = "CERRADA";
 
     /** Con qué trabaja el editor: cada servicio pone las suyas. */
     public record Piezas(AlcanceSobreLaVacante alcance, Permisos permisos,
@@ -84,7 +92,7 @@ public abstract class EditorDeVersionPropia implements EditorDeLaVacante {
                          VersionBancoRepository versiones, CriterioBancoRepository criterios,
                          PreguntaRepository preguntas, OpcionRepository opciones,
                          PropuestaPreguntasRepository propuestas, ColaCalificacionIa cola,
-                         ServicioAuditoria auditoria) {
+                         ServicioAuditoria auditoria, LugarDeLaVacante lugares) {
     }
 
     /**
@@ -102,11 +110,14 @@ public abstract class EditorDeVersionPropia implements EditorDeLaVacante {
      * @param alPublicar        la acción de auditoría al publicar
      * @param alCorregir        la acción de auditoría al corregir las instrucciones
      * @param alCopiar          la acción de auditoría al copiar
+     * @param noLoUsa           el 409 de copiar en una vacante que no usa este editor
+     * @param destinoQuieto     por qué una vacante no se ofrece para recibir la copia
      */
     public record Textos(String proposito, String etiqueta, String varaQuieta,
                          String sinBorrador, String nadaQuePublicar, String noSePublica,
                          String sinPublicada, String publicadaDeOtra, String suPublicada,
-                         String alPublicar, String alCorregir, String alCopiar) {
+                         String alPublicar, String alCorregir, String alCopiar,
+                         String noLoUsa, String destinoQuieto) {
     }
 
     /** Una pregunta como queda al editarla, ya validada por su editor. */
@@ -131,6 +142,16 @@ public abstract class EditorDeVersionPropia implements EditorDeLaVacante {
 
     /** Desde cuándo ya no se cambia el contenido: la primera postulación o la primera rendición. */
     protected abstract boolean laVaraNoSeMueve(Vacante vacante);
+
+    /** {@link #laVaraNoSeMueve} de una vez para una lista: de estas vacantes, las que ya lo rinde alguien. */
+    protected abstract Set<Long> dondeLaVaraNoSeMueve(Collection<Long> vacanteIds);
+
+    /**
+     * Si la vacante rinde lo que escribe este editor: sus preguntas propias en el Perfil
+     * Integral, o la prueba del editor en la etapa técnica. Una vacante puede guardar una
+     * versión que ya no usa (cambió de origen o de instrumento): esa no se lista ni recibe copias.
+     */
+    protected abstract boolean usaElEditor(Vacante vacante);
 
     /** El editor entero, como lo pinta el panel. */
     protected abstract EditorDePreguntas editor(ContextoUsuario quien, Vacante vacante);
@@ -163,6 +184,18 @@ public abstract class EditorDeVersionPropia implements EditorDeLaVacante {
 
     /** Pone la recalificación en la cola; falso si ya había una en marcha. */
     protected abstract boolean recalificar(Long postulacionId);
+
+    /**
+     * Por versión, lo que la fila de «Pruebas» dice además de criterios y preguntas: sus
+     * entregables y su tiempo. Las preguntas propias no tienen nada de eso.
+     */
+    protected Map<Long, LoDeLaPrueba> loDeLaPrueba(List<VersionBanco> versiones) {
+        return Map.of();
+    }
+
+    /** Los entregables (todos) y el tiempo de una versión de la prueba. */
+    public record LoDeLaPrueba(int entregables, String modalidad, Integer minutos, Integer dias) {
+    }
 
     /** Lo que se suelta antes de borrar un criterio del borrador. Nada, salvo que se diga. */
     protected void antesDeQuitarElCriterio(Long criterioId) {
@@ -529,6 +562,11 @@ public abstract class EditorDeVersionPropia implements EditorDeLaVacante {
         if (destino.getId().equals(datos.vacanteOrigenId())) {
             throw new IllegalArgumentException("Se copia de otra vacante, no de esta misma");
         }
+        // Copiar en una vacante que no usa este editor dejaría un borrador que nadie rinde
+        // (spec pruebas-indice-de-la-empresa): se rechaza antes de tocar nada.
+        if (!usaElEditor(destino)) {
+            throw new IllegalStateException(textos().noLoUsa());
+        }
         // La lectura va con el mismo corte por empresa que la vista previa: lo ajeno es 404
         // y no se crea nada.
         VersionBanco origen = laPublicadaDeOtraVacante(quien, datos.vacanteOrigenId());
@@ -543,6 +581,162 @@ public abstract class EditorDeVersionPropia implements EditorDeLaVacante {
                 "version_banco", borrador.getId(), null,
                 Map.of("desdeVacante", datos.vacanteOrigenId(), "desdeVersion", origen.getId()), null);
         return editor(quien, destino);
+    }
+
+    // ============================== «Pruebas»: el índice de la empresa ==============================
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<FilaDePrueba> indice(ContextoUsuario quien, FiltrosDelIndice filtros) {
+        Piezas piezas = piezas();
+        FiltroAlcance alcanceDeVer = piezas.permisos().alcanceDe(PERMISO_VER);
+        Map<Long, LasDeLaVacante> porVacante = enCursoPorVacante(quien.organizacionId());
+        if (porVacante.isEmpty()) {
+            return List.of();
+        }
+        // Las de esta empresa, vivas, que usan el editor para esto y a las que llega su alcance.
+        List<Vacante> suyas = piezas.vacantes().findAllById(porVacante.keySet()).stream()
+                .filter(v -> quien.organizacionId().equals(v.getOrganizacionId()) && v.getEliminadaEn() == null)
+                .filter(this::usaElEditor)
+                .filter(v -> piezas.alcance().alcanzaALaVacante(quien, alcanceDeVer, v))
+                .toList();
+        if (suyas.isEmpty()) {
+            return List.of();
+        }
+        Set<Long> laRindeAlguien = dondeLaVaraNoSeMueve(suyas.stream().map(Vacante::getId).toList());
+        Map<Long, String> nivelPorPuesto = nivelesDe(quien.organizacionId(), suyas);
+        Function<Vacante, String> lugar = piezas.lugares().paraLas(suyas);
+        List<VersionBanco> ensenadas = suyas.stream().map(v -> porVacante.get(v.getId()).laQueSeEnsena()).toList();
+        List<Long> versionIds = ensenadas.stream().map(VersionBanco::getId).toList();
+        Map<Long, Long> criteriosPorVersion = piezas.criterios().findByVersionBancoIdIn(versionIds).stream()
+                .collect(Collectors.groupingBy(CriterioBanco::getVersionBancoId, Collectors.counting()));
+        Map<Long, Long> preguntasPorVersion = piezas.preguntas().findByVersionBancoIdIn(versionIds).stream()
+                .collect(Collectors.groupingBy(Pregunta::getVersionBancoId, Collectors.counting()));
+        Map<Long, LoDeLaPrueba> deLaPrueba = loDeLaPrueba(ensenadas);
+        boolean puedeCopiar = quien.tiene(PERMISO_EDITAR);
+
+        return suyas.stream()
+                .map(v -> {
+                    LasDeLaVacante las = porVacante.get(v.getId());
+                    VersionBanco version = las.laQueSeEnsena();
+                    LoDeLaPrueba prueba = deLaPrueba.get(version.getId());
+                    boolean publicada = las.publicada() != null;
+                    return new FilaDePrueba(v.getId(), v.getTitulo(), lugar.apply(v),
+                            nivelPorPuesto.get(v.getPuestoId()), situacionDe(v),
+                            publicada ? PUBLICADA : BORRADOR, laRindeAlguien.contains(v.getId()),
+                            publicada && las.borrador() != null,
+                            criteriosPorVersion.getOrDefault(version.getId(), 0L).intValue(),
+                            preguntasPorVersion.getOrDefault(version.getId(), 0L).intValue(),
+                            prueba == null ? null : prueba.entregables(),
+                            prueba == null ? null : prueba.modalidad(),
+                            prueba == null ? null : prueba.minutos(),
+                            prueba == null ? null : prueba.dias(),
+                            publicada ? las.publicada().getPublicadaEn() : null,
+                            puedeCopiar && publicada);
+                })
+                .filter(filtros::admite)
+                .sorted(FiltrosDelIndice.ORDEN)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public VersionDePreguntas vistaPreviaDelIndice(ContextoUsuario quien, Long vacanteId) {
+        Vacante vacante = laVisible(quien, vacanteId);
+        // Lo que no está en el índice tampoco se mira desde él: el mismo 404 que lo ajeno.
+        if (!usaElEditor(vacante)) {
+            throw new ResourceNotFoundException("Vacante", "id", vacanteId);
+        }
+        VersionBanco version = version(vacante.getId(), PUBLICADA)
+                .or(() -> version(vacante.getId(), BORRADOR))
+                .orElseThrow(() -> new ResourceNotFoundException("Vacante", "id", vacanteId));
+        return sinAvisos(comoVersion(version));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<VacanteDestino> destinos(ContextoUsuario quien, Long excluir) {
+        Piezas piezas = piezas();
+        // El alcance de editar: es el que pide la copia (laEditable), así que lo que se ofrece
+        // es lo que después se puede copiar.
+        FiltroAlcance alcanceDeEdicion = piezas.permisos().alcanceDe(PERMISO_EDITAR);
+        List<Vacante> editables = piezas.vacantes()
+                .findByOrganizacionIdAndArchivadaEnIsNullAndEliminadaEnIsNullOrderByCreadoEnDesc(
+                        quien.organizacionId())
+                .stream()
+                .filter(v -> !CERRADA.equals(v.getEstado()) && !Objects.equals(v.getId(), excluir))
+                .filter(this::usaElEditor)
+                .filter(v -> piezas.alcance().alcanzaALaVacante(quien, alcanceDeEdicion, v))
+                .toList();
+        if (editables.isEmpty()) {
+            return List.of();
+        }
+        Map<Long, LasDeLaVacante> porVacante = enCursoPorVacante(quien.organizacionId());
+        Set<Long> laRindeAlguien = dondeLaVaraNoSeMueve(editables.stream().map(Vacante::getId).toList());
+        Map<Long, String> nivelPorPuesto = nivelesDe(quien.organizacionId(), editables);
+        Function<Vacante, String> lugar = piezas.lugares().paraLas(editables);
+        String motivo = textos().destinoQuieto();
+        return editables.stream()
+                .map(v -> {
+                    LasDeLaVacante las = porVacante.get(v.getId());
+                    // La misma guarda que copiar: una publicada que ya rinde alguien no se reemplaza.
+                    boolean quieta = las != null && las.publicada() != null && laRindeAlguien.contains(v.getId());
+                    return new VacanteDestino(v.getId(), v.getTitulo(), lugar.apply(v),
+                            nivelPorPuesto.get(v.getPuestoId()), situacionDe(v),
+                            las != null && las.borrador() != null, !quieta, quieta ? motivo : null);
+                })
+                // Las que pueden recibirla primero; dentro, las más nuevas arriba (el orden de la consulta).
+                .sorted(Comparator.comparing(VacanteDestino::puedeRecibir).reversed())
+                .toList();
+    }
+
+    /** La publicada y el borrador de una vacante; cualquiera de los dos puede faltar. */
+    private record LasDeLaVacante(VersionBanco publicada, VersionBanco borrador) {
+        VersionBanco laQueSeEnsena() {
+            return publicada != null ? publicada : borrador;
+        }
+    }
+
+    /** Lo escrito en este editor por cada vacante de la empresa, en una consulta. */
+    private Map<Long, LasDeLaVacante> enCursoPorVacante(Long organizacionId) {
+        Map<Long, VersionBanco> publicadas = new HashMap<>();
+        Map<Long, VersionBanco> borradores = new HashMap<>();
+        for (VersionBanco v : piezas().versiones().enCursoDelProposito(organizacionId, textos().proposito())) {
+            (PUBLICADA.equals(v.getEstado()) ? publicadas : borradores).put(v.getVacanteId(), v);
+        }
+        Set<Long> vacanteIds = new HashSet<>(publicadas.keySet());
+        vacanteIds.addAll(borradores.keySet());
+        Map<Long, LasDeLaVacante> salida = new HashMap<>();
+        vacanteIds.forEach(id -> salida.put(id, new LasDeLaVacante(publicadas.get(id), borradores.get(id))));
+        return salida;
+    }
+
+    /** El nivel de cada puesto de estas vacantes, de la misma empresa. */
+    private Map<Long, String> nivelesDe(Long organizacionId, Collection<Vacante> vacantes) {
+        Map<Long, String> nivelPorPuesto = new HashMap<>();
+        piezas().puestos().findAllById(vacantes.stream().map(Vacante::getPuestoId)
+                        .filter(Objects::nonNull).collect(Collectors.toSet())).stream()
+                .filter(p -> organizacionId.equals(p.getOrganizacionId()))
+                .forEach(p -> nivelPorPuesto.put(p.getId(), p.getNivelPuestoCodigo()));
+        return nivelPorPuesto;
+    }
+
+    /** SIN_PUBLICAR · PUBLICADA · CERRADA · ARCHIVADA. */
+    private static String situacionDe(Vacante v) {
+        if (v.getArchivadaEn() != null) {
+            return DtosIndiceDePruebas.ARCHIVADA;
+        }
+        if (CERRADA.equals(v.getEstado())) {
+            return DtosIndiceDePruebas.CERRADA;
+        }
+        return PUBLICADA.equals(v.getEstado()) ? DtosIndiceDePruebas.PUBLICADA : DtosIndiceDePruebas.SIN_PUBLICAR;
+    }
+
+    /** La vista previa no enseña lo que frena publicar ni «N por arreglar»: es del editor. */
+    private static VersionDePreguntas sinAvisos(VersionDePreguntas v) {
+        return new VersionDePreguntas(v.id(), v.estado(), v.guiaCalificacion(), v.minutosObjetivo(),
+                v.versionGuia(), v.total(), v.cuantosCriterios(), v.cuantasPreguntas(), v.criterios(),
+                v.sinCriterio(), List.of(), v.prueba());
     }
 
     // ============================== Recomendaciones por IA ==============================
@@ -572,7 +766,7 @@ public abstract class EditorDeVersionPropia implements EditorDeLaVacante {
 
     protected Vacante laEditable(ContextoUsuario quien, Long vacanteId) {
         Vacante vacante = piezas().alcance().laVacanteVisible(quien, vacanteId, PERMISO_EDITAR);
-        if (vacante.getArchivadaEn() != null || "CERRADA".equals(vacante.getEstado())) {
+        if (vacante.getArchivadaEn() != null || CERRADA.equals(vacante.getEstado())) {
             throw new IllegalStateException("Una vacante cerrada o archivada no se edita");
         }
         return vacante;
@@ -586,7 +780,7 @@ public abstract class EditorDeVersionPropia implements EditorDeLaVacante {
         FiltroAlcance alcanceDeEdicion = piezas.permisos().alcanceDe(PERMISO_EDITAR);
         return alcanceDeEdicion != null
                 && vacante.getArchivadaEn() == null
-                && !"CERRADA".equals(vacante.getEstado())
+                && !CERRADA.equals(vacante.getEstado())
                 && piezas.alcance().alcanzaALaVacante(quien, alcanceDeEdicion, vacante);
     }
 
@@ -600,7 +794,7 @@ public abstract class EditorDeVersionPropia implements EditorDeLaVacante {
         if (v.getArchivadaEn() != null) {
             return "ARCHIVADA";
         }
-        return "CERRADA".equals(v.getEstado()) ? "CERRADA" : "ACTIVA";
+        return CERRADA.equals(v.getEstado()) ? CERRADA : "ACTIVA";
     }
 
     protected VersionBanco laPublicada(Vacante vacante) {

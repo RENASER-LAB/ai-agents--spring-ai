@@ -24,7 +24,11 @@ vacante eligió cuál (V43):
 ficha.** Las existentes siguen igual, sin migrar nada: en su configuración se sigue eligiendo la
 versión publicada que rinden, y los guiones de plantillas de RENASER siguen sirviendo para ellas.
 La sección «Pruebas» del panel (`/admin/pruebas`), donde se escribían las plantillas, **se retiró
-el 05/10/2026** para todas las empresas: quien abre esa dirección llega a la lista de vacantes.
+el 05/10/2026** para todas las empresas: quien abre la dirección de una de sus versiones llega a la
+lista de vacantes. **Desde el 13/11/2026 `/admin/pruebas` es otra cosa**: el índice, en solo
+lectura, de las preguntas y pruebas que cada empresa escribió en el editor de sus vacantes, sin
+plantillas ni nada del sistema antiguo (ver [APIs](09-APIS.md), ««Pruebas»: el índice de lo
+escrito en el editor»).
 Ver «La prueba escrita en el editor» y «El catálogo de preguntas es solo de la plataforma», más
 abajo.
 

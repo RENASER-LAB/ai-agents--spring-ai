@@ -79,6 +79,7 @@ import com.renaser.ai.ai_engine.vacante.entity.Vacante;
 import com.renaser.ai.ai_engine.vacante.repository.PuestoRepository;
 import com.renaser.ai.ai_engine.vacante.repository.VacanteRepository;
 import com.renaser.ai.ai_engine.vacante.service.AlcanceSobreLaVacante;
+import com.renaser.ai.ai_engine.vacante.service.LugarDeLaVacante;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -127,7 +128,9 @@ public class ServicioPruebaPropiaImpl extends EditorDeVersionPropia implements S
             "La prueba no se puede publicar todavía: ",
             "Esta vacante todavía no tiene la prueba publicada", "Prueba publicada de la vacante",
             "la prueba publicada de esta vacante", "publicar_prueba_propia",
-            "corregir_instrucciones_ia_prueba", "copiar_prueba_propia");
+            "corregir_instrucciones_ia_prueba", "copiar_prueba_propia",
+            "Esta vacante no rinde la prueba del editor en la etapa técnica: no se le puede copiar.",
+            "Ya la rinden candidatos: su prueba no se reemplaza");
 
     private static final ObjectMapper JSON = new ObjectMapper();
 
@@ -153,6 +156,7 @@ public class ServicioPruebaPropiaImpl extends EditorDeVersionPropia implements S
     private final ColaCalificacionIa cola;
     private final ServicioAuditoria auditoria;
     private final FechaLimiteDeLaVacante fechaLimite;
+    private final LugarDeLaVacante lugares;
 
     // ============================== Leer ==============================
 
@@ -1068,7 +1072,7 @@ public class ServicioPruebaPropiaImpl extends EditorDeVersionPropia implements S
     @Override
     protected Piezas piezas() {
         return new Piezas(alcance, permisos, vacantes, puestos, versionesBanco, criteriosBanco,
-                preguntas, opciones, propuestas, cola, auditoria);
+                preguntas, opciones, propuestas, cola, auditoria, lugares);
     }
 
     /** La vara de la prueba se congela en la primera rendición (decisión 9). */
@@ -1080,6 +1084,42 @@ public class ServicioPruebaPropiaImpl extends EditorDeVersionPropia implements S
     /** La frontera de la decisión 9: alguien ya abrió su prueba en esta vacante. */
     private boolean yaSeRindio(Vacante vacante) {
         return intentos.algunoEmpezadoDeLaVacante(vacante.getId());
+    }
+
+    /** {@link #yaSeRindio} de una vez para una lista. */
+    @Override
+    protected Set<Long> dondeLaVaraNoSeMueve(Collection<Long> vacanteIds) {
+        return vacanteIds.isEmpty() ? Set.of() : Set.copyOf(intentos.vacantesConAlgunoEmpezado(vacanteIds));
+    }
+
+    /** Rinde la prueba del editor en la etapa técnica: ni una plantilla ni el cuestionario técnico. */
+    @Override
+    protected boolean usaElEditor(Vacante vacante) {
+        return PRUEBA_PROPIA.equals(vacante.getInstrumentoEtapaTecnica());
+    }
+
+    /**
+     * «N entregables» los cuenta todos, los de pregunta y los generales, como la cabecera del
+     * editor; el tiempo es el del chip: los minutos de la cronometrada o, en las de plazo
+     * abierto de antes de la V68, sus días.
+     */
+    @Override
+    protected Map<Long, LoDeLaPrueba> loDeLaPrueba(List<VersionBanco> versiones) {
+        if (versiones.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, Long> entregablesPorVersion = entregables
+                .findByVersionBancoIdIn(versiones.stream().map(VersionBanco::getId).toList()).stream()
+                .collect(Collectors.groupingBy(EntregableRequerido::getVersionBancoId, Collectors.counting()));
+        Map<Long, LoDeLaPrueba> salida = new HashMap<>();
+        for (VersionBanco v : versiones) {
+            boolean cronometrada = ReglasDeLaPrueba.CRONOMETRADA.equals(v.getModalidad());
+            boolean abierta = ReglasDeLaPrueba.PLAZO_ABIERTO.equals(v.getModalidad());
+            salida.put(v.getId(), new LoDeLaPrueba(entregablesPorVersion.getOrDefault(v.getId(), 0L).intValue(),
+                    v.getModalidad(), cronometrada ? v.getDuracionMinutos() : null,
+                    abierta ? v.getPlazoDias() : null));
+        }
+        return salida;
     }
 
     @Override

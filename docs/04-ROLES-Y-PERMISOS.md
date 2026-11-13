@@ -161,6 +161,15 @@ búsqueda fallida es **«Ajustar una nota de la IA»** (`ajustar_nota`): sin él
 —el ranking lo dice con `puedeVolverABuscar`— y la API responde 403. Fuera del alcance, 404. El
 candidato no ve nada de esto con ningún permiso.
 
+**«Pruebas», el índice de las preguntas y pruebas de la empresa (13/11/2026), tampoco trae permiso
+nuevo.** Verlo es `ver_vacantes` **con su alcance**, como la lista de vacantes: con
+`SUS_VACANTES` solo salen las propias, y la vista previa de otra es 404. «Usar en otra vacante» es
+corregir la vacante destino: `editar_vacante`, y la lista de destinos se corta con el alcance de
+ese permiso, que es el que exige la copia. Sin él, la fila no ofrece copiar (`puedeUsarEnOtra`) y
+la API responde 403. Por defecto el responsable de área ve el índice entero (`ver_vacantes` en
+`TODO`) y no copia. ⚠️ «Copiar de otra vacante», dentro del editor, sigue cortando solo por
+empresa, sin alcance (decisión del 12/10/2026).
+
 **«Editar una vacante» (`editar_vacante`) es el lápiz de la lista y la tarjeta del sueldo.**
 Desde el 19/09/2026 **respeta su alcance**: con alcance a sus vacantes, solo se corrigen las que
 esa persona dirige; en las demás no sale el lápiz, y pedirlo por la API responde 404, no 403. Sin
@@ -440,9 +449,11 @@ permisos de `GET /panel/sesion`, y sigue los permisos que ya exigía cada pantal
 con `ver_vacantes`, «Simulación» con crear sesiones o ver sus inscritos, «Colaboradores» con
 `ver_colaboradores` en `TODO`, y «Configuración» siempre. **El Administrador no ve «Vacantes»**:
 no tiene `ver_vacantes` y esas pantallas ya le respondían 403. Si la sesión no carga, el menú
-enseña las tres entradas de siempre: Vacantes, Simulación y Configuración. **«Pruebas» ya no sale
-para nadie**, RENASER incluida: la sección se retiró el 05/10/2026 y su dirección lleva a la
-lista de vacantes.
+enseña las tres entradas de siempre: Vacantes, Simulación y Configuración. **«Pruebas» vuelve
+desde el 13/11/2026 con otro contenido**: es el índice de lo que la empresa escribió en el editor
+de sus vacantes, sale en Selección detrás de «Vacantes» con `ver_vacantes`, y los permisos de las
+plantillas no la dan. La sección de plantillas que se retiró el 05/10/2026 no vuelve: la dirección
+de una de sus versiones sigue llevando a la lista de vacantes.
 
 ### Configuración
 
