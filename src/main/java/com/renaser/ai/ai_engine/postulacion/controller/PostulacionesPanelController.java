@@ -127,6 +127,14 @@ public class PostulacionesPanelController {
         return perfilIntegral.cribarCv(permisos.actual(), id);
     }
 
+    @PostMapping("/postulaciones/{id}/busqueda-cv")
+    @PreAuthorize("@permisos.tiene('ajustar_nota')")
+    @Operation(summary = "«Volver a buscar»: encola otra vez solo la búsqueda de «Qué buscar en "
+            + "el CV» de esta persona. Al llegar recalcula su nota del CV sin moverla de etapa")
+    public CalificacionEncoladaResponse volverABuscarEnElCv(@PathVariable Long id) {
+        return perfilIntegral.volverABuscarEnElCv(permisos.actual(), id);
+    }
+
     @GetMapping("/postulaciones/{id}/historial")
     @PreAuthorize("@permisos.tiene('abrir_ficha_candidato')")
     @Operation(summary = "El recorrido completo: cada transición, quién y por qué")

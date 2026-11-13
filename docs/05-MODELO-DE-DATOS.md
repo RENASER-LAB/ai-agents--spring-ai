@@ -23,8 +23,8 @@ Sirve para tres cosas:
 - **Entender el sistema.** Un modelo de datos bien contado explica el negocio mejor que
   cualquier otro documento.
 
-**La base ya está construida.** Las migraciones `V1` a `V78` viven en
-`src/main/resources/db/migration` —**125 tablas de este módulo**, 128 en la base contando la de
+**La base ya está construida.** Las migraciones `V1` a `V80` viven en
+`src/main/resources/db/migration` —**128 tablas de este módulo**, 131 en la base contando la de
 Flyway y las dos del motor de agentes— y Flyway es el dueño del esquema. Cambiar algo de aquí
 ya cuesta una migración nueva, y **una migración aplicada no se edita nunca**: se escribe otra
 encima.
@@ -281,7 +281,15 @@ Integral abiertas en vacantes publicadas y reescribe la descripción de `dias_pl
 que queda para el cuestionario técnico. Las evaluaciones abiertas en vacantes ya cerradas las
 vence la aplicación, no la migración, porque cerrar su postulación lleva los avisos de siempre.
 Ver [Estados de la postulación](03-ESTADOS-POSTULACION.md), «Se cierra la convocatoria», y el
-[Diccionario de datos](07-DICCIONARIO-DE-DATOS.md).
+[Diccionario de datos](07-DICCIONARIO-DE-DATOS.md). La `V79` (11/11/2026) tampoco toca el esquema:
+publica versiones nuevas de dos textos que aún hablaban del plazo del Perfil Integral.
+
+La `V80` (13/11/2026) trae **«Qué buscar en el CV»**: hasta seis cosas que la vacante busca en
+cada CV, privadas. Tres tablas nuevas —`linea_busqueda_cv`, `busqueda_cv` y
+`resultado_busqueda_cv`—, la columna `version_pesos.peso_busqueda_cv` (de 0 a 50; todas las
+versiones que existían, también las copias de las empresas, quedaron en 25), el agente
+`BUSQUEDA_CV` con su instrucción y el modo `REBUSCA` de `trabajo_ia`. Las vacantes que existían
+no tienen líneas, así que ninguna nota cambió. Ver «Qué buscar en el CV», más abajo.
 
 La `V54` (14/09/2026) **no añade ninguna tabla y cambia quién firma qué**. Hasta ella había dos
 tipos de texto —`PROCESO` y `FUTUROS_CONTACTOS`— y el de la cuenta usaba el primero, que habla de
@@ -663,7 +671,7 @@ Hay una versión dibujada de este mismo mapa en
 
 ## Las tablas
 
-Ciento veinticinco en total, agrupadas por área para poder leerlas de a poco. En cada una se nombran
+Ciento veintiocho en total, agrupadas por área para poder leerlas de a poco. En cada una se nombran
 las columnas que importan para entender qué hace, no todas.
 
 **Para verlas todas, con tipo y clave, está el [Diccionario de datos](07-DICCIONARIO-DE-DATOS.md).**
@@ -1304,7 +1312,7 @@ Casi todo lo que el cliente cambia seguido vive aquí, no en el código.
 
 | Tabla | Para qué existe | Columnas que importan |
 |---|---|---|
-| `version_pesos` | Una versión de todos los pesos, en borrador o publicada | organizacion_id, etiqueta, estado, publicada_por_usuario_id, publicada_en |
+| `version_pesos` | Una versión de todos los pesos, en borrador o publicada. Desde la `V80`, también cuánto pesa «Qué buscar en el CV» dentro de la nota del CV | organizacion_id, etiqueta, estado, publicada_por_usuario_id, publicada_en, peso_busqueda_cv |
 | `peso_etapa` | Cuánto pesa cada etapa. **Ya no depende del nivel** | version_pesos_id, etapa_codigo, peso |
 | `peso_componente_perfil` | Cómo se reparte el 40% entre currículum, psicométrico y evaluación | version_pesos_id, componente, peso |
 | `peso_dimension` | Cuánto pesa cada dimensión en cada nivel | version_pesos_id, nivel_puesto_codigo, dimension_codigo, peso |
@@ -1370,6 +1378,10 @@ propone preguntas para una vacante y una persona decide qué agrega. Y abre en `
 tercer modo, **`RECALIFICA`**: volver a calificar las abiertas de las preguntas propias cuando la
 empresa corrige su guía. Va por su propio carril a propósito: por la pasada normal, al terminar,
 se rehace el retrato y la persona se mueve de etapa; así solo cambian sus notas.
+
+La `V80` suma **`BUSQUEDA_CV`**, que busca en el CV lo que la vacante escribió en «Qué buscar en
+el CV», y un cuarto modo, **`REBUSCA`**: volver a buscar cuando la empresa cambia las líneas, o
+cuando alguien pulsa «Volver a buscar». Es el mismo carril aparte que `RECALIFICA`, por lo mismo.
 
 Se guarda la respuesta **completa**, no solo la nota: si alguien reclama una calificación, hay
 que poder revisar en qué se basó. Y se guarda **con cuánta confianza** la dio, que es lo que
@@ -1570,6 +1582,36 @@ tocan la de su vacante. Las filas anteriores a la `V77` quedan vacías: no se in
 
 ---
 
+### Qué buscar en el CV · 3 tablas
+
+Desde la `V80` (13/11/2026). Quien crea la vacante escribe hasta seis cosas concretas que busca en
+el CV, y la IA dice de cada persona si **lo tiene** (con la frase del CV que lo prueba), **lo
+menciona** sin detalle o **no aparece**. Cómo se busca y cómo entra en la nota, en [Calificación
+con IA](CALIFICACION-CON-IA.md), «Qué buscar en el CV».
+
+| Tabla | Para qué existe | Columnas que importan |
+|---|---|---|
+| `linea_busqueda_cv` | Lo que la vacante busca en el CV: una fila por línea, como mucho seis vivas | vacante_id, version_lineas, orden, texto, archivada_en |
+| `busqueda_cv` | Cómo acabó la búsqueda en el CV de una persona: terminada, o «CV sin texto» con su motivo. Una viva por postulación | postulacion_id, version_lineas, estado, motivo, ejecucion_ia_id, archivada_en |
+| `resultado_busqueda_cv` | Lo encontrado de cada línea en el CV de una persona. Uno vivo por persona y línea | busqueda_cv_id, postulacion_id, linea_busqueda_cv_id, version_lineas, estado, frase_cv, nota, pregunta, ejecucion_ia_id, archivado_en |
+
+**Son privadas a propósito, y por eso son tablas aparte.** Las líneas no van en
+`vacante.requisitos` ni en ninguna columna que lean el portal, «Mis procesos», WhatsApp, los correos
+o los agentes que escriben lo que ve el candidato. Tampoco cuentan para `contexto_actualizado_en`.
+
+**No son filas de `criterio`.** Los criterios del currículum se cargan todos para cualquier vacante,
+así que una fila por vacante entraría en la nota de todas.
+
+**Cambiar las líneas archiva, no borra.** Se archivan todas las vivas con lo encontrado con ellas,
+y las nuevas nacen con la `version_lineas` siguiente. Un resultado que llega con una versión que ya
+no rige se descarta. Pendiente, en curso y fallida no tienen fila en `busqueda_cv`: se leen del
+trabajo de la cola del agente `BUSQUEDA_CV`.
+
+**La nota no se guarda aquí.** Lo buscado entra en la nota del CV, que se calcula al leer con el
+peso de `version_pesos.peso_busqueda_cv`.
+
+---
+
 ## Lo que la base impide por sí sola, y lo que no
 
 No todas las reglas del sistema caben en una restricción de base de datos. Conviene tener claro
@@ -1636,6 +1678,10 @@ cuáles sí, porque las que no, hay que probarlas en el código.
   hecho dos veces no deja dos pendientes. Un `RESULTADO` lleva su resultado completo y cierra el
   vínculo; un `CONVOCATORIA_CERRADA` lleva su fecha y no lo cierra; y la autorización de aviso
   caduca como mucho 24 horas después del hecho.
+- **Como mucho seis líneas vivas de «Qué buscar en el CV» por vacante**, una por puesto en la
+  lista, de 1 a 200 caracteres (`V80`). Una búsqueda viva por postulación y un resultado vivo por
+  persona y línea. Un resultado «lo tiene» lleva siempre su frase, y el peso de lo buscado en una
+  versión de pesos va de 0 a 50.
 
 ### Tienen que vivir en el código
 
@@ -1704,6 +1750,11 @@ cuáles sí, porque las que no, hay que probarlas en el código.
   un parámetro y de la hora. **Desde el 12/11/2026 la misma regla vale para `colaborador.celular`**,
   que también se guarda en E.164, pero sin CHECK: los de antes siguen como se escribieron y,
   mientras vuelvan iguales, no se comprueban.
+- **Lo que se puede escribir en «Qué buscar en el CV»** (`V80`): que las vacías no cuenten, que una
+  repetida cuente una vez y, sobre todo, que no se pida nada que no sirve para elegir a nadie —la
+  edad, el sexo, el estado civil, los hijos, la salud, la religión o el origen—. Es una lista de
+  palabras y formas, igual en el backend y en el panel, y no cabe en un CHECK. **Que la frase de
+  «lo tiene» exista en el CV** también lo comprueba el código antes de guardarla.
 
 ### Nunca existen, ni siquiera como opción
 

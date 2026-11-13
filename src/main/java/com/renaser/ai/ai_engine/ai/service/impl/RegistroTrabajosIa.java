@@ -111,6 +111,39 @@ public class RegistroTrabajosIa {
                 .build()));
     }
 
+    /**
+     * Crea el trabajo si no hay ninguno vivo de ese agente para esa persona, <b>en ningún modo</b>
+     * (V80).
+     *
+     * <p>Es el de «Qué buscar en el CV»: la búsqueda corre con la criba (FINA) o como rebúsqueda
+     * (REBUSCA), y una viva en cualquiera de los dos ya leerá las líneas vigentes al empezar —o
+     * volverá a buscar si cambian mientras tanto—. Dos a la vez pagarían dos veces por la misma
+     * persona. Lo terminado no exime: si hace falta otra búsqueda es porque las líneas cambiaron.
+     */
+    @Transactional
+    public Optional<TrabajoIa> crearSiNingunoVivo(Long organizacionId, Long postulacionId,
+                                                 String agenteCodigo, String modo) {
+        boolean vivo = trabajos
+                .findFirstByPostulacionIdAndAgenteCodigoOrderByIdDesc(postulacionId, agenteCodigo)
+                .map(t -> "PENDIENTE".equals(t.getEstado()) || "EN_CURSO".equals(t.getEstado())
+                        || "EN_ESPERA".equals(t.getEstado()))
+                .orElse(false);
+        if (vivo) {
+            return Optional.empty();
+        }
+        return Optional.of(trabajos.save(TrabajoIa.builder()
+                .organizacionId(organizacionId)
+                .agenteCodigo(agenteCodigo)
+                .modo(modo)
+                .postulacionId(postulacionId)
+                .referenciaTabla("postulacion")
+                .referenciaId(postulacionId)
+                .estado("PENDIENTE")
+                .intentos(0)
+                .creadoEn(Instant.now())
+                .build()));
+    }
+
     /** El porqué del último intento fallido de un trabajo, o vacío si no quedó escrito. */
     @Transactional(readOnly = true)
     public Optional<String> motivoDelUltimoFallo(Long trabajoIaId) {
@@ -271,7 +304,12 @@ public class RegistroTrabajosIa {
             return Optional.empty();
         }
 
-        if (conEstado(ultimoDeCada, "TERMINADO").isEmpty()) {
+        // La búsqueda de «Qué buscar en el CV» (V80) no basta sola para armar un retrato: con el
+        // CV sin texto termina sin llamar a la IA, y contarla como «algo salió bien» armaría un
+        // retrato sobre la nada cuando todo lo demás falló.
+        Map<String, TrabajoIa> queAlimentan = new java.util.HashMap<>(ultimoDeCada);
+        queAlimentan.remove(AgenteBusquedaCv.CODIGO_AGENTE);
+        if (conEstado(queAlimentan, "TERMINADO").isEmpty()) {
             log.error("La postulación {} se queda sin Perfil de Talento: no salió bien ni uno de "
                             + "los pasos que lo alimentan ({}). NO se le inventa un retrato sobre "
                             + "la nada; hay que volver a pedir la calificación",

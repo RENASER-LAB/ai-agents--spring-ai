@@ -217,4 +217,30 @@ public final class DtosCalificacionIa {
     /** tipo: CONTRADICCION · DEMASIADO_IDEAL. Una alerta nunca descarta a nadie (RF-64). */
     public record AlertaIa(String tipo, String descripcion) {
     }
+
+    // ==================== BUSQUEDA_CV (V80) ====================
+
+    /**
+     * Lo que necesita el agente de «Qué buscar en el CV»: el puesto, el texto anonimizado del CV
+     * —el mismo que lee EVIDENCIA_CV— y las líneas vigentes, en su orden.
+     *
+     * <p>Las líneas NO se le mandan tal cual: el agente las numera y las envuelve como texto de
+     * la empresa, y van en el mensaje de datos (ver {@code AgenteBusquedaCv}). La versión viaja
+     * para que, al guardar, se descarte un resultado de unas líneas que ya cambiaron.
+     */
+    public record InsumoBusquedaCv(String puesto, String curriculum, List<String> lineas,
+                                   int versionLineas) {
+    }
+
+    /** Lo que devuelve el agente: una entrada por línea, con su número. */
+    public record ResultadoDeLaBusquedaIa(List<LineaBuscadaIa> lineas) {
+    }
+
+    /**
+     * estado: TIENE · MENCIONA · NO_APARECE. {@code frase} es obligatoria en TIENE y el servidor
+     * la busca en el CV; {@code pregunta}, para la entrevista, en MENCIONA y NO_APARECE.
+     */
+    public record LineaBuscadaIa(Integer numero, String estado, String frase, String nota,
+                                 String pregunta) {
+    }
 }

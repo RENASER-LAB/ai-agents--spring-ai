@@ -137,6 +137,9 @@ los puntos. Lo hacen `ServicioPesosDeLaVacante` y `RecalculoConOtrosPesos`; las 
   que tenía.
 - **Queda en la auditoría** (`asignar_version_pesos`): quién, cuándo, las dos versiones y
   cuántas personas se recalcularon.
+- **El peso de «Qué buscar en el CV» también es de la versión** (`V80`): dos versiones que solo
+  difieren en ese número cuentan como cambio y recalculan a todos. Lo que la IA encontró en cada
+  CV no depende del peso, así que tampoco se vuelve a buscar.
 
 Sigue sin hacerse: editar una versión de pesos publicada —se crea otra y se elige— y volver a
 «los pesos generales» desde la vacante.
@@ -169,6 +172,7 @@ clase de cambio es cada cosa:
 |---|---|---|
 | Señal de 0 · C3 esperado · C4 esperado | **No** — el texto del candidato sigue ahí | corrección editorial (auditada) → **recalificar** |
 | Pesos de pilar · cortes | **No** | versión de pesos nueva, elegida en la misma vacante aunque tenga candidatos (`V74`) → **se recalcula a todos** |
+| Lo que la vacante busca en el CV («Qué buscar en el CV», `V80`) | **No** — el CV sigue ahí | tras confirmar, se archiva lo encontrado y **se vuelve a buscar en todos los CV**, sin mover a nadie |
 | Añadir o quitar una pregunta | **Sí** — falta la respuesta | versión de banco nueva |
 | Cambiar un enunciado | **Sí** — mide otra cosa | versión de banco nueva. **Línea roja** |
 

@@ -206,8 +206,10 @@ public class ServicioExcelRankingImpl implements ServicioExcelRanking {
         List<Criterio> criterios = PRUEBA_PUESTO.equals(etapa)
                 ? criteriosDeLaPruebaVigente(quien, vacanteId)
                 : criteriosDeLaTanda(tanda.filas());
+        // «Qué buscar en el CV» (V80): una columna más, solo si la vacante busca algo.
+        boolean conLoBuscado = tanda.queBuscarEnElCv() != null && !tanda.queBuscarEnElCv().isEmpty();
         byte[] contenido = escribir(quien, etapa, enElOrdenPedido, criterios, ajenas,
-                pedido.filtroDescrito());
+                pedido.filtroDescrito(), conLoBuscado);
         return new ExcelDeRanking(nombreDelArchivo(etapa, vacanteId), contenido);
     }
 
@@ -223,7 +225,7 @@ public class ServicioExcelRankingImpl implements ServicioExcelRanking {
 
     private byte[] escribir(ContextoUsuario quien, String etapa, List<FilaRanking> filas,
                             List<Criterio> criterios, List<Long> ajenas,
-                            String filtroDescrito) {
+                            String filtroDescrito, boolean conLoBuscado) {
         try (XSSFWorkbook libro = new XSSFWorkbook();
              ByteArrayOutputStream salida = new ByteArrayOutputStream()) {
             Pinceles pinceles = new Pinceles(libro);
@@ -233,14 +235,14 @@ public class ServicioExcelRankingImpl implements ServicioExcelRanking {
             boolean veElCv = quien.tiene(PERMISO_CV);
             Map<Long, EnlaceArchivo> enlaces = veElCv ? enlacesDelCv(quien, filas) : Map.of();
 
-            encabezar(hoja, pinceles, cabeceras(deLaPrueba, criterios),
-                    anchos(deLaPrueba, criterios));
+            encabezar(hoja, pinceles, cabeceras(deLaPrueba, criterios, conLoBuscado),
+                    anchos(deLaPrueba, criterios, conLoBuscado));
             int linea = 1;
             for (FilaRanking fila : filas) {
                 escribirFila(hoja.createRow(linea++), pinceles, fila, deLaPrueba, criterios,
-                        enlaces.get(fila.postulacionId()));
+                        enlaces.get(fila.postulacionId()), conLoBuscado);
             }
-            pie(hoja, pinceles, filas, ajenas, filtroDescrito, veElCv, enlaces);
+            pie(hoja, pinceles, filas, ajenas, filtroDescrito, veElCv, enlaces, conLoBuscado);
 
             libro.write(salida);
             return salida.toByteArray();
@@ -272,9 +274,15 @@ public class ServicioExcelRankingImpl implements ServicioExcelRanking {
      * que coincide con el sistema es la fórmula: 45 el perfil integral y 55 la prueba, que es
      * lo que dice {@code peso_etapa} para esas vacantes.
      */
-    private List<String> cabeceras(boolean deLaPrueba, List<Criterio> criterios) {
+    private List<String> cabeceras(boolean deLaPrueba, List<Criterio> criterios,
+                                   boolean conLoBuscado) {
         List<String> titulos = new ArrayList<>(
                 List.of("#", "Candidato", "Correo", "CV", "Teléfono"));
+        // Después de «Teléfono» (V80), y solo si la vacante busca algo: cabeceras, anchos y
+        // escribirFila cambian juntos, o la columna se desalinea de sus celdas.
+        if (conLoBuscado) {
+            titulos.add(COLUMNA_LO_BUSCADO);
+        }
         if (deLaPrueba) {
             titulos.add("Nota Examen Técnico /100");
             titulos.add("Nota Perfil Integral /100");
@@ -290,8 +298,11 @@ public class ServicioExcelRankingImpl implements ServicioExcelRanking {
         return titulos;
     }
 
-    private int[] anchos(boolean deLaPrueba, List<Criterio> criterios) {
+    private int[] anchos(boolean deLaPrueba, List<Criterio> criterios, boolean conLoBuscado) {
         List<Integer> anchos = new ArrayList<>(List.of(5, 34, 32, 30, 18));
+        if (conLoBuscado) {
+            anchos.add(20);
+        }
         anchos.add(15);
         if (deLaPrueba) {
             anchos.add(16);
@@ -541,12 +552,34 @@ public class ServicioExcelRankingImpl implements ServicioExcelRanking {
         }
     }
 
+    /** La cabecera de la columna de «Qué buscar en el CV» (V80). */
+    static final String COLUMNA_LO_BUSCADO = "Qué buscar en el CV";
+
+    /**
+     * Lo que dice la celda de «Qué buscar en el CV»: «3 de 4» con la búsqueda terminada —cuántas
+     * «lo tiene» de cuántas líneas—, y si no, por qué no hay resultado. Buscando también es
+     * «Pendiente»: la hoja es una foto, y dentro de un minuto ya no estaría buscando.
+     */
+    static String loBuscadoDicho(FilaRanking fila) {
+        var busqueda = fila.busqueda();
+        if (busqueda == null) {
+            return null;
+        }
+        return switch (busqueda.estado()) {
+            case "TERMINADA" -> busqueda.tiene() + " de " + busqueda.total();
+            case "SIN_TEXTO" -> "CV sin texto";
+            case "FALLIDA" -> "No se pudo buscar";
+            default -> "Pendiente";
+        };
+    }
+
     // ========================================================================
     // La fila
     // ========================================================================
 
     private void escribirFila(Row f, Pinceles pinceles, FilaRanking fila, boolean deLaPrueba,
-                              List<Criterio> criterios, EnlaceArchivo enlaceDelCv) {
+                              List<Criterio> criterios, EnlaceArchivo enlaceDelCv,
+                              boolean conLoBuscado) {
         int c = 0;
         // El «#» es el puesto EN EL RANKING, el mismo que se ve en la mesa, y no la posición
         // en esta hoja. Dos razones: la hoja ya numera sus propias filas por el margen, así
@@ -558,6 +591,9 @@ public class ServicioExcelRankingImpl implements ServicioExcelRanking {
         texto(f, c++, correoDelCv(fila), pinceles);
         cv(f, c++, fila, enlaceDelCv, pinceles);
         texto(f, c++, telefonoDelCv(fila), pinceles);
+        if (conLoBuscado) {
+            texto(f, c++, loBuscadoDicho(fila), pinceles);
+        }
 
         Ponderado suyo = fila.ponderado();
         if (deLaPrueba) {
@@ -771,7 +807,8 @@ public class ServicioExcelRankingImpl implements ServicioExcelRanking {
     // ========================================================================
 
     private void pie(Sheet hoja, Pinceles pinceles, List<FilaRanking> filas, List<Long> ajenas,
-                     String filtroDescrito, boolean veElCv, Map<Long, EnlaceArchivo> enlaces) {
+                     String filtroDescrito, boolean veElCv, Map<Long, EnlaceArchivo> enlaces,
+                     boolean conLoBuscado) {
         int linea = hoja.getLastRowNum() + 2;
 
         linea = anotar(hoja, pinceles, linea,
@@ -785,6 +822,14 @@ public class ServicioExcelRankingImpl implements ServicioExcelRanking {
                         + "de preguntas apagado —Administrador y Asistente Administrativo— esa "
                         + "cifra ES la nota del currículum; en las demás es la de la prueba "
                         + "RENASER del banco.");
+
+        // La columna de «Qué buscar en el CV» (V80) no se explica sola fuera del panel.
+        if (conLoBuscado) {
+            linea = anotar(hoja, pinceles, linea,
+                    "«" + COLUMNA_LO_BUSCADO + "» dice cuántas de las líneas que busca la vacante "
+                            + "tiene cada persona en su CV («3 de 4»), o por qué todavía no hay "
+                            + "resultado. Ya está dentro de la nota del CV.");
+        }
 
         // Un enlace que caduca tiene que decir que caduca, y sobre todo tiene que decir lo
         // otro: mientras viva no vuelve a preguntar nada.

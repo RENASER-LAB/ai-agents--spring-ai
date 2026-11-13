@@ -12,7 +12,17 @@ public final class DtosPesos {
 
     private DtosPesos() {}
 
-    public record CrearVersionPesos(@NotBlank String etiqueta) {}
+    /**
+     * @param pesoBusquedaCv cuánto pesa «Qué buscar en el CV» dentro de la nota del CV, en %, de
+     *                       0 a 50 (V80). Opcional: si falta, 25.
+     */
+    public record CrearVersionPesos(@NotBlank String etiqueta, java.math.BigDecimal pesoBusquedaCv) {
+
+        /** Sin el peso de «Qué buscar en el CV»: queda en 25. */
+        public CrearVersionPesos(String etiqueta) {
+            this(etiqueta, null);
+        }
+    }
 
     public record VersionPesosResponse(Long id, String etiqueta, String estado, Instant publicadaEn) {}
 

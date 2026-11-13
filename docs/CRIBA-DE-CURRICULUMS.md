@@ -53,6 +53,10 @@ hay ninguna: llamarlo gastaría una petición al modelo para no puntuar nada.
 **La nota sale del currículum a solas.** El reparto entre currículum y evaluación reparte
 solo lo que existe, así que con una mitad la cuenta sigue saliendo en la misma escala.
 
+**Si la vacante escribió «Qué buscar en el CV»** (13/11/2026, `V80`), la criba busca también esas
+líneas en cada currículum y el Perfil de Talento lo espera: la nota del CV ya sale con lo buscado
+dentro. Ver [Calificación con IA](CALIFICACION-CON-IA.md), «Qué buscar en el CV».
+
 ---
 
 ## La vacante se monta sin requisitos que descarten solos
@@ -103,6 +107,12 @@ sale igual con su estado escrito. Si desapareciera, desaparecería también el p
 Al abrir un candidato se ven los ocho criterios con la explicación de cada nota, los
 hallazgos y los avisos. Un criterio que la IA no pudo puntuar se ve como un hueco, no como
 un cero: son cosas distintas.
+
+**Con «Qué buscar en el CV»** (`V80`), cada persona lleva bajo su nombre un punto por línea —verde
+lo tiene, ámbar lo menciona, blanco no aparece, punteado pendiente— en todas las pestañas, y se
+puede ordenar «Por lo buscado». Al abrirla, lo primero es la nota del CV con sus dos partes y,
+línea por línea, la frase del CV, una nota breve y, si no lo tiene, qué preguntarle en la
+entrevista.
 
 ---
 

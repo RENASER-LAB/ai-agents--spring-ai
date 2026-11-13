@@ -28,6 +28,13 @@ public interface ServicioVacantesPanel {
     VacanteActualizadaResponse editar(ContextoUsuario quien, Long id, GuardarVacante datos);
 
     /**
+     * Las líneas vigentes de «Qué buscar en el CV» y a cuántas personas habría que volver a
+     * buscar si cambian (V80): lo que el formulario de edición necesita para preguntar antes de
+     * guardar. Pide {@code editar_vacante}.
+     */
+    QueBuscarEnElCvActual queBuscarEnElCv(ContextoUsuario quien, Long id);
+
+    /**
      * Las vacantes de la empresa, en una de sus dos listas.
      *
      * <p>{@code archivadas} falso —lo que pide {@code /admin}— trae solo las que nadie ha

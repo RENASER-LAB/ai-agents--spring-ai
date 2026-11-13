@@ -137,6 +137,9 @@ public class PuenteCalificacionIaImpl implements PuenteCalificacionIa {
     private final EvaluacionRepository evaluaciones;
     private final CalificacionPorPuntos porPuntos;
     private final DatosDeLaVacanteParaIa datosDeLaVacante;
+    // «Qué buscar en el CV» (V80): lo buscado entra en la nota del CV. Nulo en las pruebas
+    // unitarias que no lo montan: entonces la nota del CV es la de los criterios, como antes.
+    private final com.renaser.ai.ai_engine.perfilintegral.service.LoBuscadoEnElCv loBuscado;
 
     @Override
     public Long organizacionDe(Long postulacionId) {
@@ -753,6 +756,34 @@ public class PuenteCalificacionIaImpl implements PuenteCalificacionIa {
 
     // ==================== POTENCIAL_RIESGO ====================
 
+    // ==================== «Qué buscar en el CV» (V80) ====================
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean hayQueBuscarEnElCv(Long postulacionId) {
+        if (loBuscado == null) {
+            return false;
+        }
+        return loBuscado.hayQueBuscar(postulacionId, postulacion(postulacionId).getVacanteId());
+    }
+
+    @Override
+    @Transactional
+    public void recalcularSiYaTieneNota(Long postulacionId) {
+        Postulacion postulacion = postulacion(postulacionId);
+        // La vacante antes que ninguna nota: ver CerrojoDeLosPesos.
+        vacantes.bloquearParaCalificarYReleer(postulacion);
+        // La misma regla que el cambio de pesos (RecalculoConOtrosPesos): con retrato se rehace
+        // todo; sin él, solo la nota que escribe el propio recálculo —la del currículum a solas,
+        // sin evaluación—. A quien no tiene ninguna nota no se le inventa una.
+        boolean conRetrato = perfiles.findByPostulacionId(postulacionId).isPresent();
+        boolean conNotaSinEvaluacion = postulacion.getEvaluacionId() == null
+                && notasEtapa.findByPostulacionIdAndEtapaCodigo(postulacionId, ETAPA).isPresent();
+        if (conRetrato || conNotaSinEvaluacion) {
+            recalcularNotaYGrupo(postulacionId);
+        }
+    }
+
     @Override
     @Transactional
     public InsumoPerfil insumoPerfil(Long postulacionId) {
@@ -941,17 +972,17 @@ public class PuenteCalificacionIaImpl implements PuenteCalificacionIa {
                 .collect(Collectors.toMap(PesoCriterio::getCriterioId, PesoCriterio::getPeso,
                         (a, b) -> a));
 
-        BigDecimal suma = BigDecimal.ZERO;
-        BigDecimal pesoTotal = BigDecimal.ZERO;
-        for (NotaCriterio nota : notasCriterio.findByPostulacionId(postulacionId)) {
-            BigDecimal peso = pesos.get(nota.getCriterioId());
-            if (peso == null || nota.getPuntaje() == null) continue;
-            suma = suma.add(nota.getPuntaje().multiply(peso));
-            pesoTotal = pesoTotal.add(peso);
+        BigDecimal generales = com.renaser.ai.ai_engine.perfilintegral.service.NotaDelCurriculum
+                .deLosCriterios(notasCriterio.findByPostulacionId(postulacionId), pesos, delCurriculum);
+        if (loBuscado == null) {
+            return generales;
         }
-        return pesoTotal.compareTo(BigDecimal.ZERO) == 0
-                ? null
-                : suma.divide(pesoTotal, 2, RoundingMode.HALF_UP);
+        // «Qué buscar en el CV» (V80) entra EN la nota del CV, con el peso de la versión de la
+        // vacante. La misma cuenta que el ranking y que lo que recibe POTENCIAL_RIESGO: ver
+        // NotaDelCurriculum.
+        return com.renaser.ai.ai_engine.perfilintegral.service.NotaDelCurriculum.combinar(
+                generales, loBuscado.notaDe(postulacionId, vacante.getId()),
+                loBuscado.pesoDe(vacante.getVersionPesosId()));
     }
 
     /**

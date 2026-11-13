@@ -292,6 +292,30 @@ public interface ColaCalificacionIa {
     /** Cómo va la última recomendación pedida para una vacante. */
     Seguimiento comoVaElRecomendador(Long vacanteId);
 
+    // ==================== «Qué buscar en el CV» (V80) ====================
+
+    /**
+     * Vuelve a buscar en el CV de una persona las líneas vigentes de «Qué buscar en el CV».
+     *
+     * <p>Va por su propio carril (modo {@code REBUSCA}): no pasa por la barrera del Perfil
+     * Integral, no mueve a nadie de etapa y no cuenta para {@link #comoVa}. Al llegar, el
+     * resultado recalcula la nota del CV, la del Perfil Integral y el grupo sin publicar eventos.
+     * Lo usan el cambio de las líneas (para todos) y «Volver a buscar» (para una persona). Lo
+     * terminado no exime; uno vivo, en cualquier modo, sí: ya leerá las líneas vigentes.
+     *
+     * @return true si quedó en la cola (o en espera por el tope); false si ya hay una viva o la
+     *         IA está apagada
+     */
+    boolean buscarDeNuevoEnElCv(Long postulacionId);
+
+    /**
+     * En qué punto va el último trabajo de «Qué buscar en el CV» de cada persona: {@code BUSCANDO}
+     * (pendiente o corriendo), {@code EN_ESPERA} (la empresa sin cupo de IA o suspendida: para la
+     * pantalla sigue «Pendiente»), {@code FALLIDA} o {@code TERMINADA}. Falta la entrada de quien
+     * no tiene ninguno. Lo que se encontró no vive aquí: lo guarda la selección.
+     */
+    java.util.Map<Long, String> comoVaLaBusqueda(java.util.List<Long> postulacionIds);
+
     // ==================== La prueba técnica escrita en el editor (V67) ====================
 
     /**

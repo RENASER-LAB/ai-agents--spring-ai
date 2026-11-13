@@ -211,7 +211,61 @@ public final class DtosPerfilIntegral {
              * columna no se ofrece y ninguna fila trae el dato.
              */
             boolean puedeVerResenas,
-            List<FilaRanking> filas) {}
+            List<FilaRanking> filas,
+            /**
+             * Las líneas vigentes de «Qué buscar en el CV» (V80), en su orden: vacía si la
+             * vacante no busca nada, y entonces el panel no pinta nada nuevo. Viajan con
+             * {@code ver_embudo}, el permiso de esta tanda.
+             */
+            List<String> queBuscarEnElCv,
+            /**
+             * Cuánto pesa «Qué buscar en el CV» dentro de la nota del CV con la versión de pesos
+             * de la vacante, en % (V80): «pesa 25 %», y los criterios generales «pesan 75 %».
+             */
+            BigDecimal pesoQueBuscarEnElCv,
+            /**
+             * Si quien mira puede pedir «Volver a buscar» en la ficha: el permiso
+             * {@code ajustar_nota} (V80). Una pista para pintar el botón, no la defensa: la API
+             * contesta 403 sin él.
+             */
+            boolean puedeVolverABuscar) {
+
+        /** Sin «Qué buscar en el CV»: la tanda de antes de la V80. */
+        public RankingVacante(Long vacanteId, String vacante, String puesto, String nivelPuesto,
+                              int total, int conPasadaFina, int calificados, int enCurso,
+                              int fallidos, boolean puedeVerPretension,
+                              boolean puedeMoverPostulacion, boolean vacanteMuestraSueldo,
+                              boolean puedeVerResenas, List<FilaRanking> filas) {
+            this(vacanteId, vacante, puesto, nivelPuesto, total, conPasadaFina, calificados,
+                    enCurso, fallidos, puedeVerPretension, puedeMoverPostulacion,
+                    vacanteMuestraSueldo, puedeVerResenas, filas, List.of(), null, false);
+        }
+    }
+
+    /**
+     * «Qué buscar en el CV» de una persona (V80): lo que pintan los puntos del ranking, el bloque
+     * de la ficha y la columna del Excel.
+     *
+     * @param estado                 PENDIENTE (todavía no se calificó su CV, o la empresa está
+     *                               sin cupo de IA) · BUSCANDO · TERMINADA · SIN_TEXTO · FALLIDA
+     * @param tiene                  cuántas líneas «lo tiene»; 0 si no terminó
+     * @param menciona               cuántas «lo menciona, sin detalle»
+     * @param total                  cuántas líneas tiene la vacante
+     * @param notaLoBuscado          el promedio de las líneas, sobre 100; nulo si no terminó
+     * @param notaCriteriosGenerales la nota de los ocho criterios, la de antes de la V80
+     * @param lineas                 una por línea vigente, en su orden
+     */
+    public record BusquedaEnElCv(String estado, int tiene, int menciona, int total,
+                                 BigDecimal notaLoBuscado, BigDecimal notaCriteriosGenerales,
+                                 List<LineaBuscadaEnElCv> lineas) {}
+
+    /**
+     * Una línea y lo que se encontró de ella. {@code estado} es TIENE, MENCIONA o NO_APARECE, o
+     * nulo si la búsqueda no terminó. La frase, la nota y la pregunta para la entrevista solo
+     * viajan con {@code abrir_ficha_candidato}: son lo que se lee en la ficha.
+     */
+    public record LineaBuscadaEnElCv(int orden, String texto, String estado, String frase,
+                                     String nota, String pregunta) {}
 
     public record Ponderado(
             BigDecimal sobre100,
@@ -342,7 +396,42 @@ public final class DtosPerfilIntegral {
              * pestaña, la de las preguntas propias en la del Perfil Integral. Mientras tanto
              * conserva su nota anterior.
              */
-            boolean recalificando) {
+            boolean recalificando,
+            /**
+             * «Qué buscar en el CV» de esta persona (V80): los puntos, el orden «Por lo buscado»,
+             * el bloque de la ficha y la columna del Excel. Nulo si la vacante no busca nada.
+             *
+             * <p>⚠️ Con una búsqueda terminada, {@code notaCurriculum} ya la lleva dentro: es la
+             * nota del CV de {@code NotaDelCurriculum}, la misma del Perfil Integral.
+             */
+            BusquedaEnElCv busqueda) {
+
+        /** Sin «Qué buscar en el CV» (V80). */
+        public FilaRanking(int puesto, Long postulacionId, String uuid, String candidato,
+                           String correo, String estado, String estadoNombre,
+                           String estadoCalificacion, String pasada, String archivoNombre,
+                           Long archivoId, DatosCandidato datos, String grupoPrioridad,
+                           BigDecimal notaEtapa, BigDecimal notaCurriculum, BigDecimal adecuacion,
+                           BigDecimal potencial, BigDecimal altoRendimiento,
+                           BigDecimal confianzaEvidencia, String resumen, int riesgosCriticos,
+                           int fortalezas, int alertas, Instant actualizadoEn,
+                           List<NotaCriterioResponse> notasCriterio, String ciudad,
+                           String ciudadCodigo, BigDecimal pretensionMin,
+                           BigDecimal pretensionMax, String pretensionMoneda,
+                           BigDecimal pretensionDeclarada, String pretensionDeclaradaMoneda,
+                           Ponderado ponderado, EstadoPruebaDelPuesto estadoPrueba,
+                           Instant postuladoEn,
+                           com.renaser.ai.ai_engine.resena.dto.DtosResena.PromedioResenas resenas,
+                           boolean recalificando) {
+            this(puesto, postulacionId, uuid, candidato, correo, estado, estadoNombre,
+                    estadoCalificacion, pasada, archivoNombre, archivoId, datos, grupoPrioridad,
+                    notaEtapa, notaCurriculum, adecuacion, potencial, altoRendimiento,
+                    confianzaEvidencia, resumen, riesgosCriticos, fortalezas, alertas,
+                    actualizadoEn, notasCriterio, ciudad, ciudadCodigo, pretensionMin,
+                    pretensionMax, pretensionMoneda, pretensionDeclarada,
+                    pretensionDeclaradaMoneda, ponderado, estadoPrueba, postuladoEn, resenas,
+                    recalificando, null);
+        }
 
         public FilaRanking(int puesto, Long postulacionId, String uuid, String candidato,
                            String correo, String estado, String estadoNombre,
@@ -366,7 +455,7 @@ public final class DtosPerfilIntegral {
                     actualizadoEn, notasCriterio, ciudad, ciudadCodigo, pretensionMin,
                     pretensionMax, pretensionMoneda, pretensionDeclarada,
                     pretensionDeclaradaMoneda, ponderado, estadoPrueba, postuladoEn, resenas,
-                    false);
+                    false, null);
         }
     }
 

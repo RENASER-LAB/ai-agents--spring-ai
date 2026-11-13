@@ -296,6 +296,66 @@ class RegistroTrabajosIaTest {
         verify(trabajos, never()).save(any(TrabajoIa.class));
     }
 
+    // ============ «Qué buscar en el CV» (V80) ============
+
+    private static final List<String> CON_LA_BUSQUEDA =
+            List.of("DATOS_CV", "EVIDENCIA_CV", "EVALUADOR", "BUSQUEDA_CV");
+
+    @Test
+    @DisplayName("El retrato espera a la búsqueda de «Qué buscar en el CV» mientras siga viva")
+    void elRetratoEsperaALaBusqueda() {
+        when(trabajos.bloquearLosQueVanALaVez(55L, "FINA", CON_LA_BUSQUEDA)).thenReturn(List.of(
+                trabajo(1L, "DATOS_CV", "TERMINADO"),
+                trabajo(2L, "EVIDENCIA_CV", "TERMINADO"),
+                trabajo(3L, "BUSQUEDA_CV", "EN_CURSO")));
+
+        assertThat(registro.crearElRetratoSiLosDemasAcabaron(
+                1L, 55L, CON_LA_BUSQUEDA, "POTENCIAL_RIESGO", "FINA", 2L)).isEmpty();
+        verify(trabajos, never()).save(any(TrabajoIa.class));
+    }
+
+    @Test
+    @DisplayName("Si la búsqueda se agota, el retrato se arma igual con lo que sí terminó")
+    void conLaBusquedaFallidaElRetratoSeArmaIgual() {
+        when(trabajos.bloquearLosQueVanALaVez(55L, "FINA", CON_LA_BUSQUEDA)).thenReturn(List.of(
+                trabajo(1L, "DATOS_CV", "TERMINADO"),
+                trabajo(2L, "EVIDENCIA_CV", "TERMINADO"),
+                trabajo(3L, "BUSQUEDA_CV", "FALLIDO")));
+        when(trabajos.save(any(TrabajoIa.class))).thenAnswer(i -> i.getArgument(0));
+
+        assertThat(registro.crearElRetratoSiLosDemasAcabaron(
+                1L, 55L, CON_LA_BUSQUEDA, "POTENCIAL_RIESGO", "FINA", 3L)).isPresent();
+    }
+
+    @Test
+    @DisplayName("La búsqueda sola (un CV sin texto) no basta para armar un retrato sobre la nada")
+    void laBusquedaSolaNoArmaRetrato() {
+        when(trabajos.bloquearLosQueVanALaVez(55L, "FINA", CON_LA_BUSQUEDA)).thenReturn(List.of(
+                trabajo(1L, "DATOS_CV", "FALLIDO"),
+                trabajo(2L, "EVIDENCIA_CV", "FALLIDO"),
+                trabajo(3L, "BUSQUEDA_CV", "TERMINADO")));
+
+        assertThat(registro.crearElRetratoSiLosDemasAcabaron(
+                1L, 55L, CON_LA_BUSQUEDA, "POTENCIAL_RIESGO", "FINA", 3L)).isEmpty();
+        verify(trabajos, never()).save(any(TrabajoIa.class));
+    }
+
+    @Test
+    @DisplayName("Una búsqueda viva en cualquier modo frena otra; una terminada no")
+    void crearSiNingunoVivo() {
+        when(trabajos.findFirstByPostulacionIdAndAgenteCodigoOrderByIdDesc(55L, "BUSQUEDA_CV"))
+                .thenReturn(Optional.of(trabajo(3L, "BUSQUEDA_CV", "PENDIENTE")))
+                .thenReturn(Optional.of(trabajo(3L, "BUSQUEDA_CV", "TERMINADO")));
+        when(trabajos.save(any(TrabajoIa.class))).thenAnswer(i -> i.getArgument(0));
+
+        assertThat(registro.crearSiNingunoVivo(1L, 55L, "BUSQUEDA_CV", "REBUSCA")).isEmpty();
+        assertThat(registro.crearSiNingunoVivo(1L, 55L, "BUSQUEDA_CV", "REBUSCA"))
+                .hasValueSatisfying(t -> {
+                    assertThat(t.getModo()).isEqualTo("REBUSCA");
+                    assertThat(t.getEstado()).isEqualTo("PENDIENTE");
+                });
+    }
+
     // ============ La espera del tope de IA (pieza E) ============
 
     @Test

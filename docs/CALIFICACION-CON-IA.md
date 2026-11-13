@@ -42,6 +42,10 @@ una versión de pesos que no la calculó.
 **Van en fila y no a la vez** porque el tercero necesita lo que dejaron los dos primeros. Y
 así hay un solo trabajo vivo por candidato, que es lo que hace fácil reintentar.
 
+**Si la vacante escribió «Qué buscar en el CV»** (`V80`), un agente más busca esas líneas en el
+currículum junto a la evidencia, y el Perfil de Talento lo espera: ver «Qué buscar en el CV», más
+abajo.
+
 **Si la vacante cambia de pesos con candidatos dentro (`V74`), la IA no vuelve a calificar.** Lo
 que ella pone no depende de los pesos —la nota de 0 a 100 de cada criterio del currículum, lo que
 vio en cada abierta, los hallazgos—, y la cuenta con los pesos la hace el código, que la rehace
@@ -244,6 +248,79 @@ pinta tal cual.
 nueva que vale para sus tres escalas —0 a 4, los puntos de cada pregunta, y los criterios vistos
 del banco CAZATALENTOS— y deja que el formato de cada llamada diga cuál toca. Solo la publicó
 donde nadie había reescrito la suya desde el panel.
+
+---
+
+## Qué buscar en el CV: lo que cada vacante busca en el currículum (13/11/2026)
+
+Los ocho criterios son los mismos para cualquier puesto. Desde la `V80`, quien crea la vacante
+puede escribir, en una casilla que **solo ve su equipo**, hasta seis cosas concretas que busca en
+el CV —«Controla costos y mermas», «Manejo de caja chica»—, y la IA las revisa en cada currículum.
+El candidato nunca ve ni la casilla ni lo encontrado.
+
+1. **Cuándo.** Cuando la IA califica el CV de una vacante con líneas —en la criba o en la pasada
+   completa—, el agente `BUSQUEDA_CV` corre a la vez que la evidencia del currículum. No hay una
+   búsqueda aparte al postular: no se gasta IA en quien no se va a calificar. Pasa por el tope mensual como
+   los demás: sin presupuesto espera, y la persona sale «Pendiente».
+2. **Qué recibe.** El currículum recortado —el mismo que la evidencia—, el puesto y las líneas
+   numeradas, envueltas como texto de la empresa. Su instrucción le prohíbe deducir edad, sexo,
+   estado civil, hijos, salud, religión, raza u origen a partir del nombre, las fechas, los
+   lugares o una foto. Usa el modelo que razona (`renaser.ai.busqueda-cv.razona: true`).
+3. **Qué devuelve, por línea.** **Lo tiene**, con la frase del CV que lo prueba; **Lo menciona, sin
+   detalle**; o **No aparece**. Además, una nota de una frase y, si no lo tiene, una pregunta para
+   la entrevista.
+4. **El servidor comprueba la frase.** La busca en el texto del CV sin mirar mayúsculas, tildes ni
+   espacios repetidos. Si no está, «Lo tiene» baja a «Lo menciona», sin frase. Una línea que falte
+   en la respuesta queda en «No aparece», y una que sobre se ignora.
+5. **El Perfil de Talento la espera.** El retrato no se arma hasta que la búsqueda termine o falle
+   del todo, así el pase automático decide con la nota completa. Si se queda sin reintentos, el
+   retrato se arma igual con lo demás y la persona queda en «No se pudo buscar».
+6. **CV sin texto.** Si el extractor no saca texto —menos de 40 caracteres, o un `.doc` viejo—, la
+   búsqueda queda en «CV sin texto» al primer intento, con su motivo, sin llamar a la IA ni
+   reintentar.
+
+**Cómo entra en la nota del CV.** Lo buscado es el promedio de las líneas: Lo tiene vale 100, Lo
+menciona 50 y No aparece 0. La nota del CV es **criterios generales × (1 − p) + lo buscado × p**,
+con p el peso de «Qué buscar en el CV» de la versión de pesos de la vacante: 25 % por defecto, de 0
+a 50. Con 80 en los criterios generales, 62,5 en lo buscado y p = 25, la nota del CV es 75,625. Sin
+líneas, con la búsqueda pendiente, fallida o con CV sin texto, o con p = 0, es la nota de siempre.
+
+- **Entra en la nota del CV, no encima de ella**: el peso del CV dentro del Perfil Integral no
+  cambia. El grupo de prioridad sale de la nota como siempre, así que puede cambiar.
+- La cuenta vive en un solo sitio (`NotaDelCurriculum`) y la usan la nota del Perfil Integral, el
+  ranking y lo que recibe el agente de potencial y riesgo: los tres dicen el mismo número.
+- **Las líneas no descartan ni mueven a nadie por sí solas.**
+
+**Cambiar las líneas con gente dentro.** Tras una confirmación, lo encontrado se archiva —no se
+borra—, la nota del CV vuelve a los criterios generales y se vuelve a buscar en todos los CV ya
+calificados, por su propio carril (`REBUSCA`): no vuelve a calificar los ocho criterios ni pasa por
+la barrera del retrato. Al llegar cada resultado se recalculan la nota del CV, la del Perfil
+Integral y el grupo **sin mover a nadie de etapa**, tampoco por el pase automático. Un resultado
+de las líneas de antes se descarta. «Volver a buscar», en la ficha de una búsqueda fallida, va por
+el mismo carril.
+
+**Lo que no se puede buscar.** Una línea que pida edad, sexo o género, estado civil, hijos o
+embarazo, salud o discapacidad, religión, raza, etnia, nacionalidad u origen se marca en rojo en el
+formulario mientras se escribe, y la API la rechaza con 400. La regla vive en un solo sitio por
+repositorio, con las mismas palabras y sus pruebas: `ReglasQueBuscarEnElCv` aquí y
+`reglasQueBuscar.ts` en el panel.
+
+- **Bloquea**, por ejemplo: «Menor de 35 años», «Personas de 25 a 35 años», «2 años de experiencia
+  y menor de 35 años», «Que sea casado», «Señor para vigilancia», «Chica para atención al
+  cliente», y las que piden origen o nacionalidad, religión, embarazo o hijos, salud o VIH, raza o
+  color de piel, o discapacidad.
+- **Deja pasar** los años de algo y los documentos que pide la ley: «Más de 3 años de
+  experiencia», «Experiencia general no menor de 15 años», «Experiencia en cocina, al menos 15
+  años», «durante 15 años», «Carné de salud vigente», «Manejo de caja chica», «mayor a 50 soles».
+
+⚠️ **Es una lista cerrada** (decisión de alcance del 13/11/2026): cubre las redacciones que se
+acordaron, no todas las posibles, y otra forma de pedir lo mismo puede pasar. Las que se conocen
+están en [Defectos conocidos](DEFECTOS-CONOCIDOS.md), el 20. Añadir una es cambiar la regla en los
+dos repositorios, con su prueba.
+
+**Dónde se ve.** En el panel: puntos de color bajo el nombre en las cinco pestañas del ranking, el
+orden «Por lo buscado», un bloque al abrir la ficha y una columna en el Excel. Las rutas, en
+[Las APIs](09-APIS.md), «Vacantes» y «Postulaciones».
 
 ---
 

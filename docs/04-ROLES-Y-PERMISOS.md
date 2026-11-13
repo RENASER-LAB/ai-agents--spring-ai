@@ -152,6 +152,15 @@ plantillas no basta con el permiso** (05/10/2026): listarlo, crear una pregunta 
 una versión es solo de la plataforma, y a cualquier otra empresa le responde 404 aunque tenga
 `elegir_plantilla_prueba` o `editar_plantillas_prueba`.
 
+**«Qué buscar en el CV» (`V80`, 13/11/2026) tampoco trae permiso nuevo.** Escribir las líneas es
+crear la vacante (`crear_vacante`) o corregirla (`editar_vacante`, con su alcance); verlas,
+`ver_vacantes`. En el ranking, los puntos de color y el orden «Por lo buscado» van con
+`ver_embudo`; la frase del CV, la nota y la pregunta para la entrevista, con
+`abrir_ficha_candidato`, porque son lo que se lee en la ficha. **«Volver a buscar»** en una
+búsqueda fallida es **«Ajustar una nota de la IA»** (`ajustar_nota`): sin él, el botón no sale
+—el ranking lo dice con `puedeVolverABuscar`— y la API responde 403. Fuera del alcance, 404. El
+candidato no ve nada de esto con ningún permiso.
+
 **«Editar una vacante» (`editar_vacante`) es el lápiz de la lista y la tarjeta del sueldo.**
 Desde el 19/09/2026 **respeta su alcance**: con alcance a sus vacantes, solo se corrigen las que
 esa persona dirige; en las demás no sale el lápiz, y pedirlo por la API responde 404, no 403. Sin

@@ -239,6 +239,13 @@ renaser:
       # A partir de cuántos minutos un trabajo se considera colgado y se vuelve a encolar
       minutos-colgado: 15
       periodo-sondeo-ms: 300000
+    # El agente de «Qué buscar en el CV» (BUSQUEDA_CV, V80): con qué modelo busca las líneas de la
+    # vacante en cada CV. true = el que razona (renaser.ai.chat.default-model, el mismo que pone
+    # las notas de EVIDENCIA_CV en la pasada que califica); false = el rápido que no razona
+    # (renaser.ai.chat.modelo-rapido). Razona porque «lo tiene» exige copiar una frase literal y
+    # distinguir evidencia de una palabra suelta, y lo que decide entra en la nota del CV.
+    busqueda-cv:
+      razona: true
 
   # ¿Sale el correo de esta máquina, o solo se anota?
   #

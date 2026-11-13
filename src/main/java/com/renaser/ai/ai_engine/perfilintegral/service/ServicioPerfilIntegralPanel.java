@@ -58,6 +58,14 @@ public interface ServicioPerfilIntegralPanel {
     CalificacionEncoladaResponse cribarCv(ContextoUsuario quien, Long postulacionId);
 
     /**
+     * «Volver a buscar» (V80): encola solo la búsqueda de «Qué buscar en el CV» de esa persona,
+     * como rebúsqueda: al llegar recalcula su nota sin moverla de etapa. Pide {@code ajustar_nota}.
+     *
+     * @throws IllegalStateException (409) con la vacante cerrada o archivada, o sin líneas
+     */
+    CalificacionEncoladaResponse volverABuscarEnElCv(ContextoUsuario quien, Long postulacionId);
+
+    /**
      * La tanda entera de una convocatoria, ordenada de más apto a menos.
      *
      * <p>Es lo que contesta «¿a quién invito primero?», y no se puede armar desde fuera

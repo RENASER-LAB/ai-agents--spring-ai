@@ -42,10 +42,14 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
      *
      * <p>Es una lista y no un campo en la base porque es una decisión de diseño, no de
      * configuración: quién depende de quién no lo cambia nadie desde un panel.
+     *
+     * <p><b>La búsqueda de «Qué buscar en el CV» (V80) va con ellos</b>: lee el mismo texto y
+     * escribe sus propias tablas, y el retrato la espera para que el pase automático decida con
+     * la nota del CV completa. En una vacante sin líneas se salta sola.
      */
     private static final List<String> A_LA_VEZ = List.of(
             AgenteDatosCv.CODIGO_AGENTE, AgenteEvidenciaCv.CODIGO_AGENTE,
-            AgenteEvaluador.CODIGO_AGENTE);
+            AgenteEvaluador.CODIGO_AGENTE, AgenteBusquedaCv.CODIGO_AGENTE);
 
     /**
      * Los que van a la vez en la primera pasada. No entra el evaluador, porque en una criba
@@ -74,7 +78,8 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
      */
     private static final List<String> DEL_RETRATO = List.of(
             AgenteDatosCv.CODIGO_AGENTE, AgenteEvidenciaCv.CODIGO_AGENTE,
-            AgenteEvaluador.CODIGO_AGENTE, AgentePotencialRiesgo.CODIGO_AGENTE);
+            AgenteEvaluador.CODIGO_AGENTE, AgentePotencialRiesgo.CODIGO_AGENTE,
+            AgenteBusquedaCv.CODIGO_AGENTE);
 
     public static final String RAPIDA = "RAPIDA";
     public static final String FINA = "FINA";
@@ -84,6 +89,12 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
      * terminar movería a la persona de etapa) ni en el «cómo va» del retrato.
      */
     public static final String RECALIFICA = "RECALIFICA";
+    /**
+     * La rebúsqueda de «Qué buscar en el CV» (V80): solo la búsqueda, con las líneas vigentes.
+     * Como la recalificación, va por su carril: no entra en la barrera del retrato ni en su «cómo
+     * va», y al llegar recalcula sin mover a nadie.
+     */
+    public static final String REBUSCA = "REBUSCA";
 
     /** Qué hacer con un paso concreto cuando se mira la tanda. */
     private enum Situacion {
@@ -279,6 +290,44 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
         }
         Map<Long, Seguimiento> salida = new HashMap<>();
         ultimaDeCada.forEach((id, t) -> salida.put(id, seguimientoDe(t)));
+        return salida;
+    }
+
+    // ==================== «Qué buscar en el CV» (V80) ====================
+
+    @Override
+    public boolean buscarDeNuevoEnElCv(Long postulacionId) {
+        if (apagada(postulacionId)) {
+            return false;
+        }
+        Long organizacionId = puente.organizacionDe(postulacionId);
+        Optional<TrabajoIa> creado = registro.crearSiNingunoVivo(organizacionId, postulacionId,
+                AgenteBusquedaCv.CODIGO_AGENTE, REBUSCA);
+        if (creado.isEmpty()) {
+            return false;
+        }
+        frenarOPublicar(creado.get(), organizacionId);
+        return true;
+    }
+
+    @Override
+    public Map<Long, String> comoVaLaBusqueda(List<Long> postulacionIds) {
+        if (postulacionIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, TrabajoIa> ultimaDeCada = new HashMap<>();
+        for (TrabajoIa t : trabajos.findByPostulacionIdInOrderByIdAsc(postulacionIds)) {
+            if (AgenteBusquedaCv.CODIGO_AGENTE.equals(t.getAgenteCodigo())) {
+                ultimaDeCada.put(t.getPostulacionId(), t);   // en orden: queda la última
+            }
+        }
+        Map<Long, String> salida = new HashMap<>();
+        ultimaDeCada.forEach((id, t) -> salida.put(id, switch (t.getEstado()) {
+            case "PENDIENTE", "EN_CURSO" -> "BUSCANDO";
+            case "EN_ESPERA" -> "EN_ESPERA";
+            case "FALLIDO" -> "FALLIDA";
+            default -> "TERMINADA";
+        }));
         return salida;
     }
 
@@ -521,6 +570,9 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
                 // Una recalificación de la guía no es una pasada del retrato: su nota sigue
                 // valiendo mientras tanto, y contarla aquí dejaría la tanda «en curso» sin fin.
                 .filter(t -> !RECALIFICA.equals(t.getModo()))
+                // Ni una rebúsqueda de «Qué buscar en el CV» (V80): su nota del CV sigue valiendo
+                // con los criterios generales mientras tanto.
+                .filter(t -> !REBUSCA.equals(t.getModo()))
                 .toList();
         if (suyos.isEmpty()) {
             return "SIN_EMPEZAR";
@@ -661,7 +713,9 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
                 case ESTA_VIVO -> alguienVivo = true;
                 case HAY_QUE_ENCOLARLO -> {
                     alguienIntentado = true;
-                    alguienEncolado |= crearYAvisar(postulacionId, agente, modo, null);
+                    alguienEncolado |= AgenteBusquedaCv.CODIGO_AGENTE.equals(agente)
+                            ? crearBusqueda(postulacionId, modo)
+                            : crearYAvisar(postulacionId, agente, modo, null);
                 }
                 case NO_HACE_FALTA -> { }
             }
@@ -747,7 +801,7 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
     private void intentarElRetrato(TrabajoIa acabado) {
         // Una recalificación no arma retrato: el retrato ya existe, y rehacerlo movería a la
         // persona a «por confirmar». Sus notas se recalculan al guardarse (el puente).
-        if (RECALIFICA.equals(acabado.getModo())) {
+        if (RECALIFICA.equals(acabado.getModo()) || REBUSCA.equals(acabado.getModo())) {
             return;
         }
         if (!aLaVezDe(acabado.getModo()).contains(acabado.getAgenteCodigo())) {
@@ -818,6 +872,22 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
     }
 
     /**
+     * La búsqueda de «Qué buscar en el CV» de la tanda (V80). No va por {@code crearSiHaceFalta}:
+     * una terminada con unas líneas que ya cambiaron no exime, y una viva en otro modo (una
+     * rebúsqueda) sí frena. Ver {@link RegistroTrabajosIa#crearSiNingunoVivo}.
+     */
+    private boolean crearBusqueda(Long postulacionId, String modo) {
+        Long organizacionId = puente.organizacionDe(postulacionId);
+        Optional<TrabajoIa> creado = registro.crearSiNingunoVivo(
+                organizacionId, postulacionId, AgenteBusquedaCv.CODIGO_AGENTE, modo);
+        if (creado.isEmpty()) {
+            return false;
+        }
+        frenarOPublicar(creado.get(), organizacionId);
+        return true;
+    }
+
+    /**
      * El destino de todo trabajo recién creado: EN_ESPERA si la organización está
      * suspendida o sin cupo, y a la cola si no. Lo comparten los trabajos por postulación
      * y los de vacante (el REDACTOR): el tope frena lo nuevo venga de donde venga.
@@ -874,6 +944,15 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
         if (seSalta(postulacionId, agente)) {
             return Situacion.NO_HACE_FALTA;
         }
+        if (AgenteBusquedaCv.CODIGO_AGENTE.equals(agente)) {
+            // «Qué buscar en el CV» (V80): si no se salta es que falta la de las líneas vigentes;
+            // solo la frena una viva, sea de la criba o una rebúsqueda.
+            return trabajos.findFirstByPostulacionIdAndAgenteCodigoOrderByIdDesc(postulacionId, agente)
+                    .map(TrabajoIa::getEstado)
+                    .filter(e -> "PENDIENTE".equals(e) || "EN_CURSO".equals(e) || "EN_ESPERA".equals(e))
+                    .map(e -> Situacion.ESTA_VIVO)
+                    .orElse(Situacion.HAY_QUE_ENCOLARLO);
+        }
         Optional<TrabajoIa> ultimo = trabajos
                 .findFirstByPostulacionIdAndAgenteCodigoAndModoOrderByIdDesc(
                         postulacionId, agente, modo);
@@ -914,6 +993,11 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
             log.info("La postulación {} no tiene evaluación entregada: el evaluador se salta",
                     postulacionId);
             return true;
+        }
+        // «Qué buscar en el CV» (V80): sin líneas en la vacante, o ya buscada con las vigentes
+        // —terminada o con el CV sin texto—, no se encola ni se gasta IA.
+        if (AgenteBusquedaCv.CODIGO_AGENTE.equals(agente)) {
+            return !puente.hayQueBuscarEnElCv(postulacionId);
         }
         return AgenteDatosCv.CODIGO_AGENTE.equals(agente) && puente.tieneFichaCv(postulacionId);
     }

@@ -385,6 +385,10 @@ quién va a la simulación**, con las notas de la prueba ya delante.
   provisional que se escribe al entregar un banco clásico (solo con lo cerrado) nunca da el pase.
 - **Sin nota completa, nadie pasa solo**: la IA falló, se agotó el saldo, el CV era ilegible, una
   abierta se quedó sin nota o los pesos no le dan peso a nada que se pueda llenar.
+- **Con «Qué buscar en el CV»** (`V80`), el retrato espera también a esa búsqueda, así que la nota
+  completa ya lleva lo buscado. Si la búsqueda falla del todo, el retrato se arma igual con los
+  criterios generales. **Cambiar las líneas o pulsar «Volver a buscar» no da el pase**: recalcula
+  la nota sin mover a nadie, como el cambio de pesos.
 - **Quien no llega no se descarta.** Se queda en «Tu perfil está en revisión» y una persona del
   equipo decide si lo pasa con «Avanzar». **Ninguna nota lleva a nadie a «No continúa».** La
   ficha del panel lo explica junto al estado: «Nota 58,20: no llega a la mínima de la vacante
