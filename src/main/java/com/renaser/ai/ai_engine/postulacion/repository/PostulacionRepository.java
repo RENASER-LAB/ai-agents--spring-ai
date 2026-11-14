@@ -90,6 +90,13 @@ public interface PostulacionRepository extends JpaRepository<Postulacion, Long> 
     // desde la primera postulación, los instrumentos de la vacante no se cambian.
     long countByVacanteId(Long vacanteId);
 
+    /**
+     * De estas vacantes, las que ya tienen alguna postulación: {@link #countByVacanteId} de una
+     * vez para una lista («Pruebas» y sus destinos), en vez de una consulta por fila.
+     */
+    @Query("select distinct p.vacanteId from Postulacion p where p.vacanteId in :vacanteIds")
+    List<Long> vacantesConPostulantes(@Param("vacanteIds") Collection<Long> vacanteIds);
+
     // El sondeo cierra desde aquí las evaluaciones y las pruebas vencidas: la
     // postulación se conoce por el intento, no al revés.
     Optional<Postulacion> findByEvaluacionId(Long evaluacionId);

@@ -114,6 +114,19 @@ public interface VersionBancoRepository extends JpaRepository<VersionBanco, Long
     List<VersionBanco> propiasEnCursoDe(@Param("organizacionId") Long organizacionId);
 
     /**
+     * Lo escrito en el editor de todas las vacantes de una empresa para un propósito
+     * (PERFIL_INTEGRAL o PRUEBA_PUESTO): su BORRADOR y su PUBLICADA, nunca las archivadas. Es
+     * lo que lee «Pruebas» de una vez, en vez de dos consultas por vacante.
+     */
+    @Query("""
+            select v from VersionBanco v
+             where v.organizacionId = :organizacionId and v.vacanteId is not null
+               and v.estado in ('BORRADOR', 'PUBLICADA')
+               and v.proposito = :proposito""")
+    List<VersionBanco> enCursoDelProposito(@Param("organizacionId") Long organizacionId,
+                                           @Param("proposito") String proposito);
+
+    /**
      * Los niveles para los que una empresa tiene un banco PROPIO publicado. Es la misma
      * regla que {@link #laPublicadaDelNivel} con {@code tipoBanco = 'NIVEL'}, pero de una vez
      * para todos los niveles: la lista de vacantes la necesita en cada fila.

@@ -1,5 +1,7 @@
 package com.renaser.ai.ai_engine.perfilintegral.service;
 
+import com.renaser.ai.ai_engine.perfilintegral.dto.DtosIndiceDePruebas.FilaDePrueba;
+import com.renaser.ai.ai_engine.perfilintegral.dto.DtosIndiceDePruebas.VacanteDestino;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPreguntasVacante.CambioAplicado;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPreguntasVacante.CopiarDeOtraVacante;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPreguntasVacante.EditorDePreguntas;
@@ -63,7 +65,34 @@ public interface EditorDeLaVacante {
 
     VersionDePreguntas vistaPrevia(ContextoUsuario quien, Long vacanteId, Long vacanteOrigenId);
 
+    /**
+     * Copia la publicada de otra vacante en un borrador de esta. La destino tiene que usar el
+     * editor para esto (las preguntas propias o la prueba del editor): si no, 409 y nada cambia.
+     */
     EditorDePreguntas copiar(ContextoUsuario quien, Long vacanteId, CopiarDeOtraVacante datos);
+
+    // ---------- «Pruebas»: el índice de la empresa ----------
+
+    /**
+     * Las vacantes de la empresa a las que llega {@code ver_vacantes} y que tienen su versión
+     * escrita en este editor, publicada o en borrador, ya filtradas y en orden. Solo las que usan
+     * el editor para esto: lo del sistema antiguo y las versiones que quedaron en una vacante que
+     * ya no las usa no salen.
+     */
+    List<FilaDePrueba> indice(ContextoUsuario quien, FiltrosDelIndice filtros);
+
+    /**
+     * La vista previa de una fila del índice: la publicada o, si no la hay, el borrador, sin
+     * sus avisos (son del editor). Lo ajeno, lo eliminado y lo que no está en el índice es 404.
+     */
+    VersionDePreguntas vistaPreviaDelIndice(ContextoUsuario quien, Long vacanteId);
+
+    /**
+     * Las vacantes que podrían recibir una copia: las editables a las que llega
+     * {@code editar_vacante} y que usan el editor para esto. Las que ya rinde alguien salen
+     * con su motivo. {@code excluir} (opcional) es la vacante de origen.
+     */
+    List<VacanteDestino> destinos(ContextoUsuario quien, Long excluir);
 
     // ---------- Recomendaciones por IA ----------
 

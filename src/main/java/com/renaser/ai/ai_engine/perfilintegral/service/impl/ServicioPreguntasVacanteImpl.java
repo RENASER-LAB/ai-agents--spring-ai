@@ -57,6 +57,7 @@ import com.renaser.ai.ai_engine.vacante.entity.Vacante;
 import com.renaser.ai.ai_engine.vacante.repository.PuestoRepository;
 import com.renaser.ai.ai_engine.vacante.repository.VacanteRepository;
 import com.renaser.ai.ai_engine.vacante.service.AlcanceSobreLaVacante;
+import com.renaser.ai.ai_engine.vacante.service.LugarDeLaVacante;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -67,6 +68,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -104,7 +106,10 @@ public class ServicioPreguntasVacanteImpl extends EditorDeVersionPropia implemen
             "Las preguntas no se pueden publicar todavía: ",
             "Esta vacante todavía no tiene preguntas publicadas", "Preguntas publicadas de la vacante",
             "las preguntas publicadas de esta vacante", "publicar_preguntas_propias",
-            "corregir_instrucciones_ia", "copiar_preguntas_propias");
+            "corregir_instrucciones_ia", "copiar_preguntas_propias",
+            "Esta vacante no responde preguntas propias en el Perfil Integral: no se le pueden "
+                    + "copiar. Elige «Preguntas propias» en la vacante antes de copiarlas.",
+            "Ya tiene postulantes: sus preguntas no se reemplazan");
 
     private static final ObjectMapper JSON = new ObjectMapper();
 
@@ -125,6 +130,7 @@ public class ServicioPreguntasVacanteImpl extends EditorDeVersionPropia implemen
     private final PuenteCalificacionIa puente;
     private final ColaCalificacionIa cola;
     private final ServicioAuditoria auditoria;
+    private final LugarDeLaVacante lugares;
 
     // ============================== Leer ==============================
 
@@ -625,7 +631,7 @@ public class ServicioPreguntasVacanteImpl extends EditorDeVersionPropia implemen
     @Override
     protected Piezas piezas() {
         return new Piezas(alcance, permisos, vacantes, puestos, versionesBanco, criteriosBanco,
-                preguntas, opciones, propuestas, cola, auditoria);
+                preguntas, opciones, propuestas, cola, auditoria, lugares);
     }
 
     @Override
@@ -646,6 +652,18 @@ public class ServicioPreguntasVacanteImpl extends EditorDeVersionPropia implemen
 
     private boolean hayPostulantes(Vacante vacante) {
         return postulaciones.countByVacanteId(vacante.getId()) > 0;
+    }
+
+    /** {@link #hayPostulantes} de una vez para una lista. */
+    @Override
+    protected Set<Long> dondeLaVaraNoSeMueve(Collection<Long> vacanteIds) {
+        return vacanteIds.isEmpty() ? Set.of() : Set.copyOf(postulaciones.vacantesConPostulantes(vacanteIds));
+    }
+
+    /** Responde sus preguntas propias: con evaluación y con el origen VACANTE. */
+    @Override
+    protected boolean usaElEditor(Vacante vacante) {
+        return vacante.isAplicaEvaluacion() && vacante.tienePreguntasPropias();
     }
 
     @Override

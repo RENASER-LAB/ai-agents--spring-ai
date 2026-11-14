@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -68,6 +69,18 @@ public interface IntentoPruebaRepository extends JpaRepository<IntentoPrueba, Lo
               and i.postulacionId in (select p.id from Postulacion p where p.vacanteId = :vacanteId)
             """)
     boolean algunoEmpezadoDeLaVacante(@Param("vacanteId") Long vacanteId);
+
+    /**
+     * De estas vacantes, las que tienen a alguien que ya abrió su prueba: la misma frontera que
+     * {@link #algunoEmpezadoDeLaVacante}, de una vez para una lista («Pruebas» y sus destinos).
+     */
+    @Query("""
+            select distinct p.vacanteId from Postulacion p
+            where p.vacanteId in :vacanteIds
+              and exists (select 1 from IntentoPrueba i
+                          where i.postulacionId = p.id and i.iniciadoEn is not null)
+            """)
+    List<Long> vacantesConAlgunoEmpezado(@Param("vacanteIds") Collection<Long> vacanteIds);
 
     /**
      * ¿Hay alguien de esta vacante en la etapa técnica? El intento se crea al entrar en ella,
