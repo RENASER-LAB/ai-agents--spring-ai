@@ -2,7 +2,8 @@
 
 Cómo funciona la parte en la que la IA lee el currículum, califica las respuestas abiertas y
 arma el Perfil de Talento. Al final están también los dos agentes de las etapas siguientes:
-el que califica la prueba del puesto y el que prepara la conversación final.
+el que califica la prueba del puesto y el que prepara la conversación final; y los que no
+califican a nadie, entre ellos el redactor de los informes por etapa.
 
 ---
 
@@ -470,6 +471,50 @@ faltan para llegar a 100 y puede llenar los criterios que ya existen. Pasa por s
 sigue sin cuadrar la propuesta queda fallida y se dice. Con la IA apagada o sin cupo no se encola,
 y el panel lo dice en tono de estado, no de error. Cuenta contra el tope mensual.
 
+### El redactor del informe (`V84`, 16/11/2026)
+
+**El tercero que no califica a nadie.** Escribe los textos de los informes por etapa del panel —el
+del currículum, el de la evaluación y el de la prueba del puesto—, para que se entiendan **sin leer
+las preguntas**: el resumen de la etapa, una línea por criterio con lo que demostró y lo que faltó,
+y una línea «lo que demostró» por cada respuesta del anexo. **No lee ni escribe ninguna nota**: lo
+que devuelve son frases. Los informes y sus rutas, en [Las APIs](09-APIS.md), «Los informes por
+etapa».
+
+1. **Cuándo corre.** Por la misma cola que los demás, y cada vez solo para la etapa que cambió:
+   - al terminar el Perfil de Talento, para el CV y, si la persona entregó la evaluación, también
+     para la evaluación;
+   - al terminar la calificación de la prueba del puesto o del cuestionario técnico, para la
+     prueba;
+   - al recalificar por un carril aparte: recalificar las preguntas propias rehace la evaluación,
+     y volver a buscar «Qué buscar en el CV» —al cambiar las líneas o con «Volver a buscar»—, el
+     CV;
+   - cuando una persona ajusta una nota a mano en las preguntas propias o en la prueba: **solo esa
+     etapa**;
+   - y la primera vez que alguien abre un informe que no tiene textos —en el visor, en PDF o en un
+     `.zip`—. Así reciben los suyos quienes ya estaban calificados antes de la `V84`.
+2. **Qué recibe.** Solo lo guardado de esa etapa: las notas con su explicación, las respuestas en
+   orden, los hallazgos y las afirmaciones del CV. El texto del candidato le llega **envuelto como
+   contenido de otro**, igual que al Evaluador. **No recibe «Qué buscar en el CV»**: son las líneas
+   privadas de quien recluta, y de los agentes solo las ve `BUSQUEDA_CV`. Corre **sin razonar**:
+   escribir frases con lo que ya está explicado no pide pensar, y así cuesta y tarda menos.
+3. **Lo que comprueba el código antes de guardar.** Una línea se descarta, y en su lugar va la
+   explicación completa de la IA, si falta o viene en blanco, si trae «…», si trae una cifra o un
+   nombre propio que no aparecen en los datos que recibió, o si repite la nota («88 de 100»). Si
+   las claves de los criterios no son los nombres reales, o no hay tantas líneas de respuestas
+   como respuestas se le mandaron, se descartan todas, porque no se sabe cuál es de cuál.
+4. **Dónde queda.** En `texto_informe`, una fila por postulación y etapa, atada a una **huella** de
+   los datos con que se escribió. Si una nota o una explicación cambia, la huella ya no coincide y
+   el informe vuelve a las explicaciones de la IA hasta que el redactor escriba los textos nuevos.
+   El mismo pedido no se paga dos veces: si falló, el informe sigue con las explicaciones hasta que
+   algo cambie en la etapa.
+
+**Nada de esto frena un informe.** Mientras los textos no estén escritos, o si el redactor falla,
+la IA está apagada o la empresa no tiene cupo, el informe sale en el momento con las explicaciones
+completas de la IA, sin recortar. Su instrucción vive en `instruccion_ia`, global y editable como
+las demás: es la misma con la que se escribieron a mano los informes de prueba del 14/11/2026, que
+la clienta aprobó. Cuenta contra el tope mensual: **una llamada por persona y etapa**, y pedir el
+`.zip` de una vacante entera encola una por cada persona y etapa a la que le falten textos.
+
 ## Cuándo arranca sola, y cuándo la pide una persona
 
 Cada vacante lleva un interruptor —**«calificar y avanzar sola»**, apagado de fábrica— que
@@ -501,7 +546,8 @@ Está contado en [La criba de currículums](CRIBA-DE-CURRICULUMS.md).
 queda en «calificando» y no se encola nada — tampoco los dos agentes de las etapas siguientes. Sirve si el proveedor está caído y no se quiere
 gastar reintentos. En las preguntas propias, apagada la IA, corregir la guía cuando ya hay
 candidatos calificados no se guarda, y las recomendaciones y los reintentos de recalificación contestan el motivo sin
-encolar nada.
+encolar nada. Tampoco se encola el redactor del informe: los informes salen igual, con las
+explicaciones completas de la IA.
 
 ---
 

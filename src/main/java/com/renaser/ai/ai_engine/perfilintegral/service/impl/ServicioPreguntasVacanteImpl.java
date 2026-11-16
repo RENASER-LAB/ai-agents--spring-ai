@@ -624,6 +624,23 @@ public class ServicioPreguntasVacanteImpl extends EditorDeVersionPropia implemen
         // Se recalculan el criterio, el banco, el Perfil Integral y el grupo, sin volver a
         // llamar a la IA y sin mover a nadie de etapa.
         puente.recalcularSinMover(postulacionId);
+        redactarElInformeDeNuevo(postulacionId, "EVALUACION");
+    }
+
+    /**
+     * Tras un ajuste a mano, el redactor del informe rehace los textos de esta etapa (V84).
+     * Nunca frena el ajuste: si la IA está apagada o algo falla, el informe sigue con las
+     * explicaciones hasta que alguien lo abra.
+     */
+    private void redactarElInformeDeNuevo(Long postulacionId, String etapa) {
+        if (cola == null) {
+            return;
+        }
+        try {
+            cola.encolarRedactorInforme(postulacionId, etapa);
+        } catch (RuntimeException ignorada) {
+            // Los textos del informe se piden otra vez la próxima vez que alguien lo abra.
+        }
     }
 
     // ============================== Su propósito ==============================

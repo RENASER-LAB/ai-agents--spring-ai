@@ -1,0 +1,12 @@
+Las fuentes que el backend incrusta en los PDF que genera.
+
+- onest-latin.ttf y onest-latin-ext.ttf: Onest (Dmitri Voloshin), licencia SIL Open Font
+  License 1.1. La segunda solo se usa para los caracteres que la primera no tiene.
+- syne-latin.ttf: Syne (Bonjour Monde), licencia SIL Open Font License 1.1.
+
+Son las mismas que sirve el panel (Frontend-EX, public/tipografia/*.woff2), pasadas de WOFF2 a
+TTF sin tocar ningún glifo: PDFBox no lee WOFF2. Son fuentes variables y el PDF usa su instancia
+por defecto (peso 400); el peso medio se dibuja con un trazo fino sobre el relleno.
+
+Texto de la licencia: https://openfontlicense.org (SIL OFL 1.1). Se pueden incrustar, usar y
+redistribuir libremente, también en productos comerciales, siempre que no se vendan solas.

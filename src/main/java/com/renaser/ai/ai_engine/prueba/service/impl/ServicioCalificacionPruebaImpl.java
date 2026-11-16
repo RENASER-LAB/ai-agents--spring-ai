@@ -155,7 +155,17 @@ public class ServicioCalificacionPruebaImpl implements ServicioCalificacionPrueb
           permiso con el que `verEntregables`, aquí abajo, deja ver lo que el candidato
           entregó. **Escribir no se toca**: `ajustarNota` sigue pidiendo `ajustar_nota`.
         */
-        Postulacion postulacion = laVisible(quien, postulacionId, "abrir_ficha_candidato");
+        return notasDe(laVisible(quien, postulacionId, "abrir_ficha_candidato"));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<NotaCriterioResponse> notasParaElInforme(Postulacion postulacion) {
+        return notasDe(postulacion);
+    }
+
+    private List<NotaCriterioResponse> notasDe(Postulacion postulacion) {
+        Long postulacionId = postulacion.getId();
         List<Criterio> rubrica = laRubricaDe(postulacion);
         Map<Long, NotaCriterio> notasPorCriterio = notasCriterio.findByPostulacionId(postulacionId).stream()
                 .collect(Collectors.toMap(NotaCriterio::getCriterioId, Function.identity()));
@@ -197,6 +207,21 @@ public class ServicioCalificacionPruebaImpl implements ServicioCalificacionPrueb
     @Transactional(readOnly = true)
     public List<EntregaDeLaPrueba> verEntregables(ContextoUsuario quien, Long postulacionId) {
         Postulacion postulacion = laVisible(quien, postulacionId, "abrir_ficha_candidato");
+        // Ver el CONTENIDO —el enlace que pegó, o el archivo— pide el mismo permiso que
+        // descargarlo. Sin él se sigue diciendo qué entregó y cuándo, que es lo que necesita
+        // quien solo lleva el seguimiento.
+        return entregasDe(postulacion, quien.tiene("descargar_entregables"));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<EntregaDeLaPrueba> entregablesParaElInforme(Postulacion postulacion) {
+        // El informe nunca enseña el contenido de un entregable: solo qué llegó y cuándo.
+        return entregasDe(postulacion, false);
+    }
+
+    private List<EntregaDeLaPrueba> entregasDe(Postulacion postulacion, boolean puedeVerElContenido) {
+        Long postulacionId = postulacion.getId();
         // El cuestionario técnico se contesta escribiendo: no hay nada que subir, y eso es
         // una lista vacía y no un error. Lo mismo que hace `laRubricaDe`.
         if (rindeElCuestionario(postulacion)) {
@@ -205,11 +230,6 @@ public class ServicioCalificacionPruebaImpl implements ServicioCalificacionPrueb
         IntentoPrueba intento = intentos.findByPostulacionId(postulacion.getId())
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Prueba del puesto", "postulación", postulacionId));
-
-        // Ver el CONTENIDO —el enlace que pegó, o el archivo— pide el mismo permiso que
-        // descargarlo. Sin él se sigue diciendo qué entregó y cuándo, que es lo que necesita
-        // quien solo lleva el seguimiento.
-        boolean puedeVerElContenido = quien.tiene("descargar_entregables");
 
         List<Entregable> subidos = entregables.findByIntentoPruebaId(intento.getId());
         List<EntregableRequerido> pedidos = intento.esDelEditor()
@@ -270,7 +290,17 @@ public class ServicioCalificacionPruebaImpl implements ServicioCalificacionPrueb
 
     @Override
     public List<RespuestaDePrueba> verRespuestas(ContextoUsuario quien, Long postulacionId) {
-        Postulacion postulacion = laVisible(quien, postulacionId, "abrir_ficha_candidato");
+        return respuestasDe(laVisible(quien, postulacionId, "abrir_ficha_candidato"));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<RespuestaDePrueba> respuestasParaElInforme(Postulacion postulacion) {
+        return respuestasDe(postulacion);
+    }
+
+    private List<RespuestaDePrueba> respuestasDe(Postulacion postulacion) {
+        Long postulacionId = postulacion.getId();
         if (rindeElCuestionario(postulacion)) {
             // El mismo contrato: para quien lee, son preguntas con lo que contestó. Que unas
             // vengan de una plantilla de prueba y otras del cuestionario de la vacante es
@@ -450,6 +480,23 @@ public class ServicioCalificacionPruebaImpl implements ServicioCalificacionPrueb
             fila.setAjustadaEn(Instant.now());
         }
         notasCriterio.save(fila);
+        redactarElInformeDeNuevo(postulacionId, "PRUEBA");
+    }
+
+    /**
+     * Tras un ajuste a mano, el redactor del informe rehace los textos de esta etapa (V84).
+     * Nunca frena el ajuste: si la IA está apagada o algo falla, el informe sigue con las
+     * explicaciones hasta que alguien lo abra.
+     */
+    private void redactarElInformeDeNuevo(Long postulacionId, String etapa) {
+        if (cola == null) {
+            return;
+        }
+        try {
+            cola.encolarRedactorInforme(postulacionId, etapa);
+        } catch (RuntimeException ignorada) {
+            // Los textos del informe se piden otra vez la próxima vez que alguien lo abra.
+        }
     }
 
     @Override

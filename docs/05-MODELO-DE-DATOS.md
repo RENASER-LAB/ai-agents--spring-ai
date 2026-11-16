@@ -23,11 +23,14 @@ Sirve para tres cosas:
 - **Entender el sistema.** Un modelo de datos bien contado explica el negocio mejor que
   cualquier otro documento.
 
-**La base ya está construida.** Las migraciones `V1` a `V80` viven en
-`src/main/resources/db/migration` —**128 tablas de este módulo**, 131 en la base contando la de
+**La base ya está construida.** Las migraciones `V1` a `V80` y la `V84` viven en
+`src/main/resources/db/migration` —**129 tablas de este módulo**, 132 en la base contando la de
 Flyway y las dos del motor de agentes— y Flyway es el dueño del esquema. Cambiar algo de aquí
 ya cuesta una migración nueva, y **una migración aplicada no se edita nunca**: se escribe otra
-encima.
+encima. No hay `V81` a `V83`: esos números los reservaban otras specs que todavía no se han
+construido, y como Flyway no aplica migraciones fuera de orden, tendrán que llevar un número
+mayor que la última aplicada (ver «Reglas que no se negocian» en [Reglas del
+código](REGLAS-DEL-CODIGO.md)).
 
 La `V36` trae **el perfil del candidato**: seis tablas que cuelgan de `persona` —no de
 `usuario`, porque el usuario existe una vez por organización y el perfil es de la persona—
@@ -290,6 +293,12 @@ cada CV, privadas. Tres tablas nuevas —`linea_busqueda_cv`, `busqueda_cv` y
 versiones que existían, también las copias de las empresas, quedaron en 25), el agente
 `BUSQUEDA_CV` con su instrucción y el modo `REBUSCA` de `trabajo_ia`. Las vacantes que existían
 no tienen líneas, así que ninguna nota cambió. Ver «Qué buscar en el CV», más abajo.
+
+La `V84` (16/11/2026) acompaña a **los informes por etapa** del panel —el del currículum, el de la
+evaluación y el de la prueba del puesto—, que se arman cada vez que se piden con lo ya guardado: no
+se guarda ningún PDF. Lo único que guarda es lo que escribe el **redactor del informe**: la tabla
+`texto_informe` y el agente `REDACTOR_INFORME` con su instrucción. Ninguna nota cambia y ninguna
+fila que existía se toca. Ver «Los textos del informe», más abajo.
 
 La `V54` (14/09/2026) **no añade ninguna tabla y cambia quién firma qué**. Hasta ella había dos
 tipos de texto —`PROCESO` y `FUTUROS_CONTACTOS`— y el de la cuenta usaba el primero, que habla de
@@ -1383,6 +1392,11 @@ La `V80` suma **`BUSQUEDA_CV`**, que busca en el CV lo que la vacante escribió 
 el CV», y un cuarto modo, **`REBUSCA`**: volver a buscar cuando la empresa cambia las líneas, o
 cuando alguien pulsa «Volver a buscar». Es el mismo carril aparte que `RECALIFICA`, por lo mismo.
 
+La `V84` suma el **redactor del informe** (`REDACTOR_INFORME`), que como el Redactor y el
+Recomendador no evalúa a nadie: escribe los textos de los informes por etapa con lo ya calificado.
+No abre ningún modo nuevo: sus trabajos nacen en `FINA` —aunque el redactor corre sin razonar— y
+se distinguen por `referencia_tabla` (`informe_cv`, `informe_evaluacion`, `informe_prueba`).
+
 Se guarda la respuesta **completa**, no solo la nota: si alguien reclama una calificación, hay
 que poder revisar en qué se basó. Y se guarda **con cuánta confianza** la dio, que es lo que
 distingue una nota firme de una que el propio modelo dio con dudas.
@@ -1609,6 +1623,32 @@ trabajo de la cola del agente `BUSQUEDA_CV`.
 
 **La nota no se guarda aquí.** Lo buscado entra en la nota del CV, que se calcula al leer con el
 peso de `version_pesos.peso_busqueda_cv`.
+
+---
+
+### Los textos del informe · 1 tabla
+
+Desde la `V84` (16/11/2026). Los informes por etapa se arman cada vez que se piden con lo que ya
+está guardado, y no se guarda ningún PDF. Lo que sí se guarda son los textos del **redactor del
+informe**: el resumen de la etapa, una línea por criterio y una por respuesta, escritos para que se
+entiendan sin leer las preguntas. Cómo se escriben y qué se comprueba, en [Calificación con
+IA](CALIFICACION-CON-IA.md), «El redactor del informe».
+
+| Tabla | Para qué existe | Columnas que importan |
+|---|---|---|
+| `texto_informe` | Los textos de una etapa (`CV`, `EVALUACION` o `PRUEBA`) de una postulación, con la huella de los datos con que se escribieron. Una fila por postulación y etapa | postulacion_id, etapa, huella, resumen, criterios, preguntas, descartados, huella_pedida, escrita_en |
+
+**No son notas.** Nada de esta tabla entra en una cuenta ni cambia un orden: si se borrara, los
+informes saldrían con las explicaciones completas de la IA.
+
+**Solo valen para los datos con que se escribieron.** `huella` resume esos datos; si una nota o una
+explicación cambia —una recalificación, un ajuste a mano—, la huella de hoy ya no coincide y el
+informe deja de usarlos hasta que el redactor escriba los nuevos. `huella_pedida` es lo último que
+se le pidió, para no pagar dos veces el mismo pedido.
+
+**Lo que no pasó la comprobación no está.** `criterios` y `preguntas` guardan solo las líneas
+válidas, y `descartados` cuenta las que se tiraron; en su lugar, el informe pone la explicación de
+la IA.
 
 ---
 

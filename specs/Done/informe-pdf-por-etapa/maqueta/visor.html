@@ -1,0 +1,925 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Visor de informes</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;550;600;700&amp;family=Syne:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#FCFCFA}
+a{color:#1E3A8A}a:hover{color:#172A66}
+button:focus-visible,input:focus-visible,a:focus-visible{outline:2px solid #1E3A8A;outline-offset:2px}
+.vz-cuerpo{display:grid;grid-template-columns:240px minmax(0,1fr);flex:1}
+.vz-lateral{display:flex}
+.vz-menu-btn{display:none}
+.vz-pagina{padding:24px 24px 72px}
+.vz-side{display:flex}
+.vz-mbar{display:none}
+.vz-crit{display:grid;grid-template-columns:220px minmax(0,1fr) 72px 16px;align-items:center;column-gap:14px;row-gap:6px}
+.vz-enlace:hover{color:#111312;background:rgba(17,19,18,0.04)}
+.vz-row:hover{background:#F5F7FB}
+.vz-q:hover{background:#F5F7FB}
+@media (max-width:1023.98px){
+  .vz-cuerpo{grid-template-columns:minmax(0,1fr)}
+  .vz-lateral{display:none}
+  .vz-menu-btn{display:inline-flex}
+}
+@media (max-width:760px){
+  .vz-pagina{padding:16px 16px 48px}
+  .vz-side{display:none}
+  .vz-mbar{display:flex}
+  .vz-crit{grid-template-columns:minmax(0,1fr) auto 16px}
+  .vz-bar{grid-column:1 / -1;grid-row:2}
+  .vz-hide-m{display:none}
+}
+</style>
+</helmet>
+<div style="min-height: 100%; background: #FCFCFA; color: #111312; font-family: Onest, system-ui, sans-serif; display: flex; flex-direction: column">
+
+  <header style="position: sticky; top: 0; z-index: 20; background: #FCFCFA; border-bottom: 1px solid rgba(17,19,18,0.1)">
+    <div style="display: flex; align-items: center; gap: 12px 16px; min-height: 57px; padding: 0 24px; min-width: 0">
+      <button type="button" class="vz-menu-btn" style="all: unset; box-sizing: border-box; cursor: pointer; flex: none; align-items: center; gap: 8px; min-height: 44px; padding: 0 12px; border: 1px solid #D4D6D3; border-radius: 8px; background: #FFFFFF; color: #111312; font-size: 14px; font-weight: 600"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6.5h16M4 12h16M4 17.5h16"></path></svg>Menú</button>
+      <a href="#" aria-label="Panel del equipo, inicio" style="flex: none; display: inline-flex; align-items: center; gap: 12px; min-height: 44px; color: #111312; text-decoration: none">
+        <span role="img" aria-label="EX" style="width: 32px; height: 28px; display: flex; align-items: center; justify-content: center; font-family: Syne, Onest, sans-serif; font-size: 17px; font-weight: 600; letter-spacing: -0.04em; color: #111312">EX</span>
+        <span style="font-family: Syne, Onest, sans-serif; font-size: 11px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: #111312; border-left: 1px solid rgba(17,19,18,0.1); padding-left: 12px; white-space: nowrap">Panel del equipo</span>
+      </a>
+      <span class="vz-hide-m" style="min-width: 0; flex: 0 1 auto; font-size: 14px; color: #687170; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-left: 16px; border-left: 1px solid rgba(17,19,18,0.1)">Renaser Consulting</span>
+      <div style="margin-left: auto; flex: 0 1 auto; display: flex; align-items: center; gap: 12px; min-width: 0">
+        <span class="vz-hide-m" style="min-width: 0; max-width: 16rem; font-size: 14px; color: #4A5251; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">Marisol Vega</span>
+        <button type="button" style="all: unset; box-sizing: border-box; cursor: pointer; flex: none; display: inline-flex; align-items: center; min-height: 44px; padding: 0 8px; font-size: 14px; color: #4A5251; text-decoration: underline; text-decoration-color: #D4D6D3; text-underline-offset: 0.22em">Salir</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="vz-cuerpo">
+    <nav class="vz-lateral" aria-label="Menú del panel" style="align-self: start; position: sticky; top: 58px; min-height: 760px; box-sizing: border-box; flex-direction: column; gap: 12px; padding: 16px 12px; background: #FCFCFA; border-right: 1px solid rgba(17,19,18,0.1)">
+      <div style="flex: 1; display: flex; flex-direction: column; gap: 16px">
+        <div style="display: flex; flex-direction: column; gap: 16px">
+          <section aria-label="Selección" style="display: flex; flex-direction: column; gap: 4px">
+            <h2 aria-hidden="true" style="margin: 0 0 4px; padding: 0 12px; font-size: 11px; font-weight: 400; letter-spacing: 0.16em; text-transform: uppercase; color: #656D6C">/ Selección</h2>
+            <ul role="list" style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px">
+              <li><a href="#" aria-current="page" style="display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 0 12px; border-radius: 4px; color: #1E3A8A; font-weight: 550; font-size: 14px; text-decoration: none; background: #E9EDFF; box-shadow: inset 2px 0 0 #1E3A8A"><span aria-hidden="true" style="flex: none; display: inline-flex; width: 20px; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="7" width="19" height="13" rx="2"></rect><path d="M8.5 7V5.5a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2V7"></path><path d="M2.5 12h19"></path></svg></span><span>Vacantes</span></a></li>
+              <li><a href="#" class="vz-enlace" style="display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 0 12px; border-radius: 4px; color: #4A5251; font-size: 14px; text-decoration: none"><span aria-hidden="true" style="flex: none; display: inline-flex; width: 20px; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2.8H7a2 2 0 0 0-2 2v14.4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7.8L14 2.8Z"></path><path d="M14 2.8v5h5"></path><path d="M8.5 13h7M8.5 16.5h4.5"></path></svg></span><span>Pruebas</span></a></li>
+              <li><a href="#" class="vz-enlace" style="display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 0 12px; border-radius: 4px; color: #4A5251; font-size: 14px; text-decoration: none"><span aria-hidden="true" style="flex: none; display: inline-flex; width: 20px; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5.3l3.3 2"></path></svg></span><span>Simulación</span></a></li>
+            </ul>
+          </section>
+          <section aria-label="Personas" style="display: flex; flex-direction: column; gap: 4px">
+            <h2 aria-hidden="true" style="margin: 0 0 4px; padding: 0 12px; font-size: 11px; font-weight: 400; letter-spacing: 0.16em; text-transform: uppercase; color: #656D6C">/ Personas</h2>
+            <ul role="list" style="list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px">
+              <li><a href="#" class="vz-enlace" style="display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 0 12px; border-radius: 4px; color: #4A5251; font-size: 14px; text-decoration: none"><span aria-hidden="true" style="flex: none; display: inline-flex; width: 20px; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"></circle><path d="M3 19.5c.6-3.3 3.1-5.3 6-5.3s5.4 2 6 5.3"></path><path d="M15.5 5.2a3 3 0 0 1 0 5.8"></path><path d="M17.5 14.6c1.8.6 3.1 2.3 3.5 4.9"></path></svg></span><span>Colaboradores</span></a></li>
+            </ul>
+          </section>
+        </div>
+        <ul role="list" style="list-style: none; margin: auto 0 0; padding: 12px 0 0; border-top: 1px solid rgba(17,19,18,0.1); display: flex; flex-direction: column; gap: 2px">
+          <li><a href="#" class="vz-enlace" style="display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 0 12px; border-radius: 4px; color: #4A5251; font-size: 14px; text-decoration: none"><span aria-hidden="true" style="flex: none; display: inline-flex; width: 20px; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h9M17 7h3M4 12h3M11 12h9M4 17h11M19 17h1"></path><circle cx="15" cy="7" r="2"></circle><circle cx="9" cy="12" r="2"></circle><circle cx="17" cy="17" r="2"></circle></svg></span><span>Configuración</span></a></li>
+        </ul>
+      </div>
+      <button type="button" class="vz-enlace" style="all: unset; box-sizing: border-box; cursor: pointer; display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 0 12px; border-radius: 8px; color: #4A5251; font-size: 14px"><span aria-hidden="true" style="display: inline-flex; width: 20px; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="m11.5 6.5-5.5 5.5 5.5 5.5M18 6.5 12.5 12l5.5 5.5"></path></svg></span><span>Plegar menú</span></button>
+    </nav>
+
+    <main style="min-width: 0">
+  <div class="vz-pagina" style="max-width: 1920px; margin: 0 auto; box-sizing: border-box; display: flex; flex-direction: column; gap: 16px">
+
+    <a href="#" style="align-self: flex-start; display: inline-flex; align-items: center; min-height: 44px; font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; text-decoration: none; color: #4A5251">← Volver a la vacante</a>
+
+    <header style="display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px; margin-bottom: 8px">
+      <div style="flex: 1 1 32rem; min-width: 0">
+        <p style="margin: 0 0 12px; font-size: 11px; line-height: 1.2; font-weight: 400; letter-spacing: 0.16em; text-transform: uppercase; color: #656D6C">Visor de informes</p>
+        <h1 style="margin: 0; font-size: clamp(2.25rem, 4vw, 3.5rem); line-height: 0.98; letter-spacing: -0.055em; font-weight: 400">Analista de Recursos Humanos</h1>
+        <p style="margin: 8px 0 0; font-size: 15px; color: #4A5251">Publicada el 03/11/2026 · se cierra el 20/11/2026 · con evaluación del banco</p>
+      </div>
+      <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 8px">
+        <button type="button" onClick="{{ dlVacante }}" style="all: unset; box-sizing: border-box; cursor: pointer; min-height: 44px; padding: 12px 16px; border-radius: 8px; background: #FCFCFA; border: 1px solid #E5E7EB; display: flex; align-items: center; gap: 8px; font-size: 14px; text-transform: uppercase; color: #111312"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11"></path><path d="m7 11 5 5 5-5"></path><path d="M5 20h14"></path></svg>Descargar los de toda la vacante</button>
+        <span style="font-size: 14px; color: #4A5251">13 postulantes, en el orden del ranking</span>
+      </div>
+    </header>
+    <div class="vz-mbar" style="flex-direction: column; gap: 8px">
+      <div style="display: flex; gap: 8px; align-items: stretch">
+        <button type="button" aria-label="Postulante anterior" onClick="{{ prev }}" disabled="{{ prevDisabled }}" style="all: unset; box-sizing: border-box; cursor: pointer; width: 44px; height: 44px; border: 1px solid rgba(0,0,0,0.1); border-radius: 8px; background: #FFFFFF; display: flex; align-items: center; justify-content: center; opacity: {{ prevOpacity }}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"></path></svg></button>
+        <button type="button" onClick="{{ toggleMenu }}" aria-expanded="{{ mOpen }}" style="all: unset; box-sizing: border-box; cursor: pointer; flex: 1; min-width: 0; height: 44px; border: 1px solid rgba(0,0,0,0.1); border-radius: 8px; background: #FFFFFF; padding: 0 12px; display: flex; align-items: center; gap: 10px">
+          <span style="font-family: Syne, Onest, sans-serif; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #687170; flex-shrink: 0">{{ pos }}</span>
+          <span style="flex: 1; min-width: 0; font-size: 14px; font-weight: 550; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{ cur.name }}</span>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0; transform: rotate({{ mRot }})"><path d="m6 9 6 6 6-6"></path></svg>
+        </button>
+        <button type="button" aria-label="Postulante siguiente" onClick="{{ next }}" disabled="{{ nextDisabled }}" style="all: unset; box-sizing: border-box; cursor: pointer; width: 44px; height: 44px; border: 1px solid rgba(0,0,0,0.1); border-radius: 8px; background: #FFFFFF; display: flex; align-items: center; justify-content: center; opacity: {{ nextOpacity }}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"></path></svg></button>
+      </div>
+      <sc-if value="{{ mOpen }}" hint-placeholder-val="{{ false }}">
+        <div style="background: #FFFFFF; border: 1px solid rgba(0,0,0,0.1); border-radius: 4px; display: flex; flex-direction: column; max-height: 360px; overflow-y: auto">
+          <sc-for list="{{ allRows }}" as="r" hint-placeholder-count="13">
+            <button type="button" class="vz-row" onClick="{{ r.pick }}" style="all: unset; box-sizing: border-box; cursor: pointer; display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-top: 1px solid rgba(0,0,0,0.06); background: {{ r.bg }}; box-shadow: inset 3px 0 0 {{ r.bar }}">
+              <span style="font-family: Syne, Onest, sans-serif; font-size: 11px; color: #687170; width: 20px">{{ r.rank }}</span>
+              <span style="flex: 1; min-width: 0; font-size: 14px; font-weight: {{ r.weight }}">{{ r.name }}</span>
+              <span style="font-size: 12px; color: #4A5251; font-variant-numeric: tabular-nums">{{ r.cvTxt }} · {{ r.evTxt }} · {{ r.prTxt }}</span>
+            </button>
+          </sc-for>
+        </div>
+      </sc-if>
+    </div>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-start">
+
+      <aside class="vz-side" aria-label="Postulantes de la vacante" style="flex: 1 1 280px; max-width: 320px; flex-direction: column; gap: 10px; background: #FFFFFF; border: 1px solid rgba(0,0,0,0.1); border-radius: 4px; padding: 14px 0 6px">
+        <div style="padding: 0 14px; display: flex; flex-direction: column; gap: 10px">
+          <div style="display: flex; justify-content: space-between; align-items: baseline">
+            <span style="font-family: Syne, Onest, sans-serif; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: #687170">Postulantes</span>
+            <span style="font-size: 12px; color: #687170">{{ countTxt }}</span>
+          </div>
+          <label style="display: flex; align-items: center; gap: 8px; height: 40px; border: 1px solid rgba(0,0,0,0.1); border-radius: 8px; padding: 0 10px; background: #FCFCFA">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#687170" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.3-4.3"></path></svg>
+            <input type="search" value="{{ q }}" onChange="{{ onSearch }}" placeholder="Buscar por nombre" aria-label="Buscar postulante" style="all: unset; flex: 1; min-width: 0; font-family: Onest, sans-serif; font-size: 14px; color: #111312" />
+          </label>
+          <div style="display: grid; grid-template-columns: 22px minmax(0, 1fr) 30px 30px 30px; column-gap: 6px; font-family: Syne, Onest, sans-serif; font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: #687170; padding: 0 2px">
+            <span>#</span><span>Nombre</span><span style="text-align: right">CV</span><span style="text-align: right">Eva</span><span style="text-align: right">Pru</span>
+          </div>
+        </div>
+        <div style="display: flex; flex-direction: column">
+          <sc-for list="{{ rows }}" as="r" hint-placeholder-count="13">
+            <button type="button" class="vz-row" onClick="{{ r.pick }}" aria-current="{{ r.current }}" style="all: unset; box-sizing: border-box; cursor: pointer; display: grid; grid-template-columns: 22px minmax(0, 1fr) 30px 30px 30px; column-gap: 6px; row-gap: 4px; align-items: center; padding: 10px 16px; border-top: 1px solid rgba(0,0,0,0.06); background: {{ r.bg }}; box-shadow: inset 3px 0 0 {{ r.bar }}">
+              <span style="font-family: Syne, Onest, sans-serif; font-size: 11px; color: #687170">{{ r.rank }}</span>
+              <span style="min-width: 0; display: flex; flex-direction: column; gap: 4px; align-items: flex-start">
+                <span style="font-size: 13.5px; line-height: 1.3; font-weight: {{ r.weight }}; color: #111312">{{ r.name }}</span>
+                <span title="{{ r.gFull }}" style="display: inline-block; padding: 1px 8px; border-radius: 8px; background: #F5F7FB; font-size: 12px; font-weight: 600; color: #4A5251; white-space: nowrap">{{ r.gLabel }}</span>
+              </span>
+              <span style="text-align: right; font-size: 13px; font-variant-numeric: tabular-nums; color: {{ r.cvC }}">{{ r.cvTxt }}</span>
+              <span style="text-align: right; font-size: 13px; font-variant-numeric: tabular-nums; color: {{ r.evC }}">{{ r.evTxt }}</span>
+              <span style="text-align: right; font-size: 13px; font-variant-numeric: tabular-nums; color: {{ r.prC }}">{{ r.prTxt }}</span>
+            </button>
+          </sc-for>
+          <sc-if value="{{ noRows }}" hint-placeholder-val="{{ false }}">
+            <div style="padding: 16px; font-size: 13px; color: #687170; border-top: 1px solid rgba(0,0,0,0.06)">Ningún postulante se llama «{{ q }}».</div>
+          </sc-if>
+        </div>
+      </aside>
+
+      <div style="flex: 999 1 560px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+
+        <section aria-label="Postulante" style="background: #FFFFFF; border: 1px solid rgba(0,0,0,0.1); border-radius: 4px; padding: 20px; display: flex; flex-direction: column; gap: 16px">
+          <div class="vz-hide-m" style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap">
+            <span style="font-family: Syne, Onest, sans-serif; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: #687170">Puesto {{ cur.rank }} del ranking</span>
+            <div style="display: flex; align-items: center; gap: 8px">
+              <button type="button" onClick="{{ prev }}" disabled="{{ prevDisabled }}" style="all: unset; box-sizing: border-box; cursor: pointer; min-height: 44px; padding: 12px 16px; border-radius: 8px; background: #FCFCFA; border: 1px solid #E5E7EB; color: #111312; display: inline-flex; align-items: center; font-family: Onest, sans-serif; font-size: 14px; font-weight: 400; line-height: 21px; text-transform: uppercase; opacity: {{ prevOpacity }}">← Anterior</button>
+              <span style="font-size: 14px; color: #4A5251; min-width: 56px; text-align: center; font-variant-numeric: tabular-nums">{{ pos }}</span>
+              <button type="button" onClick="{{ next }}" disabled="{{ nextDisabled }}" style="all: unset; box-sizing: border-box; cursor: pointer; min-height: 44px; padding: 12px 16px; border-radius: 8px; background: #FCFCFA; border: 1px solid #E5E7EB; color: #111312; display: inline-flex; align-items: center; font-family: Onest, sans-serif; font-size: 14px; font-weight: 400; line-height: 21px; text-transform: uppercase; opacity: {{ nextOpacity }}">Siguiente →</button>
+            </div>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; flex-wrap: wrap">
+            <div style="display: flex; flex-direction: column; gap: 8px; min-width: 0">
+              <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap">
+                <h2 style="margin: 0; font-size: 34px; font-weight: 400; letter-spacing: -0.05em; line-height: 1.05">{{ cur.name }}</h2>
+                <span title="{{ cur.gFull }}" style="display: inline-block; padding: 1px 8px; border-radius: 8px; background: #F5F7FB; font-size: 12px; font-weight: 600; color: #4A5251; white-space: nowrap">{{ cur.gFull }}</span>
+              </div>
+              <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap; font-size: 14px; color: #4A5251">
+                <span>Analista de Recursos Humanos</span>
+                <a href="#" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path><path d="M16 13H8"></path><path d="M16 17H8"></path></svg>Currículum</a>
+                <a href="#" style="display: inline-flex; align-items: center; gap: 6px; text-decoration: none"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"></path><rect width="4" height="12" x="2" y="9"></rect><circle cx="4" cy="4" r="2"></circle></svg>LinkedIn</a>
+              </div>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px; align-items: flex-end">
+              <div style="display: flex; gap: 8px; flex-wrap: wrap">
+                <button type="button" onClick="{{ openFicha }}" aria-label="Abrir la ficha para ajustar notas, mover de etapa o descartar" style="all: unset; box-sizing: border-box; cursor: pointer; min-height: 44px; padding: 12px 16px; border-radius: 8px; background: #FCFCFA; border: 1px solid #E5E7EB; display: flex; align-items: center; gap: 8px; font-size: 14px; text-transform: uppercase; color: #111312"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg>Abrir ficha</button>
+                <button type="button" onClick="{{ dlOne }}" style="all: unset; box-sizing: border-box; cursor: pointer; min-height: 44px; padding: 12px 16px; border-radius: 8px; background: #1E3A8A; border: 1px solid rgba(0,0,0,0.1); color: #FFFFFF; display: inline-flex; align-items: center; gap: 8px; font-family: Onest, sans-serif; font-size: 14px; font-weight: 400; line-height: 21px; text-transform: uppercase"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11"></path><path d="m7 11 5 5 5-5"></path><path d="M5 20h14"></path></svg>Descargar PDF</button>
+                <button type="button" onClick="{{ dlAll }}" style="all: unset; box-sizing: border-box; cursor: pointer; min-height: 44px; padding: 12px 16px; border-radius: 8px; background: #FCFCFA; border: 1px solid #E5E7EB; color: #111312; display: inline-flex; align-items: center; gap: 8px; font-family: Onest, sans-serif; font-size: 14px; font-weight: 400; line-height: 21px; text-transform: uppercase">Descargar sus 3 informes</button>
+              </div>
+              <sc-if value="{{ hasToast }}" hint-placeholder-val="{{ false }}">
+                <span role="status" style="font-size: 13px; color: #0B7A63; display: flex; align-items: center; gap: 6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="m8 12 3 3 5-6"></path></svg>{{ toast }}</span>
+              </sc-if>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 8px; border-top: 1px solid rgba(0,0,0,0.1); padding-top: 16px; min-width: 0">
+            <div role="tablist" aria-label="Informe" style="display: flex; gap: 4px; padding: 4px; border: 1px solid rgba(17,19,18,0.1); border-radius: 4px; background: #FCFCFA; width: max-content; max-width: 100%; box-sizing: border-box; overflow-x: auto">
+              <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="3">
+                <button type="button" role="tab" aria-selected="{{ t.active }}" aria-disabled="{{ t.disabled }}" title="{{ t.why }}" onClick="{{ t.pick }}" style="all: unset; box-sizing: border-box; cursor: {{ t.cursor }}; flex: 0 0 auto; min-height: 44px; padding: 0 16px; display: inline-flex; align-items: center; gap: 8px; border: 1px solid transparent; border-radius: 4px; font-family: Onest, sans-serif; font-size: 14px; font-weight: 400; white-space: nowrap; color: {{ t.fg }}; background: {{ t.bg }}">
+                  <span>{{ t.label }}</span>
+                  <span style="font-weight: 600; font-variant-numeric: tabular-nums">{{ t.scoreTxt }}</span>
+                  <sc-if value="{{ t.disabled }}" hint-placeholder-val="{{ false }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5.3l3.3 2"></path></svg></sc-if>
+                </button>
+              </sc-for>
+            </div>
+            <sc-if value="{{ hasBlocked }}" hint-placeholder-val="{{ false }}">
+              <span style="font-size: 13px; color: #687170">{{ blockedTxt }}</span>
+            </sc-if>
+          </div>
+        </section>
+
+        <sc-if value="{{ noDetail }}" hint-placeholder-val="{{ false }}">
+          <div style="background: #FFFFFF; border: 1px dashed rgba(0,0,0,0.16); border-radius: 4px; padding: 40px 24px; display: flex; flex-direction: column; gap: 8px; align-items: center; text-align: center">
+            <span style="font-family: Syne, Onest, sans-serif; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: #687170">Maqueta</span>
+            <span style="font-size: 16px; max-width: 460px; line-height: 1.5">En esta maqueta solo están completos los informes de Carlos Mendoza, Ana Torres y Lucía Paredes (puestos 2, 3 y 4).</span>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ hasDetail }}" hint-placeholder-val="{{ true }}">
+          <div style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start">
+
+            <div style="flex: 999 1 460px; min-width: 0; display: flex; flex-direction: column; gap: 16px">
+
+              <sc-if value="{{ showCv }}" hint-placeholder-val="{{ false }}">
+                <section style="background: #FFFFFF; border: 1px solid rgba(0,0,0,0.1); border-radius: 4px; padding: 20px; display: flex; flex-direction: column; gap: 14px">
+                  <span style="font-family: Syne, Onest, sans-serif; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: #687170">Experiencia profesional</span>
+                  <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px">
+                    <div style="border: 1px solid rgba(0,0,0,0.1); border-radius: 4px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; background: #F5F7FB">
+                      <span style="font-family: Syne, Onest, sans-serif; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: #687170">Total</span>
+                      <span style="font-size: 22px; letter-spacing: -0.04em; line-height: 1.1">{{ cv.total }}</span>
+                      <span style="font-size: 12.5px; color: #4A5251">{{ cv.totalSub }}</span>
+                    </div>
+                    <div style="border: 1px solid rgba(0,0,0,0.1); border-radius: 4px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px">
+                      <span style="font-family: Syne, Onest, sans-serif; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: #687170">Último puesto</span>
+                      <span style="font-size: 15px; font-weight: 550; line-height: 1.3">{{ cv.last }}</span>
+                      <span style="font-size: 12.5px; color: #4A5251; line-height: 1.4">{{ cv.lastSub }}</span>
+                    </div>
+                    <div style="border: 1px solid rgba(0,0,0,0.1); border-radius: 4px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px">
+                      <span style="font-family: Syne, Onest, sans-serif; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: #687170">Formación máxima</span>
+                      <span style="font-size: 15px; font-weight: 550; line-height: 1.3">{{ cv.edu }}</span>
+                      <span style="font-size: 12.5px; color: #4A5251; line-height: 1.4">{{ cv.eduSub }}</span>
+                    </div>
+                  </div>
+                  <div style="display: flex; flex-wrap: wrap; gap: 6px">
+                    <sc-for list="{{ cv.skills }}" as="sk" hint-placeholder-count="5">
+                      <span style="font-size: 12.5px; color: #1E3A8A; background: #E9EDFF; border-radius: 999px; padding: 5px 11px">{{ sk }}</span>
+                    </sc-for>
+                  </div>
+                  <div style="display: flex; flex-direction: column; gap: 6px; border-top: 1px solid rgba(0,0,0,0.1); padding-top: 14px">
+                    <span style="font-family: Syne, Onest, sans-serif; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: #687170">Lo que muestra su CV</span>
+                    <p style="margin: 0; font-size: 16px; line-height: 1.5; letter-spacing: -0.01em">{{ cv.shows }}</p>
+                  </div>
+                </section>
+              </sc-if>
+
+              <sc-if value="{{ showSummary }}" hint-placeholder-val="{{ true }}">
+                <section style="background: #FFFFFF; border: 1px solid rgba(0,0,0,0.1); border-radius: 4px; padding: 20px; display: flex; flex-direction: column; gap: 8px">
+                  <span style="font-family: Syne, Onest, sans-serif; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: #687170">En pocas líneas</span>
+                  <p style="margin: 0; font-size: 18px; line-height: 1.5; letter-spacing: -0.015em">{{ X.summary }}</p>
+                </section>
+              </sc-if>
+
+              <section style="background: #FFFFFF; border: 1px solid rgba(0,0,0,0.1); border-radius: 4px; padding: 20px 20px 8px; display: flex; flex-direction: column; gap: 6px">
+                <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap">
+                  <span style="font-family: Syne, Onest, sans-serif; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: #687170">Qué se evaluó</span>
+                  <span style="font-size: 12px; color: #687170">{{ X.critHint }}</span>
+                </div>
+                <div style="display: flex; flex-direction: column">
+                  <sc-for list="{{ crits }}" as="k" hint-placeholder-count="6">
+                    <div style="border-top: {{ k.sep }}; display: flex; flex-direction: column">
+                      <button type="button" class="vz-q" onClick="{{ k.toggle }}" aria-expanded="{{ k.open }}" style="all: unset; box-sizing: border-box; cursor: pointer; padding: 12px 8px; margin: 0 -8px; border-radius: 4px">
+                        <span class="vz-crit">
+                          <span style="display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 14px; font-weight: 500">
+                            <span>{{ k.n }}</span>
+                            <sc-if value="{{ k.hasWho }}" hint-placeholder-val="{{ false }}"><span style="font-family: Syne, Onest, sans-serif; font-size: 9.5px; letter-spacing: 0.12em; text-transform: uppercase; color: #4A5251; border: 1px solid rgba(0,0,0,0.16); border-radius: 999px; padding: 1px 7px">{{ k.who }}</span></sc-if>
+                            <sc-if value="{{ k.adj }}" hint-placeholder-val="{{ false }}"><span title="Ajustada a mano" style="font-size: 11.5px; color: #1E3A8A">Ajustada</span></sc-if>
+                          </span>
+                          <span class="vz-bar" style="display: block; height: 8px; background: #E9EDFF; border-radius: 999px"><span style="display: block; width: {{ k.pct }}; height: 8px; background: #1E3A8A; border-radius: 999px"></span></span>
+                          <span style="text-align: right; font-size: 15px; font-weight: 550; font-variant-numeric: tabular-nums; white-space: nowrap">{{ k.sv }}<span style="font-weight: 400; font-size: 12px; color: #687170">{{ k.sm }}</span></span>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#687170" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="transform: rotate({{ k.rot }})"><path d="m6 9 6 6 6-6"></path></svg>
+                        </span>
+                      </button>
+                      <sc-if value="{{ k.open }}" hint-placeholder-val="{{ false }}">
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; padding: 2px 0 14px">
+                          <div style="background: #F5F7FB; border-radius: 4px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px">
+                            <span style="font-family: Syne, Onest, sans-serif; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: #1E3A8A">Lo que demostró</span>
+                            <span style="font-size: 14px; line-height: 1.5">{{ k.d }}</span>
+                          </div>
+                          <div style="border: 1px solid rgba(0,0,0,0.1); border-radius: 4px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px">
+                            <span style="font-family: Syne, Onest, sans-serif; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: #687170">Por qué esta nota</span>
+                            <span style="font-size: 14px; line-height: 1.5; color: #2B2F2D">{{ k.j }}</span>
+                          </div>
+                        </div>
+                      </sc-if>
+                    </div>
+                  </sc-for>
+                </div>
+              </section>
+
+              <sc-if value="{{ showAnexo }}" hint-placeholder-val="{{ true }}">
+                <section style="background: #FFFFFF; border: 1px solid rgba(0,0,0,0.1); border-radius: 4px; padding: 20px 20px 8px; display: flex; flex-direction: column; gap: 6px">
+                  <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap">
+                    <div style="display: flex; flex-direction: column; gap: 4px">
+                      <span style="font-family: Syne, Onest, sans-serif; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: #687170">Anexo</span>
+                      <span style="font-size: 20px; letter-spacing: -0.04em">{{ X.anexoTitle }}</span>
+                    </div>
+                    <button type="button" onClick="{{ toggleAll }}" style="all: unset; box-sizing: border-box; cursor: pointer; height: 36px; padding: 0 12px; border: 1px solid rgba(0,0,0,0.1); border-radius: 8px; font-family: Syne, Onest, sans-serif; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; display: flex; align-items: center">{{ allLabel }}</button>
+                  </div>
+                  <div style="display: flex; flex-direction: column">
+                    <sc-for list="{{ qs }}" as="qq" hint-placeholder-count="4">
+                      <div style="border-top: 1px solid rgba(0,0,0,0.08); display: flex; flex-direction: column">
+                        <button type="button" class="vz-q" onClick="{{ qq.toggle }}" aria-expanded="{{ qq.open }}" style="all: unset; box-sizing: border-box; cursor: pointer; display: flex; align-items: flex-start; gap: 12px; padding: 14px 8px; margin: 0 -8px; border-radius: 4px">
+                          <span style="flex-shrink: 0; width: 26px; height: 26px; border-radius: 999px; background: #111312; color: #FCFCFA; display: flex; align-items: center; justify-content: center; font-size: 12px">{{ qq.n }}</span>
+                          <span style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px">
+                            <span style="font-size: 14.5px; font-weight: 550; line-height: 1.4">{{ qq.title }}</span>
+                            <span style="font-family: Syne, Onest, sans-serif; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: #687170">{{ qq.meta }}</span>
+                            <span style="font-size: 13.5px; line-height: 1.5; color: #4A5251"><b style="font-weight: 550; color: #2B2F2D">Lo que demostró:</b> {{ qq.shows }}</span>
+                          </span>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#687170" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0; margin-top: 5px; transform: rotate({{ qq.rot }})"><path d="m6 9 6 6 6-6"></path></svg>
+                        </button>
+                        <sc-if value="{{ qq.open }}" hint-placeholder-val="{{ false }}">
+                          <div style="margin: 0 0 14px 38px; background: {{ qq.ansBg }}; border: {{ qq.ansBorder }}; border-radius: 4px 12px 12px 12px; padding: 12px 14px; display: flex; flex-direction: column; gap: 4px">
+                            <span style="font-family: Syne, Onest, sans-serif; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase; color: #687170">Su respuesta</span>
+                            <span style="font-size: 14px; line-height: 1.55; color: #2B2F2D; font-style: {{ qq.fs }}">{{ qq.answer }}</span>
+                          </div>
+                        </sc-if>
+                      </div>
+                    </sc-for>
+                  </div>
+                  <sc-if value="{{ showPr }}" hint-placeholder-val="{{ false }}">
+                    <div style="border-top: 1px solid rgba(0,0,0,0.1); padding: 14px 0 10px; display: flex; flex-direction: column; gap: 8px">
+                      <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 12px"><span style="font-family: Syne, Onest, sans-serif; font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: #687170">Entregables pedidos</span><span style="font-size: 12.5px; color: #687170">{{ pr.entTxt }}</span></div>
+                      <sc-for list="{{ pr.ents }}" as="e" hint-placeholder-count="4">
+                        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; border: 1px solid rgba(0,0,0,0.1); border-radius: 4px; padding: 10px 12px">
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4A5251" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"></path><path d="M14 2v4a2 2 0 0 0 2 2h4"></path></svg>
+                          <span style="flex: 1 1 220px; min-width: 0; display: flex; flex-direction: column; gap: 2px"><span style="font-size: 13.5px; font-weight: 550">{{ e.n }}</span><span style="font-size: 12.5px; color: #687170">{{ e.d }}</span></span>
+                          <span style="font-family: Syne, Onest, sans-serif; font-size: 9.5px; letter-spacing: 0.12em; text-transform: uppercase; color: {{ e.fg }}; background: {{ e.bg }}; border-radius: 999px; padding: 4px 10px">{{ e.st }}</span>
+                        </div>
+                      </sc-for>
+                    </div>
+                  </sc-if>
+                </section>
+              </sc-if>
+            </div>
+
+            <div style="flex: 1 1 320px; min-width: 0; display: flex; flex-direction: column; gap: 12px">
+
+              <sc-if value="{{ showCv }}" hint-placeholder-val="{{ false }}">
+                <div style="display: flex; flex-direction: column; gap: 12px">
+                  <section style="background: #FFFFFF; border: 1px solid rgba(0,0,0,0.1); border-radius: 4px; padding: 16px; display: flex; flex-direction: column; gap: 10px">
+                    <div style="display: flex; align-items: center; gap: 10px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0B7A63" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="m8 12 3 3 5-6"></path></svg><h3 style="margin: 0; flex: 1; font-size: 15px; font-weight: 550; color: #0B7A63">Lo que el CV demuestra</h3><span style="font-size: 12px; color: #687170">{{ cv.demuestraN }}</span></div>
+                    <ul style="margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; line-height: 1.5"><sc-for list="{{ cv.demuestra }}" as="li" hint-placeholder-count="3"><li>{{ li }}</li></sc-for></ul>
+                  </section>
+                  <section style="background: #FFFFFF; border: 1px solid rgba(0,0,0,0.1); border-radius: 4px; padding: 16px; display: flex; flex-direction: column; gap: 10px">
+                    <div style="display: flex; align-items: center; gap: 10px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#C22A3F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="m15 9-6 6"></path><path d="m9 9 6 6"></path></svg><h3 style="margin: 0; flex: 1; font-size: 15px; font-weight: 550; color: #C22A3F">No cuadra</h3><span style="font-size: 12px; color: #687170">{{ cv.noCuadraN }}</span></div>
+                    <ul style="margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; line-height: 1.5"><sc-for list="{{ cv.noCuadra }}" as="li" hint-placeholder-count="1"><li>{{ li }}</li></sc-for></ul>
+                  </section>
+                  <section style="background: #F5F7FB; border: 1px solid rgba(30,58,138,0.16); border-radius: 4px; padding: 16px; display: flex; flex-direction: column; gap: 12px">
+                    <div style="display: flex; align-items: center; gap: 10px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1E3A8A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path><path d="M9.5 8.5a2.5 2.5 0 1 1 3.3 2.4c-.5.2-.8.6-.8 1.1v.5"></path><path d="M12 15h.01"></path></svg><h3 style="margin: 0; flex: 1; font-size: 15px; font-weight: 550; color: #172A66">Por verificar en la evaluación</h3><span style="font-size: 12px; color: #687170">{{ cv.verificarN }}</span></div>
+                    <sc-for list="{{ cv.verificar }}" as="v" hint-placeholder-count="3">
+                      <div style="background: #FFFFFF; border-radius: 4px; padding: 10px 12px; display: flex; flex-direction: column; gap: 4px">
+                        <span style="font-size: 14px; font-weight: 550">{{ v.t }}</span>
+                        <span style="font-size: 13.5px; line-height: 1.45; color: #172A66">{{ v.q }}</span>
+                      </div>
+                    </sc-for>
+                  </section>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ showEv }}" hint-placeholder-val="{{ true }}">
+                <div style="display: flex; flex-direction: column; gap: 12px">
+                  <section style="background: #FFFFFF; border: 1px solid rgba(0,0,0,0.1); border-radius: 4px; padding: 16px; display: flex; flex-direction: column; gap: 10px">
+                    <div style="display: flex; align-items: center; gap: 10px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0B7A63" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="m8 12 3 3 5-6"></path></svg><h3 style="margin: 0; flex: 1; font-size: 15px; font-weight: 550; color: #0B7A63">Puntos fuertes</h3></div>
+                    <ul style="margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; line-height: 1.5"><sc-for list="{{ ev.fuertes }}" as="li" hint-placeholder-count="3"><li>{{ li }}</li></sc-for></ul>
+                  </section>
+                  <section style="background: #FFFFFF; border: 1px solid rgba(0,0,0,0.1); border-radius: 4px; padding: 16px; display: flex; flex-direction: column; gap: 10px">
+                    <div style="display: flex; align-items: center; gap: 10px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4A5251" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20V10"></path><path d="m7 14 5-5 5 5"></path><path d="M4 4h16"></path></svg><h3 style="margin: 0; flex: 1; font-size: 15px; font-weight: 550; color: #2B2F2D">Puntos a fortalecer</h3></div>
+                    <ul style="margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; line-height: 1.5"><sc-for list="{{ ev.fortalecer }}" as="li" hint-placeholder-count="2"><li>{{ li.t }} <span style="color: #687170">→ {{ li.tip }}</span></li></sc-for></ul>
+                  </section>
+                  <section style="background: #FFFFFF; border: 1px solid rgba(0,0,0,0.1); border-radius: 4px; padding: 16px; display: flex; flex-direction: column; gap: 10px">
+                    <div style="display: flex; align-items: center; gap: 10px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#C22A3F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"></path><path d="M12 9v4"></path><path d="M12 17h.01"></path></svg><h3 style="margin: 0; flex: 1; font-size: 15px; font-weight: 550; color: #C22A3F">Debilidades a tener en cuenta</h3></div>
+                    <ul style="margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; line-height: 1.5"><sc-for list="{{ ev.debil }}" as="li" hint-placeholder-count="1"><li>{{ li }}</li></sc-for></ul>
+                  </section>
+                  <section style="background: #FFFFFF; border: 1px solid rgba(0,0,0,0.1); border-radius: 4px; padding: 16px; display: flex; flex-direction: column; gap: 10px">
+                    <div style="display: flex; align-items: center; gap: 10px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1E3A8A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6"></path><circle cx="11.5" cy="14.5" r="2.5"></circle><path d="M13.3 16.3 15 18"></path></svg><h3 style="margin: 0; flex: 1; font-size: 15px; font-weight: 550; color: #111312">Lo que pidió el CV</h3><span style="font-size: 12px; color: #687170">{{ ev.pidioN }}</span></div>
+                    <sc-for list="{{ ev.pidio }}" as="p" hint-placeholder-count="3">
+                      <div style="border: 1px solid rgba(0,0,0,0.1); border-radius: 4px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px">
+                        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px"><span style="font-size: 14px; font-weight: 550; line-height: 1.35">{{ p.t }}</span><span style="flex-shrink: 0; font-family: Syne, Onest, sans-serif; font-size: 9.5px; letter-spacing: 0.12em; text-transform: uppercase; color: #1E3A8A; background: #E9EDFF; border-radius: 999px; padding: 3px 8px">Por contrastar</span></div>
+                        <span style="font-size: 13px; line-height: 1.45; color: #4A5251"><b style="font-weight: 550; color: #2B2F2D">El CV decía:</b> {{ p.cv }}</span>
+                        <span style="font-size: 13px; line-height: 1.45; color: #4A5251; font-style: {{ p.fs }}"><b style="font-weight: 550; color: #2B2F2D; font-style: normal">{{ p.ref }}:</b> {{ p.dijo }}</span>
+                      </div>
+                    </sc-for>
+                  </section>
+                  <section style="background: #F5F7FB; border: 1px solid rgba(30,58,138,0.16); border-radius: 4px; padding: 16px; display: flex; flex-direction: column; gap: 12px">
+                    <div style="display: flex; align-items: center; gap: 10px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1E3A8A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path><path d="M9.5 8.5a2.5 2.5 0 1 1 3.3 2.4c-.5.2-.8.6-.8 1.1v.5"></path><path d="M12 15h.01"></path></svg><h3 style="margin: 0; flex: 1; font-size: 15px; font-weight: 550; color: #172A66">Por verificar en la prueba del puesto</h3><span style="font-size: 12px; color: #687170">{{ ev.verificarN }}</span></div>
+                    <sc-for list="{{ ev.verificar }}" as="v" hint-placeholder-count="4">
+                      <div style="background: #FFFFFF; border-radius: 4px; padding: 10px 12px; display: flex; flex-direction: column; gap: 3px">
+                        <span style="font-family: Syne, Onest, sans-serif; font-size: 9.5px; letter-spacing: 0.12em; text-transform: uppercase; color: {{ v.c }}">{{ v.lab }}</span>
+                        <span style="font-size: 14px; line-height: 1.45">{{ v.t }}</span>
+                      </div>
+                    </sc-for>
+                  </section>
+                </div>
+              </sc-if>
+
+              <sc-if value="{{ showPr }}" hint-placeholder-val="{{ false }}">
+                <div style="display: flex; flex-direction: column; gap: 12px">
+                  <section style="background: #FFFFFF; border: 1px solid rgba(0,0,0,0.1); border-radius: 4px; padding: 16px; display: flex; flex-direction: column; gap: 10px">
+                    <div style="display: flex; align-items: center; gap: 10px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0B7A63" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="m8 12 3 3 5-6"></path></svg><h3 style="margin: 0; flex: 1; font-size: 15px; font-weight: 550; color: #0B7A63">Puntos fuertes</h3></div>
+                    <ul style="margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; line-height: 1.5"><sc-for list="{{ pr.fuertes }}" as="li" hint-placeholder-count="2"><li>{{ li }}</li></sc-for></ul>
+                  </section>
+                  <section style="background: #FFFFFF; border: 1px solid rgba(0,0,0,0.1); border-radius: 4px; padding: 16px; display: flex; flex-direction: column; gap: 10px">
+                    <div style="display: flex; align-items: center; gap: 10px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#4A5251" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20V10"></path><path d="m7 14 5-5 5 5"></path><path d="M4 4h16"></path></svg><h3 style="margin: 0; flex: 1; font-size: 15px; font-weight: 550; color: #2B2F2D">Puntos a fortalecer</h3></div>
+                    <ul style="margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; line-height: 1.5"><sc-for list="{{ pr.fortalecer }}" as="li" hint-placeholder-count="2"><li>{{ li }}</li></sc-for></ul>
+                  </section>
+                  <section style="background: #F5F7FB; border: 1px solid rgba(30,58,138,0.16); border-radius: 4px; padding: 16px; display: flex; flex-direction: column; gap: 12px">
+                    <div style="display: flex; align-items: center; gap: 10px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#1E3A8A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg><h3 style="margin: 0; flex: 1; font-size: 15px; font-weight: 550; color: #172A66">Por verificar en la entrevista</h3><span style="font-size: 12px; color: #687170">{{ pr.verificarN }}</span></div>
+                    <sc-for list="{{ pr.verificar }}" as="v" hint-placeholder-count="4">
+                      <div style="background: #FFFFFF; border-radius: 4px; padding: 10px 12px; display: flex; flex-direction: column; gap: 6px">
+                        <div style="display: flex; align-items: flex-start; gap: 8px"><span style="flex-shrink: 0; font-family: Syne, Onest, sans-serif; font-size: 9.5px; letter-spacing: 0.12em; text-transform: uppercase; color: {{ v.fg }}; background: {{ v.bg }}; border-radius: 999px; padding: 3px 8px; margin-top: 1px">{{ v.o }}</span><span style="font-size: 14px; font-weight: 550; line-height: 1.4">{{ v.t }}</span></div>
+                        <span style="font-size: 13.5px; line-height: 1.45; color: #172A66; display: flex; gap: 6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0; margin-top: 3px"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>{{ v.q }}</span>
+                      </div>
+                    </sc-for>
+                    <span style="font-size: 12.5px; line-height: 1.45; color: #4A5251"><b style="font-weight: 550; color: #0B7A63">Ya resuelto en la prueba:</b> {{ pr.resuelto }}</span>
+                  </section>
+                </div>
+              </sc-if>
+
+              <span style="font-size: 12px; color: #687170; padding: 0 2px">{{ X.meta }}</span>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+  </div>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1900}}'>
+// Los rótulos del grupo de prioridad son los del ranking del panel
+// (NOMBRE_DEL_GRUPO y CORTO_DEL_GRUPO en src/panel/vacantes/ranking.ts), sin semáforo.
+var GROUPS = {
+  alta: { label: 'Alta', full: 'Prioridad alta' },
+  media: { label: 'Con riesgo', full: 'Potencial con riesgo' },
+  baja: { label: 'No priorizado', full: 'No priorizado' }
+};
+
+var LIST = [
+  { id: 'rh', name: 'Rosa Huamán Villanueva', g: 'alta', cv: 86, ev: 88, pr: 87 },
+  { id: 'cm', name: 'Carlos Mendoza Ríos', g: 'alta', cv: 81, ev: 85, pr: 84 },
+  { id: 'at', name: 'Ana Torres Quispe', g: 'alta', cv: 74, ev: 82, pr: 78 },
+  { id: 'lp', name: 'Lucía Paredes Huamán', g: 'media', cv: 69, ev: 77, pr: null, prWhy: 'La IA está calificando' },
+  { id: 'js', name: 'Jorge Salazar Ccori', g: 'media', cv: 72, ev: 71, pr: 70 },
+  { id: 'mq', name: 'Milagros Quispe Rojas', g: 'media', cv: 66, ev: 73, pr: 68 },
+  { id: 'dv', name: 'Diego Vargas Lozano', g: 'media', cv: 70, ev: 64, pr: null, prWhy: 'Aún no rinde la prueba' },
+  { id: 'kf', name: 'Karen Flores Cárdenas', g: 'baja', cv: 61, ev: 66, pr: 62 },
+  { id: 'rc', name: 'Renato Chávez Poma', g: 'baja', cv: 63, ev: 60, pr: null, prWhy: 'No pasó a la prueba' },
+  { id: 'vr', name: 'Valeria Ramos Inga', g: 'baja', cv: 58, ev: 62, pr: null, prWhy: 'No pasó a la prueba' },
+  { id: 'lg', name: 'Luis Gutiérrez Mamani', g: 'baja', cv: 55, ev: 58, pr: null, prWhy: 'No pasó a la prueba' },
+  { id: 'ac', name: 'Andrea Castillo Ñaupari', g: 'baja', cv: 60, ev: null, evWhy: 'No completó la evaluación', pr: null, prWhy: 'No llegó a la prueba' },
+  { id: 'mt', name: 'Miguel Ángel Torres Yupanqui', g: 'baja', cv: 52, ev: null, evWhy: 'La IA está calificando', pr: null, prWhy: 'No llegó a la prueba' }
+];
+
+var ORIG = {
+  CV: { fg: '#1E3A8A', bg: '#E9EDFF' },
+  'Evaluación': { fg: '#111312', bg: '#EFF0EE' },
+  Prueba: { fg: '#FFFFFF', bg: '#1E3A8A' }
+};
+
+var D = {
+  at: {
+    cv: {
+      meta: 'Informe del CV · generado el 14/11/2026 a las 10:31',
+      critHint: 'Pulsa un criterio para ver qué demostró',
+      total: '4 años y 2 meses', totalSub: 'en Recursos Humanos',
+      last: 'Analista de Selección', lastSub: 'Retail Sur S.A.C. · 2 años y 5 meses',
+      edu: 'Licenciada en Psicología', eduSub: 'UNMSM · 2021',
+      skills: ['Selección masiva', 'Entrevista por competencias', 'Clima laboral', 'Inducción', 'Excel'],
+      shows: 'Cuatro años en selección para retail con un resultado medible: bajó el tiempo de contratación de 30 a 18 días y montó una encuesta de clima para 220 personas. Faltan pruebas de planillas y nómina, que el puesto pide desde el primer mes, y un cargo de 2022 no cuadra con otro empleo del mismo periodo.',
+      crits: [
+        { n: 'Resultados demostrables', v: 88, max: 100, d: 'Redujo el tiempo de contratación de 30 a 18 días con cifras verificables.', j: 'Da el antes y el después, el año y el área donde ocurrió; es el logro mejor sustentado.' },
+        { n: 'Iniciativa o creación', v: 82, max: 100, d: 'Implementó por su cuenta la encuesta de clima trimestral para 220 personas.', j: 'La propuesta salió de ella y no de un encargo; falta saber qué se cambió con los resultados.' },
+        { n: 'Velocidad de aprendizaje', v: 78, max: 100, d: 'Pasó de practicante a analista en 14 meses y se certificó en el camino.', j: 'El ascenso y la certificación coinciden en fechas y empresa.' },
+        { n: 'Sistemas o procesos creados', v: 75, max: 100, d: 'Diseñó el flujo de inducción que su área sigue usando desde 2023.', j: 'Describe los pasos, pero no cuántas personas pasaron por él ni con qué resultado.' },
+        { n: 'Complejidad y alcance', v: 70, max: 100, d: 'Llevó la selección de 6 tiendas a la vez, con puestos de un solo nivel.', j: 'El volumen es alto, aunque todos fueron puestos operativos de tienda.' },
+        { n: 'Calidad de la evidencia', v: 68, max: 100, d: 'La mitad de sus logros traen cifra; el resto son tareas sin resultado.', j: 'Frases como «apoyo en procesos de RR. HH.» no dicen qué hizo ella ni con qué efecto.' },
+        { n: 'Desarrollo de personas', v: 62, max: 100, d: 'Capacitó a 2 practicantes, pero no cuenta qué lograron después.', j: 'No hay evidencia de que haya tenido gente a cargo de forma estable.' },
+        { n: 'Habilidades del puesto', v: 55, max: 100, adj: true, d: 'Nombra planillas y Excel avanzado sin ningún ejemplo que lo respalde.', j: 'La IA puso 62; se ajustó a mano a 55 porque el puesto pide cierres de nómina desde el primer mes.' }
+      ],
+      demuestra: ['Redujo el tiempo de contratación de 30 a 18 días (2024).', 'Implementó la encuesta de clima trimestral para 220 colaboradores.', 'Certificación en entrevista por competencias.'],
+      noCuadra: ['«Jefa de área» en 2022, pero en el mismo periodo figura como practicante en otra empresa.'],
+      verificar: [
+        { t: '«Manejo de planillas y nómina»', q: '¿Cuántos colaboradores tenía la última planilla que cerraste y con qué sistema?' },
+        { t: '«Excel avanzado»', q: 'Cuéntame un reporte que armaste tú y qué decisión se tomó con él.' },
+        { t: 'Motivo de salida del último empleo', q: '¿Por qué dejaste tu último trabajo en marzo?' }
+      ]
+    },
+    ev: {
+      meta: 'Informe de la evaluación · 9 preguntas cerradas y 5 abiertas · generado el 14/11/2026 a las 10:32',
+      critHint: 'Nota sobre 4 · pulsa un criterio para ver qué demostró',
+      summary: 'Responde con episodios concretos y propios, casi siempre con un dato comprobable. Destaca en iniciativa; le cuesta hablar de lo que salió mal.',
+      anexoTitle: 'Preguntas y respuestas',
+      crits: [
+        { n: 'Iniciativa', v: 3.6, max: 4, d: 'Armó sin que se lo pidieran un tablero de rotación que hoy usa su área.', j: 'Cuenta el episodio con fecha, lo que hizo ella y el resultado: la rotación bajó del 9 % al 6 % en tres meses.' },
+        { n: 'Resolución de problemas', v: 3.4, max: 4, d: 'Separó causa y síntoma al explicar por qué se caían las contrataciones.', j: 'Vio que los candidatos abandonaban por la demora en la segunda entrevista, no por el sueldo, y propuso agendarla el mismo día.' },
+        { n: 'Responsabilidad', v: 3.1, max: 4, d: 'Pide fechas concretas y avisa a los candidatos cuando un plazo se mueve.', j: 'Acertó las dos preguntas cerradas del criterio; en la abierta faltó un caso en el que el retraso fuera suyo.' },
+        { n: 'Servicio', v: 3.0, max: 4, d: 'Pone al candidato en el centro, aunque sin un caso propio que lo muestre.', j: 'Sus respuestas dicen cómo debería tratarse al candidato, pero no cuentan una situación que haya atendido ella.' },
+        { n: 'Integridad', v: 2.8, max: 4, adj: true, d: 'Ante un desacuerdo con su jefe dio una respuesta de manual, sin caso real.', j: 'La IA puso 3 en esa pregunta y se ajustó a mano a 2 porque no cuenta un caso vivido; las cerradas del criterio fueron correctas.' },
+        { n: 'Excelencia', v: 2.2, max: 4, d: 'Dejó sin responder la pregunta sobre el error que más le enseñó.', j: 'Sin esa respuesta solo quedan las preguntas cerradas, donde acertó 2 de 3.' }
+      ],
+      fuertes: ['Cerró 3 procesos de selección en 10 días, con fechas y cifras.', 'Armó por su cuenta el tablero de rotación que hoy usa su área.', 'Explica con claridad cómo prioriza cuando todo es urgente.'],
+      fortalecer: [{ t: 'Habla poco de lo que salió mal.', tip: 'Pedirle un error propio.' }, { t: 'Dice «hicimos» sin separar su parte.', tip: 'Preguntar qué hizo ella sola.' }],
+      debil: ['No ha cerrado planillas ni nóminas por su cuenta, y el puesto lo pide desde el primer mes.'],
+      pidio: [
+        { t: '«Excel avanzado»', cv: 'Lo pone en habilidades, sin ningún ejemplo.', ref: 'En la pregunta 1', dijo: '«Armé por mi cuenta un tablero en Excel con las salidas de los últimos 12 meses».' },
+        { t: 'Motivo de salida del último empleo', cv: 'Dejó su último trabajo en marzo de 2026 y no dice por qué.', ref: 'En la evaluación', dijo: 'Ninguna de sus respuestas lo menciona.', empty: true },
+        { t: '«Manejo de planillas y nómina»', cv: 'Lo pone como tarea de su último puesto.', ref: 'En la pregunta 7', dijo: '«Las planillas las cerraba contabilidad; yo solo pasaba las altas y bajas».' }
+      ],
+      verificar: [
+        { lab: 'Del CV · Empeoró', c: '#C22A3F', t: 'Planillas y nómina: dice que las cerraba contabilidad.' },
+        { lab: 'Del CV · Sigue pendiente', c: '#1E3A8A', t: 'Motivo de salida del último empleo: no lo mencionó.' },
+        { lab: 'De la evaluación', c: '#4A5251', t: 'Desacuerdo con su jefe: respuesta «demasiado ideal».' },
+        { lab: 'De la evaluación', c: '#4A5251', t: 'No se metió en lo incómodo en ninguna respuesta.' }
+      ],
+      qs: [
+        { title: 'Cuéntanos una vez en la que mejoraste algo que nadie te había pedido. ¿Qué hiciste tú?', meta: 'Abierta · Iniciativa', shows: 'Detectó un problema por su cuenta y lo resolvió con datos: la rotación bajó del 9 % al 6 %.', answer: 'En 2024 me di cuenta de que nadie sabía por qué se iba la gente de tiendas. Armé por mi cuenta un tablero en Excel con las salidas de los últimos 12 meses y los motivos de las entrevistas de salida. Lo presenté a mi jefa y en tres meses bajamos la rotación del 9 % al 6 %.' },
+        { title: 'Un proceso se retrasa porque el área no responde. ¿Qué haces primero?', meta: 'Opción única · Responsabilidad', shows: 'Eligió pedir una fecha concreta y avisar a los candidatos: la respuesta esperada.', answer: '«Pido una fecha concreta al jefe del área y aviso a los candidatos del nuevo plazo».' },
+        { title: 'Cuéntanos una vez en la que no estuviste de acuerdo con una decisión de tu jefe.', meta: 'Abierta · Integridad', shows: 'Habla de principios generales, pero no cuenta ningún desacuerdo que haya vivido.', answer: 'Siempre trato de entender el punto de vista de mi jefe y busco el diálogo. Creo que la comunicación asertiva resuelve cualquier desacuerdo.' },
+        { title: '¿Qué error tuyo te enseñó más y qué cambiaste después?', meta: 'Abierta · Excelencia', shows: 'Nada: dejó la pregunta en blanco y no hay evidencia para este criterio.', answer: 'Sin respuesta.', empty: true },
+        { title: 'Cuéntanos cómo era el cierre de planilla en tu último trabajo y qué parte hacías tú.', meta: 'Abierta · Responsabilidad', shows: 'Aclara que no cerraba la planilla: su parte eran las altas y bajas del mes.', answer: 'Las planillas las cerraba contabilidad; yo solo pasaba las altas y bajas del mes y revisaba que las fechas de ingreso estuvieran bien en el sistema antes del día 25.' }
+      ]
+    },
+    pr: {
+      meta: 'Informe de la prueba del puesto · caso práctico entregado el 12/11/2026 a las 17:52 · generado el 14/11/2026 a las 10:33',
+      critHint: 'Quién puso la nota: IA, Persona o Sistema',
+      summary: 'Entregó el plan para las tres tiendas y ubicó con datos dónde se va la gente. Su punto débil fue el presupuesto: no explica de dónde salen los costos y se calificó sin la hoja de cálculo, que no se pudo abrir.',
+      anexoTitle: 'Respuestas y entregables',
+      crits: [
+        { n: 'Diagnóstico del problema', who: 'IA', v: 23, max: 25, d: 'Ubicó la rotación en los 3 primeros meses con los datos del caso.', j: 'Usó la tabla de salidas para mostrar que el 70 % se va antes del tercer mes y señaló a Ate como la tienda más afectada.' },
+        { n: 'Plan de reclutamiento', who: 'IA', v: 21, max: 25, d: 'Propuso fuentes y plazos por tienda, sin decir cuál cubrir primero.', j: 'El calendario de seis semanas es realista; falta priorizar, porque Ate pierde más gente y debería ir primero.' },
+        { n: 'Indicadores de seguimiento', who: 'IA', v: 16, max: 20, d: 'Fijó tiempo de cobertura y rotación a 90 días, sin meta de calidad.', j: 'Mide rapidez y permanencia, pero ningún indicador dice si la persona contratada rinde bien.' },
+        { n: 'Entrega completa y a tiempo', who: 'Sistema', v: 8, max: 10, d: 'Subió 3 de 4 archivos antes del cierre; uno no se pudo leer.', j: 'Faltó el cronograma por tienda. Los otros tres llegaron antes de las 18:00, la hora de cierre.' },
+        { n: 'Presupuesto del plan', who: 'Persona', v: 10, max: 20, d: 'La revisora calificó solo con el resumen: la hoja de cálculo no abrió.', j: 'El total de S/ 31 400 es coherente con los conceptos que nombra, pero sin la hoja no se puede revisar el costo por contratación.' }
+      ],
+      fuertes: ['Diagnóstico: ubicó dónde se va la gente.', 'Plan: fuentes y plazos por tienda.'],
+      fortalecer: ['Presupuesto: no se sabe de dónde salen los costos.', 'Indicadores: no mide la calidad de la contratación.'],
+      verificar: [
+        { o: 'CV', t: 'Motivo de salida del último empleo.', q: '¿Por qué dejaste tu último trabajo en marzo?' },
+        { o: 'Evaluación', t: 'Desacuerdo con su jefe: «demasiado ideal».', q: 'Cuéntame un desacuerdo real: qué dijiste y qué pasó.' },
+        { o: 'Prueba', t: '«presupuesto.xlsx» no abrió; se calificó sin la hoja.', q: 'Muéstrame la hoja y explícame cómo llegas al total.' },
+        { o: 'Prueba', t: 'No entregó el cronograma por tienda.', q: '¿Qué tienda cubrirías primero y en cuántas semanas?' }
+      ],
+      resuelto: 'planillas y nómina, que ahora sí calcula (del CV), y que no entraba en lo incómodo (de la evaluación).',
+      qs: [
+        { title: 'Con los datos del caso, ¿dónde está el problema de rotación de las 3 tiendas?', meta: 'Abierta · Diagnóstico del problema', shows: 'Separó causa y síntoma con los datos del caso y ubicó la tienda más afectada.', answer: 'El 70 % de las salidas pasa en los 3 primeros meses, sobre todo en Ate. No es el sueldo: los que se van dicen que nadie les explicó los turnos. El problema está en la inducción, no en la selección.' },
+        { title: 'Propón un plan para cubrir los 12 puestos en 6 semanas: fuentes, plazos y responsables.', meta: 'Abierta · Plan de reclutamiento', shows: 'Fuentes y plazos claros por tienda, pero no dice cuál cubrir primero.', answer: 'Bolsas de empleo y referidos para Ate y Surco, convocatoria en institutos para Comas. Semana 1 a 2 convocatoria, 3 a 4 entrevistas, 5 a 6 ingreso con inducción de dos días.' },
+        { title: 'Calcula el costo mensual de planilla de los 12 puestos nuevos y explica cada concepto.', meta: 'Abierta · Presupuesto del plan', shows: 'Conoce los conceptos de planilla; el costo por contratación quedó sin revisar.', answer: 'Sueldo, gratificación, CTS y EsSalud: S/ 31 400 al mes para los 12. El detalle por puesto y el costo de cada contratación están en la hoja presupuesto.xlsx.' },
+        { title: '¿Con qué indicadores sabrías que el plan funciona y qué harías si no?', meta: 'Abierta · Indicadores de seguimiento', shows: 'Asume el error sin rodeos y tiene plan B; no mide la calidad de la contratación.', answer: 'Tiempo de cobertura por puesto y rotación a 90 días. Si Ate no cubre a la semana 3, es error mío de cálculo: lo asumo y paso a referidos pagados.' }
+      ],
+      entTxt: '3 de 4 entregados',
+      ents: [
+        { n: 'Plan de reclutamiento', d: 'plan_reclutamiento.pdf · 6 páginas · subido el 12/11 a las 17:40', ok: true },
+        { n: 'Tablero de indicadores', d: 'indicadores.pdf · 2 páginas · subido el 12/11 a las 17:46', ok: true },
+        { n: 'Presupuesto del plan', d: 'presupuesto.xlsx · subido el 12/11 a las 17:52 · no se pudo leer', ok: true },
+        { n: 'Cronograma por tienda', d: 'No se subió ningún archivo', ok: false }
+      ]
+    }
+  },
+
+  cm: {
+    cv: {
+      meta: 'Informe del CV · generado el 14/11/2026 a las 10:28',
+      critHint: 'Pulsa un criterio para ver qué demostró',
+      total: '7 años y 4 meses', totalSub: 'en Recursos Humanos',
+      last: 'Jefe de Recursos Humanos', lastSub: 'Distribuidora Andina S.A. · 3 años y 2 meses',
+      edu: 'Licenciado en Administración', eduSub: 'Universidad de Lima · 2017',
+      skills: ['Planillas', 'PLAME', 'Relaciones laborales', 'SAP SuccessFactors', 'Selección'],
+      shows: 'Siete años en RR. HH. con la planilla a su cargo: cerraba cada mes la nómina de 340 personas en SAP. Es el perfil más completo en lo técnico de la vacante; el CV dice poco de cómo trabaja con su equipo y deja un vacío de 8 meses entre 2021 y 2022.',
+      crits: [
+        { n: 'Habilidades del puesto', v: 92, max: 100, d: 'Cerró la planilla mensual de 340 colaboradores en SAP durante 3 años.', j: 'Nombra el sistema, el volumen y el periodo; es justo lo que el puesto pide desde el primer mes.' },
+        { n: 'Complejidad y alcance', v: 90, max: 100, d: 'Llevó planillas de tres sedes y dos negociaciones con el sindicato.', j: 'Combina volumen, varias sedes y relaciones laborales, algo poco frecuente en la vacante.' },
+        { n: 'Sistemas o procesos creados', v: 86, max: 100, d: 'Migró las planillas de Excel a SAP SuccessFactors en 2023.', j: 'Dice qué se migró, en cuánto tiempo y que el cierre pasó de 5 a 2 días.' },
+        { n: 'Resultados demostrables', v: 84, max: 100, d: 'Bajó el cierre de planilla de 5 días a 2 tras la migración.', j: 'El resultado es concreto; el resto de logros son responsabilidades sin cifra.' },
+        { n: 'Calidad de la evidencia', v: 80, max: 100, d: 'Casi todo trae fechas, sistema y volumen.', j: 'Solo la parte de selección queda como lista de tareas sin resultado.' },
+        { n: 'Velocidad de aprendizaje', v: 76, max: 100, d: 'Pasó de analista a jefe en 4 años en la misma empresa.', j: 'El ascenso es claro, aunque no menciona formación nueva desde 2019.' },
+        { n: 'Iniciativa o creación', v: 72, max: 100, d: 'Propuso la migración a SAP, aunque la lideró el área de sistemas.', j: 'No queda claro qué parte del proyecto fue idea suya y qué parte le encargaron.' },
+        { n: 'Desarrollo de personas', v: 64, max: 100, d: 'Tuvo 4 analistas a cargo, sin decir cómo los formó.', j: 'Menciona el equipo solo como dato de tamaño; no hay ningún logro de su gente.' }
+      ],
+      demuestra: ['Cerró la planilla mensual de 340 colaboradores en SAP durante 3 años.', 'Migró las planillas de Excel a SAP SuccessFactors en 2023.', 'Llevó 2 negociaciones colectivas con el sindicato de almacén.'],
+      noCuadra: ['Vacío de 8 meses entre octubre de 2021 y junio de 2022, sin ninguna explicación.'],
+      verificar: [
+        { t: 'Equipo a cargo', q: '¿Cuántas personas tenías a cargo y cómo las evaluabas?' },
+        { t: 'Vacío entre 2021 y 2022', q: '¿Qué hiciste entre octubre de 2021 y junio de 2022?' },
+        { t: 'Selección para tiendas', q: '¿Has hecho selección masiva para tiendas o solo para oficina y almacén?' }
+      ]
+    },
+    ev: {
+      meta: 'Informe de la evaluación · 9 preguntas cerradas y 5 abiertas · generado el 14/11/2026 a las 10:29',
+      critHint: 'Nota sobre 4 · pulsa un criterio para ver qué demostró',
+      summary: 'Domina planillas y normativa laboral y lo demuestra con casos y cifras. Responde seguro y rápido; cuando habla de su equipo da órdenes más que acompañar.',
+      anexoTitle: 'Preguntas y respuestas',
+      crits: [
+        { n: 'Responsabilidad', v: 3.8, max: 4, d: 'Cuenta cómo sostuvo el cierre de planilla durante la migración sin un solo día de retraso.', j: 'Da fechas, el plan B que tenía y quién respondía por cada paso.' },
+        { n: 'Resolución de problemas', v: 3.6, max: 4, d: 'Resolvió un descuadre de 40 boletas rastreando el error hasta un cambio de régimen.', j: 'Explica el razonamiento paso a paso y cómo evitó que se repitiera.' },
+        { n: 'Excelencia', v: 3.5, max: 4, d: 'Reconoce un error en la CTS de 2022 y lo que cambió en sus controles.', j: 'Asume el error como propio y muestra el control que añadió después.' },
+        { n: 'Integridad', v: 3.4, max: 4, d: 'Se negó a registrar horas extra sin sustento, aunque se lo pidió un gerente.', j: 'El caso es real y concreto; no cuenta cómo terminó la relación con ese gerente.' },
+        { n: 'Iniciativa', v: 3.0, max: 4, d: 'Propuso la migración a SAP, pero la ejecutó el área de sistemas.', j: 'La idea fue suya; el resto del episodio lo cuenta en plural sin separar su parte.' },
+        { n: 'Servicio', v: 2.6, max: 4, d: 'Habla del candidato como «un número más del proceso».', j: 'Sus respuestas priorizan el plazo sobre la experiencia de la persona que postula.' }
+      ],
+      fuertes: ['Cierra planillas de 340 personas sin retrasos, con sistema y cifras.', 'Reconoce sus errores y explica el control que añadió.', 'Conoce la normativa laboral peruana al detalle.'],
+      fortalecer: [{ t: 'Con su equipo, da la meta y se desentiende.', tip: 'Pedirle un caso de alguien que no llegó.' }, { t: 'Trata al candidato como trámite.', tip: 'Preguntar cómo cuida al descartado.' }],
+      debil: ['Nunca ha hecho selección masiva para tiendas: su experiencia es en oficina y almacén, y el puesto cubre 12 vacantes en 6 semanas.'],
+      pidio: [
+        { t: 'Equipo a cargo', cv: 'Tuvo 4 analistas a cargo, sin decir cómo los formó.', ref: 'En la pregunta 5', dijo: '«Tenía 4 analistas; les doy la meta del mes y que se organicen».' },
+        { t: 'Vacío entre 2021 y 2022', cv: 'No hay nada entre octubre de 2021 y junio de 2022.', ref: 'En la pregunta 9', dijo: '«Cuidé a mi padre durante una operación y su recuperación».' },
+        { t: 'Selección para tiendas', cv: 'La selección aparece como tarea, sin volumen ni tipo de puesto.', ref: 'En la evaluación', dijo: 'Ninguna de sus respuestas lo menciona.', empty: true }
+      ],
+      verificar: [
+        { lab: 'Del CV · Sigue pendiente', c: '#1E3A8A', t: 'Selección masiva para tiendas: no hay experiencia que la respalde.' },
+        { lab: 'De la evaluación', c: '#4A5251', t: 'Trato con el equipo: «les doy la meta y que se organicen».' },
+        { lab: 'De la evaluación', c: '#4A5251', t: 'Servicio: habla del candidato como «un número más del proceso».' }
+      ],
+      qs: [
+        { title: 'Cuéntanos un cierre de planilla que se complicó. ¿Qué hiciste tú?', meta: 'Abierta · Responsabilidad', shows: 'Sostuvo el cierre durante la migración a SAP sin retrasos y con un plan B.', answer: 'En marzo de 2023 migrábamos a SAP y el cierre caía la misma semana. Corrí la planilla en paralelo en Excel y en SAP, comparé las 340 boletas una por una y solo cuando cuadraron al céntimo apagamos el Excel. Pagamos el 30, como siempre.' },
+        { title: '¿Qué error tuyo te enseñó más y qué cambiaste después?', meta: 'Abierta · Excelencia', shows: 'Asume un error real en la CTS y muestra el control que añadió después.', answer: 'En 2022 calculé mal la CTS de 18 personas porque no actualicé un cambio de régimen. Lo detecté yo al mes siguiente, lo corregimos con intereses y desde entonces reviso los cambios de régimen antes de cada depósito.' },
+        { title: 'Cuéntanos cómo trabajas con tu equipo cuando hay mucha carga.', meta: 'Abierta · Desarrollo de personas', shows: 'Reparte metas, pero no cuenta cómo acompaña a quien se queda atrás.', answer: 'Tenía 4 analistas; les doy la meta del mes y que se organicen. Si alguien no llega, lo vemos en la reunión del viernes.' },
+        { title: 'Un candidato descartado te escribe molesto porque nadie le avisó. ¿Qué haces?', meta: 'Opción única · Servicio', shows: 'Eligió responder con la plantilla estándar, no la respuesta esperada.', answer: '«Le respondo con el mensaje estándar de cierre del proceso».' }
+      ]
+    },
+    pr: {
+      meta: 'Informe de la prueba del puesto · caso práctico entregado el 12/11/2026 a las 16:05 · generado el 14/11/2026 a las 10:30',
+      critHint: 'Quién puso la nota: IA, Persona o Sistema',
+      summary: 'Entregó todo a tiempo y su presupuesto es el más sólido de la vacante: costo por puesto y por contratación, con cada concepto explicado. El plan de reclutamiento es correcto pero genérico: repite el mismo calendario en las tres tiendas.',
+      anexoTitle: 'Respuestas y entregables',
+      crits: [
+        { n: 'Diagnóstico del problema', who: 'IA', v: 21, max: 25, d: 'Vio que la rotación se concentra en los primeros meses.', j: 'Usa bien los datos generales, pero no separa la rotación por tienda y no detecta que Ate es la más afectada.' },
+        { n: 'Plan de reclutamiento', who: 'IA', v: 18, max: 25, d: 'Fuentes correctas, con el mismo calendario para las tres tiendas.', j: 'Las fuentes son razonables; el plan no se adapta a que cada tienda pierde gente a un ritmo distinto.' },
+        { n: 'Indicadores de seguimiento', who: 'IA', v: 17, max: 20, d: 'Mide cobertura, rotación a 90 días y desempeño al tercer mes.', j: 'Es el único que incluye un indicador de calidad de la contratación.' },
+        { n: 'Entrega completa y a tiempo', who: 'Sistema', v: 10, max: 10, d: 'Subió los 4 archivos casi dos horas antes del cierre.', j: 'Todos los archivos se pudieron leer sin problemas.' },
+        { n: 'Presupuesto del plan', who: 'Persona', v: 18, max: 20, d: 'Costo por puesto y por contratación, con cada concepto explicado.', j: 'La revisora comprobó los cálculos de la hoja; solo faltó el costo de la inducción.' }
+      ],
+      fuertes: ['Presupuesto: costo por puesto y por contratación, todo explicado.', 'Indicadores: mide también la calidad de la contratación.', 'Entrega: los 4 archivos antes del cierre.'],
+      fortalecer: ['Plan: el mismo calendario para las tres tiendas.', 'Diagnóstico: no separa la rotación por tienda.'],
+      verificar: [
+        { o: 'Evaluación', t: 'Trato con el equipo: da la meta y se desentiende.', q: 'Cuéntame la última vez que un analista tuyo no llegó a la meta: ¿qué hiciste?' },
+        { o: 'CV', t: 'Selección masiva para tiendas: no hay experiencia.', q: '¿Cómo cubrirías 40 vacantes de tienda en un mes?' },
+        { o: 'Evaluación', t: 'Servicio al candidato: lo trata como trámite.', q: '¿Qué haces para que un candidato descartado se lleve una buena impresión?' },
+        { o: 'Prueba', t: 'El mismo calendario para las tres tiendas.', q: 'Si Ate pierde el doble de gente que Surco, ¿qué cambiarías en tu plan?' }
+      ],
+      resuelto: 'el vacío entre 2021 y 2022 (del CV), que explicó en la evaluación.',
+      qs: [
+        { title: 'Con los datos del caso, ¿dónde está el problema de rotación de las 3 tiendas?', meta: 'Abierta · Diagnóstico del problema', shows: 'Ubicó la rotación en los primeros meses, sin separar por tienda.', answer: 'La mayoría de salidas ocurre antes de los 3 meses. Recomiendo revisar el proceso de inducción y el perfil que se está contratando en las tres tiendas.' },
+        { title: 'Propón un plan para cubrir los 12 puestos en 6 semanas: fuentes, plazos y responsables.', meta: 'Abierta · Plan de reclutamiento', shows: 'Fuentes razonables, pero el mismo calendario para las tres tiendas.', answer: 'Bolsas de empleo, referidos con bono y ferias distritales. Semana 1 a 2 convocatoria, 3 a 4 evaluación, 5 a 6 ingreso, igual en las tres tiendas. Responsable: analista de selección con apoyo del jefe de tienda.' },
+        { title: 'Calcula el costo mensual de planilla de los 12 puestos nuevos y explica cada concepto.', meta: 'Abierta · Presupuesto del plan', shows: 'Cálculo completo y explicado; solo faltó el costo de la inducción.', answer: 'Sueldo básico S/ 1 300, gratificación y CTS provisionadas por mes y EsSalud al 9 %: S/ 30 860 al mes para los 12. El costo por contratación es de S/ 410, entre avisos, bono de referido y horas de entrevista. Detalle en presupuesto.xlsx.' },
+        { title: '¿Con qué indicadores sabrías que el plan funciona y qué harías si no?', meta: 'Abierta · Indicadores de seguimiento', shows: 'Incluye desempeño al tercer mes, además de cobertura y rotación.', answer: 'Días para cubrir cada puesto, rotación a 90 días y nota de desempeño del jefe de tienda al tercer mes. Si la rotación pasa del 8 %, reviso la inducción antes que la selección.' }
+      ],
+      entTxt: '4 de 4 entregados',
+      ents: [
+        { n: 'Plan de reclutamiento', d: 'plan_carlos_mendoza.pdf · 4 páginas · subido el 12/11 a las 15:58', ok: true },
+        { n: 'Tablero de indicadores', d: 'indicadores.pdf · 1 página · subido el 12/11 a las 16:01', ok: true },
+        { n: 'Presupuesto del plan', d: 'presupuesto.xlsx · subido el 12/11 a las 16:03', ok: true },
+        { n: 'Cronograma por tienda', d: 'cronograma.pdf · 1 página · subido el 12/11 a las 16:05', ok: true }
+      ]
+    }
+  },
+
+  lp: {
+    cv: {
+      meta: 'Informe del CV · generado el 14/11/2026 a las 10:34',
+      critHint: 'Pulsa un criterio para ver qué demostró',
+      total: '2 años y 8 meses', totalSub: 'en bienestar y capacitación',
+      last: 'Asistente de Bienestar Social', lastSub: 'Clínica San Gabriel · 1 año y 9 meses',
+      edu: 'Bachiller en Psicología Organizacional', eduSub: 'Universidad César Vallejo · 2023',
+      skills: ['Bienestar social', 'Clima laboral', 'Capacitación', 'Onboarding', 'Power BI'],
+      shows: 'Menos de tres años de experiencia, centrada en bienestar y capacitación, con un resultado claro: subió la asistencia a capacitaciones del 54 % al 81 %. Le falta selección: solo apoyó en el filtro de currículums y nunca condujo entrevistas.',
+      crits: [
+        { n: 'Velocidad de aprendizaje', v: 82, max: 100, d: 'Pasó de practicante a asistente en 9 meses y sacó dos cursos en ese tiempo.', j: 'Las fechas cuadran y los cursos tienen relación con lo que hacía.' },
+        { n: 'Iniciativa o creación', v: 80, max: 100, d: 'Creó por su cuenta un programa de bienvenida para el personal de enfermería.', j: 'La idea fue suya y la clínica lo adoptó; no dice cuántas personas pasaron por él.' },
+        { n: 'Resultados demostrables', v: 76, max: 100, d: 'Subió la asistencia a capacitaciones del 54 % al 81 % en un año.', j: 'Da el antes, el después y el periodo; es su logro mejor sustentado.' },
+        { n: 'Calidad de la evidencia', v: 72, max: 100, d: 'Dos logros con cifra; el resto son funciones del puesto.', j: 'Lo que describe es verificable, pero corto para el nivel que pide la vacante.' },
+        { n: 'Desarrollo de personas', v: 70, max: 100, d: 'Diseñó y dictó talleres de inducción para 60 personas nuevas.', j: 'Hay volumen y continuidad, aunque sin medir qué aprendieron.' },
+        { n: 'Sistemas o procesos creados', v: 60, max: 100, d: 'Armó un registro de asistencia en Power BI.', j: 'El tablero existe, pero no queda claro quién lo usa ni para qué decisión.' },
+        { n: 'Habilidades del puesto', v: 58, max: 100, d: 'Apoyó en el filtro de currículums; nunca condujo entrevistas.', j: 'El puesto pide llevar procesos completos de selección y eso no aparece en su CV.' },
+        { n: 'Complejidad y alcance', v: 52, max: 100, d: 'Una sola sede y un solo grupo de puestos.', j: 'Su experiencia se limita a una clínica, sin trabajo con varias sedes ni con volumen alto.' }
+      ],
+      demuestra: ['Subió la asistencia a capacitaciones del 54 % al 81 % en un año.', 'Creó el programa de bienvenida para el personal de enfermería.', 'Dictó talleres de inducción para 60 personas nuevas.'],
+      noCuadra: ['Dice «Power BI avanzado», pero el único curso que figura es de nivel básico (2024).'],
+      verificar: [
+        { t: 'Entrevistas de selección', q: '¿Cuántas entrevistas has conducido tú sola y para qué puestos?' },
+        { t: '«Power BI avanzado»', q: '¿Qué tablero armaste y quién lo usaba para decidir?' },
+        { t: 'Disponibilidad para tiendas', q: '¿Puedes moverte entre Ate, Surco y Comas durante la semana?' }
+      ]
+    },
+    ev: {
+      meta: 'Informe de la evaluación · 9 preguntas cerradas y 5 abiertas · generado el 15/11/2026 a las 09:12',
+      critHint: 'Nota sobre 4 · pulsa un criterio para ver qué demostró',
+      summary: 'Muy buena en lo humano: escucha, pregunta y cuenta casos con empatía. Le falta experiencia en selección y lo reconoce sin rodeos; sus respuestas sobre plazos y metas son vagas.',
+      anexoTitle: 'Preguntas y respuestas',
+      crits: [
+        { n: 'Servicio', v: 3.8, max: 4, d: 'Acompañó a una enfermera nueva que quería renunciar en su primera semana y se quedó.', j: 'El caso es propio, con lo que dijo, lo que hizo y cómo terminó.' },
+        { n: 'Integridad', v: 3.5, max: 4, d: 'Reconoce sin rodeos que nunca condujo una entrevista sola.', j: 'Prefiere decir lo que no sabe antes que inflar su experiencia.' },
+        { n: 'Excelencia', v: 3.2, max: 4, d: 'Cuenta un taller que salió mal y cómo lo rehízo.', j: 'Asume el error y explica qué cambió; falta el resultado del segundo intento.' },
+        { n: 'Iniciativa', v: 3.0, max: 4, d: 'Propuso el programa de bienvenida sin que se lo pidieran.', j: 'Es un buen ejemplo, aunque es el mismo que ya cuenta su CV.' },
+        { n: 'Responsabilidad', v: 2.6, max: 4, d: 'Ante un plazo que se mueve, espera a que le avisen.', j: 'En la pregunta cerrada eligió esperar instrucciones en lugar de pedir una fecha.' },
+        { n: 'Resolución de problemas', v: 2.4, max: 4, d: 'Describe el problema, pero no separa causa y síntoma.', j: 'Ante la caída de asistencia propuso «motivar más», sin buscar por qué faltaba la gente.' }
+      ],
+      fuertes: ['Cuenta casos propios con empatía y un final claro.', 'Reconoce lo que no sabe sin inflar su experiencia.', 'Escucha antes de proponer: pregunta qué necesita la persona.'],
+      fortalecer: [{ t: 'Espera instrucciones cuando un plazo se mueve.', tip: 'Preguntar qué haría sin jefe cerca.' }, { t: 'Propone soluciones sin buscar la causa.', tip: 'Pedirle que explique un porqué.' }],
+      debil: ['No ha conducido procesos de selección completos, y el puesto cubre 12 vacantes en 6 semanas.'],
+      pidio: [
+        { t: 'Entrevistas de selección', cv: 'Solo apoyó en el filtro de currículums.', ref: 'En la pregunta 4', dijo: '«Estuve en unas 15 entrevistas como apoyo; nunca conduje una sola».' },
+        { t: '«Power BI avanzado»', cv: 'Lo pone como avanzado; el curso es básico.', ref: 'En la pregunta 8', dijo: '«Hice un tablero de asistencia con filtros por área; lo revisaba mi jefa cada mes».' },
+        { t: 'Disponibilidad para tiendas', cv: 'Vive en San Juan de Lurigancho; no dice si puede moverse.', ref: 'En la evaluación', dijo: 'Ninguna de sus respuestas lo menciona.', empty: true }
+      ],
+      verificar: [
+        { lab: 'Del CV · Empeoró', c: '#C22A3F', t: 'Entrevistas de selección: nunca condujo una sola.' },
+        { lab: 'Del CV · Sigue pendiente', c: '#1E3A8A', t: 'Disponibilidad para moverse entre las tres tiendas.' },
+        { lab: 'De la evaluación', c: '#4A5251', t: 'Resolución de problemas: propone sin buscar la causa.' }
+      ],
+      qs: [
+        { title: 'Cuéntanos una vez en la que ayudaste a alguien a quedarse en su trabajo.', meta: 'Abierta · Servicio', shows: 'Acompañó a una enfermera que quería renunciar y logró que se quedara.', answer: 'Una enfermera nueva me dijo al tercer día que se iba porque no entendía los turnos. Me senté con ella, armamos juntas su calendario del mes y le presenté a una compañera con más tiempo. Hoy lleva un año y medio en la clínica.' },
+        { title: '¿Has conducido entrevistas de selección? Cuéntanos la última.', meta: 'Abierta · Integridad', shows: 'Reconoce que solo estuvo como apoyo y nunca condujo una entrevista.', answer: 'Estuve en unas 15 entrevistas como apoyo; nunca conduje una sola. Tomaba notas y luego comentaba con la analista lo que había visto.' },
+        { title: 'Un proceso se retrasa porque el área no responde. ¿Qué haces primero?', meta: 'Opción única · Responsabilidad', shows: 'Eligió esperar instrucciones, no la respuesta esperada.', answer: '«Espero a que mi jefa me indique cómo seguir».' },
+        { title: 'La asistencia a una capacitación cae a la mitad. ¿Qué haces?', meta: 'Abierta · Resolución de problemas', shows: 'Propone motivar más, sin buscar por qué falta la gente.', answer: 'Haría una campaña para motivar al personal, con afiches y un pequeño premio para el área que más asista. También pediría a los jefes que recuerden la fecha.' }
+      ]
+    },
+    pr: { meta: '', critHint: '', summary: '', anexoTitle: '', crits: [], fuertes: [], fortalecer: [], verificar: [], resuelto: '', qs: [], entTxt: '', ents: [] }
+  }
+};
+
+var EMPTY_CV = { meta: '', critHint: '', total: '', totalSub: '', last: '', lastSub: '', edu: '', eduSub: '', skills: [], shows: '', crits: [], demuestra: [], noCuadra: [], verificar: [] };
+var EMPTY_EV = { meta: '', critHint: '', summary: '', anexoTitle: '', crits: [], fuertes: [], fortalecer: [], debil: [], pidio: [], verificar: [], qs: [] };
+var EMPTY_PR = D.lp.pr;
+
+var FILES = { cv: 'Informe del CV', ev: 'Informe de la evaluación', pr: 'Informe de la prueba del puesto' };
+
+function norm(s) { return String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase(); }
+function fmt(v, max) { return max === 4 ? v.toFixed(1).replace('.', ',') : String(v); }
+function noteColor(v) { return v == null ? '#9AA19F' : '#111312'; }
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { active: 2, tab: 'ev', open: {}, q: '', mOpen: false, toast: '' };
+    this.timer = null;
+  }
+
+  componentWillUnmount() { if (this.timer) clearTimeout(this.timer); }
+
+  go(i) {
+    if (i < 0 || i >= LIST.length) return;
+    this.setState({ active: i, open: {}, mOpen: false });
+  }
+
+  say(msg) {
+    if (this.timer) clearTimeout(this.timer);
+    this.setState({ toast: msg });
+    this.timer = setTimeout(() => this.setState({ toast: '' }), 4000);
+  }
+
+  renderVals() {
+    const s = this.state;
+    const cur = LIST[s.active];
+    const g = GROUPS[cur.g];
+    const det = D[cur.id] || null;
+
+    const tabDefs = [
+      { key: 'cv', label: 'CV', score: cur.cv, why: cur.cvWhy || '' },
+      { key: 'ev', label: 'Evaluación', score: cur.ev, why: cur.evWhy || '' },
+      { key: 'pr', label: 'Prueba', score: cur.pr, why: cur.prWhy || '' }
+    ];
+    let tab = s.tab;
+    if (!tabDefs.some((t) => t.key === tab && t.score != null)) {
+      const first = tabDefs.find((t) => t.score != null);
+      tab = first ? first.key : 'cv';
+    }
+
+    const tabs = tabDefs.map((t) => {
+      const disabled = t.score == null;
+      const active = t.key === tab;
+      return {
+        label: t.label,
+        scoreTxt: disabled ? '—' : String(t.score),
+        disabled: disabled,
+        active: active,
+        why: disabled ? t.why : '',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        fg: disabled ? '#9AA19F' : (active ? '#1E3A8A' : '#4A5251'),
+        bg: active ? '#E9EDFF' : 'transparent',
+        pick: () => { if (!disabled) this.setState({ tab: t.key }); }
+      };
+    });
+
+    const mkRow = (c, i) => {
+      const on = i === s.active;
+      const gg = GROUPS[c.g];
+      return {
+        rank: String(i + 1),
+        name: c.name,
+        gLabel: gg.label, gFull: gg.full,
+        cvTxt: c.cv == null ? '—' : String(c.cv),
+        evTxt: c.ev == null ? '—' : String(c.ev),
+        prTxt: c.pr == null ? '—' : String(c.pr),
+        cvC: noteColor(c.cv), evC: noteColor(c.ev), prC: noteColor(c.pr),
+        current: on ? 'true' : 'false',
+        bg: on ? '#E9EDFF' : 'transparent',
+        bar: on ? '#1E3A8A' : 'transparent',
+        weight: on ? '600' : '400',
+        pick: () => this.go(i)
+      };
+    };
+    const allRows = LIST.map(mkRow);
+    const nq = norm(s.q.trim());
+    const rows = nq ? allRows.filter((r) => norm(r.name).indexOf(nq) !== -1) : allRows;
+
+    const X = det ? det[tab] : EMPTY_EV;
+    const prefix = cur.id + '-' + tab + '-';
+
+    const crits = (X.crits || []).map((k, i) => {
+      const key = prefix + 'c' + i;
+      const open = !!s.open[key];
+      return {
+        n: k.n, d: k.d, j: k.j,
+        who: k.who || '', hasWho: !!k.who, adj: !!k.adj,
+        sv: fmt(k.v, k.max),
+        sm: k.max === 100 ? '' : ' / ' + k.max,
+        pct: Math.round((k.v / k.max) * 100) + '%',
+        sep: i === 0 ? '0' : '1px solid rgba(0,0,0,0.08)',
+        open: open,
+        rot: open ? '180deg' : '0deg',
+        toggle: () => this.setState({ open: Object.assign({}, s.open, { [key]: !open }) })
+      };
+    });
+
+    const qKeys = (X.qs || []).map((q, i) => prefix + 'q' + i);
+    const allOpen = qKeys.length > 0 && qKeys.every((k) => s.open[k]);
+    const qs = (X.qs || []).map((q, i) => {
+      const key = qKeys[i];
+      const open = !!s.open[key];
+      return {
+        n: String(i + 1), title: q.title, meta: q.meta, shows: q.shows, answer: q.answer,
+        open: open,
+        rot: open ? '180deg' : '0deg',
+        fs: q.empty ? 'italic' : 'normal',
+        ansBg: q.empty ? '#FFFFFF' : '#F5F7FB',
+        ansBorder: q.empty ? '1px dashed rgba(0,0,0,0.16)' : '1px solid transparent',
+        toggle: () => this.setState({ open: Object.assign({}, s.open, { [key]: !open }) })
+      };
+    });
+
+    const cvRaw = det ? det.cv : EMPTY_CV;
+    const evRaw = det ? det.ev : EMPTY_EV;
+    const prRaw = det ? det.pr : EMPTY_PR;
+    const cv = Object.assign({}, cvRaw, {
+      demuestraN: String(cvRaw.demuestra.length),
+      noCuadraN: String(cvRaw.noCuadra.length),
+      verificarN: cvRaw.verificar.length + ' preguntas'
+    });
+    const ev = Object.assign({}, evRaw, {
+      pidioN: evRaw.pidio.length + ' dudas',
+      verificarN: String(evRaw.verificar.length),
+      pidio: evRaw.pidio.map((p) => Object.assign({}, p, { fs: p.empty ? 'italic' : 'normal' }))
+    });
+    const pr = Object.assign({}, prRaw, {
+      verificarN: prRaw.verificar.length + ' pendientes',
+      verificar: prRaw.verificar.map((v) => Object.assign({}, v, ORIG[v.o])),
+      ents: prRaw.ents.map((e) => ({ n: e.n, d: e.d, st: e.ok ? 'Entregado' : 'No entregado', fg: e.ok ? '#0B7A63' : '#C22A3F', bg: e.ok ? '#E6F5F0' : '#FBEAEC' }))
+    });
+
+    const avail = tabDefs.filter((t) => t.score != null);
+    const missing = tabDefs.filter((t) => t.score == null);
+    const name = cur.name;
+
+    return {
+      cur: { name: name, rank: String(s.active + 1), gLabel: g.label, gFull: g.full },
+      hasBlocked: missing.length > 0,
+      blockedTxt: missing.map((t) => t.label + ': ' + t.why.charAt(0).toLowerCase() + t.why.slice(1) + '.').join(' '),
+      pos: (s.active + 1) + ' de ' + LIST.length,
+      prev: () => this.go(s.active - 1),
+      next: () => this.go(s.active + 1),
+      prevDisabled: s.active === 0,
+      nextDisabled: s.active === LIST.length - 1,
+      prevOpacity: s.active === 0 ? '0.4' : '1',
+      nextOpacity: s.active === LIST.length - 1 ? '0.4' : '1',
+      mOpen: s.mOpen,
+      mRot: s.mOpen ? '180deg' : '0deg',
+      toggleMenu: () => this.setState({ mOpen: !s.mOpen }),
+      q: s.q,
+      onSearch: (e) => this.setState({ q: e.target.value }),
+      rows: rows,
+      allRows: allRows,
+      noRows: rows.length === 0,
+      countTxt: nq ? rows.length + ' de ' + LIST.length : LIST.length + ' en total',
+      tabs: tabs,
+      hasDetail: !!det,
+      noDetail: !det,
+      showCv: !!det && tab === 'cv',
+      showEv: !!det && tab === 'ev',
+      showPr: !!det && tab === 'pr',
+      showSummary: !!det && tab !== 'cv',
+      showAnexo: !!det && tab !== 'cv',
+      X: X,
+      cv: cv, ev: ev, pr: pr,
+      crits: crits,
+      qs: qs,
+      allLabel: allOpen ? 'Cerrar todas' : 'Abrir todas',
+      toggleAll: () => {
+        const o = Object.assign({}, s.open);
+        qKeys.forEach((k) => { o[k] = !allOpen; });
+        this.setState({ open: o });
+      },
+      hasToast: !!s.toast,
+      toast: s.toast,
+      openFicha: () => this.say('Abre la ficha de ' + name + ' en el ranking: ahí se ajustan notas, se mueve de etapa, se descarta o se contrata. El visor solo lee.'),
+      dlOne: () => this.say('Descargando «' + FILES[tab] + ' · ' + name + '.pdf»'),
+      dlVacante: () => this.say('Preparando un .zip con los informes de los 13 postulantes: una carpeta por postulante con sus 3 informes. Los que aún no existen se listan en un aviso dentro del .zip.'),
+      dlAll: () => this.say(missing.length
+        ? 'Se descargan ' + avail.length + ' de 3. Falta ' + missing.map((t) => 'la ' + t.label.toLowerCase() + ': ' + t.why.charAt(0).toLowerCase() + t.why.slice(1)).join('; ')
+        : 'Descargando los 3 informes de ' + name + ' en un .zip')
+    };
+  }
+}
+</script>
+</body>
+</html>

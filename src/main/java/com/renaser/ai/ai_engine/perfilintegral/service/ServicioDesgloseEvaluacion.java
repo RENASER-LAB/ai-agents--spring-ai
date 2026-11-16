@@ -17,4 +17,11 @@ import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
 public interface ServicioDesgloseEvaluacion {
 
     DesgloseEvaluacion ver(ContextoUsuario quien, Long postulacionId);
+
+    /**
+     * El mismo desglose para el informe de la evaluación, sin nadie conectado: lo pide también
+     * el redactor del informe desde la cola. Quien llama ya comprobó el permiso y el alcance
+     * (o es un proceso del sistema); aquí no se ofrece ajustar nada.
+     */
+    DesgloseEvaluacion paraElInforme(com.renaser.ai.ai_engine.postulacion.entity.Postulacion postulacion);
 }
