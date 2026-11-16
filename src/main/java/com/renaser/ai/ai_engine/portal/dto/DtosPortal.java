@@ -76,12 +76,62 @@ public final class DtosPortal {
     // publicadaEn y ciudad llegaron con la pantalla de búsqueda (V62). La fecha puede venir
     // vacía —se fija al publicar y las viejas pueden no tenerla—; la ciudad es la del catálogo
     // o nulo, y `ubicacion` sigue viajando con lo que ahora es la zona o referencia.
+    //
+    // codigoEmpresa, empresa y videoPuesto llegaron con el propósito de la empresa (V81). El
+    // código es el del perfil público (/empresas/<código en minúsculas>) y viaja siempre;
+    // `empresa` es lo que la empresa cuenta de sí misma y va a nulo si no llenó nada. Se repite
+    // en cada vacante de la misma empresa a propósito: 1500 caracteres como mucho, antes que
+    // obligar al portal a una segunda llamada. `proposito` sigue siendo el DEL PUESTO.
     public record VacantePublica(Long id, String titulo, String nombreEmpresa, String descripcion,
                                  String proposito, String responsabilidades, String requisitos,
                                  String modalidad, String horario, String ubicacion,
                                  CiudadPublica ciudad, Instant publicadaEn,
                                  RemuneracionPublica remuneracion,
-                                 List<RequisitoPublico> requisitosObjetivos) {}
+                                 List<RequisitoPublico> requisitosObjetivos,
+                                 String codigoEmpresa,
+                                 EmpresaDeLaVacante empresa,
+                                 /** El video propio del puesto, o nulo: entonces vale el de la empresa. */
+                                 VideoPublico videoPuesto) {}
+
+    /**
+     * Lo que la empresa cuenta de sí misma, junto a cada vacante (V81): el bloque «Sobre
+     * {empresa}» y el logo pequeño junto a su nombre. Nulo en la vacante si no tiene nada.
+     *
+     * @param proposito el de la EMPRESA ({@code organizacion.proposito_empresa})
+     * @param logo      la dirección pública del logo, o nulo
+     */
+    public record EmpresaDeLaVacante(String proposito, VideoPublico video, String paginaWeb,
+                                     List<RedPublica> redes, String logo) {}
+
+    /**
+     * Un video de YouTube o de Vimeo, ya reducido a lo que hace falta para pintarlo (V81).
+     *
+     * <p>El portal construye el reproductor con {@code servicio}, {@code identificador} y
+     * {@code clave} —la de un video oculto de Vimeo—, nunca copiando {@code enlace} dentro de
+     * la página. {@code enlace} es el que se pegó, para «Ver en YouTube».
+     *
+     * @param servicio {@code YOUTUBE} o {@code VIMEO}
+     */
+    public record VideoPublico(String servicio, String identificador, String clave, String enlace) {}
+
+    /** El enlace de la empresa en una red: {@code FACEBOOK}, {@code INSTAGRAM}, {@code LINKEDIN}, {@code TIKTOK} o {@code YOUTUBE}. */
+    public record RedPublica(String red, String enlace) {}
+
+    /**
+     * El perfil público de una empresa (V81): {@code GET /portal/empresas/{codigo}}, sin token.
+     *
+     * <p>Solo lo público: la presentación y sus vacantes publicadas, con los mismos campos de la
+     * tarjeta del tablón. Ni candidatos, ni pretensiones, ni vacantes cerradas o archivadas.
+     *
+     * @param ciudad la provincia de su primera sede activa, o nulo
+     * @param sedes  las provincias de sus sedes activas, sin repetir
+     */
+    public record PerfilDeEmpresa(String codigo, String nombre, String ciudad, String logo,
+                                  String portada, String sector, String tamano,
+                                  String tamanoTexto, Integer anioFundacion, List<String> sedes,
+                                  String quienesSomos, String proposito, VideoPublico video,
+                                  List<String> beneficios, String paginaWeb,
+                                  List<RedPublica> redes, List<VacantePublica> vacantes) {}
 
     /**
      * La ciudad de una vacante, como la lee el portal: el código —que es lo que viaja en la

@@ -103,11 +103,14 @@ public final class CambiosDeLaVacante {
     private final List<Cambio> cambios;
     private final Integer plazas;
     private final Instant cierraEn;
+    private final String video;
 
-    private CambiosDeLaVacante(List<Cambio> cambios, Integer plazas, Instant cierraEn) {
+    private CambiosDeLaVacante(List<Cambio> cambios, Integer plazas, Instant cierraEn,
+                               String video) {
         this.cambios = List.copyOf(cambios);
         this.plazas = plazas;
         this.cierraEn = cierraEn;
+        this.video = video;
     }
 
     /**
@@ -165,11 +168,17 @@ public final class CambiosDeLaVacante {
         valor(encontrados, "plazas", "Plazas", vacante.getPlazas(), plazas);
         valor(encontrados, "cierraEn", "Fecha de cierre", vacante.getCierraEn(), cierre);
 
+        // El video del puesto (V81): interno. Cambiarlo con la vacante publicada es una corrección
+        // normal —se guarda y se audita— y no le escribe a nadie. Ausente en el cuerpo, se queda.
+        String video = videoQueQuedaria(vacante, datos);
+        texto(encontrados, "videoPresentacion", "Video del puesto", vacante.getVideoPresentacion(),
+                video, Clase.INTERNO);
+
         // ⚠️ La fecha de APERTURA no se compara, y no es un olvido: el formulario de edición
         // no la enseña, así que el cuerpo nunca la trae y compararla haría que cada guardado
         // «cambiara» a nulo algo que nadie tocó. Se define al crear la vacante.
 
-        return new CambiosDeLaVacante(encontrados, plazas, cierre);
+        return new CambiosDeLaVacante(encontrados, plazas, cierre, video);
     }
 
     /**
@@ -202,6 +211,17 @@ public final class CambiosDeLaVacante {
         return cambioLaFormaDeCierre(vacante, datos) ? null : vacante.getCierraEn();
     }
 
+    /**
+     * El video del puesto que queda (V81): el de antes si el cuerpo no lo trae, o el que llega
+     * ya normalizado (sin espacios, con https:// delante si no lo traía; vacío es nulo). Quien
+     * llama ya comprobó que vale.
+     */
+    private static String videoQueQuedaria(Vacante vacante, GuardarVacante datos) {
+        return datos.videoPresentacion() == null ? vacante.getVideoPresentacion()
+                : com.renaser.ai.ai_engine.organizacion.service.EnlacesDeLaEmpresa
+                        .normalizar(datos.videoPresentacion());
+    }
+
     private static boolean cambioLaFormaDeCierre(Vacante vacante, GuardarVacante datos) {
         return !limpio(vacante.getTipoCierre()).equals(limpio(datos.tipoCierre()));
     }
@@ -214,6 +234,11 @@ public final class CambiosDeLaVacante {
     /** La fecha de cierre que el servicio tiene que escribir. */
     public Instant cierreQueQueda() {
         return cierraEn;
+    }
+
+    /** El video del puesto que el servicio tiene que escribir (V81). */
+    public String videoQueQueda() {
+        return video;
     }
 
     private static void texto(List<Cambio> encontrados, String campo, String etiqueta,

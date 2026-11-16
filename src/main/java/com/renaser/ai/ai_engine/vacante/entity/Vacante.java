@@ -46,6 +46,12 @@ public class Vacante {
     private String proposito;
     private String responsabilidades;
     private String requisitos;
+    /**
+     * El video propio del puesto (V81): un enlace de YouTube o Vimeo tal como se pegó, o nulo, y
+     * entonces el portal usa el de la empresa. Cambiarlo con la vacante publicada se audita y no
+     * se avisa.
+     */
+    private String videoPresentacion;
     private String modalidad;
     private String horario;
     /**

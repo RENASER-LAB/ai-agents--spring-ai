@@ -20,4 +20,12 @@ public interface ServicioTablonPortal {
     // El texto PROCESO publicado de la empresa de esa vacante: lo que el candidato
     // acepta al postular. 404 si la vacante no está publicada.
     ConsentimientoDeVacante consentimientoDeVacante(Long vacanteId);
+
+    /**
+     * Las vacantes publicadas de UNA empresa, con los campos de la tarjeta del tablón (V81): la
+     * lista «Vacantes abiertas» de su perfil público. Las mismas que el tablón enseña de ella —ni
+     * borradores, ni cerradas, ni eliminadas—, sin el bloque `empresa`, que el perfil ya lleva
+     * arriba.
+     */
+    List<VacantePublica> vacantesPublicadasDe(com.renaser.ai.ai_engine.organizacion.entity.Organizacion empresa);
 }

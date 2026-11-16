@@ -100,7 +100,30 @@ public final class DtosVacante {
              * Si quien edita ya confirmó volver a buscar en los CV calificados (V80). Cambiar las
              * líneas con CV calificados sin esto es un 409: el panel pregunta antes.
              */
-            Boolean confirmarNuevaBusqueda) {
+            Boolean confirmarNuevaBusqueda,
+            /**
+             * El «Video del puesto» (V81): un enlace de YouTube o de Vimeo, con las mismas reglas y
+             * errores que el video de la empresa. Ausente (nulo), no se toca —un formulario que no
+             * lo enseña no lo borra—; vacío, se quita, y la vacante vuelve a usar el de la
+             * empresa. Cambiarlo con la vacante publicada se audita y no se avisa a nadie.
+             */
+            String videoPresentacion) {
+
+        /** Sin el video del puesto (V81): no se toca. */
+        public GuardarVacante(Long solicitudTalentoId, Long puestoId, String titulo,
+                              String descripcion, String proposito, String responsabilidades,
+                              String requisitos, String modalidad, String horario,
+                              String ubicacion, String ciudadUbigeo,
+                              RemuneracionDeLaVacante remuneracion, String tipoCierre,
+                              Integer plazas, Instant abreEn, Instant cierraEn,
+                              Long responsableUsuarioId, String motivoRemuneracion,
+                              java.util.List<String> queBuscarEnElCv,
+                              Boolean confirmarNuevaBusqueda) {
+            this(solicitudTalentoId, puestoId, titulo, descripcion, proposito, responsabilidades,
+                    requisitos, modalidad, horario, ubicacion, ciudadUbigeo, remuneracion,
+                    tipoCierre, plazas, abreEn, cierraEn, responsableUsuarioId,
+                    motivoRemuneracion, queBuscarEnElCv, confirmarNuevaBusqueda, null);
+        }
 
         /** Sin «Qué buscar en el CV» (V80): no se tocan las líneas. */
         public GuardarVacante(Long solicitudTalentoId, Long puestoId, String titulo,
@@ -113,7 +136,7 @@ public final class DtosVacante {
             this(solicitudTalentoId, puestoId, titulo, descripcion, proposito, responsabilidades,
                     requisitos, modalidad, horario, ubicacion, ciudadUbigeo, remuneracion,
                     tipoCierre, plazas, abreEn, cierraEn, responsableUsuarioId,
-                    motivoRemuneracion, null, null);
+                    motivoRemuneracion, null, null, null);
         }
     }
 
@@ -312,7 +335,12 @@ public final class DtosVacante {
                                 * detalle —la lista lo resuelve de una vez para todas las filas—
                                 * porque el lápiz de la lista abre el formulario con lo de la fila.
                                 */
-                               java.util.List<String> queBuscarEnElCv) {}
+                               java.util.List<String> queBuscarEnElCv,
+                               /**
+                                * El «Video del puesto» guardado (V81), tal como se pegó, o vacío:
+                                * entonces el portal usa el de la empresa.
+                                */
+                               String videoPresentacion) {}
 
     /**
      * Lo que el formulario de edición necesita para decidir si pregunta antes de guardar las

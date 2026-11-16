@@ -32,6 +32,10 @@ public interface VacanteRepository extends JpaRepository<Vacante, Long>, Cerrojo
     /** El tablón de verdad: publicadas y no eliminadas (V60). */
     List<Vacante> findByEstadoAndEliminadaEnIsNullOrderByPublicadaEnDesc(String estado);
 
+    /** Las publicadas y no eliminadas de UNA empresa: su perfil público (V81). */
+    List<Vacante> findByOrganizacionIdAndEstadoAndEliminadaEnIsNullOrderByPublicadaEnDesc(
+            Long organizacionId, String estado);
+
     List<Vacante> findByOrganizacionIdOrderByCreadoEnDesc(Long organizacionId);
 
     /**

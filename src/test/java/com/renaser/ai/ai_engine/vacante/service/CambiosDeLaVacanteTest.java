@@ -450,4 +450,49 @@ class CambiosDeLaVacanteTest {
                     .hasSize(2);
         }
     }
+
+    @Nested
+    @DisplayName("El video del puesto (V81)")
+    class ElVideoDelPuesto {
+
+        private GuardarVacante conVideo(String video) {
+            GuardarVacante base = comoEsta();
+            return new GuardarVacante(base.solicitudTalentoId(), base.puestoId(), base.titulo(),
+                    base.descripcion(), base.proposito(), base.responsabilidades(),
+                    base.requisitos(), base.modalidad(), base.horario(), base.ubicacion(),
+                    base.ciudadUbigeo(), base.remuneracion(), base.tipoCierre(), base.plazas(),
+                    base.abreEn(), base.cierraEn(), base.responsableUsuarioId(),
+                    base.motivoRemuneracion(), null, null, video);
+        }
+
+        @Test
+        @DisplayName("cambiarlo con la vacante publicada se audita y no le escribe a nadie")
+        void esInterno() {
+            CambiosDeLaVacante cambios = comparar(conVideo("youtu.be/abc123DEF45"));
+
+            assertThat(cambios.hayCambios()).isTrue();
+            assertThat(cambios.hayVisibles()).isFalse();
+            assertThat(cambios.videoQueQueda()).isEqualTo("https://youtu.be/abc123DEF45");
+            assertThat(cambios.nuevo()).containsEntry("videoPresentacion",
+                    "https://youtu.be/abc123DEF45");
+            assertThat(cambios.cuerpoDelAviso()).isEqualTo(CambiosDeLaVacante.CIERRE);
+        }
+
+        @Test
+        @DisplayName("un cuerpo sin el campo no lo toca; vacío lo quita")
+        void ausenteNoToca() {
+            Vacante conUno = laVacante();
+            conUno.setVideoPresentacion("https://vimeo.com/123456789");
+
+            CambiosDeLaVacante sinCampo = CambiosDeLaVacante.entre(conUno, comoEsta(), "S/ 3 000",
+                    "S/ 3 000", "", "");
+            assertThat(sinCampo.hayCambios()).isFalse();
+            assertThat(sinCampo.videoQueQueda()).isEqualTo("https://vimeo.com/123456789");
+
+            CambiosDeLaVacante vacio = CambiosDeLaVacante.entre(conUno, conVideo("  "), "S/ 3 000",
+                    "S/ 3 000", "", "");
+            assertThat(vacio.hayCambios()).isTrue();
+            assertThat(vacio.videoQueQueda()).isNull();
+        }
+    }
 }
