@@ -2,7 +2,9 @@ package com.renaser.ai.ai_engine.informe.dto;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * El informe de una etapa de un candidato, armado una vez y pintado dos: como página en el
@@ -187,7 +189,30 @@ public final class DtosInforme {
                                    List<PostulanteDelVisor> postulantes, List<String> etapas) {
     }
 
-    /** Un archivo ya armado: el PDF o el .zip, con su nombre. */
+    /**
+     * Un archivo ya armado: el PDF o el .zip, con su nombre.
+     *
+     * <p>Lleva un arreglo, así que la igualdad se compara por contenido y el texto dice cuántos
+     * bytes trae en vez de volcarlos (un PDF ocupa cientos de KB).
+     */
     public record ArchivoArmado(String nombre, String tipo, byte[] contenido) {
+
+        @Override
+        public boolean equals(Object otro) {
+            return this == otro || otro instanceof ArchivoArmado o
+                    && Objects.equals(nombre, o.nombre) && Objects.equals(tipo, o.tipo)
+                    && Arrays.equals(contenido, o.contenido);
+        }
+
+        @Override
+        public int hashCode() {
+            return 31 * Objects.hash(nombre, tipo) + Arrays.hashCode(contenido);
+        }
+
+        @Override
+        public String toString() {
+            return "ArchivoArmado[nombre=" + nombre + ", tipo=" + tipo + ", contenido="
+                    + (contenido == null ? "null" : contenido.length + " bytes") + "]";
+        }
     }
 }

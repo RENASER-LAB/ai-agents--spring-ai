@@ -56,12 +56,12 @@ public class ServicioInformesImpl implements ServicioInformes {
     /** El mismo permiso con el que se firma el enlace del CV en el Excel del ranking. */
     private static final String PERMISO_CV = "descargar_entregables";
     private static final String AVISO = "LEEME - informes que faltan.txt";
-    private static final String PDF = "application/pdf";
-    private static final String ZIP = "application/zip";
+    private static final String TIPO_PDF = "application/pdf";
+    private static final String TIPO_ZIP = "application/zip";
 
     private final AlcanceSobreLaVacante alcance;
     private final ArmadoDelInforme armado;
-    private final PdfDelInforme pdf;
+    private final PdfDelInforme generadorPdf;
     private final ServicioPostulacionesPanel archivos;
     private final ServicioPerfilIntegralPanel tandas;
     private final NotaEtapaRepository notasEtapa;
@@ -95,7 +95,7 @@ public class ServicioInformesImpl implements ServicioInformes {
     @Override
     public ArchivoArmado pdf(ContextoUsuario quien, Long postulacionId, String etapa) {
         Informe informe = informe(quien, postulacionId, etapa);
-        return new ArchivoArmado(informe.nombreArchivo(), PDF, pdf.generar(informe));
+        return new ArchivoArmado(informe.nombreArchivo(), TIPO_PDF, generadorPdf.generar(informe));
     }
 
     @Override
@@ -122,7 +122,7 @@ public class ServicioInformesImpl implements ServicioInformes {
             Informe informe = conEnlaceAlCv(quien, hecho.get());
             nombre = informe.candidato();
             vacante = informe.vacante();
-            entradas.put(etapa.enElZip(), pdf.generar(informe));
+            entradas.put(etapa.enElZip(), generadorPdf.generar(informe));
         }
         if (entradas.isEmpty()) {
             throw new IllegalStateException("Todavía no hay ningún informe de este postulante: "
@@ -133,7 +133,7 @@ public class ServicioInformesImpl implements ServicioInformes {
         }
         String archivo = FormatoDelInforme.paraArchivo("Informes - " + nombre
                 + (vacante == null ? "" : " - " + vacante)) + ".zip";
-        return new ArchivoArmado(archivo, ZIP, zip(entradas));
+        return new ArchivoArmado(archivo, TIPO_ZIP, zip(entradas));
     }
 
     @Override
@@ -190,7 +190,7 @@ public class ServicioInformesImpl implements ServicioInformes {
                             + armado.estado(visible.get(), etapa).motivo() + ".");
                     continue;
                 }
-                entradas.put(carpeta + "/" + etapa.enElZip(), pdf.generar(conEnlaceAlCv(quien, hecho.get())));
+                entradas.put(carpeta + "/" + etapa.enElZip(), generadorPdf.generar(conEnlaceAlCv(quien, hecho.get())));
                 alguno = true;
             }
             if (alguno) {
@@ -211,7 +211,7 @@ public class ServicioInformesImpl implements ServicioInformes {
                 conInformes, faltan.size());
         String archivo = FormatoDelInforme.paraArchivo("Informes - " + ranking.vacante() + " - "
                 + FormatoDelInforme.fecha(Instant.now()).replace('/', '-')) + ".zip";
-        return new ArchivoArmado(archivo, ZIP, zip(entradas));
+        return new ArchivoArmado(archivo, TIPO_ZIP, zip(entradas));
     }
 
     // ================================================================== permisos
