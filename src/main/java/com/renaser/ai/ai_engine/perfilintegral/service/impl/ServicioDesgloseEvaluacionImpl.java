@@ -68,8 +68,21 @@ public class ServicioDesgloseEvaluacionImpl implements ServicioDesgloseEvaluacio
     @Override
     @Transactional(readOnly = true)
     public DesgloseEvaluacion ver(ContextoUsuario quien, Long postulacionId) {
-        Postulacion postulacion = laVisible(quien, postulacionId);
+        return armar(quien, laVisible(quien, postulacionId));
+    }
 
+    @Override
+    @Transactional(readOnly = true)
+    public DesgloseEvaluacion paraElInforme(Postulacion postulacion) {
+        // Sin permisos: el informe no ofrece ajustar, y así no se pregunta por el contexto de
+        // seguridad, que en la cola no existe.
+        ContextoUsuario sinPermisos = new ContextoUsuario(null, null,
+                postulacion.getOrganizacionId(), "SISTEMA", List.of(), Map.of());
+        return armar(sinPermisos, postulacion);
+    }
+
+    private DesgloseEvaluacion armar(ContextoUsuario quien, Postulacion postulacion) {
+        Long postulacionId = postulacion.getId();
         // Sin evaluación asignada no hay nada que abrir, y no es un error: la vacante
         // pudo publicarse con la evaluación del banco apagada.
         if (postulacion.getEvaluacionId() == null) {

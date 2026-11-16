@@ -1,7 +1,10 @@
 package com.renaser.ai.ai_engine.integracion;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.renaser.ai.ai_engine.ai.dto.RespuestaModelo;
 import com.renaser.ai.ai_engine.ai.service.ClienteModelo;
 
@@ -183,8 +186,36 @@ public class FlujoCalificacionIaIT {
                 case "EVIDENCIA_CV" -> evidenciaCv();
                 case "EVALUADOR" -> evaluador(contenido);
                 case "POTENCIAL_RIESGO" -> potencialRiesgo();
+                case "REDACTOR_INFORME" -> redactorInforme(contenido);
                 default -> throw new IllegalStateException("agente inesperado: " + agenteCodigo);
             };
+        }
+
+        private static final ObjectMapper LECTOR = new ObjectMapper();
+
+        /**
+         * El redactor del informe, que corre al cerrarse cada etapa (spec informe-pdf-por-etapa).
+         * No califica: devuelve frases, una por criterio con su nombre exacto y una por respuesta,
+         * sin cifras ni nombres propios, que es lo que el código deja pasar.
+         */
+        private String redactorInforme(String contenido) {
+            try {
+                JsonNode datos = LECTOR.readTree(contenido);
+                ObjectNode salida = LECTOR.createObjectNode();
+                salida.put("resumen", "Deja resultados medidos en lo que hace y explica cómo los consiguió.");
+                ObjectNode criterios = salida.putObject("criterios");
+                for (JsonNode criterio : datos.path("criterios")) {
+                    criterios.put(criterio.path("nombre").asText(),
+                            "Explica con un caso propio lo que logró y cómo lo midió.");
+                }
+                ArrayNode preguntas = salida.putArray("preguntas");
+                for (int i = 0; i < datos.path("respuestas").size(); i++) {
+                    preguntas.add("Responde con un caso propio y dice qué resultado obtuvo.");
+                }
+                return LECTOR.writeValueAsString(salida);
+            } catch (JsonProcessingException e) {
+                throw new IllegalStateException("el redactor del informe recibió algo que no es json", e);
+            }
         }
 
         /**
@@ -273,6 +304,7 @@ public class FlujoCalificacionIaIT {
     void laIaCalificaYLaPostulacionAvanzaSola() throws Exception {
         ModeloDePrueba.falla = false;
         ModeloDePrueba.enviosRecibidos.clear();
+        ModeloDePrueba.razonoPorAgente.clear();
 
         tokenEquipo = entrarComoEquipo();
         vacanteId = prepararVacantePublicada();
@@ -283,8 +315,14 @@ public class FlujoCalificacionIaIT {
         // Cuatro y no tres: la fila normal empieza sacando la ficha de datos del candidato.
         // Antes solo la sacaba la pasada rápida, y quien se calificaba por aquí salía sin
         // teléfono, sin experiencia y sin último puesto, sin manera de rellenarlo después.
-        esperarA(() -> contar("select count(*) from trabajo_ia where estado = 'TERMINADO'") == 4,
-                "los cuatro agentes terminen");
+        //
+        // Y seis trabajos y no cuatro: al cerrarse el retrato, el redactor del informe escribe
+        // los textos del CV y los de la evaluación (spec informe-pdf-por-etapa: corre cuando
+        // termina la calificación de cada etapa). Se espera a los seis: los redactores arrancan
+        // en cuanto acaba el retrato, y esperar a «cuatro» podía saltarse ese instante o dejarlos
+        // corriendo en la prueba siguiente, que apaga el modelo.
+        esperarA(() -> contar("select count(*) from trabajo_ia where estado = 'TERMINADO'") == 6,
+                "los cuatro agentes y los dos redactores del informe terminen");
 
         long postulacionId = idDe(codigoBueno);
 
@@ -318,7 +356,7 @@ public class FlujoCalificacionIaIT {
                 select agente_codigo, version_agente, instruccion_ia_id, es_exitosa,
                        tokens_entrada, duracion_ms
                 from ejecucion_ia order by id""");
-        assertThat(ejecuciones).hasSize(4);
+        assertThat(ejecuciones).hasSize(6);
         assertThat(ejecuciones).allSatisfy(fila -> {
             assertThat(fila.get("instruccion_ia_id")).isNotNull();
             assertThat(fila.get("version_agente")).isNotNull();
@@ -333,6 +371,8 @@ public class FlujoCalificacionIaIT {
         assertThat(codigos.subList(0, 3))
                 .containsExactlyInAnyOrder("DATOS_CV", "EVIDENCIA_CV", "EVALUADOR");
         assertThat(codigos.get(3)).isEqualTo("POTENCIAL_RIESGO");
+        // Los redactores van detrás del retrato: se piden cuando la etapa ya está calificada
+        assertThat(codigos.subList(4, 6)).containsExactly("REDACTOR_INFORME", "REDACTOR_INFORME");
 
         // 4 · Los ocho criterios del currículum, ni uno más. El noveno que devolvió el modelo
         // no existe y el décimo venía sin explicación: los dos se descartan (RF-150).
@@ -393,6 +433,35 @@ public class FlujoCalificacionIaIT {
         Long versionDeLaVacante = jdbc.queryForObject(
                 "select version_pesos_id from vacante where id = ?", Long.class, vacanteId);
         assertThat(nota.get("version_pesos_id")).isEqualTo(versionDeLaVacante);
+
+        // 8 · El redactor del informe (AC-01j): un texto por etapa, el del CV y el de la
+        // evaluación, sin razonar —escribe frases con lo ya explicado, no juzga— y sin tocar
+        // ninguna nota. Lo de arriba ya se comprobó con los redactores terminados.
+        assertThat(jdbc.queryForList("""
+                select referencia_tabla from trabajo_ia
+                where postulacion_id = ? and agente_codigo = 'REDACTOR_INFORME'
+                order by referencia_tabla""", String.class, postulacionId))
+                .containsExactly("informe_cv", "informe_evaluacion");
+        assertThat(contar("""
+                select count(*) from texto_informe
+                where postulacion_id = %d and resumen is not null
+                  and ejecucion_ia_id is not null""".formatted(postulacionId))).isEqualTo(2);
+        assertThat(ModeloDePrueba.razonoPorAgente)
+                .filteredOn(llamada -> llamada.startsWith("REDACTOR_INFORME"))
+                .containsExactly("REDACTOR_INFORME:false", "REDACTOR_INFORME:false");
+        assertThat(contar("""
+                select count(*) from nota_criterio n
+                join ejecucion_ia e on e.id = n.ejecucion_ia_id
+                where e.agente_codigo = 'REDACTOR_INFORME'""")).isZero();
+        // Y tampoco a él le llega lo que la IA no puede ver (RF-41), ni el celular
+        assertThat(jdbc.queryForList(
+                "select envio from ejecucion_ia where agente_codigo = 'REDACTOR_INFORME'", String.class))
+                .hasSize(2)
+                .allSatisfy(alRedactor -> assertThat(alRedactor)
+                        .doesNotContain("34 años")
+                        .doesNotContain("Femenino")
+                        .doesNotContain("Casada")
+                        .doesNotContain("999888777"));
     }
 
     @DisplayName("Si la IA falla se reintenta, y no se inventa ninguna nota")
@@ -529,10 +598,12 @@ public class FlujoCalificacionIaIT {
         //
         // El que saca la ficha de datos no entra en la cuenta y no es un olvido: no juzga
         // nada, copia del currículum lo que ya está escrito. Hacerle razonar sería pagar
-        // más por el mismo dato.
+        // más por el mismo dato. El redactor del informe tampoco: escribe frases con las notas
+        // ya explicadas y no pone ninguna; que no razona se comprueba en la primera prueba.
         assertThat(ModeloDePrueba.razonoPorAgente)
                 .isNotEmpty()
-                .filteredOn(llamada -> !llamada.startsWith("DATOS_CV"))
+                .filteredOn(llamada -> !llamada.startsWith("DATOS_CV")
+                        && !llamada.startsWith("REDACTOR_INFORME"))
                 .isNotEmpty()
                 .allSatisfy(llamada -> assertThat(llamada).endsWith(":true"));
 

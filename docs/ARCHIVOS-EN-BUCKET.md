@@ -36,7 +36,7 @@ para que el navegador hable directamente con el almacén.
 | **Enlace de descarga** | El navegador se baja el currículum del bucket. El backend no lo toca | 5 minutos |
 | **Enlace de subida** | El navegador manda el archivo al bucket. El backend no lo toca | 2 horas (lo fija Supabase) |
 | **Enlace del enunciado** | Solo en las plantillas de prueba: se guarda con su versión (`version_plantilla_prueba.url_consigna`). El correo de la prueba lo mandaba al candidato; **desde el 10/10/2026 ya no** (`{{enlacePrueba}}` va vacía): el caso se lee al empezar, en el portal. **Desde la `V74` el editor de la prueba no lo fabrica**: guarda el archivo, que se abre con el enlace de descarga, fresco cada vez | 180 días (`dias-enlace-consigna`) |
-| **Enlace del Excel del ranking** | Es el que se escribe **dentro** de la hoja, en la columna «CV» | 8 horas (`horas-enlace-volcado`) |
+| **Enlace del Excel del ranking** | Es el que se escribe **dentro** de la hoja, en la columna «CV». Desde el 16/11/2026 (`V84`), el mismo va en «Currículum (PDF)» de los informes por etapa, en el visor del panel y dentro de cada PDF | 8 horas (`horas-enlace-volcado`) |
 
 Duran poco a propósito. **El enlace no vuelve a preguntar quién eres**: el permiso se comprueba
 una vez, al pedirlo, y a partir de ahí el enlace vale por sí solo. Es tan secreto como el
@@ -63,6 +63,14 @@ Escribir esos enlaces pide **el mismo permiso que la descarga de siempre**
 del archivo y nada más, y el pie se lo dice. Un currículum que ya no está en el almacén, o que no
 se pudo firmar, deja su fila sin enlace y se cuenta al pie: **una firma que falla no puede dejar
 sin hoja a la tanda entera**.
+
+**Los informes por etapa (`V84`, 16/11/2026) llevan el mismo enlace, con el mismo precio.** Un PDF
+se descarga, se reenvía y se abre lejos del panel igual que la hoja, así que su «Currículum (PDF)»
+dura también las horas de `horas-enlace-volcado` y abre el CV sin sesión mientras tanto; el PDF lo
+avisa en letra pequeña. Lo escribe con el mismo permiso, `descargar_entregables`: sin él, el
+informe solo trae las redes de la persona. Si la firma falla, el informe sale igual, sin ese
+enlace. ⚠️ Al revés que el pie de la hoja, el aviso del PDF lleva «8 horas» escrito en el código:
+si se cambia `horas-enlace-volcado`, ese texto no cambia con él.
 
 ### El almacén de disco ya no existe
 

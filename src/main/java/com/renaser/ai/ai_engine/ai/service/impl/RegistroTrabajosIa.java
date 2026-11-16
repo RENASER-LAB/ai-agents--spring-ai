@@ -187,6 +187,35 @@ public class RegistroTrabajosIa {
     }
 
     /**
+     * Un trabajo de una postulación atado a una referencia propia —el informe de una etapa, para
+     * el redactor del informe (V84)—, si no hay ya uno vivo del mismo agente y referencia.
+     */
+    @Transactional
+    public Optional<TrabajoIa> crearDePostulacionConReferencia(Long organizacionId, Long postulacionId,
+                                                              String agenteCodigo, String referenciaTabla,
+                                                              String modo) {
+        boolean vivo = trabajos.findByPostulacionIdOrderByIdAsc(postulacionId).stream()
+                .anyMatch(t -> agenteCodigo.equals(t.getAgenteCodigo())
+                        && referenciaTabla.equals(t.getReferenciaTabla())
+                        && ("PENDIENTE".equals(t.getEstado()) || "EN_CURSO".equals(t.getEstado())
+                        || "EN_ESPERA".equals(t.getEstado())));
+        if (vivo) {
+            return Optional.empty();
+        }
+        return Optional.of(trabajos.save(TrabajoIa.builder()
+                .organizacionId(organizacionId)
+                .agenteCodigo(agenteCodigo)
+                .modo(modo)
+                .postulacionId(postulacionId)
+                .referenciaTabla(referenciaTabla)
+                .referenciaId(postulacionId)
+                .estado("PENDIENTE")
+                .intentos(0)
+                .creadoEn(Instant.now())
+                .build()));
+    }
+
+    /**
      * Crea un trabajo que cuelga de una referencia cualquiera que no es una postulación: la
      * de {@link #crearParaVacante}, con otra tabla. La usa el recomendador de la prueba
      * técnica (V67), que cuelga de la vacante por un carril propio para no frenar ni mezclarse

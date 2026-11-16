@@ -34,7 +34,7 @@ requisitos nuevos el 14 de agosto y cambian bastante.
 | [02 · Requisitos no funcionales](02-REQUISITOS-NO-FUNCIONALES.md) | RNF-01 a RNF-66. Tecnología, seguridad, rendimiento |
 | [03 · Estados de la postulación](03-ESTADOS-POSTULACION.md) | Los 18 estados de una postulación y sus transiciones |
 | [04 · Roles y permisos](04-ROLES-Y-PERMISOS.md) | Los 81 permisos, acción por acción. En la base hay 79 sembrados |
-| [05 · Modelo de datos](05-MODELO-DE-DATOS.md) | Las 128 tablas del módulo (V1-V80) por área y por qué el modelo es así. Se lee |
+| [05 · Modelo de datos](05-MODELO-DE-DATOS.md) | Las 129 tablas del módulo (V1-V80 y V84) por área y por qué el modelo es así. Se lee |
 | [06 · Inventario de pantallas](06-INVENTARIO-DE-PANTALLAS-MOCKUPS.md) | Las 21 pantallas base, estados, ventanas, campos y datos de los mockups |
 | [07 · Diccionario de datos](07-DICCIONARIO-DE-DATOS.md) | Cada tabla con todas sus columnas, tipos y claves. Se consulta |
 | [08 · Alcance del MVP](08-ALCANCE-DEL-MVP.md) | Qué se construye primero, en tres hitos, y qué queda fuera |
@@ -44,7 +44,7 @@ requisitos nuevos el 14 de agosto y cambian bastante.
 | [Reglas del código](REGLAS-DEL-CODIGO.md) | Los dos módulos, los paquetes de dominio, la frontera con el motor de agentes, y las reglas que no se negocian (estados, alcance, migraciones, Jackson 3). Qué documento se actualiza con cada cambio |
 | [Trabajar en local](TRABAJAR-EN-LOCAL.md) | Perfiles de configuración, arrancar el backend, correr los tests (y por qué siempre con `clean`), las pruebas de extremo a extremo contra un worktree, un backend propio por rama, dónde están las pantallas, los guiones de `scripts/` |
 | [Curso del backend](CURSO-BACKEND.md) | Ruta para entender el código que existe, en orden. Para quien entra al proyecto |
-| [Calificación con IA](CALIFICACION-CON-IA.md) | Cómo la IA lee el currículum, califica lo abierto y arma el Perfil de Talento. Y qué pasa si falla |
+| [Calificación con IA](CALIFICACION-CON-IA.md) | Cómo la IA lee el currículum, califica lo abierto y arma el Perfil de Talento. Y qué pasa si falla. El redactor que escribe los textos de los informes por etapa (V84) |
 | [La rúbrica de la prueba](RUBRICA-DE-LA-PRUEBA.md) | Cómo se reparten los 100 puntos de una prueba y **quién pone cada nota**: el sistema, un agente o una persona |
 | [La prueba del puesto, por dentro](PRUEBA-DEL-PUESTO.md) | Los instrumentos de la etapa técnica y la prueba escrita en el editor de cada vacante nueva (V67), con sus archivos por pregunta, «Mira» deducido, la fecha límite y los puntos del criterio entero (V68-V69); componer una versión antes de publicarla; el catálogo de preguntas, solo de la plataforma; la guía de calificación; los minutos de la vacante; el cierre en dos niveles; la vacante sin banco; la nota de la etapa y qué dice el ranking cuando no la hay; lo que el panel ve de los entregables |
 | [Diseño de la prueba técnica](DISENO-PRUEBA-TECNICA-FICHA-Y-REDACTOR.md) · [Una vacante, una versión](DECISION-UNA-VACANTE-UNA-VERSION.md) | La ficha del puesto (las 10 preguntas al dueño) y el redactor que arma el cuestionario; y por qué una vacante rinde una sola versión |

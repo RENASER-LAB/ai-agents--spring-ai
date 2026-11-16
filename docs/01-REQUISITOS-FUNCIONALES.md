@@ -870,6 +870,15 @@ potencial con riesgo**, **no priorizados** e **incompatibilidad objetiva**.
 **RF-69** Los no priorizados tienen una razón explicable y su evidencia. Una persona autorizada
 puede confirmarlos **por lote**, sin abrir uno por uno, y cada uno conserva su razón individual.
 
+**RF-69b** **Cada etapa calificada tiene un informe corto que se puede leer y descargar**
+(16/11/2026): uno del currículum, uno de la evaluación y uno de la prueba del puesto. Cada uno
+lleva la nota una sola vez, qué se evaluó, en qué es fuerte, qué debilidades tiene y qué queda
+**por verificar** en la etapa siguiente —en el último, en la entrevista—, con las preguntas y
+respuestas aparte. Nada se recorta. Se leen en el panel y se bajan en PDF, de una persona o de
+toda la vacante, con el mismo permiso que la pantalla que enseña esos datos, y nunca llevan la
+pretensión salarial, el celular, la foto, la edad, el sexo, el estado civil ni el contenido de un
+entregable. Sus textos los redacta la IA solo con lo ya calificado, **sin cambiar ninguna nota**.
+
 ## Reutilizar lo ya respondido
 
 **RF-70** **Que dos puestos sean del mismo nivel no basta** para reutilizar una evaluación

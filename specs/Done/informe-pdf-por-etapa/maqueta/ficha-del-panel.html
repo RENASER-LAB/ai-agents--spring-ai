@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Ficha del candidato: informes</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;550;600&amp;family=Syne:wght@400;500&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#FCFCFA}
+a{color:#1E3A8A}a:hover{color:#172A66}
+@keyframes girar{to{transform:rotate(360deg)}}
+</style>
+</helmet>
+<div style="background: #FCFCFA; color: #111312; font-family: Onest, system-ui, sans-serif; padding: 48px 16px; box-sizing: border-box">
+<div style="max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 24px">
+
+  <div style="font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: #687170">Ficha del candidato / Informes en PDF</div>
+
+  <section style="background: #FFFFFF; border: 1px solid rgba(0,0,0,0.1); border-radius: 4px; padding: 28px; display: flex; flex-direction: column; gap: 24px">
+    <div style="display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap">
+      <div style="display: flex; align-items: center; gap: 16px">
+        <span style="width: 48px; height: 48px; border-radius: 999px; background: #E9EDFF; color: #1E3A8A; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 550">AT</span>
+        <div style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 28px; font-weight: 400; line-height: 1; letter-spacing: -0.05em">Ana Torres Quispe</span><span style="font-size: 14px; color: #4A5251">Postuló el 03/11/2026 · Por confirmar</span></div>
+      </div>
+      <div role="group" aria-label="Informes en PDF" style="display: flex; flex-wrap: wrap; gap: 8px">
+        <button type="button" aria-label="Descargar el informe del CV" style="all: unset; box-sizing: border-box; cursor: pointer; height: 44px; padding: 0 16px; border-radius: 8px; background: #1E3A8A; color: #FFFFFF; display: flex; align-items: center; gap: 8px; font-size: 14px; text-transform: uppercase"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11"></path><path d="m7 11 5 5 5-5"></path><path d="M5 20h14"></path></svg>CV</button>
+        <button type="button" disabled="disabled" aria-busy="true" aria-label="Generando el informe de la evaluación" style="all: unset; box-sizing: border-box; height: 44px; padding: 0 16px; border-radius: 8px; background: #FFFFFF; color: #1E3A8A; box-shadow: inset 0 0 0 1px #1E3A8A, 0 0 0 3px #E9EDFF; display: flex; align-items: center; gap: 8px; font-size: 14px; text-transform: uppercase"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true" style="animation: girar 0.9s linear infinite"><path d="M21 12a9 9 0 1 1-6.2-8.6"></path></svg>Evaluación</button>
+        <button type="button" disabled="disabled" title="La IA está calificando" aria-label="Informe de la prueba no disponible: la IA está calificando" style="all: unset; box-sizing: border-box; height: 44px; padding: 0 16px; border-radius: 8px; background: #E5E5E7; color: #687170; display: flex; align-items: center; gap: 8px; font-size: 14px; text-transform: uppercase"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>Prueba</button>
+      </div>
+    </div>
+    <div style="display: flex; flex-wrap: wrap; gap: 24px; font-size: 13px; color: #4A5251; border-top: 1px solid rgba(0,0,0,0.1); padding-top: 16px">
+      <span style="display: flex; align-items: center; gap: 10px"><span style="width: 10px; height: 10px; border-radius: 2px; background: #1E3A8A"></span>Listo para descargar</span>
+      <span style="display: flex; align-items: center; gap: 10px"><span style="width: 10px; height: 10px; border-radius: 2px; box-shadow: inset 0 0 0 1.5px #1E3A8A, 0 0 0 2px #E9EDFF"></span>Generando</span>
+      <span style="display: flex; align-items: center; gap: 10px"><span style="width: 10px; height: 10px; border-radius: 2px; background: #E5E5E7"></span>Todavía no · el motivo al pasar el ratón</span>
+    </div>
+  </section>
+
+  <div style="display: flex; flex-wrap: wrap; gap: 24px">
+    <div style="flex: 1 1 300px; min-width: 0; display: flex; flex-direction: column; gap: 10px">
+      <div style="font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: #687170">En la etapa Perfil Integral</div>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap">
+        <span style="height: 44px; padding: 0 16px; border-radius: 8px; background: #1E3A8A; color: #FFFFFF; display: flex; align-items: center; font-size: 14px; text-transform: uppercase">↓ CV</span>
+        <span style="height: 44px; padding: 0 16px; border-radius: 8px; background: #1E3A8A; color: #FFFFFF; display: flex; align-items: center; font-size: 14px; text-transform: uppercase">↓ Evaluación</span>
+      </div>
+    </div>
+    <div style="flex: 1 1 300px; min-width: 0; display: flex; flex-direction: column; gap: 10px">
+      <div style="font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: #687170">En la etapa Prueba del puesto</div>
+      <div style="display: flex; gap: 8px; flex-wrap: wrap">
+        <span style="height: 44px; padding: 0 16px; border-radius: 8px; background: #1E3A8A; color: #FFFFFF; display: flex; align-items: center; font-size: 14px; text-transform: uppercase">↓ Prueba</span>
+      </div>
+    </div>
+  </div>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":560}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

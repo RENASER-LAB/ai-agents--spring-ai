@@ -47,7 +47,7 @@ com.renaser.ai.ai_engine.<dominio>
 | `portal` | La cara del candidato: un controlador y tres servicios por tema (la cuenta y su acceso, el tablón público, la postulación) |
 | `administracion` | La cara de configuración del panel; el borrado 29733 vive aparte en `ServicioBorradoDatos` |
 | `seguridad` | Las puertas —portal, panel y, desde la V73, integraciones, con la firma del bot en `FiltroFirmaWhatsapp`—, tokens, contexto y permisos con alcance |
-| `comun` | El manejador de errores propio y el candado de Swagger |
+| `comun` | El manejador de errores propio y el candado de Swagger. Desde la `V84`, también el motor de PDF (`comun/pdf/`), pensado para cualquier documento que genere el backend: ver «Dónde vive cada cuenta que se hace en un solo sitio» |
 | `catalogo` | Los catálogos que el panel consulta |
 | `perfilintegral` | Evaluación, criterios, notas y el Perfil de Talento (hito 2) |
 | `prueba` | La prueba del puesto: plantillas, intentos y entregables (hito 3) |
@@ -58,6 +58,7 @@ com.renaser.ai.ai_engine.<dominio>
 | `resena` | Las reseñas de empresas a quien contrataron, sus respuestas y la moderación de reportes (V63). No puntúan |
 | `colaborador` | La gestión de personas (V64): la ficha del colaborador, sus periodos y su situación laboral, el alta, la carga por Excel, los cambios, el cese y el reingreso. Las sedes y los cargos viven en `organizacion` (`EstructuraController`) y la sesión del panel en `seguridad` |
 | `whatsapp` | Las novedades de la postulación por WhatsApp (V73): el vínculo de un número con una postulación, la cola de avisos hacia el bot (`AvisosPorWhatsapp`, `EnvioAlBot`), la integración firmada que llama el bot, el cliente hacia él en tres modos (apagado, falso y real) y el bot falso. El botón del portal entra por `PortalController`, y el sondeo vive en `comun/programado/SondeoWhatsapp`. Ver [el contrato](CONTRATO-NOVEDADES-POR-WHATSAPP.md). Desde la V76, el contrato v2: la consulta del contexto (`ContextoWhatsappController`, `ServicioContextoWhatsappImpl`, con `FichaPublica`, `ProcedimientoPublico`, `LoQueLeToca` y `ReferenciasOpacas`), el resultado consultable y los eventos finales (`ResultadosPorWhatsapp`, `EnvioDeEventos`). Ver [el contrato v2](CONTRATO-CONTEXTO-Y-RESULTADOS-POR-WHATSAPP-V2.md) |
+| `informe` | Los informes por etapa (V84): el armado de cada uno (`ArmadoDelCv`, `ArmadoDeLaEvaluacion`, `ArmadoDeLaPrueba`, con lo común en `LoComunDelInforme`), su PDF (`PdfDelInforme`), el servicio con los permisos y los `.zip`, y el redactor del informe (`AgenteRedactorInforme`, con sus comprobaciones en `RedaccionDelInforme` y sus textos en `texto_informe`). **Sin controlador propio**: sus rutas viven en `postulacion/controller/InformesController`, como el Excel del ranking, porque ese paquete es el que ya reconocen `ManejadorErrores` y `ConfiguracionSwagger`. Ver [Las APIs](09-APIS.md), «Los informes por etapa» |
 
 Dos clases marcan la frontera con el motor de agentes y **hay que actualizarlas al añadir un
 controlador nuevo**, porque enumeran los nuestros: `comun/exception/ManejadorErrores` (para que
@@ -93,7 +94,11 @@ salgan con candado). Está escrito en el javadoc de ambas.
   los inscritos de `V37` a `V40`. **Git no ve ese choque**: `V40__una.sql` y `V40__otra.sql` son
   dos archivos distintos y los fusiona sin avisar; quien se entera es Flyway al arrancar. Hay una
   prueba que lo caza (`MigracionesSinChoqueTest`), pero cada rama pasa el CI en verde por su
-  cuenta: solo salta cuando la segunda se fusiona.
+  cuenta: solo salta cuando la segunda se fusiona. **Y un número por debajo de la última
+  migración aplicada ya no entra**: Flyway no aplica migraciones fuera de orden (`out-of-order`
+  no está activado), y en una base que ya tenga una más alta no arranca. Pasa ya: la `V84`, de
+  los informes por etapa, llegó antes que la `V81`, la `V82` y la `V83` que reservaban otras
+  specs; cuando se construyan tendrán que llevar un número mayor que la última aplicada.
 - **Nada se recalcula hacia atrás por su cuenta.** Cada nota queda atada a la versión de pesos de
   su vacante. La única vía para cambiarla es cambiar la versión de la vacante (`V74`), que
   recalcula a todos a la vez por `RecalculoConOtrosPesos`, sin IA, sin máquina de estados y sin
@@ -182,6 +187,8 @@ está en su classpath, así que `integracion/soporte/RespuestaV3` usa la 2 a pro
 | Qué celular vale y cómo se escribe (`V73`) | `whatsapp/service/Celular`: nueve cifras que empiezan por 9 (Perú) o el número completo con su prefijo, siempre a E.164, y cómo se enseña y se enmascara. El alta, «Mi cuenta» y la integración con el bot lo usan, y desde el 12/11/2026 también la ficha del colaborador y su carga por Excel, por `colaborador/service/ReglasDelColaborador` (`errorDelCelular` y `celularParaGuardar`, que dejan pasar sin comprobar el valor que ya estaba guardado). El portal tiene la misma regla en `src/dominio/celular.ts` y el mismo mensaje de error, amarradas a `docs/contratos/celular-casos.json`, igual en los dos repositorios: `CelularTest` aquí y `celular.test.ts` allí fallan si no dan lo mismo. **Cambiar la regla es cambiarla en los dos y añadir el caso al contrato** |
 | La nota del CV (`V80`) | `perfilintegral/service/NotaDelCurriculum`: criterios generales × (1 − p) + lo buscado × p, y la de siempre sin líneas, sin búsqueda terminada o con p = 0. La usan la nota del Perfil Integral y lo que recibe `POTENCIAL_RIESGO` (`InsumoPerfil`), los dos en `PuenteCalificacionIaImpl`, y el ranking (`ServicioPerfilIntegralPanelImpl`). Hasta la `V80` cada uno ponderaba por su cuenta, y con lo buscado dentro habrían dicho tres números distintos |
 | Qué se puede escribir en «Qué buscar en el CV» (`V80`) | `vacante/service/ReglasQueBuscarEnElCv`: vacías, repetidas, el tope de seis y de 200 caracteres, y lo que no se puede buscar. El panel tiene la misma regla en `src/panel/vacantes/reglasQueBuscar.ts`, con las mismas palabras; **no hay contrato que las amarre**: cada una tiene sus pruebas (`ReglasQueBuscarEnElCvTest` aquí, `reglasQueBuscar.test.ts` allí). **Es una lista cerrada**: cambiarla es cambiarla en los dos, con su caso en las dos pruebas (ver el 20 de [Defectos conocidos](DEFECTOS-CONOCIDOS.md)) |
+| Qué dice el informe de una etapa (`V84`) | `informe/service/ArmadoDelInforme`: **un solo armado, dos salidas**. El JSON del visor y el PDF leen el mismo objeto, y el redactor del informe recibe sus datos de ese mismo armado (`RedaccionDelInforme.insumo`). Las notas no se recalculan aquí: la del CV sale de `NotaDelCurriculum` y las demás, de los servicios que ya usa la ficha. Con un armado para la pantalla y otro para el PDF, el visor y el archivo acabarían diciendo cosas distintas |
+| Cómo se dibuja un PDF (`V84`) | `comun/pdf/`: `LienzoPdf` (páginas A4 de PDFBox, con las coordenadas desde arriba como en la maqueta HTML), `FlujoPdf` (coloca piezas una debajo de otra y abre página cuando no caben, sin partir una pieza que quepa entera en una hoja), `RenglonesPdf` (parte el texto en renglones sin recortar nada), `TipografiaPdf` y `EstiloPdf`. **Las fuentes van incrustadas**, solo con los glifos usados: Onest y Syne, pasadas a TTF desde los WOFF2 del panel (`src/main/resources/pdf/fuentes/`, con su licencia en `LEEME.txt`). Son variables y el PDF usa su peso 400; el peso medio se simula con un trazo fino sobre el relleno. Un carácter que ninguna fuente dibuja sale como «?», en vez de tumbar el documento. Ningún dato sale a un servicio externo para armarlo. Lo propio de cada documento —el informe por etapa, y los que vengan— va en su paquete, no aquí |
 
 ---
 

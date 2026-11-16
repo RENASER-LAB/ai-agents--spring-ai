@@ -228,6 +228,20 @@ mismo permiso que la descarga de siempre, y a propósito: si una de las dos form
 mismo currículum no comprobara nada, sería la puerta de atrás. Ver
 [Los currículums dejan de vivir en el backend](ARCHIVOS-EN-BUCKET.md).
 
+**Los informes por etapa (`V84`, 16/11/2026) no traen permiso nuevo.** Cada uno pide el permiso de
+la pantalla que enseña esos datos: el del currículum, **«Ver el Perfil Integral»**
+(`ver_perfil_integral`); el de la evaluación, **«Ver respuesta por respuesta»**
+(`ver_respuestas_evaluacion`); y el de la prueba, **«Abrir la ficha completa»**
+(`abrir_ficha_candidato`). Sin el de una etapa, su botón no sale en la ficha y la API responde 403;
+fuera del alcance, 404. El visor de una vacante y su `.zip` piden además `ver_embudo`, como el
+ranking, y en ellos cada postulante y cada etapa respetan su propio permiso. **«Descargar
+entregables» decide también aquí el enlace al currículum**: con él, cada informe lleva el mismo
+enlace firmado de 8 horas que el Excel; sin él, solo las redes de la persona. ⚠️ En el informe del
+CV, la frase del CV y la pregunta de «Qué buscar en el CV» van con `ver_perfil_integral`, mientras
+que en el ranking piden `abrir_ficha_candidato`. Con los roles sembrados no cambia nada —Talento,
+el responsable del área y Dirección tienen los dos—, pero un rol a medida con solo el primero las
+leería en el informe. Ver [Las APIs](09-APIS.md), «Los informes por etapa».
+
 **Las claves de puntuación las ven el Equipo de Talento y Dirección.** Lo que dice el documento
 del cliente es esto, textual:
 

@@ -119,4 +119,13 @@ public interface ServicioCalificacionPrueba {
      * no {@code mover_postulacion}: quien no puede cambiar el plazo tiene que poder verlo.
      */
     PlazoVigente verPlazo(ContextoUsuario quien, Long postulacionId);
+
+    // ---- Para el informe de la prueba (sin nadie conectado: también lo pide la cola). Quien
+    // llama ya comprobó el permiso y el alcance. Nunca traen el contenido de un entregable.
+
+    List<NotaCriterioResponse> notasParaElInforme(com.renaser.ai.ai_engine.postulacion.entity.Postulacion postulacion);
+
+    List<RespuestaDePrueba> respuestasParaElInforme(com.renaser.ai.ai_engine.postulacion.entity.Postulacion postulacion);
+
+    List<EntregaDeLaPrueba> entregablesParaElInforme(com.renaser.ai.ai_engine.postulacion.entity.Postulacion postulacion);
 }
