@@ -30,4 +30,12 @@ public interface ServicioCalificacionPruebaPropia {
 
     /** Quienes dejaron vencer el tiempo con algo sin responder (decisión 11). */
     List<NoCompleto> noCompletaron(ContextoUsuario quien, Long vacanteId);
+
+    /**
+     * La misma lectura para el informe de la prueba, sin nadie conectado (también la pide el
+     * redactor del informe desde la cola). Sin el contenido de los entregables y sin ofrecer
+     * ajustar: el informe nunca enseña lo que hay dentro de un archivo. Nulo si la postulación
+     * no rinde la prueba del editor.
+     */
+    PruebaDelCandidato paraElInforme(com.renaser.ai.ai_engine.postulacion.entity.Postulacion postulacion);
 }

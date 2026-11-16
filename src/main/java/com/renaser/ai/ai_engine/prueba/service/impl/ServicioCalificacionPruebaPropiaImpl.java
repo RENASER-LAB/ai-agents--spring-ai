@@ -93,6 +93,18 @@ public class ServicioCalificacionPruebaPropiaImpl implements ServicioCalificacio
         return armar(quien, postulacion, intento.get());
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public PruebaDelCandidato paraElInforme(Postulacion postulacion) {
+        Optional<IntentoPrueba> intento = intentos.findByPostulacionId(postulacion.getId());
+        if (intento.isEmpty() || !intento.get().esDelEditor()) {
+            return null;
+        }
+        ContextoUsuario sinPermisos = new ContextoUsuario(null, null,
+                postulacion.getOrganizacionId(), "SISTEMA", List.of(), java.util.Map.of());
+        return armar(sinPermisos, postulacion, intento.get());
+    }
+
     private PruebaDelCandidato armar(ContextoUsuario quien, Postulacion postulacion, IntentoPrueba intento) {
         Resultado r = calculo.calcular(intento);
         boolean entregada = intento.getEntregadoEn() != null && !intento.isNoCompletada();
@@ -310,9 +322,26 @@ public class ServicioCalificacionPruebaPropiaImpl implements ServicioCalificacio
         // Sin IA y sin mover a nadie, salvo el paso a «por confirmar» si con esto la prueba
         // queda entera (punto 9).
         cierre.recalcular(intento, true);
+        redactarElInformeDeNuevo(postulacion.getId(), "PRUEBA");
         Postulacion alDia = postulaciones.findByIdAndOrganizacionId(postulacion.getId(),
                 postulacion.getOrganizacionId()).orElse(postulacion);
         return armar(quien, alDia, intento);
+    }
+
+    /**
+     * Tras un ajuste a mano, el redactor del informe rehace los textos de esta etapa (V84).
+     * Nunca frena el ajuste: si la IA está apagada o algo falla, el informe sigue con las
+     * explicaciones hasta que alguien lo abra.
+     */
+    private void redactarElInformeDeNuevo(Long postulacionId, String etapa) {
+        if (cola == null) {
+            return;
+        }
+        try {
+            cola.encolarRedactorInforme(postulacionId, etapa);
+        } catch (RuntimeException ignorada) {
+            // Los textos del informe se piden otra vez la próxima vez que alguien lo abra.
+        }
     }
 
     // ============================== Quienes no la completaron ==============================

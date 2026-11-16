@@ -466,6 +466,73 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
         return false;
     }
 
+    // ==================== El redactor del informe (V84) ====================
+
+    /** La referencia de sus trabajos: «informe_cv», «informe_evaluacion», «informe_prueba». */
+    public static final String REFERENCIA_INFORME = "informe_";
+
+    @Override
+    public boolean encolarRedactorInforme(Long postulacionId, String etapa) {
+        if (apagada(postulacionId)) {
+            return false;
+        }
+        Long organizacionId = puente.organizacionDe(postulacionId);
+        Optional<TrabajoIa> creado = registro.crearDePostulacionConReferencia(organizacionId,
+                postulacionId, AGENTE_REDACTOR_INFORME, referenciaDelInforme(etapa), FINA);
+        if (creado.isEmpty()) {
+            return false;
+        }
+        frenarOPublicar(creado.get(), organizacionId);
+        return true;
+    }
+
+    @Override
+    public boolean redactorDelInformeVivo(Long postulacionId, String etapa) {
+        String referencia = referenciaDelInforme(etapa);
+        return trabajos.findByPostulacionIdOrderByIdAsc(postulacionId).stream()
+                .anyMatch(t -> AGENTE_REDACTOR_INFORME.equals(t.getAgenteCodigo())
+                        && referencia.equals(t.getReferenciaTabla())
+                        && ("PENDIENTE".equals(t.getEstado()) || "EN_CURSO".equals(t.getEstado())
+                        || "EN_ESPERA".equals(t.getEstado())));
+    }
+
+    private static String referenciaDelInforme(String etapa) {
+        return REFERENCIA_INFORME + etapa.toLowerCase(java.util.Locale.ROOT);
+    }
+
+    /**
+     * Cuando termina la calificación de una etapa, el redactor del informe escribe sus textos.
+     *
+     * <p>El retrato cierra el CV y la evaluación (si la hay); una recalificación de las preguntas
+     * propias, la evaluación; una rebúsqueda de «Qué buscar en el CV», el CV; y la calificación
+     * de la prueba (o del cuestionario técnico), la prueba. <b>Nunca rompe la cola</b>: si algo
+     * falla aquí, el informe sigue con las explicaciones y el redactor correrá la primera vez
+     * que alguien lo abra.
+     */
+    private void redactarLosInformes(TrabajoIa acabado) {
+        if (acabado.getPostulacionId() == null) {
+            return;
+        }
+        try {
+            String modo = acabado.getModo();
+            List<String> etapas = switch (acabado.getAgenteCodigo()) {
+                case AgentePotencialRiesgo.CODIGO_AGENTE ->
+                        puente.tieneEvaluacionEntregada(acabado.getPostulacionId())
+                                ? List.of("CV", "EVALUACION") : List.of("CV");
+                case AgenteEvaluador.CODIGO_AGENTE -> RECALIFICA.equals(modo) ? List.of("EVALUACION") : List.of();
+                case AgenteBusquedaCv.CODIGO_AGENTE -> REBUSCA.equals(modo) ? List.of("CV") : List.of();
+                case AgentePruebaPuesto.CODIGO_AGENTE, AgenteCuestionarioTecnico.CODIGO_AGENTE -> List.of("PRUEBA");
+                default -> List.of();
+            };
+            for (String etapa : etapas) {
+                encolarRedactorInforme(acabado.getPostulacionId(), etapa);
+            }
+        } catch (RuntimeException e) {
+            log.warn("No se pudo pedir el redactor del informe tras el trabajo {}: {}",
+                    acabado.getId(), mensaje(e));
+        }
+    }
+
     /** Los que van a la vez en esta pasada. */
     private List<String> aLaVezDe(String modo) {
         return RAPIDA.equals(modo) ? A_LA_VEZ_RAPIDA : A_LA_VEZ;
@@ -489,6 +556,7 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
             agente.ejecutar(trabajo);
             registro.terminar(trabajoIaId);
             intentarElRetrato(trabajo);
+            redactarLosInformes(trabajo);
         } catch (RuntimeException e) {
             // Nunca se guarda una nota inventada ni se mueve la postulación: solo se anota
             // el fallo y, si queda intento, se vuelve a poner en la cola.

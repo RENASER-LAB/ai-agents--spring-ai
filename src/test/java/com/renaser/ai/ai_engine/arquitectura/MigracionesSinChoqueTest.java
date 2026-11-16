@@ -47,7 +47,11 @@ class MigracionesSinChoqueTest {
      * Los huecos que se dejaron a propósito, cada uno con su porqué. Hoy no queda ninguno: los
      * que hubo se cerraron al juntarse en {@code main} las ramas que se repartían los números.
      */
-    private static final List<String> HUECOS_DELIBERADOS = List.of();
+    private static final List<String> HUECOS_DELIBERADOS = List.of(
+            // Las specs de la reunión del 13/11/2026 tienen reservados V81 a V87, uno por spec;
+            // la del informe en PDF por etapa (los textos del redactor) se quedó con la V84 y
+            // llegó antes que las demás. Cuando entren las otras, el hueco se cierra solo.
+            "entre V80 y V84");
 
     @Test
     @DisplayName("Ningún número de versión se repite: git no ve ese conflicto, Flyway sí")

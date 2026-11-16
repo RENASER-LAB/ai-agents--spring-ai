@@ -177,6 +177,10 @@ public class FlujoQueBuscarEnElCvIT {
                 case "POTENCIAL_RIESGO" -> """
                         {"adecuacion":78,"potencial":70,"altoRendimiento":70,"confianzaEvidencia":66,
                          "resumen":"Cocinera con resultados medidos.","hallazgos":[],"alertas":[]}""";
+                // El redactor del informe corre al cerrarse el CV (spec informe-pdf-por-etapa).
+                // Aquí basta con que conteste: lo que se mira es lo que se le mandó.
+                case "REDACTOR_INFORME" -> """
+                        {"resumen":"Deja resultados medidos en cocina.","criterios":{},"preguntas":[]}""";
                 default -> throw new IllegalStateException("agente inesperado: " + agenteCodigo);
             };
         }
@@ -329,7 +333,15 @@ public class FlujoQueBuscarEnElCvIT {
         assertThat(detalle).doesNotContain("XQ7").doesNotContain("Certificado BPM vigente");
         assertThat(misProcesos).doesNotContain("XQ7").doesNotContain("merma de verduras");
 
-        // Lo que se mandó a los demás agentes no las lleva: solo BUSQUEDA_CV las ve.
+        // Lo que se mandó a los demás agentes no las lleva: solo BUSQUEDA_CV las ve. Tampoco el
+        // redactor del informe, aunque el informe del CV enseñe el bloque «Qué buscar en el CV»:
+        // se espera a que haya escrito los textos del CV de Lucía, para que la comprobación lo
+        // alcance de verdad y no pase por no haber llegado a correr.
+        esperarA(() -> contar("""
+                select count(*) from trabajo_ia t join ejecucion_ia e on e.trabajo_ia_id = t.id
+                where t.postulacion_id = %d and t.agente_codigo = 'REDACTOR_INFORME'
+                  and t.referencia_tabla = 'informe_cv' and t.estado = 'TERMINADO'""".formatted(lucia)) >= 1,
+                "el redactor del informe escriba los textos del CV de Lucía");
         assertThat(jdbc.queryForList("""
                 select envio from ejecucion_ia where agente_codigo <> 'BUSQUEDA_CV'""", String.class))
                 .isNotEmpty()

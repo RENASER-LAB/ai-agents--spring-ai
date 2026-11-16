@@ -353,4 +353,23 @@ public interface ColaCalificacionIa {
      */
     record Seguimiento(String estado, String motivo) {
     }
+
+    // ==================== El redactor del informe (V84) ====================
+
+    /** El agente que escribe los textos del informe de una etapa. No califica. */
+    String AGENTE_REDACTOR_INFORME = "REDACTOR_INFORME";
+
+    /**
+     * Encola al redactor del informe para una etapa (CV, EVALUACION o PRUEBA) de una postulación.
+     *
+     * <p>No cambia ninguna nota ni mueve a nadie: lee lo guardado de esa etapa y escribe sus
+     * textos. Uno vivo para la misma etapa frena al siguiente, para no pagar dos veces.
+     *
+     * @return true si quedó en la cola (o EN_ESPERA por tope); false si hay uno vivo o la IA
+     *         está apagada
+     */
+    boolean encolarRedactorInforme(Long postulacionId, String etapa);
+
+    /** Si hay un redactor del informe vivo (pendiente, en curso o esperando) para esa etapa. */
+    boolean redactorDelInformeVivo(Long postulacionId, String etapa);
 }

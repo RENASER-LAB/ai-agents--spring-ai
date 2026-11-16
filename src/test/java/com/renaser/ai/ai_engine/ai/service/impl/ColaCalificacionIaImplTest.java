@@ -505,6 +505,45 @@ class ColaCalificacionIaImplTest {
         verify(publicador).publicar(9L);
     }
 
+    // ============ El redactor del informe (V84) ============
+
+    @Test
+    @DisplayName("AC-01j · al terminar el retrato con evaluación, el redactor escribe los textos del CV y de la evaluación")
+    void alTerminarElRetratoSeRedactanLosInformes() {
+        when(registro.tomar(1L))
+                .thenReturn(Optional.of(trabajo(1L, AgentePotencialRiesgo.CODIGO_AGENTE, "EN_CURSO", "FINA")));
+        when(puente.tieneEvaluacionEntregada(POSTULACION)).thenReturn(true);
+
+        cola.ejecutar(1L);
+
+        verify(registro).crearDePostulacionConReferencia(1L, POSTULACION, "REDACTOR_INFORME", "informe_cv", "FINA");
+        verify(registro).crearDePostulacionConReferencia(1L, POSTULACION, "REDACTOR_INFORME",
+                "informe_evaluacion", "FINA");
+    }
+
+    @Test
+    @DisplayName("Al calificarse la prueba, el redactor escribe solo los textos de la prueba")
+    void alCalificarseLaPruebaSeRedactaSuInforme() {
+        when(registro.tomar(1L))
+                .thenReturn(Optional.of(trabajo(1L, AgentePruebaPuesto.CODIGO_AGENTE, "EN_CURSO", "FINA")));
+
+        cola.ejecutar(1L);
+
+        verify(registro).crearDePostulacionConReferencia(1L, POSTULACION, "REDACTOR_INFORME", "informe_prueba", "FINA");
+        verify(registro, never()).crearDePostulacionConReferencia(eq(1L), eq(POSTULACION), eq("REDACTOR_INFORME"),
+                eq("informe_cv"), anyString());
+    }
+
+    @Test
+    @DisplayName("Con la IA apagada no se encola ningún redactor")
+    void conLaIaApagadaNoHayRedactor() {
+        ColaCalificacionIaImpl apagada = conLaCalificacion(false);
+
+        assertThat(apagada.encolarRedactorInforme(POSTULACION, "CV")).isFalse();
+
+        verify(registro, never()).crearDePostulacionConReferencia(any(), any(), any(), any(), any());
+    }
+
     // ============ Ejecutar un trabajo ============
 
     @Test

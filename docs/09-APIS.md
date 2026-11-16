@@ -845,6 +845,81 @@ usan. Se deja así por decisión del 12/10/2026; solo importa si alguien configu
 > mirar antes las respuestas — y si `abiertas` también viene vacía, no hay nada que leer: o no hay
 > evaluación asignada, o ninguna de sus preguntas era puntuable.
 
+### Los informes por etapa (`V84`, 16/11/2026)
+
+Tres informes por persona —el del currículum, el de la evaluación y el de la prueba del puesto—,
+que el panel enseña en su visor y deja bajar en PDF. **Todo es de solo lectura y se arma en el
+momento** con lo que ya está guardado: no se guarda ningún PDF ni ningún `.zip`, y pedir dos veces
+da el mismo informe salvo la hora de generación, que va escrita en la cabecera. **El JSON del visor
+y el PDF salen del mismo armado** (`informe/service/ArmadoDelInforme`), así que dicen lo mismo.
+Están en Swagger bajo «Panel · Informes por etapa».
+
+| Método y ruta | Qué hace | Permiso |
+|---|---|---|
+| GET `/postulaciones/{id}/informes` | Qué informes de esta postulación puede ver quien pregunta y si ya se pueden bajar: `{postulacionId, informes: [{etapa, disponible, motivo, nota}]}`, con `etapa` = `CV`, `EVALUACION` o `PRUEBA`. Uno no disponible trae su motivo: «Todavía no tiene calificación», «La IA está calificando» o «La calificación falló». **Una etapa que quien pregunta no puede ver no sale** | El de cada etapa (ver abajo); sin ninguno de los tres, 403 |
+| GET `/postulaciones/{id}/informes/{etapa}` | El informe de una etapa (`cv`, `evaluacion` o `prueba`) para el visor, con los mismos datos que el PDF. Mientras no haya nada que enseñar, **409** con el motivo; una etapa que no existe, 400 | El de esa etapa |
+| GET `/postulaciones/{id}/informes/{etapa}/pdf` | El mismo informe en PDF A4, como adjunto: «Informe CV - Nombre Apellido - Vacante.pdf», «Informe evaluación - …» o «Informe prueba - …» | El de esa etapa |
+| GET `/postulaciones/{id}/informes/zip` | Los informes disponibles de la persona en un `.zip`: «1 - Informe del CV.pdf», «2 - Informe de la evaluación.pdf» y «3 - Informe de la prueba del puesto.pdf». Si falta alguno, dentro va «LEEME - informes que faltan.txt» con cuál y por qué, también los que quien pregunta no puede ver. Sin ninguno, 409 | Cualquiera de los tres |
+| GET `/vacantes/{id}/informes` | La lista del visor: los postulantes de la vacante **en el orden del ranking**, cada uno con `puesto`, `candidato`, `grupo` y sus tres notas —`notaCv`, `notaEvaluacion` y `notaPrueba`, nulas en las etapas que quien pregunta no puede ver—, y `etapas`, las que sí puede ver | `ver_embudo` y uno de los tres |
+| GET `/vacantes/{id}/informes/zip` | Los de toda la vacante en un `.zip`: **una carpeta por postulante visible**, «01 - Nombre Apellido», con sus informes disponibles —vacía si todavía no tiene ninguno— y «LEEME - informes que faltan.txt» con cada informe que falta y su motivo. Quien no se ve con esos permisos no entra. **Puede tardar** en una vacante grande: arma todos los PDF en la misma petición | `ver_embudo` y uno de los tres |
+
+**El permiso lo decide la etapa**, y es el de la pantalla que enseña esos datos: el informe del CV
+pide `ver_perfil_integral`; el de la evaluación, `ver_respuestas_evaluacion`; y el de la prueba,
+`abrir_ficha_candidato`. Sin el de esa etapa, **403**; una postulación de otra empresa o fuera del
+alcance, **404**, y no se arma nada. En la lista del visor y en los `.zip`, cada postulante y cada
+etapa respetan además su propio permiso.
+
+**Lo que lleva cada informe.** Una cabecera con la empresa, la vacante, el nombre, la etapa y la
+fecha y hora de generación, sin el estado de la postulación; la nota de la etapa una sola vez; «Qué
+se evaluó», cada criterio con su barra; los bloques del resumen; el porqué de cada nota; y, en la
+evaluación y la prueba, el anexo con las preguntas y respuestas. Lo pendiente pasa de un informe al
+siguiente: «Por verificar en la evaluación» en el del CV, «Por verificar en la prueba del puesto» en
+el de la evaluación y «Por verificar en la entrevista», el único que habla de la entrevista, en el
+de la prueba. El de la prueba es **el de la prueba que rindió esa persona**, no la que la vacante
+tenga puesta hoy. En el de la evaluación, «Lo que pidió el CV» lista cada duda que el CV mandó
+verificar con la etiqueta «Por contrastar»: decir si la evaluación la resolvió, la dejó pendiente o
+la empeoró es de otra spec, la del seguimiento de pendientes entre etapas, y hasta entonces el
+informe no inventa estados. Una nota ajustada a mano lleva «ajustada a mano» y su motivo; una que
+falta sale como «—» o «pendiente», nunca como 0.
+
+⚠️ **Nada se recorta, ni en el PDF ni en el visor** (decisión del 16/11/2026). Bajo cada barra va
+la línea del redactor del informe o, sin ella, **la explicación completa de la IA**, no su primera
+frase; y los bloques llevan todos sus puntos, sin «y N más». Un informe ocupa las hojas que
+necesite, también el del CV, que suele ir en una o dos. «Qué se evaluó» y cada bloque del resumen
+empiezan siempre en la primera hoja: si no caben enteros, la primera hoja guarda el título y el
+primer punto de cada uno y el resto sigue en la siguiente, en el mismo orden y con «(sigue)». Ningún
+punto, criterio ni pregunta se parte entre dos hojas, salvo uno más largo que una hoja entera.
+
+**Nunca lleva** la pretensión salarial, el celular, la foto, la edad, el sexo, el estado civil ni
+el contenido de un entregable, del que va solo el nombre. De la persona van el nombre y el correo.
+
+⚠️ **El bloque «Enlaces» puede abrir el currículum sin sesión durante 8 horas.** Con
+`descargar_entregables`, cada informe lleva «Currículum (PDF)» con el **mismo enlace firmado que la
+columna «CV» del Excel del ranking** —el plazo es `app.archivos.supabase.horas-enlace-volcado`—, y
+el PDF lo avisa en letra pequeña —con «8 horas» escrito, aunque se cambie ese plazo—. Sin ese
+permiso, o si la firma falla, el bloque solo trae las redes de la persona: las de su perfil o de
+su CV, solo `http` y `https` y como mucho cuatro. Ver [Los currículums dejan de vivir en el
+backend](ARCHIVOS-EN-BUCKET.md).
+
+**Los textos del redactor llegan después y no se esperan.** El informe pone, donde ya están
+escritos, los textos del agente `REDACTOR_INFORME` —el resumen de la etapa, una línea por criterio y
+una «lo que demostró» por respuesta—, y donde faltan o no pasaron la comprobación, las explicaciones
+completas de la IA. Si al abrir un informe (el JSON, el PDF o un `.zip`) le faltan textos, los pide
+en ese momento y responde igual, sin esperar: el JSON trae `textosEnCamino: true` mientras el
+redactor escribe, y el panel vuelve a pedirlo. Cuándo corre y qué comprueba, en [Calificación con
+IA](CALIFICACION-CON-IA.md), «El redactor del informe».
+
+⚠️ **Pedir el `.zip` de la vacante puede gastar IA.** Encola al redactor para cada persona y etapa
+a la que le falten textos —una llamada por cada una, con el tope mensual de siempre—, aunque el
+`.zip` sale en ese momento con las explicaciones completas donde falten.
+
+⚠️ **En el informe del CV, lo de «Qué buscar en el CV» va con el permiso del informe.** El bloque
+lleva, por cada línea de la vacante, «Lo tiene», «Lo menciona» o «No aparece» con la frase del CV o
+la pregunta para la entrevista, y basta `ver_perfil_integral`; en el ranking, la frase y la pregunta
+piden `abrir_ficha_candidato`. Con los roles sembrados no cambia nada, porque los mismos roles
+tienen los dos permisos; un rol a medida con solo el primero las leería en el informe. Esas líneas
+**no se le mandan al redactor**: de los agentes, solo `BUSQUEDA_CV` las ve.
+
 ### La prueba del puesto (hito 3)
 
 | Método y ruta | Qué hace | Permiso |
@@ -1208,7 +1283,8 @@ vacante (`V66`): su guía vive en su versión, y la instrucción del `EVALUADOR`
 nuevo por la `V66`— vale para sus tres escalas: 0–4, puntos de cada pregunta y criterios vistos.
 Igual con «Qué buscar en el CV» (`V80`): la instrucción de `BUSQUEDA_CV` es global y editable
 aquí, y las líneas de cada vacante viajan en los datos de cada llamada, envueltas como texto de la
-empresa.
+empresa. Y con la del redactor del informe (`REDACTOR_INFORME`, `V84`): global y editable aquí; lo
+de cada etapa le llega en los datos de cada llamada.
 
 ### La plataforma y las empresas
 
