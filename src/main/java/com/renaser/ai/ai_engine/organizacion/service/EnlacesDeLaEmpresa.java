@@ -5,7 +5,7 @@ import java.net.URISyntaxException;
 import java.util.Locale;
 
 /**
- * Qué enlace vale en la presentación de una empresa (V81): la página web, las redes y los dos
+ * Qué enlace vale en la presentación de una empresa (V85): la página web, las redes y los dos
  * videos, el de la empresa y el de cada puesto.
  *
  * <p>Las reglas son las de la spec, paso 4: solo {@code http} o {@code https}, con dominio, sin

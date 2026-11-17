@@ -3,7 +3,7 @@ package com.renaser.ai.ai_engine.organizacion.dto;
 import java.util.List;
 import java.util.Map;
 
-/** Los contratos del módulo «Perfil de la empresa» del panel (V81). */
+/** Los contratos del módulo «Perfil de la empresa» del panel (V85). */
 public final class DtosPresentacion {
 
     private DtosPresentacion() {

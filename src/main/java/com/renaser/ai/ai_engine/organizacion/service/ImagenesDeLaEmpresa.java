@@ -24,7 +24,7 @@ import java.util.Locale;
 import java.util.Optional;
 
 /**
- * El logo y la portada de una empresa (V81): qué se acepta y cómo se limpia antes de guardar.
+ * El logo y la portada de una empresa (V85): qué se acepta y cómo se limpia antes de guardar.
  *
  * <p><b>Son los primeros archivos de EX que se ven sin cuenta</b>, así que no se guarda lo que
  * llega: se lee la imagen y se vuelve a codificar en el servidor. Lo que se guarda son solo los

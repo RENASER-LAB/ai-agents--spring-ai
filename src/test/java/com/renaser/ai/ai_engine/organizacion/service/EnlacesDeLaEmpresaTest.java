@@ -11,7 +11,7 @@ import static com.renaser.ai.ai_engine.organizacion.service.EnlacesDeLaEmpresa.M
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Las reglas de los enlaces de la presentación (V81). Son las mismas, con las mismas palabras,
+ * Las reglas de los enlaces de la presentación (V85). Son las mismas, con las mismas palabras,
  * que {@code src/dominio/presentacionEmpresa.ts} del panel: un caso nuevo aquí va también allí.
  */
 @DisplayName("Los enlaces de la presentación de una empresa")

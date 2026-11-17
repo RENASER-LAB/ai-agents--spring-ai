@@ -168,7 +168,7 @@ public final class CambiosDeLaVacante {
         valor(encontrados, "plazas", "Plazas", vacante.getPlazas(), plazas);
         valor(encontrados, "cierraEn", "Fecha de cierre", vacante.getCierraEn(), cierre);
 
-        // El video del puesto (V81): interno. Cambiarlo con la vacante publicada es una corrección
+        // El video del puesto (V85): interno. Cambiarlo con la vacante publicada es una corrección
         // normal —se guarda y se audita— y no le escribe a nadie. Ausente en el cuerpo, se queda.
         String video = videoQueQuedaria(vacante, datos);
         texto(encontrados, "videoPresentacion", "Video del puesto", vacante.getVideoPresentacion(),
@@ -212,7 +212,7 @@ public final class CambiosDeLaVacante {
     }
 
     /**
-     * El video del puesto que queda (V81): el de antes si el cuerpo no lo trae, o el que llega
+     * El video del puesto que queda (V85): el de antes si el cuerpo no lo trae, o el que llega
      * ya normalizado (sin espacios, con https:// delante si no lo traía; vacío es nulo). Quien
      * llama ya comprobó que vale.
      */
@@ -236,7 +236,7 @@ public final class CambiosDeLaVacante {
         return cierraEn;
     }
 
-    /** El video del puesto que el servicio tiene que escribir (V81). */
+    /** El video del puesto que el servicio tiene que escribir (V85). */
     public String videoQueQueda() {
         return video;
     }

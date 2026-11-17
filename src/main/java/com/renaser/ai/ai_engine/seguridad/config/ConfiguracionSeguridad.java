@@ -49,7 +49,7 @@ public class ConfiguracionSeguridad {
             .authorizeHttpRequests(auth -> auth
                 // Lo que un candidato puede hacer ANTES de tener cuenta
                 .requestMatchers(HttpMethod.GET, "/api/v1/portal/vacantes/**").permitAll()
-                // El perfil público de cada empresa y su logo y portada (V81): se leen sin
+                // El perfil público de cada empresa y su logo y portada (V85): se leen sin
                 // cuenta, igual que el tablón desde el que se llega.
                 .requestMatchers(HttpMethod.GET, "/api/v1/portal/empresas/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/v1/portal/consentimientos/textos").permitAll()

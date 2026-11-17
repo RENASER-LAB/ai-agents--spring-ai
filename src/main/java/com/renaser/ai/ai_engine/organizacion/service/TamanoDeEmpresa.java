@@ -3,7 +3,7 @@ package com.renaser.ai.ai_engine.organizacion.service;
 import java.util.Optional;
 
 /**
- * Cuánta gente trabaja en la empresa, en los seis rangos de la presentación (V81). El código es
+ * Cuánta gente trabaja en la empresa, en los seis rangos de la presentación (V85). El código es
  * lo que se guarda (y lo que exige el CHECK de la columna); el texto, lo que se lee.
  */
 public enum TamanoDeEmpresa {

@@ -7,7 +7,7 @@ import java.util.Locale;
 import java.util.Optional;
 
 /**
- * Un video de YouTube o de Vimeo, reducido a lo que hace falta para pintarlo (V81): el servicio,
+ * Un video de YouTube o de Vimeo, reducido a lo que hace falta para pintarlo (V85): el servicio,
  * el identificador del video y, en un video oculto de Vimeo, su clave.
  *
  * <p><b>Por qué se reduce.</b> Se guarda el enlace tal como se pegó, pero el portal nunca lo

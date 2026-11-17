@@ -23,14 +23,14 @@ Sirve para tres cosas:
 - **Entender el sistema.** Un modelo de datos bien contado explica el negocio mejor que
   cualquier otro documento.
 
-**La base ya está construida.** Las migraciones `V1` a `V80` y la `V84` viven en
-`src/main/resources/db/migration` —**129 tablas de este módulo**, 132 en la base contando la de
+**La base ya está construida.** Las migraciones `V1` a `V80`, la `V84` y la `V85` viven en
+`src/main/resources/db/migration` —**131 tablas de este módulo**, 134 en la base contando la de
 Flyway y las dos del motor de agentes— y Flyway es el dueño del esquema. Cambiar algo de aquí
 ya cuesta una migración nueva, y **una migración aplicada no se edita nunca**: se escribe otra
 encima. No hay `V81` a `V83`: esos números los reservaban otras specs que todavía no se han
 construido, y como Flyway no aplica migraciones fuera de orden, tendrán que llevar un número
-mayor que la última aplicada (ver «Reglas que no se negocian» en [Reglas del
-código](REGLAS-DEL-CODIGO.md)).
+mayor que la última aplicada. Ya pasó con el perfil de la empresa, que reservaba la `V81` y entró
+como `V85` (ver «Reglas que no se negocian» en [Reglas del código](REGLAS-DEL-CODIGO.md)).
 
 La `V36` trae **el perfil del candidato**: seis tablas que cuelgan de `persona` —no de
 `usuario`, porque el usuario existe una vez por organización y el perfil es de la persona—
@@ -299,6 +299,14 @@ evaluación y el de la prueba del puesto—, que se arman cada vez que se piden 
 se guarda ningún PDF. Lo único que guarda es lo que escribe el **redactor del informe**: la tabla
 `texto_informe` y el agente `REDACTOR_INFORME` con su instrucción. Ninguna nota cambia y ninguna
 fila que existía se toca. Ver «Los textos del informe», más abajo.
+
+La `V85` (16/11/2026) trae **el perfil de la empresa**: cómo se presenta cada empresa ante el
+candidato. Nueve columnas opcionales en `organizacion` —el propósito, «Quiénes somos», sector,
+tamaño, año de fundación, el enlace del video de presentación, la página web, el logo y la
+portada—, dos tablas, `organizacion_beneficio` y `organizacion_red_social`, la columna
+`vacante.video_presentacion` (el video propio de un puesto) y el permiso
+`editar_presentacion_empresa`. Las empresas que existían quedan sin datos, así que ninguna vacante
+cambia hasta que su empresa guarda. Ver «Organización», más abajo.
 
 La `V54` (14/09/2026) **no añade ninguna tabla y cambia quién firma qué**. Hasta ella había dos
 tipos de texto —`PROCESO` y `FUTUROS_CONTACTOS`— y el de la cuenta usaba el primero, que habla de
@@ -680,7 +688,7 @@ Hay una versión dibujada de este mismo mapa en
 
 ## Las tablas
 
-Ciento veintiocho en total, agrupadas por área para poder leerlas de a poco. En cada una se nombran
+Ciento treinta y una en total, agrupadas por área para poder leerlas de a poco. En cada una se nombran
 las columnas que importan para entender qué hace, no todas.
 
 **Para verlas todas, con tipo y clave, está el [Diccionario de datos](07-DICCIONARIO-DE-DATOS.md).**
@@ -690,13 +698,30 @@ Todas tienen `id` y fecha de creación aunque no se repita cada vez.
 
 ---
 
-### Organización · 1 tabla
+### Organización · 3 tablas
 
 | Tabla | Para qué existe | Columnas que importan |
 |---|---|---|
-| `organizacion` | Renaser, y mañana cada cliente de consultoría | codigo, nombre, es_activa |
+| `organizacion` | Renaser, y mañana cada cliente de consultoría. Desde la `V85`, también cómo se presenta ante el candidato | codigo, nombre, es_activa, proposito_empresa, quienes_somos, sector, tamano, anio_fundacion, video_presentacion, pagina_web, logo_archivo_id, portada_archivo_id |
+| `organizacion_beneficio` | Los beneficios que la empresa enseña en su perfil, hasta 12 y en su orden (`V85`) | organizacion_id, texto, orden |
+| `organizacion_red_social` | El enlace de la empresa en cada red: Facebook, Instagram, LinkedIn, TikTok y YouTube. Una fila por red, y una red vacía es una fila que no existe (`V85`) | organizacion_id, red, enlace |
 
 Arranca con una sola fila. Todo lo demás la referencia, directamente o a través de su padre.
+
+**El perfil de la empresa es de la empresa, no de cada vacante** (`V85`). Lo llena en el panel, en
+«Perfil de la empresa», y el portal lo pinta en todas sus vacantes publicadas y en su perfil
+público (`/empresas/<código>`), sin copiarlo en ninguna postulación: si cambia el propósito, todas
+sus vacantes enseñan el nuevo al recargar. `proposito_empresa` se llama así a propósito, porque
+`vacante.proposito` es el del puesto y no cambia. El video se guarda tal como se pegó, y el portal
+monta el reproductor con el servicio y el identificador del video, nunca copiando el enlace en la
+página. El logo y la portada son filas de `archivo` de la propia empresa, ya limpias de
+metadatos, y son **los primeros archivos que se ven sin cuenta** (ver [Archivos en el
+bucket](ARCHIVOS-EN-BUCKET.md)). Guardar los beneficios los reemplaza todos: no tienen historia
+propia, y el cambio queda en la auditoría.
+
+**`vacante.video_presentacion` es el video propio del puesto** (`V85`), opcional y con las mismas
+reglas que el de la empresa. Vacío, la vacante enseña el de la empresa. Cambiarlo con la vacante
+publicada es una corrección normal: se audita y no avisa a nadie.
 
 ---
 
@@ -835,7 +860,7 @@ agente que la produjo.
 | `familia` | Las siete familias de trabajo | codigo, nombre |
 | `familia_afin` | Qué familias se parecen lo bastante para reutilizar evaluaciones | familia_codigo, familia_afin_codigo |
 | `puesto` | El catálogo de puestos, con su nivel y su familia. Desde la `V64` es también el catálogo de **cargos** de la gestión de personas, y se renombra y desactiva desde Configuración | organizacion_id, codigo, nombre, nivel_puesto_codigo, familia_codigo, es_activo |
-| `vacante` | Una convocatoria concreta | organizacion_id, solicitud_talento_id, puesto_id, titulo, descripcion, modalidad, ciudad_ubigeo, ubicacion, tipo_cierre, plazas, cierra_en, estado, version_pesos_id, version_plantilla_prueba_id, plantilla_evaluacion_id, responsable_usuario_id, remuneracion_tipo, remuneracion_min, remuneracion_max, remuneracion_moneda, remuneracion_actualizada_en, archivada_en, eliminada_en, aplica_evaluacion, origen_preguntas, version_banco_fija_id, instrumento_etapa_tecnica, calificacion_automatica, nota_minima |
+| `vacante` | Una convocatoria concreta | organizacion_id, solicitud_talento_id, puesto_id, titulo, descripcion, modalidad, ciudad_ubigeo, ubicacion, tipo_cierre, plazas, cierra_en, estado, version_pesos_id, version_plantilla_prueba_id, plantilla_evaluacion_id, responsable_usuario_id, remuneracion_tipo, remuneracion_min, remuneracion_max, remuneracion_moneda, remuneracion_actualizada_en, archivada_en, eliminada_en, aplica_evaluacion, origen_preguntas, version_banco_fija_id, instrumento_etapa_tecnica, calificacion_automatica, nota_minima, video_presentacion |
 | `requisito_objetivo` | Lo único que puede detener una postulación sin que intervenga nadie | vacante_id, descripcion, regla, es_activo |
 | `barrera_critica` | Lo que ningún promedio alto compensa, definido por vacante | vacante_id, descripcion, es_activa |
 | `evaluador_estandar` | Quién revisa que la urgencia no baje el nivel, en esta vacante | vacante_id, usuario_id, puede_bloquear, asignado_por_usuario_id |
@@ -1722,6 +1747,11 @@ cuáles sí, porque las que no, hay que probarlas en el código.
   lista, de 1 a 200 caracteres (`V80`). Una búsqueda viva por postulación y un resultado vivo por
   persona y línea. Un resultado «lo tiene» lleva siempre su frase, y el peso de lo buscado en una
   versión de pesos va de 0 a 50.
+- **El perfil de la empresa tiene sus largos y sus listas cerradas** (`V85`): el propósito y
+  «Quiénes somos» hasta 1500 caracteres, el sector hasta 60, los enlaces hasta 500 y un campo vacío
+  es nulo, nunca una cadena vacía. El tamaño es uno de seis rangos y el año de fundación, 1800 o
+  más. Como mucho 12 beneficios de 40 caracteres por empresa, y una sola fila por empresa y red,
+  con la red entre las cinco de la lista.
 
 ### Tienen que vivir en el código
 
@@ -1795,6 +1825,11 @@ cuáles sí, porque las que no, hay que probarlas en el código.
   edad, el sexo, el estado civil, los hijos, la salud, la religión o el origen—. Es una lista de
   palabras y formas, igual en el backend y en el panel, y no cabe en un CHECK. **Que la frase de
   «lo tiene» exista en el CV** también lo comprueba el código antes de guardarla.
+- **Los enlaces del perfil de la empresa** (`V85`): que sean `http` o `https` con dominio y sin
+  usuario ni contraseña delante, que el video sea de YouTube o de Vimeo y se le pueda sacar el
+  identificador, y que cada red sea de su dominio. **Que el año de fundación no pase del actual**:
+  un CHECK con la fecha de hoy no es inmutable, y una copia restaurada años después podría rechazar
+  filas que valían al guardarse.
 
 ### Nunca existen, ni siquiera como opción
 
@@ -1860,14 +1895,15 @@ Datos que se cargan con la primera migración, no a mano:
 
 - La **organización** Renaser, marcada como **dueña de la plataforma** (`es_plataforma`)
 - Los **18 estados** de la postulación, con su etapa y su momento
-- Los **79 permisos** que las migraciones siembran, con su etiqueta y su grupo — contados
+- Los **80 permisos** que las migraciones siembran, con su etiqueta y su grupo — contados
   de las migraciones, no de los documentos de diseño. Los más recientes: de la V37,
   `personalizar_instrumentos` para el administrador de cada empresa y
   `administrar_plataforma` solo para el de la plataforma; de la V40,
   `ver_inscritos_simulacion` y `administrar_permisos`; de la V60, `eliminar_vacante`; de la
   V63, `resenar_contratado`, `ver_resenas_candidato` y `moderar_resenas`, este último solo para
-  el administrador de la plataforma; y de la V64, `ver_colaboradores`, `editar_colaboradores`,
-  `ver_sueldos` —solo Dirección— y `editar_estructura`
+  el administrador de la plataforma; de la V64, `ver_colaboradores`, `editar_colaboradores`,
+  `ver_sueldos` —solo Dirección— y `editar_estructura`; y de la V85,
+  `editar_presentacion_empresa`, para Talento, Dirección y Administrador de todas las empresas
 - Los **cinco roles** iniciales con sus permisos: candidato, equipo de talento, responsable del
   área, dirección y administrador. Es como arranca el sistema, no cómo queda para siempre
 - Las **22 dimensiones**, con cuáles de ellas son obligatorias

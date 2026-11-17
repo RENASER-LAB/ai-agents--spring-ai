@@ -77,7 +77,7 @@ public final class DtosPortal {
     // vacía —se fija al publicar y las viejas pueden no tenerla—; la ciudad es la del catálogo
     // o nulo, y `ubicacion` sigue viajando con lo que ahora es la zona o referencia.
     //
-    // codigoEmpresa, empresa y videoPuesto llegaron con el propósito de la empresa (V81). El
+    // codigoEmpresa, empresa y videoPuesto llegaron con el propósito de la empresa (V85). El
     // código es el del perfil público (/empresas/<código en minúsculas>) y viaja siempre;
     // `empresa` es lo que la empresa cuenta de sí misma y va a nulo si no llenó nada. Se repite
     // en cada vacante de la misma empresa a propósito: 1500 caracteres como mucho, antes que
@@ -94,7 +94,7 @@ public final class DtosPortal {
                                  VideoPublico videoPuesto) {}
 
     /**
-     * Lo que la empresa cuenta de sí misma, junto a cada vacante (V81): el bloque «Sobre
+     * Lo que la empresa cuenta de sí misma, junto a cada vacante (V85): el bloque «Sobre
      * {empresa}» y el logo pequeño junto a su nombre. Nulo en la vacante si no tiene nada.
      *
      * @param proposito el de la EMPRESA ({@code organizacion.proposito_empresa})
@@ -104,7 +104,7 @@ public final class DtosPortal {
                                      List<RedPublica> redes, String logo) {}
 
     /**
-     * Un video de YouTube o de Vimeo, ya reducido a lo que hace falta para pintarlo (V81).
+     * Un video de YouTube o de Vimeo, ya reducido a lo que hace falta para pintarlo (V85).
      *
      * <p>El portal construye el reproductor con {@code servicio}, {@code identificador} y
      * {@code clave} —la de un video oculto de Vimeo—, nunca copiando {@code enlace} dentro de
@@ -118,7 +118,7 @@ public final class DtosPortal {
     public record RedPublica(String red, String enlace) {}
 
     /**
-     * El perfil público de una empresa (V81): {@code GET /portal/empresas/{codigo}}, sin token.
+     * El perfil público de una empresa (V85): {@code GET /portal/empresas/{codigo}}, sin token.
      *
      * <p>Solo lo público: la presentación y sus vacantes publicadas, con los mismos campos de la
      * tarjeta del tablón. Ni candidatos, ni pretensiones, ni vacantes cerradas o archivadas.

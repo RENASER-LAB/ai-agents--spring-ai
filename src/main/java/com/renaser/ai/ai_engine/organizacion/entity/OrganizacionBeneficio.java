@@ -4,7 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 /**
- * Un beneficio que la empresa ofrece (V81): un chip de hasta 40 caracteres, hasta 12 por
+ * Un beneficio que la empresa ofrece (V85): un chip de hasta 40 caracteres, hasta 12 por
  * empresa y en su orden. Guardar la presentación los reemplaza todos.
  */
 @Entity

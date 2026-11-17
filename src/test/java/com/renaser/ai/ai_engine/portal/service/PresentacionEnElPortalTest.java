@@ -23,7 +23,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-/** Lo que el portal enseña de cada empresa junto a sus vacantes (V81). */
+/** Lo que el portal enseña de cada empresa junto a sus vacantes (V85). */
 @ExtendWith(MockitoExtension.class)
 @DisplayName("La presentación de las empresas en el portal")
 class PresentacionEnElPortalTest {

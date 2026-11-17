@@ -5,7 +5,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * La presentación no se guarda así (V81): un 400 con TODOS los campos que fallan, cada uno con
+ * La presentación no se guarda así (V85): un 400 con TODOS los campos que fallan, cada uno con
  * su frase, para que el panel los marque juntos y no se guarde nada.
  *
  * <p>Las claves son las del cuerpo ({@code paginaWeb}, {@code videoPresentacion},

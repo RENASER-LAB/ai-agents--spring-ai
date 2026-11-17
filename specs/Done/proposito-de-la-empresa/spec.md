@@ -1,6 +1,5 @@
 # El propósito de la empresa, a la vista del candidato
-
-Estado: lista para implementar
+Estado: TERMINADO
 
 ## Objetivo
 Que quien busca trabajo en EX sepa **por qué existe la empresa** antes de postular, sin salir

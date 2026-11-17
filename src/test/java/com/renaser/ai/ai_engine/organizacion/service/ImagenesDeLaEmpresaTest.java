@@ -21,7 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
- * El logo y la portada se vuelven a codificar en el servidor, sin metadatos (V81, AC-26).
+ * El logo y la portada se vuelven a codificar en el servidor, sin metadatos (V85, AC-26).
  */
 @DisplayName("El logo y la portada de una empresa")
 class ImagenesDeLaEmpresaTest {

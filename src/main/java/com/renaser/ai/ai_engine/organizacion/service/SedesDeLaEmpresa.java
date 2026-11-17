@@ -11,7 +11,7 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Lo que la presentación de una empresa dice de sus sedes (V81). Se usa en el panel —la vista
+ * Lo que la presentación de una empresa dice de sus sedes (V85). Se usa en el panel —la vista
  * previa— y en el perfil público, y tienen que decir lo mismo.
  */
 public final class SedesDeLaEmpresa {

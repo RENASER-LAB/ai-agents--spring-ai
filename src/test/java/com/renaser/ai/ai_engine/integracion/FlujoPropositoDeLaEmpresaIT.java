@@ -46,7 +46,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * El propósito de la empresa contra Postgres de verdad (V81): el permiso, el aislamiento entre
+ * El propósito de la empresa contra Postgres de verdad (V85): el permiso, el aislamiento entre
  * empresas, las reglas de los enlaces, el tablón con y sin datos —sin una consulta por
  * vacante—, el perfil público y sus imágenes.
  *
@@ -141,7 +141,7 @@ public class FlujoPropositoDeLaEmpresaIT {
 
     @Test
     @Order(2)
-    @DisplayName("V81: Talento, Dirección y Administrador lo tienen en todas las empresas; Responsable no")
+    @DisplayName("V85: Talento, Dirección y Administrador lo tienen en todas las empresas; Responsable no")
     void elPermisoQuedaSembrado() {
         for (String rol : new String[] {"TALENTO", "DIRECCION", "ADMINISTRADOR"}) {
             assertThat(alcance(plataforma, rol)).as(rol).isEqualTo("TODO");

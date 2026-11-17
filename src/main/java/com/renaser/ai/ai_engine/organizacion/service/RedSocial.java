@@ -5,7 +5,7 @@ import java.util.Locale;
 import java.util.Optional;
 
 /**
- * Las cinco redes que una empresa puede enlazar en su presentación (V81), cada una con los
+ * Las cinco redes que una empresa puede enlazar en su presentación (V85), cada una con los
  * dominios que se le aceptan. X no entra (decisión al redactar la spec).
  *
  * <p>El panel tiene la misma lista en {@code src/dominio/presentacionEmpresa.ts}, con los mismos

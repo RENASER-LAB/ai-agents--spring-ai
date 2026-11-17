@@ -42,7 +42,7 @@ public class ServicioTablonPortalImpl implements ServicioTablonPortal {
     // Pone nombre y departamento a la ciudad de cada vacante (V62). El mismo catálogo del
     // registro, con las desactivadas incluidas: lo que una vacante tiene guardado se enseña.
     private final CatalogosDelPerfil catalogos;
-    // La presentación de cada empresa (V81): el bloque «Sobre…» de la vacante. Las redes de todo
+    // La presentación de cada empresa (V85): el bloque «Sobre…» de la vacante. Las redes de todo
     // el lote en una sola consulta, como los requisitos.
     private final PresentacionEnElPortal presentacion;
 
@@ -75,7 +75,7 @@ public class ServicioTablonPortalImpl implements ServicioTablonPortal {
                 publicadas.stream().map(Vacante::getId).toList());
         // Y el catálogo de ciudades una sola vez, por lo mismo; y ninguna si ninguna la tiene.
         Map<String, OpcionUbigeo> ciudades = ciudadesDe(publicadas);
-        // Y la presentación de las empresas del lote, también de una vez (V81). Sale de la misma
+        // Y la presentación de las empresas del lote, también de una vez (V85). Sale de la misma
         // fila de la organización que ya trajo el colador, más una consulta para todas las redes.
         Map<Long, EmpresaDeLaVacante> presentaciones = presentacion.deLas(
                 organizacionesActivas.values());
@@ -189,7 +189,7 @@ public class ServicioTablonPortalImpl implements ServicioTablonPortal {
 
     /**
      * La vacante como la ve el candidato. `empresaDeLaVacante` es la presentación de su empresa
-     * (V81), o nulo si no llenó nada; `proposito` sigue siendo el del puesto.
+     * (V85), o nulo si no llenó nada; `proposito` sigue siendo el del puesto.
      */
     private VacantePublica comoPublica(Vacante v, List<RequisitoObjetivo> suyos,
                                        Organizacion empresa, EmpresaDeLaVacante empresaDeLaVacante,

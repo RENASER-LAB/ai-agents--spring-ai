@@ -113,7 +113,7 @@ class ServicioPostulacionPortalImplTest {
     // La tarjeta de WhatsApp (V73): sin stub devuelve un mapa vacío, es decir, «no disponible».
     @Mock private com.renaser.ai.ai_engine.whatsapp.service.ServicioWhatsappPortal whatsapp;
 
-    // La presentación de las empresas en el tablón (V81): estas pruebas no la miran.
+    // La presentación de las empresas en el tablón (V85): estas pruebas no la miran.
     @Mock private com.renaser.ai.ai_engine.portal.service.PresentacionEnElPortal presentacion;
 
     private ServicioPostulacionPortalImpl servicio;

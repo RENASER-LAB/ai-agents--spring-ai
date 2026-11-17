@@ -491,6 +491,15 @@ de una de sus versiones sigue llevando a la lista de vacantes.
 | **Revisar las reseñas y respuestas reportadas** (`moderar_resenas`) | ○ | ○ | ○ | ○ | ● ‡ |
 | **Editar parámetros del sistema** | ○ | ○ | ○ | ● | ● |
 | **Ver el registro de auditoría** | ○ | ○ | ○ | ● | ● |
+| Editar el perfil de la empresa (`editar_presentacion_empresa`) | ○ | ● | ○ | ● | ● |
+
+**Editar el perfil de la empresa** (`editar_presentacion_empresa`, `V85`, 16/11/2026) abre el
+módulo «Perfil de la empresa» del panel: logo, portada, propósito, beneficios, video, web y redes,
+lo que el candidato ve de la empresa en el portal. Lo tienen Talento, Dirección y Administrador,
+con alcance `TODO`, **en todas las empresas que ya existían** y no solo en la plataforma; las que
+se den de alta después lo reciben con la copia de roles. Sin él, el módulo no sale en el menú y la
+API responde **403** sin guardar nada. Solo toca la empresa de quien ha entrado. El formulario de
+la vacante solo pregunta si la empresa tiene video, y para eso basta `ver_vacantes`.
 
 ‡ Las dos filas de los instrumentos y del alta de empresas llegaron con el multiempresa
 (`V37`), y no significan lo mismo. **Personalizar los instrumentos** lo tiene el
@@ -689,7 +698,7 @@ una que el servidor haga cumplir.
 
 ### 2 · Que la pantalla se vuelva ilegible
 
-Son **81 permisos**. Con una casilla por cada uno y sin agrupar, nadie entiende qué está
+Son **82 permisos**. Con una casilla por cada uno y sin agrupar, nadie entiende qué está
 marcando, y la pantalla se usa mal o se deja de usar.
 
 **Cómo se evita:**
@@ -700,7 +709,7 @@ marcando, y la pantalla se usa mal o se deja de usar.
 - Un interruptor por grupo para marcar o desmarcar todo el bloque.
 
 ```
-  ROL · Equipo de Talento              57 de 81 permisos
+  ROL · Equipo de Talento              58 de 82 permisos
 
   Vacantes                                    [8/9] v
      [x] Ver vacantes
@@ -709,7 +718,7 @@ marcando, y la pantalla se usa mal o se deja de usar.
      [ ] Elegir la version de pesos
      ...
 
-  Configuracion                               [4/17] >
+  Configuracion                               [5/18] >
   Candidatos                                  [7/7]  >
 
                             [ Ver el sistema como este rol ]
@@ -717,7 +726,7 @@ marcando, y la pantalla se usa mal o se deja de usar.
 
 Los denominadores de este boceto son los del **catálogo diseñado**, que es lo que enumera este
 documento. La pantalla de verdad los sacará de la tabla `permiso`, así que dirá otros números:
-en `Configuracion`, 15 casillas y no 17 —de las diseñadas faltan por construir la vigencia de
+en `Configuracion`, 16 casillas y no 18 —de las diseñadas faltan por construir la vigencia de
 los componentes, el periodo de conservación y el poder de bloqueo del Evaluador de Estándar, y
 en cambio hay una que esta tabla no enumera, `ver_banco_preguntas`—. No es un descuadre del
 boceto: es la misma diferencia entre lo diseñado y lo construido que explica el principio del

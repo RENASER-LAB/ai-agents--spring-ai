@@ -4,7 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 /**
- * El enlace de la empresa en una red (V81). Una fila por empresa y red; una red vacía es una
+ * El enlace de la empresa en una red (V85). Una fila por empresa y red; una red vacía es una
  * fila que no existe. La red es uno de {@link com.renaser.ai.ai_engine.organizacion.service.RedSocial}.
  */
 @Entity

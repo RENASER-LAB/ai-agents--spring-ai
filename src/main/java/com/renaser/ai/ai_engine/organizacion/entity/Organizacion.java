@@ -5,7 +5,7 @@ import lombok.*;
 
 import java.time.Instant;
 
-// @DynamicUpdate (V81): la fila la escriben a la vez el alta y la suspensión de la plataforma,
+// @DynamicUpdate (V85): la fila la escriben a la vez el alta y la suspensión de la plataforma,
 // las banderas de personalización y ahora la presentación del panel. Con el UPDATE de la fila
 // entera, el último en confirmar devolvía a lo que leyó las columnas del otro.
 @Entity
@@ -36,7 +36,7 @@ public class Organizacion {
     private boolean pesosPropios;
     private boolean plantillasEvaluacionPropias;
 
-    // ---------- La presentación (V81) ----------
+    // ---------- La presentación (V85) ----------
     // Lo que la empresa cuenta de sí misma en «Perfil de la empresa». Todo opcional: vacío es
     // nulo. Las reglas viven en ReglasDeLaPresentacion; los beneficios y las redes, en sus
     // tablas (OrganizacionBeneficio, OrganizacionRedSocial).

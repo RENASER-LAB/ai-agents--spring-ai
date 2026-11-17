@@ -102,14 +102,14 @@ public final class DtosVacante {
              */
             Boolean confirmarNuevaBusqueda,
             /**
-             * El «Video del puesto» (V81): un enlace de YouTube o de Vimeo, con las mismas reglas y
+             * El «Video del puesto» (V85): un enlace de YouTube o de Vimeo, con las mismas reglas y
              * errores que el video de la empresa. Ausente (nulo), no se toca —un formulario que no
              * lo enseña no lo borra—; vacío, se quita, y la vacante vuelve a usar el de la
              * empresa. Cambiarlo con la vacante publicada se audita y no se avisa a nadie.
              */
             String videoPresentacion) {
 
-        /** Sin el video del puesto (V81): no se toca. */
+        /** Sin el video del puesto (V85): no se toca. */
         public GuardarVacante(Long solicitudTalentoId, Long puestoId, String titulo,
                               String descripcion, String proposito, String responsabilidades,
                               String requisitos, String modalidad, String horario,
@@ -337,7 +337,7 @@ public final class DtosVacante {
                                 */
                                java.util.List<String> queBuscarEnElCv,
                                /**
-                                * El «Video del puesto» guardado (V81), tal como se pegó, o vacío:
+                                * El «Video del puesto» guardado (V85), tal como se pegó, o vacío:
                                 * entonces el portal usa el de la empresa.
                                 */
                                String videoPresentacion) {}

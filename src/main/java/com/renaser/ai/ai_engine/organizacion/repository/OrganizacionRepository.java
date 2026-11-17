@@ -15,7 +15,7 @@ public interface OrganizacionRepository extends JpaRepository<Organizacion, Long
 
     /**
      * Las que tienen ese código sin mirar mayúsculas: el perfil público va en
-     * {@code /empresas/<código en minúsculas>} (V81). Una lista y no un Optional porque el
+     * {@code /empresas/<código en minúsculas>} (V85). Una lista y no un Optional porque el
      * índice único de la columna distingue mayúsculas: quien llama decide qué hacer si hay dos.
      */
     @org.springframework.data.jpa.repository.Query(
@@ -24,7 +24,7 @@ public interface OrganizacionRepository extends JpaRepository<Organizacion, Long
             @org.springframework.data.repository.query.Param("codigo") String codigo);
 
     /**
-     * La organización con su fila bloqueada hasta el final de la transacción (V81). Guardar la
+     * La organización con su fila bloqueada hasta el final de la transacción (V85). Guardar la
      * presentación borra y vuelve a escribir los beneficios y las redes: dos guardados a la vez
      * pasan de uno en uno y gana el último, en vez de chocar en el índice único.
      */

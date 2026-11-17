@@ -24,7 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 /**
- * «Perfil de la empresa» (V81): lo que la empresa de quien ha entrado cuenta de sí misma, y que
+ * «Perfil de la empresa» (V85): lo que la empresa de quien ha entrado cuenta de sí misma, y que
  * el candidato ve en el portal junto a cada vacante y en el perfil público.
  *
  * <p>La dirección no lleva el id de la empresa: siempre es la de quien ha entrado. Sin

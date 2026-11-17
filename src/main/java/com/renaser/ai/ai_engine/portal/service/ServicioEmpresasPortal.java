@@ -3,7 +3,7 @@ package com.renaser.ai.ai_engine.portal.service;
 import com.renaser.ai.ai_engine.portal.dto.DtosPortal.PerfilDeEmpresa;
 
 /**
- * El perfil público de una empresa (V81): {@code /empresas/<código>} en el portal, sin cuenta,
+ * El perfil público de una empresa (V85): {@code /empresas/<código>} en el portal, sin cuenta,
  * igual que el tablón. Solo de las empresas activas: una suspendida, o un código que no existe,
  * no tiene perfil para nadie.
  */

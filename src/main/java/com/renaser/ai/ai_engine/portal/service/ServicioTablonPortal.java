@@ -22,7 +22,7 @@ public interface ServicioTablonPortal {
     ConsentimientoDeVacante consentimientoDeVacante(Long vacanteId);
 
     /**
-     * Las vacantes publicadas de UNA empresa, con los campos de la tarjeta del tablón (V81): la
+     * Las vacantes publicadas de UNA empresa, con los campos de la tarjeta del tablón (V85): la
      * lista «Vacantes abiertas» de su perfil público. Las mismas que el tablón enseña de ella —ni
      * borradores, ni cerradas, ni eliminadas—, sin el bloque `empresa`, que el perfil ya lleva
      * arriba.

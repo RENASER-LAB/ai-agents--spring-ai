@@ -10,7 +10,7 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * Qué se puede guardar en la presentación de una empresa (V81), campo a campo.
+ * Qué se puede guardar en la presentación de una empresa (V85), campo a campo.
  *
  * <p>Todo es opcional. Los espacios de los bordes se quitan y un campo vacío es «sin dato». Si
  * algo no vale, no se guarda nada: se juntan todos los errores en una
@@ -54,7 +54,7 @@ public final class ReglasDeLaPresentacion {
      * Limpia y comprueba todo junto.
      *
      * @param anioActual el año de hoy en Lima: el techo del año de fundación vive aquí y no en
-     *                   la base (ver la V81)
+     *                   la base (ver la V85)
      * @throws PresentacionInvalidaException con todos los campos que fallan
      */
     public static PresentacionLimpia limpiar(GuardarPresentacion datos, int anioActual) {

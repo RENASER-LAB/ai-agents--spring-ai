@@ -173,7 +173,7 @@ public class ManejadorErrores {
         return problema;
     }
 
-    // La presentación de la empresa no se guarda así (V81): 400 con TODOS los campos que fallan
+    // La presentación de la empresa no se guarda así (V85): 400 con TODOS los campos que fallan
     // en `errores` ({campo: frase}), que el panel marca junto a cada campo. No se guardó nada.
     @ExceptionHandler(com.renaser.ai.ai_engine.organizacion.service.PresentacionInvalidaException.class)
     public ProblemDetail presentacionInvalida(

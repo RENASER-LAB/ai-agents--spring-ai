@@ -20,7 +20,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * Lo que el portal enseña de la presentación de una empresa (V81), armado en un solo sitio: el
+ * Lo que el portal enseña de la presentación de una empresa (V85), armado en un solo sitio: el
  * tablón, el detalle de la vacante y el perfil público dicen lo mismo.
  *
  * <p>⚠️ <b>El tablón es la pantalla más pedida y se sirve sin cuenta.</b> Las redes de todas las

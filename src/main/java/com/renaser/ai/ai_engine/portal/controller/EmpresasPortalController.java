@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.time.Duration;
 
 /**
- * El perfil público de cada empresa (V81), sin token como el tablón: lo abre cualquiera desde
+ * El perfil público de cada empresa (V85), sin token como el tablón: lo abre cualquiera desde
  * una vacante o por su enlace {@code /empresas/<código>}.
  *
  * <p>El logo y la portada son los primeros archivos de EX que se ven sin cuenta. Se sirven solo

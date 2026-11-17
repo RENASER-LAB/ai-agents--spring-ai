@@ -320,7 +320,7 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
             throw new IllegalArgumentException(faltaDelCierre);
         }
         boolean porFecha = FormaDeCierre.esPorFecha(datos.tipoCierre());
-        // El video del puesto (V81), también antes de construir nada y con las reglas del de la
+        // El video del puesto (V85), también antes de construir nada y con las reglas del de la
         // empresa: un enlace que no es de YouTube ni de Vimeo no deja media vacante guardada.
         String video = EnlacesDeLaEmpresa.normalizar(datos.videoPresentacion());
         String errorDelVideo = EnlacesDeLaEmpresa.errorDelVideo(video);
@@ -445,7 +445,7 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
         if (faltaDelCierre != null) {
             throw new IllegalArgumentException(faltaDelCierre);
         }
-        // El video del puesto (V81), antes de tocar nada: solo si el cuerpo lo trae. Ausente, se
+        // El video del puesto (V85), antes de tocar nada: solo si el cuerpo lo trae. Ausente, se
         // queda el que había; vacío, se quita (lo decide CambiosDeLaVacante).
         String errorDelVideo = EnlacesDeLaEmpresa.errorDelVideo(
                 EnlacesDeLaEmpresa.normalizar(datos.videoPresentacion()));

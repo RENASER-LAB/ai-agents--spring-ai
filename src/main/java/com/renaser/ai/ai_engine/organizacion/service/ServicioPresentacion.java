@@ -6,7 +6,7 @@ import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
 import org.springframework.web.multipart.MultipartFile;
 
 /**
- * «Perfil de la empresa» (V81): lo que la empresa de quien ha entrado cuenta de sí misma.
+ * «Perfil de la empresa» (V85): lo que la empresa de quien ha entrado cuenta de sí misma.
  *
  * <p>⚠️ <b>Siempre la empresa de quien pregunta.</b> Ningún método recibe el id de una
  * organización: la sale del contexto, así que no hay forma de leer ni de guardar la de otra. La
