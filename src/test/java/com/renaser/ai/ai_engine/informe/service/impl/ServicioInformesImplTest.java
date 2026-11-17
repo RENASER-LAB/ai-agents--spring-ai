@@ -418,6 +418,22 @@ class ServicioInformesImplTest {
         }
 
         @Test
+        @DisplayName("el ponderado sale a quien ve las tres notas, y solo de quien tiene las tres")
+        void ponderadoALaVista() {
+            ranking(List.of(fila(1, 51L, "Con las tres"), fila(2, 52L, "Sin prueba")));
+            when(notasEtapa.findByPostulacionIdInAndEtapaCodigo(anyList(), eq("PRUEBA_PUESTO")))
+                    .thenReturn(List.of(nota(51L, 90)));
+            when(tandas.ponderadosDeLoRendido(any(), eq(VACANTE)))
+                    .thenReturn(Map.of(51L, BigDecimal.valueOf(83), 52L, BigDecimal.valueOf(60)));
+
+            assertThat(servicio.visor(quien(VER_CV, VER_EVALUACION, VER_PRUEBA), VACANTE).postulantes())
+                    .extracting(PostulanteDelVisor::candidato, PostulanteDelVisor::ponderado)
+                    .containsExactly(tuple("Con las tres", BigDecimal.valueOf(83)), tuple("Sin prueba", null));
+            assertThat(servicio.visor(quien(VER_CV, VER_EVALUACION), VACANTE).postulantes())
+                    .extracting(PostulanteDelVisor::ponderado).containsOnlyNulls();
+        }
+
+        @Test
         @DisplayName("AC-10 · sin permiso para ver la nota del CV el orden es el mismo y la columna sale vacía")
         void elOrdenNoDependeDeLosPermisos() {
             vacanteDeLaCaptura();

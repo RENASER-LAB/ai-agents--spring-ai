@@ -200,13 +200,16 @@ public final class DtosInforme {
      * Un postulante en la lista del visor.
      *
      * @param puesto  su lugar en ESTA lista, de 1 en adelante (no el del ranking)
-     * @param celular el de su cuenta o, si no tiene, el del CV; nulo si no hay ninguno o si la
-     *                persona está anonimizada. Lo ve quien puede abrir el visor y nunca va en un PDF
+     * @param celular   el de su cuenta o, si no tiene, el del CV; nulo si no hay ninguno o si la
+     *                  persona está anonimizada. Lo ve quien puede abrir el visor y nunca va en un PDF
+     * @param ponderado el ponderado de lo rendido que decide su lugar en la lista, sobre 100. Nulo
+     *                  si no tiene las tres notas (va debajo, en el orden del ranking) o si quien
+     *                  mira no puede ver alguna de las tres: el ponderado las delataría
      */
     public record PostulanteDelVisor(Long postulacionId, int puesto, String candidato,
                                      String grupo, BigDecimal notaCv,
                                      BigDecimal notaEvaluacion, BigDecimal notaPrueba,
-                                     Celular celular) {
+                                     Celular celular, BigDecimal ponderado) {
     }
 
     /**

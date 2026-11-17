@@ -152,6 +152,8 @@ public class ServicioInformesImpl implements ServicioInformes {
         Map<Long, Celular> suyos = orden.filas().isEmpty() ? Map.of()
                 : celulares.de(orden.filas().stream().map(o -> o.fila().postulacionId()).toList());
         List<PostulanteDelVisor> postulantes = new ArrayList<>();
+        // El ponderado se enseña solo a quien ve las tres notas que lo forman.
+        boolean veLasTres = suyas.containsAll(List.of(EtapaDelInforme.values()));
         for (int i = 0; i < orden.filas().size(); i++) {
             Ordenado o = orden.filas().get(i);
             FilaRanking f = o.fila();
@@ -161,7 +163,8 @@ public class ServicioInformesImpl implements ServicioInformes {
                     suyas.contains(EtapaDelInforme.CV) ? f.notaCurriculum() : null,
                     suyas.contains(EtapaDelInforme.EVALUACION) ? f.notaEtapa() : null,
                     suyas.contains(EtapaDelInforme.PRUEBA) ? o.notaPrueba() : null,
-                    suyos.get(f.postulacionId())));
+                    suyos.get(f.postulacionId()),
+                    veLasTres && o.tieneLasTres() ? o.combinada() : null));
         }
         return new VisorDeLaVacante(vacanteId, orden.ranking().vacante(), orden.ranking().puesto(),
                 postulantes, suyas.stream().map(Enum::name).toList());
