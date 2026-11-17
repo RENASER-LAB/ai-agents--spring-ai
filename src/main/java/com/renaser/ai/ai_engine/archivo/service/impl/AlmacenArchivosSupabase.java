@@ -292,17 +292,36 @@ public class AlmacenArchivosSupabase implements AlmacenArchivos {
 
     // ==================== Apoyo ====================
 
+    /**
+     * Sube los bytes al bucket.
+     *
+     * <p>Si Supabase lo rechaza, quien subió ve el «error inesperado» de siempre, pero el
+     * registro dice qué pasó: el bucket, el tipo, el tamaño y la respuesta de Supabase tal cual.
+     * Hacía falta: el bucket tiene su propia lista de tipos permitidos y su propio tope de
+     * peso, y cuando no casaban con lo que acepta la aplicación el fallo solo se veía como un
+     * {@code 400 Bad Request} perdido en la traza.
+     */
     private void subir(String ruta, byte[] contenido, String tipo) {
-        cliente.post()
-                .uri(objeto("/object", ruta))
-                .header("Content-Type", tipo)
-                // Sin esto, volver a subir sobre una ruta existente da 409. No debería
-                // pasar nunca —cada archivo estrena uuid— pero si pasa, más vale que el
-                // error diga «ya existe» y no que se pise un currículum ajeno en silencio.
-                .header("x-upsert", "false")
-                .body(contenido)
-                .retrieve()
-                .toBodilessEntity();
+        try {
+            cliente.post()
+                    .uri(objeto("/object", ruta))
+                    .header("Content-Type", tipo)
+                    // Sin esto, volver a subir sobre una ruta existente da 409. No debería
+                    // pasar nunca —cada archivo estrena uuid— pero si pasa, más vale que el
+                    // error diga «ya existe» y no que se pise un currículum ajeno en silencio.
+                    .header("x-upsert", "false")
+                    .body(contenido)
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (RestClientResponseException e) {
+            log.error("Supabase rechazó la subida al bucket «{}»: ruta={}, tipo={}, bytes={}, "
+                            + "estado={}, respuesta={}. Si dice invalid_mime_type o "
+                            + "Payload too large, revisa los tipos permitidos y el tope de "
+                            + "peso del bucket en Supabase.",
+                    config.getBucket(), ruta, tipo, contenido.length,
+                    e.getStatusCode().value(), e.getResponseBodyAsString());
+            throw e;
+        }
     }
 
     /**

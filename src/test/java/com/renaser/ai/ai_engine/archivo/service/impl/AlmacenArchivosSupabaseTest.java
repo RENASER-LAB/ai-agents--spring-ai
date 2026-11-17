@@ -14,7 +14,10 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.client.MockRestServiceServer;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
 import java.util.Optional;
 
@@ -119,6 +122,29 @@ class AlmacenArchivosSupabaseTest {
         // Y no se llamó a nadie: la comprobación es antes de gastar una petición.
         supabase.verify();
         verify(archivos, never()).save(any(Archivo.class));
+    }
+
+    @Test
+    @ExtendWith(OutputCaptureExtension.class)
+    void siElBucketRechazaElTipoElRegistroDiceQuePasoYNoQuedaFila(CapturedOutput registro) {
+        // Lo que pasó en producción con el logo: el bucket solo admitía PDF y Word.
+        String rechazo = "{\"statusCode\":\"415\",\"error\":\"invalid_mime_type\","
+                + "\"message\":\"mime type image/png is not supported\"}";
+        supabase.expect(method(org.springframework.http.HttpMethod.POST))
+                .andRespond(withStatus(org.springframework.http.HttpStatus.BAD_REQUEST)
+                        .contentType(MediaType.APPLICATION_JSON).body(rechazo));
+
+        assertThatThrownBy(() -> almacen.guardarImagen(ORGANIZACION,
+                new MockMultipartFile("archivo", "logo.png", "image/png", new byte[]{1, 2, 3})))
+                .isInstanceOf(RestClientResponseException.class);
+
+        verify(archivos, never()).save(any(Archivo.class));
+        assertThat(registro.getOut())
+                .contains("Supabase rechazó la subida al bucket «curriculums»")
+                .contains("tipo=image/png")
+                .contains("bytes=3")
+                .contains("estado=400")
+                .contains("invalid_mime_type");
     }
 
     // ============ El enlace de descarga, que es lo que evita el doble viaje ============
