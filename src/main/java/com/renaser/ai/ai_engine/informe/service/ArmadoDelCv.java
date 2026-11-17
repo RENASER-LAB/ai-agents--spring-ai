@@ -171,7 +171,7 @@ public class ArmadoDelCv {
             BigDecimal maximo = c.getPuntos() == null ? CIEN : c.getPuntos();
             BigDecimal puntaje = n == null ? null : n.getPuntaje();
             boolean ajustada = n != null && n.getAjustadaPorUsuarioId() != null;
-            String explicacion = n == null ? null : limpio(n.getExplicacion());
+            String explicacion = n == null ? null : FormatoDelInforme.sinMarca(n.getExplicacion());
             return new Criterio(c.getNombre(), puntaje, maximo, FormatoDelInforme.nota(puntaje),
                     maximo.compareTo(CIEN) == 0 ? null : "/ " + FormatoDelInforme.nota(maximo),
                     FormatoDelInforme.porcentaje(puntaje, maximo),
@@ -233,7 +233,7 @@ public class ArmadoDelCv {
                 hay(dato.getUltimoPuesto()) ? dato.getUltimoPuesto().strip() : SIN_DATO,
                 detalle.isEmpty() ? null : String.join(" · ", detalle),
                 hay(dato.getEducacionMaxima()) ? dato.getEducacionMaxima().strip() : SIN_DATO,
-                habilidades, limpio(dato.getPerfilResumen()));
+                habilidades, FormatoDelInforme.sinMarca(dato.getPerfilResumen()));
     }
 
     private static boolean sinTextoLegible(Base base) {

@@ -82,6 +82,13 @@ public class AgentePotencialRiesgo implements AgenteSeleccion {
         EjecutorAgenteIa.Ejecutado<ResultadoPerfil> salida =
                 ejecutor.ejecutar(trabajo, OBJETIVO, FORMATO, insumo, ResultadoPerfil.class,
                         !ColaCalificacionIaImpl.RAPIDA.equals(trabajo.getModo()));
+        // La recalificación del CV (spec la-ia-sabe-que-dia-es-hoy) rehace el retrato sin mover a
+        // nadie de etapa: quien quede por encima de la nota mínima no avanza solo.
+        if (ColaCalificacionIaImpl.RECALIFICA.equals(trabajo.getModo())) {
+            puente.cerrarPerfilIntegralSinMover(trabajo.getPostulacionId(), salida.ejecucionIaId(),
+                    salida.resultado());
+            return;
+        }
         puente.cerrarPerfilIntegral(trabajo.getPostulacionId(), salida.ejecucionIaId(),
                 salida.resultado());
     }

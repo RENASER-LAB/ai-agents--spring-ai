@@ -282,6 +282,42 @@ public interface ColaCalificacionIa {
     java.util.Map<Long, Seguimiento> recalificacionDe(java.util.List<Long> postulacionIds);
 
     /**
+     * Rehace la calificación del CV y el retrato de una postulación (spec
+     * la-ia-sabe-que-dia-es-hoy): quien se calificó sin la fecha de hoy o sin ver sus años de
+     * experiencia.
+     *
+     * <p>Mismo carril que {@link #recalificar} (modo {@code RECALIFICA}): los agentes del CV
+     * —datos, evidencia y, si la vacante busca algo, «Qué buscar en el CV»— vuelven a correr
+     * aunque ya hayan terminado, y al acabar se rehace el retrato <b>sin mover a nadie de etapa</b>
+     * ni avisar al pase automático. La evaluación no se rehace: el retrato lee sus notas guardadas.
+     * Lo ajustado a mano no se pisa, como siempre.
+     *
+     * <p>Si la evidencia del CV se agota en reintentos, el retrato no se rehace: la persona
+     * conserva su calificación anterior y {@link #recalificacionDelCvDe} la da por detenida.
+     *
+     * @param tambienLaBusqueda si la vacante tiene líneas de «Qué buscar en el CV» (V80)
+     * @return true si quedó en la cola (o en espera por el tope); false si ya hay un trabajo vivo
+     *         del retrato de esa persona —confirmar dos veces no paga dos veces— o la IA está
+     *         apagada
+     */
+    boolean recalificarElCv(Long postulacionId, boolean tambienLaBusqueda);
+
+    /**
+     * Cómo va la última recalificación del CV de cada postulación: EN_CURSO (en la cola o
+     * esperando cupo), DETENIDA (con el porqué: conserva su calificación anterior y se puede
+     * reintentar) o TERMINADA. Falta la entrada de quien no tuvo ninguna.
+     */
+    java.util.Map<Long, Seguimiento> recalificacionDelCvDe(java.util.List<Long> postulacionIds);
+
+    /**
+     * Cuáles de estas ejecuciones de la IA ya se hicieron con la fecha de hoy en el mensaje (y,
+     * con ella, con el anonimizador que deja ver los años de experiencia). Quien está al día no
+     * es un afectado de la spec la-ia-sabe-que-dia-es-hoy aunque un texto suyo hable de una fecha
+     * futura: con la fecha correcta, eso ya es juicio de la IA.
+     */
+    java.util.Set<Long> conLaFechaDeHoy(java.util.Collection<Long> ejecucionIaIds);
+
+    /**
      * Encola al RECOMENDADOR: proponer criterios y preguntas para una vacante. Como el
      * REDACTOR, cuelga de la vacante y uno vivo frena al siguiente.
      *

@@ -41,6 +41,7 @@ import com.renaser.ai.ai_engine.simulacion.repository.SesionSimulacionRepository
 import com.renaser.ai.ai_engine.simulacion.service.PuenteSimulacionIa;
 import com.renaser.ai.ai_engine.vacante.entity.Puesto;
 import com.renaser.ai.ai_engine.vacante.service.ContextoDeLaVacante;
+import com.renaser.ai.ai_engine.postulacion.service.impl.AnonimizadorCv;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -165,6 +166,9 @@ public class PuenteSimulacionIaImpl implements PuenteSimulacionIa {
         }
         return afirmaciones.findByCvId(cv.getId()).stream()
                 .filter(a -> !"DEMOSTRADA".equals(a.getClasificacion()))
+                // Las afirmaciones antiguas con un dato tapado no se le dan para preguntar: hablan
+                // de algo que la IA no vio, y la pregunta saldría sobre la marca.
+                .filter(a -> !AnonimizadorCv.traeLaMarca(a.getTexto()))
                 .map(a -> new DijoEnElCurriculum(a.getTexto(), a.getClasificacion()))
                 .toList();
     }

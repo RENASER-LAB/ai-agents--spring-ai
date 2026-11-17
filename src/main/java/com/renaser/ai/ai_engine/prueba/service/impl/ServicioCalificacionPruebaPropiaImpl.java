@@ -100,9 +100,13 @@ public class ServicioCalificacionPruebaPropiaImpl implements ServicioCalificacio
         if (intento.isEmpty() || !intento.get().esDelEditor()) {
             return null;
         }
-        ContextoUsuario sinPermisos = new ContextoUsuario(null, null,
-                postulacion.getOrganizacionId(), "SISTEMA", List.of(), java.util.Map.of());
-        return armar(sinPermisos, postulacion, intento.get());
+        // Con el permiso de ver el contenido, para que el entregable traiga con qué se abre (el
+        // archivo o el enlace). El informe nunca enseña el contenido, y lo de abrirlo lo quita el
+        // servicio de los informes a quien no tiene «descargar_entregables».
+        ContextoUsuario delInforme = new ContextoUsuario(null, null,
+                postulacion.getOrganizacionId(), "SISTEMA", List.of(),
+                java.util.Map.of(PERMISO_CONTENIDO, "TODO"));
+        return armar(delInforme, postulacion, intento.get());
     }
 
     private PruebaDelCandidato armar(ContextoUsuario quien, Postulacion postulacion, IntentoPrueba intento) {

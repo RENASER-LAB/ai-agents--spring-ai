@@ -1,7 +1,10 @@
 package com.renaser.ai.ai_engine.informe.service.impl;
 
+import com.renaser.ai.ai_engine.informe.dto.DtosInforme.Anexo;
 import com.renaser.ai.ai_engine.informe.dto.DtosInforme.ArchivoArmado;
+import com.renaser.ai.ai_engine.informe.dto.DtosInforme.Celular;
 import com.renaser.ai.ai_engine.informe.dto.DtosInforme.Enlace;
+import com.renaser.ai.ai_engine.informe.dto.DtosInforme.EntregableAnexo;
 import com.renaser.ai.ai_engine.informe.dto.DtosInforme.EstadoDeUnInforme;
 import com.renaser.ai.ai_engine.informe.dto.DtosInforme.Informe;
 import com.renaser.ai.ai_engine.informe.dto.DtosInforme.InformesDelPostulante;
@@ -9,6 +12,7 @@ import com.renaser.ai.ai_engine.informe.dto.DtosInforme.PostulanteDelVisor;
 import com.renaser.ai.ai_engine.informe.dto.DtosInforme.VisorDeLaVacante;
 import com.renaser.ai.ai_engine.informe.service.ArmadoDelInforme;
 import com.renaser.ai.ai_engine.informe.service.ArmadoDelInforme.Armado;
+import com.renaser.ai.ai_engine.informe.service.CelularesDelVisor;
 import com.renaser.ai.ai_engine.informe.service.EtapaDelInforme;
 import com.renaser.ai.ai_engine.informe.service.FormatoDelInforme;
 import com.renaser.ai.ai_engine.informe.service.LoComunDelInforme;
@@ -33,16 +37,17 @@ import org.springframework.stereotype.Service;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
@@ -65,6 +70,7 @@ public class ServicioInformesImpl implements ServicioInformes {
     private final ServicioPostulacionesPanel archivos;
     private final ServicioPerfilIntegralPanel tandas;
     private final NotaEtapaRepository notasEtapa;
+    private final CelularesDelVisor celulares;
 
     @Override
     public InformesDelPostulante estados(ContextoUsuario quien, Long postulacionId) {
@@ -89,7 +95,7 @@ public class ServicioInformesImpl implements ServicioInformes {
     public Informe informe(ContextoUsuario quien, Long postulacionId, String etapa) {
         EtapaDelInforme laEtapa = EtapaDelInforme.de(etapa);
         Postulacion postulacion = laVisible(quien, postulacionId, laEtapa);
-        return conEnlaceAlCv(quien, armar(postulacion, laEtapa));
+        return conEnlaces(quien, armar(postulacion, laEtapa));
     }
 
     @Override
@@ -119,7 +125,7 @@ public class ServicioInformesImpl implements ServicioInformes {
                 faltan.add(etapa.titulo() + ": " + armado.estado(postulacion, etapa).motivo() + ".");
                 continue;
             }
-            Informe informe = conEnlaceAlCv(quien, hecho.get());
+            Informe informe = conEnlaces(quien, hecho.get());
             nombre = informe.candidato();
             vacante = informe.vacante();
             entradas.put(etapa.enElZip(), generadorPdf.generar(informe));
@@ -142,21 +148,23 @@ public class ServicioInformesImpl implements ServicioInformes {
         if (suyas.isEmpty()) {
             throw new AccessDeniedException("No tienes permiso para ver ningún informe");
         }
-        RankingVacante ranking = tandas.ranking(quien, vacanteId);
-        List<Long> ids = ranking.filas().stream().map(FilaRanking::postulacionId).toList();
-        Map<Long, NotaEtapa> pruebas = ids.isEmpty() ? Map.of()
-                : notasEtapa.findByPostulacionIdInAndEtapaCodigo(ids, "PRUEBA_PUESTO").stream()
-                        .collect(Collectors.toMap(NotaEtapa::getPostulacionId, Function.identity(), (a, b) -> a));
-        List<PostulanteDelVisor> postulantes = ranking.filas().stream()
-                .map(f -> new PostulanteDelVisor(f.postulacionId(), f.puesto(), f.candidato(),
-                        f.grupoPrioridad(),
-                        suyas.contains(EtapaDelInforme.CV) ? f.notaCurriculum() : null,
-                        suyas.contains(EtapaDelInforme.EVALUACION) ? f.notaEtapa() : null,
-                        suyas.contains(EtapaDelInforme.PRUEBA) && pruebas.containsKey(f.postulacionId())
-                                ? pruebas.get(f.postulacionId()).getPuntaje() : null))
-                .toList();
-        return new VisorDeLaVacante(vacanteId, ranking.vacante(), ranking.puesto(), postulantes,
-                suyas.stream().map(Enum::name).toList());
+        Orden orden = orden(quien, vacanteId);
+        Map<Long, Celular> suyos = orden.filas().isEmpty() ? Map.of()
+                : celulares.de(orden.filas().stream().map(o -> o.fila().postulacionId()).toList());
+        List<PostulanteDelVisor> postulantes = new ArrayList<>();
+        for (int i = 0; i < orden.filas().size(); i++) {
+            Ordenado o = orden.filas().get(i);
+            FilaRanking f = o.fila();
+            // El orden ya se calculó con las tres notas; aquí solo se tapa la que no se puede ver.
+            postulantes.add(new PostulanteDelVisor(f.postulacionId(), i + 1, f.candidato(),
+                    f.grupoPrioridad(),
+                    suyas.contains(EtapaDelInforme.CV) ? f.notaCurriculum() : null,
+                    suyas.contains(EtapaDelInforme.EVALUACION) ? f.notaEtapa() : null,
+                    suyas.contains(EtapaDelInforme.PRUEBA) ? o.notaPrueba() : null,
+                    suyos.get(f.postulacionId())));
+        }
+        return new VisorDeLaVacante(vacanteId, orden.ranking().vacante(), orden.ranking().puesto(),
+                postulantes, suyas.stream().map(Enum::name).toList());
     }
 
     @Override
@@ -165,13 +173,15 @@ public class ServicioInformesImpl implements ServicioInformes {
         if (suyas.isEmpty()) {
             throw new AccessDeniedException("No tienes permiso para ver ningún informe");
         }
-        RankingVacante ranking = tandas.ranking(quien, vacanteId);
+        Orden orden = orden(quien, vacanteId);
         Map<String, byte[]> entradas = new LinkedHashMap<>();
         List<String> faltan = new ArrayList<>();
         Set<String> carpetas = new HashSet<>();
         int conInformes = 0;
-        for (FilaRanking fila : ranking.filas()) {
-            String carpeta = carpetaUnica(carpetas, String.format("%02d - %s", fila.puesto(),
+        for (int i = 0; i < orden.filas().size(); i++) {
+            FilaRanking fila = orden.filas().get(i).fila();
+            // Numeradas con el mismo lugar que el visor (AC-11), no con el puesto del ranking.
+            String carpeta = carpetaUnica(carpetas, String.format("%02d - %s", i + 1,
                     FormatoDelInforme.paraArchivo(fila.candidato())));
             boolean alguno = false;
             boolean seVe = false;
@@ -190,7 +200,7 @@ public class ServicioInformesImpl implements ServicioInformes {
                             + armado.estado(visible.get(), etapa).motivo() + ".");
                     continue;
                 }
-                entradas.put(carpeta + "/" + etapa.enElZip(), generadorPdf.generar(conEnlaceAlCv(quien, hecho.get())));
+                entradas.put(carpeta + "/" + etapa.enElZip(), generadorPdf.generar(conEnlaces(quien, hecho.get())));
                 alguno = true;
             }
             if (alguno) {
@@ -209,9 +219,63 @@ public class ServicioInformesImpl implements ServicioInformes {
         }
         log.info("Informes de la vacante {}: {} postulantes con informes, {} que faltan", vacanteId,
                 conInformes, faltan.size());
-        String archivo = FormatoDelInforme.paraArchivo("Informes - " + ranking.vacante() + " - "
+        String archivo = FormatoDelInforme.paraArchivo("Informes - " + orden.ranking().vacante() + " - "
                 + FormatoDelInforme.fecha(Instant.now()).replace('/', '-')) + ".zip";
         return new ArchivoArmado(archivo, TIPO_ZIP, zip(entradas));
+    }
+
+    // ================================================================== el orden
+
+    /** Un postulante con lo que decide su lugar: la nota de la prueba y la combinada. */
+    private record Ordenado(FilaRanking fila, BigDecimal notaPrueba, BigDecimal combinada) {
+
+        /** CV, evaluación y prueba calificada, y una vacante con pesos para combinarlas. */
+        boolean tieneLasTres() {
+            return fila.notaCurriculum() != null && fila.notaEtapa() != null && notaPrueba != null
+                    && combinada != null;
+        }
+    }
+
+    private record Orden(RankingVacante ranking, List<Ordenado> filas) {
+    }
+
+    /**
+     * El orden del visor y de su .zip (spec la-ia-sabe-que-dia-es-hoy).
+     *
+     * <p><b>Arriba</b>, quienes tienen las tres notas —CV, evaluación y la prueba del puesto
+     * calificada—, de mayor a menor por el ponderado de lo ya rendido del RF-155; a igual
+     * ponderado, por la nota de la prueba y luego por la de la evaluación. <b>Debajo</b>, los
+     * demás en el orden del ranking. Una prueba empezada sin calificar no es tercera nota, y una
+     * vacante sin pesos de etapa no tiene ponderado: queda en el orden del ranking, como antes.
+     *
+     * <p>⚠️ <b>Se calcula con las tres notas aunque quien mira no pueda ver alguna</b>: el orden
+     * es el mismo para todos, y la nota que no se ve sale «–» en la lista.
+     */
+    private Orden orden(ContextoUsuario quien, Long vacanteId) {
+        RankingVacante ranking = tandas.ranking(quien, vacanteId);
+        List<Long> ids = ranking.filas().stream().map(FilaRanking::postulacionId).toList();
+        if (ids.isEmpty()) {
+            return new Orden(ranking, List.of());
+        }
+        Map<Long, BigDecimal> pruebas = notasEtapa.findByPostulacionIdInAndEtapaCodigo(ids, "PRUEBA_PUESTO")
+                .stream()
+                .filter(n -> n.getPuntaje() != null)
+                .collect(Collectors.toMap(NotaEtapa::getPostulacionId, NotaEtapa::getPuntaje, (a, b) -> a));
+        Map<Long, BigDecimal> combinadas = tandas.ponderadosDeLoRendido(quien, vacanteId);
+        List<Ordenado> arriba = new ArrayList<>();
+        List<Ordenado> debajo = new ArrayList<>();
+        for (FilaRanking f : ranking.filas()) {
+            Ordenado o = new Ordenado(f, pruebas.get(f.postulacionId()),
+                    combinadas == null ? null : combinadas.get(f.postulacionId()));
+            (o.tieneLasTres() ? arriba : debajo).add(o);
+        }
+        // List.sort es estable: a igualdad completa se respeta el orden del ranking.
+        arriba.sort(Comparator.comparing(Ordenado::combinada, Comparator.reverseOrder())
+                .thenComparing(Ordenado::notaPrueba, Comparator.reverseOrder())
+                .thenComparing(o -> o.fila().notaEtapa(), Comparator.reverseOrder()));
+        List<Ordenado> todos = new ArrayList<>(arriba);
+        todos.addAll(debajo);
+        return new Orden(ranking, todos);
     }
 
     // ================================================================== permisos
@@ -253,34 +317,76 @@ public class ServicioInformesImpl implements ServicioInformes {
     }
 
     /**
-     * El enlace firmado al currículum, el mismo del Excel: abre el CV durante unas horas sin
-     * sesión. Pide «descargar_entregables»; sin él, el bloque solo trae las redes.
+     * Lo que abre el informe a quien tiene «descargar_entregables»: el enlace firmado al
+     * currículum —el mismo del Excel, que abre el CV unas horas sin sesión— y el de cada
+     * entregable entregado. Sin ese permiso el bloque solo trae las redes y los entregables van
+     * sin nada con que abrirlos, como siempre.
+     *
+     * <p>Es la única salida del informe —la página, el PDF y los dos .zip pasan por aquí—, así
+     * que es también donde se quita lo que el armado trae para abrir un entregable cuando quien
+     * mira no puede.
      */
-    private Informe conEnlaceAlCv(ContextoUsuario quien, Armado hecho) {
+    private Informe conEnlaces(ContextoUsuario quien, Armado hecho) {
         Informe informe = hecho.informe();
-        if (hecho.archivoCvId() == null || !quien.tiene(PERMISO_CV)) {
-            return informe;
+        boolean puedeAbrir = quien.tiene(PERMISO_CV);
+        List<Enlace> enlaces = informe.enlaces();
+        Optional<String> cv = puedeAbrir && hecho.archivoCvId() != null
+                ? firmado(quien, hecho.archivoCvId(), informe.postulacionId(), "el CV") : Optional.empty();
+        if (cv.isPresent()) {
+            enlaces = new ArrayList<>();
+            enlaces.add(new Enlace("Currículum (PDF)", cv.get(), "CV"));
+            enlaces.addAll(informe.enlaces());
         }
-        Optional<EnlaceArchivo> firmado;
-        try {
-            firmado = archivos.enlaceDeVolcado(quien, hecho.archivoCvId());
-        } catch (RuntimeException noSePudo) {
-            log.warn("No se pudo firmar el enlace del CV de la postulación {}: {}",
-                    informe.postulacionId(), noSePudo.toString());
-            return informe;
-        }
-        if (firmado.isEmpty() || !LoComunDelInforme.esWeb(firmado.get().url())) {
-            return informe;
-        }
-        List<Enlace> enlaces = new ArrayList<>();
-        enlaces.add(new Enlace("Currículum (PDF)", firmado.get().url(), "CV"));
-        enlaces.addAll(informe.enlaces());
         return new Informe(informe.etapa(), informe.titulo(), informe.empresa(), informe.vacante(),
                 informe.postulacionId(), informe.candidato(), informe.correo(), informe.generadoEn(),
                 informe.nota(), informe.grupo(), informe.datosClave(), informe.recuentos(),
                 informe.experiencia(), informe.resumen(), informe.evaluado(), informe.bloques(), enlaces,
-                informe.detalleTitulo(), informe.detalle(), informe.detallePie(), informe.anexo(),
-                informe.aviso(), informe.textosEnCamino(), informe.nombreArchivo());
+                informe.detalleTitulo(), informe.detalle(), informe.detallePie(),
+                conEntregables(quien, informe, puedeAbrir), informe.aviso(), informe.textosEnCamino(),
+                informe.nombreArchivo());
+    }
+
+    /**
+     * Los entregables con lo que los abre, o sin nada si no se pueden abrir.
+     *
+     * <p>Un archivo lleva su id —el visor pide con él el enlace firmado de siempre— y, para el
+     * PDF, el enlace firmado de 8 horas, el mismo trato que el del CV. Un entregable de tipo
+     * enlace lleva la dirección que pegó el candidato, solo si es web. Uno no entregado, nada.
+     */
+    private Anexo conEntregables(ContextoUsuario quien, Informe informe, boolean puedeAbrir) {
+        Anexo anexo = informe.anexo();
+        if (anexo == null || anexo.entregables() == null || anexo.entregables().isEmpty()) {
+            return anexo;
+        }
+        List<EntregableAnexo> entregables = new ArrayList<>();
+        for (EntregableAnexo e : anexo.entregables()) {
+            EntregableAnexo sinNada = new EntregableAnexo(e.nombre(), e.detalle(), e.entregado());
+            if (!puedeAbrir || !e.entregado()) {
+                entregables.add(sinNada);
+            } else if (e.archivoId() != null) {
+                entregables.add(new EntregableAnexo(e.nombre(), e.detalle(), true, e.archivoId(),
+                        firmado(quien, e.archivoId(), informe.postulacionId(), "un entregable").orElse(null)));
+            } else if (LoComunDelInforme.esWeb(e.url())) {
+                entregables.add(new EntregableAnexo(e.nombre(), e.detalle(), true, null, e.url().strip()));
+            } else {
+                entregables.add(sinNada);
+            }
+        }
+        return new Anexo(anexo.titulo(), anexo.subtitulo(), anexo.caso(), anexo.preguntas(),
+                anexo.entregablesResumen(), entregables);
+    }
+
+    /** El enlace firmado de un archivo, o vacío si no se pudo firmar o no es web. */
+    private Optional<String> firmado(ContextoUsuario quien, Long archivoId, Long postulacionId, String deQue) {
+        Optional<EnlaceArchivo> firmado;
+        try {
+            firmado = archivos.enlaceDeVolcado(quien, archivoId);
+        } catch (RuntimeException noSePudo) {
+            log.warn("No se pudo firmar el enlace de {} de la postulación {}: {}", deQue, postulacionId,
+                    noSePudo.toString());
+            return Optional.empty();
+        }
+        return firmado.map(EnlaceArchivo::url).filter(LoComunDelInforme::esWeb);
     }
 
     // ================================================================== el .zip

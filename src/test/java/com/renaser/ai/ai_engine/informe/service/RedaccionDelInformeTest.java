@@ -88,6 +88,21 @@ class RedaccionDelInformeTest {
     }
 
     @Test
+    @DisplayName("Una línea con la marca [DATO NO UTILIZABLE] se descarta: habla de un dato que la IA no vio")
+    void laMarcaDelAnonimizador() {
+        Textos t = RedaccionDelInforme.validar(insumo, respuesta(
+                "Tiene más de [DATO NO UTILIZABLE] de experiencia en Recursos Humanos.",
+                Map.of(DIAGNOSTICO, "Sobre el diagnóstico: con [DATO NO UTILIZABLE] en el sector, ubicó la rotación."),
+                "Sobre el problema: ubica la salida en los 3 primeros meses.",
+                "Sobre la planilla: suma los conceptos de ley."));
+
+        assertThat(t.resumen()).isNull();
+        assertThat(t.criterios()).doesNotContainKey(DIAGNOSTICO);
+        assertThat(t.preguntas()).doesNotContainNull();
+        assertThat(t.descartados()).isEqualTo(2);
+    }
+
+    @Test
     @DisplayName("Si no trae una línea por respuesta, o las claves no son los criterios reales, eso se descarta")
     void cuentasYClaves() {
         Map<String, String> criterios = new LinkedHashMap<>();

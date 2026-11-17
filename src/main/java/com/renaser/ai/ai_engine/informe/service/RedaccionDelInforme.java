@@ -8,6 +8,7 @@ import com.renaser.ai.ai_engine.informe.dto.DtosInforme.Informe;
 import com.renaser.ai.ai_engine.informe.dto.DtosInforme.PreguntaAnexo;
 import com.renaser.ai.ai_engine.informe.dto.DtosInforme.Punto;
 import com.renaser.ai.ai_engine.informe.dto.DtosInforme.Resumen;
+import com.renaser.ai.ai_engine.postulacion.service.impl.AnonimizadorCv;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -34,7 +35,8 @@ import static com.renaser.ai.ai_engine.informe.service.FormatoDelInforme.hay;
  *   <li>trae «…» (nada se recorta);
  *   <li>trae una cifra que no está en los datos que recibió (nunca inventa cifras);
  *   <li>trae un nombre propio que no está en esos datos;
- *   <li>repite la nota («88 de 100», «nota de 88»): ya se ve junto a la barra.
+ *   <li>repite la nota («88 de 100», «nota de 88»): ya se ve junto a la barra;
+ *   <li>trae la marca {@code [DATO NO UTILIZABLE]} del anonimizador: habla de algo que no vio.
  * </ul>
  * Las claves de {@code criterios} tienen que ser los nombres reales, y {@code preguntas} tiene
  * que traer tantas líneas como respuestas se le mandaron: si no, se descartan todas, porque no
@@ -233,6 +235,10 @@ public final class RedaccionDelInforme {
     static boolean vale(String linea, Set<String> cifrasDeLosDatos, String datosEnMinusculas,
                         List<String> notas, String maximo) {
         if (!hay(linea) || linea.contains("…") || linea.contains("...")) {
+            return false;
+        }
+        // La marca del anonimizador: la línea habla de un dato que la IA no vio.
+        if (AnonimizadorCv.traeLaMarca(linea)) {
             return false;
         }
         for (String cifra : cifras(linea)) {

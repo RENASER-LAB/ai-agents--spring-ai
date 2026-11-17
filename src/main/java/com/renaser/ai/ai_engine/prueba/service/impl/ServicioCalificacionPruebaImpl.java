@@ -216,8 +216,10 @@ public class ServicioCalificacionPruebaImpl implements ServicioCalificacionPrueb
     @Override
     @Transactional(readOnly = true)
     public List<EntregaDeLaPrueba> entregablesParaElInforme(Postulacion postulacion) {
-        // El informe nunca enseña el contenido de un entregable: solo qué llegó y cuándo.
-        return entregasDe(postulacion, false);
+        // El informe nunca enseña el contenido de un entregable: qué llegó, cuándo y con qué se
+        // abre. Lo de abrirlo (el archivo o el enlace) lo quita el servicio de los informes a
+        // quien no tiene «descargar_entregables»; las guardas del archivo son las de siempre.
+        return entregasDe(postulacion, true);
     }
 
     private List<EntregaDeLaPrueba> entregasDe(Postulacion postulacion, boolean puedeVerElContenido) {

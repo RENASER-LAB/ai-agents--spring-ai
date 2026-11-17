@@ -33,9 +33,10 @@ public interface ServicioCalificacionPruebaPropia {
 
     /**
      * La misma lectura para el informe de la prueba, sin nadie conectado (también la pide el
-     * redactor del informe desde la cola). Sin el contenido de los entregables y sin ofrecer
-     * ajustar: el informe nunca enseña lo que hay dentro de un archivo. Nulo si la postulación
-     * no rinde la prueba del editor.
+     * redactor del informe desde la cola). Sin ofrecer ajustar; de cada entregable trae con qué
+     * se abre (el archivo o el enlace), que el servicio de los informes deja solo a quien tiene
+     * {@code descargar_entregables}: el informe nunca enseña lo que hay dentro de un archivo.
+     * Nulo si la postulación no rinde la prueba del editor.
      */
     PruebaDelCandidato paraElInforme(com.renaser.ai.ai_engine.postulacion.entity.Postulacion postulacion);
 }

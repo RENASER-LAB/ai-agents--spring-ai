@@ -9,6 +9,9 @@ import com.renaser.ai.ai_engine.organizacion.dto.DtosOrganizacion.TopeIa;
 import com.renaser.ai.ai_engine.organizacion.service.Instrumento;
 import com.renaser.ai.ai_engine.organizacion.service.ServicioPersonalizacion;
 import com.renaser.ai.ai_engine.organizacion.service.ServicioPlataforma;
+import com.renaser.ai.ai_engine.perfilintegral.dto.DtosRecalificacionDelCv.ListaDeAfectados;
+import com.renaser.ai.ai_engine.perfilintegral.dto.DtosRecalificacionDelCv.TandaDeRecalificacion;
+import com.renaser.ai.ai_engine.perfilintegral.service.ServicioRecalificacionDelCv;
 import com.renaser.ai.ai_engine.seguridad.service.Permisos;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -39,6 +42,7 @@ public class PlataformaController {
 
     private final ServicioPlataforma servicio;
     private final ServicioPersonalizacion personalizacion;
+    private final ServicioRecalificacionDelCv recalificacion;
     private final Permisos permisos;
 
     @GetMapping("/empresas")
@@ -108,6 +112,29 @@ public class PlataformaController {
     public void apagarPersonalizacion(@PathVariable Long id, @PathVariable String instrumento,
                                       @Valid @RequestBody MotivoPlataforma datos) {
         personalizacion.apagarPara(permisos.actual(), id, instrumento(instrumento), datos.motivo());
+    }
+
+    // ---------- La recalificación de los afectados por la fecha (la-ia-sabe-que-dia-es-hoy) ----------
+    //
+    // No es un botón del panel (decisión del 16/11/2026): lo lanza el comando de administración
+    // scripts/recalificar-afectados-por-la-fecha.py, primero en modo de prueba y después con
+    // --confirmar. Doble llave, como el resto de este controlador.
+
+    @GetMapping("/recalificacion-por-la-fecha")
+    @PreAuthorize("@permisos.tiene('administrar_plataforma')")
+    @Operation(summary = "Modo de prueba: las postulaciones en curso de vacantes abiertas que la IA "
+            + "calificó sin la fecha de hoy o sin ver sus años de experiencia, por qué, de qué "
+            + "vacantes y cuántas llamadas costaría recalificarlas. No llama a la IA")
+    public ListaDeAfectados afectadosPorLaFecha() {
+        return recalificacion.afectados(permisos.actual());
+    }
+
+    @PostMapping("/recalificacion-por-la-fecha")
+    @PreAuthorize("@permisos.tiene('administrar_plataforma')")
+    @Operation(summary = "Con confirmación: reencola el CV y el retrato de cada afectado, sin mover a "
+            + "nadie de etapa y sin pisar lo ajustado a mano. Un fallo con uno no frena a los demás")
+    public TandaDeRecalificacion recalificarAfectadosPorLaFecha() {
+        return recalificacion.recalificar(permisos.actual());
     }
 
     // La conversión a mano, como en PersonalizacionController y por lo mismo: un valor

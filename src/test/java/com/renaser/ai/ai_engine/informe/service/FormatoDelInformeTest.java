@@ -133,6 +133,16 @@ class FormatoDelInformeTest {
         assertThat(new ArchivoArmado(null, null, null)).isEqualTo(new ArchivoArmado(null, null, null));
     }
 
+    @Test
+    @DisplayName("AC-08 · un texto de la IA con la marca del anonimizador no se enseña tal cual; los demás, limpios")
+    void sinLaMarca() {
+        assertThat(FormatoDelInforme.sinMarca("Tiene más de [DATO NO UTILIZABLE] de experiencia")).isNull();
+        assertThat(FormatoDelInforme.sinMarca("  Tiene más de 5 años de experiencia  "))
+                .isEqualTo("Tiene más de 5 años de experiencia");
+        assertThat(FormatoDelInforme.sinMarca("   ")).isNull();
+        assertThat(FormatoDelInforme.sinMarca(null)).isNull();
+    }
+
     private static Base base(Vacante vacante) {
         return new Base(Postulacion.builder().id(1L).build(), vacante, null, null, "Ana Torres", null, null, null,
                 List.of(), null, List.of(), List.of(), null);

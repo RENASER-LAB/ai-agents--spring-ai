@@ -24,6 +24,7 @@ import com.renaser.ai.ai_engine.postulacion.entity.Postulacion;
 import com.renaser.ai.ai_engine.postulacion.repository.CvRepository;
 import com.renaser.ai.ai_engine.postulacion.repository.DatoCvRepository;
 import com.renaser.ai.ai_engine.postulacion.repository.EnlaceCvRepository;
+import com.renaser.ai.ai_engine.postulacion.service.impl.AnonimizadorCv;
 import com.renaser.ai.ai_engine.usuario.entity.Usuario;
 import com.renaser.ai.ai_engine.usuario.repository.UsuarioRepository;
 import com.renaser.ai.ai_engine.usuario.service.NombresDeUsuarios;
@@ -102,12 +103,20 @@ public class LoComunDelInforme {
                 ? null : usuario.getCorreo();
         Cv cv = cvs.findByPostulacionId(postulacion.getId()).orElse(null);
         DatoCv dato = datosCv.findByPostulacionId(postulacion.getId()).orElse(null);
+        // Lo que trae la marca del anonimizador habla de un dato que la IA no vio: no se enseña.
+        // Cubre lo guardado antes de que se dejara de guardar (las afirmaciones) y lo que la IA
+        // escriba en un hallazgo. Ver AnonimizadorCv#traeLaMarca.
         List<AfirmacionCv> suyas = cv == null ? List.of() : afirmaciones.findByCvId(cv.getId()).stream()
+                .filter(a -> !AnonimizadorCv.traeLaMarca(a.getTexto())
+                        && !AnonimizadorCv.traeLaMarca(a.getPreguntaValidacion()))
                 .sorted(java.util.Comparator.comparing(AfirmacionCv::getId))
                 .toList();
         PerfilTalento perfil = perfiles.findByPostulacionId(postulacion.getId()).orElse(null);
         List<HallazgoPerfil> deSuPerfil = perfil == null ? List.of()
                 : hallazgos.findByPerfilTalentoId(perfil.getId()).stream()
+                        .filter(h -> !AnonimizadorCv.traeLaMarca(h.getDescripcion())
+                                && !AnonimizadorCv.traeLaMarca(h.getEvidencia())
+                                && !AnonimizadorCv.traeLaMarca(h.getSugerencia()))
                         .sorted(java.util.Comparator.comparing(HallazgoPerfil::getId))
                         .toList();
         List<Alerta> suyasAlertas = alertas.findByPostulacionId(postulacion.getId()).stream()
