@@ -5,8 +5,12 @@ import lombok.*;
 
 import java.time.Instant;
 
+// @DynamicUpdate (V85): la fila la escriben a la vez el alta y la suspensión de la plataforma,
+// las banderas de personalización y ahora la presentación del panel. Con el UPDATE de la fila
+// entera, el último en confirmar devolvía a lo que leyó las columnas del otro.
 @Entity
 @Table(name = "organizacion")
+@org.hibernate.annotations.DynamicUpdate
 @Getter @Setter @Builder @NoArgsConstructor @AllArgsConstructor
 public class Organizacion {
 
@@ -31,4 +35,22 @@ public class Organizacion {
     // pero ya no se mapean (V74): el banco y las pruebas de una empresa son siempre los suyos.
     private boolean pesosPropios;
     private boolean plantillasEvaluacionPropias;
+
+    // ---------- La presentación (V85) ----------
+    // Lo que la empresa cuenta de sí misma en «Perfil de la empresa». Todo opcional: vacío es
+    // nulo. Las reglas viven en ReglasDeLaPresentacion; los beneficios y las redes, en sus
+    // tablas (OrganizacionBeneficio, OrganizacionRedSocial).
+
+    /** Por qué existe la empresa. No es {@code vacante.proposito}, que es el del puesto. */
+    private String propositoEmpresa;
+    private String quienesSomos;
+    private String sector;
+    /** Uno de {@link com.renaser.ai.ai_engine.organizacion.service.TamanoDeEmpresa}. */
+    private String tamano;
+    private Integer anioFundacion;
+    /** El enlace de YouTube o Vimeo tal como se pegó. */
+    private String videoPresentacion;
+    private String paginaWeb;
+    private Long logoArchivoId;
+    private Long portadaArchivoId;
 }

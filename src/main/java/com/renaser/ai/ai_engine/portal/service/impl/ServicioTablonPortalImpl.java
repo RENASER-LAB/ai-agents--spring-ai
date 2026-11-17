@@ -8,8 +8,10 @@ import com.renaser.ai.ai_engine.perfil.dto.DtosPerfil.OpcionUbigeo;
 import com.renaser.ai.ai_engine.perfil.service.CatalogosDelPerfil;
 import com.renaser.ai.ai_engine.portal.dto.DtosPortal.CiudadPublica;
 import com.renaser.ai.ai_engine.portal.dto.DtosPortal.ConsentimientoDeVacante;
+import com.renaser.ai.ai_engine.portal.dto.DtosPortal.EmpresaDeLaVacante;
 import com.renaser.ai.ai_engine.portal.dto.DtosPortal.RequisitoPublico;
 import com.renaser.ai.ai_engine.portal.dto.DtosPortal.VacantePublica;
+import com.renaser.ai.ai_engine.portal.service.PresentacionEnElPortal;
 import com.renaser.ai.ai_engine.portal.service.ServicioTablonPortal;
 import com.renaser.ai.ai_engine.vacante.entity.RequisitoObjetivo;
 import com.renaser.ai.ai_engine.vacante.entity.Vacante;
@@ -40,6 +42,9 @@ public class ServicioTablonPortalImpl implements ServicioTablonPortal {
     // Pone nombre y departamento a la ciudad de cada vacante (V62). El mismo catálogo del
     // registro, con las desactivadas incluidas: lo que una vacante tiene guardado se enseña.
     private final CatalogosDelPerfil catalogos;
+    // La presentación de cada empresa (V85): el bloque «Sobre…» de la vacante. Las redes de todo
+    // el lote en una sola consulta, como los requisitos.
+    private final PresentacionEnElPortal presentacion;
 
     @Override
     public List<VacantePublica> vacantesPublicadas() {
@@ -70,11 +75,15 @@ public class ServicioTablonPortalImpl implements ServicioTablonPortal {
                 publicadas.stream().map(Vacante::getId).toList());
         // Y el catálogo de ciudades una sola vez, por lo mismo; y ninguna si ninguna la tiene.
         Map<String, OpcionUbigeo> ciudades = ciudadesDe(publicadas);
+        // Y la presentación de las empresas del lote, también de una vez (V85). Sale de la misma
+        // fila de la organización que ya trajo el colador, más una consulta para todas las redes.
+        Map<Long, EmpresaDeLaVacante> presentaciones = presentacion.deLas(
+                organizacionesActivas.values());
 
         return publicadas.stream()
                 .map(v -> comoPublica(v, porVacante.getOrDefault(v.getId(), List.of()),
-                        organizacionesActivas.get(v.getOrganizacionId()).getNombre(),
-                        ciudades))
+                        organizacionesActivas.get(v.getOrganizacionId()),
+                        presentaciones.get(v.getOrganizacionId()), ciudades))
                 .toList();
     }
 
@@ -95,7 +104,7 @@ public class ServicioTablonPortalImpl implements ServicioTablonPortal {
                 .filter(Organizacion::isEsActiva)
                 .orElseThrow(() -> new ResourceNotFoundException("Vacante", "id", id));
         return comoPublica(vacante, requisitos.findByVacanteIdAndEsActivoTrue(vacante.getId()),
-                empresa.getNombre(), ciudadesDe(List.of(vacante)));
+                empresa, presentacion.deUna(empresa), ciudadesDe(List.of(vacante)));
     }
 
     @Override
@@ -163,14 +172,35 @@ public class ServicioTablonPortalImpl implements ServicioTablonPortal {
                 : new CiudadPublica(opcion.codigo(), opcion.nombre(), opcion.departamento());
     }
 
+    @Override
+    public List<VacantePublica> vacantesPublicadasDe(Organizacion empresa) {
+        // El mismo colador que el tablón, acotado a una empresa: publicadas y sin eliminar. Quien
+        // llama ya comprobó que la empresa está activa.
+        List<Vacante> suyas = vacantes.findByOrganizacionIdAndEstadoAndEliminadaEnIsNullOrderByPublicadaEnDesc(
+                empresa.getId(), "PUBLICADA");
+        Map<Long, List<RequisitoObjetivo>> porVacante = requisitosDe(
+                suyas.stream().map(Vacante::getId).toList());
+        Map<String, OpcionUbigeo> ciudades = ciudadesDe(suyas);
+        return suyas.stream()
+                .map(v -> comoPublica(v, porVacante.getOrDefault(v.getId(), List.of()), empresa,
+                        null, ciudades))
+                .toList();
+    }
+
+    /**
+     * La vacante como la ve el candidato. `empresaDeLaVacante` es la presentación de su empresa
+     * (V85), o nulo si no llenó nada; `proposito` sigue siendo el del puesto.
+     */
     private VacantePublica comoPublica(Vacante v, List<RequisitoObjetivo> suyos,
-                                       String nombreEmpresa, Map<String, OpcionUbigeo> ciudades) {
+                                       Organizacion empresa, EmpresaDeLaVacante empresaDeLaVacante,
+                                       Map<String, OpcionUbigeo> ciudades) {
         List<RequisitoPublico> reqs = suyos.stream()
                 .map(r -> new RequisitoPublico(r.getId(), r.getDescripcion()))
                 .toList();
-        return new VacantePublica(v.getId(), v.getTitulo(), nombreEmpresa, v.getDescripcion(),
+        return new VacantePublica(v.getId(), v.getTitulo(), empresa.getNombre(), v.getDescripcion(),
                 v.getProposito(), v.getResponsabilidades(), v.getRequisitos(), v.getModalidad(),
                 v.getHorario(), v.getUbicacion(), ciudadDe(v, ciudades), v.getPublicadaEn(),
-                RemuneracionQueVeElCandidato.de(v), reqs);
+                RemuneracionQueVeElCandidato.de(v), reqs, empresa.getCodigo(), empresaDeLaVacante,
+                PresentacionEnElPortal.videoDe(v.getVideoPresentacion()));
     }
 }

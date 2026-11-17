@@ -173,6 +173,20 @@ public class ManejadorErrores {
         return problema;
     }
 
+    // La presentación de la empresa no se guarda así (V85): 400 con TODOS los campos que fallan
+    // en `errores` ({campo: frase}), que el panel marca junto a cada campo. No se guardó nada.
+    @ExceptionHandler(com.renaser.ai.ai_engine.organizacion.service.PresentacionInvalidaException.class)
+    public ProblemDetail presentacionInvalida(
+            com.renaser.ai.ai_engine.organizacion.service.PresentacionInvalidaException ex,
+            WebRequest request) {
+        log.warn("Presentación inválida - Path: {}, Campos: {}", request.getDescription(false),
+                ex.getErrores().keySet());
+        ProblemDetail problema = construir(HttpStatus.BAD_REQUEST, "No se guardó nada",
+                "presentacion-invalida", ex.getMessage());
+        problema.setProperty("errores", ex.getErrores());
+        return problema;
+    }
+
     // El botón de WhatsApp no se puede usar ahora (V73): 409 con un `codigo` que el portal lee.
     // SIN_CELULAR es el que importa: la tarjeta pide entonces el celular y vuelve a intentarlo.
     @ExceptionHandler(com.renaser.ai.ai_engine.whatsapp.service.WhatsappNoDisponibleException.class)
