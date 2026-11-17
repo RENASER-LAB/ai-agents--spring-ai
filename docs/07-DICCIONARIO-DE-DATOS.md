@@ -1,7 +1,7 @@
 # Diccionario de datos
 
 Sistema de selección de personal — Renaser Consulting
-Versión 3.14 · 2026-11-16 · Puesto al día con las migraciones hasta la `V84` (la V84 trae la tabla `texto_informe`, con los textos del redactor de los informes por etapa, y el agente `REDACTOR_INFORME` con su instrucción; no hay V81 a V83: los números los reservaban otras specs todavía sin construir; la V80 trae las tablas `linea_busqueda_cv`, `busqueda_cv` y `resultado_busqueda_cv` de «Qué buscar en el CV», la columna `version_pesos.peso_busqueda_cv`, el agente `BUSQUEDA_CV` y el modo `REBUSCA` de `trabajo_ia`; la V79 no crea tablas: publica la 1.3 del texto `PLATAFORMA` y una versión nueva del correo `RECORDATORIO_EVALUACION`; la V78 no añade columnas: pasa a `PERMANENTE` las vacantes «Por plazas» y las publicadas con la fecha vencida, lleva las fechas de cierre a las 23:59:59 de Lima y quita la fecha al Perfil Integral abierto; la V77 añade `contexto_actualizado_en` a `vacante`, `intento_prueba` y `evaluacion`, que fechan triggers solo cuando cambia un dato que viaja en la consulta v2 del bot de WhatsApp; la V76 trae las tablas `resultado_whatsapp` y `evento_whatsapp` del contrato v2 con el bot, todavía no activo; la V75 añade `nota_criterio.puntaje_original` y `maximo_original`, la nota de la simulación y la validación tal como se puso, de la que se recalcula al cambiar los pesos de la vacante; la V74 añade `vacante.version_banco_fija_id`, pasa a `PRUEBA_PROPIA` los borradores de antes con `PLANTILLA` sin prueba, deja sin uso `organizacion.banco_propio` y `pruebas_puesto_propias` y vacía `version_banco.url_consigna`; la V73 trae las tablas `vinculo_whatsapp`, `aviso_whatsapp` y `whatsapp_baja`, el CHECK de E.164 de `persona.telefono`, el tipo `WHATSAPP` de `texto_consentimiento` con su 1.0, la versión 1.2 del texto `PLATAFORMA` y el parámetro `whatsapp_novedades_activo` de la plataforma; la V72 no crea tablas: hace obligatoria `vacante.nota_minima`, entera de 0 a 100 y 60 por defecto, y publica la versión 1.1 del texto `PLATAFORMA`; la V71 añade `perfil_candidato.logros`, los logros clave que escribe el candidato; la V70 añade `transicion_estado.aviso_al_candidato` y la tabla `recordatorio_enviado`, siembra en todas las organizaciones tres parámetros y los correos `RECORDATORIO_EVALUACION` y `RECORDATORIO_PRUEBA`, publica una versión nueva de los textos de `PRUEBA_DISPONIBLE` que decían «desde este correo» y documenta siete tipos de aviso de la campana; la V69 añade `criterio_banco.puntos_del_criterio`, lo que vale entero un criterio de la prueba técnica; la V68 trae el alcance de los entregables de la prueba del editor —`entregable_requerido.alcance` y `pregunta_id` y la tabla `entregable_cubre_pregunta`—, desde la que «Mira» se deduce, y deja sin días los borradores de esa prueba; la V67 trae la prueba técnica escrita en el editor —las tablas `criterio_banco_entregable` y `nota_criterio_prueba`, el tercer valor `PRUEBA_PROPIA` de `vacante.instrumento_etapa_tecnica`, el propósito `PRUEBA_PUESTO` con el caso y el tiempo en `version_banco`, la parte calificada en `criterio_banco`, `entregable_requerido`, `intento_prueba` y `respuesta_prueba` colgando también de la versión del editor, `intento_prueba.no_completada` y el propósito en `propuesta_preguntas`—; la V66 trae las preguntas propias de cada vacante —las tablas `criterio_banco` y `propuesta_preguntas`, `vacante.origen_preguntas`, el propósito, el método `PUNTOS` y la guía en `version_banco`, los tres tipos nuevos con sus puntos en `pregunta`, el orden en `opcion`, la nota hasta 100 y la de la IA aparte en `nota_respuesta`, el modo `RECALIFICA` y el agente `RECOMENDADOR`—; la V64 trae la gestión de personas —`sede`, `colaborador`, `periodo_laboral`, `situacion_laboral`, `cese_anulado` y `contratado_sin_alta`— y sus cuatro permisos; la V65 añade las columnas `antes_*` de `situacion_laboral`; la V49 y la V50 solo siembran pesos; la V51 trae la tabla `lectura_cv_perfil` y los archivos del perfil; la V52 y la V53 no crean tablas; la V55 pone el sueldo en la vacante y la pretensión en la postulación; la V56 trae la tabla `aviso_portal`; la V57 no crea tablas, solo siembra los precios de los dos modelos de DeepSeek; la V58 no crea tablas: suma el aviso `VACANTE_ACTUALIZADA` y apaga el correo `REMUNERACION_ACTUALIZADA`; la V59 añade `vacante.archivada_en`; la V60 añade `vacante.eliminada_en` —el borrado lógico—, el motivo de cierre y el tipo de aviso `VACANTE_ELIMINADA`, y el permiso `eliminar_vacante`; la V61 trae la tabla `recuperacion_clave`, tres parámetros y los dos correos de «¿Olvidaste tu contraseña?»; la V62 añade `vacante.ciudad_ubigeo`; la V63 trae las tablas `resena`, `respuesta_resena` y `reporte_resena`, los tres permisos de las reseñas de empresas y cuatro tipos de aviso)
+Versión 3.15 · 2026-11-16 · Puesto al día con las migraciones hasta la `V85` (la V85 trae el perfil de la empresa: nueve columnas en `organizacion` —`proposito_empresa`, `quienes_somos`, `sector`, `tamano`, `anio_fundacion`, `video_presentacion`, `pagina_web`, `logo_archivo_id` y `portada_archivo_id`—, las tablas `organizacion_beneficio` y `organizacion_red_social`, la columna `vacante.video_presentacion` y el permiso `editar_presentacion_empresa`; su spec reservaba la V81 y entró como V85 porque la V84 ya estaba aplicada; la V84 trae la tabla `texto_informe`, con los textos del redactor de los informes por etapa, y el agente `REDACTOR_INFORME` con su instrucción; no hay V81 a V83: los números los reservaban otras specs todavía sin construir, que tendrán que llevar uno mayor que la última aplicada; la V80 trae las tablas `linea_busqueda_cv`, `busqueda_cv` y `resultado_busqueda_cv` de «Qué buscar en el CV», la columna `version_pesos.peso_busqueda_cv`, el agente `BUSQUEDA_CV` y el modo `REBUSCA` de `trabajo_ia`; la V79 no crea tablas: publica la 1.3 del texto `PLATAFORMA` y una versión nueva del correo `RECORDATORIO_EVALUACION`; la V78 no añade columnas: pasa a `PERMANENTE` las vacantes «Por plazas» y las publicadas con la fecha vencida, lleva las fechas de cierre a las 23:59:59 de Lima y quita la fecha al Perfil Integral abierto; la V77 añade `contexto_actualizado_en` a `vacante`, `intento_prueba` y `evaluacion`, que fechan triggers solo cuando cambia un dato que viaja en la consulta v2 del bot de WhatsApp; la V76 trae las tablas `resultado_whatsapp` y `evento_whatsapp` del contrato v2 con el bot, todavía no activo; la V75 añade `nota_criterio.puntaje_original` y `maximo_original`, la nota de la simulación y la validación tal como se puso, de la que se recalcula al cambiar los pesos de la vacante; la V74 añade `vacante.version_banco_fija_id`, pasa a `PRUEBA_PROPIA` los borradores de antes con `PLANTILLA` sin prueba, deja sin uso `organizacion.banco_propio` y `pruebas_puesto_propias` y vacía `version_banco.url_consigna`; la V73 trae las tablas `vinculo_whatsapp`, `aviso_whatsapp` y `whatsapp_baja`, el CHECK de E.164 de `persona.telefono`, el tipo `WHATSAPP` de `texto_consentimiento` con su 1.0, la versión 1.2 del texto `PLATAFORMA` y el parámetro `whatsapp_novedades_activo` de la plataforma; la V72 no crea tablas: hace obligatoria `vacante.nota_minima`, entera de 0 a 100 y 60 por defecto, y publica la versión 1.1 del texto `PLATAFORMA`; la V71 añade `perfil_candidato.logros`, los logros clave que escribe el candidato; la V70 añade `transicion_estado.aviso_al_candidato` y la tabla `recordatorio_enviado`, siembra en todas las organizaciones tres parámetros y los correos `RECORDATORIO_EVALUACION` y `RECORDATORIO_PRUEBA`, publica una versión nueva de los textos de `PRUEBA_DISPONIBLE` que decían «desde este correo» y documenta siete tipos de aviso de la campana; la V69 añade `criterio_banco.puntos_del_criterio`, lo que vale entero un criterio de la prueba técnica; la V68 trae el alcance de los entregables de la prueba del editor —`entregable_requerido.alcance` y `pregunta_id` y la tabla `entregable_cubre_pregunta`—, desde la que «Mira» se deduce, y deja sin días los borradores de esa prueba; la V67 trae la prueba técnica escrita en el editor —las tablas `criterio_banco_entregable` y `nota_criterio_prueba`, el tercer valor `PRUEBA_PROPIA` de `vacante.instrumento_etapa_tecnica`, el propósito `PRUEBA_PUESTO` con el caso y el tiempo en `version_banco`, la parte calificada en `criterio_banco`, `entregable_requerido`, `intento_prueba` y `respuesta_prueba` colgando también de la versión del editor, `intento_prueba.no_completada` y el propósito en `propuesta_preguntas`—; la V66 trae las preguntas propias de cada vacante —las tablas `criterio_banco` y `propuesta_preguntas`, `vacante.origen_preguntas`, el propósito, el método `PUNTOS` y la guía en `version_banco`, los tres tipos nuevos con sus puntos en `pregunta`, el orden en `opcion`, la nota hasta 100 y la de la IA aparte en `nota_respuesta`, el modo `RECALIFICA` y el agente `RECOMENDADOR`—; la V64 trae la gestión de personas —`sede`, `colaborador`, `periodo_laboral`, `situacion_laboral`, `cese_anulado` y `contratado_sin_alta`— y sus cuatro permisos; la V65 añade las columnas `antes_*` de `situacion_laboral`; la V49 y la V50 solo siembran pesos; la V51 trae la tabla `lectura_cv_perfil` y los archivos del perfil; la V52 y la V53 no crean tablas; la V55 pone el sueldo en la vacante y la pretensión en la postulación; la V56 trae la tabla `aviso_portal`; la V57 no crea tablas, solo siembra los precios de los dos modelos de DeepSeek; la V58 no crea tablas: suma el aviso `VACANTE_ACTUALIZADA` y apaga el correo `REMUNERACION_ACTUALIZADA`; la V59 añade `vacante.archivada_en`; la V60 añade `vacante.eliminada_en` —el borrado lógico—, el motivo de cierre y el tipo de aviso `VACANTE_ELIMINADA`, y el permiso `eliminar_vacante`; la V61 trae la tabla `recuperacion_clave`, tres parámetros y los dos correos de «¿Olvidaste tu contraseña?»; la V62 añade `vacante.ciudad_ubigeo`; la V63 trae las tablas `resena`, `respuesta_resena` y `reporte_resena`, los tres permisos de las reseñas de empresas y cuatro tipos de aviso)
 
 Cada tabla con todas sus columnas, tipos y claves. **Este documento se consulta**, no se lee de
 corrido: es la base para escribir las migraciones de Flyway.
@@ -11,8 +11,8 @@ Lo que llegó después de la versión 2.0 va marcado con su migración entre par
 ⚠️ **Tres tablas de la base no tienen ficha aquí.** `agent_run` es del motor de agentes y no de
 selección, así que no la tendrá nunca. `invitacion` (`V37`) y `tarifa_modelo` (`V38`) sí
 deberían tenerla: llegaron con el multiempresa y su ficha está pendiente. Hasta que se
-escriban, para esas dos manda la migración. De las **129 tablas de selección y de gestión de
-personas** que existen hoy, aquí hay ficha de 127, más otras diez que están solo diseñadas y
+escriban, para esas dos manda la migración. De las **131 tablas de selección y de gestión de
+personas** que existen hoy, aquí hay ficha de 129, más otras diez que están solo diseñadas y
 todavía no existen.
 
 Para entender *por qué* el modelo es así, está el [Modelo de datos](05-MODELO-DE-DATOS.md).
@@ -72,6 +72,15 @@ Renaser, y mañana cada cliente de consultoría.
 | `plantillas_evaluacion_propias` | boolean | sí | (`V37`) Lo mismo con las plantillas de evaluación |
 | `banco_propio` | boolean | sí | (`V37`) **Sin uso desde la `V74`**: el banco de una empresa es siempre el suyo y el de RENASER ya no se presta. Se conserva con su valor como registro de quién lo había personalizado |
 | `pruebas_puesto_propias` | boolean | sí | (`V37`) **Sin uso desde la `V74`**, por lo mismo con las pruebas del puesto |
+| `proposito_empresa` | text | no | (`V85`) Por qué existe la empresa, como la cuenta ella. De 1 a 1500 caracteres. **No es `vacante.proposito`**, que es el del puesto |
+| `quienes_somos` | text | no | (`V85`) «Quiénes somos», de 1 a 1500 caracteres |
+| `sector` | text | no | (`V85`) Texto libre, de 1 a 60 caracteres |
+| `tamano` | text con restricción | no | (`V85`) `DE_1_A_10`, `DE_11_A_50`, `DE_51_A_200`, `DE_201_A_500`, `DE_501_A_1000` o `MAS_DE_1000` colaboradores |
+| `anio_fundacion` | integer | no | (`V85`) 1800 o más. Que no pase del año actual lo comprueba la aplicación |
+| `video_presentacion` | text | no | (`V85`) El enlace del video de YouTube o de Vimeo, tal como se pegó, de 1 a 500 caracteres. El portal monta el reproductor con el servicio y el identificador, nunca copiando este texto |
+| `pagina_web` | text | no | (`V85`) De 1 a 500 caracteres |
+| `logo_archivo_id` | bigint → `archivo` | no | (`V85`) El logo, ya re-codificado sin metadatos |
+| `portada_archivo_id` | bigint → `archivo` | no | (`V85`) La foto de portada, igual |
 
 **Clave primaria:** `id` · **Único:** `codigo`
 
@@ -81,6 +90,38 @@ Arranca con una sola fila. Todo lo demás la referencia, directa o indirectament
 resuelve los pesos y las plantillas de evaluación. Las del banco y las pruebas se dejaron en la
 tabla porque quitarlas no daba nada que valiera lo que cuesta deshacerlo; la entidad ya no las
 mapea.
+
+**El perfil de la empresa** (`V85`) son las nueve columnas marcadas así y las dos tablas que siguen.
+Todo es opcional y un campo vacío es nulo, nunca una cadena vacía: por eso cada CHECK pide al menos
+un carácter. Las empresas que existían quedaron sin datos. El logo y la portada son los primeros
+archivos que se ven sin cuenta, y solo se sirven por `/api/v1/portal/empresas/{codigo}/imagenes/…`.
+
+## `organizacion_beneficio` (`V85`)
+
+Los beneficios que la empresa enseña en su perfil, en su orden. **Guardar los reemplaza todos**:
+se borran y se escriben de nuevo, sin historia propia; el cambio queda en la auditoría.
+
+| Columna | Tipo | Oblig. | Qué guarda |
+|---|---|---|---|
+| `id` | bigint | sí | Clave. Sin `creado_en` |
+| `organizacion_id` | bigint → `organizacion` | sí | |
+| `texto` | text | sí | De 1 a 40 caracteres |
+| `orden` | integer | sí | De 1 a 12 |
+
+**Clave primaria:** `id` · **Único:** `(organizacion_id, orden)`, así que como mucho 12 por empresa
+
+## `organizacion_red_social` (`V85`)
+
+El enlace de la empresa en cada red. **Una red vacía es una fila que no existe.**
+
+| Columna | Tipo | Oblig. | Qué guarda |
+|---|---|---|---|
+| `id` | bigint | sí | Clave. Sin `creado_en` |
+| `organizacion_id` | bigint → `organizacion` | sí | |
+| `red` | text con restricción | sí | `FACEBOOK`, `INSTAGRAM`, `LINKEDIN`, `TIKTOK` o `YOUTUBE` |
+| `enlace` | text | sí | De 1 a 500 caracteres |
+
+**Clave primaria:** `id` · **Único:** `(organizacion_id, red)`
 
 ---
 
@@ -263,7 +304,10 @@ llegaron con la `V40`, `eliminar_vacante` con la `V60`, y los tres últimos con 
 `CONFIGURACION`), este solo para el Administrador de la plataforma y fuera de la copia del alta
 de empresas. La `V64` suma los cuatro del grupo `PERSONAS` —`ver_colaboradores`,
 `editar_colaboradores`, `ver_sueldos` y `editar_estructura`— para Talento y Dirección de todas
-las organizaciones, con alcance `TODO`; `ver_sueldos`, solo para Dirección.
+las organizaciones, con alcance `TODO`; `ver_sueldos`, solo para Dirección. La `V85` suma
+`editar_presentacion_empresa` (grupo `CONFIGURACION`, «Editar el perfil de la empresa») para
+Talento, Dirección y Administrador de todas las organizaciones, con alcance `TODO`; las empresas
+nuevas lo reciben con la copia de roles del alta.
 
 La etiqueta existe porque la pantalla donde se reparten permisos nunca debe mostrar nombres
 técnicos.
@@ -733,6 +777,7 @@ Una convocatoria concreta.
 | `archivada_en` | timestamptz | no | (`V59`) Cuándo se retiró de la lista habitual del panel. Vacío = no archivada, y es lo que trae por defecto `/admin`. **No es un estado**: la vacante sigue `CERRADA` y sus postulaciones quedan como estaban. Desarchivar la vuelve a dejar vacía. Quién la archivó no está aquí: eso lo guarda `auditoria`, con persona, fecha y acción |
 | `contexto_actualizado_en` | timestamptz | no | (`V77`) Cuándo cambió por última vez lo que la vacante cuenta a quien postula por WhatsApp: ficha pública, requisitos indispensables, empresa, convocatoria, procedimiento y plazos de la prueba. La fechan triggers; vacía si no cambió desde la `V77`. Ver abajo |
 | `eliminada_en` | timestamptz | no | (`V60`) Cuándo se eliminó por **borrado lógico**. Vacío = existe, como todas las anteriores a la `V60`. Con fecha, deja de salir en el panel (lista habitual, Archivadas y su contador), el tablón, «Mis procesos», los rankings, las exportaciones, la selección de sesiones de simulación y los procesos automáticos, y consultarla por id responde 404. **No se borra ninguna fila**. Persona y motivo van en `auditoria`, acción `eliminar_vacante`. No hay vuelta desde el panel: soporte la restaura vaciando la fecha en la base |
+| `video_presentacion` | text | no | (`V85`) «Video del puesto»: el enlace de un video de YouTube o de Vimeo propio de esta vacante, de 1 a 500 caracteres, con las mismas reglas que `organizacion.video_presentacion`. Vacío, el portal enseña el de la empresa. Cambiarlo con la vacante publicada se audita y no avisa a nadie. No está en el trigger de `contexto_actualizado_en` |
 
 **Clave primaria:** `id`
 **Apunta a:** `organizacion`, `solicitud_talento`, `puesto`, `version_pesos`,
@@ -3880,6 +3925,8 @@ caro sale: cada consulta que filtra por el padre acaba leyendo la tabla entera.
 | `busqueda_cv (postulacion_id) WHERE archivada_en IS NULL` | **Único y parcial.** Una búsqueda viva por postulación (`V80`) |
 | `resultado_busqueda_cv (postulacion_id, linea_busqueda_cv_id) WHERE archivado_en IS NULL` | **Único y parcial.** Un resultado vivo por persona y línea (`V80`) |
 | `resultado_busqueda_cv (busqueda_cv_id)` | Los resultados de una búsqueda (`V80`) |
+| `organizacion_beneficio (organizacion_id, orden)` | **Único.** Como mucho 12 beneficios por empresa, uno por posición (`V85`) |
+| `organizacion_red_social (organizacion_id, red)` | **Único.** Una fila por empresa y red; es también el que usa el tablón para cargar las redes de todas las empresas del lote en una sola consulta (`V85`) |
 
 Los índices de `organizacion_id` sueltos **no hacen falta**: van dentro de los compuestos de
 arriba, porque toda consulta filtra primero por organización.
@@ -3949,6 +3996,11 @@ Resumen de las restricciones que están repartidas por el documento:
   y el peso de lo buscado en una versión de pesos va de 0 a 50 (`V80`).
 - Una fila de textos del informe por postulación y etapa, de `CV`, `EVALUACION` o `PRUEBA`, y su
   recuento de descartados nunca es negativo (`V84`).
+- El perfil de la empresa (`V85`): cada texto tiene su largo —propósito y «Quiénes somos» hasta
+  1500, sector hasta 60, enlaces hasta 500— y un campo vacío es nulo, nunca una cadena vacía; el
+  tamaño es uno de seis rangos y el año de fundación, 1800 o más. Como mucho 12 beneficios de 40
+  caracteres por empresa y una fila por empresa y red, con la red entre las cinco de la lista. El
+  techo del año (el actual) y las reglas de los enlaces viven en el código.
 
 ⚠️ Aquí decía «el rango del cambio inesperado cabe dentro de la duración de la prueba». **Eso no
 lo impide nada**: no hay CHECK que lo diga ni comprobación en el código. Ver
@@ -3966,7 +4018,7 @@ Lo que **no** cabe en una restricción y hay que probar en el código está en
 - [Alcance del MVP](08-ALCANCE-DEL-MVP.md) — qué tablas entran en cada hito
 - [Requisitos funcionales](01-REQUISITOS-FUNCIONALES.md) — qué hace el sistema
 - [Estados de la postulación](03-ESTADOS-POSTULACION.md) — los 18 estados y sus transiciones
-- [Roles y permisos](04-ROLES-Y-PERMISOS.md) — los 81 permisos
+- [Roles y permisos](04-ROLES-Y-PERMISOS.md) — los 82 permisos
 - [Diagrama del modelo](diagramas/modelo-de-datos.html) — se abre en el navegador
 
 

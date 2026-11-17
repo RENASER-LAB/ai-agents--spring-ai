@@ -33,6 +33,7 @@ import com.renaser.ai.ai_engine.prueba.repository.IntentoPruebaRepository;
 import com.renaser.ai.ai_engine.prueba.repository.PlantillaPruebaRepository;
 import com.renaser.ai.ai_engine.prueba.repository.VersionPlantillaPruebaRepository;
 import com.renaser.ai.ai_engine.organizacion.service.DuenoDelInstrumento;
+import com.renaser.ai.ai_engine.organizacion.service.EnlacesDeLaEmpresa;
 import com.renaser.ai.ai_engine.perfil.dto.DtosPerfil.OpcionUbigeo;
 import com.renaser.ai.ai_engine.perfil.service.CatalogosDelPerfil;
 import com.renaser.ai.ai_engine.organizacion.service.Instrumento;
@@ -319,6 +320,13 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
             throw new IllegalArgumentException(faltaDelCierre);
         }
         boolean porFecha = FormaDeCierre.esPorFecha(datos.tipoCierre());
+        // El video del puesto (V85), también antes de construir nada y con las reglas del de la
+        // empresa: un enlace que no es de YouTube ni de Vimeo no deja media vacante guardada.
+        String video = EnlacesDeLaEmpresa.normalizar(datos.videoPresentacion());
+        String errorDelVideo = EnlacesDeLaEmpresa.errorDelVideo(video);
+        if (errorDelVideo != null) {
+            throw new IllegalArgumentException(errorDelVideo);
+        }
 
         Vacante vacante = vacantes.save(Vacante.builder()
                 .organizacionId(quien.organizacionId())
@@ -329,6 +337,7 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                 .proposito(datos.proposito())
                 .responsabilidades(datos.responsabilidades())
                 .requisitos(datos.requisitos())
+                .videoPresentacion(video)
                 .modalidad(datos.modalidad())
                 .horario(datos.horario())
                 .ubicacion(datos.ubicacion())
@@ -436,6 +445,13 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
         if (faltaDelCierre != null) {
             throw new IllegalArgumentException(faltaDelCierre);
         }
+        // El video del puesto (V85), antes de tocar nada: solo si el cuerpo lo trae. Ausente, se
+        // queda el que había; vacío, se quita (lo decide CambiosDeLaVacante).
+        String errorDelVideo = EnlacesDeLaEmpresa.errorDelVideo(
+                EnlacesDeLaEmpresa.normalizar(datos.videoPresentacion()));
+        if (errorDelVideo != null) {
+            throw new IllegalArgumentException(errorDelVideo);
+        }
 
         // El sueldo, validado ANTES de tocar la entidad: si el rango está al revés o la
         // vacante publicada intenta esconder lo que paga, no se guarda ni una coma del resto.
@@ -494,6 +510,7 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
         // auditoría. Ver CambiosDeLaVacante.
         vacante.setPlazas(cambios.plazasQueQuedan());
         vacante.setCierraEn(cambios.cierreQueQueda());
+        vacante.setVideoPresentacion(cambios.videoQueQueda());
         // ⚠️ La fecha de APERTURA no se toca al editar. El formulario de esta entrega no la
         // enseña —responsable, título, textos, modalidad, horario, ubicación, forma de
         // cierre y remuneración—, y escribir lo que el cuerpo no trae la vaciaba en silencio
@@ -1995,7 +2012,8 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                         : v.isAplicaEvaluacion()
                                 && Vacante.ORIGEN_NIVEL.equals(v.getOrigenPreguntas())
                                 && Boolean.FALSE.equals(bancoPropio),
-                preguntas.estadoPropias(), prestado.banco(), prestado.prueba(), queBuscarEnElCv);
+                preguntas.estadoPropias(), prestado.banco(), prestado.prueba(), queBuscarEnElCv,
+                v.getVideoPresentacion());
     }
 
     /**

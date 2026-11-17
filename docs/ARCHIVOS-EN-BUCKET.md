@@ -72,6 +72,18 @@ informe solo trae las redes de la persona. Si la firma falla, el informe sale ig
 enlace. ⚠️ Al revés que el pie de la hoja, el aviso del PDF lleva «8 horas» escrito en el código:
 si se cambia `horas-enlace-volcado`, ese texto no cambia con él.
 
+### El logo y la portada de una empresa se ven sin cuenta, y no llevan enlace firmado
+
+Desde la `V85` (16/11/2026) cada empresa puede subir su logo y su portada desde «Perfil de la
+empresa», y los ve cualquiera que abra sus vacantes o su perfil público. **Son los primeros
+archivos que se ven sin cuenta.** Viven en el mismo almacén privado que los demás y **no se da
+ningún enlace a él**: el backend los lee y los sirve él mismo por
+`GET /portal/empresas/{codigo}/imagenes/{logo|portada}`, solo esos dos y solo de una empresa
+activa, con caché pública de un día. Para que se puedan enseñar sin miedo, al subirlas se
+**vuelven a codificar en el servidor sin metadatos** (la posición GPS, la cámara, la fecha): lo que
+se guarda son solo los píxeles. La dirección lleva el id del archivo (`?v=`), así que al cambiar
+el logo cambia también la dirección y la caché no enseña el viejo.
+
 ### El almacén de disco ya no existe
 
 Hubo uno y se quitó: hoy el único sitio donde viven los archivos es el bucket. Las pruebas usan

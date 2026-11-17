@@ -66,6 +66,11 @@ cambian sin avisar a nadie: no salen de la empresa.
 
 ### 3 · La gente postula
 
+**Antes de postular, ve quién ofrece el puesto.** Después de lo que pide la vacante, la empresa
+cuenta quién es: su propósito, un video, su web y sus redes. Con un clic se abre su perfil, con sus
+beneficios y todas sus vacantes abiertas, sin necesidad de cuenta. La empresa lo escribe una vez en
+su panel y sale igual en todas sus convocatorias; una que no lo llenó se ve como siempre.
+
 Por el portal. Sube su currículum y acepta cómo se van a usar sus datos. Si la convocatoria dice
 lo que paga, también dice cuánto quiere ganar: un número, no una horquilla, porque es lo único que
 se puede poner de frente contra el presupuesto y contestar «entra o no entra». Se le propone el

@@ -1,0 +1,383 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Vacante · Supervisor de producción</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@100..900&amp;family=Syne:wght@400..800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#111312}a:hover{color:#111312}
+.ex-nav-enlace:hover,.ex-volver:hover{opacity:0.6}
+.ex-entrar:hover{background:#172a66}
+.ex-boton:hover{background:#172a66}
+.ex-chip:hover{background:#f6f6f4;border-color:#d4d6d3}
+.ex-reproducir:hover .ex-circulo{transform:scale(1.06)}
+.ex-reproducir:focus-visible{outline:2px solid #1e3a8a;outline-offset:3px}
+.ex-ver:hover{text-decoration-color:currentColor}
+.ex-cab{gap:24px}
+.ex-marca{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%)}
+.ex-nav{display:flex}
+.ex-rayas{display:none}
+.ex-hoja{padding:48px 24px 72px}
+.ex-reparto{display:grid;grid-template-columns:minmax(0,1fr) 22rem;grid-template-areas:'contenido lateral';column-gap:72px;margin-top:32px;padding-top:32px;border-top:1px solid #e6e7e4}
+.ex-lateral{grid-area:lateral}
+.ex-contenido{grid-area:contenido;max-width:46rem}
+.ex-solo-pc{display:block}
+.ex-solo-tel{display:none}
+@media (max-width:899px){
+  .ex-solo-pc{display:none}
+  .ex-solo-tel{display:flex}
+  .ex-reparto{grid-template-columns:minmax(0,1fr);grid-template-areas:'lateral' 'contenido';row-gap:32px;margin-top:24px;padding-top:0;border-top:0}
+  .ex-contenido{max-width:none}
+  .ex-accion{position:fixed;left:0;right:0;bottom:0;z-index:20;padding:12px 16px;background:#ffffff;border-top:1px solid #e6e7e4}
+  .ex-hoja{padding-bottom:120px}
+}
+@media (max-width:860px){.ex-marca{position:static;transform:none}}
+@media (max-width:640px){.ex-hoja{padding:32px 16px 120px}}
+@media (max-width:620px){.ex-cab{gap:8px}.ex-nav{display:none}.ex-rayas{display:inline-flex}}
+</style>
+</helmet>
+<div style="min-height:100vh;background:#fcfcfa;color:#111312;font-family:Onest, system-ui, sans-serif;font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased">
+  <div role="group" aria-label="Solo de la maqueta: elegir el caso" style="position:fixed;top:12px;right:12px;z-index:100;display:flex;align-items:center;gap:4px;padding:4px 4px 4px 12px;border:1px dashed #7b8382;border-radius:8px;background:#ffffff;font-family:ui-monospace, SFMono-Regular, Menlo, monospace;font-size:12px;color:#4a5251;box-shadow:0 2px 8px rgb(15 23 42 / 0.08)">
+    <span>Maqueta · Ver:</span>
+    <button type="button" onClick="{{ verConPuesto }}" aria-pressed="{{ conPuesto }}" style="min-height:32px;padding:0 10px;border:0;border-radius:4px;background:{{ fondoCon }};color:{{ tintaCon }};font:inherit;cursor:pointer">con video del puesto</button>
+    <button type="button" onClick="{{ verSinPuesto }}" aria-pressed="{{ sinPuesto }}" style="min-height:32px;padding:0 10px;border:0;border-radius:4px;background:{{ fondoSin }};color:{{ tintaSin }};font:inherit;cursor:pointer">sin video del puesto</button>
+  </div>
+
+  <header style="background:#fcfcfa;border-bottom:1px solid rgb(0 0 0 / 0.1)">
+    <div class="ex-cab" style="position:relative;width:min(95vw, 100% - 32px);margin:0 auto;padding:12px 0;display:flex;align-items:center">
+      <a class="ex-marca" href="#" aria-label="EX, inicio" style="z-index:1;display:inline-flex;align-items:center;min-height:44px;color:#111312;text-decoration:none">
+        <svg width="32" height="28" viewBox="0 0 32 28" fill="none" role="img" aria-label="EX"><path d="M1 2h12v5H6.5v4.5H12v4.5H6.5V21H13v5H1Z" fill="currentColor"></path><path d="M15 2h5l3 6.5L26 2h5l-5.5 12L31 26h-5l-3-6.5-3 6.5h-5l5.5-12Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"></path></svg>
+      </a>
+      <nav class="ex-nav" aria-label="Destinos del portal" style="flex:1;min-width:0;align-items:center;font-size:14px;line-height:21px">
+        <a class="ex-nav-enlace" href="#" style="display:inline-flex;align-items:center;min-height:44px;padding:0 16px 0 4px;letter-spacing:0.025em;text-transform:uppercase;white-space:nowrap;color:#111312;text-decoration:none"><span aria-hidden="true" style="margin-right:0.4em">/</span>Inicio</a>
+        <a class="ex-nav-enlace" href="#" aria-current="page" style="display:inline-flex;align-items:center;min-height:44px;padding:0 16px 0 12px;border-left:1px solid rgb(0 0 0 / 0.06);letter-spacing:0.025em;text-transform:uppercase;white-space:nowrap;color:#1e3a8a;text-decoration:none"><span aria-hidden="true" style="margin-right:0.4em">/</span>Vacantes</a>
+        <a class="ex-nav-enlace" href="#" style="display:inline-flex;align-items:center;min-height:44px;padding:0 16px 0 12px;border-left:1px solid rgb(0 0 0 / 0.06);letter-spacing:0.025em;text-transform:uppercase;white-space:nowrap;color:#111312;text-decoration:none"><span aria-hidden="true" style="margin-right:0.4em">/</span>Mis procesos</a>
+      </nav>
+      <div style="margin-left:auto;display:flex;justify-content:flex-end;align-items:center;gap:12px">
+        <a class="ex-entrar" href="#" style="display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:0 16px;border:1px solid rgb(0 0 0 / 0.1);background:#1e3a8a;color:#ffffff;font-family:Syne, Onest, system-ui, sans-serif;font-size:12px;line-height:18px;text-transform:uppercase;white-space:nowrap;text-decoration:none">Iniciar sesión</a>
+        <button class="ex-rayas" type="button" aria-label="Abrir el menú" aria-expanded="false" style="position:relative;align-items:center;justify-content:center;width:44px;height:44px;padding:0;border:0;background:transparent;color:#111312;font-size:20px;line-height:30px;cursor:pointer"><span aria-hidden="true">/</span></button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div class="ex-hoja" style="max-width:80rem;margin:0 auto">
+      <a class="ex-volver" href="#" style="margin-top:-24px;display:inline-flex;align-items:center;min-height:44px;font-size:12px;letter-spacing:0.06em;text-transform:uppercase;text-decoration:none;color:#4a5251">← Volver a las vacantes</a>
+
+      <div style="margin-top:32px">
+        <h1 style="margin:0 0 0 -0.08em;max-width:22ch;font-size:clamp(2.25rem, 4vw, 3.5rem);line-height:0.98;letter-spacing:-0.055em;font-weight:400;text-wrap:balance">Supervisor de producción</h1>
+        <p style="margin:8px 0 0;display:flex;align-items:center;gap:8px;font-size:18px;font-weight:550;letter-spacing:-0.01em;color:#4a5251"><span aria-hidden="true" style="flex:none;display:inline-flex;width:28px;height:28px;border-radius:4px;overflow:hidden;box-shadow:0 0 0 1px rgb(0 0 0 / 0.1)"><svg width="28" height="28" viewBox="0 0 64 64"><rect width="64" height="64" fill="#7c4a1d"></rect><path d="M32 52V16" stroke="#f5deb3" stroke-width="2.5" stroke-linecap="round"></path><path d="M32 24c-4-1-7-4-7-8 4 1 7 4 7 8Zm0 0c4-1 7-4 7-8-4 1-7 4-7 8Zm0 9c-4-1-7-4-7-8 4 1 7 4 7 8Zm0 0c4-1 7-4 7-8-4 1-7 4-7 8Zm0 9c-4-1-7-4-7-8 4 1 7 4 7 8Zm0 0c4-1 7-4 7-8-4 1-7 4-7 8Z" fill="#f5deb3"></path></svg></span><a href="Portal_perfil.dc.html" style="color:#4a5251;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:0.22em;text-decoration-color:#d4d6d3">Molinos del Sur</a></p>
+      </div>
+
+      <sc-if value="{{ conPuesto }}" hint-placeholder-val="{{ true }}">
+      <figure class="ex-solo-tel" style="margin:24px 0 0;flex-direction:column;gap:12px">
+                <figcaption style="font-size:12px;font-weight:500;letter-spacing:0.16em;text-transform:uppercase;color:#687170">{{ tituloTarjeta }}</figcaption>
+                <sc-if value="{{ t.enEspera }}" hint-placeholder-val="{{ true }}">
+                  <button class="ex-reproducir" type="button" onClick="{{ t.reproducir }}" aria-label="Reproducir el video: {{ nombreTarjeta }}" style="position:relative;box-sizing:border-box;display:block;width:100%;max-width:100%;aspect-ratio:16 / 9;padding:0;border:0;border-radius:4px;background:#141416;color:#f0f0f2;cursor:pointer;overflow:hidden;text-align:left">
+                    <span style="position:absolute;left:14px;top:12px;right:14px;font-family:Syne, Onest, system-ui, sans-serif;font-size:15.84px;font-weight:520;letter-spacing:-0.025em;line-height:1.3">{{ nombreTarjeta }}</span>
+                    <span class="ex-circulo" aria-hidden="true" style="position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:999px;background:#ffffff;color:#111312;display:flex;align-items:center;justify-content:center;transition:transform 160ms cubic-bezier(0.16, 1, 0.3, 1)">
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M8.5 5.5v13l10-6.5-10-6.5Z" fill="currentColor"></path></svg>
+                    </span>
+                  </button>
+                </sc-if>
+                <sc-if value="{{ t.enMarcha }}" hint-placeholder-val="{{ false }}">
+                  <div role="region" aria-label="Reproductor de YouTube (simulado)" style="position:relative;box-sizing:border-box;width:100%;max-width:100%;aspect-ratio:16 / 9;border-radius:4px;background:#000000;color:#ffffff;overflow:hidden">
+                    <div aria-hidden="true" style="position:absolute;inset:0 0 40px 0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;background:#1d1f1e">
+                      <span style="font-family:Syne, Onest, system-ui, sans-serif;font-size:18px;font-weight:600;letter-spacing:-0.02em">{{ nombreTarjeta }}</span>
+                      <span style="font-size:11px;color:rgb(255 255 255 / 0.7)">youtube-nocookie.com · simulado</span>
+                    </div>
+                    <div style="position:absolute;left:0;right:0;bottom:0;height:40px;box-sizing:border-box;padding:0 8px;display:flex;flex-direction:column;justify-content:center;gap:4px;background:#000000">
+                      <div aria-hidden="true" style="position:relative;height:3px;background:rgb(255 255 255 / 0.3)"><div style="position:absolute;left:0;top:0;bottom:0;width:{{ t.avance }};background:#ffffff"></div></div>
+                      <div style="display:flex;align-items:center;gap:8px">
+                        <button type="button" onClick="{{ t.alternar }}" aria-label="{{ t.rotuloAlternar }}" style="width:24px;height:24px;padding:0;border:0;background:none;color:#ffffff;display:inline-flex;align-items:center;justify-content:center;cursor:pointer">
+                          <sc-if value="{{ t.sonando }}" hint-placeholder-val="{{ true }}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6v12M15 6v12"></path></svg></sc-if>
+                          <sc-if value="{{ t.pausado }}" hint-placeholder-val="{{ false }}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M8.5 5.5v13l10-6.5-10-6.5Z" fill="currentColor"></path></svg></sc-if>
+                        </button>
+                        <span data-cifra="" style="font-size:12px;font-variant-numeric:tabular-nums">{{ t.tiempo }} / 2:48</span>
+                        <span style="margin-left:auto;display:inline-flex" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"></path></svg></span>
+                      </div>
+                    </div>
+                  </div>
+                </sc-if>
+                <a class="ex-ver" href="{{ enlaceTarjeta }}" target="_blank" rel="noopener noreferrer" style="align-self:flex-start;display:inline-flex;align-items:center;gap:8px;min-height:44px;font-size:14px;color:#111312;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:0.22em;text-decoration-color:#d4d6d3">Ver en YouTube<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4.5h5.5V10M19.5 4.5 11 13"></path><path d="M17 13.5v4a2 2 0 0 1-2 2H6.5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h4"></path></svg></a>
+                <a class="ex-ver" href="Portal_perfil.dc.html" style="align-self:flex-start;display:inline-flex;align-items:center;min-height:44px;font-size:14px;color:#111312;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:0.22em;text-decoration-color:#d4d6d3">Ver perfil de Molinos del Sur →</a>
+      </figure>
+      </sc-if>
+
+      <div class="ex-reparto" style="align-items:start">
+        <aside class="ex-lateral" aria-label="Lo esencial del puesto">
+          <div style="display:flex;flex-direction:column;gap:24px;padding:24px;background:#ffffff;border:1px solid #e6e7e4;border-radius:8px">
+            <figure class="ex-solo-pc" style="margin:0;padding-bottom:24px;border-bottom:1px solid #e6e7e4">
+              <div style="display:flex;flex-direction:column;gap:12px">
+                <figcaption style="font-size:12px;font-weight:500;letter-spacing:0.16em;text-transform:uppercase;color:#687170">{{ tituloTarjeta }}</figcaption>
+                <sc-if value="{{ t.enEspera }}" hint-placeholder-val="{{ true }}">
+                  <button class="ex-reproducir" type="button" onClick="{{ t.reproducir }}" aria-label="Reproducir el video: {{ nombreTarjeta }}" style="position:relative;box-sizing:border-box;display:block;width:100%;max-width:100%;aspect-ratio:16 / 9;padding:0;border:0;border-radius:4px;background:#141416;color:#f0f0f2;cursor:pointer;overflow:hidden;text-align:left">
+                    <span style="position:absolute;left:14px;top:12px;right:14px;font-family:Syne, Onest, system-ui, sans-serif;font-size:15.84px;font-weight:520;letter-spacing:-0.025em;line-height:1.3">{{ nombreTarjeta }}</span>
+                    <span class="ex-circulo" aria-hidden="true" style="position:absolute;left:50%;top:50%;width:56px;height:56px;margin:-28px 0 0 -28px;border-radius:999px;background:#ffffff;color:#111312;display:flex;align-items:center;justify-content:center;transition:transform 160ms cubic-bezier(0.16, 1, 0.3, 1)">
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M8.5 5.5v13l10-6.5-10-6.5Z" fill="currentColor"></path></svg>
+                    </span>
+                  </button>
+                </sc-if>
+                <sc-if value="{{ t.enMarcha }}" hint-placeholder-val="{{ false }}">
+                  <div role="region" aria-label="Reproductor de YouTube (simulado)" style="position:relative;box-sizing:border-box;width:100%;max-width:100%;aspect-ratio:16 / 9;border-radius:4px;background:#000000;color:#ffffff;overflow:hidden">
+                    <div aria-hidden="true" style="position:absolute;inset:0 0 40px 0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;background:#1d1f1e">
+                      <span style="font-family:Syne, Onest, system-ui, sans-serif;font-size:18px;font-weight:600;letter-spacing:-0.02em">{{ nombreTarjeta }}</span>
+                      <span style="font-size:11px;color:rgb(255 255 255 / 0.7)">youtube-nocookie.com · simulado</span>
+                    </div>
+                    <div style="position:absolute;left:0;right:0;bottom:0;height:40px;box-sizing:border-box;padding:0 8px;display:flex;flex-direction:column;justify-content:center;gap:4px;background:#000000">
+                      <div aria-hidden="true" style="position:relative;height:3px;background:rgb(255 255 255 / 0.3)"><div style="position:absolute;left:0;top:0;bottom:0;width:{{ t.avance }};background:#ffffff"></div></div>
+                      <div style="display:flex;align-items:center;gap:8px">
+                        <button type="button" onClick="{{ t.alternar }}" aria-label="{{ t.rotuloAlternar }}" style="width:24px;height:24px;padding:0;border:0;background:none;color:#ffffff;display:inline-flex;align-items:center;justify-content:center;cursor:pointer">
+                          <sc-if value="{{ t.sonando }}" hint-placeholder-val="{{ true }}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6v12M15 6v12"></path></svg></sc-if>
+                          <sc-if value="{{ t.pausado }}" hint-placeholder-val="{{ false }}"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M8.5 5.5v13l10-6.5-10-6.5Z" fill="currentColor"></path></svg></sc-if>
+                        </button>
+                        <span data-cifra="" style="font-size:12px;font-variant-numeric:tabular-nums">{{ t.tiempo }} / 2:48</span>
+                        <span style="margin-left:auto;display:inline-flex" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"></path></svg></span>
+                      </div>
+                    </div>
+                  </div>
+                </sc-if>
+                <a class="ex-ver" href="{{ enlaceTarjeta }}" target="_blank" rel="noopener noreferrer" style="align-self:flex-start;display:inline-flex;align-items:center;gap:8px;min-height:44px;font-size:14px;color:#111312;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:0.22em;text-decoration-color:#d4d6d3">Ver en YouTube<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4.5h5.5V10M19.5 4.5 11 13"></path><path d="M17 13.5v4a2 2 0 0 1-2 2H6.5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h4"></path></svg></a>
+                <a class="ex-ver" href="Portal_perfil.dc.html" style="align-self:flex-start;display:inline-flex;align-items:center;min-height:44px;font-size:14px;color:#111312;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:0.22em;text-decoration-color:#d4d6d3">Ver perfil de Molinos del Sur →</a>
+              </div>
+            </figure>
+            <p style="display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;margin:0">
+              <span style="flex-basis:100%;font-size:12px;font-weight:500;letter-spacing:0.16em;text-transform:uppercase;color:#687170">Remuneración</span>
+              <span data-cifra="" style="font-size:clamp(24px, 2.4vw, 30px);font-weight:550;font-variant-numeric:tabular-nums">S/ 3,200 – S/ 3,800</span>
+              <span style="font-size:14px;color:#4a5251">según experiencia</span>
+            </p>
+            <dl style="display:flex;flex-direction:column;margin:0;border-top:1px solid #e6e7e4">
+              <div style="display:grid;grid-template-columns:6.5rem 1fr;column-gap:12px;padding:12px 0;border-bottom:1px solid #e6e7e4">
+                <dt style="font-size:12px;font-weight:500;letter-spacing:0.16em;text-transform:uppercase;color:#687170;padding-top:2px">Modalidad</dt>
+                <dd style="margin:0;font-size:14px;line-height:1.5">Presencial</dd>
+              </div>
+              <div style="display:grid;grid-template-columns:6.5rem 1fr;column-gap:12px;padding:12px 0;border-bottom:1px solid #e6e7e4">
+                <dt style="font-size:12px;font-weight:500;letter-spacing:0.16em;text-transform:uppercase;color:#687170;padding-top:2px">Ciudad</dt>
+                <dd style="margin:0;font-size:14px;line-height:1.5">Arequipa · Cerro Colorado</dd>
+              </div>
+              <div style="display:grid;grid-template-columns:6.5rem 1fr;column-gap:12px;padding:12px 0;border-bottom:1px solid #e6e7e4">
+                <dt style="font-size:12px;font-weight:500;letter-spacing:0.16em;text-transform:uppercase;color:#687170;padding-top:2px">Horario</dt>
+                <dd style="margin:0;font-size:14px;line-height:1.5"><span style="display:block">Lunes a sábado</span><span style="display:block">6:00 a 14:00</span></dd>
+              </div>
+            </dl>
+            <div class="ex-accion" style="display:flex">
+              <a class="ex-boton" href="#" style="box-sizing:border-box;width:100%;display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:12px 20px;border-radius:8px;background:#1e3a8a;border:1px solid rgb(0 0 0 / 0.1);color:#ffffff;font-size:14px;font-weight:400;line-height:21px;text-transform:uppercase;text-decoration:none">Postular a este puesto</a>
+            </div>
+          </div>
+        </aside>
+
+        <article class="ex-contenido" style="min-width:0">
+          <section>
+            <h2 style="margin:0 0 12px;font-size:20px;line-height:1.2;letter-spacing:-0.03em;font-weight:550">El resultado que esperamos</h2>
+            <p style="margin:0;font-size:16px;line-height:1.65;color:#4a5251;max-width:68ch;white-space:pre-line">Que la línea de panificación de la planta de Cerro Colorado cumpla cada día el plan de producción, con la merma por debajo del 3 % y sin accidentes.</p>
+          </section>
+
+          <section style="margin-top:32px;padding-top:32px;border-top:1px solid #e6e7e4">
+            <h2 style="margin:0 0 12px;font-size:20px;line-height:1.2;letter-spacing:-0.03em;font-weight:550">Lo que harás</h2>
+            <ul role="list" style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px;max-width:68ch">
+              <li style="display:grid;grid-template-columns:5px 1fr;column-gap:12px;font-size:16px;line-height:1.55;color:#4a5251"><span aria-hidden="true" style="width:5px;height:5px;margin-top:0.55em;background:#d4d6d3"></span><span>Organizar los turnos y las tareas de los 14 operarios de la línea de panificación.</span></li>
+              <li style="display:grid;grid-template-columns:5px 1fr;column-gap:12px;font-size:16px;line-height:1.55;color:#4a5251"><span aria-hidden="true" style="width:5px;height:5px;margin-top:0.55em;background:#d4d6d3"></span><span>Revisar al inicio de cada turno la limpieza y el estado de hornos y amasadoras.</span></li>
+              <li style="display:grid;grid-template-columns:5px 1fr;column-gap:12px;font-size:16px;line-height:1.55;color:#4a5251"><span aria-hidden="true" style="width:5px;height:5px;margin-top:0.55em;background:#d4d6d3"></span><span>Registrar la producción, la merma y las paradas en el sistema de la planta.</span></li>
+              <li style="display:grid;grid-template-columns:5px 1fr;column-gap:12px;font-size:16px;line-height:1.55;color:#4a5251"><span aria-hidden="true" style="width:5px;height:5px;margin-top:0.55em;background:#d4d6d3"></span><span>Coordinar con almacén la llegada de harina y el despacho a las 22 tiendas.</span></li>
+              <li style="display:grid;grid-template-columns:5px 1fr;column-gap:12px;font-size:16px;line-height:1.55;color:#4a5251"><span aria-hidden="true" style="width:5px;height:5px;margin-top:0.55em;background:#d4d6d3"></span><span>Formar a los operarios nuevos en buenas prácticas de manufactura.</span></li>
+            </ul>
+          </section>
+
+          <section style="margin-top:32px;padding-top:32px;border-top:1px solid #e6e7e4">
+            <h2 style="margin:0 0 12px;font-size:20px;line-height:1.2;letter-spacing:-0.03em;font-weight:550">Lo que buscamos</h2>
+            <ul role="list" style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:12px;max-width:68ch">
+              <li style="display:grid;grid-template-columns:5px 1fr;column-gap:12px;font-size:16px;line-height:1.55;color:#4a5251"><span aria-hidden="true" style="width:5px;height:5px;margin-top:0.55em;background:#d4d6d3"></span><span>Dos años o más supervisando personal en una planta de alimentos.</span></li>
+              <li style="display:grid;grid-template-columns:5px 1fr;column-gap:12px;font-size:16px;line-height:1.55;color:#4a5251"><span aria-hidden="true" style="width:5px;height:5px;margin-top:0.55em;background:#d4d6d3"></span><span>Excel intermedio para los reportes de producción.</span></li>
+              <li style="display:grid;grid-template-columns:5px 1fr;column-gap:12px;font-size:16px;line-height:1.55;color:#4a5251"><span aria-hidden="true" style="width:5px;height:5px;margin-top:0.55em;background:#d4d6d3"></span><span>Conocimiento de BPM y HACCP.</span></li>
+              <li style="display:grid;grid-template-columns:5px 1fr;column-gap:12px;font-size:16px;line-height:1.55;color:#4a5251"><span aria-hidden="true" style="width:5px;height:5px;margin-top:0.55em;background:#d4d6d3"></span><span>Trato claro y respetuoso con el equipo, también en los días de más presión.</span></li>
+            </ul>
+          </section>
+
+          <section style="margin-top:48px;border:2px solid #1e3a8a;border-radius:4px;background:#e9edff;color:#172a66;padding:24px">
+            <h2 style="margin:0;font-size:20px;line-height:1.2;letter-spacing:-0.03em;font-weight:550;color:#172a66">Requisitos indispensables</h2>
+            <p style="margin:8px 0 0;font-size:15px;line-height:1.55;max-width:50ch">Estos son condición para el puesto. Al postular te pediremos que confirmes cada uno, y <b style="font-weight:600">no cumplir alguno cierra la postulación</b>. Léelos antes de empezar.</p>
+            <ul role="list" style="list-style:none;margin:16px 0 0;padding:0;display:flex;flex-direction:column;gap:12px">
+              <li style="display:grid;grid-template-columns:7px 1fr;column-gap:12px;font-size:15px;line-height:1.5"><span aria-hidden="true" style="width:7px;height:7px;margin-top:0.5em;background:#1e3a8a"></span><span>Título técnico o universitario en Industrias Alimentarias o afín.</span></li>
+              <li style="display:grid;grid-template-columns:7px 1fr;column-gap:12px;font-size:15px;line-height:1.5"><span aria-hidden="true" style="width:7px;height:7px;margin-top:0.5em;background:#1e3a8a"></span><span>Disponibilidad de lunes a sábado en el turno de mañana.</span></li>
+              <li style="display:grid;grid-template-columns:7px 1fr;column-gap:12px;font-size:15px;line-height:1.5"><span aria-hidden="true" style="width:7px;height:7px;margin-top:0.5em;background:#1e3a8a"></span><span>Vivir en Arequipa o poder mudarse antes de empezar.</span></li>
+            </ul>
+          </section>
+
+          <section aria-labelledby="sobre-empresa" style="margin-top:48px;padding-top:32px;border-top:1px solid #e6e7e4;display:flex;flex-direction:column;gap:24px">
+            <h2 id="sobre-empresa" style="margin:0;font-size:20px;line-height:1.2;letter-spacing:-0.03em;font-weight:550;overflow-wrap:anywhere">Sobre Molinos del Sur</h2>
+
+            <p style="margin:0;font-size:16px;line-height:1.65;color:#4a5251;max-width:68ch;white-space:pre-line">Llevamos pan y harina de calidad a las mesas del sur del Perú desde 1987. Creemos que comer bien no debería depender de dónde vives.
+
+Trabajamos con agricultores de Arequipa, Puno y Cusco, pagamos precios justos y formamos a cada persona que entra al equipo, empiece en la planta o en la oficina.</p>
+
+            <figure class="ex-solo-tel" style="margin:0;flex-direction:column;gap:12px">
+              <sc-if value="{{ e.enEspera }}" hint-placeholder-val="{{ true }}">
+                <button class="ex-reproducir" type="button" onClick="{{ e.reproducir }}" aria-label="Reproducir el video de Molinos del Sur" style="position:relative;box-sizing:border-box;display:block;width:100%;max-width:100%;aspect-ratio:16 / 9;padding:0;border:0;border-radius:4px;background:#141416;color:#f0f0f2;cursor:pointer;overflow:hidden;text-align:left">
+                  <span style="position:absolute;left:20px;top:18px;right:20px;font-family:Syne, Onest, system-ui, sans-serif;font-size:15.84px;font-weight:520;letter-spacing:-0.025em;line-height:1.3">Molinos del Sur</span>
+                  <span class="ex-circulo" aria-hidden="true" style="position:absolute;left:50%;top:50%;width:72px;height:72px;margin:-36px 0 0 -36px;border-radius:999px;background:#ffffff;color:#111312;display:flex;align-items:center;justify-content:center;transition:transform 160ms cubic-bezier(0.16, 1, 0.3, 1)">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M8.5 5.5v13l10-6.5-10-6.5Z" fill="currentColor"></path></svg>
+                  </span>
+                </button>
+              </sc-if>
+              <sc-if value="{{ e.enMarcha }}" hint-placeholder-val="{{ false }}">
+                <div role="region" aria-label="Reproductor de YouTube (simulado)" style="position:relative;box-sizing:border-box;width:100%;max-width:100%;aspect-ratio:16 / 9;border-radius:4px;background:#000000;color:#ffffff;overflow:hidden">
+                  <div aria-hidden="true" style="position:absolute;inset:0 0 52px 0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:#1d1f1e">
+                    <span style="font-family:Syne, Onest, system-ui, sans-serif;font-size:28px;font-weight:600;letter-spacing:-0.02em">Molinos del Sur</span>
+                    <span style="font-size:14px;color:rgb(255 255 255 / 0.7)">Así trabajamos en la planta de Cerro Colorado</span>
+                  </div>
+                  <span style="position:absolute;top:12px;right:12px;padding:4px 8px;border-radius:4px;background:rgb(0 0 0 / 0.6);font-size:12px;color:rgb(255 255 255 / 0.85)">youtube-nocookie.com · simulado</span>
+                  <div style="position:absolute;left:0;right:0;bottom:0;height:52px;box-sizing:border-box;padding:0 12px;display:flex;flex-direction:column;justify-content:center;gap:6px;background:#000000">
+                    <div aria-hidden="true" style="position:relative;height:3px;background:rgb(255 255 255 / 0.3)"><div style="position:absolute;left:0;top:0;bottom:0;width:{{ e.avance }};background:#ffffff"></div></div>
+                    <div style="display:flex;align-items:center;gap:12px">
+                      <button type="button" onClick="{{ e.alternar }}" aria-label="{{ e.rotuloAlternar }}" style="width:28px;height:28px;padding:0;border:0;background:none;color:#ffffff;display:inline-flex;align-items:center;justify-content:center;cursor:pointer">
+                        <sc-if value="{{ e.sonando }}" hint-placeholder-val="{{ true }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6v12M15 6v12"></path></svg></sc-if>
+                        <sc-if value="{{ e.pausado }}" hint-placeholder-val="{{ false }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M8.5 5.5v13l10-6.5-10-6.5Z" fill="currentColor"></path></svg></sc-if>
+                      </button>
+                      <span data-cifra="" style="font-size:13px;font-variant-numeric:tabular-nums">{{ e.tiempo }} / 2:48</span>
+                      <span style="margin-left:auto;display:inline-flex" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"></path></svg></span>
+                    </div>
+                  </div>
+                </div>
+              </sc-if>
+              <a class="ex-ver" href="https://www.youtube.com/watch?v=Qm8sR2vT4kA" target="_blank" rel="noopener noreferrer" style="align-self:flex-start;display:inline-flex;align-items:center;gap:8px;min-height:44px;font-size:14px;color:#111312;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:0.22em;text-decoration-color:#d4d6d3">Ver en YouTube<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4.5h5.5V10M19.5 4.5 11 13"></path><path d="M17 13.5v4a2 2 0 0 1-2 2H6.5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h4"></path></svg></a>
+            </figure>
+            <sc-if value="{{ conPuesto }}" hint-placeholder-val="{{ true }}">
+            <figure class="ex-solo-pc" style="margin:0">
+              <div style="display:flex;flex-direction:column;gap:12px">
+              <figcaption style="font-size:12px;font-weight:500;letter-spacing:0.16em;text-transform:uppercase;color:#687170">Conoce a Molinos del Sur</figcaption>
+              <sc-if value="{{ e.enEspera }}" hint-placeholder-val="{{ true }}">
+                <button class="ex-reproducir" type="button" onClick="{{ e.reproducir }}" aria-label="Reproducir el video de Molinos del Sur" style="position:relative;box-sizing:border-box;display:block;width:100%;max-width:100%;aspect-ratio:16 / 9;padding:0;border:0;border-radius:4px;background:#141416;color:#f0f0f2;cursor:pointer;overflow:hidden;text-align:left">
+                  <span style="position:absolute;left:20px;top:18px;right:20px;font-family:Syne, Onest, system-ui, sans-serif;font-size:15.84px;font-weight:520;letter-spacing:-0.025em;line-height:1.3">Molinos del Sur</span>
+                  <span class="ex-circulo" aria-hidden="true" style="position:absolute;left:50%;top:50%;width:72px;height:72px;margin:-36px 0 0 -36px;border-radius:999px;background:#ffffff;color:#111312;display:flex;align-items:center;justify-content:center;transition:transform 160ms cubic-bezier(0.16, 1, 0.3, 1)">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M8.5 5.5v13l10-6.5-10-6.5Z" fill="currentColor"></path></svg>
+                  </span>
+                </button>
+              </sc-if>
+              <sc-if value="{{ e.enMarcha }}" hint-placeholder-val="{{ false }}">
+                <div role="region" aria-label="Reproductor de YouTube (simulado)" style="position:relative;box-sizing:border-box;width:100%;max-width:100%;aspect-ratio:16 / 9;border-radius:4px;background:#000000;color:#ffffff;overflow:hidden">
+                  <div aria-hidden="true" style="position:absolute;inset:0 0 52px 0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;background:#1d1f1e">
+                    <span style="font-family:Syne, Onest, system-ui, sans-serif;font-size:28px;font-weight:600;letter-spacing:-0.02em">Molinos del Sur</span>
+                    <span style="font-size:14px;color:rgb(255 255 255 / 0.7)">Así trabajamos en la planta de Cerro Colorado</span>
+                  </div>
+                  <span style="position:absolute;top:12px;right:12px;padding:4px 8px;border-radius:4px;background:rgb(0 0 0 / 0.6);font-size:12px;color:rgb(255 255 255 / 0.85)">youtube-nocookie.com · simulado</span>
+                  <div style="position:absolute;left:0;right:0;bottom:0;height:52px;box-sizing:border-box;padding:0 12px;display:flex;flex-direction:column;justify-content:center;gap:6px;background:#000000">
+                    <div aria-hidden="true" style="position:relative;height:3px;background:rgb(255 255 255 / 0.3)"><div style="position:absolute;left:0;top:0;bottom:0;width:{{ e.avance }};background:#ffffff"></div></div>
+                    <div style="display:flex;align-items:center;gap:12px">
+                      <button type="button" onClick="{{ e.alternar }}" aria-label="{{ e.rotuloAlternar }}" style="width:28px;height:28px;padding:0;border:0;background:none;color:#ffffff;display:inline-flex;align-items:center;justify-content:center;cursor:pointer">
+                        <sc-if value="{{ e.sonando }}" hint-placeholder-val="{{ true }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M9 6v12M15 6v12"></path></svg></sc-if>
+                        <sc-if value="{{ e.pausado }}" hint-placeholder-val="{{ false }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M8.5 5.5v13l10-6.5-10-6.5Z" fill="currentColor"></path></svg></sc-if>
+                      </button>
+                      <span data-cifra="" style="font-size:13px;font-variant-numeric:tabular-nums">{{ e.tiempo }} / 2:48</span>
+                      <span style="margin-left:auto;display:inline-flex" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"></path></svg></span>
+                    </div>
+                  </div>
+                </div>
+              </sc-if>
+              <a class="ex-ver" href="https://www.youtube.com/watch?v=Qm8sR2vT4kA" target="_blank" rel="noopener noreferrer" style="align-self:flex-start;display:inline-flex;align-items:center;gap:8px;min-height:44px;font-size:14px;color:#111312;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:0.22em;text-decoration-color:#d4d6d3">Ver en YouTube<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4.5h5.5V10M19.5 4.5 11 13"></path><path d="M17 13.5v4a2 2 0 0 1-2 2H6.5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h4"></path></svg></a>
+              </div>
+            </figure>
+            </sc-if>
+
+            <ul role="list" style="list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:8px">
+              <li><a class="ex-chip" href="https://molinosdelsur.pe" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:8px;min-height:44px;box-sizing:border-box;padding:0 16px 0 12px;border:1px solid #e5e7eb;border-radius:999px;background:#fcfcfa;color:#111312;font-size:14px;text-decoration:none;white-space:nowrap"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M3 12h18"></path><path d="M12 3c2.5 2.6 3.8 5.7 3.8 9S14.5 18.4 12 21c-2.5-2.6-3.8-5.7-3.8-9S9.5 5.6 12 3Z"></path></svg>Página web</a></li>
+              <li><a class="ex-chip" href="https://www.facebook.com/molinosdelsur" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:8px;min-height:44px;box-sizing:border-box;padding:0 16px 0 12px;border:1px solid #e5e7eb;border-radius:999px;background:#fcfcfa;color:#111312;font-size:14px;text-decoration:none;white-space:nowrap"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 8.5H17V5h-2.5A3.5 3.5 0 0 0 11 8.5V11H8.5v3.5H11V21h3.5v-6.5H17l.5-3.5h-3V9a.5.5 0 0 1 .5-.5Z"></path></svg>Facebook</a></li>
+              <li><a class="ex-chip" href="https://www.instagram.com/molinosdelsur" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:8px;min-height:44px;box-sizing:border-box;padding:0 16px 0 12px;border:1px solid #e5e7eb;border-radius:999px;background:#fcfcfa;color:#111312;font-size:14px;text-decoration:none;white-space:nowrap"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="5"></rect><circle cx="12" cy="12" r="4"></circle><path d="M17.5 6.5h.01"></path></svg>Instagram</a></li>
+              <li><a class="ex-chip" href="https://www.linkedin.com/company/molinos-del-sur" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:8px;min-height:44px;box-sizing:border-box;padding:0 16px 0 12px;border:1px solid #e5e7eb;border-radius:999px;background:#fcfcfa;color:#111312;font-size:14px;text-decoration:none;white-space:nowrap"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2.5"></rect><path d="M7.5 10.5V17M7.5 7.4v.1"></path><path d="M11.5 17v-4a2.5 2.5 0 0 1 5 0v4"></path></svg>LinkedIn</a></li>
+              <li><a class="ex-chip" href="https://www.tiktok.com/@molinosdelsur" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:8px;min-height:44px;box-sizing:border-box;padding:0 16px 0 12px;border:1px solid #e5e7eb;border-radius:999px;background:#fcfcfa;color:#111312;font-size:14px;text-decoration:none;white-space:nowrap"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3v11.5a3.5 3.5 0 1 1-3.5-3.5"></path><path d="M14 3c.4 2.6 2.2 4.4 5 4.6"></path></svg>TikTok</a></li>
+              <li><a class="ex-chip" href="https://www.youtube.com/@molinosdelsur" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:8px;min-height:44px;box-sizing:border-box;padding:0 16px 0 12px;border:1px solid #e5e7eb;border-radius:999px;background:#fcfcfa;color:#111312;font-size:14px;text-decoration:none;white-space:nowrap"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="5.5" width="19" height="13" rx="4"></rect><path d="m10.5 9.5 4 2.5-4 2.5Z"></path></svg>YouTube</a></li>
+            </ul>
+            <a class="ex-ver" href="Portal_perfil.dc.html" style="align-self:flex-start;display:inline-flex;align-items:center;min-height:44px;font-size:14px;color:#111312;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:0.22em;text-decoration-color:#d4d6d3">Ver perfil de Molinos del Sur →</a>
+          </section>
+        </article>
+      </div>
+    </div>
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":2400}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { conPuesto: true, t: { estado: 'espera', segundos: 0 }, e: { estado: 'espera', segundos: 0 } };
+    this.relojes = {};
+  }
+
+  componentWillUnmount() {
+    var r = this.relojes;
+    Object.keys(r).forEach(function (k) { if (r[k]) clearInterval(r[k]); });
+  }
+
+  poner(clave, cambio) {
+    var o = {};
+    o[clave] = Object.assign({}, this.state[clave], cambio);
+    this.setState(o);
+  }
+
+  parar(clave) {
+    if (this.relojes[clave]) clearInterval(this.relojes[clave]);
+    this.relojes[clave] = null;
+  }
+
+  arrancar(clave) {
+    var self = this;
+    this.parar(clave);
+    this.relojes[clave] = setInterval(function () {
+      var s = self.state[clave].segundos + 1;
+      if (s >= 168) { self.parar(clave); self.poner(clave, { segundos: 168, estado: 'pausado' }); return; }
+      self.poner(clave, { segundos: s });
+    }, 1000);
+  }
+
+  reproductor(clave) {
+    var self = this, r = this.state[clave];
+    var min = Math.floor(r.segundos / 60), seg = r.segundos % 60;
+    return {
+      enEspera: r.estado === 'espera',
+      enMarcha: r.estado !== 'espera',
+      sonando: r.estado === 'sonando',
+      pausado: r.estado === 'pausado',
+      tiempo: min + ':' + (seg < 10 ? '0' : '') + seg,
+      avance: (Math.max(1, r.segundos / 168 * 100)).toFixed(1) + '%',
+      rotuloAlternar: r.estado === 'sonando' ? 'Pausar' : 'Reproducir',
+      reproducir: function () { self.poner(clave, { estado: 'sonando' }); self.arrancar(clave); },
+      alternar: function () {
+        if (self.state[clave].estado === 'sonando') { self.parar(clave); self.poner(clave, { estado: 'pausado' }); }
+        else { self.poner(clave, { estado: 'sonando', segundos: self.state[clave].segundos >= 168 ? 0 : self.state[clave].segundos }); self.arrancar(clave); }
+      }
+    };
+  }
+
+  cambiarCaso(con) {
+    this.parar('t'); this.parar('e');
+    this.setState({ conPuesto: con, t: { estado: 'espera', segundos: 0 }, e: { estado: 'espera', segundos: 0 } });
+  }
+
+  renderVals() {
+    var self = this, con = this.state.conPuesto;
+    return {
+      conPuesto: con,
+      sinPuesto: !con,
+      t: this.reproductor('t'),
+      e: this.reproductor('e'),
+      tituloTarjeta: con ? 'Conoce el puesto' : 'Conoce a Molinos del Sur',
+      nombreTarjeta: con ? 'Supervisor de producción' : 'Molinos del Sur',
+      enlaceTarjeta: con ? 'https://youtu.be/Hk3pL9dW2sQ' : 'https://www.youtube.com/watch?v=Qm8sR2vT4kA',
+      fondoCon: con ? '#111312' : 'transparent',
+      tintaCon: con ? '#ffffff' : '#4a5251',
+      fondoSin: con ? 'transparent' : '#111312',
+      tintaSin: con ? '#4a5251' : '#ffffff',
+      verConPuesto: function () { self.cambiarCaso(true); },
+      verSinPuesto: function () { self.cambiarCaso(false); }
+    };
+  }
+}
+</script>
+</body>
+</html>

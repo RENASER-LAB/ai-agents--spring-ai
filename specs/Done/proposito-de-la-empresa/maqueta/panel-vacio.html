@@ -1,0 +1,521 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Perfil de la empresa vacío · Panel</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@100..900&amp;family=Syne:wght@400..800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#111312}a:hover{color:#111312}
+.ex-in:hover{border-color:#111312}
+.ex-in:focus-visible{outline:none;border-color:#1e3a8a;box-shadow:0 0 0 1px #1e3a8a,0 0 0 4px rgb(30 58 138 / 0.22)}
+.ex-select{appearance:none;padding-right:48px;background-image:linear-gradient(45deg, transparent 50%, #4a5251 50%),linear-gradient(135deg, #4a5251 50%, transparent 50%);background-position:calc(100% - 22px) calc(50% + 2px),calc(100% - 16px) calc(50% + 2px);background-size:6px 6px,6px 6px;background-repeat:no-repeat;cursor:pointer}
+.ex-enlace:hover{color:#111312;background:rgb(17 19 18 / 0.04)}
+.ex-sec:hover:not(:disabled){background:#f6f6f4}
+.ex-sec:focus-within{outline:2px solid #1e3a8a;outline-offset:3px}
+.ex-acento:hover:not(:disabled){background:#172a66}
+.ex-chico:hover:not(:disabled){border-color:#111312}
+.ex-oculta{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}
+.ex-barra{padding:0 24px}
+.ex-pagina{padding:24px 24px 72px}
+.ex-lateral{display:flex}
+.ex-menu{display:none}
+.ex-dos{display:grid;grid-template-columns:minmax(0,1fr) 26rem;gap:32px;align-items:start}
+.ex-previa{display:block;position:sticky;top:16px}
+.ex-boton-previa{display:none}
+.ex-cerrar-previa{display:none}
+.ex-cajon{position:fixed;top:0;right:0;bottom:0;z-index:90;width:min(30rem, 100vw);display:block;overflow:auto;background:#ffffff;border-left:1px solid #e6e7e4;box-shadow:0 24px 80px rgb(15 23 42 / 0.12)}
+.ex-cajon .ex-cerrar-previa{display:inline-flex}
+@media (max-width:1279.98px){.ex-dos{grid-template-columns:minmax(0,1fr)}.ex-previa{display:none}.ex-previa.ex-cajon{display:block}.ex-boton-previa{display:inline-flex}}
+@media (max-width:1023.98px){.ex-lateral{display:none}.ex-menu{display:inline-flex}}
+@media (max-width:640px){.ex-ocultable{display:none}.ex-barra{padding:0 16px}.ex-pagina{padding:16px 16px 48px}}
+</style>
+</helmet>
+<div style="min-height:100vh;display:flex;flex-direction:column;background:#fcfcfa;color:#111312;font-family:Onest, system-ui, sans-serif;font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased">
+
+  <header class="ex-barra" style="background:#fcfcfa;border-bottom:1px solid rgb(17 19 18 / 0.1);display:flex;align-items:center;gap:12px 16px;min-height:57px;min-width:0">
+    <button class="ex-menu" type="button" style="flex:none;align-items:center;gap:8px;min-height:44px;padding:0 12px;border:1px solid #e5e7eb;border-radius:8px;background:#fcfcfa;color:#111312;font-family:Onest, system-ui, sans-serif;font-size:14px;font-weight:400;text-transform:uppercase;cursor:pointer">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6.5h16M4 12h16M4 17.5h16"></path></svg>
+      Menú
+    </button>
+    <a href="#" aria-label="Panel del equipo, inicio" style="flex:none;display:inline-flex;align-items:center;gap:12px;min-height:44px;color:#111312;text-decoration:none">
+      <svg width="32" height="28" viewBox="0 0 32 28" fill="none" role="img" aria-label="EX"><path d="M1 2h12v5H6.5v4.5H12v4.5H6.5V21H13v5H1Z" fill="currentColor"></path><path d="M15 2h5l3 6.5L26 2h5l-5.5 12L31 26h-5l-3-6.5-3 6.5h-5l5.5-12Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"></path></svg>
+      <span class="ex-ocultable" style="font-family:Syne, Onest, system-ui, sans-serif;font-size:11px;font-weight:600;letter-spacing:0.16em;text-transform:uppercase;color:#111312;border-left:1px solid rgb(17 19 18 / 0.1);padding-left:12px;white-space:nowrap">Panel del equipo</span>
+    </a>
+    <span class="ex-ocultable" style="min-width:0;font-size:14px;color:#687170;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-left:16px;border-left:1px solid rgb(17 19 18 / 0.1)">{{ empresa }}</span>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:12px;min-width:0">
+      <span class="ex-ocultable" style="font-size:14px;color:#4a5251;white-space:nowrap">{{ usuario }}</span>
+      <button type="button" style="flex:none;display:inline-flex;align-items:center;min-height:44px;background:none;border:0;padding:0 8px;font-family:Onest, system-ui, sans-serif;font-size:14px;color:#4a5251;cursor:pointer;text-decoration:underline;text-decoration-color:#d4d6d3;text-underline-offset:0.22em">Salir</button>
+    </div>
+  </header>
+
+  <div style="flex:1;display:flex;align-items:flex-start;min-width:0">
+    <nav class="ex-lateral" aria-label="Menú del panel" style="flex:0 0 240px;box-sizing:border-box;height:742px;flex-direction:column;gap:12px;padding:16px 12px;background:#fcfcfa;border-right:1px solid rgb(17 19 18 / 0.1)">
+      <div style="flex:1;display:flex;flex-direction:column;gap:16px;min-height:0">
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <section aria-label="Selección" style="display:flex;flex-direction:column;gap:4px">
+            <h2 aria-hidden="true" style="margin:0 0 4px;padding:0 12px;font-size:11px;font-weight:400;line-height:1.2;letter-spacing:0.16em;text-transform:uppercase;color:#656d6c">/ Selección</h2>
+            <ul role="list" style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px">
+              <li><a class="ex-enlace" href="Panel_vacante_video.dc.html" style="display:flex;align-items:center;gap:12px;min-height:44px;padding:0 12px;border-radius:4px;color:#4a5251;font-size:14px;text-decoration:none"><span aria-hidden="true" style="display:inline-flex;width:20px;justify-content:center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="7" width="19" height="13" rx="2"></rect><path d="M8.5 7V5.5a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2V7"></path><path d="M2.5 12h19"></path></svg></span><span>Vacantes</span></a></li>
+              <li><a class="ex-enlace" href="#" style="display:flex;align-items:center;gap:12px;min-height:44px;padding:0 12px;border-radius:4px;color:#4a5251;font-size:14px;text-decoration:none"><span aria-hidden="true" style="display:inline-flex;width:20px;justify-content:center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2.8H7a2 2 0 0 0-2 2v14.4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7.8L14 2.8Z"></path><path d="M14 2.8v5h5"></path><path d="M8.5 13h7M8.5 16.5h4.5"></path></svg></span><span>Pruebas</span></a></li>
+              <li><a class="ex-enlace" href="#" style="display:flex;align-items:center;gap:12px;min-height:44px;padding:0 12px;border-radius:4px;color:#4a5251;font-size:14px;text-decoration:none"><span aria-hidden="true" style="display:inline-flex;width:20px;justify-content:center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5.3l3.3 2"></path></svg></span><span>Simulación</span></a></li>
+              <li><a href="#" aria-current="page" style="display:flex;align-items:center;gap:12px;min-height:44px;padding:0 12px;border-radius:4px;color:#1e3a8a;font-weight:550;background:#e9edff;box-shadow:inset 2px 0 0 #1e3a8a;font-size:14px;text-decoration:none"><span aria-hidden="true" style="display:inline-flex;width:20px;justify-content:center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 21V4.5a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1V21"></path><path d="M14.5 9.5h4a1 1 0 0 1 1 1V21"></path><path d="M3 21h18"></path><path d="M8 7.5h3M8 11h3M8 14.5h3"></path></svg></span><span>Perfil de la empresa</span></a></li>
+            </ul>
+          </section>
+          <section aria-label="Personas" style="display:flex;flex-direction:column;gap:4px">
+            <h2 aria-hidden="true" style="margin:0 0 4px;padding:0 12px;font-size:11px;font-weight:400;line-height:1.2;letter-spacing:0.16em;text-transform:uppercase;color:#656d6c">/ Personas</h2>
+            <ul role="list" style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px">
+              <li><a class="ex-enlace" href="#" style="display:flex;align-items:center;gap:12px;min-height:44px;padding:0 12px;border-radius:4px;color:#4a5251;font-size:14px;text-decoration:none"><span aria-hidden="true" style="display:inline-flex;width:20px;justify-content:center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"></circle><path d="M3 19.5c.6-3.3 3.1-5.3 6-5.3s5.4 2 6 5.3"></path><path d="M15.5 5.2a3 3 0 0 1 0 5.8"></path><path d="M17.5 14.6c1.8.6 3.1 2.3 3.5 4.9"></path></svg></span><span>Colaboradores</span></a></li>
+            </ul>
+          </section>
+        </div>
+        <ul role="list" style="list-style:none;margin:auto 0 0;padding:12px 0 0;display:flex;flex-direction:column;gap:2px;border-top:1px solid rgb(17 19 18 / 0.1)">
+          <li><a class="ex-enlace" href="#" style="display:flex;align-items:center;gap:12px;min-height:44px;padding:0 12px;border-radius:4px;color:#4a5251;font-size:14px;text-decoration:none"><span aria-hidden="true" style="display:inline-flex;width:20px;justify-content:center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h9M17 7h3M4 12h3M11 12h9M4 17h11M19 17h1"></path><circle cx="15" cy="7" r="2"></circle><circle cx="9" cy="12" r="2"></circle><circle cx="17" cy="17" r="2"></circle></svg></span><span>Configuración</span></a></li>
+        </ul>
+      </div>
+      <button type="button" aria-pressed="false" style="display:flex;align-items:center;gap:12px;min-height:44px;padding:0 12px;border:0;border-radius:8px;background:none;color:#4a5251;font-family:Onest, system-ui, sans-serif;font-size:14px;cursor:pointer">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m11.5 6.5-5.5 5.5 5.5 5.5M18 6.5 12.5 12l5.5 5.5"></path></svg>
+        <span>Plegar menú</span>
+      </button>
+    </nav>
+
+    <main style="flex:1 1 0;min-width:0">
+      <div class="ex-pagina" style="max-width:120rem;margin:0 auto">
+        <h1 style="margin:0;font-size:clamp(2.25rem, 4vw, 3.5rem);line-height:0.98;letter-spacing:-0.055em;font-weight:400;text-wrap:balance">Perfil de la empresa.</h1>
+        <p style="margin:8px 0 0;font-size:15px;line-height:1.55;color:#4a5251;max-width:50ch">Lo que ven los candidatos en tu página pública y junto a cada vacante.</p>
+
+        <div class="ex-dos" style="margin-top:32px">
+          <form onSubmit="{{ enviar }}" noValidate="{{ true }}" style="display:flex;flex-direction:column;gap:24px;min-width:0">
+
+            <section aria-labelledby="s-identidad" style="padding:24px;background:#ffffff;border:1px solid rgb(0 0 0 / 0.1);border-radius:4px;display:flex;flex-direction:column;gap:24px">
+              <h2 id="s-identidad" style="margin:0;font-size:20px;line-height:1.2;letter-spacing:-0.03em;font-weight:550">Identidad</h2>
+
+              <div style="display:flex;flex-wrap:wrap;gap:16px 24px;align-items:flex-start">
+                <div style="flex:none;width:96px;height:96px;border-radius:8px;overflow:hidden;border:1px solid #e6e7e4;display:grid;place-items:center;background:#e9edff;color:#172a66;font-size:28px;font-weight:550">
+                  <sc-if value="{{ hayLogo }}" hint-placeholder-val="{{ true }}">
+                    <svg width="96" height="96" viewBox="0 0 64 64" role="img" aria-label="Logo de la empresa"><rect width="64" height="64" fill="#7c4a1d"></rect><path d="M32 52V16" stroke="#f5deb3" stroke-width="2.5" stroke-linecap="round"></path><path d="M32 24c-4-1-7-4-7-8 4 1 7 4 7 8Zm0 0c4-1 7-4 7-8-4 1-7 4-7 8Zm0 9c-4-1-7-4-7-8 4 1 7 4 7 8Zm0 0c4-1 7-4 7-8-4 1-7 4-7 8Zm0 9c-4-1-7-4-7-8 4 1 7 4 7 8Zm0 0c4-1 7-4 7-8-4 1-7 4-7 8Z" fill="#f5deb3"></path></svg>
+                  </sc-if>
+                  <sc-if value="{{ sinLogo }}" hint-placeholder-val="{{ false }}"><span aria-hidden="true">{{ iniciales }}</span></sc-if>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:8px;min-width:0;flex:1 1 14rem">
+                  <span style="font-size:14px;font-weight:500;letter-spacing:-0.01em">Logo</span>
+                  <div style="display:flex;flex-wrap:wrap;gap:8px">
+                    <label class="ex-sec" for="archivo-logo" style="display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 16px;border-radius:8px;background:#fcfcfa;border:1px solid #e5e7eb;color:#111312;font-size:14px;line-height:21px;text-transform:uppercase;cursor:pointer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8.5h3.2l1.4-2.3a1.5 1.5 0 0 1 1.3-.7h6.2a1.5 1.5 0 0 1 1.3.7l1.4 2.3H21a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1Z"></path><circle cx="12" cy="13.8" r="3.4"></circle></svg>{{ textoSubirLogo }}</label>
+                    <input id="archivo-logo" class="ex-oculta" type="file" accept="image/jpeg,image/png" onChange="{{ elegirLogo }}">
+                    <sc-if value="{{ hayLogo }}" hint-placeholder-val="{{ true }}">
+                      <button class="ex-sec" type="button" onClick="{{ quitarLogo }}" style="display:inline-flex;align-items:center;min-height:44px;padding:0 16px;border-radius:8px;background:#fcfcfa;border:1px solid #e5e7eb;color:#111312;font-family:Onest, system-ui, sans-serif;font-size:14px;line-height:21px;text-transform:uppercase;cursor:pointer">Quitar</button>
+                    </sc-if>
+                  </div>
+                  <sc-if value="{{ hayErrorLogo }}" hint-placeholder-val="{{ false }}"><p role="alert" style="margin:0;font-size:13px;color:#c22a3f">{{ errorLogo }}</p></sc-if>
+                </div>
+              </div>
+
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <span style="font-size:14px;font-weight:500;letter-spacing:-0.01em">Foto de portada</span>
+                <div style="height:120px;border-radius:8px;overflow:hidden;border:1px solid #e6e7e4;background:#f5f7fb">
+                  <sc-if value="{{ hayPortada }}" hint-placeholder-val="{{ true }}">
+                    <svg width="100%" height="120" viewBox="0 0 1600 400" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect width="1600" height="400" fill="#efe3cb"></rect><circle cx="1240" cy="120" r="70" fill="#f2c46d"></circle><path d="M0 270 C300 200 520 230 800 250 S1300 210 1600 240 V400 H0Z" fill="#d6b06a"></path><path d="M0 320 C260 280 600 300 900 315 S1350 290 1600 300 V400 H0Z" fill="#b8863f"></path><path d="M0 365 C400 340 900 350 1600 345 V400 H0Z" fill="#7c4a1d"></path><path d="M220 400 L520 300 M480 400 L700 305 M760 400 L900 312 M1040 400 L1100 316 M1320 400 L1300 312" stroke="#e8c98a" stroke-width="6" opacity="0.6"></path></svg>
+                  </sc-if>
+                </div>
+                <div style="display:flex;flex-wrap:wrap;gap:8px">
+                  <label class="ex-sec" for="archivo-portada" style="display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 16px;border-radius:8px;background:#fcfcfa;border:1px solid #e5e7eb;color:#111312;font-size:14px;line-height:21px;text-transform:uppercase;cursor:pointer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8.5h3.2l1.4-2.3a1.5 1.5 0 0 1 1.3-.7h6.2a1.5 1.5 0 0 1 1.3.7l1.4 2.3H21a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1Z"></path><circle cx="12" cy="13.8" r="3.4"></circle></svg>{{ textoSubirPortada }}</label>
+                  <input id="archivo-portada" class="ex-oculta" type="file" accept="image/jpeg,image/png" onChange="{{ elegirPortada }}">
+                  <sc-if value="{{ hayPortada }}" hint-placeholder-val="{{ true }}">
+                    <button class="ex-sec" type="button" onClick="{{ quitarPortada }}" style="display:inline-flex;align-items:center;min-height:44px;padding:0 16px;border-radius:8px;background:#fcfcfa;border:1px solid #e5e7eb;color:#111312;font-family:Onest, system-ui, sans-serif;font-size:14px;line-height:21px;text-transform:uppercase;cursor:pointer">Quitar</button>
+                  </sc-if>
+                </div>
+                <sc-if value="{{ hayErrorPortada }}" hint-placeholder-val="{{ false }}"><p role="alert" style="margin:0;font-size:13px;color:#c22a3f">{{ errorPortada }}</p></sc-if>
+              </div>
+
+              <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(14rem, 1fr));gap:24px 16px">
+                <div style="display:flex;flex-direction:column;gap:8px;min-width:0">
+                  <label for="campo-nombre" style="font-size:14px;font-weight:500;letter-spacing:-0.01em">Nombre de la empresa</label>
+                  <input id="campo-nombre" type="text" value="{{ empresa }}" readOnly="{{ true }}" style="box-sizing:border-box;width:100%;min-height:48px;padding:0 12px;background:#e5e5e7;color:#4a5251;border:1px solid #e5e5e7;font-family:Onest, system-ui, sans-serif;font-size:16px;border-radius:4px">
+                </div>
+                <div style="display:flex;flex-direction:column;gap:8px;min-width:0">
+                  <label for="campo-sector" style="font-size:14px;font-weight:500;letter-spacing:-0.01em">Sector</label>
+                  <input id="campo-sector" class="ex-in" type="text" maxLength="60" value="{{ sector }}" onInput="{{ cambiarSector }}" style="box-sizing:border-box;width:100%;min-height:48px;padding:0 12px;background:#ffffff;color:#111312;border:1px solid #7b8382;font-family:Onest, system-ui, sans-serif;font-size:16px;border-radius:4px">
+                </div>
+                <div style="display:flex;flex-direction:column;gap:8px;min-width:0">
+                  <label for="campo-tamano" style="font-size:14px;font-weight:500;letter-spacing:-0.01em">Tamaño</label>
+                  <select id="campo-tamano" class="ex-in ex-select" value="{{ tamano }}" onChange="{{ cambiarTamano }}" style="box-sizing:border-box;width:100%;min-height:48px;padding-left:12px;background-color:#ffffff;color:#111312;border:1px solid #7b8382;font-family:Onest, system-ui, sans-serif;font-size:16px;border-radius:4px">
+                    <option value="">Sin indicar</option>
+                    <option value="1–10 colaboradores">1–10 colaboradores</option>
+                    <option value="11–50 colaboradores">11–50 colaboradores</option>
+                    <option value="51–200 colaboradores">51–200 colaboradores</option>
+                    <option value="201–500 colaboradores">201–500 colaboradores</option>
+                    <option value="501–1000 colaboradores">501–1000 colaboradores</option>
+                    <option value="Más de 1000 colaboradores">Más de 1000 colaboradores</option>
+                  </select>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:8px;min-width:0">
+                  <label for="campo-fundacion" style="font-size:14px;font-weight:500;letter-spacing:-0.01em">Año de fundación</label>
+                  <input id="campo-fundacion" class="ex-in" type="text" inputMode="numeric" maxLength="4" value="{{ fundacion }}" onInput="{{ cambiarFundacion }}" aria-invalid="{{ fundacionInvalida }}" style="box-sizing:border-box;width:100%;min-height:48px;padding:0 12px;background:#ffffff;color:#111312;border:{{ bordeFundacion }};font-family:Onest, system-ui, sans-serif;font-size:16px;border-radius:4px;font-variant-numeric:tabular-nums">
+                  <sc-if value="{{ hayErrorFundacion }}" hint-placeholder-val="{{ false }}"><p style="margin:0;font-size:13px;color:#c22a3f">{{ errorFundacion }}</p></sc-if>
+                </div>
+              </div>
+
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <div style="display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:4px 12px">
+                  <span style="font-size:14px;font-weight:500;letter-spacing:-0.01em">Sedes</span>
+                  <a href="#" style="font-size:14px;color:#111312;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:0.22em;text-decoration-color:#d4d6d3">Gestionar sedes</a>
+                </div>
+                <sc-if value="{{ haySedes }}" hint-placeholder-val="{{ true }}">
+                  <ul role="list" style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px">
+                    <sc-for list="{{ sedes }}" as="s" hint-placeholder-count="3">
+                      <li style="display:flex;flex-wrap:wrap;align-items:center;gap:4px 16px;background:#ffffff;border:1px solid #e6e7e4;border-radius:4px;padding:12px 16px">
+                        <span style="font-size:16px;font-weight:600">{{ s.nombre }}</span>
+                        <span style="font-size:13px;color:#4a5251">{{ s.provincia }}</span>
+                      </li>
+                    </sc-for>
+                  </ul>
+                </sc-if>
+                <sc-if value="{{ sinSedes }}" hint-placeholder-val="{{ false }}">
+                  <p style="margin:0;font-size:15px;line-height:1.55;color:#4a5251;background:#f5f7fb;border-radius:4px;padding:16px;max-width:50ch">Todavía no hay ninguna sede.</p>
+                </sc-if>
+              </div>
+            </section>
+
+            <section aria-labelledby="s-presentacion" style="padding:24px;background:#ffffff;border:1px solid rgb(0 0 0 / 0.1);border-radius:4px;display:flex;flex-direction:column;gap:24px">
+              <h2 id="s-presentacion" style="margin:0;font-size:20px;line-height:1.2;letter-spacing:-0.03em;font-weight:550">Presentación</h2>
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <label for="campo-quienes" style="font-size:14px;font-weight:500;letter-spacing:-0.01em">Quiénes somos</label>
+                <textarea id="campo-quienes" class="ex-in" maxLength="1500" value="{{ quienes }}" onInput="{{ cambiarQuienes }}" style="box-sizing:border-box;width:100%;min-height:9rem;padding:12px;background:#ffffff;color:#111312;border:1px solid #7b8382;font-family:Onest, system-ui, sans-serif;font-size:16px;line-height:1.55;resize:vertical;border-radius:4px"></textarea>
+                <span data-cifra="" style="align-self:flex-end;font-size:13px;color:{{ colorQuienes }};font-variant-numeric:tabular-nums">{{ cuentaQuienes }} / 1500</span>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <label for="campo-proposito" style="font-size:14px;font-weight:500;letter-spacing:-0.01em">Nuestro propósito</label>
+                <textarea id="campo-proposito" class="ex-in" maxLength="1500" value="{{ proposito }}" onInput="{{ cambiarProposito }}" style="box-sizing:border-box;width:100%;min-height:9rem;padding:12px;background:#ffffff;color:#111312;border:1px solid #7b8382;font-family:Onest, system-ui, sans-serif;font-size:16px;line-height:1.55;resize:vertical;border-radius:4px"></textarea>
+                <span data-cifra="" style="align-self:flex-end;font-size:13px;color:{{ colorProposito }};font-variant-numeric:tabular-nums">{{ cuentaProposito }} / 1500</span>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px">
+                  <label for="campo-beneficio" style="font-size:14px;font-weight:500;letter-spacing:-0.01em">Beneficios</label>
+                  <span data-cifra="" style="font-size:13px;color:#687170;font-variant-numeric:tabular-nums">{{ cuentaBeneficios }} / 12</span>
+                </div>
+                <sc-if value="{{ hayBeneficios }}" hint-placeholder-val="{{ true }}">
+                  <ul role="list" style="list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:8px">
+                    <sc-for list="{{ beneficios }}" as="b" hint-placeholder-count="6">
+                      <li style="display:inline-flex;align-items:center;gap:4px;min-height:36px;box-sizing:border-box;padding:0 4px 0 12px;border:1px solid #e5e7eb;border-radius:999px;background:#fcfcfa;font-size:14px">
+                        <span>{{ b.texto }}</span>
+                        <button type="button" onClick="{{ b.quitar }}" aria-label="{{ b.rotulo }}" style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;padding:0;border:0;border-radius:999px;background:none;color:#4a5251;cursor:pointer"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="m6.5 6.5 11 11M17.5 6.5l-11 11"></path></svg></button>
+                      </li>
+                    </sc-for>
+                  </ul>
+                </sc-if>
+                <div style="display:flex;gap:8px;max-width:28rem">
+                  <input id="campo-beneficio" class="ex-in" type="text" maxLength="40" value="{{ nuevoBeneficio }}" onInput="{{ cambiarNuevo }}" onKeyDown="{{ teclaNuevo }}" disabled="{{ beneficiosLlenos }}" style="box-sizing:border-box;flex:1;min-width:0;min-height:48px;padding:0 12px;background:#ffffff;color:#111312;border:1px solid #7b8382;font-family:Onest, system-ui, sans-serif;font-size:16px;border-radius:4px">
+                  <button class="ex-chico" type="button" onClick="{{ anadirBeneficio }}" disabled="{{ noSePuedeAnadir }}" style="flex:none;display:inline-flex;align-items:center;min-height:48px;padding:0 16px;background:#fcfcfa;color:#111312;border:1px solid #e5e7eb;font-family:Onest, system-ui, sans-serif;font-size:13px;font-weight:400;text-transform:uppercase;cursor:pointer;white-space:nowrap;border-radius:8px">Añadir</button>
+                </div>
+              </div>
+            </section>
+
+            <section aria-labelledby="s-video" style="padding:24px;background:#ffffff;border:1px solid rgb(0 0 0 / 0.1);border-radius:4px;display:flex;flex-direction:column;gap:24px">
+              <h2 id="s-video" style="margin:0;font-size:20px;line-height:1.2;letter-spacing:-0.03em;font-weight:550">Video y enlaces</h2>
+              <div style="display:flex;flex-direction:column;gap:8px">
+                <label for="campo-video" style="font-size:14px;font-weight:500;letter-spacing:-0.01em">Video de la empresa</label>
+                <input id="campo-video" class="ex-in" type="text" inputMode="url" autoComplete="off" value="{{ video }}" onInput="{{ cambiarVideo }}" aria-invalid="{{ videoInvalido }}" style="box-sizing:border-box;width:100%;min-height:48px;padding:0 12px;background:#ffffff;color:#111312;border:{{ bordeVideo }};font-family:Onest, system-ui, sans-serif;font-size:16px;border-radius:4px">
+                <sc-if value="{{ hayErrorVideo }}" hint-placeholder-val="{{ false }}"><p style="margin:0;font-size:13px;color:#c22a3f">{{ errorVideo }}</p></sc-if>
+              </div>
+              <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(16rem, 1fr));gap:24px 16px">
+                <sc-for list="{{ enlaces }}" as="c" hint-placeholder-count="6">
+                  <div style="display:flex;flex-direction:column;gap:8px;min-width:0">
+                    <label for="{{ c.id }}" style="font-size:14px;font-weight:500;letter-spacing:-0.01em">{{ c.etiqueta }}</label>
+                    <input id="{{ c.id }}" class="ex-in" type="text" inputMode="url" autoComplete="off" value="{{ c.valor }}" onInput="{{ c.cambiar }}" aria-invalid="{{ c.invalido }}" style="box-sizing:border-box;width:100%;min-height:48px;padding:0 12px;background:#ffffff;color:#111312;border:{{ c.borde }};font-family:Onest, system-ui, sans-serif;font-size:16px;border-radius:4px">
+                    <sc-if value="{{ c.hayError }}" hint-placeholder-val="{{ false }}"><p style="margin:0;font-size:13px;color:#c22a3f">{{ c.error }}</p></sc-if>
+                  </div>
+                </sc-for>
+              </div>
+            </section>
+
+            <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px">
+              <button class="ex-acento" type="submit" disabled="{{ guardando }}" style="display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:12px 16px;border-radius:8px;font-family:Onest, system-ui, sans-serif;font-size:14px;font-weight:400;line-height:21px;text-transform:uppercase;background:{{ fondoGuardar }};color:{{ tintaGuardar }};border:1px solid {{ bordeGuardar }};cursor:pointer">{{ textoGuardar }}</button>
+              <button class="ex-boton-previa ex-chico" type="button" onClick="{{ abrirPrevia }}" style="align-items:center;min-height:44px;padding:0 16px;background:#fcfcfa;color:#111312;border:1px solid #e5e7eb;font-family:Onest, system-ui, sans-serif;font-size:13px;font-weight:400;text-transform:uppercase;cursor:pointer;white-space:nowrap;border-radius:8px">Vista previa</button>
+              <a href="Portal_perfil.dc.html" style="display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 8px;font-size:14px;color:#4a5251;text-decoration:underline;text-decoration-thickness:1px;text-underline-offset:0.22em;text-decoration-color:#d4d6d3;white-space:nowrap">Ver perfil público<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4.5h5.5V10M19.5 4.5 11 13"></path><path d="M17 13.5v4a2 2 0 0 1-2 2H6.5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2h4"></path></svg></a>
+            </div>
+            <sc-if value="{{ aviso }}" hint-placeholder-val="{{ false }}">
+              <p role="status" style="margin:0;font-size:15px;color:#0b7a63;border-left:2px solid #0b7a63;padding-left:12px">Guardado. Tu perfil público ya lo muestra.</p>
+            </sc-if>
+            <sc-if value="{{ hayErrores }}" hint-placeholder-val="{{ false }}">
+              <p role="alert" style="display:flex;gap:12px;margin:0;border:1px solid #f3c3cc;background:#fdedf0;padding:12px 16px;font-size:15px;line-height:1.5;color:#c22a3f;max-width:50ch;border-radius:4px"><span aria-hidden="true" style="flex:none;width:3px;background:#c22a3f"></span><span>No se guardó nada. Corrige los campos marcados.</span></p>
+            </sc-if>
+          </form>
+
+          <aside class="ex-previa {{ claseCajon }}" aria-label="Vista previa del perfil público">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;padding:{{ rellenoCabeceraPrevia }}">
+              <p style="margin:0;font-size:12px;font-weight:500;letter-spacing:0.16em;text-transform:uppercase;color:#687170">Vista previa</p>
+              <button class="ex-cerrar-previa" type="button" onClick="{{ cerrarPrevia }}" aria-label="Cerrar la vista previa" style="align-items:center;justify-content:center;width:44px;height:44px;margin-right:-12px;background:none;border:0;font-size:28px;line-height:1;color:#4a5251;cursor:pointer">×</button>
+            </div>
+            <div style="background:#fcfcfa;border:1px solid rgb(0 0 0 / 0.1);border-radius:8px;overflow:hidden;max-height:742px;overflow-y:auto">
+              <div style="height:96px;background:#f5f7fb;border-bottom:1px solid #e6e7e4">
+                <sc-if value="{{ hayPortada }}" hint-placeholder-val="{{ true }}">
+                  <svg width="100%" height="96" viewBox="0 0 1600 400" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect width="1600" height="400" fill="#efe3cb"></rect><circle cx="1240" cy="120" r="70" fill="#f2c46d"></circle><path d="M0 270 C300 200 520 230 800 250 S1300 210 1600 240 V400 H0Z" fill="#d6b06a"></path><path d="M0 320 C260 280 600 300 900 315 S1350 290 1600 300 V400 H0Z" fill="#b8863f"></path><path d="M0 365 C400 340 900 350 1600 345 V400 H0Z" fill="#7c4a1d"></path></svg>
+                </sc-if>
+              </div>
+              <div style="padding:0 16px 16px;display:flex;flex-direction:column;gap:16px">
+                <div style="margin-top:-32px;width:64px;height:64px;box-sizing:border-box;border:3px solid #ffffff;border-radius:8px;overflow:hidden;display:grid;place-items:center;background:#e9edff;color:#172a66;font-size:20px;font-weight:550;box-shadow:0 8px 24px rgb(15 23 42 / 0.08)">
+                  <sc-if value="{{ hayLogo }}" hint-placeholder-val="{{ true }}">
+                    <svg width="64" height="64" viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" fill="#7c4a1d"></rect><path d="M32 52V16" stroke="#f5deb3" stroke-width="2.5" stroke-linecap="round"></path><path d="M32 24c-4-1-7-4-7-8 4 1 7 4 7 8Zm0 0c4-1 7-4 7-8-4 1-7 4-7 8Zm0 9c-4-1-7-4-7-8 4 1 7 4 7 8Zm0 0c4-1 7-4 7-8-4 1-7 4-7 8Zm0 9c-4-1-7-4-7-8 4 1 7 4 7 8Zm0 0c4-1 7-4 7-8-4 1-7 4-7 8Z" fill="#f5deb3"></path></svg>
+                  </sc-if>
+                  <sc-if value="{{ sinLogo }}" hint-placeholder-val="{{ false }}"><span aria-hidden="true">{{ iniciales }}</span></sc-if>
+                </div>
+                <div>
+                  <p style="margin:0;font-size:24px;font-weight:550;letter-spacing:-0.03em;line-height:1.1">{{ empresa }}</p>
+                  <sc-if value="{{ hayLineaDatos }}" hint-placeholder-val="{{ true }}"><p style="margin:6px 0 0;font-size:14px;line-height:1.4;color:#4a5251">{{ lineaDatos }}</p></sc-if>
+                  <sc-if value="{{ haySedes }}" hint-placeholder-val="{{ true }}"><p style="margin:4px 0 0;font-size:13px;color:#687170">{{ ciudadPrincipal }}</p></sc-if>
+                </div>
+                <sc-if value="{{ hayQuienes }}" hint-placeholder-val="{{ true }}">
+                  <div><p style="margin:0 0 6px;font-size:15px;font-weight:550;letter-spacing:-0.02em">Quiénes somos</p><p style="margin:0;font-size:14px;line-height:1.6;color:#4a5251;white-space:pre-line;overflow-wrap:anywhere">{{ quienes }}</p></div>
+                </sc-if>
+                <sc-if value="{{ hayProposito }}" hint-placeholder-val="{{ true }}">
+                  <div><p style="margin:0 0 6px;font-size:15px;font-weight:550;letter-spacing:-0.02em">Nuestro propósito</p><p style="margin:0;font-size:14px;line-height:1.6;color:#4a5251;white-space:pre-line;overflow-wrap:anywhere">{{ proposito }}</p></div>
+                </sc-if>
+                <sc-if value="{{ hayVideoValido }}" hint-placeholder-val="{{ true }}">
+                  <div style="position:relative;width:100%;aspect-ratio:16 / 9;border-radius:4px;background:#141416;color:#f0f0f2">
+                    <span style="position:absolute;left:12px;top:10px;font-family:Syne, Onest, system-ui, sans-serif;font-size:13px;font-weight:520">{{ empresa }}</span>
+                    <span aria-hidden="true" style="position:absolute;left:50%;top:50%;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:999px;background:#ffffff;color:#111312;display:flex;align-items:center;justify-content:center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="M8.5 5.5v13l10-6.5-10-6.5Z" fill="currentColor"></path></svg></span>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ hayBeneficios }}" hint-placeholder-val="{{ true }}">
+                  <div>
+                    <p style="margin:0 0 8px;font-size:15px;font-weight:550;letter-spacing:-0.02em">Beneficios</p>
+                    <ul role="list" style="list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:6px">
+                      <sc-for list="{{ beneficios }}" as="b" hint-placeholder-count="6">
+                        <li style="display:inline-flex;align-items:center;gap:4px;padding:2px 10px;border:1px solid #e5e7eb;border-radius:999px;background:#ffffff;font-size:12px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0b7a63" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12.8 4.5 4.5L19 7.5"></path></svg>{{ b.texto }}</li>
+                      </sc-for>
+                    </ul>
+                  </div>
+                </sc-if>
+                <div>
+                  <p style="margin:0 0 8px;font-size:15px;font-weight:550;letter-spacing:-0.02em">Vacantes abiertas (1)</p>
+                  <ul role="list" style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px">
+                    <li style="padding:8px 10px;border-radius:4px;background:#ffffff;box-shadow:0 0 0 1px rgb(0 0 0 / 0.1);font-size:13px"><span style="display:block;font-weight:600">Vendedor de mostrador</span><span style="color:#687170">Presencial · Huancayo</span></li>
+                  </ul>
+                </div>
+                <sc-if value="{{ hayRedes }}" hint-placeholder-val="{{ true }}">
+                  <ul role="list" style="list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:6px">
+                    <sc-for list="{{ redesPrevia }}" as="r" hint-placeholder-count="6">
+                      <li style="padding:2px 10px;border:1px solid #e5e7eb;border-radius:999px;background:#fcfcfa;font-size:12px">{{ r.nombre }}</li>
+                    </sc-for>
+                  </ul>
+                </sc-if>
+              </div>
+            </div>
+          </aside>
+        </div>
+        <sc-if value="{{ previaAbierta }}" hint-placeholder-val="{{ false }}">
+          <div aria-hidden="true" onClick="{{ cerrarPrevia }}" style="position:fixed;inset:0;z-index:80;background:rgb(0 0 0 / 0.4)"></div>
+        </sc-if>
+      </div>
+    </main>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1900}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    var datos = this.datosIniciales();
+    this.state = { datos: datos, nuevo: '', errores: {}, guardando: false, aviso: false, previa: false };
+  }
+
+  datosIniciales() {
+    return {
+      empresa: 'Ferretería Los Andes',
+      usuario: 'Jorge Huamán',
+      logo: false,
+      portada: false,
+      sector: '',
+      tamano: '',
+      fundacion: '',
+      sedes: [],
+      quienes: '',
+      proposito: '',
+      beneficios: [],
+      video: '',
+      WEB: '',
+      FACEBOOK: '',
+      INSTAGRAM: '',
+      LINKEDIN: '',
+      TIKTOK: '',
+      YOUTUBE: ''
+    };
+  }
+
+  enlacesDef() {
+    return [
+      { clave: 'WEB', nombre: 'Página web', dominios: null },
+      { clave: 'FACEBOOK', nombre: 'Facebook', dominios: ['facebook.com', 'fb.com'] },
+      { clave: 'INSTAGRAM', nombre: 'Instagram', dominios: ['instagram.com'] },
+      { clave: 'LINKEDIN', nombre: 'LinkedIn', dominios: ['linkedin.com'] },
+      { clave: 'TIKTOK', nombre: 'TikTok', dominios: ['tiktok.com'] },
+      { clave: 'YOUTUBE', nombre: 'YouTube', dominios: ['youtube.com', 'youtu.be'] }
+    ];
+  }
+
+  normalizar(v) {
+    var t = (v || '').trim();
+    if (!t) return '';
+    return /^[a-z][a-z0-9+.\-]*:/i.test(t) ? t : 'https://' + t;
+  }
+
+  url(u) {
+    if (u.length > 500 || /\s/.test(u)) return null;
+    var x;
+    try { x = new URL(u); } catch (e) { return null; }
+    if (x.protocol !== 'http:' && x.protocol !== 'https:') return null;
+    if (x.username || x.password || x.hostname.indexOf('.') < 0) return null;
+    return x;
+  }
+
+  host(x) { return x.hostname.toLowerCase().replace(/^(www\.|m\.)/, ''); }
+
+  esVideo(x) {
+    var h = this.host(x), p = x.pathname;
+    if (h === 'youtu.be') return /^\/[\w-]{6,}\/?$/.test(p);
+    if (h === 'youtube.com') return p === '/watch' ? /^[\w-]{6,}$/.test(x.searchParams.get('v') || '') : /^\/(shorts|embed)\/[\w-]{6,}\/?$/.test(p);
+    if (h === 'vimeo.com') return /^\/\d+(\/[0-9a-z]+)?\/?$/i.test(p);
+    return false;
+  }
+
+  validar(d) {
+    var self = this, e = {}, GEN = 'Escribe una dirección web que empiece por https://';
+    var v = this.normalizar(d.video);
+    if (v) { var xv = this.url(v); if (!xv) e.video = GEN; else if (!this.esVideo(xv)) e.video = 'Pega el enlace de un video de YouTube o de Vimeo'; }
+    this.enlacesDef().forEach(function (k) {
+      var n = self.normalizar(d[k.clave]);
+      if (!n) return;
+      var x = self.url(n);
+      if (!x) e[k.clave] = GEN;
+      else if (k.dominios && !k.dominios.some(function (dm) { var h = self.host(x); return h === dm || h.slice(-(dm.length + 1)) === '.' + dm; })) e[k.clave] = 'Este enlace no es de ' + k.nombre;
+    });
+    var f = (d.fundacion || '').trim();
+    if (f && (!/^\d{4}$/.test(f) || +f < 1800 || +f > 2026)) e.fundacion = 'Escribe un año entre 1800 y 2026.';
+    return e;
+  }
+
+  poner(campo, valor) {
+    var d = Object.assign({}, this.state.datos);
+    d[campo] = valor;
+    var e = Object.assign({}, this.state.errores);
+    delete e[campo];
+    this.setState({ datos: d, errores: e, aviso: false });
+  }
+
+  revisarImagen(archivo, como) {
+    if (!archivo) return null;
+    if (['image/jpeg', 'image/png'].indexOf(archivo.type) < 0) return como + ' tiene que ser JPG o PNG.';
+    if (archivo.size > 2 * 1024 * 1024) return como + ' no puede pesar más de 2 MB. Prueba a guardarlo más pequeño.';
+    return '';
+  }
+
+  elegir(ev, campo, como) {
+    var archivo = ev && ev.target && ev.target.files ? ev.target.files[0] : null;
+    var reparo = this.revisarImagen(archivo, como);
+    if (ev && ev.target) ev.target.value = '';
+    if (reparo === null) return;
+    var e = Object.assign({}, this.state.errores);
+    if (reparo) { e[campo] = reparo; this.setState({ errores: e }); return; }
+    delete e[campo];
+    var d = Object.assign({}, this.state.datos);
+    d[campo] = true;
+    this.setState({ datos: d, errores: e, aviso: false });
+  }
+
+  anadir() {
+    var t = this.state.nuevo.trim(), lista = this.state.datos.beneficios;
+    if (!t || lista.length >= 12) return;
+    if (lista.some(function (b) { return b.toLowerCase() === t.toLowerCase(); })) { this.setState({ nuevo: '' }); return; }
+    this.poner('beneficios', lista.concat([t.slice(0, 40)]));
+    this.setState({ nuevo: '' });
+  }
+
+  renderVals() {
+    var self = this, s = this.state, d = s.datos, e = s.errores;
+    var BORDE = '1px solid #7b8382', MAL = '2px solid #c22a3f';
+    var iniciales = d.empresa.split(/\s+/).filter(Boolean).slice(0, 2).map(function (p) { return p[0].toUpperCase(); }).join('');
+    var enlaces = this.enlacesDef().map(function (k) {
+      var id = 'campo-' + k.clave.toLowerCase(), err = e[k.clave] || '';
+      return { id: id, etiqueta: k.nombre, valor: d[k.clave] || '', error: err, hayError: !!err, invalido: err ? true : undefined, borde: err ? MAL : BORDE, cambiar: function (ev) { self.poner(k.clave, ev.target.value); } };
+    });
+    var redesPrevia = this.enlacesDef().filter(function (k) { return k.clave !== 'WEB' && (d[k.clave] || '').trim(); }).map(function (k) { return { nombre: k.nombre }; });
+    if ((d.WEB || '').trim()) redesPrevia.unshift({ nombre: 'Página web' });
+    var linea = [d.sector.trim(), d.tamano, /^\d{4}$/.test(d.fundacion.trim()) ? 'Fundada en ' + d.fundacion.trim() : ''].filter(Boolean).join(' · ');
+    var nv = this.normalizar(d.video), xv = nv ? this.url(nv) : null;
+    var lleno = d.beneficios.length >= 12;
+    return {
+      empresa: d.empresa,
+      usuario: d.usuario,
+      iniciales: iniciales,
+      hayLogo: d.logo, sinLogo: !d.logo,
+      hayPortada: d.portada,
+      textoSubirLogo: d.logo ? 'Cambiar' : 'Subir logo',
+      textoSubirPortada: d.portada ? 'Cambiar' : 'Subir portada',
+      errorLogo: e.logo || '', hayErrorLogo: !!e.logo,
+      errorPortada: e.portada || '', hayErrorPortada: !!e.portada,
+      elegirLogo: function (ev) { self.elegir(ev, 'logo', 'El logo'); },
+      elegirPortada: function (ev) { self.elegir(ev, 'portada', 'La portada'); },
+      quitarLogo: function () { self.poner('logo', false); },
+      quitarPortada: function () { self.poner('portada', false); },
+      sector: d.sector, cambiarSector: function (ev) { self.poner('sector', ev.target.value.slice(0, 60)); },
+      tamano: d.tamano, cambiarTamano: function (ev) { self.poner('tamano', ev.target.value); },
+      fundacion: d.fundacion, cambiarFundacion: function (ev) { self.poner('fundacion', ev.target.value.replace(/\D/g, '').slice(0, 4)); },
+      errorFundacion: e.fundacion || '', hayErrorFundacion: !!e.fundacion, fundacionInvalida: e.fundacion ? true : undefined, bordeFundacion: e.fundacion ? MAL : BORDE,
+      sedes: d.sedes, haySedes: d.sedes.length > 0, sinSedes: d.sedes.length === 0,
+      ciudadPrincipal: d.sedes.length ? d.sedes[0].provincia : '',
+      quienes: d.quienes, cambiarQuienes: function (ev) { self.poner('quienes', ev.target.value.slice(0, 1500)); },
+      cuentaQuienes: d.quienes.length, colorQuienes: d.quienes.length >= 1500 ? '#c22a3f' : '#687170',
+      proposito: d.proposito, cambiarProposito: function (ev) { self.poner('proposito', ev.target.value.slice(0, 1500)); },
+      cuentaProposito: d.proposito.length, colorProposito: d.proposito.length >= 1500 ? '#c22a3f' : '#687170',
+      hayQuienes: !!d.quienes.trim(), hayProposito: !!d.proposito.trim(),
+      beneficios: d.beneficios.map(function (b, i) { return { texto: b, rotulo: 'Quitar ' + b, quitar: function () { self.poner('beneficios', self.state.datos.beneficios.filter(function (_, j) { return j !== i; })); } }; }),
+      hayBeneficios: d.beneficios.length > 0,
+      cuentaBeneficios: d.beneficios.length,
+      beneficiosLlenos: lleno,
+      noSePuedeAnadir: lleno || !s.nuevo.trim(),
+      nuevoBeneficio: s.nuevo,
+      cambiarNuevo: function (ev) { self.setState({ nuevo: ev.target.value.slice(0, 40) }); },
+      teclaNuevo: function (ev) { if (ev.key === 'Enter') { ev.preventDefault(); self.anadir(); } },
+      anadirBeneficio: function () { self.anadir(); },
+      video: d.video, cambiarVideo: function (ev) { self.poner('video', ev.target.value); },
+      errorVideo: e.video || '', hayErrorVideo: !!e.video, videoInvalido: e.video ? true : undefined, bordeVideo: e.video ? MAL : BORDE,
+      hayVideoValido: !!(xv && this.esVideo(xv)),
+      enlaces: enlaces,
+      redesPrevia: redesPrevia, hayRedes: redesPrevia.length > 0,
+      lineaDatos: linea, hayLineaDatos: !!linea,
+      hayErrores: Object.keys(e).filter(function (k) { return k !== 'logo' && k !== 'portada'; }).length > 0,
+      aviso: s.aviso,
+      guardando: s.guardando,
+      textoGuardar: s.guardando ? 'Guardando…' : 'Guardar',
+      fondoGuardar: s.guardando ? '#e5e5e7' : '#1e3a8a',
+      tintaGuardar: s.guardando ? '#687170' : '#ffffff',
+      bordeGuardar: s.guardando ? 'transparent' : 'rgb(0 0 0 / 0.1)',
+      previaAbierta: s.previa,
+      claseCajon: s.previa ? 'ex-cajon' : '',
+      rellenoCabeceraPrevia: s.previa ? '16px 24px 0' : '0',
+      abrirPrevia: function () { self.setState({ previa: true }); },
+      cerrarPrevia: function () { self.setState({ previa: false }); },
+      enviar: function (ev) {
+        if (ev && ev.preventDefault) ev.preventDefault();
+        if (self.state.guardando) return;
+        var err = self.validar(self.state.datos);
+        if (Object.keys(err).length) { self.setState({ errores: err, aviso: false }); return; }
+        var limpio = Object.assign({}, self.state.datos);
+        limpio.video = self.normalizar(limpio.video);
+        self.enlacesDef().forEach(function (k) { limpio[k.clave] = self.normalizar(limpio[k.clave]); });
+        limpio.sector = limpio.sector.trim(); limpio.quienes = limpio.quienes.trim(); limpio.proposito = limpio.proposito.trim();
+        self.setState({ guardando: true, errores: {} });
+        setTimeout(function () { self.setState({ guardando: false, aviso: true, datos: limpio }); }, 700);
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>

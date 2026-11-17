@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Editar vacante · Video del puesto</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@100..900&amp;family=Syne:wght@400..800&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#111312}a:hover{color:#111312}
+.ex-in:focus-visible{outline:3px solid color-mix(in srgb, #1e3a8a 28%, transparent);outline-offset:2px;border-color:#1e3a8a}
+.ex-enlace:hover{color:#111312;background:rgb(17 19 18 / 0.04)}
+.ex-sec:hover:not(:disabled){background:#f6f6f4}
+.ex-acento:hover:not(:disabled){background:#172a66}
+.ex-cerrar:hover{color:#111312}
+.ex-lapiz:hover{border-color:#d4d6d3;color:#111312}
+.ex-barra{padding:0 24px}
+.ex-pagina{padding:24px 24px 72px}
+.ex-lateral{display:flex}
+.ex-menu{display:none}
+@media (max-width:1023.98px){.ex-lateral{display:none}.ex-menu{display:inline-flex}}
+@media (max-width:640px){.ex-ocultable{display:none}.ex-barra{padding:0 16px}.ex-pagina{padding:16px 16px 48px}}
+</style>
+</helmet>
+<div style="min-height:100vh;display:flex;flex-direction:column;background:#fcfcfa;color:#111312;font-family:Onest, system-ui, sans-serif;font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased">
+
+  <header class="ex-barra" style="background:#fcfcfa;border-bottom:1px solid rgb(17 19 18 / 0.1);display:flex;align-items:center;gap:12px 16px;min-height:57px;min-width:0">
+    <button class="ex-menu" type="button" style="flex:none;align-items:center;gap:8px;min-height:44px;padding:0 12px;border:1px solid #e5e7eb;border-radius:8px;background:#fcfcfa;color:#111312;font-family:Onest, system-ui, sans-serif;font-size:14px;font-weight:400;text-transform:uppercase;cursor:pointer">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6.5h16M4 12h16M4 17.5h16"></path></svg>
+      Menú
+    </button>
+    <a href="#" aria-label="Panel del equipo, inicio" style="flex:none;display:inline-flex;align-items:center;gap:12px;min-height:44px;color:#111312;text-decoration:none">
+      <svg width="32" height="28" viewBox="0 0 32 28" fill="none" role="img" aria-label="EX"><path d="M1 2h12v5H6.5v4.5H12v4.5H6.5V21H13v5H1Z" fill="currentColor"></path><path d="M15 2h5l3 6.5L26 2h5l-5.5 12L31 26h-5l-3-6.5-3 6.5h-5l5.5-12Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"></path></svg>
+      <span class="ex-ocultable" style="font-family:Syne, Onest, system-ui, sans-serif;font-size:11px;font-weight:600;letter-spacing:0.16em;text-transform:uppercase;color:#111312;border-left:1px solid rgb(17 19 18 / 0.1);padding-left:12px;white-space:nowrap">Panel del equipo</span>
+    </a>
+    <span class="ex-ocultable" style="min-width:0;font-size:14px;color:#687170;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-left:16px;border-left:1px solid rgb(17 19 18 / 0.1)">Molinos del Sur</span>
+    <div style="margin-left:auto;display:flex;align-items:center;gap:12px;min-width:0">
+      <span class="ex-ocultable" style="font-size:14px;color:#4a5251;white-space:nowrap">Carla Mendoza</span>
+      <button type="button" style="flex:none;display:inline-flex;align-items:center;min-height:44px;background:none;border:0;padding:0 8px;font-family:Onest, system-ui, sans-serif;font-size:14px;color:#4a5251;cursor:pointer;text-decoration:underline;text-decoration-color:#d4d6d3;text-underline-offset:0.22em">Salir</button>
+    </div>
+  </header>
+
+  <div style="flex:1;display:flex;align-items:flex-start;min-width:0">
+    <nav class="ex-lateral" aria-label="Menú del panel" style="flex:0 0 240px;box-sizing:border-box;height:742px;flex-direction:column;gap:12px;padding:16px 12px;background:#fcfcfa;border-right:1px solid rgb(17 19 18 / 0.1)">
+      <div style="flex:1;display:flex;flex-direction:column;gap:16px;min-height:0">
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <section aria-label="Selección" style="display:flex;flex-direction:column;gap:4px">
+            <h2 aria-hidden="true" style="margin:0 0 4px;padding:0 12px;font-size:11px;font-weight:400;line-height:1.2;letter-spacing:0.16em;text-transform:uppercase;color:#656d6c">/ Selección</h2>
+            <ul role="list" style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px">
+              <li><a href="#" aria-current="page" style="display:flex;align-items:center;gap:12px;min-height:44px;padding:0 12px;border-radius:4px;color:#1e3a8a;font-weight:550;background:#e9edff;box-shadow:inset 2px 0 0 #1e3a8a;font-size:14px;text-decoration:none"><span aria-hidden="true" style="display:inline-flex;width:20px;justify-content:center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="7" width="19" height="13" rx="2"></rect><path d="M8.5 7V5.5a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2V7"></path><path d="M2.5 12h19"></path></svg></span><span>Vacantes</span></a></li>
+              <li><a class="ex-enlace" href="#" style="display:flex;align-items:center;gap:12px;min-height:44px;padding:0 12px;border-radius:4px;color:#4a5251;font-size:14px;text-decoration:none"><span aria-hidden="true" style="display:inline-flex;width:20px;justify-content:center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2.8H7a2 2 0 0 0-2 2v14.4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7.8L14 2.8Z"></path><path d="M14 2.8v5h5"></path><path d="M8.5 13h7M8.5 16.5h4.5"></path></svg></span><span>Pruebas</span></a></li>
+              <li><a class="ex-enlace" href="#" style="display:flex;align-items:center;gap:12px;min-height:44px;padding:0 12px;border-radius:4px;color:#4a5251;font-size:14px;text-decoration:none"><span aria-hidden="true" style="display:inline-flex;width:20px;justify-content:center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5.3l3.3 2"></path></svg></span><span>Simulación</span></a></li>
+              <li><a class="ex-enlace" href="Main.dc.html" style="display:flex;align-items:center;gap:12px;min-height:44px;padding:0 12px;border-radius:4px;color:#4a5251;font-size:14px;text-decoration:none"><span aria-hidden="true" style="display:inline-flex;width:20px;justify-content:center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 21V4.5a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1V21"></path><path d="M14.5 9.5h4a1 1 0 0 1 1 1V21"></path><path d="M3 21h18"></path><path d="M8 7.5h3M8 11h3M8 14.5h3"></path></svg></span><span>Perfil de la empresa</span></a></li>
+            </ul>
+          </section>
+          <section aria-label="Personas" style="display:flex;flex-direction:column;gap:4px">
+            <h2 aria-hidden="true" style="margin:0 0 4px;padding:0 12px;font-size:11px;font-weight:400;line-height:1.2;letter-spacing:0.16em;text-transform:uppercase;color:#656d6c">/ Personas</h2>
+            <ul role="list" style="list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px">
+              <li><a class="ex-enlace" href="#" style="display:flex;align-items:center;gap:12px;min-height:44px;padding:0 12px;border-radius:4px;color:#4a5251;font-size:14px;text-decoration:none"><span aria-hidden="true" style="display:inline-flex;width:20px;justify-content:center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"></circle><path d="M3 19.5c.6-3.3 3.1-5.3 6-5.3s5.4 2 6 5.3"></path><path d="M15.5 5.2a3 3 0 0 1 0 5.8"></path><path d="M17.5 14.6c1.8.6 3.1 2.3 3.5 4.9"></path></svg></span><span>Colaboradores</span></a></li>
+            </ul>
+          </section>
+        </div>
+        <ul role="list" style="list-style:none;margin:auto 0 0;padding:12px 0 0;display:flex;flex-direction:column;gap:2px;border-top:1px solid rgb(17 19 18 / 0.1)">
+          <li><a class="ex-enlace" href="#" style="display:flex;align-items:center;gap:12px;min-height:44px;padding:0 12px;border-radius:4px;color:#4a5251;font-size:14px;text-decoration:none"><span aria-hidden="true" style="display:inline-flex;width:20px;justify-content:center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h9M17 7h3M4 12h3M11 12h9M4 17h11M19 17h1"></path><circle cx="15" cy="7" r="2"></circle><circle cx="9" cy="12" r="2"></circle><circle cx="17" cy="17" r="2"></circle></svg></span><span>Configuración</span></a></li>
+        </ul>
+      </div>
+      <button type="button" aria-pressed="false" style="display:flex;align-items:center;gap:12px;min-height:44px;padding:0 12px;border:0;border-radius:8px;background:none;color:#4a5251;font-family:Onest, system-ui, sans-serif;font-size:14px;cursor:pointer">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m11.5 6.5-5.5 5.5 5.5 5.5M18 6.5 12.5 12l5.5 5.5"></path></svg>
+        <span>Plegar menú</span>
+      </button>
+    </nav>
+
+    <main style="flex:1 1 0;min-width:0">
+      <div class="ex-pagina" style="max-width:120rem;margin:0 auto">
+        <div style="display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:32px">
+          <div>
+            <h1 tabindex="-1" style="margin:0;font-size:clamp(2.25rem, 4vw, 3.5rem);line-height:0.98;letter-spacing:-0.055em;font-weight:400">Vacantes.</h1>
+            <p style="margin:8px 0 0;font-size:15px;line-height:1.55;color:#4a5251;max-width:50ch">Cada una con su estado. Dentro están los postulantes, el ranking y el avance de etapa.</p>
+          </div>
+          <div style="display:flex;flex-wrap:wrap;gap:12px">
+            <button class="ex-sec" type="button" style="display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:12px 16px;border-radius:8px;background:#fcfcfa;border:1px solid #e5e7eb;color:#111312;font-family:Onest, system-ui, sans-serif;font-size:14px;font-weight:400;line-height:21px;text-transform:uppercase;cursor:pointer">Escribir una solicitud</button>
+          </div>
+        </div>
+
+        <sc-if value="{{ hayAviso }}" hint-placeholder-val="{{ false }}">
+          <p role="status" style="margin:16px 0;font-size:15px;color:#0b7a63;background:#e6f5f0;padding:12px 16px;border-radius:4px">Cambios guardados</p>
+        </sc-if>
+
+        <div style="overflow-x:auto;background:#ffffff;border:1px solid #e6e7e4;border-radius:8px;box-shadow:0 8px 24px rgb(15 23 42 / 0.08), 0 2px 8px rgb(15 23 42 / 0.04)">
+          <table style="width:100%;border-collapse:collapse;font-size:14px">
+            <thead>
+              <tr>
+                <th style="text-align:left;font-size:12px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#687170;background:#f5f7fb;padding:12px 16px;border-bottom:1px solid #d4d6d3">Vacante</th>
+                <th style="text-align:left;font-size:12px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#687170;background:#f5f7fb;padding:12px 16px;border-bottom:1px solid #d4d6d3">Estado</th>
+                <th style="text-align:right;font-size:12px;font-weight:600;letter-spacing:0.06em;text-transform:uppercase;color:#687170;background:#f5f7fb;padding:12px 16px;border-bottom:1px solid #d4d6d3">Postulantes</th>
+                <th style="background:#f5f7fb;padding:12px 16px;border-bottom:1px solid #d4d6d3"></th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td style="padding:12px 16px;border-bottom:1px solid #e6e7e4;font-weight:600">Supervisor de producción</td>
+                <td style="padding:12px 16px;border-bottom:1px solid #e6e7e4">Publicada</td>
+                <td style="padding:12px 16px;border-bottom:1px solid #e6e7e4;text-align:right;font-variant-numeric:tabular-nums">38</td>
+                <td style="padding:8px 16px;border-bottom:1px solid #e6e7e4;white-space:nowrap;text-align:right"><button class="ex-lapiz" type="button" onClick="{{ abrir }}" aria-label="Editar Supervisor de producción" style="display:inline-flex;align-items:center;justify-content:center;width:2rem;height:2rem;border:1px solid transparent;border-radius:4px;background:none;color:#4a5251;cursor:pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4l10.5-10.5a2.1 2.1 0 0 0-3-3L5 17v3Z"></path><path d="m14.5 6 3.5 3.5"></path></svg></button></td>
+              </tr>
+              <tr>
+                <td style="padding:12px 16px;border-bottom:1px solid #e6e7e4;font-weight:600">Asistente de almacén</td>
+                <td style="padding:12px 16px;border-bottom:1px solid #e6e7e4">Publicada</td>
+                <td style="padding:12px 16px;border-bottom:1px solid #e6e7e4;text-align:right;font-variant-numeric:tabular-nums">61</td>
+                <td style="padding:8px 16px;border-bottom:1px solid #e6e7e4"></td>
+              </tr>
+              <tr>
+                <td style="padding:12px 16px;font-weight:600">Analista de calidad</td>
+                <td style="padding:12px 16px">Publicada</td>
+                <td style="padding:12px 16px;text-align:right;font-variant-numeric:tabular-nums">12</td>
+                <td style="padding:8px 16px"></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <sc-if value="{{ abierto }}" hint-placeholder-val="{{ true }}">
+    <div aria-hidden="true" onClick="{{ cerrar }}" style="position:fixed;inset:0;background:rgb(0 0 0 / 0.4);z-index:80"></div>
+    <section role="dialog" aria-modal="true" aria-labelledby="titulo-modal" style="position:fixed;z-index:90;left:50%;top:50%;transform:translate(-50%, -50%);width:min(38rem, calc(100vw - 2rem));max-height:min(88vh, 52rem);display:flex;flex-direction:column;background:#ffffff;border:1px solid rgb(0 0 0 / 0.1);box-shadow:0 24px 80px rgb(15 23 42 / 0.12), 0 2px 8px rgb(15 23 42 / 0.06);border-radius:8px">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 24px;border-bottom:1px solid #e6e7e4">
+        <h2 id="titulo-modal" style="margin:0;font-size:20px;line-height:1.2;letter-spacing:-0.03em;font-weight:550">Editar vacante</h2>
+        <button class="ex-cerrar" type="button" onClick="{{ cerrar }}" aria-label="Cerrar" style="flex:none;display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;margin-right:-12px;background:none;border:0;font-size:28px;line-height:1;color:#4a5251;cursor:pointer">×</button>
+      </div>
+      <div ref="{{ refCuerpo }}" style="padding:24px;overflow:auto">
+        <form id="formulario-vacante" onSubmit="{{ enviar }}" noValidate="{{ true }}" style="display:flex;flex-direction:column;gap:16px">
+          <div style="display:flex;flex-direction:column;gap:4px;padding:12px 16px;background:#f5f7fb;border-radius:4px;min-width:0">
+            <span style="font-size:14px;font-weight:600">Solicitud y puesto</span>
+            <strong style="font-weight:600;overflow-wrap:anywhere">Solicitud #48 · Supervisor de producción</strong>
+            <span style="color:#4a5251;font-size:14px">El puesto decide el nivel y la familia de la evaluación; para cambiarlo, crea otra vacante</span>
+          </div>
+
+          <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(16rem, 1fr));gap:16px">
+            <div style="display:flex;flex-direction:column;gap:8px;min-width:0">
+              <label for="v-responsable" style="font-size:14px;font-weight:600">Responsable del proceso</label>
+              <select id="v-responsable" class="ex-in" style="min-height:44px;padding:0 48px 0 12px;background-color:#ffffff;color:#111312;border:1px solid #7b8382;font-family:Onest, system-ui, sans-serif;font-size:16px;border-radius:4px"><option>talento@molinosdelsur.pe</option></select>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px;min-width:0;grid-column:1 / -1">
+              <label for="v-titulo" style="font-size:14px;font-weight:600">Título que ve quien postula</label>
+              <input id="v-titulo" class="ex-in" type="text" value="Supervisor de producción" style="min-height:44px;padding:0 12px;background-color:#ffffff;color:#111312;border:1px solid #7b8382;font-family:Onest, system-ui, sans-serif;font-size:16px;border-radius:4px">
+            </div>
+            <label style="display:flex;flex-direction:column;gap:8px;min-width:0;grid-column:1 / -1">
+              <span style="font-size:14px;font-weight:600">Descripción</span>
+              <textarea class="ex-in" style="min-height:5.5rem;padding:12px;background:#ffffff;color:#111312;border:1px solid #7b8382;font-family:Onest, system-ui, sans-serif;font-size:16px;line-height:1.5;resize:vertical;border-radius:4px">Buscamos a quien organice la línea de panificación de la planta de Cerro Colorado.</textarea>
+            </label>
+            <label style="display:flex;flex-direction:column;gap:8px;min-width:0;grid-column:1 / -1">
+              <span style="font-size:14px;font-weight:600">El resultado que se espera (propósito)</span>
+              <textarea class="ex-in" style="min-height:5.5rem;padding:12px;background:#ffffff;color:#111312;border:1px solid #7b8382;font-family:Onest, system-ui, sans-serif;font-size:16px;line-height:1.5;resize:vertical;border-radius:4px">Que la línea de panificación de la planta de Cerro Colorado cumpla cada día el plan de producción, con la merma por debajo del 3 % y sin accidentes.</textarea>
+            </label>
+            <label style="display:flex;flex-direction:column;gap:8px;min-width:0;grid-column:1 / -1">
+              <span style="font-size:14px;font-weight:600">Lo que hará, una responsabilidad por línea</span>
+              <textarea class="ex-in" style="min-height:5.5rem;padding:12px;background:#ffffff;color:#111312;border:1px solid #7b8382;font-family:Onest, system-ui, sans-serif;font-size:16px;line-height:1.5;resize:vertical;border-radius:4px">Organizar los turnos y las tareas de los 14 operarios de la línea de panificación.
+Revisar al inicio de cada turno la limpieza y el estado de hornos y amasadoras.</textarea>
+            </label>
+            <label style="display:flex;flex-direction:column;gap:8px;min-width:0;grid-column:1 / -1">
+              <span style="font-size:14px;font-weight:600">Lo que se busca, un requisito por línea</span>
+              <textarea class="ex-in" style="min-height:5.5rem;padding:12px;background:#ffffff;color:#111312;border:1px solid #7b8382;font-family:Onest, system-ui, sans-serif;font-size:16px;line-height:1.5;resize:vertical;border-radius:4px">Dos años o más supervisando personal en una planta de alimentos.
+Conocimiento de BPM y HACCP.</textarea>
+            </label>
+
+            <div style="display:flex;flex-direction:column;gap:8px;min-width:0;grid-column:1 / -1">
+              <div style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:4px 12px">
+                <label for="v-video" style="font-size:14px;font-weight:600">Video del puesto (opcional)</label>
+                <sc-if value="{{ usaElDeLaEmpresa }}" hint-placeholder-val="{{ true }}">
+                  <span style="flex:none;display:inline-flex;align-items:center;gap:6px;padding:3px 12px;font-size:12px;font-weight:700;letter-spacing:0.02em;white-space:nowrap;border-radius:8px;border:1px solid transparent;background:#e5e5e7;color:#111312"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M8.5 5.5v13l10-6.5-10-6.5Z" fill="currentColor"></path></svg>Se usará el video de la empresa</span>
+                </sc-if>
+              </div>
+              <input id="v-video" class="ex-in" type="text" inputMode="url" autoComplete="off" value="{{ video }}" onInput="{{ cambiarVideo }}" onBlur="{{ revisarVideo }}" aria-invalid="{{ videoInvalido }}" aria-describedby="{{ videoDescrito }}" style="min-height:44px;padding:0 12px;background-color:#ffffff;color:#111312;border:{{ bordeVideo }};font-family:Onest, system-ui, sans-serif;font-size:16px;border-radius:4px">
+              <sc-if value="{{ hayErrorVideo }}" hint-placeholder-val="{{ false }}">
+                <span id="v-video-error" style="font-size:13px;color:#c22a3f">{{ errorVideo }}</span>
+              </sc-if>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:8px;min-width:0">
+              <label for="v-modalidad" style="font-size:14px;font-weight:600">Modalidad</label>
+              <select id="v-modalidad" class="ex-in" style="min-height:44px;padding:0 48px 0 12px;background-color:#ffffff;color:#111312;border:1px solid #7b8382;font-family:Onest, system-ui, sans-serif;font-size:16px;border-radius:4px"><option>Presencial</option><option>Híbrido</option><option>Remoto</option></select>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px;min-width:0">
+              <label for="v-ciudad" style="font-size:14px;font-weight:600">Ciudad</label>
+              <select id="v-ciudad" class="ex-in" style="min-height:44px;padding:0 48px 0 12px;background-color:#ffffff;color:#111312;border:1px solid #7b8382;font-family:Onest, system-ui, sans-serif;font-size:16px;border-radius:4px"><option>Arequipa</option></select>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px;min-width:0">
+              <label for="v-horario" style="font-size:14px;font-weight:600">Horario</label>
+              <input id="v-horario" class="ex-in" type="text" value="Lunes a sábado · 6:00 a 14:00" style="min-height:44px;padding:0 12px;background-color:#ffffff;color:#111312;border:1px solid #7b8382;font-family:Onest, system-ui, sans-serif;font-size:16px;border-radius:4px">
+            </div>
+            <div style="display:flex;flex-direction:column;gap:8px;min-width:0">
+              <label for="v-zona" style="font-size:14px;font-weight:600">Zona o referencia (opcional)</label>
+              <input id="v-zona" class="ex-in" type="text" value="Cerro Colorado" aria-describedby="v-zona-pista" style="min-height:44px;padding:0 12px;background-color:#ffffff;color:#111312;border:1px solid #7b8382;font-family:Onest, system-ui, sans-serif;font-size:16px;border-radius:4px">
+              <span id="v-zona-pista" style="font-size:13px;color:#687170">Barrio, distrito o dirección. Se ve en la ficha de la vacante</span>
+            </div>
+          </div>
+
+          <sc-if value="{{ hayFallo }}" hint-placeholder-val="{{ false }}">
+            <p role="alert" style="display:flex;gap:12px;margin:16px 0;border:1px solid #f3c3cc;background:#fdedf0;padding:12px 16px;font-size:15px;color:#c22a3f;border-radius:4px"><span aria-hidden="true" style="flex:none;width:3px;background:#c22a3f"></span><span>Corrige lo marcado en «Video del puesto».</span></p>
+          </sc-if>
+        </form>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;justify-content:flex-end;gap:12px;padding:16px 24px;border-top:1px solid #e6e7e4">
+        <button class="ex-sec" type="button" onClick="{{ cerrar }}" disabled="{{ guardando }}" style="display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:12px 16px;border-radius:8px;background:#fcfcfa;border:1px solid #e5e7eb;color:#111312;font-family:Onest, system-ui, sans-serif;font-size:14px;font-weight:400;line-height:21px;text-transform:uppercase;cursor:pointer">Cancelar</button>
+        <button class="ex-acento" type="submit" form="formulario-vacante" disabled="{{ guardando }}" style="display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:12px 20px;border-radius:8px;background:{{ fondoGuardar }};border:1px solid rgb(0 0 0 / 0.1);color:{{ tintaGuardar }};font-family:Onest, system-ui, sans-serif;font-size:14px;font-weight:400;line-height:21px;text-transform:uppercase;cursor:pointer">{{ textoGuardar }}</button>
+      </div>
+    </section>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { abierto: true, video: '', error: '', fallo: false, guardando: false, aviso: false };
+    this.desplazado = false;
+  }
+
+  normalizar(v) {
+    var t = (v || '').trim();
+    if (!t) return '';
+    return /^[a-z][a-z0-9+.\-]*:/i.test(t) ? t : 'https://' + t;
+  }
+
+  errorDe(v) {
+    var u = this.normalizar(v);
+    if (!u) return '';
+    var GENERICO = 'Escribe una dirección web que empiece por https://';
+    if (u.length > 500 || /\s/.test(u)) return GENERICO;
+    var x;
+    try { x = new URL(u); } catch (e) { return GENERICO; }
+    if ((x.protocol !== 'http:' && x.protocol !== 'https:') || x.username || x.password || x.hostname.indexOf('.') < 0) return GENERICO;
+    var h = x.hostname.toLowerCase().replace(/^(www\.|m\.)/, ''), p = x.pathname, ok = false;
+    if (h === 'youtu.be') ok = /^\/[\w-]{6,}\/?$/.test(p);
+    else if (h === 'youtube.com') ok = p === '/watch' ? /^[\w-]{6,}$/.test(x.searchParams.get('v') || '') : /^\/(shorts|embed)\/[\w-]{6,}\/?$/.test(p);
+    else if (h === 'vimeo.com') ok = /^\/\d+(\/[0-9a-z]+)?\/?$/i.test(p);
+    return ok ? '' : 'Pega el enlace de un video de YouTube o de Vimeo';
+  }
+
+  renderVals() {
+    var self = this, s = this.state;
+    return {
+      abierto: s.abierto,
+      hayAviso: s.aviso,
+      video: s.video,
+      usaElDeLaEmpresa: s.video.trim() === '',
+      errorVideo: s.error,
+      hayErrorVideo: !!s.error,
+      videoInvalido: s.error ? true : undefined,
+      videoDescrito: s.error ? 'v-video-error' : undefined,
+      bordeVideo: s.error ? '2px solid #c22a3f' : '1px solid #7b8382',
+      hayFallo: s.fallo,
+      guardando: s.guardando,
+      textoGuardar: s.guardando ? 'Guardando…' : 'Guardar cambios',
+      fondoGuardar: s.guardando ? '#e5e5e7' : '#1e3a8a',
+      tintaGuardar: s.guardando ? '#687170' : '#ffffff',
+      refCuerpo: function (el) {
+        if (el && !self.desplazado) { self.desplazado = true; el.scrollTop = 400; }
+        if (!el) self.desplazado = false;
+      },
+      cambiarVideo: function (ev) { self.setState({ video: ev.target.value, error: '', fallo: false }); },
+      revisarVideo: function () { self.setState({ error: self.errorDe(self.state.video) }); },
+      abrir: function () { self.setState({ abierto: true, aviso: false, error: '', fallo: false }); },
+      cerrar: function () { if (!self.state.guardando) self.setState({ abierto: false }); },
+      enviar: function (ev) {
+        if (ev && ev.preventDefault) ev.preventDefault();
+        var e = self.errorDe(self.state.video);
+        if (e) { self.setState({ error: e, fallo: true }); return; }
+        self.setState({ guardando: true, video: self.normalizar(self.state.video) });
+        setTimeout(function () { self.setState({ guardando: false, abierto: false, aviso: true }); }, 700);
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>

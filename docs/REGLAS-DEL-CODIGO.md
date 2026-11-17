@@ -34,7 +34,7 @@ com.renaser.ai.ai_engine.<dominio>
 | Dominio | Qué guarda |
 |---|---|
 | `usuario` | Persona, usuario del equipo, roles y permisos |
-| `organizacion` | La organización, sus áreas, la plataforma (alta de empresas) y la personalización de instrumentos |
+| `organizacion` | La organización, sus áreas, la plataforma (alta de empresas) y la personalización de instrumentos. Desde la `V85`, el «Perfil de la empresa» (`PresentacionEmpresaController`, `ServicioPresentacionImpl`, las reglas en `ReglasDeLaPresentacion` y el logo y la portada, re-codificados sin metadatos, en `ImagenesDeLaEmpresa`) |
 | `solicitud` | La Solicitud de Talento y sus resultados esperados |
 | `vacante` | Vacante, puesto, catálogos y requisitos objetivos. Aquí vive también `AlcanceSobreLaVacante`, que decide para todo el panel qué filas alcanza cada alcance |
 | `postulacion` | La postulación, su historial, el CV y **la máquina de estados** |
@@ -44,7 +44,7 @@ com.renaser.ai.ai_engine.<dominio>
 | `archivo` | El almacén de archivos (memoria, disco o bucket según el perfil) |
 | `auditoria` | El registro inmutable de quién hizo qué |
 | `parametro` | Los valores que Renaser cambia sin programar |
-| `portal` | La cara del candidato: un controlador y tres servicios por tema (la cuenta y su acceso, el tablón público, la postulación) |
+| `portal` | La cara del candidato: un controlador y tres servicios por tema (la cuenta y su acceso, el tablón público, la postulación). Desde la `V85`, un segundo controlador sin token, `EmpresasPortalController`, con el perfil público de cada empresa y su logo y portada (`ServicioEmpresasPortalImpl`) |
 | `administracion` | La cara de configuración del panel; el borrado 29733 vive aparte en `ServicioBorradoDatos` |
 | `seguridad` | Las puertas —portal, panel y, desde la V73, integraciones, con la firma del bot en `FiltroFirmaWhatsapp`—, tokens, contexto y permisos con alcance |
 | `comun` | El manejador de errores propio y el candado de Swagger. Desde la `V84`, también el motor de PDF (`comun/pdf/`), pensado para cualquier documento que genere el backend: ver «Dónde vive cada cuenta que se hace en un solo sitio» |
@@ -98,7 +98,11 @@ salgan con candado). Está escrito en el javadoc de ambas.
   migración aplicada ya no entra**: Flyway no aplica migraciones fuera de orden (`out-of-order`
   no está activado), y en una base que ya tenga una más alta no arranca. Pasa ya: la `V84`, de
   los informes por etapa, llegó antes que la `V81`, la `V82` y la `V83` que reservaban otras
-  specs; cuando se construyan tendrán que llevar un número mayor que la última aplicada.
+  specs, y el perfil de la empresa, que reservaba la `V81`, entró como `V85` porque la `V84` ya
+  estaba aplicada en producción. Las demás reservas de la reunión del 13/11 se corrieron
+  (brochure `V86`, convocatoria `V87`, video por webcam `V88`), y las de seguimiento de
+  pendientes (`V82`) y Excel resumido (`V83`) tendrán que subir al construirse. **Una reserva no
+  es un número**: el de verdad se elige al construir y siempre es mayor que la última aplicada.
 - **Nada se recalcula hacia atrás por su cuenta.** Cada nota queda atada a la versión de pesos de
   su vacante. La única vía para cambiarla es cambiar la versión de la vacante (`V74`), que
   recalcula a todos a la vez por `RecalculoConOtrosPesos`, sin IA, sin máquina de estados y sin
@@ -189,6 +193,8 @@ está en su classpath, así que `integracion/soporte/RespuestaV3` usa la 2 a pro
 | Qué se puede escribir en «Qué buscar en el CV» (`V80`) | `vacante/service/ReglasQueBuscarEnElCv`: vacías, repetidas, el tope de seis y de 200 caracteres, y lo que no se puede buscar. El panel tiene la misma regla en `src/panel/vacantes/reglasQueBuscar.ts`, con las mismas palabras; **no hay contrato que las amarre**: cada una tiene sus pruebas (`ReglasQueBuscarEnElCvTest` aquí, `reglasQueBuscar.test.ts` allí). **Es una lista cerrada**: cambiarla es cambiarla en los dos, con su caso en las dos pruebas (ver el 20 de [Defectos conocidos](DEFECTOS-CONOCIDOS.md)) |
 | Qué dice el informe de una etapa (`V84`) | `informe/service/ArmadoDelInforme`: **un solo armado, dos salidas**. El JSON del visor y el PDF leen el mismo objeto, y el redactor del informe recibe sus datos de ese mismo armado (`RedaccionDelInforme.insumo`). Las notas no se recalculan aquí: la del CV sale de `NotaDelCurriculum` y las demás, de los servicios que ya usa la ficha. Con un armado para la pantalla y otro para el PDF, el visor y el archivo acabarían diciendo cosas distintas |
 | Cómo se dibuja un PDF (`V84`) | `comun/pdf/`: `LienzoPdf` (páginas A4 de PDFBox, con las coordenadas desde arriba como en la maqueta HTML), `FlujoPdf` (coloca piezas una debajo de otra y abre página cuando no caben, sin partir una pieza que quepa entera en una hoja), `RenglonesPdf` (parte el texto en renglones sin recortar nada), `TipografiaPdf` y `EstiloPdf`. **Las fuentes van incrustadas**, solo con los glifos usados: Onest y Syne, pasadas a TTF desde los WOFF2 del panel (`src/main/resources/pdf/fuentes/`, con su licencia en `LEEME.txt`). Son variables y el PDF usa su peso 400; el peso medio se simula con un trazo fino sobre el relleno. Un carácter que ninguna fuente dibuja sale como «?», en vez de tumbar el documento. Ningún dato sale a un servicio externo para armarlo. Lo propio de cada documento —el informe por etapa, y los que vengan— va en su paquete, no aquí |
+| Qué enlace vale en el perfil de la empresa y en el video del puesto (`V85`) | `organizacion/service/EnlacesDeLaEmpresa` (web, redes y los dos videos: `http` o `https`, con dominio, sin usuario delante y hasta 500; sin esquema se le pone `https://`) y `organizacion/service/VideoDePresentacion` (qué video de YouTube o de Vimeo vale y su servicio, identificador y clave). Los usan el «Perfil de la empresa» y el alta y la edición de la vacante. El panel tiene la misma regla en `src/dominio/presentacionEmpresa.ts`, con las mismas palabras y **sin contrato que las amarre**: cambiarla es cambiarla en los dos, con su caso en las dos pruebas |
+| Lo que el portal enseña de una empresa (`V85`) | `portal/service/PresentacionEnElPortal`: el tablón, el detalle de la vacante y el perfil público dicen lo mismo. **El tablón carga las redes de todas las empresas del lote en una sola consulta**, nunca una por vacante: es la pantalla más pedida y se sirve sin cuenta |
 
 ---
 
