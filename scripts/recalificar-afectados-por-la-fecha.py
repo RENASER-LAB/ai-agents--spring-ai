@@ -120,7 +120,7 @@ def main():
     opciones.add_argument("--confirmar", action="store_true",
                           help="recalificar de verdad. Sin esto solo se lista y se estima el coste")
     args = opciones.parse_args()
-    ruta = RUTA
+    ruta, ids = RUTA, []
     if args.vacantes:
         ids = [v.strip() for v in args.vacantes.split(",") if v.strip()]
         if not ids or not all(v.isdigit() for v in ids):
@@ -132,6 +132,12 @@ def main():
     if codigo != 200:
         sys.exit(f"No se pudo leer la lista de afectados: HTTP {codigo} {lista}")
     pintar_lista(lista)
+
+    # Un backend sin el filtro ignora «?vacantes=» y devuelve todas: entonces no se encola nada.
+    fuera = {v["vacanteId"] for v in lista["vacantes"]} - {int(v) for v in ids}
+    if ids and fuera:
+        sys.exit(f"\nEl backend devolvio vacantes que no pediste ({sorted(fuera)}): no tiene el filtro "
+                 "desplegado. No se recalifica nada; despliega antes de usar --vacantes.")
 
     if not args.confirmar:
         print("\nNada pedido. Con --confirmar se recalifica a los de la lista: cada uno cuesta "
