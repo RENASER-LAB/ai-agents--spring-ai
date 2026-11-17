@@ -33,4 +33,18 @@ public interface EjecucionIaRepository extends JpaRepository<EjecucionIa, Long> 
      * proveedor contesta 402 o se agota el tiempo).
      */
     java.util.Optional<EjecucionIa> findFirstByTrabajoIaIdAndEsExitosaFalseOrderByIdDesc(Long trabajoIaId);
+
+    /**
+     * Cuáles de estas ejecuciones llevan un texto en su envío. Solo devuelve los ids: el envío
+     * entero es largo y aquí no se lee. Lo usa la recalificación del CV para saber quién se
+     * calificó ya con la fecha de hoy (spec la-ia-sabe-que-dia-es-hoy).
+     */
+    @Query("""
+            select e.id
+              from EjecucionIa e
+             where e.id in :ids
+               and e.envio like concat('%', :texto, '%')
+            """)
+    java.util.List<Long> idsConEnvioQueLleva(@Param("ids") java.util.Collection<Long> ids,
+                                             @Param("texto") String texto);
 }

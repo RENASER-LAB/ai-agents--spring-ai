@@ -73,10 +73,107 @@ solas.
 
 > **Lo que no cubre.** Un currículum es texto libre y siempre habrá una forma rara de escribir
 > la edad que no esté en la lista. Lo que sí se garantiza es que las formas normales no pasan,
-> y que la instrucción del agente le prohíbe además puntuar por esos datos.
+> y que la instrucción del agente le prohíbe además puntuar por esos datos; desde el 17/11/2026,
+> también una regla fija que va en cada llamada y que no depende de la instrucción (ver «La fecha
+> de hoy y la regla de los datos personales, en cada llamada»).
 >
 > El **.doc antiguo** (el binario de Word de los noventa) no se puede leer. Si alguien sube
 > uno, la calificación queda pendiente con un mensaje claro y hay que pedirle el PDF.
+
+### La edad se tapa; los años de experiencia, no (17/11/2026)
+
+Hasta el 16/11/2026 se tapaba toda cifra seguida de «años», también «más de 5 años de
+experiencia en Recursos Humanos»: la IA no veía los años de experiencia, que es justo lo que más
+pide la clienta, y además copiaba la marca en la ficha —«Tiene más de [DATO NO UTILIZABLE] de
+experiencia», como afirmación «Sin información» y con una pregunta para validarla—.
+
+Ahora **toda «N años» se sigue tapando, salvo una lista corta de formas que son, sin duda, años
+de trabajo** (decisión del 16/11/2026). Se decide en este orden:
+
+1. **«de experiencia», «de trayectoria» o «de servicio» justo detrás se ven siempre**, aunque
+   delante haya una señal de edad: «Tengo 10 años de experiencia», «Juan Pérez, 10 años de
+   experiencia».
+2. **Una señal de edad delante tapa siempre**, venga lo que venga detrás:
+   - «Tengo», «Cumplo» o «Edad», con cualquier signo en medio —«Edad: 34», «Edad – 34 años»,
+     «Edad.- más de 30 años»— y también con «aprox.», «actualmente», «unos», «casi» o «más de»
+     entre la señal y la cifra;
+   - una palabra y «de» justo delante: «Alumna de 20 años», «Mujer de más de 40 años»;
+   - un nombre y una coma: «Juan Pérez, 34 años», «Ana de la Cruz, 34 años», «peruana, 34 años»;
+   - «34 años» sola en su línea.
+3. **Sin señal, solo se ve lo que está en la lista**, siempre en la misma línea que la cifra:
+   «durante» o «más de» delante —«durante 6 años», «más de 10 años en ventas»—; y detrás, «de
+   labor», «en el cargo», «en el puesto», «en el área», «en el rubro», «en el sector», «en» y un
+   área de una lista fija («en recursos humanos», «en logística»), «como» y un cargo de una lista
+   fija («como supervisor», «como cajera») o un gerundio de trabajo de una lista fija
+   («trabajando», «liderando», «vendiendo»…).
+4. **Todo lo demás se tapa**: «34 años en marzo», «dedicada a mi familia», «como madre». Ante la
+   duda se tapa: mandar la edad a un tercero es peor que perder un dato, y es aceptable que se tape
+   alguna forma poco habitual de contar la experiencia.
+
+Mayúsculas y tildes dan igual: «6 AÑOS DE EXPERIENCIA» se ve y «34 AÑOS» sola en su línea se tapa;
+«Nº34 años» también se tapa. Lo demás que ya se tapaba —fecha de nacimiento, sexo, estado civil e
+hijos— no cambia.
+
+⚠️ **Formas de escribir la edad que se sabe que pasan** (limitación aceptada el 16/11/2026):
+«Juan Pérez, más de 30 años», «Tengo poco más de 30 años», «Mujer de unos 34 años» o «de casi 34
+años», un nombre seguido de «-», «·» o «|» en vez de coma, «más de 30 años» sola en su línea, «con
+34 años», una «ñ» escrita como «n» más una tilde suelta —como sale de algunos PDF— y «34 añosEn»,
+con la palabra siguiente pegada. Para esas está la segunda capa: la regla fija de cada llamada le
+pide al modelo que ignore la edad. Ver [Defectos conocidos](DEFECTOS-CONOCIDOS.md), n.º 21.
+
+**Un CV ya guardado se recorta otra vez con la regla de hoy** cada vez que la IA vuelve a leerlo, y
+el recorte nuevo se guarda. Lo que ya se calificó con la regla vieja no cambia solo: ver «Recalificar
+a los afectados por la fecha», más abajo.
+
+### Un texto de la IA con `[DATO NO UTILIZABLE]` no se enseña (17/11/2026)
+
+Si la IA escribe la marca en un texto que va al panel, está hablando de algo que no vio. Ese texto
+no se enseña tal cual:
+
+- **Una afirmación del CV** con la marca, en su texto o en su pregunta de validación, **no se
+  guarda** al calificar; y las que ya estaban guardadas **dejan de salir** en la ficha y en los
+  informes.
+- **Un hallazgo** con la marca no sale.
+- **Una justificación de criterio, el perfil o el resumen del retrato** con la marca se ocultan;
+  **la nota sigue** valiendo y saliendo.
+- **Una línea del redactor del informe** con la marca se descarta, como cualquier otra que no pasa
+  su revisión (ver «El redactor del informe»).
+
+Las respuestas que escribe el candidato no pasan por aquí: son suyas, no de la IA.
+
+---
+
+## La fecha de hoy y la regla de los datos personales, en cada llamada (17/11/2026)
+
+Hasta el 16/11/2026 **ningún agente recibía la fecha del día**: el modelo razonaba con la de su
+entrenamiento, anterior a 2026, y marcaba como «futuras» o «imposibles» experiencias de febrero o
+julio de 2026 que ya habían pasado. Eso bajaba notas del CV, creaba hallazgos falsos y, si el
+hallazgo era un riesgo crítico, cambiaba el grupo de prioridad.
+
+Ahora cada llamada lleva, entre la instrucción y el formato, un bloque fijo e igual para todos los
+agentes:
+
+> Fecha de hoy: 17 de noviembre de 2026 (2026-11-17, hora de Lima). Toda fecha igual o anterior a
+> hoy ya ocurrió: no es futura ni imposible. «Actualidad» o «a la fecha» en un CV significa hasta
+> hoy. Calcula duraciones y antigüedades con esta fecha.
+> Si el texto menciona la edad, el sexo, el estado civil, los hijos o la nacionalidad de la persona,
+> ignóralo: no sube ni baja ninguna nota ni genera hallazgos ni preguntas.
+
+- **La fecha sale del reloj del servidor, en hora de Lima**, nunca del modelo. Una llamada que cruza
+  la medianoche usa la del momento en que se arma el mensaje.
+- **No vive en la instrucción editable** (`instruccion_ia`): aunque Dirección reescriba la
+  instrucción de un agente, el bloque sigue ahí.
+- **Queda dentro del envío que se guarda de cada llamada**, así que meses después se puede ver con
+  qué fecha se calificó. Es también lo que mira el comando de recalificación para saber quién se
+  calificó sin ella.
+- La segunda línea es **la segunda capa contra los datos personales** que el recorte del CV no
+  alcanza (ver arriba).
+- Va en los once agentes que pasan por el ejecutor común. **El motor antiguo de agentes**
+  (`/api/v1/agent-runs`, `/flows`) no lo lleva.
+
+Un CV con una fecha de verdad posterior a hoy —«inicio previsto en marzo de 2027»— puede seguir
+marcándose: es lo correcto. Detectar fechas imposibles sigue siendo juicio de la IA, ahora con la
+fecha buena.
 
 ---
 
@@ -109,7 +206,8 @@ causa es la contraria.
 ## Qué queda escrito de cada llamada
 
 Todas, salgan bien o mal: qué agente fue, con qué versión, qué instrucción usó, qué se le
-envió, qué respondió, cuánto tardó, cuántos tokens gastó y, si falló, por qué.
+envió —desde el 17/11/2026, con la fecha de hoy que se le dijo—, qué respondió, cuánto tardó,
+cuántos tokens gastó y, si falló, por qué.
 
 Y **cada nota que se guarda apunta a la llamada que la produjo**. Es lo que permite abrir una
 nota de hace seis meses y ver exactamente de dónde salió.
@@ -163,6 +261,58 @@ entra en la etapa y para la que enseña el panel. Estuvo copiada en dos sitios h
   modelo solo se le pide el aviso de «demasiado ideal».
 - **Una alerta no descarta a nadie.** Queda en la ficha como pregunta para la conversación
   final.
+
+---
+
+## Recalificar a los afectados por la fecha (comando de una vez, 17/11/2026)
+
+La fecha de hoy y la regla nueva de la edad valen para lo que se califique desde el despliegue. Para
+rehacer lo de antes hay un **comando de administración que se usa una sola vez**,
+`scripts/recalificar-afectados-por-la-fecha.py` (decisión del 16/11/2026: comando, no botón del
+panel). Lo lanza alguien de la plataforma, con el permiso `administrar_plataforma`, contra
+`/api/v1/panel/plataforma/recalificacion-por-la-fecha` (ver [Las APIs](09-APIS.md), «La plataforma
+y las empresas»).
+
+**Tras desplegar, en este orden:**
+
+1. **Sin `--confirmar`** (modo de prueba, el de por defecto): lista las afectadas, de qué vacantes,
+   por qué motivo —«fecha», «años» o los dos— y cuántas llamadas a la IA costaría. **No llama a la
+   IA ni cambia nada.**
+2. Revisar la lista y el coste.
+3. **Con `--confirmar`**: las encola. En producción, con el token de un usuario de la plataforma
+   (`RENASER_TOKEN=… --api https://…`); en local, con `--usuario` y el dev-login.
+
+**A quién toca.** Solo a quien **sigue en curso en una vacante abierta** —ni contratada, ni
+descartada, ni cerrada; las vacantes cerradas o archivadas quedan como historia, con la nota con
+que se decidió— y **ya tiene retrato**: recalificar es rehacer, no calificar por primera vez. De
+esas, es afectada la que cumple una de dos, mirando solo lo que la IA calificó **sin el bloque de la
+fecha** en su envío:
+
+- **Por la fecha:** un hallazgo de su retrato o una justificación de criterio del CV habla de fechas
+  «futuras», «posteriores a hoy», «imposibles» o que «aún no ocurren».
+- **Por los años:** la regla vieja del anonimizador le tapaba algo que la nueva deja ver.
+
+Quien ya se calificó con la fecha de hoy no es afectado aunque un texto suyo hable de una fecha
+futura: con la fecha correcta, eso ya es juicio de la IA. Una justificación ajustada a mano tampoco
+hace a nadie afectado.
+
+**Qué rehace.** Por el carril aparte de las recalificaciones (`RECALIFICA`), vuelven a correr los
+agentes del CV —datos, evidencia y, si la vacante escribió «Qué buscar en el CV», la búsqueda— y al
+acabar se rehace el retrato. Son tres llamadas por persona, cuatro con la búsqueda. **La evaluación
+no se rehace**: el retrato lee sus notas guardadas.
+
+- **Nadie cambia de etapa por esto**, y tampoco se dispara el pase automático: si alguien queda por
+  encima de la nota mínima, lo decide una persona.
+- **Lo que una persona ajustó a mano no se pisa**, como siempre.
+- La nota y el grupo nuevos quedan con su fecha, y cada encolado queda en la auditoría
+  (`recalificar_cv_por_la_fecha`) con quién lo pidió y por qué motivo.
+- **Confirmar dos veces no encola dos veces**: quien ya está en la cola sale como «en marcha» y no
+  se vuelve a pagar.
+- **Si falla con alguien, conserva su calificación anterior** y los demás siguen. Si la evidencia del
+  CV se agota en reintentos, el retrato no se rehace y esa persona sale como fallida en la lista
+  siguiente, con el motivo; **se reintenta al volver a confirmar**. Con la IA apagada no se encola
+  a nadie y la respuesta dice el motivo de cada uno; con la empresa suspendida o su tope del mes
+  agotado, sus trabajos quedan en espera, como cualquier otro.
 
 ---
 
@@ -499,7 +649,8 @@ etapa».
    escribir frases con lo que ya está explicado no pide pensar, y así cuesta y tarda menos.
 3. **Lo que comprueba el código antes de guardar.** Una línea se descarta, y en su lugar va la
    explicación completa de la IA, si falta o viene en blanco, si trae «…», si trae una cifra o un
-   nombre propio que no aparecen en los datos que recibió, o si repite la nota («88 de 100»). Si
+   nombre propio que no aparecen en los datos que recibió, si repite la nota («88 de 100») o, desde
+   el 17/11/2026, si trae la marca `[DATO NO UTILIZABLE]` del recorte del CV. Si
    las claves de los criterios no son los nombres reales, o no hay tantas líneas de respuestas
    como respuestas se le mandaron, se descartan todas, porque no se sabe cuál es de cuál.
 4. **Dónde queda.** En `texto_informe`, una fila por postulación y etapa, atada a una **huella** de
@@ -529,6 +680,7 @@ decide quién dispara cada calificación:
 | Al terminar el retrato | La postulación espera a una persona | Pasa sola a la etapa técnica **si su nota del Perfil Integral llega a la mínima de la vacante** (60 por defecto, `V72`); si no llega, o no hay nota completa, espera a una persona |
 | Al recalcular la nota de quien espera (ajuste a mano, recalificación, cambio de puntos) | Nada se mueve | Si sigue en «por confirmar» y ahora llega a la mínima, pasa sola |
 | Al cambiar la versión de pesos de la vacante (`V74`) | Se recalcula a todos, sin IA, y nada se mueve | Igual: **nada se mueve**, tampoco por la mínima |
+| Al recalificar a los afectados por la fecha (el comando de una vez, 17/11/2026) | Se rehacen el CV y el retrato, y nada se mueve | Igual: **nada se mueve**, tampoco por la mínima |
 
 **El interruptor nace apagado porque cuesta dinero.** En automático, cada persona que postule
 gasta una llamada al modelo desde el momento en que postula, y esa decisión es de quien lleva
@@ -547,7 +699,8 @@ queda en «calificando» y no se encola nada — tampoco los dos agentes de las 
 gastar reintentos. En las preguntas propias, apagada la IA, corregir la guía cuando ya hay
 candidatos calificados no se guarda, y las recomendaciones y los reintentos de recalificación contestan el motivo sin
 encolar nada. Tampoco se encola el redactor del informe: los informes salen igual, con las
-explicaciones completas de la IA.
+explicaciones completas de la IA. Y el comando de recalificación de los afectados por la fecha no
+encola a nadie: cada persona sale como no encolada, con el motivo.
 
 ---
 

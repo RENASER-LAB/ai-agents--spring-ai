@@ -81,6 +81,14 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
             AgenteEvaluador.CODIGO_AGENTE, AgentePotencialRiesgo.CODIGO_AGENTE,
             AgenteBusquedaCv.CODIGO_AGENTE);
 
+    /**
+     * Los del CV que rehace la recalificación del CV (spec la-ia-sabe-que-dia-es-hoy), en el
+     * carril RECALIFICA. Son los que leen el texto del currículum; el evaluador no lo abre, y su
+     * carril RECALIFICA (el de las preguntas propias) no arma retrato.
+     */
+    private static final List<String> DEL_CV = List.of(
+            AgenteEvidenciaCv.CODIGO_AGENTE, AgenteDatosCv.CODIGO_AGENTE, AgenteBusquedaCv.CODIGO_AGENTE);
+
     public static final String RAPIDA = "RAPIDA";
     public static final String FINA = "FINA";
     /**
@@ -291,6 +299,98 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
         Map<Long, Seguimiento> salida = new HashMap<>();
         ultimaDeCada.forEach((id, t) -> salida.put(id, seguimientoDe(t)));
         return salida;
+    }
+
+    // ==================== La recalificación del CV (la-ia-sabe-que-dia-es-hoy) ====================
+
+    @Override
+    public boolean recalificarElCv(Long postulacionId, boolean tambienLaBusqueda) {
+        if (apagada(postulacionId)) {
+            return false;
+        }
+        // Uno vivo de la tanda del retrato —en cualquier carril— ya va a dejar sus notas, y dos a
+        // la vez pagarían dos veces por la misma persona. Es lo que hace que confirmar dos veces
+        // no encole dos veces: se usa el trabajo vivo de siempre.
+        boolean hayUnoVivo = trabajos.findByPostulacionIdOrderByIdAsc(postulacionId).stream()
+                .anyMatch(t -> DEL_RETRATO.contains(t.getAgenteCodigo()) && esVivo(t.getEstado()));
+        if (hayUnoVivo) {
+            return false;
+        }
+        Long organizacionId = puente.organizacionDe(postulacionId);
+        boolean alguno = false;
+        for (String agente : DEL_CV) {
+            if (AgenteBusquedaCv.CODIGO_AGENTE.equals(agente) && !tambienLaBusqueda) {
+                continue;
+            }
+            Optional<TrabajoIa> creado = registro.crearSiNoHayUnoVivo(organizacionId, postulacionId,
+                    agente, RECALIFICA);
+            if (creado.isPresent()) {
+                frenarOPublicar(creado.get(), organizacionId);
+                alguno = true;
+            }
+        }
+        return alguno;
+    }
+
+    @Override
+    public Map<Long, Seguimiento> recalificacionDelCvDe(List<Long> postulacionIds) {
+        if (postulacionIds == null || postulacionIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<Long, List<TrabajoIa>> porPostulacion = trabajos.findByPostulacionIdInOrderByIdAsc(postulacionIds)
+                .stream()
+                .filter(t -> RECALIFICA.equals(t.getModo())
+                        && (DEL_CV.contains(t.getAgenteCodigo()) || ULTIMO.equals(t.getAgenteCodigo())))
+                .collect(Collectors.groupingBy(TrabajoIa::getPostulacionId));
+        Map<Long, Seguimiento> salida = new HashMap<>();
+        porPostulacion.forEach((id, suyos) -> salida.put(id, comoVaLaRecalificacionDelCv(suyos)));
+        return salida;
+    }
+
+    @Override
+    public java.util.Set<Long> conLaFechaDeHoy(java.util.Collection<Long> ejecucionIaIds) {
+        return registro.conLaFechaDeHoy(ejecucionIaIds);
+    }
+
+    /** Lo de una persona, con sus trabajos del carril en orden. */
+    private Seguimiento comoVaLaRecalificacionDelCv(List<TrabajoIa> suyos) {
+        Optional<TrabajoIa> vivo = suyos.stream().filter(t -> esVivo(t.getEstado())).findFirst();
+        if (vivo.isPresent()) {
+            // En espera por el tope también va a salir: para el comando está «en marcha».
+            return new Seguimiento("EN_CURSO", "EN_ESPERA".equals(vivo.get().getEstado())
+                    ? seguimientoDe(vivo.get()).motivo() : null);
+        }
+        TrabajoIa evidencia = ultimoDel(suyos, AgenteEvidenciaCv.CODIGO_AGENTE);
+        TrabajoIa retrato = ultimoDel(suyos, ULTIMO);
+        if (evidencia != null && "FALLIDO".equals(evidencia.getEstado())) {
+            return new Seguimiento("DETENIDA", registro.motivoDelUltimoFallo(evidencia.getId())
+                    .orElse("La nota del CV no salió después de varios intentos."));
+        }
+        // El retrato cuenta si es posterior a la última evidencia: el de una tanda anterior no.
+        if (retrato != null && (evidencia == null || retrato.getId() > evidencia.getId())) {
+            if ("TERMINADO".equals(retrato.getEstado())) {
+                return new Seguimiento("TERMINADA", null);
+            }
+            if ("FALLIDO".equals(retrato.getEstado())) {
+                return new Seguimiento("DETENIDA", registro.motivoDelUltimoFallo(retrato.getId())
+                        .orElse("El retrato no salió después de varios intentos."));
+            }
+        }
+        return new Seguimiento("DETENIDA", "El retrato no se rehízo: conserva su calificación anterior.");
+    }
+
+    private static TrabajoIa ultimoDel(List<TrabajoIa> suyos, String agente) {
+        TrabajoIa ultimo = null;
+        for (TrabajoIa t : suyos) {
+            if (agente.equals(t.getAgenteCodigo())) {
+                ultimo = t;   // en orden: queda el último
+            }
+        }
+        return ultimo;
+    }
+
+    private static boolean esVivo(String estado) {
+        return "PENDIENTE".equals(estado) || "EN_CURSO".equals(estado) || "EN_ESPERA".equals(estado);
     }
 
     // ==================== «Qué buscar en el CV» (V80) ====================
@@ -533,8 +633,11 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
         }
     }
 
-    /** Los que van a la vez en esta pasada. */
+    /** Los que van a la vez en esta pasada; en la recalificación del CV, los del CV. */
     private List<String> aLaVezDe(String modo) {
+        if (RECALIFICA.equals(modo)) {
+            return DEL_CV;
+        }
         return RAPIDA.equals(modo) ? A_LA_VEZ_RAPIDA : A_LA_VEZ;
     }
 
@@ -867,9 +970,14 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
      * instancias distintas. Quien contesta es la base, y contesta que sí una sola vez.
      */
     private void intentarElRetrato(TrabajoIa acabado) {
-        // Una recalificación no arma retrato: el retrato ya existe, y rehacerlo movería a la
-        // persona a «por confirmar». Sus notas se recalculan al guardarse (el puente).
-        if (RECALIFICA.equals(acabado.getModo()) || REBUSCA.equals(acabado.getModo())) {
+        // Una recalificación de las preguntas propias no arma retrato: el retrato ya existe, y
+        // rehacerlo movería a la persona a «por confirmar». Sus notas se recalculan al guardarse
+        // (el puente). Lo mismo una rebúsqueda de «Qué buscar en el CV».
+        if (REBUSCA.equals(acabado.getModo())) {
+            return;
+        }
+        if (RECALIFICA.equals(acabado.getModo())) {
+            intentarElRetratoDelCv(acabado);
             return;
         }
         if (!aLaVezDe(acabado.getModo()).contains(acabado.getAgenteCodigo())) {
@@ -898,6 +1006,27 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
             }
         }
         dispararElRetrato(acabado.getPostulacionId(), acabado.getModo(), acabado.getId());
+    }
+
+    /**
+     * La barrera de la recalificación del CV (spec la-ia-sabe-que-dia-es-hoy): solo los agentes
+     * del CV en el carril RECALIFICA la cruzan —el evaluador y la prueba de ese carril no arman
+     * retrato—, y <b>solo si la nota del CV salió</b>. Si la evidencia se agotó, la persona
+     * conserva su calificación anterior, retrato incluido. El retrato que sale, en el mismo
+     * carril, se cierra sin mover a nadie de etapa (AgentePotencialRiesgo).
+     */
+    private void intentarElRetratoDelCv(TrabajoIa acabado) {
+        if (!DEL_CV.contains(acabado.getAgenteCodigo()) || acabado.getPostulacionId() == null) {
+            return;
+        }
+        boolean laNotaDelCvSalio = trabajos.findFirstByPostulacionIdAndAgenteCodigoAndModoOrderByIdDesc(
+                        acabado.getPostulacionId(), AgenteEvidenciaCv.CODIGO_AGENTE, RECALIFICA)
+                .map(t -> "TERMINADO".equals(t.getEstado()))
+                .orElse(false);
+        if (!laNotaDelCvSalio) {
+            return;
+        }
+        dispararElRetrato(acabado.getPostulacionId(), RECALIFICA, acabado.getId());
     }
 
     private boolean dispararElRetrato(Long postulacionId, String modo, Long alimentadoPor) {

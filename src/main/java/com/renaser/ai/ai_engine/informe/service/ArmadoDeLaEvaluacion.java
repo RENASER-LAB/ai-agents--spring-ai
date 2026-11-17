@@ -151,7 +151,7 @@ public class ArmadoDeLaEvaluacion {
                 LoComunDelInforme.bloque("PENDIENTE", EtapaDelInforme.EVALUACION.pendiente(),
                         "PENDIENTE", LoComunDelInforme.pendientesDeLaEvaluacion(base, d.patrones(), null)));
 
-        String resumen = base.perfil() == null ? null : limpio(base.perfil().getResumen());
+        String resumen = base.perfil() == null ? null : FormatoDelInforme.sinMarca(base.perfil().getResumen());
         String pieCerradas = d.cerradas() != null && d.cerradas().preguntas() > 0
                 ? "Lo cerrado: " + FormatoDelInforme.nota(d.cerradas().nota()) + " de 100 en "
                         + d.cerradas().preguntas() + (d.cerradas().preguntas() == 1 ? " pregunta." : " preguntas.")

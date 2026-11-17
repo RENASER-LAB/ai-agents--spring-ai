@@ -1,7 +1,10 @@
 package com.renaser.ai.ai_engine.informe.service.impl;
 
+import com.renaser.ai.ai_engine.informe.dto.DtosInforme.Anexo;
 import com.renaser.ai.ai_engine.informe.dto.DtosInforme.ArchivoArmado;
+import com.renaser.ai.ai_engine.informe.dto.DtosInforme.Celular;
 import com.renaser.ai.ai_engine.informe.dto.DtosInforme.Enlace;
+import com.renaser.ai.ai_engine.informe.dto.DtosInforme.EntregableAnexo;
 import com.renaser.ai.ai_engine.informe.dto.DtosInforme.EstadoDeUnInforme;
 import com.renaser.ai.ai_engine.informe.dto.DtosInforme.Informe;
 import com.renaser.ai.ai_engine.informe.dto.DtosInforme.InformesDelPostulante;
@@ -9,6 +12,7 @@ import com.renaser.ai.ai_engine.informe.dto.DtosInforme.PostulanteDelVisor;
 import com.renaser.ai.ai_engine.informe.dto.DtosInforme.VisorDeLaVacante;
 import com.renaser.ai.ai_engine.informe.service.ArmadoDelInforme;
 import com.renaser.ai.ai_engine.informe.service.ArmadoDelInforme.Armado;
+import com.renaser.ai.ai_engine.informe.service.CelularesDelVisor;
 import com.renaser.ai.ai_engine.informe.service.EtapaDelInforme;
 import com.renaser.ai.ai_engine.informe.service.InformesDePrueba;
 import com.renaser.ai.ai_engine.informe.service.PdfDelInforme;
@@ -52,6 +56,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -83,6 +88,7 @@ class ServicioInformesImplTest {
     @Mock private ServicioPostulacionesPanel archivos;
     @Mock private ServicioPerfilIntegralPanel tandas;
     @Mock private NotaEtapaRepository notasEtapa;
+    @Mock private CelularesDelVisor celulares;
 
     @InjectMocks private ServicioInformesImpl servicio;
 
@@ -323,7 +329,7 @@ class ServicioInformesImplTest {
         }
 
         @Test
-        @DisplayName("las carpetas con el mismo nombre se numeran")
+        @DisplayName("dos postulantes con el mismo nombre y el mismo puesto del ranking no se pisan: cada carpeta lleva su lugar en la lista")
         void carpetasRepetidas() throws IOException {
             ranking(List.of(fila(1, 10L, "Ana"), fila(1, 10L, "Ana")));
             armado(EtapaDelInforme.CV, sinEnlaces(), null);
@@ -331,7 +337,7 @@ class ServicioInformesImplTest {
             Map<String, String> entradas = entradas(servicio.zipDeLaVacante(quien(VER_CV), VACANTE).contenido());
 
             assertThat(entradas).containsOnlyKeys("01 - Ana/1 - Informe del CV.pdf",
-                    "01 - Ana (2)/1 - Informe del CV.pdf");
+                    "02 - Ana/1 - Informe del CV.pdf");
         }
 
         @Test
@@ -344,6 +350,251 @@ class ServicioInformesImplTest {
             assertThatThrownBy(() -> servicio.zipDeLaVacante(quien, VACANTE))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessage("Todavía no hay ningún informe en esta vacante.");
+        }
+    }
+
+    // ================================================================= el orden por nota combinada
+
+    /**
+     * El orden del visor y de su .zip (spec la-ia-sabe-que-dia-es-hoy, AC-09 a AC-11): arriba
+     * quienes tienen las tres notas, por su nota combinada; debajo los demás, en el orden del
+     * ranking.
+     */
+    @Nested
+    @DisplayName("El orden por nota combinada")
+    class ElOrden {
+
+        /**
+         * La vacante de la captura del 16/11/2026: en el ranking primero los que no tienen
+         * prueba; los tres con prueba calificada tienen ponderado.
+         */
+        private void vacanteDeLaCaptura() {
+            ranking(List.of(fila(1, 21L, "Ximena Aleman"), fila(2, 22L, "Ruth Suri"),
+                    fila(3, 23L, "Alex Aquise"), fila(4, 24L, "Robert Villegas"),
+                    fila(5, 25L, "Mayra Garcia-Godos"), fila(6, 26L, "Christian Casahuaman"),
+                    fila(7, 27L, "Diego Tejada")));
+            when(notasEtapa.findByPostulacionIdInAndEtapaCodigo(anyList(), eq("PRUEBA_PUESTO"))).thenReturn(List.of(
+                    nota(22L, 94), nota(24L, 93), nota(25L, 88),
+                    // Empezada pero sin calificar: no es tercera nota.
+                    NotaEtapa.builder().postulacionId(26L).puntaje(null).build()));
+            // Perfil Integral 82 · 70 · 73 y prueba 93 · 94 · 88, con pesos 40 y 30.
+            when(tandas.ponderadosDeLoRendido(any(), eq(VACANTE))).thenReturn(Map.of(
+                    24L, new BigDecimal("86.71"), 22L, new BigDecimal("80.29"), 25L, new BigDecimal("79.43")));
+        }
+
+        @Test
+        @DisplayName("AC-09 · los tres con las tres notas van primero, de mayor a menor nota combinada y numerados 1, 2 y 3; los demás debajo en el orden del ranking")
+        void arribaLosDeLasTresNotas() {
+            vacanteDeLaCaptura();
+
+            VisorDeLaVacante visor = servicio.visor(quien(VER_CV, VER_EVALUACION, VER_PRUEBA), VACANTE);
+
+            assertThat(visor.postulantes()).extracting(PostulanteDelVisor::puesto, PostulanteDelVisor::candidato)
+                    .containsExactly(
+                            tuple(1, "Robert Villegas"),
+                            tuple(2, "Ruth Suri"),
+                            tuple(3, "Mayra Garcia-Godos"),
+                            tuple(4, "Ximena Aleman"),
+                            tuple(5, "Alex Aquise"),
+                            tuple(6, "Christian Casahuaman"),
+                            tuple(7, "Diego Tejada"));
+        }
+
+        @Test
+        @DisplayName("a igual ponderado y prueba, decide la evaluación; a igualdad completa, el ranking")
+        void desempates() {
+            FilaRanking ana = fila(1, 31L, "Ana");
+            FilaRanking luis = fila(2, 32L, "Luis");
+            FilaRanking eva = fila(3, 33L, "Eva");
+            when(eva.notaEtapa()).thenReturn(BigDecimal.valueOf(90));
+            ranking(List.of(ana, luis, eva));
+            when(notasEtapa.findByPostulacionIdInAndEtapaCodigo(anyList(), eq("PRUEBA_PUESTO")))
+                    .thenReturn(List.of(nota(31L, 80), nota(32L, 80), nota(33L, 80)));
+            when(tandas.ponderadosDeLoRendido(any(), eq(VACANTE))).thenReturn(Map.of(
+                    31L, BigDecimal.valueOf(75), 32L, BigDecimal.valueOf(75), 33L, BigDecimal.valueOf(75)));
+
+            assertThat(servicio.visor(quien(VER_CV), VACANTE).postulantes())
+                    .extracting(PostulanteDelVisor::candidato).containsExactly("Eva", "Ana", "Luis");
+        }
+
+        @Test
+        @DisplayName("AC-10 · sin permiso para ver la nota del CV el orden es el mismo y la columna sale vacía")
+        void elOrdenNoDependeDeLosPermisos() {
+            vacanteDeLaCaptura();
+            List<String> deDireccion = servicio.visor(quien(VER_CV, VER_EVALUACION, VER_PRUEBA), VACANTE)
+                    .postulantes().stream().map(PostulanteDelVisor::candidato).toList();
+
+            VisorDeLaVacante sinCv = servicio.visor(quien(VER_EVALUACION), VACANTE);
+
+            assertThat(sinCv.postulantes()).extracting(PostulanteDelVisor::candidato)
+                    .containsExactlyElementsOf(deDireccion);
+            assertThat(sinCv.postulantes()).extracting(PostulanteDelVisor::notaCv).containsOnlyNulls();
+            assertThat(sinCv.postulantes()).extracting(PostulanteDelVisor::notaPrueba).containsOnlyNulls();
+        }
+
+        @Test
+        @DisplayName("una vacante sin pesos de etapa no tiene ponderado: queda en el orden del ranking")
+        void sinPesosElOrdenDelRanking() {
+            ranking(List.of(fila(1, 41L, "Sin prueba"), fila(2, 42L, "Con prueba")));
+            when(notasEtapa.findByPostulacionIdInAndEtapaCodigo(anyList(), eq("PRUEBA_PUESTO")))
+                    .thenReturn(List.of(nota(42L, 99)));
+            when(tandas.ponderadosDeLoRendido(any(), eq(VACANTE))).thenReturn(Map.of());
+
+            assertThat(servicio.visor(quien(VER_PRUEBA), VACANTE).postulantes())
+                    .extracting(PostulanteDelVisor::puesto, PostulanteDelVisor::candidato)
+                    .containsExactly(tuple(1, "Sin prueba"), tuple(2, "Con prueba"));
+        }
+
+        @Test
+        @DisplayName("sin nota del CV no cuenta como tres notas aunque tenga ponderado")
+        void sinNotaDelCvNoVaArriba() {
+            FilaRanking sinCv = fila(2, 52L, "Sin CV");
+            when(sinCv.notaCurriculum()).thenReturn(null);
+            ranking(List.of(fila(1, 51L, "Primero"), sinCv));
+            when(notasEtapa.findByPostulacionIdInAndEtapaCodigo(anyList(), eq("PRUEBA_PUESTO")))
+                    .thenReturn(List.of(nota(52L, 99)));
+            when(tandas.ponderadosDeLoRendido(any(), eq(VACANTE))).thenReturn(Map.of(52L, BigDecimal.valueOf(90)));
+
+            assertThat(servicio.visor(quien(VER_CV), VACANTE).postulantes())
+                    .extracting(PostulanteDelVisor::candidato).containsExactly("Primero", "Sin CV");
+        }
+
+        @Test
+        @DisplayName("AC-11 · las carpetas del .zip van numeradas en el mismo orden que el visor")
+        void elZipEnElMismoOrden() throws IOException {
+            vacanteDeLaCaptura();
+            for (long id = 21L; id <= 27L; id++) {
+                Postulacion suya = Postulacion.builder().id(id).build();
+                when(alcance.laPostulacionVisible(any(), eq(id), any())).thenReturn(suya);
+                when(armado.armar(suya, EtapaDelInforme.CV, true))
+                        .thenReturn(Optional.of(new Armado(sinEnlaces(), null)));
+            }
+
+            Map<String, String> entradas = entradas(servicio.zipDeLaVacante(quien(VER_CV), VACANTE).contenido());
+
+            assertThat(entradas.keySet()).containsExactly(
+                    "01 - Robert Villegas/1 - Informe del CV.pdf",
+                    "02 - Ruth Suri/1 - Informe del CV.pdf",
+                    "03 - Mayra Garcia-Godos/1 - Informe del CV.pdf",
+                    "04 - Ximena Aleman/1 - Informe del CV.pdf",
+                    "05 - Alex Aquise/1 - Informe del CV.pdf",
+                    "06 - Christian Casahuaman/1 - Informe del CV.pdf",
+                    "07 - Diego Tejada/1 - Informe del CV.pdf");
+        }
+    }
+
+    // ================================================================= el celular
+
+    @Nested
+    @DisplayName("El celular en el visor")
+    class ElCelular {
+
+        @Test
+        @DisplayName("AC-14 · AC-15 · cada postulante lleva el celular que le toca; quien no tiene ninguno, nada")
+        void llevaElSuyo() {
+            ranking(List.of(fila(1, 10L, "Ana"), fila(2, 11L, "Luis")));
+            Celular deAna = new Celular("987 654 321", "tel:+51987654321", "https://wa.me/51987654321");
+            when(celulares.de(List.of(10L, 11L))).thenReturn(Map.of(10L, deAna));
+
+            VisorDeLaVacante visor = servicio.visor(quien(VER_CV), VACANTE);
+
+            assertThat(visor.postulantes()).extracting(PostulanteDelVisor::celular).containsExactly(deAna, null);
+        }
+
+        @Test
+        @DisplayName("lo ve quien puede abrir el visor, sin pedir el permiso de descargar")
+        void sinPermisoDeDescargar() {
+            ranking(List.of(fila(1, 10L, "Ana")));
+            Celular fijo = new Celular("(01) 456-7890", "tel:014567890", null);
+            when(celulares.de(List.of(10L))).thenReturn(Map.of(10L, fijo));
+
+            assertThat(servicio.visor(quien(VER_PRUEBA), VACANTE).postulantes().getFirst().celular()).isEqualTo(fijo);
+        }
+    }
+
+    // ================================================================= los entregables
+
+    /** AC-12 y AC-13: los entregables se abren desde el informe solo con «descargar_entregables». */
+    @Nested
+    @DisplayName("Los entregables con enlace")
+    class LosEntregables {
+
+        private void armadoDeLaPrueba() {
+            Informe base = InformesDePrueba.prueba(List.of());
+            Anexo anexo = new Anexo(base.anexo().titulo(), base.anexo().subtitulo(), base.anexo().caso(),
+                    List.of(), "3 de 4 entregados", List.of(
+                    new EntregableAnexo("Documento de Recursos Humanos", "Subido el 14/11 a las 10:14", true, 77L, null),
+                    new EntregableAnexo("Video de sustentación", "Subido el 14/11 a las 10:20", true, null,
+                            "https://drive.example/video"),
+                    new EntregableAnexo("Enlace raro", "Subido el 14/11 a las 10:30", true, null, "javascript:alert(1)"),
+                    new EntregableAnexo("Cronograma", "No se subió ningún archivo", false, 78L, null)));
+            Informe conAnexo = new Informe(base.etapa(), base.titulo(), base.empresa(), base.vacante(),
+                    base.postulacionId(), base.candidato(), base.correo(), base.generadoEn(), base.nota(),
+                    base.grupo(), base.datosClave(), base.recuentos(), base.experiencia(), base.resumen(),
+                    base.evaluado(), base.bloques(), base.enlaces(), base.detalleTitulo(), base.detalle(),
+                    base.detallePie(), anexo, base.aviso(), base.textosEnCamino(), base.nombreArchivo());
+            armado(EtapaDelInforme.PRUEBA, conAnexo, null);
+            when(archivos.enlaceDeVolcado(any(), eq(77L))).thenReturn(Optional.of(
+                    new EnlaceArchivo("https://almacen.example/rrhh.pdf?firma=8h", Instant.now(), "rrhh.pdf")));
+        }
+
+        @Test
+        @DisplayName("AC-12 · con permiso: el archivo trae su id y el enlace firmado de 8 horas; el de tipo enlace, su dirección")
+        void conPermiso() {
+            armadoDeLaPrueba();
+
+            List<EntregableAnexo> entregables =
+                    servicio.informe(quien(VER_PRUEBA, DESCARGAR), POSTULACION, "prueba").anexo().entregables();
+
+            assertThat(entregables).extracting(EntregableAnexo::nombre, EntregableAnexo::archivoId, EntregableAnexo::url)
+                    .containsExactly(
+                            tuple("Documento de Recursos Humanos", 77L, "https://almacen.example/rrhh.pdf?firma=8h"),
+                            tuple("Video de sustentación", null, "https://drive.example/video"),
+                            // Lo que no es web no se abre desde aquí.
+                            tuple("Enlace raro", null, null),
+                            // Uno no entregado sigue sin enlace.
+                            tuple("Cronograma", null, null));
+            verify(archivos, never()).enlaceDeVolcado(any(), eq(78L));
+        }
+
+        @Test
+        @DisplayName("AC-12 · el PDF que descarga quien tiene el permiso lleva esos enlaces")
+        void elPdfLlevaLosEnlaces() {
+            armadoDeLaPrueba();
+
+            servicio.pdf(quien(VER_PRUEBA, DESCARGAR), POSTULACION, "prueba");
+
+            org.mockito.ArgumentCaptor<Informe> captor = org.mockito.ArgumentCaptor.forClass(Informe.class);
+            verify(generadorPdf).generar(captor.capture());
+            assertThat(captor.getValue().anexo().entregables()).extracting(EntregableAnexo::url)
+                    .contains("https://almacen.example/rrhh.pdf?firma=8h", "https://drive.example/video");
+        }
+
+        @Test
+        @DisplayName("AC-13 · sin permiso, ni el visor ni el PDF traen con qué abrirlos, como hoy")
+        void sinPermiso() {
+            armadoDeLaPrueba();
+
+            List<EntregableAnexo> entregables =
+                    servicio.informe(quien(VER_PRUEBA), POSTULACION, "prueba").anexo().entregables();
+
+            assertThat(entregables).extracting(EntregableAnexo::archivoId).containsOnlyNulls();
+            assertThat(entregables).extracting(EntregableAnexo::url).containsOnlyNulls();
+            assertThat(entregables).extracting(EntregableAnexo::entregado).containsExactly(true, true, true, false);
+            verify(archivos, never()).enlaceDeVolcado(any(), anyLong());
+        }
+
+        @Test
+        @DisplayName("si el almacén no firma, el archivo conserva su id para el visor y el PDF sale sin enlace")
+        void siNoSePuedeFirmar() {
+            armadoDeLaPrueba();
+            when(archivos.enlaceDeVolcado(any(), eq(77L))).thenThrow(new IllegalStateException("almacén caído"));
+
+            EntregableAnexo documento = servicio.informe(quien(VER_PRUEBA, DESCARGAR), POSTULACION, "prueba")
+                    .anexo().entregables().getFirst();
+
+            assertThat(documento.archivoId()).isEqualTo(77L);
+            assertThat(documento.url()).isNull();
         }
     }
 
@@ -392,6 +643,10 @@ class ServicioInformesImplTest {
         when(fila.notaCurriculum()).thenReturn(BigDecimal.valueOf(70));
         when(fila.notaEtapa()).thenReturn(BigDecimal.valueOf(65));
         return fila;
+    }
+
+    private static NotaEtapa nota(Long postulacionId, int puntaje) {
+        return NotaEtapa.builder().postulacionId(postulacionId).puntaje(BigDecimal.valueOf(puntaje)).build();
     }
 
     private static Map<String, String> entradas(byte[] zip) throws IOException {

@@ -293,6 +293,69 @@ class ServicioPerfilIntegralPanelImplTest {
         assertThat(filas.get(0).ponderado().sobre100()).isEqualByComparingTo("79.00");
     }
 
+    /**
+     * El ponderado de cada postulación para ordenar el visor de informes (spec
+     * la-ia-sabe-que-dia-es-hoy): la misma cuenta que la columna, solo para quien tiene las dos
+     * notas.
+     */
+    @Test
+    void losPonderadosParaElVisorDeInformes() {
+        candidatos(candidato(1L, "ALTA", "82"), candidato(2L, "ALTA", "70"), candidato(3L, "ALTA", null));
+        pesosDeEtapa("PERFIL_INTEGRAL", "40", "PRUEBA_PUESTO", "30");
+        notaDeLaPrueba(1L, "73");
+        notaDeLaPrueba(3L, "90");
+
+        Map<Long, BigDecimal> ponderados = servicio.ponderadosDeLoRendido(quien, VACANTE);
+
+        assertThat(ponderados).containsOnlyKeys(1L);
+        assertThat(ponderados.get(1L)).isEqualByComparingTo("78.14");
+    }
+
+    /** Sin el peso de la prueba no hay ponderado: el visor queda en el orden del ranking. */
+    @Test
+    void sinPesosDeEtapaNoHayPonderadosParaElVisor() {
+        candidatos(candidato(1L, "ALTA", "82"));
+        pesosDeEtapa("PERFIL_INTEGRAL", "40");
+        notaDeLaPrueba(1L, "73");
+
+        assertThat(servicio.ponderadosDeLoRendido(quien, VACANTE)).isEmpty();
+    }
+
+    /**
+     * La ficha no enseña la marca del anonimizador (spec la-ia-sabe-que-dia-es-hoy, AC-08): el
+     * hallazgo que la trae no sale, y la justificación que la trae se calla sin quitar la nota.
+     */
+    @Test
+    void laFichaNoEnsenaLaMarca() {
+        Postulacion suya = candidato(1L, "ALTA", "70");
+        when(postulaciones.findByIdAndOrganizacionId(1L, ORGANIZACION)).thenReturn(Optional.of(suya));
+        when(perfiles.findByPostulacionId(1L)).thenReturn(Optional.of(
+                com.renaser.ai.ai_engine.perfilintegral.entity.PerfilTalento.builder().id(4L).postulacionId(1L)
+                        .resumen("Perfil con [DATO NO UTILIZABLE] de experiencia").build()));
+        when(criterios.findByEtapaCodigoAndVersionPlantillaPruebaIdIsNullOrderByOrden("PERFIL_INTEGRAL")).thenReturn(List.of(
+                Criterio.builder().id(100L).nombre("Experiencia").codigo("EXP").build(),
+                Criterio.builder().id(101L).nombre("Logros").codigo("LOG").build()));
+        when(notasCriterio.findByPostulacionId(1L)).thenReturn(List.of(
+                NotaCriterio.builder().criterioId(100L).puntaje(new BigDecimal("60"))
+                        .explicacion("Tiene más de [DATO NO UTILIZABLE] de experiencia").build(),
+                NotaCriterio.builder().criterioId(101L).puntaje(new BigDecimal("80"))
+                        .explicacion("Redujo la rotación a la mitad").build()));
+        when(hallazgos.findByPerfilTalentoId(4L)).thenReturn(List.of(
+                com.renaser.ai.ai_engine.perfilintegral.entity.HallazgoPerfil.builder().tipo("RIESGO_CRITICO")
+                        .descripcion("Sus [DATO NO UTILIZABLE] no cuadran con el cargo").build(),
+                com.renaser.ai.ai_engine.perfilintegral.entity.HallazgoPerfil.builder().tipo("FORTALEZA")
+                        .descripcion("Experiencia en selección").evidencia("«5 años de experiencia»").build()));
+
+        var ficha = servicio.ver(quien, 1L);
+
+        assertThat(ficha.hallazgos()).extracting(h -> h.descripcion()).containsExactly("Experiencia en selección");
+        assertThat(ficha.resumen()).isNull();
+        assertThat(ficha.notasCriterio()).extracting(NotaCriterioResponse::puntaje, NotaCriterioResponse::explicacion)
+                .containsExactly(
+                        org.assertj.core.api.Assertions.tuple(new BigDecimal("60"), null),
+                        org.assertj.core.api.Assertions.tuple(new BigDecimal("80"), "Redujo la rotación a la mitad"));
+    }
+
     /** El desglose trae las tres notas que hay detras de la cifra. */
     @Test
     void elDesgloseTraeElCurriculumYLasDosEtapas() {

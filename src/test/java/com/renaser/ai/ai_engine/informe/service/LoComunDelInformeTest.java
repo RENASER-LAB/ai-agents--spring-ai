@@ -125,6 +125,33 @@ class LoComunDelInformeTest {
         }
 
         @Test
+        @DisplayName("AC-08 · una afirmación o un hallazgo con la marca del anonimizador no salen en los informes")
+        void sinLaMarca() {
+            when(cvs.findByPostulacionId(POSTULACION)).thenReturn(Optional.of(Cv.builder().id(7L).build()));
+            when(afirmaciones.findByCvId(7L)).thenReturn(List.of(
+                    AfirmacionCv.builder().id(1L).clasificacion("FALTA_INFO")
+                            .texto("Tiene más de [DATO NO UTILIZABLE] de experiencia en Recursos Humanos")
+                            .preguntaValidacion("¿Cuántos años de experiencia tienes?").build(),
+                    AfirmacionCv.builder().id(2L).clasificacion("DECLARADA").texto("Lideró un equipo de 5")
+                            .preguntaValidacion("¿Cuántos años tenías al empezar? [DATO NO UTILIZABLE]").build(),
+                    AfirmacionCv.builder().id(3L).clasificacion("DECLARADA").texto("Habla inglés avanzado")
+                            .preguntaValidacion("¿Dónde lo certificó?").build()));
+            when(perfiles.findByPostulacionId(POSTULACION)).thenReturn(Optional.of(PerfilTalento.builder().id(4L).build()));
+            when(hallazgos.findByPerfilTalentoId(4L)).thenReturn(List.of(
+                    HallazgoPerfil.builder().id(1L).tipo("RIESGO_CRITICO")
+                            .descripcion("Sus [DATO NO UTILIZABLE] no cuadran con el cargo").build(),
+                    HallazgoPerfil.builder().id(2L).tipo("FORTALEZA").descripcion("Experiencia en selección")
+                            .evidencia("«5 años de experiencia»").build()));
+
+            Base base = comun.leer(postulacion(1L));
+
+            assertThat(base.afirmaciones()).extracting(AfirmacionCv::getId).containsExactly(3L);
+            assertThat(base.hallazgos()).extracting(HallazgoPerfil::getId).containsExactly(2L);
+            assertThat(LoComunDelInforme.dudasDelCv(base, null, "Del CV")).extracting(p -> p.texto())
+                    .containsExactly("«Habla inglés avanzado»");
+        }
+
+        @Test
         @DisplayName("una persona anonimizada no enseña su correo, y sin vacante, CV ni retrato todo queda vacío")
         void anonimizadaYSinNada() {
             when(usuarios.findById(1L)).thenReturn(Optional.of(Usuario.builder().id(1L).correo("ana@correo.pe").build()));

@@ -869,8 +869,26 @@ Están en Swagger bajo «Panel · Informes por etapa».
 | GET `/postulaciones/{id}/informes/{etapa}` | El informe de una etapa (`cv`, `evaluacion` o `prueba`) para el visor, con los mismos datos que el PDF. Mientras no haya nada que enseñar, **409** con el motivo; una etapa que no existe, 400 | El de esa etapa |
 | GET `/postulaciones/{id}/informes/{etapa}/pdf` | El mismo informe en PDF A4, como adjunto: «Informe CV - Nombre Apellido - Vacante.pdf», «Informe evaluación - …» o «Informe prueba - …» | El de esa etapa |
 | GET `/postulaciones/{id}/informes/zip` | Los informes disponibles de la persona en un `.zip`: «1 - Informe del CV.pdf», «2 - Informe de la evaluación.pdf» y «3 - Informe de la prueba del puesto.pdf». Si falta alguno, dentro va «LEEME - informes que faltan.txt» con cuál y por qué, también los que quien pregunta no puede ver. Sin ninguno, 409 | Cualquiera de los tres |
-| GET `/vacantes/{id}/informes` | La lista del visor: los postulantes de la vacante **en el orden del ranking**, cada uno con `puesto`, `candidato`, `grupo` y sus tres notas —`notaCv`, `notaEvaluacion` y `notaPrueba`, nulas en las etapas que quien pregunta no puede ver—, y `etapas`, las que sí puede ver | `ver_embudo` y uno de los tres |
-| GET `/vacantes/{id}/informes/zip` | Los de toda la vacante en un `.zip`: **una carpeta por postulante visible**, «01 - Nombre Apellido», con sus informes disponibles —vacía si todavía no tiene ninguno— y «LEEME - informes que faltan.txt» con cada informe que falta y su motivo. Quien no se ve con esos permisos no entra. **Puede tardar** en una vacante grande: arma todos los PDF en la misma petición | `ver_embudo` y uno de los tres |
+| GET `/vacantes/{id}/informes` | La lista del visor: los postulantes de la vacante **ordenados por nota combinada** (ver abajo), cada uno con `puesto` —su lugar en esta lista, de 1 en adelante, no el del ranking—, `candidato`, `grupo`, sus tres notas —`notaCv`, `notaEvaluacion` y `notaPrueba`, nulas en las etapas que quien pregunta no puede ver— y `celular` (ver abajo); y `etapas`, las que sí puede ver | `ver_embudo` y uno de los tres |
+| GET `/vacantes/{id}/informes/zip` | Los de toda la vacante en un `.zip`: **una carpeta por postulante visible**, numerada en el mismo orden que el visor —«01 - Nombre Apellido»; dos homónimos quedan «01 - Ana» y «02 - Ana»—, con sus informes disponibles —vacía si todavía no tiene ninguno— y «LEEME - informes que faltan.txt» con cada informe que falta y su motivo. Quien no se ve con esos permisos no entra. **Puede tardar** en una vacante grande: arma todos los PDF en la misma petición | `ver_embudo` y uno de los tres |
+
+**El orden del visor y del `.zip` (17/11/2026).** Arriba, quienes tienen **las tres notas** —CV,
+evaluación y prueba del puesto ya calificada—, de mayor a menor por el **ponderado de lo ya
+rendido** del RF-155; a igual ponderado, por la nota de la prueba, luego por la de la evaluación y
+luego por el ranking. Debajo, los demás, en el orden del ranking de siempre. Una prueba empezada y
+sin calificar no cuenta como tercera nota, y una vacante sin pesos de etapa no tiene ponderado: su
+lista queda en el orden del ranking. **El orden no depende de los permisos de quien mira**: se
+calcula con las tres notas aunque alguna le salga nula. La cifra del ponderado no viaja: la lista
+sigue con CV, evaluación y prueba. El ranking de las pestañas y su Excel no cambian.
+
+**El celular del visor (17/11/2026).** `celular` trae `{texto, llamar, whatsapp}`: el de la cuenta
+de la persona o, si no tiene, el que la IA leyó de su CV. Un celular peruano de 9 cifras que
+empieza por 9 se escribe «987 654 321», con `llamar` = `tel:+51987654321` y `whatsapp` =
+`https://wa.me/51987654321`; cualquier otro número va tal cual, para llamar y sin WhatsApp. Es nulo
+si no hay ninguno **o si la persona está anonimizada**: quien pidió borrar sus datos no deja un
+número a un clic, aunque el que leyó la IA siga guardado (ver [Defectos
+conocidos](DEFECTOS-CONOCIDOS.md), n.º 22). Lo ve quien puede abrir el visor, igual que el enlace al
+currículum, que ya lleva el número dentro. **Nunca va en un informe ni en un PDF.**
 
 **El permiso lo decide la etapa**, y es el de la pantalla que enseña esos datos: el informe del CV
 pide `ver_perfil_integral`; el de la evaluación, `ver_respuestas_evaluacion`; y el de la prueba,
@@ -901,6 +919,18 @@ punto, criterio ni pregunta se parte entre dos hojas, salvo uno más largo que u
 
 **Nunca lleva** la pretensión salarial, el celular, la foto, la edad, el sexo, el estado civil ni
 el contenido de un entregable, del que va solo el nombre. De la persona van el nombre y el correo.
+Desde el 17/11/2026, **un texto de la IA con la marca `[DATO NO UTILIZABLE]` no sale**: ni las
+afirmaciones del CV ni los hallazgos que la traen; una justificación, el perfil o el resumen con la
+marca se ocultan y la nota sigue. Ver [Calificación con IA](CALIFICACION-CON-IA.md), «Un texto de
+la IA con `[DATO NO UTILIZABLE]` no se enseña».
+
+**Los entregables se abren desde el informe de la prueba (17/11/2026)**, solo para quien tiene
+`descargar_entregables`. Cada entregable entregado trae dos campos: `archivoId`, si es un archivo
+—el panel lo abre en una pestaña nueva con el enlace firmado de siempre, `/archivos/{id}/enlace`—,
+y `url`, lo que lo abre en el PDF: el enlace firmado de 8 horas del archivo, el mismo trato que el
+del currículum, o la dirección que pegó el candidato si es de tipo enlace (solo `http` y `https`).
+Sin ese permiso, o si no se entregó, los dos vienen nulos y se ve como antes, sin enlace, también
+en el PDF que esa persona baje.
 
 ⚠️ **El bloque «Enlaces» puede abrir el currículum sin sesión durante 8 horas.** Con
 `descargar_entregables`, cada informe lleva «Currículum (PDF)» con el **mismo enlace firmado que la
@@ -1295,6 +1325,12 @@ aquí, y las líneas de cada vacante viajan en los datos de cada llamada, envuel
 empresa. Y con la del redactor del informe (`REDACTOR_INFORME`, `V84`): global y editable aquí; lo
 de cada etapa le llega en los datos de cada llamada.
 
+**La fecha de hoy y la regla de los datos personales no se editan aquí** (17/11/2026). Las añade el
+ejecutor común a cada llamada, entre la instrucción y el formato, igual para todos los agentes, y
+quedan en el `envio` guardado; ninguna versión de una instrucción puede quitarlas. Ver [Calificación
+con IA](CALIFICACION-CON-IA.md), «La fecha de hoy y la regla de los datos personales, en cada
+llamada».
+
 ### La plataforma y las empresas
 
 Desde el 25/08/2026 el sistema es multiempresa: cada empresa se registra por invitación de
@@ -1310,6 +1346,8 @@ Renaser, publica sus vacantes y ve solo a sus candidatos. El porqué de cada dec
 | PUT `/plataforma/empresas/{id}/tope-ia` | Poner, subir o quitar (`tope` en blanco) el tope mensual de IA. Lo que quedó en espera lo despierta solo el sondeo de la cola | `administrar_plataforma`, y ser la plataforma |
 | POST/DELETE `/plataforma/empresas/{id}/personalizacion/{instrumento}` | Encender o apagar la personalización **de otra empresa**, con motivo, cuando ella lo pide fuera del sistema. Misma copia y misma auditoría que si lo hiciera ella. **`BANCO` y `PRUEBA` responden 400** desde la `V67`, igual que en la ruta de la empresa | `administrar_plataforma`, y ser la plataforma |
 | GET `/plataforma/consumo?mes=YYYY-MM` | El consumo de IA del mes por empresa y por agente: total, tokens y llamadas. Con estos números Renaser factura fuera del sistema | `administrar_plataforma`, y ser la plataforma |
+| GET `/plataforma/recalificacion-por-la-fecha` | **Modo de prueba** del comando de una vez `scripts/recalificar-afectados-por-la-fecha.py` (17/11/2026): las postulaciones en curso de vacantes abiertas que la IA calificó sin la fecha de hoy o sin ver sus años de experiencia. Trae los totales (`pendientes`, `porLaFecha`, `porLosAnios`, `enMarcha`, `fallidas`, `llamadasEstimadas`), cuántas hay por vacante y cada afectada con su candidato, su vacante, sus dos motivos, su `estado` —`PENDIENTE`, `EN_CURSO` (ya en la cola) o `DETENIDA` (falló la vez anterior, con `motivoDelFallo`)— y sus `llamadas`. **No llama a la IA ni escribe nada** | `administrar_plataforma`, y ser la plataforma |
+| POST `/plataforma/recalificacion-por-la-fecha` | **Con confirmación**: reencola el CV y el retrato de cada afectada por el carril `RECALIFICA`, sin mover a nadie de etapa, sin el pase automático y sin pisar lo ajustado a mano; deja cada encolado en la auditoría. Responde `{encoladas, yaEnMarcha, fallidas: [{postulacionId, candidato, motivo}], llamadasEstimadas}`. Un fallo con una no frena a las demás, y quien ya tiene un trabajo vivo no se encola dos veces. Las reglas, en [Calificación con IA](CALIFICACION-CON-IA.md), «Recalificar a los afectados por la fecha» | `administrar_plataforma`, y ser la plataforma |
 | GET `/resenas-reportadas?resueltos=` | «Reseñas reportadas» (`V63`): los reportes de reseñas —de la persona— y de respuestas —de la empresa autora— en las mismas listas. Sin parámetro, los pendientes del más antiguo al más reciente; con `resueltos=true`, los resueltos, el último arriba. Cada uno dice qué se juzga (`RESENA` o `RESPUESTA`), empresa y persona, estrellas, los textos, motivo, comentario y fecha | `moderar_resenas`, y ser la plataforma |
 | POST `/resenas-reportadas/{id}/resolucion` | `decision` `MANTENER` u `OCULTAR`, con `nota` obligatoria. Ocultar es definitivo: deja de verse y de contar para todos, y la empresa autora —o la persona, si era su respuesta— lo ve atenuado con la nota. Avisa en la campana a quien corresponda | `moderar_resenas`, y ser la plataforma |
 | GET `/organizacion/personalizacion` | Qué instrumentos tiene propios esta organización, bandera por bandera: **`{pesosPropios, plantillasEvaluacionPropias}`**. Desde la `V74` ya no viajan `bancoPropio` ni `pruebasPuestoPropias`: el banco y las pruebas de una empresa son siempre los suyos | `personalizar_instrumentos` |

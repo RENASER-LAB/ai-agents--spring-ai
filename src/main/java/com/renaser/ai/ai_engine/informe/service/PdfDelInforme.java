@@ -883,8 +883,14 @@ public class PdfDelInforme {
                 l.linea(x + 17f, y + 7f, x + 10f, y + 14f, ROJO, 1.3f);
             }
             float yy = y + 6f;
+            // Con algo con que abrirlo (solo con «descargar_entregables»), el nombre es un enlace:
+            // el firmado de 8 horas de un archivo, como el del CV, o la dirección que pegó.
+            boolean abre = e.entregado() && LoComunDelInforme.esWeb(e.url());
             for (String linea : nombre) {
-                l.texto(x + 28f, yy, CUERPO_MEDIO, linea);
+                float anchoLinea = l.texto(x + 28f, yy, abre ? CUERPO_MEDIO.conColor(AZUL) : CUERPO_MEDIO, linea);
+                if (abre) {
+                    l.enlace(x + 28f, yy - 2f, anchoLinea, 13f, e.url().strip());
+                }
                 yy += 11.5f;
             }
             for (String linea : detalle) {

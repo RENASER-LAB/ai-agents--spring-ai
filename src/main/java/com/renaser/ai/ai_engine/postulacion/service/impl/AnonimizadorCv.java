@@ -3,6 +3,7 @@ package com.renaser.ai.ai_engine.postulacion.service.impl;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.function.UnaryOperator;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -66,15 +67,28 @@ public class AnonimizadorCv {
     // texto sale del PDF que sube cualquiera con cuenta de candidato: ese rato largo es
     // alcanzable desde fuera. No cambia lo que se acepta —`\s`, `[:-]` y lo que viene detrás
     // no comparten ningún carácter, así que volver atrás nunca le sirvió de nada.
-    private static final List<Pattern> PATRONES = List.of(
-            // "Edad: 34", "Edad 34 años"
-            patron("\\bedad\\s*+[:\\-]?\\s*+\\d{1,3}\\s*+(a[ñn]os)?"),
-            // "34 años", "34 años de edad".
-            //
-            // Los bordes van escritos a mano y no con \b: lo único que hace falta pedir es
-            // que la cifra no venga pegada a otra cifra —para no partir un "1234"— y que
-            // detrás no siga una letra. Con \b en Unicode, un "Nº34 años" se escaparía.
-            patron("(?<!\\d)\\d{1,3}\\s*+a[ñn]os(\\s+de\\s+edad)?(?![\\p{L}\\p{N}])"),
+
+    /**
+     * "Edad: 34", "Edad 34 años", "Edad – 34", "Edad.- más de 30": entre el rótulo y la cifra, lo
+     * mismo que acepta la señal «Edad» de {@link ReglaDeLaEdad#TRAS_LA_SENAL} —cualquier signo, no
+     * solo «:» o «-»—, para que una raya o un «.-» no dejen pasar la edad sin «años».
+     */
+    private static final String EDAD_ROTULADA =
+            "\\bedad" + ReglaDeLaEdad.TRAS_LA_SENAL + "\\d{1,3}\\s*+(a[ñn]os)?";
+
+    /**
+     * La regla de la edad hasta noviembre de 2026: una cifra con «años», mirase lo que mirase
+     * detrás. Tapaba también «5 años de experiencia». Ya no se usa para tapar; se conserva para
+     * saber qué currículums perdieron años de experiencia con ella ({@link #laReglaViejaTapabaDeMas}).
+     *
+     * <p>Los bordes van escritos a mano y no con \b: lo único que hace falta pedir es que la
+     * cifra no venga pegada a otra cifra —para no partir un "1234"— y que detrás no siga una
+     * letra. Con \b en Unicode, un "Nº34 años" se escaparía.
+     */
+    private static final String EDAD_VIEJA = "(?<!\\d)\\d{1,3}\\s*+a[ñn]os(\\s+de\\s+edad)?(?![\\p{L}\\p{N}])";
+
+    /** Los que no cambian entre la regla vieja y la nueva: nacimiento, sexo, estado civil… */
+    private static final List<Pattern> RESTO = List.of(
             // "Fecha de nacimiento: 12/03/1990", "Nacido el 12 de marzo de 1990"
             patron("\\b(fecha\\s+de\\s+)?nacimiento\\s*+[:\\-]?\\s*+[^\\n]{0,40}"),
             patron("\\bnacid[oa]\\s+(el\\s+)?[^\\n]{0,40}"),
@@ -90,16 +104,53 @@ public class AnonimizadorCv {
             // Una foto que se coló como texto ("[foto]", "Fotografía:")
             patron("\\bfotograf[ií]a\\s*+[:\\-]?"));
 
+    private static final Pattern ROTULADA = patron(EDAD_ROTULADA);
+
+    private static final Pattern VIEJA = patron(EDAD_VIEJA);
+
+    /**
+     * Cuándo «N años» es una edad lo decide {@link ReglaDeLaEdad} (decisiones D-2 y D-3 de la spec
+     * la-ia-sabe-que-dia-es-hoy): toda «N años» se tapa salvo una lista blanca mínima y literal de
+     * lo que hizo la persona, y una señal de edad delante tapa siempre. Ante la duda, se tapa.
+     */
+    private static final UnaryOperator<String> EDAD_NUEVA = texto -> ReglaDeLaEdad.tapar(texto, TAPADO);
+
+    /** La de antes de noviembre de 2026, solo para comparar. */
+    private static final UnaryOperator<String> EDAD_ANTES = texto ->
+            VIEJA.matcher(texto).replaceAll(Matcher.quoteReplacement(TAPADO));
+
     private static Pattern patron(String expresion) {
         return Pattern.compile(expresion, BANDERAS);
+    }
+
+    /** Si un texto lleva la marca de un dato tapado: se refiere a algo que la IA no vio. */
+    public static boolean traeLaMarca(String texto) {
+        return texto != null && texto.contains(TAPADO);
+    }
+
+    /**
+     * Si con la regla de antes de noviembre de 2026 este currículum perdía algo que la de ahora
+     * deja ver: en la práctica, años de experiencia («5 años de experiencia» llegaba a la IA como
+     * «[DATO NO UTILIZABLE] de experiencia»). Lo usa el comando que recalifica a los afectados.
+     */
+    public boolean laReglaViejaTapabaDeMas(String texto) {
+        if (texto == null || texto.isBlank()) {
+            return false;
+        }
+        return !tapar(texto, EDAD_ANTES).equals(tapar(texto, EDAD_NUEVA));
     }
 
     public String anonimizar(String texto) {
         if (texto == null || texto.isBlank()) {
             return texto;
         }
-        String salida = texto;
-        for (Pattern patron : PATRONES) {
+        return tapar(texto, EDAD_NUEVA);
+    }
+
+    /** Primero la edad rotulada, luego la edad suelta con la regla que toque y después el resto. */
+    private static String tapar(String texto, UnaryOperator<String> edad) {
+        String salida = edad.apply(ROTULADA.matcher(texto).replaceAll(Matcher.quoteReplacement(TAPADO)));
+        for (Pattern patron : RESTO) {
             salida = patron.matcher(salida).replaceAll(Matcher.quoteReplacement(TAPADO));
         }
         // Varios tapados seguidos ("Sexo: M · Estado civil: Casado") se leen mejor como uno

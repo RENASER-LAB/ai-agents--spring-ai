@@ -275,6 +275,8 @@ class ArmadoDeLaPruebaTest {
             assertThat(informe.anexo().entregables()).extracting(EntregableAnexo::detalle, EntregableAnexo::entregado)
                     .containsExactly(tuple("Subido el 12/11 a las 17:05", true),
                             tuple("No se subió ningún archivo", false));
+            assertThat(informe.anexo().entregables()).extracting(EntregableAnexo::archivoId, EntregableAnexo::url)
+                    .containsExactly(tuple(null, "https://drive.example/planilla"), tuple(null, null));
             assertThat(informe.detalle()).isEmpty();
         }
 
@@ -352,6 +354,10 @@ class ArmadoDeLaPruebaTest {
             assertThat(informe.nota().texto()).isEqualTo("82");
             assertThat(informe.datosClave().get(0)).isEqualTo(new Dato("Prueba", "Prueba de analista"));
             assertThat(informe.anexo().caso()).isEqualTo("El caso");
+            // Con qué se abre viaja hasta el servicio, que lo quita a quien no tiene permiso
+            // (spec la-ia-sabe-que-dia-es-hoy); uno no entregado no lleva nada.
+            assertThat(informe.anexo().entregables()).extracting(EntregableAnexo::archivoId, EntregableAnexo::url)
+                    .containsExactly(tuple(5L, null), tuple(null, null));
             List<Criterio> criterios = informe.evaluado().criterios();
             assertThat(criterios).extracting(Criterio::quien).containsExactly("Persona", null, "Sistema");
             assertThat(criterios.get(0).motivoAjuste()).isEqualTo("subió el anexo");
@@ -506,7 +512,8 @@ class ArmadoDeLaPruebaTest {
     }
 
     private static EntregaVista entregaVista(String nombre, boolean loEntrego) {
-        return new EntregaVista(1L, nombre, null, null, true, null, loEntrego, null, null, null,
+        return new EntregaVista(1L, nombre, null, null, true, null, loEntrego,
+                loEntrego ? "https://drive.example/planilla" : null, null, null,
                 loEntrego ? ENTREGADA : null, null, null);
     }
 }

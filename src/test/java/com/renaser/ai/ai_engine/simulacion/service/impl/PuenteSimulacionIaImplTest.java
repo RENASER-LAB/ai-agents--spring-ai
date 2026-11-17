@@ -234,7 +234,9 @@ class PuenteSimulacionIaImplTest {
                 afirmacion("Lideré un equipo de ocho", "DEMOSTRADA"),
                 afirmacion("Reduje el retrabajo a la mitad", "DECLARADA"),
                 afirmacion("Aviso los riesgos temprano", "CONTRADICHA"),
-                afirmacion("Sé leer un tablero de indicadores", "FALTA_INFO")));
+                afirmacion("Sé leer un tablero de indicadores", "FALTA_INFO"),
+                // Una antigua con la marca del anonimizador: habla de algo que la IA no vio.
+                afirmacion("Tiene más de [DATO NO UTILIZABLE] de experiencia", "FALTA_INFO")));
 
         InsumoConversacion insumo = puente.insumoConversacion(POSTULACION);
 

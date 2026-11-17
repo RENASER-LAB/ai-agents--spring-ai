@@ -251,6 +251,33 @@ class PdfDelInformeTest {
         }
 
         @Test
+        @DisplayName("AC-12 · con algo con que abrirlo, el nombre del entregable entregado es un enlace: el firmado de un archivo o la dirección pegada")
+        void losEntregablesSeAbren() throws IOException {
+            Informe base = InformesDePrueba.prueba(List.of());
+            Informe conEnlaces = conEntregables(base, List.of(
+                    new EntregableAnexo("Documento de Recursos Humanos", "Subido el 14/11 a las 10:14", true, 77L,
+                            "https://almacen.example/rrhh.pdf?firma=8h"),
+                    new EntregableAnexo("Video de sustentación", "Subido el 14/11 a las 10:20", true, null,
+                            "https://drive.example/video"),
+                    // No entregado: aunque trajera una dirección, no se enlaza.
+                    new EntregableAnexo("Cronograma", "No se subió ningún archivo", false, null,
+                            "https://drive.example/nada")));
+
+            byte[] archivo = pdf.generar(conEnlaces);
+
+            assertThat(urls(archivo)).contains("https://almacen.example/rrhh.pdf?firma=8h",
+                    "https://drive.example/video").doesNotContain("https://drive.example/nada");
+            assertThat(texto(archivo)).contains("Documento de Recursos Humanos", "Video de sustentación");
+        }
+
+        @Test
+        @DisplayName("AC-13 · sin nada con que abrirlos, los entregables salen sin enlace, como siempre")
+        void sinEnlaceComoSiempre() throws IOException {
+            byte[] archivo = pdf.generar(InformesDePrueba.prueba(List.of()));
+            assertThat(urls(archivo)).noneMatch(u -> u.contains("drive") || u.contains("rrhh"));
+        }
+
+        @Test
         @DisplayName("AC-01i · la nota de cada criterio sale una sola vez y «En pocas líneas» no empieza por la nota")
         void notaUnaSolaVez() throws IOException {
             String todo = texto(pdf.generar(InformesDePrueba.prueba(List.of())));
@@ -334,6 +361,15 @@ class PdfDelInformeTest {
         try (PDDocument documento = Loader.loadPDF(archivo)) {
             return documento.getNumberOfPages();
         }
+    }
+
+    private static Informe conEntregables(Informe i, List<EntregableAnexo> entregables) {
+        Anexo a = i.anexo();
+        return new Informe(i.etapa(), i.titulo(), i.empresa(), i.vacante(), i.postulacionId(), i.candidato(),
+                i.correo(), i.generadoEn(), i.nota(), i.grupo(), i.datosClave(), i.recuentos(), i.experiencia(),
+                i.resumen(), i.evaluado(), i.bloques(), i.enlaces(), i.detalleTitulo(), i.detalle(), i.detallePie(),
+                new Anexo(a.titulo(), a.subtitulo(), a.caso(), a.preguntas(), a.entregablesResumen(), entregables),
+                i.aviso(), i.textosEnCamino(), i.nombreArchivo());
     }
 
     private static List<String> urls(byte[] archivo) throws IOException {

@@ -1417,6 +1417,12 @@ La `V80` suma **`BUSQUEDA_CV`**, que busca en el CV lo que la vacante escribió 
 el CV», y un cuarto modo, **`REBUSCA`**: volver a buscar cuando la empresa cambia las líneas, o
 cuando alguien pulsa «Volver a buscar». Es el mismo carril aparte que `RECALIFICA`, por lo mismo.
 
+Desde el 17/11/2026, sin migración, **`RECALIFICA` lleva también la recalificación de los
+afectados por la fecha**: los agentes del CV vuelven a correr y al acabar se rehace el retrato,
+pero sin mover a nadie de etapa ni disparar el pase automático. Y el bloque con la fecha de hoy que
+desde ese día va en cada llamada queda dentro de `ejecucion_ia.envio`: no hay columna aparte. Ver
+[Calificación con IA](CALIFICACION-CON-IA.md).
+
 La `V84` suma el **redactor del informe** (`REDACTOR_INFORME`), que como el Redactor y el
 Recomendador no evalúa a nadie: escribe los textos de los informes por etapa con lo ya calificado.
 No abre ningún modo nuevo: sus trabajos nacen en `FINA` —aunque el redactor corre sin razonar— y

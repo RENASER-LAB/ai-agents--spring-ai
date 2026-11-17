@@ -62,8 +62,9 @@ import static com.renaser.ai.ai_engine.informe.service.FormatoDelInforme.limpio;
  * mismos servicios que la ficha: la prueba de una plantilla, la escrita en el editor (V67) y el
  * cuestionario técnico.
  *
- * <p><b>Del entregable va el nombre y cuándo llegó, nunca su contenido</b>: los servicios se
- * piden sin el permiso de verlo.
+ * <p><b>Del entregable va el nombre y cuándo llegó, nunca su contenido.</b> Con qué se abre
+ * —el id del archivo o la dirección que pegó— viaja hasta {@code ServicioInformesImpl}, que lo
+ * deja solo a quien tiene {@code descargar_entregables}.
  */
 @Component
 @RequiredArgsConstructor
@@ -300,16 +301,23 @@ public class ArmadoDeLaPrueba {
                 List.of(), null);
     }
 
+    /**
+     * Un entregable para el anexo: el nombre, cuándo llegó y con qué se abre (el archivo o la
+     * dirección que pegó). Lo de abrirlo lo quita {@code ServicioInformesImpl} a quien no tiene
+     * {@code descargar_entregables}; el contenido nunca entra en el informe.
+     */
     private static EntregableAnexo entregable(EntregaVista e) {
         return new EntregableAnexo(e.nombre(), e.loEntrego()
                 ? "Subido el " + FormatoDelInforme.diaYHora(e.subidoEn())
-                : "No se subió ningún archivo", e.loEntrego());
+                : "No se subió ningún archivo", e.loEntrego(),
+                e.loEntrego() ? e.archivoId() : null, e.loEntrego() && e.archivoId() == null ? e.enlace() : null);
     }
 
     private static EntregableAnexo entregable(EntregaDeLaPrueba e) {
         return new EntregableAnexo(e.nombre(), e.loEntrego()
                 ? "Subido el " + FormatoDelInforme.diaYHora(e.subidoEn())
-                : "No se subió ningún archivo", e.loEntrego());
+                : "No se subió ningún archivo", e.loEntrego(),
+                e.loEntrego() ? e.archivoId() : null, e.loEntrego() && e.archivoId() == null ? e.enlace() : null);
     }
 
     private static String respuestaDe(PreguntaDelCandidato p) {

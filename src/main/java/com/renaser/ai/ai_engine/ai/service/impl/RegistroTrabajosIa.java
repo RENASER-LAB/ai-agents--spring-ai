@@ -144,6 +144,19 @@ public class RegistroTrabajosIa {
                 .build()));
     }
 
+    /**
+     * Cuáles de estas ejecuciones ya llevaban la fecha de hoy en su mensaje: se hicieron con la
+     * fecha correcta y con el anonimizador que deja ver los años de experiencia, que llegaron
+     * juntos (spec la-ia-sabe-que-dia-es-hoy).
+     */
+    @Transactional(readOnly = true)
+    public java.util.Set<Long> conLaFechaDeHoy(java.util.Collection<Long> ejecucionIaIds) {
+        if (ejecucionIaIds == null || ejecucionIaIds.isEmpty()) {
+            return java.util.Set.of();
+        }
+        return new java.util.HashSet<>(ejecuciones.idsConEnvioQueLleva(ejecucionIaIds, FechaDeHoyParaLaIa.REGLA));
+    }
+
     /** El porqué del último intento fallido de un trabajo, o vacío si no quedó escrito. */
     @Transactional(readOnly = true)
     public Optional<String> motivoDelUltimoFallo(Long trabajoIaId) {

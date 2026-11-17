@@ -121,7 +121,9 @@ public interface ServicioCalificacionPrueba {
     PlazoVigente verPlazo(ContextoUsuario quien, Long postulacionId);
 
     // ---- Para el informe de la prueba (sin nadie conectado: también lo pide la cola). Quien
-    // llama ya comprobó el permiso y el alcance. Nunca traen el contenido de un entregable.
+    // llama ya comprobó el permiso y el alcance. Nunca traen el contenido de un entregable; los
+    // entregables sí traen con qué se abren, y el servicio de los informes lo deja solo a quien
+    // tiene «descargar_entregables».
 
     List<NotaCriterioResponse> notasParaElInforme(com.renaser.ai.ai_engine.postulacion.entity.Postulacion postulacion);
 

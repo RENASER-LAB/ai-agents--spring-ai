@@ -65,6 +65,7 @@ import com.renaser.ai.ai_engine.postulacion.repository.EnlaceCvRepository;
 import com.renaser.ai.ai_engine.postulacion.repository.PostulacionRepository;
 import com.renaser.ai.ai_engine.postulacion.service.MaquinaEstados;
 import com.renaser.ai.ai_engine.postulacion.service.ServicioTextoCv;
+import com.renaser.ai.ai_engine.postulacion.service.impl.AnonimizadorCv;
 import com.renaser.ai.ai_engine.vacante.entity.Puesto;
 import com.renaser.ai.ai_engine.vacante.entity.Vacante;
 import com.renaser.ai.ai_engine.vacante.repository.PuestoRepository;
@@ -314,6 +315,15 @@ public class PuenteCalificacionIaImpl implements PuenteCalificacionIa {
         afirmaciones.deleteByCvId(cv.getId());
         for (AfirmacionIa afirmacion : lista(resultado == null ? null : resultado.afirmaciones())) {
             if (esVacio(afirmacion.texto()) || !CLASIFICACIONES.contains(afirmacion.clasificacion())) {
+                continue;
+            }
+            // Una afirmación con la marca del anonimizador habla de un dato que la IA no vio
+            // («Tiene más de [DATO NO UTILIZABLE] de experiencia»): no se guarda, y su pregunta
+            // para validarla tampoco. Mostrarla sería pedir que se confirme algo inventado.
+            if (AnonimizadorCv.traeLaMarca(afirmacion.texto())
+                    || AnonimizadorCv.traeLaMarca(afirmacion.preguntaValidacion())) {
+                log.info("EVIDENCIA_CV: afirmación descartada en la postulación {}: lleva un dato tapado",
+                        postulacionId);
                 continue;
             }
             afirmaciones.save(AfirmacionCv.builder()
@@ -838,6 +848,48 @@ public class PuenteCalificacionIaImpl implements PuenteCalificacionIa {
     @Transactional
     public void cerrarPerfilIntegral(Long postulacionId, Long ejecucionIaId,
                                      ResultadoPerfil resultado) {
+        Postulacion postulacion = guardarElRetrato(postulacionId, ejecucionIaId, resultado);
+
+        // Lo último, y solo por la máquina: nunca se escribe estado_codigo a mano.
+        //
+        // ⚠️ Y solo si sigue en el Perfil Integral. Entre que este trabajo empieza y termina
+        // pasan minutos, y en ese rato una persona puede haberla avanzado desde el panel:
+        // mover a «por confirmar» sin mirar la devolvía a la bandeja anterior, le quitaba al
+        // candidato el turno que ya le habían dado y dejaba su intento de la prueba creado
+        // pero fuera de etapa —desde ahí, volver a avanzarla chocaba contra la clave única y
+        // el panel solo sabía decir «ya existe un registro con postulacion_id X». Lo
+        // calificado se guarda igual: lo que no se hace es mandarla donde ya no está.
+        if (maquina.sigueEnLaEtapa(postulacion, "PERFIL_INTEGRAL")) {
+            maquina.transicionar(postulacion, "PERFIL_POR_CONFIRMAR", null, null, true, false, null);
+            // Y si la vacante califica y avanza sola, alguien tiene que enterarse de que esto
+            // ya terminó: con la nota completa, el pase decide si llega a la mínima (V72). Se
+            // avisa y no se llama: avanzar pasa por crear lo que el candidato va a rendir, y
+            // ese camino vuelve hasta aquí cerrando un círculo con el que Spring no arranca.
+            // Ver RetratoTerminado.
+            avisos.publishEvent(new RetratoTerminado(postulacionId));
+        } else {
+            log.info("POTENCIAL_RIESGO: la postulación {} ya salió del Perfil Integral (está en "
+                    + "{}): se guarda su perfil y su nota, pero no se la mueve",
+                    postulacionId, postulacion.getEstadoCodigo());
+        }
+    }
+
+    @Override
+    @Transactional
+    public void cerrarPerfilIntegralSinMover(Long postulacionId, Long ejecucionIaId,
+                                             ResultadoPerfil resultado) {
+        Postulacion postulacion = guardarElRetrato(postulacionId, ejecucionIaId, resultado);
+        // Ni la máquina ni el aviso al pase automático: una recalificación no cambia de etapa a
+        // nadie, aunque su nota nueva llegue a la mínima. Lo decide una persona.
+        log.info("POTENCIAL_RIESGO: la postulación {} se recalificó sin moverla de etapa (sigue en {})",
+                postulacionId, postulacion.getEstadoCodigo());
+    }
+
+    /**
+     * El cuerpo común de los dos cierres: el Perfil de Talento, sus hallazgos y alertas, la nota
+     * del Perfil Integral y el grupo. No toca la etapa.
+     */
+    private Postulacion guardarElRetrato(Long postulacionId, Long ejecucionIaId, ResultadoPerfil resultado) {
         Postulacion postulacion = postulacion(postulacionId);
         Vacante vacante = vacanteParaCalificar(postulacion);
         Puesto puesto = puesto(vacante);
@@ -871,32 +923,9 @@ public class PuenteCalificacionIaImpl implements PuenteCalificacionIa {
         BigDecimal nota = recalcularNotaDeLaEtapa(postulacionId, vacante, puesto);
         postulacion.setGrupoPrioridad(grupoDe(postulacion.getOrganizacionId(), nota, perfil, resultado));
         postulaciones.save(postulacion);
-
-        // Lo último, y solo por la máquina: nunca se escribe estado_codigo a mano.
-        //
-        // ⚠️ Y solo si sigue en el Perfil Integral. Entre que este trabajo empieza y termina
-        // pasan minutos, y en ese rato una persona puede haberla avanzado desde el panel:
-        // mover a «por confirmar» sin mirar la devolvía a la bandeja anterior, le quitaba al
-        // candidato el turno que ya le habían dado y dejaba su intento de la prueba creado
-        // pero fuera de etapa —desde ahí, volver a avanzarla chocaba contra la clave única y
-        // el panel solo sabía decir «ya existe un registro con postulacion_id X». Lo
-        // calificado se guarda igual: lo que no se hace es mandarla donde ya no está.
-        if (maquina.sigueEnLaEtapa(postulacion, "PERFIL_INTEGRAL")) {
-            maquina.transicionar(postulacion, "PERFIL_POR_CONFIRMAR", null, null, true, false, null);
-            // Y si la vacante califica y avanza sola, alguien tiene que enterarse de que esto
-            // ya terminó: con la nota completa, el pase decide si llega a la mínima (V72). Se
-            // avisa y no se llama: avanzar pasa por crear lo que el candidato va a rendir, y
-            // ese camino vuelve hasta aquí cerrando un círculo con el que Spring no arranca.
-            // Ver RetratoTerminado.
-            avisos.publishEvent(new RetratoTerminado(postulacionId));
-        } else {
-            log.info("POTENCIAL_RIESGO: la postulación {} ya salió del Perfil Integral (está en "
-                    + "{}): se guarda su perfil y su nota, pero no se la mueve",
-                    postulacionId, postulacion.getEstadoCodigo());
-        }
-
         log.info("POTENCIAL_RIESGO: postulación {} calificada con {} y grupo {}",
                 postulacionId, nota, postulacion.getGrupoPrioridad());
+        return postulacion;
     }
 
     private void guardarHallazgos(PerfilTalento perfil, ResultadoPerfil resultado) {

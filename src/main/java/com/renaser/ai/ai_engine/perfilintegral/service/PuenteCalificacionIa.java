@@ -184,4 +184,15 @@ public interface PuenteCalificacionIa {
      * {@code PERFIL_POR_CONFIRMAR}, que es donde una persona decide.
      */
     void cerrarPerfilIntegral(Long postulacionId, Long ejecucionIaId, ResultadoPerfil resultado);
+
+    /**
+     * Lo mismo que {@link #cerrarPerfilIntegral} —el Perfil de Talento con sus hallazgos, la nota
+     * del Perfil Integral y el grupo, con su fecha— <b>sin mover a nadie de etapa</b> y sin avisar
+     * al pase automático.
+     *
+     * <p>Es el cierre de la recalificación del CV (spec la-ia-sabe-que-dia-es-hoy): quien quede por
+     * encima de la nota mínima no avanza solo; lo decide una persona. Lo ajustado a mano se
+     * respeta como siempre, porque la nota se recalcula con las notas guardadas.
+     */
+    void cerrarPerfilIntegralSinMover(Long postulacionId, Long ejecucionIaId, ResultadoPerfil resultado);
 }

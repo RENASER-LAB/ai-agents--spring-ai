@@ -111,6 +111,17 @@ public interface ServicioPerfilIntegralPanel {
     RankingVacante ranking(ContextoUsuario quien, Long vacanteId, String etapaCodigo);
 
     /**
+     * El ponderado de lo ya rendido (RF-155) de cada postulación de la vacante que lo tiene: la
+     * nota del Perfil Integral y la de la prueba del puesto, reescaladas sobre la suma de sus
+     * pesos. Es la misma cuenta que la columna del ranking de la prueba del puesto.
+     *
+     * <p>Solo entran las que tienen las dos notas, en una vacante cuyos dos pesos son mayores que
+     * cero: sin pesos de etapa no hay ponderado y el mapa sale vacío. No mira qué notas puede ver
+     * quien pregunta: sirve para ordenar el visor de informes, no para enseñarse.
+     */
+    java.util.Map<Long, java.math.BigDecimal> ponderadosDeLoRendido(ContextoUsuario quien, Long vacanteId);
+
+    /**
      * La rúbrica de la prueba que la vacante tiene puesta HOY, en el orden en que se
      * escribió.
      *

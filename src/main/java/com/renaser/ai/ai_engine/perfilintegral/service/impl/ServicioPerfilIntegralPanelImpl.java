@@ -51,6 +51,7 @@ import com.renaser.ai.ai_engine.postulacion.repository.DatoCvRepository;
 import com.renaser.ai.ai_engine.postulacion.repository.EstadoPostulacionRepository;
 import com.renaser.ai.ai_engine.postulacion.repository.PostulacionRepository;
 import com.renaser.ai.ai_engine.postulacion.service.MaquinaEstados;
+import com.renaser.ai.ai_engine.postulacion.service.impl.AnonimizadorCv;
 import com.renaser.ai.ai_engine.perfilintegral.service.CalificacionPorPuntos;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
 import com.renaser.ai.ai_engine.seguridad.service.Permisos;
@@ -187,6 +188,11 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
 
         List<HallazgoResponse> lista = perfil == null ? List.of()
                 : hallazgos.findByPerfilTalentoId(perfil.getId()).stream()
+                        // Un hallazgo con la marca del anonimizador habla de un dato que la IA
+                        // no vio: no se enseña (spec la-ia-sabe-que-dia-es-hoy).
+                        .filter(h -> !AnonimizadorCv.traeLaMarca(h.getDescripcion())
+                                && !AnonimizadorCv.traeLaMarca(h.getEvidencia())
+                                && !AnonimizadorCv.traeLaMarca(h.getSugerencia()))
                         .map(h -> new HallazgoResponse(h.getTipo(), h.getDescripcion(),
                                 h.getEvidencia(), h.isEsCanalizable(), h.getSugerencia()))
                         .toList();
@@ -201,7 +207,9 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
         return new PerfilIntegralResponse(
                 postulacionId,
                 estadoDeLaCalificacion(postulacion, perfil),
-                perfil == null ? null : perfil.getResumen(),
+                // El resumen con la marca del anonimizador tampoco se enseña tal cual, como en el
+                // informe de la evaluación.
+                perfil == null || AnonimizadorCv.traeLaMarca(perfil.getResumen()) ? null : perfil.getResumen(),
                 perfil == null ? null : perfil.getAdecuacion(),
                 perfil == null ? null : perfil.getPotencial(),
                 perfil == null ? null : perfil.getAltoRendimiento(),
@@ -1195,6 +1203,34 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
      * ningún rol sembrado tiene esa forma, pero los roles se configuran desde el panel y esto
      * dejaría de ser cierto sin que nadie tocara una línea de código.
      */
+    @Override
+    @Transactional(readOnly = true)
+    public Map<Long, BigDecimal> ponderadosDeLoRendido(ContextoUsuario quien, Long vacanteId) {
+        Vacante vacante = vacanteVisible(quien, vacanteId, "ver_embudo");
+        List<Long> ids = postulaciones.findByVacanteIdOrderByCreadoEnDesc(vacanteId).stream()
+                .map(Postulacion::getId).toList();
+        if (ids.isEmpty() || vacante.getVersionPesosId() == null) {
+            return Map.of();
+        }
+        // Los pesos de la versión de LA VACANTE, como en el ranking: no los de la última publicada.
+        Map<String, BigDecimal> pesoDeLaEtapa = pesosEtapa.findByVersionPesosId(vacante.getVersionPesosId())
+                .stream()
+                .collect(Collectors.toMap(PesoEtapa::getEtapaCodigo, PesoEtapa::getPeso, (a, b) -> a));
+        Map<Long, NotaEtapa> delPerfil = porPostulacion(
+                notasEtapa.findByPostulacionIdInAndEtapaCodigo(ids, ETAPA), NotaEtapa::getPostulacionId);
+        Map<Long, NotaEtapa> deLaPrueba = porPostulacion(
+                notasEtapa.findByPostulacionIdInAndEtapaCodigo(ids, ETAPA_TECNICA), NotaEtapa::getPostulacionId);
+        Map<Long, BigDecimal> salida = new java.util.HashMap<>();
+        for (Long id : ids) {
+            BigDecimal sobre100 = ponderadoDeLoRendido(delPerfil.get(id), deLaPrueba.get(id), null,
+                    pesoDeLaEtapa).sobre100();
+            if (sobre100 != null) {
+                salida.put(id, sobre100);
+            }
+        }
+        return salida;
+    }
+
     private Vacante vacanteVisible(ContextoUsuario quien, Long vacanteId, String permiso) {
         // El findById + filter por organización de antes era findByIdAndOrganizacionId escrito
         // a mano: el guardián usa la consulta derivada, que dice lo mismo en una sola pasada.
@@ -1361,7 +1397,10 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
                 nota == null ? null : nota.getPuntaje(),
                 criterio.getPuntos(),
                 peso,
-                nota == null ? null : nota.getExplicacion(),
+                // La justificación con la marca del anonimizador no se enseña tal cual: habla
+                // de un dato que la IA no vio. La nota sigue saliendo.
+                nota == null || AnonimizadorCv.traeLaMarca(nota.getExplicacion()) ? null
+                        : nota.getExplicacion(),
                 nota == null ? null : nota.getOrigen(),
                 // Va tal cual: 0 a 100, la misma escala del puntaje. Ver el comentario de
                 // NotaCriterioResponse.

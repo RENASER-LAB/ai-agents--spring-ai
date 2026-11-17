@@ -11,7 +11,9 @@ import java.util.Objects;
  * visor del panel y como PDF. Los dos leen exactamente estos datos.
  *
  * <p><b>Nunca lleva</b> la pretensión salarial, el celular, la foto, la edad, el sexo, el estado
- * civil ni el contenido de un entregable. Del candidato van el nombre y el correo.
+ * civil ni el contenido de un entregable. Del candidato van el nombre y el correo. El celular
+ * viaja solo en la lista del visor ({@link PostulanteDelVisor}), que no se imprime; de un
+ * entregable, a quien tiene {@code descargar_entregables}, el enlace para abrirlo.
  *
  * <p><b>Nada viene recortado.</b> Cada texto llega entero; quien lo pinta decide cómo enseñarlo
  * (el PDF lo imprime todo, el visor lo despliega).
@@ -157,8 +159,24 @@ public final class DtosInforme {
                                 String loQueDemostro, String explicacion) {
     }
 
-    /** Del entregable va el nombre y cuándo llegó; nunca su contenido. */
-    public record EntregableAnexo(String nombre, String detalle, boolean entregado) {
+    /**
+     * Del entregable va el nombre y cuándo llegó; nunca su contenido.
+     *
+     * <p>Lo que lo abre viaja solo a quien tiene {@code descargar_entregables} y solo si se
+     * entregó; sin ese permiso los dos vienen nulos y se ve como siempre, sin enlace.
+     *
+     * @param archivoId el archivo subido, para que el visor pida su enlace firmado de siempre
+     *                  ({@code /archivos/{id}/enlace}); nulo si es un enlace o no se ve
+     * @param url       lo que lo abre en el PDF: el enlace firmado de 8 horas de un archivo, o la
+     *                  dirección que pegó el candidato; nulo si no se ve o no es web
+     */
+    public record EntregableAnexo(String nombre, String detalle, boolean entregado, Long archivoId,
+                                  String url) {
+
+        /** Sin nada con que abrirlo: como se ve sin permiso. */
+        public EntregableAnexo(String nombre, String detalle, boolean entregado) {
+            this(nombre, detalle, entregado, null, null);
+        }
     }
 
     // ============================================================ lo que no es el informe
@@ -178,13 +196,37 @@ public final class DtosInforme {
                                         List<EstadoDeUnInforme> informes) {
     }
 
-    /** Un postulante en la lista del visor. */
+    /**
+     * Un postulante en la lista del visor.
+     *
+     * @param puesto  su lugar en ESTA lista, de 1 en adelante (no el del ranking)
+     * @param celular el de su cuenta o, si no tiene, el del CV; nulo si no hay ninguno o si la
+     *                persona está anonimizada. Lo ve quien puede abrir el visor y nunca va en un PDF
+     */
     public record PostulanteDelVisor(Long postulacionId, int puesto, String candidato,
                                      String grupo, BigDecimal notaCv,
-                                     BigDecimal notaEvaluacion, BigDecimal notaPrueba) {
+                                     BigDecimal notaEvaluacion, BigDecimal notaPrueba,
+                                     Celular celular) {
     }
 
-    /** La lista del visor, en el orden del ranking, y qué etapas puede ver quien pregunta. */
+    /**
+     * El celular del candidato, listo para pintar en el visor.
+     *
+     * @param texto    cómo se enseña: «987 654 321» si es un celular peruano; si no, tal cual
+     * @param llamar   el enlace para llamar ({@code tel:+51987654321})
+     * @param whatsapp la conversación ({@code https://wa.me/51987654321}); nulo si no es un
+     *                 celular peruano de 9 cifras que empiece por 9
+     */
+    public record Celular(String texto, String llamar, String whatsapp) {
+    }
+
+    /**
+     * La lista del visor y qué etapas puede ver quien pregunta.
+     *
+     * <p>Arriba quienes tienen las tres notas (CV, evaluación y prueba calificada), de mayor a
+     * menor por el ponderado de lo ya rendido (RF-155); debajo los demás, en el orden del
+     * ranking. El orden no depende de qué notas puede ver quien mira.
+     */
     public record VisorDeLaVacante(Long vacanteId, String vacante, String puesto,
                                    List<PostulanteDelVisor> postulantes, List<String> etapas) {
     }

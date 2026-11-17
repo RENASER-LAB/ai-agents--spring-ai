@@ -1,5 +1,7 @@
 package com.renaser.ai.ai_engine.informe.service;
 
+import com.renaser.ai.ai_engine.postulacion.service.impl.AnonimizadorCv;
+
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.DecimalFormat;
@@ -92,6 +94,18 @@ public final class FormatoDelInforme {
     /** El texto sin espacios de más a los lados, o nulo si no hay. */
     public static String limpio(String texto) {
         return hay(texto) ? texto.strip() : null;
+    }
+
+    /**
+     * Un texto de la IA para enseñar, o nulo si trae la marca del anonimizador.
+     *
+     * <p>«Tiene más de [DATO NO UTILIZABLE] de experiencia» habla de un dato que la IA no vio:
+     * enseñarlo tal cual pone la marca en el panel y en el PDF. Va solo en lo que escribe la IA
+     * a partir del CV (justificaciones, el perfil, el resumen del retrato); las respuestas del
+     * candidato no pasan por aquí.
+     */
+    public static String sinMarca(String texto) {
+        return AnonimizadorCv.traeLaMarca(texto) ? null : limpio(texto);
     }
 
     /** Lo que se escribe en el nombre de un archivo: sin barras ni signos que el disco rechace. */

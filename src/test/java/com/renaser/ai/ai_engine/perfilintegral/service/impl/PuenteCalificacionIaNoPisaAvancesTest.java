@@ -177,6 +177,22 @@ class PuenteCalificacionIaNoPisaAvancesTest {
     }
 
     @Test
+    @DisplayName("AC-18 · la recalificación del CV guarda el retrato, la nota y el grupo pero no mueve a nadie ni avisa al pase automático")
+    void laRecalificacionNoMueve() {
+        lenient().when(maquina.sigueEnLaEtapa(postulacion, "PERFIL_INTEGRAL")).thenReturn(true);
+
+        puente.cerrarPerfilIntegralSinMover(POSTULACION, EJECUCION_IA, resultado());
+
+        verify(maquina, never()).transicionar(any(), anyString(), any(), any(),
+                anyBoolean(), anyBoolean(), any());
+        verify(avisos, never()).publishEvent(any(Object.class));
+        assertThat(postulacion.getEstadoCodigo()).isEqualTo("PERFIL_CALIFICANDO");
+        verify(perfiles).save(any(PerfilTalento.class));
+        verify(notasEtapa).save(any(NotaEtapa.class));
+        assertThat(postulacion.getGrupoPrioridad()).isNotNull();
+    }
+
+    @Test
     @DisplayName("sin ningún componente con peso, la nota que hubiera se queda como estaba")
     void sinPesosLaNotaViejaNoSeVuelveAFirmar() {
         /*

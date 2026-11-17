@@ -106,7 +106,8 @@ class OrdenDelPromptParaLaCacheTest {
         // La calculadora del costo con un repositorio vacío: sin tarifa el costo queda
         // nulo, que aquí da igual — esta prueba mira el orden del prompt, no el precio.
         ejecutor = new EjecutorAgenteIaImpl(agentes, instrucciones, ejecuciones, espia,
-                new CalculadoraCostoIa(tarifas), JsonMapper.builder().build());
+                new CalculadoraCostoIa(tarifas), JsonMapper.builder().build(),
+                new FechaDeHoyParaLaIa());
     }
 
     private void calificar(String curriculum) {

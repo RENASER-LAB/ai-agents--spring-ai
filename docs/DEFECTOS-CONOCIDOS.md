@@ -14,7 +14,7 @@ haría falta para arreglarlo**. Sin lo tercero, una lista así solo sirve para p
 **Los números no se corren ni se reutilizan.** Otros documentos citan las entradas por su número,
 así que la que se cierra deja su hueco.
 
-Última revisión: **16/10/2026**.
+Última revisión: **17/11/2026**.
 
 ---
 
@@ -492,6 +492,42 @@ nombre, las fechas, los lugares o la foto, y el CV le llega recortado como siemp
 **Qué haría falta.** Añadir cada forma nueva a las dos listas —`ReglasQueBuscarEnElCv` en el
 backend y `reglasQueBuscar.ts` en el panel— con su caso en las pruebas de las dos. Las líneas
 escritas se pueden revisar en `linea_busqueda_cv`.
+
+---
+
+## 21 · El recorte del CV deja pasar algunas formas de escribir la edad
+
+**Qué le pasa a alguien.** Un candidato escribe su edad de una forma que el recorte no reconoce, y
+la cifra llega a la IA, que es un tercero. Se conocen estas: «Juan Pérez, más de 30 años», «Tengo
+poco más de 30 años», «Mujer de unos 34 años» o «de casi 34 años», un nombre seguido de «-», «·» o
+«|» en vez de coma, «más de 30 años» sola en su línea, «con 34 años», una «ñ» escrita como «n» más
+una tilde suelta —como sale de algunos PDF— y «34 añosEn», con la palabra siguiente pegada.
+
+**Por qué pasa.** Es lo decidido el 16/11/2026, al dejar de tapar los años de experiencia: toda
+«N años» se tapa salvo una lista corta de formas de trabajo, y unas pocas señales de edad tapan
+siempre. Esas formas no son señal o caen en la lista de lo que se deja ver. Lo que no cambia: cada
+llamada lleva una regla fija que le pide al modelo ignorar la edad, el sexo, el estado civil, los
+hijos y la nacionalidad, y ninguna edición de la instrucción la quita. Las reglas, en [Calificación
+con IA](CALIFICACION-CON-IA.md), «La edad se tapa; los años de experiencia, no».
+
+**Qué haría falta.** Añadir cada forma nueva a `ReglaDeLaEdad`, con su caso en la batería de
+pruebas del anonimizador, cuidando de no volver a tapar «N años de experiencia». Lo que de verdad
+salió hacia la IA se puede revisar en `cv.texto_anonimizado` y en `ejecucion_ia.envio`.
+
+---
+
+## 22 · Borrar los datos de una persona no vacía el teléfono que la IA leyó de su CV
+
+**Qué le pasa a alguien.** Quien pidió borrar sus datos conserva su número en `dato_cv.telefono`,
+el que la IA sacó del currículum. El visor de informes no lo enseña —de una persona anonimizada no
+sale ningún celular—, pero el dato sigue en la base.
+
+**Por qué pasa.** El borrado vacía el celular de la cuenta (`persona.telefono`) y no toca la ficha
+que la IA sacó del CV. Se vio el 16/11/2026, al poner el celular en el visor, y quedó fuera de esa
+spec.
+
+**Qué haría falta.** Que el borrado vacíe también `dato_cv.telefono` —y revisar si el resto de
+esa ficha, como el nombre y el correo, corre la misma suerte—, con una prueba que lo compruebe.
 
 ---
 
