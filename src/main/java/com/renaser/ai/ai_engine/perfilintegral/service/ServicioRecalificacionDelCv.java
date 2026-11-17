@@ -4,6 +4,8 @@ import com.renaser.ai.ai_engine.perfilintegral.dto.DtosRecalificacionDelCv.Lista
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosRecalificacionDelCv.TandaDeRecalificacion;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
 
+import java.util.Set;
+
 /**
  * Recalificar, de una sola vez, a quienes la IA calificó sin la fecha de hoy o sin ver sus años
  * de experiencia (spec la-ia-sabe-que-dia-es-hoy, decisión del 16/11/2026: un comando de
@@ -25,12 +27,22 @@ import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
 public interface ServicioRecalificacionDelCv {
 
     /** El modo de prueba: la lista y el coste estimado en llamadas, sin llamar a la IA. */
-    ListaDeAfectados afectados(ContextoUsuario quien);
+    default ListaDeAfectados afectados(ContextoUsuario quien) {
+        return afectados(quien, Set.of());
+    }
+
+    /** Lo mismo, solo en esas vacantes; vacío es todas las abiertas. */
+    ListaDeAfectados afectados(ContextoUsuario quien, Set<Long> soloVacantes);
 
     /**
      * Con la confirmación: reencola a cada afectado con el mecanismo de siempre —el CV y el
      * retrato, sin mover a nadie de etapa—. Lo ajustado a mano no se pisa. Un fallo con uno no
      * frena a los demás, y queda en la auditoría quién lo pidió.
      */
-    TandaDeRecalificacion recalificar(ContextoUsuario quien);
+    default TandaDeRecalificacion recalificar(ContextoUsuario quien) {
+        return recalificar(quien, Set.of());
+    }
+
+    /** Lo mismo, solo en esas vacantes; vacío es todas las abiertas. */
+    TandaDeRecalificacion recalificar(ContextoUsuario quien, Set<Long> soloVacantes);
 }

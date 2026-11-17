@@ -19,13 +19,18 @@ QUE HACE
 
 Lo pide la plataforma (permiso administrar_plataforma y ser de la organizacion plataforma).
 
-    # local, con el dev-login
-    python3 scripts/recalificar-afectados-por-la-fecha.py --usuario UID_DE_PLATAFORMA
-    python3 scripts/recalificar-afectados-por-la-fecha.py --usuario UID_DE_PLATAFORMA --confirmar
+    # produccion (como los demas scripts): correo y contrasena de una cuenta de la plataforma
+    export RENASER_PANEL_CORREO='tu-cuenta@renaser.pe'
+    export RENASER_PANEL_CLAVE='...'
+    python3 scripts/recalificar-afectados-por-la-fecha.py
+    python3 scripts/recalificar-afectados-por-la-fecha.py --confirmar
 
-    # produccion: un token Bearer real de un usuario de la plataforma
-    RENASER_TOKEN=... python3 scripts/recalificar-afectados-por-la-fecha.py --api https://API
-    RENASER_TOKEN=... python3 scripts/recalificar-afectados-por-la-fecha.py --api https://API --confirmar
+    # solo algunas vacantes (ids del panel, separados por comas)
+    python3 scripts/recalificar-afectados-por-la-fecha.py --vacantes 29,27,26,25,24
+
+    # otra API: export RENASER_BACKEND=http://localhost:8081
+    # local con el dev-login: --api http://localhost:8081 --usuario UID_DE_PLATAFORMA
+    # o un token Bearer ya hecho: RENASER_TOKEN=...
 """
 
 import argparse
@@ -60,7 +65,17 @@ def entrar(args):
     if args.token:
         return args.token
     if not args.usuario:
-        sys.exit("Hace falta --usuario (local, dev-login) o --token / RENASER_TOKEN (produccion).")
+        correo = os.environ.get("RENASER_PANEL_CORREO")
+        clave = os.environ.get("RENASER_PANEL_CLAVE")
+        if not (correo and clave):
+            sys.exit("El panel pide correo y contrasena. Exportalas antes de correr esto:\n"
+                     "    export RENASER_PANEL_CORREO='tu-cuenta@renaser.pe'\n"
+                     "    export RENASER_PANEL_CLAVE='...'")
+        codigo, sesion = llamar(args.api, "POST", "/api/v1/panel/auth/login", None,
+                                {"correo": correo, "contrasena": clave})
+        if codigo != 200:
+            sys.exit(f"No se pudo entrar como «{correo}»: HTTP {codigo} {sesion}")
+        return sesion["token"]
     codigo, sesion = llamar(args.api, "POST", "/api/v1/panel/auth/dev-login", None,
                             {"usuarioRenaserOsId": args.usuario})
     if codigo != 200:
@@ -93,17 +108,27 @@ def pintar_lista(lista):
 def main():
     opciones = argparse.ArgumentParser(description=__doc__,
                                        formatter_class=argparse.RawDescriptionHelpFormatter)
-    opciones.add_argument("--api", default="http://localhost:8081",
-                          help="el backend (local: 8081; el 8080 suele ser Adminer)")
+    opciones.add_argument("--api", default=os.environ.get("RENASER_BACKEND",
+                                                          "https://34-196-100-108.nip.io"),
+                          help="el backend (por defecto produccion; local: 8081, el 8080 es Adminer)")
     opciones.add_argument("--usuario", help="usuarioRenaserOsId para el dev-login local")
     opciones.add_argument("--token", default=os.environ.get("RENASER_TOKEN"),
                           help="token Bearer de un usuario de la plataforma (produccion)")
+    opciones.add_argument("--vacantes",
+                          help="solo estas vacantes: ids separados por comas (p. ej. 29,27,26). "
+                               "Sin esto, todas las abiertas")
     opciones.add_argument("--confirmar", action="store_true",
                           help="recalificar de verdad. Sin esto solo se lista y se estima el coste")
     args = opciones.parse_args()
+    ruta = RUTA
+    if args.vacantes:
+        ids = [v.strip() for v in args.vacantes.split(",") if v.strip()]
+        if not ids or not all(v.isdigit() for v in ids):
+            sys.exit(f"--vacantes son ids separados por comas, no «{args.vacantes}»")
+        ruta = f"{RUTA}?vacantes={','.join(ids)}"
     token = entrar(args)
 
-    codigo, lista = llamar(args.api, "GET", RUTA, token)
+    codigo, lista = llamar(args.api, "GET", ruta, token)
     if codigo != 200:
         sys.exit(f"No se pudo leer la lista de afectados: HTTP {codigo} {lista}")
     pintar_lista(lista)
@@ -116,7 +141,7 @@ def main():
         print("\nNo hay nadie por recalificar.")
         return 0
 
-    codigo, tanda = llamar(args.api, "POST", RUTA, token)
+    codigo, tanda = llamar(args.api, "POST", ruta, token)
     if codigo != 200:
         sys.exit(f"No se pudo pedir la recalificacion: HTTP {codigo} {tanda}")
     print(f"\nEncoladas: {tanda['encoladas']} · ya en la cola: {tanda['yaEnMarcha']} · "

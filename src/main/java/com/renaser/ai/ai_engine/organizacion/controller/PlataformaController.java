@@ -26,10 +26,12 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Set;
 
 // Renaser como dueña de la plataforma. Doble llave: el permiso administrar_plataforma
 // (que la copia de roles del alta no reparte) y, en el servicio, ser de la organización
@@ -124,17 +126,19 @@ public class PlataformaController {
     @PreAuthorize("@permisos.tiene('administrar_plataforma')")
     @Operation(summary = "Modo de prueba: las postulaciones en curso de vacantes abiertas que la IA "
             + "calificó sin la fecha de hoy o sin ver sus años de experiencia, por qué, de qué "
-            + "vacantes y cuántas llamadas costaría recalificarlas. No llama a la IA")
-    public ListaDeAfectados afectadosPorLaFecha() {
-        return recalificacion.afectados(permisos.actual());
+            + "vacantes y cuántas llamadas costaría recalificarlas. No llama a la IA. Con «vacantes» "
+            + "(ids separados por comas), solo en esas")
+    public ListaDeAfectados afectadosPorLaFecha(@RequestParam(required = false) Set<Long> vacantes) {
+        return recalificacion.afectados(permisos.actual(), vacantes == null ? Set.of() : vacantes);
     }
 
     @PostMapping("/recalificacion-por-la-fecha")
     @PreAuthorize("@permisos.tiene('administrar_plataforma')")
     @Operation(summary = "Con confirmación: reencola el CV y el retrato de cada afectado, sin mover a "
-            + "nadie de etapa y sin pisar lo ajustado a mano. Un fallo con uno no frena a los demás")
-    public TandaDeRecalificacion recalificarAfectadosPorLaFecha() {
-        return recalificacion.recalificar(permisos.actual());
+            + "nadie de etapa y sin pisar lo ajustado a mano. Un fallo con uno no frena a los demás. Con "
+            + "«vacantes» (ids separados por comas), solo en esas")
+    public TandaDeRecalificacion recalificarAfectadosPorLaFecha(@RequestParam(required = false) Set<Long> vacantes) {
+        return recalificacion.recalificar(permisos.actual(), vacantes == null ? Set.of() : vacantes);
     }
 
     // La conversión a mano, como en PersonalizacionController y por lo mismo: un valor
