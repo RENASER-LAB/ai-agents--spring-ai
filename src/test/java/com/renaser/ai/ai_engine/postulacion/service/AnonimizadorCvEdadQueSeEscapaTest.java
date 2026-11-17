@@ -28,6 +28,10 @@ import static org.assertj.core.api.Assertions.assertThat;
  * destapa una lista cerrada. Lo que se escapa aún: «Tengo/Edad: más de N años», un nombre con
  * «de la», personas fuera de la lista fija, «en» + una palabra en minúscula que no es un área y
  * entradas que no están en la lista cerrada.
+ *
+ * <p>Con D-4 la regla queda cerrada: lo que aún se escapa (QA-FECHA-12 y 13) es limitación
+ * conocida, la deja constancia {@code limitacionConocidaD4} y la cubre la regla de los datos
+ * personales del bloque fijo del ejecutor.
  */
 @DisplayName("QA · la edad no se escapa por la línea siguiente, por «de N años en busca» ni por lo que la lista toma por experiencia")
 class AnonimizadorCvEdadQueSeEscapaTest {
@@ -197,5 +201,75 @@ class AnonimizadorCvEdadQueSeEscapaTest {
         assertThat(anonimizador.anonimizar(texto))
                 .contains(AnonimizadorCv.TAPADO).doesNotContainPattern("(?<!\\d)34(?!\\d)");
         assertThat(anonimizador.laReglaViejaTapabaDeMas(texto)).isFalse();
+    }
+
+    // ===================================================== cuarta vuelta, con D-3
+
+    /**
+     * D-3: «Edad» (con o sin «más de» en medio) es una señal de edad y tapa siempre. Entre «Edad»
+     * y la cifra solo hay puntuación, pero la señal solo se reconoce con «:» o «-»: con la raya
+     * que pone Word al escribir « - » («–», «—»), con el «.-» de los formularios o con «.» o «=»
+     * no hay señal, y «más de» delante o «como &lt;cargo&gt;»/un gerundio detrás dejan ver la edad.
+     * La regla de antes los tapaba todos.
+     */
+    @ParameterizedTest(name = "«{0}» se tapa y el comando no lo toma por experiencia perdida")
+    @ValueSource(strings = {
+            "Edad – 34 años como cajero",
+            "Edad — 34 años trabajando en Ripley",
+            "Edad – más de 30 años",
+            "EDAD — MÁS DE 30 AÑOS",
+            "Edad.- 34 años como cajero",
+            "Edad.- más de 30 años",
+            "Edad. más de 30 años",
+            "Edad = más de 30 años"})
+    @DisplayName("QA-FECHA-11 · «Edad» con raya, «.-», «.» o «=» antes de la cifra sigue siendo una señal de edad")
+    void laSenalEdadConOtraPuntuacionTapa(String texto) {
+        assertThat(anonimizador.anonimizar(texto))
+                .contains(AnonimizadorCv.TAPADO).doesNotContainPattern("(?<!\\d)(30|34)(?!\\d)");
+        assertThat(anonimizador.laReglaViejaTapabaDeMas(texto)).isFalse();
+    }
+
+    // ===================================================== limitación conocida, D-4
+
+    /**
+     * <b>Limitación conocida, no defecto (D-4).</b> La regla de la edad queda como en el ciclo 4
+     * (D-1 a D-3 y las señales con cualquier puntuación). Estas variantes, que la QA encontró en
+     * QA-FECHA-12 y QA-FECHA-13, aún dejan ver la edad y D-4 las acepta como limitación:
+     * <ul>
+     *   <li>«más de» entre la señal y la cifra: «Juan Pérez, más de 30 años», «Tengo poco más de
+     *   30 años», «Edad: poco más de 30 años» (QA-FECHA-12);</li>
+     *   <li>«palabra + de» con «unos», «casi» o «aprox.» antes de la cifra: «Mujer de unos 34 años»
+     *   (QA-FECHA-13).</li>
+     * </ul>
+     *
+     * <p>Lo que las cubre es la segunda capa de D-4: el bloque fijo que el ejecutor común pone en
+     * cada llamada ({@code FechaDeHoyParaLaIa.REGLA_DATOS_PERSONALES}) le pide al modelo que ignore
+     * la edad, el sexo, el estado civil, los hijos y la nacionalidad.
+     *
+     * <p>Esta prueba solo deja constancia de que hoy llegan enteras. Si un cambio futuro de la regla
+     * empieza a taparlas, no es una regresión: se quita el caso de aquí y se pasa a los que se tapan.
+     */
+    @ParameterizedTest(name = "«{0}» llega entera (limitación conocida, D-4)")
+    @ValueSource(strings = {
+            // QA-FECHA-12
+            "Juan Pérez, más de 30 años",
+            "JUAN PÉREZ, MÁS DE 30 AÑOS",
+            "Ana de la Cruz, más de 30 años",
+            "peruana, más de 30 años",
+            "Juan Pérez, más de 30 años como cajero",
+            "Tengo poco más de 30 años",
+            "Tengo un poco más de 30 años",
+            "Tengo ya más de 30 años",
+            "Tengo algo más de 30 años",
+            "Edad: poco más de 30 años",
+            "Mujer de poco más de 30 años",
+            // QA-FECHA-13
+            "Mujer de unos 34 años trabajando en ventas",
+            "Joven de casi 34 años como cajero",
+            "Señora de aproximadamente 34 años como vendedora",
+            "Joven de aprox. 34 años trabajando"})
+    @DisplayName("D-4 · limitación conocida: «más de» entre la señal y la cifra (QA-FECHA-12) y «palabra + de» con «unos/casi/aprox.» (QA-FECHA-13) aún llegan enteras")
+    void limitacionConocidaD4(String texto) {
+        assertThat(anonimizador.anonimizar(texto)).isEqualTo(texto);
     }
 }

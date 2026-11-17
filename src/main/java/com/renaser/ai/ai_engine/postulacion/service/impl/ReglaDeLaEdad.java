@@ -22,8 +22,10 @@ import java.util.stream.Stream;
  *       Pérez, 10 años de experiencia» llegan a la IA. Es la única excepción a las señales.</li>
  *   <li><b>Una señal de edad delante tapa siempre</b>, venga lo que venga detrás:
  *       <ul>
- *         <li>«Tengo», «Cumplo» o «Edad» justo delante, también con «más de» en medio: «Tengo
- *             más de 30 años», «Cumplo 34 años en marzo», «Edad: más de 30 años».</li>
+ *         <li>«Tengo», «Cumplo» o «Edad» justo delante, también con «más de» en medio y con
+ *             cualquier signo entre la señal y la cifra ({@link #TRAS_LA_SENAL}): «Tengo más de 30
+ *             años», «Cumplo 34 años en marzo», «Edad: más de 30 años», «Edad – 34 años como
+ *             cajero», «Edad.- más de 30 años».</li>
  *         <li>Cualquier palabra + «de» justo delante, también con «más de» en medio: «Alumna de
  *             20 años», «Licenciada en Administración de 28 años», «Mujer de más de 40 años».
  *             La única palabra que no cuenta es el propio «más» de «más de 10 años en ventas».</li>
@@ -86,9 +88,27 @@ final class ReglaDeLaEdad {
     /** El «más de» que puede ir entre la señal y la cifra: «Tengo más de 30», «Mujer de más de 40». */
     private static final String MAS_DE = "(?:m[aá]s\\s++de\\s*+)?+";
 
-    /** «Tengo 34 años», «Cumplo 34 años», «Edad: 34 años», y con «más de» en medio. */
+    /** Cualquier tramo de signos y espacios, sin letras ni cifras; también saltos de línea. */
+    private static final String SIGNOS = "[^\\p{L}\\p{N}]*+";
+
+    /**
+     * Lo que puede ir entre «Edad», «Tengo» o «Cumplo» y la cifra. No es una lista de signos: es
+     * cualquier tramo de signos y espacios —«:», «-», la raya que pone Word al escribir « - »
+     * («–», «—»), el «.-» de los formularios, «.», «=», «·», «|», un salto de línea…—; con un
+     * «aprox.», «aproximada(mente)», «actual(mente)», «unos» o «casi» si acaso en medio, y luego el
+     * «más de»: «Edad – 34 años», «Edad.- más de 30 años», «Edad aprox. 34 años», «Tengo
+     * actualmente 34 años», «EDAD = MÁS DE 30 AÑOS». Fuera de esas palabras no cabe ninguna
+     * letra: la señal solo cuenta cuando la cifra va justo detrás.
+     *
+     * <p>Lo usa también la edad rotulada de {@link AnonimizadorCv} («Edad – 34», sin «años»), para
+     * que las dos reconozcan el rótulo igual.
+     */
+    static final String TRAS_LA_SENAL = SIGNOS
+            + "(?:(?:(?:aprox|actual)\\p{L}*+|unos|casi)" + SIGNOS + ")?+" + MAS_DE;
+
+    /** «Tengo 34 años», «Cumplo 34 años», «Edad: 34 años», «Edad – 34 años», y con «más de» en medio. */
     private static final Pattern TENGO_CUMPLO_EDAD = patron(
-            "(?<![\\p{L}\\p{N}])(?:tengo|cumplo|edad\\h*+[:\\-]?)\\s*+" + MAS_DE + "\\z");
+            "(?<![\\p{L}\\p{N}])(?:tengo|cumplo|edad)" + TRAS_LA_SENAL + "\\z");
 
     /**
      * Cualquier palabra + «de», y con «más de» en medio: «Alumna de 20», «Mujer de más de 40». El

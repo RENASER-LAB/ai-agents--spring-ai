@@ -68,8 +68,13 @@ public class AnonimizadorCv {
     // alcanzable desde fuera. No cambia lo que se acepta —`\s`, `[:-]` y lo que viene detrás
     // no comparten ningún carácter, así que volver atrás nunca le sirvió de nada.
 
-    /** "Edad: 34", "Edad 34 años". */
-    private static final String EDAD_ROTULADA = "\\bedad\\s*+[:\\-]?\\s*+\\d{1,3}\\s*+(a[ñn]os)?";
+    /**
+     * "Edad: 34", "Edad 34 años", "Edad – 34", "Edad.- más de 30": entre el rótulo y la cifra, lo
+     * mismo que acepta la señal «Edad» de {@link ReglaDeLaEdad#TRAS_LA_SENAL} —cualquier signo, no
+     * solo «:» o «-»—, para que una raya o un «.-» no dejen pasar la edad sin «años».
+     */
+    private static final String EDAD_ROTULADA =
+            "\\bedad" + ReglaDeLaEdad.TRAS_LA_SENAL + "\\d{1,3}\\s*+(a[ñn]os)?";
 
     /**
      * La regla de la edad hasta noviembre de 2026: una cifra con «años», mirase lo que mirase

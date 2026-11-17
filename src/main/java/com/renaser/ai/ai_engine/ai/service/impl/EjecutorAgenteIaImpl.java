@@ -36,7 +36,10 @@ public class EjecutorAgenteIaImpl implements EjecutorAgenteIa {
     private final ClienteModelo modelo;
     private final CalculadoraCostoIa costos;
     private final JsonMapper json;
-    /** La fecha de hoy, en Lima, que va en cada llamada aunque la instrucción no la nombre. */
+    /**
+     * La fecha de hoy, en Lima, y la regla de los datos personales (D-4): van en cada llamada
+     * aunque la instrucción no las nombre.
+     */
     private final FechaDeHoyParaLaIa fecha;
 
     @Override
@@ -64,6 +67,7 @@ public class EjecutorAgenteIaImpl implements EjecutorAgenteIa {
          * edición de Dirección no puede quitarla, y queda en el `envio` de la bitácora para
          * saber meses después con qué fecha se calificó. Lo editable sigue yendo delante: es
          * el prefijo que la caché de DeepSeek reaprovecha entre candidatos del mismo día.
+         * El bloque lleva también la regla de los datos personales (D-4), por el mismo motivo.
          */
         String sistema = instruccion.getTexto() + "\n\n" + fecha.bloque() + "\n\n" + formato;
         String contenido = json.writeValueAsString(insumo);

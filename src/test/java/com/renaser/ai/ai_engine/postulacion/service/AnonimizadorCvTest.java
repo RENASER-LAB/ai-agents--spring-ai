@@ -331,7 +331,8 @@ class AnonimizadorCvTest {
         @ParameterizedTest(name = "«{0}» no se tapa")
         @ValueSource(strings = {"Tengo 10 años de experiencia en ventas", "Profesional de 10 años de experiencia",
                 "Juan Pérez, 10 años de experiencia", "JOVEN DE 5 AÑOS DE TRAYECTORIA", "Tengo 12 años de servicio",
-                "Mujer de más de 10 años de experiencia", "Licenciado, 8 años de\nexperiencia en ventas"})
+                "Mujer de más de 10 años de experiencia", "Licenciado, 8 años de\nexperiencia en ventas",
+                "Tengo aproximadamente 10 años de experiencia"})
         @DisplayName("D-2 · «de experiencia», «de trayectoria» o «de servicio» detrás ganan a la señal de edad delante")
         void laExperienciaGanaALaSenal(String texto) {
             assertThat(anonimizador.anonimizar(texto)).isEqualTo(texto);
@@ -345,6 +346,26 @@ class AnonimizadorCvTest {
         void laSenalGanaAMasDe(String texto) {
             assertThat(anonimizador.anonimizar(texto))
                     .contains(AnonimizadorCv.TAPADO).doesNotContainPattern("(?<!\\d)(20|30|40)(?!\\d)");
+            assertThat(anonimizador.laReglaViejaTapabaDeMas(texto)).isFalse();
+        }
+
+        /**
+         * Entre la señal y la cifra cabe cualquier signo, no una lista de dos (QA-FECHA-11): «·»,
+         * «|», «:-», un salto de línea, y un «aprox.», «aproximada(mente)», «actual(mente)», «unos»
+         * o «casi» en medio. La edad rotulada sin «años» («Edad – 34») reconoce el rótulo igual que
+         * la señal.
+         */
+        @ParameterizedTest(name = "«{0}» se tapa")
+        @ValueSource(strings = {"Edad · 34 años como cajero", "Edad | 34 años en ventas", "EDAD:- 34 AÑOS TRABAJANDO",
+                "Edad\n34 años como supervisor", "Edad aprox. 34 años como cajero",
+                "Edad aproximada: más de 34 años en ventas", "Edad actual – 34 años liderando equipos",
+                "Tengo aproximadamente 34 años trabajando en ventas", "Tengo actualmente 34 años trabajando en Ripley",
+                "Tengo unos 34 años como cajera", "Cumplo casi 34 años en ventas", "Edad – 34", "Edad.- 34", "Edad = 34",
+                "Edad aprox. 34", "Edad — más de 34"})
+        @DisplayName("QA-FECHA-11 · cualquier signo entre «Edad»/«Tengo» y la cifra sigue siendo la señal")
+        void cualquierSignoTrasLaSenalTapa(String texto) {
+            assertThat(anonimizador.anonimizar(texto))
+                    .contains(AnonimizadorCv.TAPADO).doesNotContainPattern("(?<!\\d)34(?!\\d)");
             assertThat(anonimizador.laReglaViejaTapabaDeMas(texto)).isFalse();
         }
 
@@ -376,10 +397,12 @@ class AnonimizadorCvTest {
             String nombres = "Ab ".repeat(50_000) + ", 34 años trabajando";
             String persona = "x".repeat(100_000) + " de 34 años trabajando";
             String detras = "34 años en" + " la".repeat(30_000);
+            String signos = "Edad" + " –.".repeat(50_000) + " aproximadamente" + " ·".repeat(50_000) + " x";
             assertTimeoutPreemptively(Duration.ofSeconds(2), () -> {
                 anonimizador.anonimizar(nombres);
                 anonimizador.anonimizar(persona);
                 anonimizador.anonimizar(detras);
+                anonimizador.anonimizar(signos);
             });
         }
     }

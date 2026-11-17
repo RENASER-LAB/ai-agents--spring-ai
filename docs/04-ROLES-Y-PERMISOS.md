@@ -236,7 +236,11 @@ la pantalla que enseña esos datos: el del currículum, **«Ver el Perfil Integr
 fuera del alcance, 404. El visor de una vacante y su `.zip` piden además `ver_embudo`, como el
 ranking, y en ellos cada postulante y cada etapa respetan su propio permiso. **«Descargar
 entregables» decide también aquí el enlace al currículum**: con él, cada informe lleva el mismo
-enlace firmado de 8 horas que el Excel; sin él, solo las redes de la persona. ⚠️ En el informe del
+enlace firmado de 8 horas que el Excel; sin él, solo las redes de la persona. Desde el 17/11/2026
+decide además **si los entregables se abren desde el informe de la prueba**, en el visor y en el
+PDF; sin él se ven como antes, sin enlace. **El celular del visor no pide permiso propio**: lo ve
+quien puede abrir el visor, igual que el enlace al currículum, que ya lo lleva dentro, y nunca va
+en un PDF. ⚠️ En el informe del
 CV, la frase del CV y la pregunta de «Qué buscar en el CV» van con `ver_perfil_integral`, mientras
 que en el ranking piden `abrir_ficha_candidato`. Con los roles sembrados no cambia nada —Talento,
 el responsable del área y Dirección tienen los dos—, pero un rol a medida con solo el primero las

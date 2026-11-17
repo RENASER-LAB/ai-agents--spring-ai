@@ -1,6 +1,5 @@
 # La IA sabe qué día es hoy, ve los años de experiencia y arreglos del visor de informes
-
-Estado: lista para implementar
+Estado: TERMINADO
 
 ## Objetivo
 Que ninguna calificación de la IA castigue a un candidato por un dato de su CV que la IA no pudo

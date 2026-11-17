@@ -657,6 +657,25 @@ publicaciones u otras evidencias.
 civil** y cualquier otro dato marcado como no utilizable para puntuar. Se guarda cuál de las dos
 versiones se envió, para poder demostrar que la regla se cumplió.
 
+> **La edad se tapa; los años de experiencia, no** (decisión del 16/11/2026, construida el
+> 17/11/2026). Toda cifra seguida de «años» se tapa, salvo una lista corta de formas que son años
+> de trabajo, en la misma línea: «de experiencia», «de trayectoria» o «de servicio» justo detrás,
+> que se ven siempre; y, si delante no hay una señal de edad, «durante» o «más de» delante, o
+> detrás «de labor», «en el cargo», «en el puesto», «en el área», «en el rubro», «en el sector»,
+> «en» y un área de una lista fija, «como» y un cargo de una lista fija, o un gerundio de trabajo
+> de una lista fija. Una señal de edad delante tapa siempre: «Tengo», «Cumplo» o «Edad» —con
+> cualquier signo, «aprox.» o «más de» en medio—, una palabra y «de» («Alumna de 20 años»), un
+> nombre y una coma («Juan Pérez, 34 años») o la cifra sola en su línea. Ante la duda, se tapa.
+>
+> **Limitación conocida**, aceptada el mismo día: pasan «Juan Pérez, más de 30 años», «Tengo poco
+> más de 30 años», «Mujer de unos 34 años» o «de casi 34 años», un nombre seguido de «-», «·» o «|»,
+> «más de 30 años» sola en su línea, «con 34 años», una «ñ» escrita con la tilde suelta y «34
+> añosEn». Como segunda capa, cada llamada a la IA le pide ignorar la edad, el sexo, el estado
+> civil, los hijos y la nacionalidad, con una regla fija que la instrucción editable no puede
+> quitar. Y un texto de la IA que trae la marca `[DATO NO UTILIZABLE]` no se enseña en el panel ni
+> en los informes. El detalle, en [Calificación con IA](CALIFICACION-CON-IA.md), «La edad se tapa;
+> los años de experiencia, no», y en [Defectos conocidos](DEFECTOS-CONOCIDOS.md), n.º 21.
+
 **RF-42** El equipo sí ve el currículum completo cuando lo abre.
 
 **RF-43** La IA lo puntúa sobre 100 con ocho criterios, cuyo peso cambia según el nivel:
@@ -1388,7 +1407,10 @@ hay ninguna cifra que compare la tanda, y el equipo decide a quién seguir mucho
 es la Puntuación Global**: no se guarda, no se compara con los umbrales del semáforo y no mueve a
 nadie de estado. Si falta cualquiera de las dos notas, no hay cifra —media cuenta no es una
 cuenta—. Va también al Excel del ranking de esa pestaña, como **«Nota Combinada /100»**, con las
-dos notas que la componen en sus propias columnas.
+dos notas que la componen en sus propias columnas. Desde el 17/11/2026 **ordena además el visor de
+informes y el `.zip` de la vacante**: arriba quienes tienen las tres notas, de mayor a menor por
+este ponderado, y debajo los demás en el orden del ranking; la cifra no se enseña ahí. Ver [Las
+APIs](09-APIS.md), «Los informes por etapa».
 
 ---
 
