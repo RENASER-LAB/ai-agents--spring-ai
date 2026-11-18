@@ -12,6 +12,7 @@ import com.renaser.ai.ai_engine.perfilintegral.service.ServicioExcelRanking;
 import com.renaser.ai.ai_engine.perfilintegral.service.ServicioPerfilIntegralPanel;
 import com.renaser.ai.ai_engine.postulacion.dto.DtosPostulacion.EnlaceArchivo;
 import com.renaser.ai.ai_engine.postulacion.service.ServicioPostulacionesPanel;
+import com.renaser.ai.ai_engine.prueba.service.EstadoPruebaDelPuesto;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
 
 import org.apache.poi.common.usermodel.HyperlinkType;
@@ -101,8 +102,11 @@ public class ServicioExcelRankingImpl implements ServicioExcelRanking {
     private static final String HOJA = "Datos";
 
     /**
-     * Lo que dice una celda de nota sin nota. Nunca en blanco y nunca un cero: un cero es un
-     * juicio que nadie ha hecho, y un blanco en una columna de números se lee como un cero.
+     * Lo que dice una celda de nota sin nota. Nunca un cero: un cero es un juicio que nadie ha
+     * hecho, y un blanco en una columna de números se lee como un cero.
+     *
+     * <p>La única excepción es quien <b>no completó</b> la prueba del puesto (V89): esa celda
+     * va en blanco, porque no hay rúbrica a medias sino una prueba que no llegó a entregarse.
      */
     private static final String SIN_NOTA = "rúbrica incompleta";
 
@@ -600,7 +604,14 @@ public class ServicioExcelRankingImpl implements ServicioExcelRanking {
             // En esta pestaña «la nota de la etapa» ES la de la prueba: la misma cifra que la
             // columna «Nota» de la tabla. No se saca del ponderado para que una fila sin
             // ponderado —a la que le falta la otra etapa— siga enseñando la que sí tiene.
-            nota(f, c++, fila.notaEtapa(), pinceles);
+            // Quien no la completó (V89) va con la nota en blanco: no le falta calificar una
+            // rúbrica, le faltó entregar la prueba.
+            if (fila.estadoPrueba() == EstadoPruebaDelPuesto.NO_COMPLETADA
+                    && fila.notaEtapa() == null) {
+                cifra(f, c++, null, pinceles);
+            } else {
+                nota(f, c++, fila.notaEtapa(), pinceles);
+            }
             cifraOMotivo(f, c++, suyo == null ? null : suyo.perfil(), pinceles);
         } else {
             nota(f, c++, fila.notaEtapa(), pinceles);
@@ -1221,7 +1232,10 @@ public class ServicioExcelRankingImpl implements ServicioExcelRanking {
         celda.setCellStyle(pinceles.normal);
     }
 
-    /** Una nota de etapa: o el número, o por qué no lo hay. Nunca en blanco y nunca un cero. */
+    /**
+     * Una nota de etapa: o el número, o por qué no lo hay. Nunca un cero, y en blanco solo la
+     * de quien no completó la prueba, que se decide antes de llegar aquí.
+     */
     private void nota(Row fila, int columna, BigDecimal valor, Pinceles pinceles) {
         Cell celda = fila.createCell(columna);
         if (valor == null) {

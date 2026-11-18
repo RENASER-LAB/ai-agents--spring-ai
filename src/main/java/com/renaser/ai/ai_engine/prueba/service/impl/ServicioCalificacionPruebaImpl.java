@@ -577,7 +577,11 @@ public class ServicioCalificacionPruebaImpl implements ServicioCalificacionPrueb
         intento.setPlazoPropio(true);
         intentos.save(intento);
 
-        auditoria.registrar(quien.organizacionId(), quien, "definir_plazo_prueba",
+        // Esta fila de la auditoría también decide (V89): si llega después de un «Darle más
+        // tiempo» a quien no la había abierto, su fecha vuelve a respetarse tal cual al empezar,
+        // en vez de ser solo el tope del cronómetro. Lo de quién dio más tiempo no se borra:
+        // la ficha lo sigue contando. Ver IntentoPruebaRepository.plazoPuestoAManoDespuesDe.
+        auditoria.registrar(quien.organizacionId(), quien, IntentoPruebaRepository.PLAZO_PUESTO_A_MANO,
                 "intento_prueba", intento.getId(),
                 anterior == null ? null : Map.of("venceEn", anterior.toString()),
                 Map.of("venceEn", datos.venceEn().toString()), datos.motivo());

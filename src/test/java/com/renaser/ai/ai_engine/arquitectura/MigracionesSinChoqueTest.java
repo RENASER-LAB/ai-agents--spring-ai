@@ -9,9 +9,11 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -44,14 +46,23 @@ class MigracionesSinChoqueTest {
     private static final Pattern NOMBRE = Pattern.compile("^V(\\d+)__(.+)\\.sql$");
 
     /**
-     * Los huecos que se dejaron a propósito, cada uno con su porqué. Hoy no queda ninguno: los
-     * que hubo se cerraron al juntarse en {@code main} las ramas que se repartían los números.
+     * Los números que faltan a propósito, cada uno con su porqué. Un salto solo se tolera si
+     * <em>todos</em> los números que se salta están aquí: así un hueco documentado no tapa otro
+     * que no lo está (si se perdiera la V86, el salto de V85 a V89 seguiría avisando), y da igual
+     * en qué orden lleguen las ramas que tienen un número reservado.
      */
-    private static final List<String> HUECOS_DELIBERADOS = List.of(
-            // Las specs de la reunión del 13/11/2026 tienen reservados V81 a V87, uno por spec;
-            // la del informe en PDF por etapa (los textos del redactor) se quedó con la V84 y
-            // llegó antes que las demás. Cuando entren las otras, el hueco se cierra solo.
-            "entre V80 y V84");
+    private static final Set<Integer> HUECOS_DELIBERADOS = Set.of(
+            // V81 a V83 no se usarán nunca. Eran reservas de las specs de la reunión del
+            // 13/11/2026, pero la del informe en PDF por etapa (V84, los textos del redactor)
+            // llegó antes a producción y Flyway no aplica una versión menor que la mayor ya
+            // aplicada: las specs que las tenían subieron de número al construirse.
+            81, 82, 83,
+            // V87 y V88 las tienen reservadas dos specs aún sin fusionar: la convocatoria desde el
+            // propósito (V87) y el video de la empresa por webcam (V88). La de las incompletas en
+            // el ranking y más tiempo (V89) se construyó antes. Si entran antes de que la V89
+            // llegue a producción, el hueco se cierra solo; si no, tendrán que subir de número
+            // y V87–V88 quedarán como V81–V83.
+            87, 88);
 
     @Test
     @DisplayName("Ningún número de versión se repite: git no ve ese conflicto, Flyway sí")
@@ -97,14 +108,16 @@ class MigracionesSinChoqueTest {
         for (int i = 1; i < versiones.size(); i++) {
             int anterior = versiones.get(i - 1);
             int actual = versiones.get(i);
-            String hueco = "entre V" + anterior + " y V" + actual;
-            if (actual != anterior + 1 && !HUECOS_DELIBERADOS.contains(hueco)) {
-                huecos.add(hueco);
+            boolean deliberado = IntStream.range(anterior + 1, actual)
+                    .allMatch(HUECOS_DELIBERADOS::contains);
+            if (!deliberado) {
+                huecos.add("entre V" + anterior + " y V" + actual);
             }
         }
         // Flyway aplica igual con huecos, así que esto no es una regla suya sino nuestra: un
         // salto casi siempre significa que alguien renumeró a medias, o que una migración se
-        // perdió en un rebase. Si algún día un hueco es deliberado, se documenta aquí.
+        // perdió en un rebase. Un hueco deliberado se documenta, número a número, en
+        // HUECOS_DELIBERADOS.
         assertThat(huecos)
                 .as("Hay saltos en la numeración de las migraciones")
                 .isEmpty();

@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.Instant;
+import java.util.function.BooleanSupplier;
 
 // Cuando un candidato rinde. El reloj lo lleva el servidor: venceEn se calcula y se
 // guarda al empezar, no se recalcula cada vez. No hay pausas —cerrar la página no para
@@ -77,6 +78,31 @@ public class IntentoPrueba {
      */
     public boolean quedoSinCompletar(Instant ahora) {
         return noCompletada || vencidaSinAbrir(ahora);
+    }
+
+    /**
+     * Si su fecha se la concedieron a mano con «El plazo de esta persona» (V32): empezar no la
+     * toca, ni para acercarla con el cronómetro.
+     *
+     * <p>⚠️ <b>La de «Darle más tiempo» (V89) no cuenta</b>, aunque también deje
+     * {@code plazoPropio}: a quien no la había abierto, su reloj arranca cuando la abra y la
+     * fecha nueva es solo el tope (punto 11 de la spec). La marca de esa reapertura es
+     * {@code masTiempoEn}, la misma que mira el recordatorio previo al plazo.
+     *
+     * <p>⚠️ <b>Salvo que después alguien la cambiara con «El plazo de esta persona»</b> (punto
+     * 16): entonces vuelve a ser una fecha concedida a mano, como la de cualquiera. El intento
+     * no lo sabe —{@code masTiempoEn} sigue diciendo quién dio más tiempo, para la ficha y el
+     * recordatorio—, así que lo contesta quien llama, y solo se le pregunta si hubo más tiempo.
+     *
+     * @param cambiadaAManoDespues si «El plazo de esta persona» se usó después del último «Darle
+     *                             más tiempo» ({@code masTiempoEn}). Ver
+     *                             {@code IntentoPruebaRepository.plazoPuestoAManoDespuesDe}.
+     */
+    public boolean fechaConcedidaAMano(BooleanSupplier cambiadaAManoDespues) {
+        if (!plazoPropio || venceEn == null) {
+            return false;
+        }
+        return masTiempoEn == null || cambiadaAManoDespues.getAsBoolean();
     }
 
     /**

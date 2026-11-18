@@ -253,6 +253,12 @@ public class ServicioPruebaImpl implements ServicioPrueba {
      * concesión, que es justo lo que la columna existe para impedir. Único matiz: si está
      * marcado pero no hay fecha que proteger, se calcula como con cualquiera — dejarlo vacío
      * sería un plazo infinito, que nadie concedió.
+     *
+     * <p>⚠️ <b>Salvo que la fecha la pusiera «Darle más tiempo» (V89)</b> a quien no la había
+     * abierto: también deja {@code plazoPropio}, pero su reloj arranca al empezar y la fecha
+     * nueva es solo el tope, como promete la pantalla previa («30 min desde que pulses Empezar o
+     * hasta la fecha límite, si llega antes»). Si después alguien le cambió esa fecha con «El
+     * plazo de esta persona», vuelve a ser una concesión a mano y se respeta tal cual (punto 16).
      */
     @Override
     @Transactional
@@ -270,7 +276,10 @@ public class ServicioPruebaImpl implements ServicioPrueba {
             Instant ahora = Instant.now();
 
             intento.setIniciadoEn(ahora);
-            boolean concedidaAMano = intento.isPlazoPropio() && intento.getVenceEn() != null;
+            // La fecha de «Darle más tiempo» (V89) no es una concesión a mano: el reloj arranca
+            // ahora y esa fecha solo es el tope, salvo que después alguien la cambiara con «El
+            // plazo de esta persona». Ver fechaConcedidaAMano.
+            boolean concedidaAMano = fechaConcedidaAMano(intento);
             if (!concedidaAMano) {
                 if (intento.getVenceEn() == null) {
                     // Sin fecha no hay nada que respetar: se cuenta el plazo que toque,
@@ -622,7 +631,7 @@ public class ServicioPruebaImpl implements ServicioPrueba {
                 version.getEnunciado(), version.getMateriales(), version.getHerramientasPermitidas(),
                 cambioTexto, preguntas, entregablesCandidato,
                 minutos == null ? version.getPlazoDias() : null, false, null, false, null,
-                preguntas.size());
+                preguntas.size(), !empezada(intento) && fechaConcedidaAMano(intento));
         return empezada(intento) ? pintada : pintada.antesDeEmpezar();
     }
 
@@ -635,6 +644,22 @@ public class ServicioPruebaImpl implements ServicioPrueba {
      */
     private static boolean empezada(IntentoPrueba intento) {
         return intento.getIniciadoEn() != null;
+    }
+
+    /**
+     * Si su fecha se la pusieron a mano con «El plazo de esta persona»: al empezar, el reloj
+     * llega hasta ella y los minutos no la acercan. La fecha de «Darle más tiempo» a quien no la
+     * abrió no cuenta —es el tope de su cronómetro—, salvo que después alguien la cambiara a mano
+     * (V89, puntos 11 y 16). Ver {@link IntentoPrueba#fechaConcedidaAMano}.
+     *
+     * <p>⚠️ <b>Una sola regla para empezar y para la pantalla previa.</b> {@code iniciar} e
+     * {@code iniciarDelEditor} deciden con ella el vencimiento, y la previa la manda en
+     * {@code MiPrueba.fechaConcedidaAMano} para no prometer «30 min desde que pulses Empezar» a
+     * quien tendrá hasta su fecha. Si se separaran, la pantalla volvería a mentir.
+     */
+    private boolean fechaConcedidaAMano(IntentoPrueba intento) {
+        return intento.fechaConcedidaAMano(() ->
+                intentos.plazoPuestoAManoDespuesDe(intento.getId(), intento.getMasTiempoEn()));
     }
 
     /**
@@ -768,7 +793,10 @@ public class ServicioPruebaImpl implements ServicioPrueba {
             VersionBanco version = laVersionDelEditor(intento);
             Instant ahora = Instant.now();
             intento.setIniciadoEn(ahora);
-            boolean concedidaAMano = intento.isPlazoPropio() && intento.getVenceEn() != null;
+            // La fecha de «Darle más tiempo» (V89) no es una concesión a mano: el reloj arranca
+            // ahora y esa fecha solo es el tope, salvo que después alguien la cambiara con «El
+            // plazo de esta persona». Ver fechaConcedidaAMano.
+            boolean concedidaAMano = fechaConcedidaAMano(intento);
             if (!concedidaAMano) {
                 Integer minutos = "CRONOMETRADA".equals(version.getModalidad())
                         ? version.getDuracionMinutos() : null;
@@ -831,7 +859,8 @@ public class ServicioPruebaImpl implements ServicioPrueba {
                 null, preguntas, deLaPrueba,
                 cronometrada ? null : v.getPlazoDias(), r.esCuestionario(),
                 empezada(intento) ? consignaDe(v) : null, true,
-                fechaLimiteDe(postulacion, intento), preguntas.size());
+                fechaLimiteDe(postulacion, intento), preguntas.size(),
+                !empezada(intento) && fechaConcedidaAMano(intento));
         return empezada(intento) ? pintada : pintada.antesDeEmpezar();
     }
 

@@ -1,7 +1,7 @@
 # Diccionario de datos
 
 Sistema de selección de personal — Renaser Consulting
-Versión 3.17 · 2026-11-18 · Puesto al día con las migraciones hasta la `V86` (la V86 trae el brochure de la empresa: cuatro columnas en `organizacion` —`mision`, `vision`, `plantilla_brochure` y `color_brochure`—, sin tablas ni permisos nuevos; la fecha de hoy en cada llamada a la IA, del 17/11/2026, no trae migración: cambian solo el contenido de `ejecucion_ia.envio`, el recorte de `cv.texto_anonimizado` y un uso más del modo `RECALIFICA`; la V85 trae el perfil de la empresa: nueve columnas en `organizacion` —`proposito_empresa`, `quienes_somos`, `sector`, `tamano`, `anio_fundacion`, `video_presentacion`, `pagina_web`, `logo_archivo_id` y `portada_archivo_id`—, las tablas `organizacion_beneficio` y `organizacion_red_social`, la columna `vacante.video_presentacion` y el permiso `editar_presentacion_empresa`; su spec reservaba la V81 y entró como V85 porque la V84 ya estaba aplicada; la V84 trae la tabla `texto_informe`, con los textos del redactor de los informes por etapa, y el agente `REDACTOR_INFORME` con su instrucción; no hay V81 a V83: los números los reservaban otras specs todavía sin construir, que tendrán que llevar uno mayor que la última aplicada; la V80 trae las tablas `linea_busqueda_cv`, `busqueda_cv` y `resultado_busqueda_cv` de «Qué buscar en el CV», la columna `version_pesos.peso_busqueda_cv`, el agente `BUSQUEDA_CV` y el modo `REBUSCA` de `trabajo_ia`; la V79 no crea tablas: publica la 1.3 del texto `PLATAFORMA` y una versión nueva del correo `RECORDATORIO_EVALUACION`; la V78 no añade columnas: pasa a `PERMANENTE` las vacantes «Por plazas» y las publicadas con la fecha vencida, lleva las fechas de cierre a las 23:59:59 de Lima y quita la fecha al Perfil Integral abierto; la V77 añade `contexto_actualizado_en` a `vacante`, `intento_prueba` y `evaluacion`, que fechan triggers solo cuando cambia un dato que viaja en la consulta v2 del bot de WhatsApp; la V76 trae las tablas `resultado_whatsapp` y `evento_whatsapp` del contrato v2 con el bot, todavía no activo; la V75 añade `nota_criterio.puntaje_original` y `maximo_original`, la nota de la simulación y la validación tal como se puso, de la que se recalcula al cambiar los pesos de la vacante; la V74 añade `vacante.version_banco_fija_id`, pasa a `PRUEBA_PROPIA` los borradores de antes con `PLANTILLA` sin prueba, deja sin uso `organizacion.banco_propio` y `pruebas_puesto_propias` y vacía `version_banco.url_consigna`; la V73 trae las tablas `vinculo_whatsapp`, `aviso_whatsapp` y `whatsapp_baja`, el CHECK de E.164 de `persona.telefono`, el tipo `WHATSAPP` de `texto_consentimiento` con su 1.0, la versión 1.2 del texto `PLATAFORMA` y el parámetro `whatsapp_novedades_activo` de la plataforma; la V72 no crea tablas: hace obligatoria `vacante.nota_minima`, entera de 0 a 100 y 60 por defecto, y publica la versión 1.1 del texto `PLATAFORMA`; la V71 añade `perfil_candidato.logros`, los logros clave que escribe el candidato; la V70 añade `transicion_estado.aviso_al_candidato` y la tabla `recordatorio_enviado`, siembra en todas las organizaciones tres parámetros y los correos `RECORDATORIO_EVALUACION` y `RECORDATORIO_PRUEBA`, publica una versión nueva de los textos de `PRUEBA_DISPONIBLE` que decían «desde este correo» y documenta siete tipos de aviso de la campana; la V69 añade `criterio_banco.puntos_del_criterio`, lo que vale entero un criterio de la prueba técnica; la V68 trae el alcance de los entregables de la prueba del editor —`entregable_requerido.alcance` y `pregunta_id` y la tabla `entregable_cubre_pregunta`—, desde la que «Mira» se deduce, y deja sin días los borradores de esa prueba; la V67 trae la prueba técnica escrita en el editor —las tablas `criterio_banco_entregable` y `nota_criterio_prueba`, el tercer valor `PRUEBA_PROPIA` de `vacante.instrumento_etapa_tecnica`, el propósito `PRUEBA_PUESTO` con el caso y el tiempo en `version_banco`, la parte calificada en `criterio_banco`, `entregable_requerido`, `intento_prueba` y `respuesta_prueba` colgando también de la versión del editor, `intento_prueba.no_completada` y el propósito en `propuesta_preguntas`—; la V66 trae las preguntas propias de cada vacante —las tablas `criterio_banco` y `propuesta_preguntas`, `vacante.origen_preguntas`, el propósito, el método `PUNTOS` y la guía en `version_banco`, los tres tipos nuevos con sus puntos en `pregunta`, el orden en `opcion`, la nota hasta 100 y la de la IA aparte en `nota_respuesta`, el modo `RECALIFICA` y el agente `RECOMENDADOR`—; la V64 trae la gestión de personas —`sede`, `colaborador`, `periodo_laboral`, `situacion_laboral`, `cese_anulado` y `contratado_sin_alta`— y sus cuatro permisos; la V65 añade las columnas `antes_*` de `situacion_laboral`; la V49 y la V50 solo siembran pesos; la V51 trae la tabla `lectura_cv_perfil` y los archivos del perfil; la V52 y la V53 no crean tablas; la V55 pone el sueldo en la vacante y la pretensión en la postulación; la V56 trae la tabla `aviso_portal`; la V57 no crea tablas, solo siembra los precios de los dos modelos de DeepSeek; la V58 no crea tablas: suma el aviso `VACANTE_ACTUALIZADA` y apaga el correo `REMUNERACION_ACTUALIZADA`; la V59 añade `vacante.archivada_en`; la V60 añade `vacante.eliminada_en` —el borrado lógico—, el motivo de cierre y el tipo de aviso `VACANTE_ELIMINADA`, y el permiso `eliminar_vacante`; la V61 trae la tabla `recuperacion_clave`, tres parámetros y los dos correos de «¿Olvidaste tu contraseña?»; la V62 añade `vacante.ciudad_ubigeo`; la V63 trae las tablas `resena`, `respuesta_resena` y `reporte_resena`, los tres permisos de las reseñas de empresas y cuatro tipos de aviso)
+Versión 3.18 · 2026-11-18 · Puesto al día con las migraciones hasta la `V89` (la V89 trae «Darle más tiempo» a quien no completó la prueba del puesto: `intento_prueba.mas_tiempo_en`, `mas_tiempo_por_usuario_id` y `mas_tiempo_motivo`, el correo `PRUEBA_MAS_TIEMPO` en todas las organizaciones, el tipo `PRUEBA_MAS_TIEMPO` de `aviso_whatsapp` con sus columnas `intento_prueba_id` y `plazo_en` —y `transicion_estado_id` vacía solo en ese tipo— y el mismo tipo en la campana; no hay V87 ni V88: las reservan dos specs aún sin fusionar, la convocatoria desde el propósito y el video por webcam; la V86 trae el brochure de la empresa: cuatro columnas en `organizacion` —`mision`, `vision`, `plantilla_brochure` y `color_brochure`—, sin tablas ni permisos nuevos; la fecha de hoy en cada llamada a la IA, del 17/11/2026, no trae migración: cambian solo el contenido de `ejecucion_ia.envio`, el recorte de `cv.texto_anonimizado` y un uso más del modo `RECALIFICA`; la V85 trae el perfil de la empresa: nueve columnas en `organizacion` —`proposito_empresa`, `quienes_somos`, `sector`, `tamano`, `anio_fundacion`, `video_presentacion`, `pagina_web`, `logo_archivo_id` y `portada_archivo_id`—, las tablas `organizacion_beneficio` y `organizacion_red_social`, la columna `vacante.video_presentacion` y el permiso `editar_presentacion_empresa`; su spec reservaba la V81 y entró como V85 porque la V84 ya estaba aplicada; la V84 trae la tabla `texto_informe`, con los textos del redactor de los informes por etapa, y el agente `REDACTOR_INFORME` con su instrucción; no hay V81 a V83: los números los reservaban otras specs todavía sin construir, que tendrán que llevar uno mayor que la última aplicada; la V80 trae las tablas `linea_busqueda_cv`, `busqueda_cv` y `resultado_busqueda_cv` de «Qué buscar en el CV», la columna `version_pesos.peso_busqueda_cv`, el agente `BUSQUEDA_CV` y el modo `REBUSCA` de `trabajo_ia`; la V79 no crea tablas: publica la 1.3 del texto `PLATAFORMA` y una versión nueva del correo `RECORDATORIO_EVALUACION`; la V78 no añade columnas: pasa a `PERMANENTE` las vacantes «Por plazas» y las publicadas con la fecha vencida, lleva las fechas de cierre a las 23:59:59 de Lima y quita la fecha al Perfil Integral abierto; la V77 añade `contexto_actualizado_en` a `vacante`, `intento_prueba` y `evaluacion`, que fechan triggers solo cuando cambia un dato que viaja en la consulta v2 del bot de WhatsApp; la V76 trae las tablas `resultado_whatsapp` y `evento_whatsapp` del contrato v2 con el bot, todavía no activo; la V75 añade `nota_criterio.puntaje_original` y `maximo_original`, la nota de la simulación y la validación tal como se puso, de la que se recalcula al cambiar los pesos de la vacante; la V74 añade `vacante.version_banco_fija_id`, pasa a `PRUEBA_PROPIA` los borradores de antes con `PLANTILLA` sin prueba, deja sin uso `organizacion.banco_propio` y `pruebas_puesto_propias` y vacía `version_banco.url_consigna`; la V73 trae las tablas `vinculo_whatsapp`, `aviso_whatsapp` y `whatsapp_baja`, el CHECK de E.164 de `persona.telefono`, el tipo `WHATSAPP` de `texto_consentimiento` con su 1.0, la versión 1.2 del texto `PLATAFORMA` y el parámetro `whatsapp_novedades_activo` de la plataforma; la V72 no crea tablas: hace obligatoria `vacante.nota_minima`, entera de 0 a 100 y 60 por defecto, y publica la versión 1.1 del texto `PLATAFORMA`; la V71 añade `perfil_candidato.logros`, los logros clave que escribe el candidato; la V70 añade `transicion_estado.aviso_al_candidato` y la tabla `recordatorio_enviado`, siembra en todas las organizaciones tres parámetros y los correos `RECORDATORIO_EVALUACION` y `RECORDATORIO_PRUEBA`, publica una versión nueva de los textos de `PRUEBA_DISPONIBLE` que decían «desde este correo» y documenta siete tipos de aviso de la campana; la V69 añade `criterio_banco.puntos_del_criterio`, lo que vale entero un criterio de la prueba técnica; la V68 trae el alcance de los entregables de la prueba del editor —`entregable_requerido.alcance` y `pregunta_id` y la tabla `entregable_cubre_pregunta`—, desde la que «Mira» se deduce, y deja sin días los borradores de esa prueba; la V67 trae la prueba técnica escrita en el editor —las tablas `criterio_banco_entregable` y `nota_criterio_prueba`, el tercer valor `PRUEBA_PROPIA` de `vacante.instrumento_etapa_tecnica`, el propósito `PRUEBA_PUESTO` con el caso y el tiempo en `version_banco`, la parte calificada en `criterio_banco`, `entregable_requerido`, `intento_prueba` y `respuesta_prueba` colgando también de la versión del editor, `intento_prueba.no_completada` y el propósito en `propuesta_preguntas`—; la V66 trae las preguntas propias de cada vacante —las tablas `criterio_banco` y `propuesta_preguntas`, `vacante.origen_preguntas`, el propósito, el método `PUNTOS` y la guía en `version_banco`, los tres tipos nuevos con sus puntos en `pregunta`, el orden en `opcion`, la nota hasta 100 y la de la IA aparte en `nota_respuesta`, el modo `RECALIFICA` y el agente `RECOMENDADOR`—; la V64 trae la gestión de personas —`sede`, `colaborador`, `periodo_laboral`, `situacion_laboral`, `cese_anulado` y `contratado_sin_alta`— y sus cuatro permisos; la V65 añade las columnas `antes_*` de `situacion_laboral`; la V49 y la V50 solo siembran pesos; la V51 trae la tabla `lectura_cv_perfil` y los archivos del perfil; la V52 y la V53 no crean tablas; la V55 pone el sueldo en la vacante y la pretensión en la postulación; la V56 trae la tabla `aviso_portal`; la V57 no crea tablas, solo siembra los precios de los dos modelos de DeepSeek; la V58 no crea tablas: suma el aviso `VACANTE_ACTUALIZADA` y apaga el correo `REMUNERACION_ACTUALIZADA`; la V59 añade `vacante.archivada_en`; la V60 añade `vacante.eliminada_en` —el borrado lógico—, el motivo de cierre y el tipo de aviso `VACANTE_ELIMINADA`, y el permiso `eliminar_vacante`; la V61 trae la tabla `recuperacion_clave`, tres parámetros y los dos correos de «¿Olvidaste tu contraseña?»; la V62 añade `vacante.ciudad_ubigeo`; la V63 trae las tablas `resena`, `respuesta_resena` y `reporte_resena`, los tres permisos de las reseñas de empresas y cuatro tipos de aviso)
 
 Cada tabla con todas sus columnas, tipos y claves. **Este documento se consulta**, no se lee de
 corrido: es la base para escribir las migraciones de Flyway.
@@ -1180,6 +1180,12 @@ sola vez.
 12 horas del del plazo o con el turno ya vencido; a 12 horas justas salen los dos. Queda escrito
 para que el sondeo, que corre cada 60 segundos, no lo vuelva a considerar.
 
+**«Darle más tiempo» (`V89`) también escribe `OMITIDO`**, en el turno en que está la persona,
+porque no abre turno nuevo: el `TRAS_ENTRAR`, si aún no estaba, para que no salga tarde; y el
+`ANTES_DEL_PLAZO` de la fecha nueva cuando esta queda a menos de las horas del recordatorio, porque
+saldría justo detrás del aviso de «más tiempo». Con la fecha nueva más lejos, el del plazo sale
+una vez con ella, también a quien ya la había empezado.
+
 Cada fila se escribe en la misma transacción que su correo. El aviso de la campana sale después de
 confirmarla.
 
@@ -2252,10 +2258,13 @@ Cuando un candidato rinde.
 | `version_banco_id` | bigint | no | (`V67`) La versión de la prueba del editor con que rindió (RF-138: queda atado a ella) |
 | `iniciado_en` | timestamptz | sí | Desde aquí corre el reloj |
 | `vence_en` | timestamptz | sí | Cuándo se le cierra. **Se calcula al empezar y se guarda**: entre el reloj de la prueba (`ahora + minutos`) y la fecha de la vacante (`prueba_cierra_en`) rige **el que caiga antes**, y sin ninguno de los dos, los días de la versión de la plantilla desde que empieza. ⚠️ **Los días nunca acercan la fecha de la vacante**, solo un cronómetro puede; y con `plazo_propio` manda la fecha puesta a mano. **En la prueba del editor (`V68`)** una «Sin cronómetro» vence en la fecha límite, y al mover esa fecha a quien ya abrió una cronometrada le queda lo que llegue antes entre su inicio más los minutos y la nueva fecha: mover la fecha no le alarga el reloj |
-| `plazo_propio` | boolean | sí | A esta persona se le fijó su fecha a mano. Mover la de la vacante no se la toca |
-| `entregado_en` | timestamptz | no | Cuándo se entregó. Vacío = no llegó a entregarse |
+| `plazo_propio` | boolean | sí | A esta persona se le fijó su fecha a mano, con «El plazo de esta persona» o, desde la `V89`, con «Darle más tiempo». Mover la de la vacante no se la toca |
+| `entregado_en` | timestamptz | no | Cuándo se entregó. Vacío = no llegó a entregarse. «Darle más tiempo» (`V89`) lo vacía junto con `no_completada` y `es_entrega_automatica` |
 | `es_entrega_automatica` | boolean | sí | Si lo entregó el reloj por él |
-| `no_completada` | boolean | sí | (`V67`) Por defecto falso. Solo en la prueba del editor: venció con algo sin responder o sin un entregable obligatorio y **se cerró sin entregar**. No se califica, no gasta IA, no sale en el ranking y la postulación no cambia de etapa sola. `entregado_en` guarda cuándo se cerró, para que el barrido no lo vuelva a mirar |
+| `no_completada` | boolean | sí | (`V67`) Por defecto falso. Solo en la prueba del editor: venció con algo sin responder o sin un entregable obligatorio y **se cerró sin entregar**. No se califica, no gasta IA y la postulación no cambia de etapa sola. `entregado_en` guarda cuándo se cerró, para que el barrido no lo vuelva a mirar. **Desde la `V89` sale en el ranking como «No la completó»**, solo en «Toda la tanda», y «Darle más tiempo» la vuelve a falso |
+| `mas_tiempo_en` | timestamptz | no | (`V89`) La última vez que el equipo le dio más tiempo. Vacía si nunca se le dio. Es lo que la ficha cuenta («más tiempo dado el 18 nov por Ana: …») y la marca con la que el recordatorio previo al plazo alcanza también a quien ya la había empezado. **No es un historial**: el historial entero (fecha anterior, nueva, motivo y quién) está en `auditoria`, acción `dar_mas_tiempo_prueba` |
+| `mas_tiempo_por_usuario_id` | bigint → `usuario` | no | (`V89`) Quién le dio más tiempo la última vez |
+| `mas_tiempo_motivo` | text | no | (`V89`) Por qué. Va con `mas_tiempo_en`: las dos o ninguna (CHECK) |
 | `variante_cambio_id` | bigint | no | Cuál le tocó. Nunca en la prueba del editor, que no tiene cambio inesperado |
 | `minuto_cambio` | integer | no | El sorteado dentro del rango |
 | `cambio_mostrado_en` | timestamptz | no | |
@@ -2264,7 +2273,8 @@ Cuando un candidato rinde.
 **Clave primaria:** `id` · **Único:** `postulacion_id`
 **Restricciones (`V67`):** `intento_prueba_de_una_version_check` —de una plantilla o de una
 versión del editor, exactamente de una— e `intento_prueba_no_completada_cerrada_check` —uno no
-completado tiene `entregado_en`—
+completado tiene `entregado_en`—. **(`V89`):** `intento_prueba_mas_tiempo_con_motivo_check` —quien
+recibió más tiempo lleva su motivo—
 
 El reloj lo lleva el servidor. Si cierra la página, el tiempo sigue corriendo. **No hay
 acumulador de pausas porque no se puede pausar.**
@@ -2274,13 +2284,16 @@ una consulta sobre una columna indexada, y no depende de que la plantilla siga i
 
 Cuando se acaba, el sistema entrega solo. **No existe entregar tarde**, y por eso hay una marca en
 vez de un estado. **En la prueba del editor (`V67`) solo se entrega sola si está completa**; si
-falta algo, se cierra con `no_completada` y la persona sale en «No completaron la prueba» del
-panel, no en el ranking.
+falta algo, se cierra con `no_completada`. Desde la `V89` esa persona sale en el ranking como «No
+la completó», solo en «Toda la tanda», y el equipo puede darle más tiempo desde su ficha: la
+prueba vuelve a abrirse con sus respuestas y sus archivos, que nunca se tocaron.
 
-`entregado_en` y `es_entrega_automatica` son además **lo que decide el texto de la pestaña «Prueba
-del puesto»** del ranking cuando esa persona no tiene nota de etapa: sin entrega, o con una que
-puso el reloj, se lee «Prueba incompleta»; con una entrega suya, «Pendiente de calificación». **No
-se guarda ningún estado nuevo**: se calcula al leer, con estas dos columnas y la nota. Ver
+Estas columnas y la nota son además **lo que decide el texto de la pestaña «Prueba del puesto»**
+del ranking cuando esa persona no tiene nota de etapa (`V89`): con `entregado_en` y sin
+`no_completada`, «Pendiente de calificación»; con `no_completada`, o sin abrir (`iniciado_en`
+vacío) y con `vence_en` ya pasado, «No la completó»; abierta y sin entregar, «En curso»; y sin
+abrir con plazo vigente o sin fecha, «Sin empezar». **No se guarda ningún estado nuevo**: se
+calcula al leer, también el «se le pasó la fecha sin abrirla», que el barrido no cierra. Ver
 [La prueba del puesto, por dentro](PRUEBA-DEL-PUESTO.md).
 
 ## `entregable`
@@ -2875,6 +2888,13 @@ cuenta sin contraseña, y se creaba uno en cada envío aunque el texto ya no lo 
 recordatorios de la `V70` lo volvieron a poner en el correo después de que el usuario quitara
 esos enlaces el 03/10/2026. En producción se corrigieron los textos a mano con versión nueva.
 
+**`PRUEBA_MAS_TIEMPO` (`V89`) se sembró en todas las organizaciones**, como los recordatorios: es
+el correo de «Darle más tiempo», que sale solo si el equipo deja marcada «Avisar a {nombre}». Lleva
+`{{nombre}}`, `{{vacante}}`, `{{vence}}` —la fecha nueva en hora de Lima, «jue 20 nov, 18:00», con
+el año solo si no es el actual—, `{{aviso}}` —la frase entera: «Tienes más tiempo para la prueba de
+{vacante}, hasta el {fecha} (hora de Lima). Entra a Mis procesos para continuarla.»— y `{{enlace}}`,
+la dirección del proceso **sin token**. Si a una empresa le faltara, sale el de la plataforma.
+
 **`PRUEBA_DISPONIBLE` ya no dice «desde este correo»** (`V70`): el reloj arranca al abrir la
 prueba, no al recibir el correo. La migración publicó una versión nueva solo de los textos activos
 que contenían esa frase —los de cada organización y los propios que una vacante use para ese aviso
@@ -3102,7 +3122,7 @@ leído.
 | `id` | bigint | sí | Clave |
 | `usuario_id` | bigint | sí | A quién. **Del usuario y no de la persona**: la campana es de quien entra al portal, y es el usuario el que tiene sesión |
 | `organizacion_id` | bigint | sí | De qué empresa viene. La misma regla que la postulación: el aviso nace en la organización **de la vacante**, que es la que hizo algo que contar |
-| `tipo` | text | sí | Qué clase de noticia es. `REMUNERACION_ACTUALIZADA` (`V55`): el sueldo cambiado desde la tarjeta del detalle. `VACANTE_ACTUALIZADA` (`V58`): la vacante corregida con el formulario, **uno solo por guardado** con todo lo que cambió, sueldo incluido. `VACANTE_ELIMINADA` (`V60`): la empresa retiró la vacante y la postulación quedó cerrada; **es el único sin enlace**, con `postulacion_id` y `vacante_id` vacíos. `RESENA_PUBLICADA`, `RESENA_EDITADA` (la empresa editó una reseña ya respondida), `REPORTE_RESENA_RESUELTO` y `RESPUESTA_RESENA_OCULTADA` (`V63`): las reseñas de empresas; también llegan con `postulacion_id` y `vacante_id` vacíos, y el portal los lleva por su tipo a la sección de reseñas del perfil. De las etapas (`V70`), con el mismo código que el correo al que acompañan: `PRUEBA_DISPONIBLE`, `POSTULACION_AVANZA`, `POSTULACION_NO_CONTINUA`, `POSTULACION_CERRADA` y `RETIRO_CONFIRMADO`; y los recordatorios `RECORDATORIO_EVALUACION` y `RECORDATORIO_PRUEBA` (`V70`). Todos estos llevan `postulacion_id` y `vacante_id`. Sin CHECK: un tipo nuevo no pide migración |
+| `tipo` | text | sí | Qué clase de noticia es. `REMUNERACION_ACTUALIZADA` (`V55`): el sueldo cambiado desde la tarjeta del detalle. `VACANTE_ACTUALIZADA` (`V58`): la vacante corregida con el formulario, **uno solo por guardado** con todo lo que cambió, sueldo incluido. `VACANTE_ELIMINADA` (`V60`): la empresa retiró la vacante y la postulación quedó cerrada; **es el único sin enlace**, con `postulacion_id` y `vacante_id` vacíos. `RESENA_PUBLICADA`, `RESENA_EDITADA` (la empresa editó una reseña ya respondida), `REPORTE_RESENA_RESUELTO` y `RESPUESTA_RESENA_OCULTADA` (`V63`): las reseñas de empresas; también llegan con `postulacion_id` y `vacante_id` vacíos, y el portal los lleva por su tipo a la sección de reseñas del perfil. De las etapas (`V70`), con el mismo código que el correo al que acompañan: `PRUEBA_DISPONIBLE`, `POSTULACION_AVANZA`, `POSTULACION_NO_CONTINUA`, `POSTULACION_CERRADA` y `RETIRO_CONFIRMADO`; y los recordatorios `RECORDATORIO_EVALUACION` y `RECORDATORIO_PRUEBA` (`V70`). `PRUEBA_MAS_TIEMPO` (`V89`): el equipo le dio más tiempo para la prueba del puesto, con el mismo texto que su correo. Todos estos llevan `postulacion_id` y `vacante_id`. Sin CHECK: un tipo nuevo no pide migración |
 | `titulo` | text | sí | El texto **ya armado** |
 | `cuerpo` | text | sí | El texto **ya armado** |
 | `postulacion_id` | bigint | no | A dónde lleva al pulsarlo |
@@ -3674,15 +3694,18 @@ Que un número va a escribir, o ya escribió, por una postulación. Una fila cad
 ## `aviso_whatsapp`
 
 Un «te toca» que EX le debe al bot. Nace en la transición que manda el correo y la campana, si la
-postulación tiene un vínculo `ACTIVO`, y lo envía después un sondeo.
+postulación tiene un vínculo `ACTIVO`, y lo envía después un sondeo. Desde la `V89` nace también
+al darle más tiempo para la prueba, que no es una transición.
 
 | Columna | Tipo | Oblig. | Qué guarda |
 |---|---|---|---|
 | `id` | uuid | sí | Clave. **Es el `avisoId` del contrato** (UUIDv7) y su clave de idempotencia: un reintento manda el mismo |
 | `postulacion_id` | bigint | sí | |
 | `vinculo_whatsapp_id` | bigint | sí | |
-| `transicion_estado_id` | bigint | sí | La transición que lo hizo nacer |
-| `tipo` | text | sí | `PRUEBA_DISPONIBLE` o `POSTULACION_AVANZA` (CHECK). Nunca recordatorios ni cierres |
+| `transicion_estado_id` | bigint | no | La transición que lo hizo nacer. **Obligatoria en todos los tipos menos `PRUEBA_MAS_TIEMPO`**, que va sin ella (CHECK, `V89`) |
+| `intento_prueba_id` | bigint → `intento_prueba` | no | (`V89`) La prueba a la que se le dio más tiempo. Solo en `PRUEBA_MAS_TIEMPO`, y ahí obligatoria (CHECK) |
+| `plazo_en` | timestamptz | no | (`V89`) La fecha nueva que se avisa. Solo en `PRUEBA_MAS_TIEMPO`, y ahí obligatoria (CHECK) |
+| `tipo` | text | sí | `PRUEBA_DISPONIBLE`, `POSTULACION_AVANZA` o, desde la `V89`, `PRUEBA_MAS_TIEMPO` (CHECK). Nunca recordatorios ni cierres |
 | `estado` | text | sí | `PENDIENTE`, `ENVIADO`, `FALLIDO` u `OMITIDO` —el vínculo se cerró antes de que saliera— (CHECK) |
 | `telefono` · `referencia` · `nombre` · `vacante` · `texto` | text | sí | **Lo que se manda, congelado al encolar**: el número, la `postulacionRef`, el nombre de pila y el título (hasta 60) y el mensaje (hasta 1000). Un reintento es idéntico al primero aunque cambie la vacante |
 | `intentos` | integer | sí | Por defecto 0. Con 5 sin éxito, o un error definitivo, queda `FALLIDO` |
@@ -3692,7 +3715,11 @@ postulación tiene un vínculo `ACTIVO`, y lo envía después un sondeo.
 | `actualizado_en` | timestamptz | sí | Por defecto, ahora |
 
 **Clave primaria:** `id` · **Única:** `aviso_whatsapp_una_vez_por_transicion` (`transicion_estado_id`,
-`tipo`) · **Apunta a:** `postulacion`, `vinculo_whatsapp`, `transicion_estado`
+`tipo`) y, desde la `V89`, `aviso_whatsapp_mas_tiempo_una_vez` (`intento_prueba_id`, `plazo_en`)
+solo para `PRUEBA_MAS_TIEMPO`: dar más tiempo dos veces con la misma fecha deja un solo aviso ·
+**Restricción (`V89`):** `aviso_whatsapp_de_que_cuelga_check` —el de más tiempo cuelga de la
+prueba y la fecha, y los demás de su transición, nunca de las dos cosas— · **Apunta a:**
+`postulacion`, `vinculo_whatsapp`, `transicion_estado`, `intento_prueba`
 
 ## `whatsapp_baja`
 
@@ -3928,6 +3955,7 @@ caro sale: cada consulta que filtra por el padre acaba leyendo la tabla entera.
 | `vinculo_whatsapp (revocacion_proximo_intento_en) WHERE cerrado_en IS NOT NULL AND revocacion_enviada_en IS NULL` | **Índice parcial.** Las revocaciones que el sondeo aún le debe al bot (`V73`) |
 | `aviso_whatsapp (proximo_intento_en) WHERE estado = 'PENDIENTE'` | **Índice parcial.** La cola de avisos que lee el sondeo (`V73`) |
 | `aviso_whatsapp (postulacion_id)` | Los avisos de una postulación (`V73`) |
+| `aviso_whatsapp (intento_prueba_id, plazo_en) WHERE tipo = 'PRUEBA_MAS_TIEMPO'` | **Único y parcial.** Un aviso de más tiempo por prueba y fecha nueva (`V89`) |
 | `resultado_whatsapp (vinculo_whatsapp_id)` | Los resultados de un vínculo: BAJA, cambio de celular y borrado de datos (`V76`) |
 | `resultado_whatsapp (consultable_hasta) WHERE acceso_revocado_en IS NULL` | **Índice parcial.** Los resultados que aún se consultan, y los vencidos que el sondeo retira (`V76`) |
 | `evento_whatsapp (proximo_intento_en) WHERE estado = 'PENDIENTE'` | **Índice parcial.** La cola de eventos v2 que lee el sondeo (`V76`) |
@@ -4016,6 +4044,9 @@ Resumen de las restricciones que están repartidas por el documento:
   techo del año (el actual) y las reglas de los enlaces viven en el código.
 - El brochure de la empresa (`V86`): la misión y la visión, de 1 a 400 caracteres o nulas; la
   plantilla, una de tres, y el color, uno de seis, los dos sin nulos.
+- «Darle más tiempo» (`V89`): quien recibió más tiempo lleva su motivo; el aviso de WhatsApp
+  `PRUEBA_MAS_TIEMPO` cuelga de la prueba y de la fecha nueva, nunca de una transición, y sale
+  una sola vez por prueba y fecha; los demás tipos siguen exigiendo su transición.
 
 ⚠️ Aquí decía «el rango del cambio inesperado cabe dentro de la duración de la prueba». **Eso no
 lo impide nada**: no hay CHECK que lo diga ni comprobación en el código. Ver

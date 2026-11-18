@@ -11,6 +11,7 @@ import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.RankingVac
 import com.renaser.ai.ai_engine.perfilintegral.service.ServicioPerfilIntegralPanel;
 import com.renaser.ai.ai_engine.postulacion.dto.DtosPostulacion.EnlaceArchivo;
 import com.renaser.ai.ai_engine.postulacion.service.ServicioPostulacionesPanel;
+import com.renaser.ai.ai_engine.prueba.service.EstadoPruebaDelPuesto;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
 
 import org.apache.poi.ss.usermodel.DataFormatter;
@@ -267,6 +268,36 @@ class ServicioExcelRankingImplTest {
         assertThat(celda(libro, 1, 8)).isEqualTo("falta una nota de etapa");
         // Y la nota de la etapa que SÍ tiene se sigue escribiendo: no se saca del ponderado.
         assertThat(celda(libro, 1, 5)).isEqualTo("73");
+    }
+
+    /*
+     * AC-12 (V89): quien no completó la prueba del puesto vuelve a la tabla de «Toda la tanda»
+     * y, con ella, al Excel. Su nota técnica va EN BLANCO: «rúbrica incompleta» diría que hay
+     * una entrega esperando calificación, y no la hay. Quien sí la entregó y espera nota lo
+     * sigue diciendo, y las ajenas siguen siendo solo las de otra vacante.
+     */
+    @Test
+    @DisplayName("quien no completó la prueba sale con la nota en blanco; quien espera nota lo sigue diciendo")
+    void quienNoLaCompletoVaConLaNotaEnBlanco() {
+        when(tandas.ranking(any(), eq(13L), eq("PRUEBA_PUESTO"))).thenReturn(tanda(
+                deLaPrueba(427L, "Ana Quispe", rubrica("Divisas", "12", "15")),
+                conEstado(sinPonderado(sinCriterios(sinNotaDeEtapa(deLaPrueba(422L, "Bruno Diaz")))),
+                        EstadoPruebaDelPuesto.NO_COMPLETADA),
+                conEstado(sinPonderado(sinNotaDeEtapa(deLaPrueba(450L, "Carla Rojas",
+                                rubrica("Divisas", "12", "15")))),
+                        EstadoPruebaDelPuesto.PENDIENTE_CALIFICACION)));
+
+        laVigenteEs(rubrica("Divisas", "12", "15"));
+        byte[] libro = servicio.generar(quien("ver_embudo"), 13L,
+                new PedidoExcelRanking("PRUEBA_PUESTO", List.of(427L, 422L, 450L), null)).contenido();
+
+        assertThat(columna(libro, CANDIDATO).subList(1, 4))
+                .containsExactly("Ana Quispe", "Bruno Diaz", "Carla Rojas");
+        assertThat(celda(libro, 1, 5)).isEqualTo("73");
+        assertThat(celda(libro, 2, 5)).isEmpty();
+        assertThat(celda(libro, 3, 5)).isEqualTo("rúbrica incompleta");
+        assertThat(celdas(libro).stream().flatMap(List::stream))
+                .noneMatch(t -> t.contains("no son de esta vacante"));
     }
 
     /*
@@ -1969,8 +2000,9 @@ class ServicioExcelRankingImplTest {
                 // pasar que la hoja las escribiera en el orden equivocado.
                 new Ponderado(new BigDecimal("78.14"), new BigDecimal("76.50"),
                         new BigDecimal("82.00"), new BigDecimal("73.00")),
-                // El estado de la prueba no se escribe en la hoja: es lo que decide el texto
-                // de una celda de la TABLA cuando no hay nota, y aquí siempre la hay.
+                // El estado de la prueba no se escribe en la hoja: decide el texto de una celda
+                // de la TABLA sin nota y, en el Excel, solo que quien no la completó (V89) vaya
+                // con la nota en blanco. Aquí siempre la hay; conEstado lo cambia.
                 null,
                 // La fecha de postulación tampoco: filtra la tabla del panel, no el Excel.
                 Instant.parse("2026-08-12T15:00:00Z"),
@@ -2009,6 +2041,19 @@ class ServicioExcelRankingImplTest {
     /** La misma fila sin rúbrica: quien todavía no ha rendido la prueba. */
     private static FilaRanking sinCriterios(FilaRanking f) {
         return copia(f, f.notaEtapa(), List.of(), f.archivoNombre(), f.archivoId(), f.ponderado());
+    }
+
+    /** La misma fila con otro estado de la prueba del puesto (V89). */
+    private static FilaRanking conEstado(FilaRanking f, EstadoPruebaDelPuesto estado) {
+        return new FilaRanking(f.puesto(), f.postulacionId(), f.uuid(), f.candidato(), f.correo(),
+                f.estado(), f.estadoNombre(), f.estadoCalificacion(), f.pasada(),
+                f.archivoNombre(), f.archivoId(), f.datos(), f.grupoPrioridad(), f.notaEtapa(),
+                f.notaCurriculum(), f.adecuacion(), f.potencial(), f.altoRendimiento(),
+                f.confianzaEvidencia(), f.resumen(), f.riesgosCriticos(), f.fortalezas(),
+                f.alertas(), f.actualizadoEn(), f.notasCriterio(), f.ciudad(), f.ciudadCodigo(),
+                f.pretensionMin(), f.pretensionMax(), f.pretensionMoneda(),
+                f.pretensionDeclarada(), f.pretensionDeclaradaMoneda(), f.ponderado(), estado,
+                f.postuladoEn(), f.resenas());
     }
 
     /** La misma fila sin currículum subido: no hay nada que firmar. */

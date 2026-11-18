@@ -876,9 +876,81 @@ public class FlujoPruebaPropiaIT {
         assertThat(antes.get("estadoIntento").asText()).isEqualTo("PENDIENTE");
         assertThat(antes.path("preguntas").size()).isZero();
         assertThat(antes.path("enunciado").isMissingNode() || antes.path("enunciado").isNull()).isTrue();
-        // Al abrirla, su reloj no pasa de la fecha nueva (AC-10)
+        // La pantalla previa promete los 90 minutos desde «Empezar», con la fecha nueva de tope
+        assertThat(antes.get("duracionMinutos").asInt()).isEqualTo(90);
+        assertThat(java.time.Instant.parse(antes.get("fechaLimite").asText())).isEqualTo(nueva);
+        assertThat(antes.get("fechaConcedidaAMano").asBoolean()).isFalse();
+        // Al abrirla, su reloj arranca ahí y no pasa de la fecha nueva (AC-10, punto 11): la
+        // fecha de «Darle más tiempo» es el tope, no un plazo concedido a mano que se coma el
+        // cronómetro. Con 90 minutos y la fecha a 3 h, manda el cronómetro.
         iniciar("hugo");
-        assertThat(venceEn("hugo")).isEqualTo(nueva);
+        assertThat(venceASusMinutos("hugo")).isTrue();
+        assertThat(venceEn("hugo")).isBefore(nueva);
+    }
+
+    @DisplayName("«El plazo de esta persona» después de «Darle más tiempo» se respeta tal cual al empezar; "
+            + "puesto antes, el más tiempo sigue siendo solo el tope del reloj (V89, punto 16)")
+    @Test
+    @Order(15)
+    void elPlazoAManoTrasElMasTiempo() throws Exception {
+        java.time.Instant aMano = java.time.Instant.now().plus(java.time.Duration.ofHours(48))
+                .truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
+        java.time.Instant tope = java.time.Instant.now().plus(java.time.Duration.ofHours(3))
+                .truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
+
+        // Inés no la abrió a tiempo, recibe más tiempo y DESPUÉS alguien le fija su fecha a mano
+        entrarALaPrueba("ines", "ines.propia@correo.pe");
+        vencer("ines");
+        String deInes = "/api/v1/panel/postulaciones/" + postulacion.get("ines") + "/prueba";
+        conToken(post(deInes + "/mas-tiempo"), tokenTalento,
+                "{\"venceEn\":\"%s\",\"motivo\":\"No le llegó el correo\",\"avisar\":false}".formatted(tope))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.estadoPrueba").value("SIN_EMPEZAR"));
+        conToken(post(deInes + "/plazo"), tokenTalento,
+                "{\"venceEn\":\"%s\",\"motivo\":\"Lo pidió por teléfono\"}".formatted(aMano))
+                .andExpect(status().isOk());
+        // La ficha sigue contando quién le dio más tiempo, con la fecha puesta a mano
+        conTokenGet(deInes + "/plazo", tokenTalento)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.origen").value("PROPIO"))
+                .andExpect(jsonPath("$.sinCompletar").doesNotExist())
+                .andExpect(jsonPath("$.masTiempo.motivo").value("No le llegó el correo"))
+                .andExpect(jsonPath("$.masTiempo.dadoPor").isNotEmpty());
+        // La pantalla previa ya dice que tendrá hasta esa fecha, no los 90 minutos, y sin
+        // adelantar nada de la prueba (feedback de la revisión del 18/11/2026)
+        JsonNode previaDeInes = laPrevia("ines");
+        assertThat(previaDeInes.get("estadoIntento").asText()).isEqualTo("PENDIENTE");
+        assertThat(previaDeInes.get("fechaConcedidaAMano").asBoolean()).isTrue();
+        assertThat(java.time.Instant.parse(previaDeInes.get("fechaLimite").asText())).isEqualTo(aMano);
+        assertThat(previaDeInes.path("preguntas").size()).isZero();
+        assertThat(previaDeInes.path("enunciado").isMissingNode() || previaDeInes.path("enunciado").isNull()).isTrue();
+        // Al empezar, su fecha no se toca aunque la prueba sea de 90 minutos (como con V32)
+        iniciar("ines");
+        assertThat(venceEn("ines")).isEqualTo(aMano);
+        assertThat(venceASusMinutos("ines")).isFalse();
+        assertThat(laPrevia("ines").get("fechaConcedidaAMano").asBoolean())
+                .as("empezada, lo que rige es venceEn").isFalse();
+
+        // Joel tenía su fecha a mano ANTES de que se le pasara sin abrirla: el más tiempo que
+        // llega después manda, y su reloj arranca al empezar sin pasarse de la fecha nueva
+        entrarALaPrueba("joel", "joel.propia@correo.pe");
+        String deJoel = "/api/v1/panel/postulaciones/" + postulacion.get("joel") + "/prueba";
+        conToken(post(deJoel + "/plazo"), tokenTalento,
+                "{\"venceEn\":\"%s\",\"motivo\":\"Lo pidió por teléfono\"}".formatted(aMano))
+                .andExpect(status().isOk());
+        vencer("joel");
+        conToken(post(deJoel + "/mas-tiempo"), tokenTalento,
+                "{\"venceEn\":\"%s\",\"motivo\":\"No le llegó el correo\",\"avisar\":false}".formatted(tope))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.estadoPrueba").value("SIN_EMPEZAR"));
+        // Su pantalla previa promete los 90 minutos, con la fecha nueva de tope
+        JsonNode previaDeJoel = laPrevia("joel");
+        assertThat(previaDeJoel.get("fechaConcedidaAMano").asBoolean()).isFalse();
+        assertThat(previaDeJoel.get("duracionMinutos").asInt()).isEqualTo(90);
+        assertThat(java.time.Instant.parse(previaDeJoel.get("fechaLimite").asText())).isEqualTo(tope);
+        iniciar("joel");
+        assertThat(venceASusMinutos("joel")).isTrue();
+        assertThat(venceEn("joel")).isBefore(tope);
     }
 
     // ============ Con candidatos dentro ============
@@ -1293,6 +1365,12 @@ public class FlujoPruebaPropiaIT {
                 Long.class, id)).isEqualTo(publicadaId(vacanteId));
     }
 
+    /** Lo que trae el portal en su pantalla de la prueba (la previa, si aún no pulsó «Empezar»). */
+    private JsonNode laPrevia(String quien) throws Exception {
+        return json.readTree(conTokenGet("/api/v1/portal/prueba/" + codigo.get(quien), tokenCandidata.get(quien))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+    }
+
     private void iniciar(String quien) throws Exception {
         mvc.perform(post("/api/v1/portal/prueba/" + codigo.get(quien) + "/inicio")
                         .header("Authorization", "Bearer " + tokenCandidata.get(quien)))
@@ -1601,6 +1679,7 @@ public class FlujoPruebaPropiaIT {
     }
 
     /** Si vence justo a los 90 minutos de haberla abierto (se compara en la base, sin redondeos). */
+    // También lo usa «quien no la abrió a tiempo» tras darle más tiempo (V89).
     private boolean venceASusMinutos(String quien) {
         return Boolean.TRUE.equals(jdbc.queryForObject("select vence_en = iniciado_en + interval '90 minutes' "
                 + "from intento_prueba where postulacion_id = ?", Boolean.class, postulacion.get(quien)));

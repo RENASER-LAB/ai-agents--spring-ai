@@ -65,9 +65,10 @@ plantilla **o** de la versión del editor. Diferencias:
 - **No se entrega sin responderlo todo** ni sin los entregables obligatorios, aunque se llame a
   la API directamente. Un texto en blanco no cuenta.
 - **Al vencer con algo pendiente, el intento queda «no completado»**: no se califica, no gasta
-  IA, no sale en el ranking ni en su Excel y la postulación no cambia de etapa. El panel lo lista
-  en «No completaron la prueba», desde donde alguien cierra su proceso. Con todo completo se
-  entrega sola, como antes.
+  IA y la postulación no cambia de etapa. **Desde la `V89` sale en el ranking como «No la
+  completó»**, solo en «Toda la tanda», y en el Excel con la nota en blanco; desde su ficha se le
+  da más tiempo o se descarta (ver «Darle más tiempo», más abajo). Con todo completo se entrega
+  sola, como antes.
 - Al portal nunca le llegan puntos, claves, criterios, calificadores ni qué mira cada criterio
   (RF-53).
 - **El reloj al abrirla.** Una cronometrada vence a los N minutos o en la fecha límite, lo que
@@ -197,8 +198,9 @@ donde se escriben».
   `PRUEBA_DISPONIBLE` que decían «desde este correo» —los de cada organización y los propios de
   una vacante— y conservó las viejas desactivadas.
 - **Recordatorio de la prueba sin empezar** (`RECORDATORIO_PRUEBA`): a las 24 horas de entrar en
-  la etapa y 24 horas antes del plazo que rija. Quien ya la empezó no recibe ninguno. Las reglas,
-  en [estados de la postulación](03-ESTADOS-POSTULACION.md), «Los recordatorios».
+  la etapa y 24 horas antes del plazo que rija. Quien ya la empezó no recibe ninguno, salvo el de
+  antes del plazo tras «Darle más tiempo» (`V89`). Las reglas, en
+  [estados de la postulación](03-ESTADOS-POSTULACION.md), «Los recordatorios».
 
 ### Nada antes del reloj (10/10/2026)
 
@@ -230,6 +232,83 @@ de plantilla.
   se ve, en el `docs/02-QUE-VE-EL-CANDIDATO.md` del frontend, 2.9.
 
 Lo prueban `LoQueViajaAntesDeEmpezarTest`, `FlujoPruebaPropiaIT` y `MaquinaEstadosAvisoTest`.
+
+### Darle más tiempo a quien no la completó (V89, 18/11/2026)
+
+Hasta aquí, quien dejaba vencer la prueba del editor con algo pendiente desaparecía de la tabla y
+solo se veía en una lista aparte, «No completaron la prueba», desde donde lo único posible era
+cerrar su proceso. Y quien no la abría antes de su fecha se quedaba atascado sin que nadie lo
+viera. Ahora:
+
+- **«No la completó» se calcula al leer**: el intento tiene `no_completada`, o no se abrió y su
+  `vence_en` ya pasó (`IntentoPrueba.quedoSinCompletar`). El barrido sigue cerrando solo las
+  empezadas. Esa persona vuelve a la pestaña «Prueba del puesto» con ese rótulo, **solo en «Toda
+  la tanda»**, tenga el proceso abierto o cerrado; no sale en «Pendiente» ni en «Le toca al
+  candidato». La lista aparte y su ruta, `GET …/prueba-propia/no-completaron`, se retiraron.
+- **«Avanzar» no la mueve**: `confirmacion-avance` responde 409 «No completó la prueba: dale más
+  tiempo desde su ficha o descarta su proceso». Sin entrega no hay nada que calificar.
+- **Darle más tiempo** (`POST /panel/postulaciones/{id}/prueba/mas-tiempo`, `MasTiempoDeLaPrueba`)
+  es una fecha y hora futura —sin tope—, un motivo obligatorio y si se le avisa. Pide
+  `mover_postulacion`, como «El plazo de esta persona». Se comprueba en este orden: el alcance
+  (vacante eliminada, 404), la vacante **archivada** (409 «La vacante está archivada: desarchívala
+  para darle más tiempo»), el proceso cerrado (409), que siga sin completar (409: un segundo
+  envío ya no la encuentra y no repite los avisos) y la fecha futura (400). **Con la vacante
+  cerrada sí se puede** (decisión del 18/11/2026): el cierre automático de la V78 la cierra antes
+  de que se rinda la prueba, y la prueba conserva su propia fecha. El guardado y el barrido toman
+  primero la vacante y se esperan: si coinciden, el plazo nuevo se aplica igual.
+- **Qué le pasa a la prueba**: se apagan `no_completada`, `entregado_en` y
+  `es_entrega_automatica`; `vence_en` pasa a la fecha nueva con `plazo_propio`, y `mas_tiempo_en`,
+  `mas_tiempo_por_usuario_id` y `mas_tiempo_motivo` guardan la última vez. **Las respuestas y los
+  archivos no se tocan.** Si la había abierto queda «En curso»; si no, «Sin empezar». La
+  postulación sigue en `PRUEBA_TURNO_CANDIDATO`, así que vuelve a «Le toca al candidato». La
+  auditoría guarda `dar_mas_tiempo_prueba` con la fecha anterior, la nueva y el motivo. Si llega la
+  fecha nueva y vuelve a faltar algo, queda otra vez sin completar, y se le puede volver a dar.
+- **El reloj de quien nunca la abrió.** La fecha de «Darle más tiempo» **no es una fecha
+  concedida a mano**: al pulsar «Empezar» corren sus minutos y esa fecha es solo el tope —rige lo
+  que llegue antes—. Si después alguien la cambia con «El plazo de esta persona», esa fecha manda
+  sin cronómetro, como cualquier plazo puesto a mano. El intento no lo sabe por sí solo: lo decide
+  si hay un `definir_plazo_prueba` en la auditoría posterior a `mas_tiempo_en`
+  (`IntentoPrueba.fechaConcedidaAMano`). Esa misma regla viaja al portal, solo antes de empezar,
+  en `fechaConcedidaAMano`, para que la pantalla previa diga «Hasta la fecha límite» a quien tendrá
+  hasta su fecha en vez de «N min desde que pulses Empezar».
+- **Nada antes del reloj** no cambia: volver a «Sin empezar» no adelanta el caso ni las preguntas,
+  porque `empezada(intento)` sigue mirando solo `iniciado_en`.
+- **Los avisos**, si se marca «Avisar» (es lo que llega marcado): el correo `PRUEBA_MAS_TIEMPO`,
+  la campana del mismo tipo y, con vínculo `ACTIVO`, número sin baja y la empresa en la beta, un
+  aviso de WhatsApp `PRUEBA_MAS_TIEMPO` en la cola, ligado a la prueba y a la fecha nueva: la misma
+  fecha dos veces deja un solo aviso. Los tres dicen «Tienes más tiempo para la prueba de
+  {vacante}, hasta el {fecha} (hora de Lima). Entra a Mis procesos para continuarla.», sin enlace
+  con token. Salen después de confirmar el guardado y cada uno en su transacción
+  (`AvisoDeMasTiempo`): un fallo del aviso no deshace el plazo. La respuesta dice por dónde
+  (`avisadoPor`).
+- ⚠️ **El bot de WhatsApp todavía no conoce ese tipo.** Hasta que el bot de `Renaser/crm` acepte
+  `PRUEBA_MAS_TIEMPO` —y se despliegue a mano, porque `desplegar` no lo sube—, el aviso se queda
+  en la cola de EX pendiente o `FALLIDO`, sin tocar el correo ni la campana. Fuera de la ventana de
+  24 h el bot usará la plantilla ya aprobada `prueba_disponible_postulante` hasta que Meta apruebe
+  `prueba_mas_tiempo_postulante`. Lo que lee el bot en la consulta v2 sí cambia solo: la prueba
+  deja de salir vencida y sale habilitada hasta la fecha nueva. Ver
+  [Estado del proyecto](ESTADO-DEL-PROYECTO.md), «Lo que falta y no es código».
+- **Los recordatorios**: «a las 24 horas de que le toque» no se repite, porque dar más tiempo no
+  abre turno; «24 horas antes del plazo» sale una vez con la fecha nueva, **también a quien ya la
+  había empezado**; y si la fecha nueva queda a menos de esas horas se anota como omitido, porque
+  saldría justo detrás del aviso. Ver [estados de la postulación](03-ESTADOS-POSTULACION.md), «Los
+  recordatorios».
+- **La ficha lo cuenta** en `GET …/prueba/plazo`: `sinCompletar` —cuándo se le acabó, si no la
+  abrió, qué le faltó, si quien mira puede usar el botón y, si no, por qué: «Vacante archivada» o
+  «Proceso cerrado»— y `masTiempo` —cuándo, quién y por qué—, mientras la prueba siga abierta.
+  `POST …/prueba/plazo` («El plazo de esta persona») también responde 409 con la vacante archivada.
+- **El informe de la prueba** vuelve a «sin calificar» mientras la prueba siga abierta, como
+  cualquier prueba sin entregar. Los textos que el redactor escribió para el informe de «No la
+  completó» no se borran: dejan de casar con la prueba y se reescriben cuando haya entrega.
+- **Queda fuera**: empezar de cero, reabrir un proceso cerrado, darle más tiempo a varias personas
+  a la vez y que el candidato lo pida. En las vacantes con plantilla solo cambian los rótulos, y
+  «No la completó» es solo quien no la abrió a tiempo, porque la plantilla al vencer se entrega
+  sola; las del cuestionario técnico no usan `intento_prueba` y conservan el texto de siempre.
+  Tampoco cambia lo que ve en el portal quien no la abrió a tiempo y aún no recibió más tiempo.
+
+Lo prueban `MasTiempoDeLaPruebaTest`, `RelojDeLaEtapaTecnicaQaTest`, `LoQueViajaAntesDeEmpezarTest`,
+`AvisosPorWhatsappTest`, `FlujoPruebaPropiaIT` y `FlujoNovedadesWhatsappIT`; en el panel, el e2e
+`72-incompletas-y-mas-tiempo-qa`.
 
 ---
 
@@ -356,7 +435,8 @@ decir «esta convocatoria cierra el domingo».
   editor más simple»).
 - **Por candidato**: `POST /panel/postulaciones/{id}/prueba/plazo`, para dar más horas a quien
   las pide. Marca `intento_prueba.plazo_propio`, y **a esos no les afecta mover la fecha de la
-  vacante**.
+  vacante**. Desde la `V89` responde 409 con la vacante archivada, y a quien ya no completó la
+  prueba se le da tiempo con «Darle más tiempo» (ver más arriba), que deja la fecha igual de suya.
 - Empezar la prueba no recalcula una fecha ya puesta.
 - **Una prueba cronometrada también admite fecha** (22/09/2026). Antes se rechazaba «porque
   anularía el reloj», y dejó de ser cierto cuando empezar pasó a quedarse con **el plazo que
@@ -484,27 +564,32 @@ que falte un criterio de los que pone una persona. En el ranking eso se leía ig
 contrario —el candidato que nunca la terminó—, y el equipo salía a perseguir a quien ya había
 hecho lo suyo.
 
-Desde el 18/09 el ranking de la etapa dice cuál de los dos es. La regla es una sola y vive en el
-enum `EstadoPruebaDelPuesto`:
+Desde el 18/09 el ranking de la etapa dice cuál de los dos es, y desde la `V89` (18/11/2026)
+distingue además a quien sigue haciéndola: «Prueba incompleta» se le decía también a quien aún
+tenía tiempo, y ese rótulo desapareció. La regla es una sola y vive en el enum
+`EstadoPruebaDelPuesto`, con esta prioridad:
 
-| Lo que hay | Lo que se lee en la pestaña |
-|---|---|
-| Nota de la etapa | La nota. **Un cero es una nota**, y manda aunque la entrega la hiciera el reloj |
-| Sin nota y sin `entregado_en` | «Prueba incompleta»: no llegó a haber entrega |
-| Sin nota, con `entregado_en` y `es_entrega_automatica` | «Prueba incompleta»: la cerró el sistema al vencer el plazo, que no es un «ya está» del candidato |
-| Sin nota, con `entregado_en` puesto por la persona | «Pendiente de calificación»: hay entrega que mirar |
-| Sin intento | El texto de siempre. No hay prueba de la que hablar |
+| Lo que hay | `estadoPrueba` | Lo que se lee en la pestaña |
+|---|---|---|
+| Nota de la etapa | `CALIFICADA` | La nota. **Un cero es una nota**, y manda aunque la entrega la hiciera el reloj |
+| Sin nota y no la completó: `no_completada`, o sin abrir con la fecha pasada | `NO_COMPLETADA` | «No la completó»; al pasar el ratón, cuándo se le acabó y qué le faltó, o «sin abrirla». Solo en «Toda la tanda» |
+| Sin nota, con `entregado_en` —a mano, o sola al vencer con todo respondido— | `PENDIENTE_CALIFICACION` | «Pendiente de calificación»: hay entrega que mirar. En la de plantilla, también la que se entregó sola |
+| Abierta y sin entregar | `EN_CURSO` | «En curso»: su tiempo sigue corriendo |
+| Sin abrir, con plazo vigente o sin fecha | `SIN_EMPEZAR` | «Sin empezar» |
+| Sin intento | `NO_APLICA` | El texto de siempre. No hay prueba de la que hablar |
 
-- **No se guarda en ninguna parte.** Se calcula al abrir el ranking con la nota y el intento tal
-  como estén; consultar o descargar no escribe nada, y quien entregue o califique hoy ve el texto
-  nuevo al recargar. Ni migración, ni columna.
+- **No se guarda en ninguna parte.** Se calcula al abrir el ranking con la nota, el intento y la
+  hora tal como estén; consultar o descargar no escribe nada, y quien entregue, califique o vea
+  pasar su fecha hoy ve el texto nuevo al recargar. Ni migración, ni columna.
 - **Viaja al panel en `estadoPrueba`**, y solo con `?etapa=PRUEBA_PUESTO`: en las demás pestañas
-  la columna Nota no habla de esta prueba. Los cuatro valores, en [Las APIs](09-APIS.md).
+  la columna Nota no habla de esta prueba. Desde la `V89` la fila trae además `detallePrueba`
+  —cuándo la abrió, cuándo se entregó o se cerró, la fecha que rige y qué le faltó— para el texto
+  del ratón. Los valores, en [Las APIs](09-APIS.md).
 - ⚠️ **Las vacantes que rinden el cuestionario técnico se quedan fuera**: no usan
   `intento_prueba`, así que todas sus filas sin nota caen en el caso neutro, incluidas las ya
   entregadas. Es alcance decidido, no un fallo — está en [Defectos conocidos](DEFECTOS-CONOCIDOS.md).
-- ⚠️ **El Excel no lo hereda**: su columna de nota técnica sigue diciendo «rúbrica incompleta»
-  para cualquier fila sin nota. La distinción vive solo en la tabla del panel.
+- ⚠️ **El Excel lo hereda solo a medias**: desde la `V89` quien no la completó va con la nota
+  técnica en blanco; cualquier otra fila sin nota sigue diciendo «rúbrica incompleta».
 
 ---
 

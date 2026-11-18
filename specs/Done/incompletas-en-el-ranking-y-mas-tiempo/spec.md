@@ -1,6 +1,5 @@
 # Las pruebas incompletas, dentro del ranking y con «Darle más tiempo»
-
-Estado: lista para implementar
+Estado: TERMINADO
 
 Escrita el 21/10/2026. Revisada el 18/11/2026 contra `origin/main`: backend `f365b43` (#143,
 migraciones hasta la V85) y frontend `7124173` (#108, panel en Northstar desde el 14/11/2026).
@@ -170,7 +169,7 @@ Rutas del backend bajo `src/main/java/com/renaser/ai/ai_engine/`; las del panel,
 
 - **Perfil Integral (con el banco de RENASER o con preguntas propias):**
   - No tiene reloj y no se puede entregar a medias.
-  - Desde la [V78](../../Done/perfil-integral-hasta-el-cierre-de-la-vacante/spec.md) ya no vence
+  - Desde la [V78](../perfil-integral-hasta-el-cierre-de-la-vacante/spec.md) ya no vence
     a los 14 días: dura hasta el cierre de la vacante, y quien va a medias sale en «Le toca al
     candidato». Al cerrarse la vacante, quien no terminó queda cerrado con sus avisos. El caso «se
     le acabó el tiempo y quiero dárselo» no existe ahí.
@@ -184,16 +183,16 @@ Rutas del backend bajo `src/main/java/com/renaser/ai/ai_engine/`; las del panel,
   portal «Mis procesos» y la prueba; un correo, un aviso de campana y un aviso de WhatsApp nuevos;
   el recordatorio previo al plazo.
 - Referencias:
-  - [Prueba del puesto con el editor](../../Done/prueba-del-puesto-con-el-editor.md): la
+  - [Prueba del puesto con el editor](../prueba-del-puesto-con-el-editor.md): la
     decisión 11 y el punto 13, que esta spec revisa.
-  - [Etiquetas del ranking](../../Done/etiquetas-ranking-prueba-puesto.md).
-  - [Plazo de la prueba del puesto](../../Done/plazo-de-la-prueba-del-puesto.md).
-  - [Filtros y selección en lote](../../Done/filtros-y-seleccion-en-lote-ranking.md).
-  - [La prueba al instante y los avisos de etapa](../../Done/la-prueba-al-instante-y-avisos-de-etapa.md):
+  - [Etiquetas del ranking](../etiquetas-ranking-prueba-puesto.md).
+  - [Plazo de la prueba del puesto](../plazo-de-la-prueba-del-puesto.md).
+  - [Filtros y selección en lote](../filtros-y-seleccion-en-lote-ranking.md).
+  - [La prueba al instante y los avisos de etapa](../la-prueba-al-instante-y-avisos-de-etapa.md):
     los recordatorios.
-  - [Novedades por WhatsApp](../../Done/novedades-por-whatsapp.md) y
-    [Contexto y resultados por WhatsApp](../../Done/contexto-y-resultados-por-whatsapp.md).
-  - [Informe en PDF por etapa](../../Done/informe-pdf-por-etapa/spec.md).
+  - [Novedades por WhatsApp](../novedades-por-whatsapp.md) y
+    [Contexto y resultados por WhatsApp](../contexto-y-resultados-por-whatsapp.md).
+  - [Informe en PDF por etapa](../informe-pdf-por-etapa/spec.md).
 
 ## Alcance
 
@@ -603,17 +602,17 @@ Darle más tiempo a Beto Gil                                   ×
 ## Dependencias y dudas
 
 - Requiere:
-  - [Qué buscar en el CV](../../Done/que-buscar-en-el-cv/spec.md): **cumplida** (PR #135/#97,
+  - [Qué buscar en el CV](../que-buscar-en-el-cv/spec.md): **cumplida** (PR #135/#97,
     V80). Esta spec parte del ranking, la ficha y el Excel que dejó.
-  - [Perfil Integral hasta el cierre de la vacante](../../Done/perfil-integral-hasta-el-cierre-de-la-vacante/spec.md):
+  - [Perfil Integral hasta el cierre de la vacante](../perfil-integral-hasta-el-cierre-de-la-vacante/spec.md):
     **cumplida** (PR #132/#93, V78). De ahí sale la regla de la vacante cerrada (punto 15).
   - El cambio en el bot de `Renaser/crm` para el tipo `PRUEBA_MAS_TIEMPO`, y su plantilla fuera
     de ventana (ver la decisión pendiente 1).
 - Choca con:
-  - [El Excel del ranking, resumido](../../Draft/excel-del-ranking-resumido/spec.md), aparcada: si se
+  - «El Excel del ranking, resumido» (`specs/Draft/excel-del-ranking-resumido/spec.md`), aparcada: si se
     retoma, debe partir del Excel con estas filas incluidas.
-  - [El informe del grupo](../../Draft/informe-del-grupo.md) y
-    [Seguimiento de pendientes entre etapas](../../Draft/seguimiento-de-pendientes-entre-etapas.md) hablan
+  - «El informe del grupo» (`specs/Draft/informe-del-grupo.md`) y
+    «Seguimiento de pendientes entre etapas» (`specs/Draft/seguimiento-de-pendientes-entre-etapas.md`) hablan
     de quien «no completó la prueba»: conviene que usen el mismo rótulo, «No la completó».
 - Decisiones confirmadas por el usuario:
   1. (23/10/2026) Quienes no la completaron salen **solo en «Toda la tanda»**, accesibles por

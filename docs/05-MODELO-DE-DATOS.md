@@ -23,15 +23,17 @@ Sirve para tres cosas:
 - **Entender el sistema.** Un modelo de datos bien contado explica el negocio mejor que
   cualquier otro documento.
 
-**La base ya está construida.** Las migraciones `V1` a `V80` y de la `V84` a la `V86` viven en
+**La base ya está construida.** Las migraciones `V1` a `V80`, de la `V84` a la `V86` y la `V89` viven en
 `src/main/resources/db/migration` —**131 tablas de este módulo**, 134 en la base contando la de
 Flyway y las dos del motor de agentes— y Flyway es el dueño del esquema. Cambiar algo de aquí
 ya cuesta una migración nueva, y **una migración aplicada no se edita nunca**: se escribe otra
 encima. No hay `V81` a `V83`: esos números los reservaban otras specs que todavía no se han
 construido, y como Flyway no aplica migraciones fuera de orden, tendrán que llevar un número
 mayor que la última aplicada. Ya pasó con el perfil de la empresa, que reservaba la `V81` y entró
-como `V85`, y su brochure entró como `V86` (ver «Reglas que no se negocian» en [Reglas del
-código](REGLAS-DEL-CODIGO.md)).
+como `V85`, y su brochure entró como `V86`. **Tampoco hay `V87` ni `V88`**: las reservan la
+convocatoria desde el propósito y el video por webcam, aún sin fusionar, y la `V89` se construyó
+antes. `MigracionesSinChoqueTest` admite esos cinco números como huecos deliberados (ver «Reglas
+que no se negocian» en [Reglas del código](REGLAS-DEL-CODIGO.md)).
 
 La `V36` trae **el perfil del candidato**: seis tablas que cuelgan de `persona` —no de
 `usuario`, porque el usuario existe una vez por organización y el perfil es de la persona—
@@ -314,6 +316,18 @@ pide con lo guardado y no se guarda en ningún sitio. **No añade tablas ni perm
 columnas en `organizacion` —la misión y la visión, opcionales, y la plantilla y el color elegidos
 para el brochure, que nunca van vacíos—. Las empresas que existían quedan sin misión ni visión, con
 «Clásica» y «Azul». Ver «Organización», más abajo.
+
+La `V89` (18/11/2026) acompaña a **las pruebas sin completar dentro del ranking y a «Darle más
+tiempo»**, y **no crea tablas**. Quien no completó la prueba del puesto —se le acabó el tiempo
+con huecos, o se le pasó la fecha sin abrirla— se calcula al leer, sin columna nueva. Lo que
+guarda: en `intento_prueba`, quién, cuándo y por qué se le dio más tiempo la última vez
+(`mas_tiempo_en`, `mas_tiempo_por_usuario_id`, `mas_tiempo_motivo`; el historial entero va a la
+auditoría); el correo `PRUEBA_MAS_TIEMPO`, sembrado en todas las organizaciones; y en
+`aviso_whatsapp`, el tipo `PRUEBA_MAS_TIEMPO`, que no cuelga de una transición sino de la prueba
+y la fecha nueva (`intento_prueba_id`, `plazo_en`, con `transicion_estado_id` vacía solo en ese
+tipo y una clave única por prueba y fecha). Ninguna fila que existía cambia: las pruebas que ya
+estaban sin completar aparecen en la tabla al desplegar. Ver [La prueba del puesto, por
+dentro](PRUEBA-DEL-PUESTO.md), «Darle más tiempo a quien no la completó».
 
 La `V54` (14/09/2026) **no añade ninguna tabla y cambia quién firma qué**. Hasta ella había dos
 tipos de texto —`PROCESO` y `FUTUROS_CONTACTOS`— y el de la cuenta usaba el primero, que habla de
@@ -1212,7 +1226,7 @@ La sugerencia de otro puesto **no mueve nada sola**: es información para que un
 | `pregunta_version_plantilla` | Cuáles eligió esta plantilla | version_plantilla_prueba_id, pregunta_prueba_id, orden |
 | `entregable_requerido` | Qué cosas distintas hay que entregar, cada una con su regla. Desde la `V67`, de una plantilla **o** de la prueba del editor; desde la `V68`, en el editor, con su alcance: de una pregunta o general | version_plantilla_prueba_id, version_banco_id, nombre, detalle, formato, es_obligatorio, orden, que_debe_tener, alcance, pregunta_id |
 | `entregable_cubre_pregunta` | Las preguntas que reúne un entregable general de la prueba del editor (`V68`) | entregable_requerido_id, pregunta_id |
-| `intento_prueba` | Cuando un candidato rinde. Desde la `V67`, una plantilla **o** la prueba del editor | postulacion_id, version_plantilla_prueba_id, version_banco_id, iniciado_en, vence_en, entregado_en, es_entrega_automatica, no_completada, variante_cambio_id, minuto_cambio, cambio_mostrado_en |
+| `intento_prueba` | Cuando un candidato rinde. Desde la `V67`, una plantilla **o** la prueba del editor | postulacion_id, version_plantilla_prueba_id, version_banco_id, iniciado_en, vence_en, plazo_propio, entregado_en, es_entrega_automatica, no_completada, mas_tiempo_en, mas_tiempo_por_usuario_id, mas_tiempo_motivo, variante_cambio_id, minuto_cambio, cambio_mostrado_en |
 | `entregable` | Lo que sube o el enlace que pega, y **cuál de los pedidos es** | intento_prueba_id, entregable_requerido_id, archivo_id, enlace, version, subido_en |
 | `respuesta_prueba` | Sus respuestas a las preguntas de la prueba. Desde la `V67`, también a las del editor, cerradas incluidas | intento_prueba_id, pregunta_prueba_id, pregunta_id, texto, opcion_id, detalle, respondida_en |
 | `nota_criterio_prueba` | La nota de la parte calificada de un criterio de la prueba del editor, por id de criterio (`V67`) | intento_prueba_id, criterio_banco_id, puntaje, puntaje_ia, explicacion, origen, version_guia, ajustada_por_usuario_id, motivo_ajuste |
@@ -1244,8 +1258,11 @@ ni por nombre, y guarda aparte la nota de la IA cuando una persona la ajusta y e
 con que se calculó.
 
 **`no_completada` distingue «venció con algo sin responder» de «entregada».** Ese intento se
-cierra sin entregar: no se califica, no sale en el ranking y la postulación no cambia de etapa
-sola. Guarda en `entregado_en` cuándo se cerró, para que el barrido no lo vuelva a mirar.
+cierra sin entregar: no se califica y la postulación no cambia de etapa sola. Guarda en
+`entregado_en` cuándo se cerró, para que el barrido no lo vuelva a mirar. Desde la `V89` sale en
+el ranking como «No la completó» —igual que quien no abrió la prueba antes de su fecha, que se
+deduce al leer— y «Darle más tiempo» lo reabre: apaga `no_completada` y `entregado_en`, le pone la
+fecha nueva como propia (`plazo_propio`) y anota `mas_tiempo_*`, sin tocar respuestas ni archivos.
 
 **La prueba nueva es cronometrada, y eso está decidido.** Las cinco pruebas que Renaser ha
 enviado —en `insumos/pruebas-tecnicas/`— son encargos de varios días sin reloj y sin cambio a
@@ -1588,7 +1605,7 @@ cola de lo que le debe al bot. Lo que se dicen los dos está en
 | Tabla | Para qué existe | Columnas que importan |
 |---|---|---|
 | `vinculo_whatsapp` | Que un número va a escribir, o ya escribió, por una postulación. Una fila por cada vez que se pulsa el botón sin un vínculo vivo | postulacion_id, persona_id, referencia, telefono, estado, consentimiento_id, anuncio_caduca_en, vinculado_en, cerrado_en, motivo_cierre, revocacion_enviada_en |
-| `aviso_whatsapp` | Un «te toca» que EX le debe al bot, uno por transición y tipo. Su `id` es el `avisoId` del contrato | postulacion_id, vinculo_whatsapp_id, transicion_estado_id, tipo, estado, telefono, nombre, vacante, texto, intentos, proximo_intento_en, ultimo_error |
+| `aviso_whatsapp` | Un «te toca» que EX le debe al bot, uno por transición y tipo; el de más tiempo para la prueba (`V89`), uno por prueba y fecha nueva, sin transición. Su `id` es el `avisoId` del contrato | postulacion_id, vinculo_whatsapp_id, transicion_estado_id, intento_prueba_id, plazo_en, tipo, estado, telefono, nombre, vacante, texto, intentos, proximo_intento_en, ultimo_error |
 | `whatsapp_baja` | Los números que escribieron BAJA al bot | telefono, dada_en |
 | `resultado_whatsapp` | El resultado de una postulación que terminó con el vínculo `ACTIVO`, lo que el bot puede consultar 30 días (`V76`). Uno por postulación | postulacion_id, vinculo_whatsapp_id, tipo, fecha, revision, es_correccion, consultable_hasta, acceso_revocado_en, acceso_revocado_motivo |
 | `evento_whatsapp` | Un evento v2 que EX le debe al bot: `RESULTADO` o `CONVOCATORIA_CERRADA` (`V76`). Su `id` es el `eventoId` del contrato v2 | postulacion_id, vinculo_whatsapp_id, tipo, revision, estado, telefono, referencia, nombre, vacante, ocurrido_en, resultado_*, convocatoria_cerrada_en, aviso_autorizado, aviso_caduca_en, cierra_vinculo, intentos, motivo |
