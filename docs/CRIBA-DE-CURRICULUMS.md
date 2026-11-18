@@ -232,7 +232,9 @@ Dos endpoints más en `PostulacionesPanelController`:
   guarda nada, no hay migración y abrir el ranking no escribe. Un cero es una nota y se muestra
   como número. Sin intento el valor es neutro y la celda conserva el texto de siempre; ahí caen
   las postulaciones que aún no llegaron a la etapa técnica y las vacantes con cuestionario
-  técnico. Los cuatro valores, uno por uno, en [Las APIs](09-APIS.md).
+  técnico. Desde la `V89` (18/11/2026) separa además a quien **no la completó** de quien la sigue
+  haciendo («En curso») o aún no la abrió («Sin empezar»), y quien no la completó vuelve a la tabla.
+  Los valores, uno por uno, en [Las APIs](09-APIS.md).
 - **Con `PRUEBA_PUESTO` cada fila trae además el `ponderado`** (desde el 04/09/2026, RF-155): lo
   ya rendido —Perfil Integral y prueba— reescalado sobre la suma de sus dos pesos, con su
   desglose. Vacío si falta cualquiera de las dos notas. **No es la Puntuación Global.** Está

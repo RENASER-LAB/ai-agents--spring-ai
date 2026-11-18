@@ -109,8 +109,29 @@ responde, EX lo reintenta (30 s, 2 min, 8 min, 32 min) mientras no caduque.
  "texto": "¡Felicidades, Ana! 🎉\n\n📌 *Asistente Contable*\nTu *prueba del puesto* ya está disponible.\n⏰ Puedes empezarla hasta el *20 de octubre a las 23:59* (hora de Lima).\n\n👉 https://…/procesos\nInicia sesión con tu correo y contraseña y abre «Mis procesos»."}
 ```
 
-- `tipo`: `PRUEBA_DISPONIBLE` o `POSTULACION_AVANZA`. Nunca recordatorios, cierres, rechazos ni
-  movidos «sin avisar».
+- `tipo`: `PRUEBA_DISPONIBLE` o `POSTULACION_AVANZA` y, desde el 18/11/2026 (`V89` de EX),
+  `PRUEBA_MAS_TIEMPO`. Nunca recordatorios, cierres, rechazos ni movidos «sin avisar».
+- **`PRUEBA_MAS_TIEMPO`**: el equipo le dio más tiempo para una prueba del puesto que no había
+  completado. No nace de una transición sino de la fecha nueva, y sale una vez por prueba y fecha:
+  dar más tiempo dos veces con la misma fecha no lo repite. Mismo cuerpo, misma firma y misma
+  idempotencia que los otros dos; su `texto`:
+
+  ```
+  Hola, Beto 👋
+
+  📌 *Analista de operaciones*
+  Tienes *más tiempo* para tu prueba del puesto.
+  ⏰ Hasta el *jue 20 nov, 18:00* (hora de Lima).
+
+  👉 https://…/procesos
+  Inicia sesión con tu correo y contraseña y abre «Mis procesos».
+  ```
+
+  La fecha lleva el año solo si no es el de hoy. ⚠️ **El bot todavía no acepta este tipo**: hasta
+  que el bot de `Renaser/crm` lo aprenda y se despliegue (va a mano), el aviso se queda pendiente
+  o `FALLIDO` en la cola de EX, sin afectar a lo demás. **Fuera de la ventana de 24 h** el bot usará la
+  plantilla ya aprobada `prueba_disponible_postulante` («tu prueba ya está disponible», que es
+  cierto) hasta que Meta apruebe `prueba_mas_tiempo_postulante`, que se pide en paralelo.
 - **El `texto`** (desde el 19/10/2026, regla 19 de la spec de EX
   `contexto-y-resultados-por-whatsapp.md`) va en bloques con las negritas de WhatsApp: el saludo, la vacante en negrita tras 📌, lo que toca y, al final, el
   enlace fijo a «Mis procesos» con «Inicia sesión con tu correo y contraseña y abre «Mis

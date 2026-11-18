@@ -558,11 +558,19 @@ Cada transición guarda **cómo se enteró** (`transicion_estado.aviso_al_candid
 el cierre por vacante eliminada, que sigue con su aviso único y no se duplica). Las transiciones
 anteriores al 07/10/2026 la tienen vacía.
 
+**«Darle más tiempo» avisa sin transición** (`V89`, 18/11/2026). Quien no completó la prueba del
+puesto sigue en `PRUEBA_TURNO_CANDIDATO`; si el equipo le da una fecha nueva con «Avisar»
+marcada, le llegan el correo `PRUEBA_MAS_TIEMPO`, el aviso de la campana del mismo tipo y, si
+escribió al bot, el de WhatsApp. Como no cambia de estado, no queda en `aviso_al_candidato`: queda
+en la auditoría (`dar_mas_tiempo_prueba`). Ver [La prueba del puesto, por
+dentro](PRUEBA-DEL-PUESTO.md), «Darle más tiempo a quien no la completó».
+
 ### Los recordatorios
 
 Para quien se quedó a medias en dos turnos: **el banco sin entregar** (`PERFIL_TURNO_CANDIDATO`)
 y **la prueba del puesto sin empezar** (`PRUEBA_TURNO_CANDIDATO`). Quien ya entregó o empezó no
-recibe ninguno.
+recibe ninguno, con una excepción desde la `V89`: a quien ya la había empezado y recibió más tiempo
+le llega el del plazo con la fecha nueva.
 
 | Recordatorio | Cuándo sale |
 |---|---|
@@ -577,6 +585,10 @@ recibe ninguno.
   vencido. A 12 horas justas salen los dos.
 - **No sale** si ya entregó o empezó, cambió de estado, la postulación se cerró, la vacante se
   archivó o se eliminó, se le movió sin avisar, o la empresa los tiene apagados.
+- **Tras «Darle más tiempo»** (`V89`), que no abre turno nuevo: el primero no se repite —si aún no
+  había salido, se anota como omitido—, y el del plazo sale una vez con la fecha nueva, también a
+  quien ya la había empezado. Si la fecha nueva queda a menos de las horas del recordatorio, se
+  anota como omitido: saldría justo detrás del aviso de «más tiempo».
 - **Reiniciar el servidor no repite ninguno:** cada uno queda escrito en `recordatorio_enviado`
   —también los omitidos— y la base no deja escribirlo dos veces.
 - **Solo cuentan los turnos abiertos con correo después del despliegue.** Los que ya llevaban
@@ -595,7 +607,11 @@ al bot desde el celular de su cuenta, queda vinculado y desde entonces:
 
 - **Solo le llegan los «te toca»**: `PRUEBA_DISPONIBLE` al pasar a la prueba y
   `POSTULACION_AVANZA` en los demás turnos que lo esperan. Ni recordatorios, ni cierres, ni
-  rechazos, ni movidos «sin avisar».
+  rechazos, ni movidos «sin avisar». Desde la `V89` también `PRUEBA_MAS_TIEMPO`, cuando el equipo
+  le da más tiempo con «Avisar» marcada; ese no cuelga de una transición y sale una vez por prueba
+  y fecha nueva. ⚠️ El bot todavía tiene que aprender ese tipo: hasta entonces el aviso se queda en
+  la cola sin salir (ver [Estado del proyecto](ESTADO-DEL-PROYECTO.md), «Lo que falta y no es
+  código»).
 - **Salen en la misma transición que el correo y la campana, y son independientes**: el aviso se
   encola cuando la transición ya se confirmó, en su propia transacción, y un fallo ahí no la
   deshace ni le quita al candidato el correo ni la campana. Lo manda un sondeo con hasta 5
@@ -636,12 +652,16 @@ todo respondido y los entregables obligatorios subidos, también a mano. Al venc
 - **Con todo completo**, el sistema la entrega sola, como siempre, y pasa a `PRUEBA_CALIFICANDO`;
   si las cerradas ya la dejan entera —una prueba sin parte calificada—, sigue enseguida a
   `PRUEBA_POR_CONFIRMAR`.
-- **Con algo pendiente**, el intento se cierra como **no completada**: no se califica, no gasta
-  IA y no sale en el ranking. **La postulación no se mueve**: se queda en
-  `PRUEBA_TURNO_CANDIDATO`, el portal le dice «Tu tiempo terminó y la prueba quedó sin
-  completar» sin botón, y el panel la lista en «No completaron la prueba», desde donde una
-  persona cierra su proceso. Alargarle el plazo antes de que venza lo evita; después no se
-  reabre.
+- **Con algo pendiente**, el intento se cierra como **no completada**: no se califica y no gasta
+  IA. **La postulación no se mueve**: se queda en `PRUEBA_TURNO_CANDIDATO`, el portal le dice «Tu
+  tiempo terminó y la prueba quedó sin completar» sin botón, y el panel la enseña en el ranking
+  como «No la completó», solo en «Toda la tanda». «Avanzar» no la mueve (409). Desde su ficha una
+  persona **le da más tiempo** —la prueba se reabre con lo que tenía y la fecha nueva como
+  suya— o cierra su proceso con el descarte de siempre (`V89`, 18/11/2026; hasta entonces salía en
+  una lista aparte y solo se podía cerrar). En el panel pasa lo mismo con quien no abrió la prueba
+  antes de su fecha, que el barrido no cierra y se reconoce al leer; lo que le dice el portal a esa
+  persona no cambió. Ver [La prueba del puesto, por
+  dentro](PRUEBA-DEL-PUESTO.md), «Darle más tiempo a quien no la completó».
 
 ### El candidato ya respondió las preguntas antes
 

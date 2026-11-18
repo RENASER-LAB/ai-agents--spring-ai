@@ -145,8 +145,11 @@ permiso nuevo.** Armarla, publicarla, copiarla, pedir recomendaciones y fijar su
 (`editar_vacante`, con su alcance); verla, `ver_vacantes`. En la ficha, ver la prueba de una
 persona es `abrir_ficha_candidato` —el contenido de sus entregables pide además
 `descargar_entregables`— y ajustar o poner la parte calificada de un criterio, `ajustar_nota`.
-La lista «No completaron la prueba» va con `ver_embudo`, como el ranking, y cerrar el proceso de
-quien no la completó es el descarte de siempre (`mover_postulacion`). Elegir plantilla de prueba
+Quien no completó la prueba se ve en el ranking, con su filtro «Prueba», con `ver_embudo` (la
+lista aparte se retiró en la `V89`); cerrar su proceso es el descarte de siempre y **«Darle más
+tiempo»** (`V89`, 18/11/2026) va con el mismo permiso que «El plazo de esta persona»,
+`mover_postulacion`, sin permiso nuevo: sin él el botón no sale —la ficha lo dice con
+`sinCompletar.puedeMover`— y la API responde 403. Elegir plantilla de prueba
 (`elegir_plantilla_prueba`) queda para las vacantes de antes. **El catálogo de preguntas de las
 plantillas no basta con el permiso** (05/10/2026): listarlo, crear una pregunta o elegirla para
 una versión es solo de la plataforma, y a cualquier otra empresa le responde 404 aunque tenga

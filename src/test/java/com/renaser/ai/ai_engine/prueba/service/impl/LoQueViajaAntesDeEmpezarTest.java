@@ -227,6 +227,8 @@ class LoQueViajaAntesDeEmpezarTest {
             assertThat(prueba.duracionMinutos()).isEqualTo(90);
             assertThat(prueba.fechaLimite()).isEqualTo(cierraEn);
             assertThat(prueba.venceEn()).isEqualTo(cierraEn);
+            // La fecha de la vacante solo acorta el cronómetro: no es una fecha puesta a mano
+            assertThat(prueba.fechaConcedidaAMano()).isFalse();
             assertThat(prueba.herramientasPermitidas()).isEqualTo(HERRAMIENTAS);
             assertThat(prueba.entregables()).containsExactly(
                     new EntregableRequeridoCandidato(301L, "Conciliación.xlsx", null, "ARCHIVO", true, false, ABIERTA, 2),
@@ -292,6 +294,73 @@ class LoQueViajaAntesDeEmpezarTest {
             assertThat(enJson(prueba)).doesNotContain("https://");
         }
 
+        /*
+         * La pantalla previa dice lo que hará el reloj al pulsar «Empezar» (feedback de la revisión
+         * del 18/11/2026): con la fecha puesta a mano, hasta esa fecha y sin los minutos; tras
+         * «Darle más tiempo» a quien no la abrió, sus minutos con la fecha nueva de tope. La regla
+         * es la de `iniciar`, y cada caso se comprueba también empezando.
+         */
+        @Test
+        @DisplayName("con su fecha puesta a mano, la previa dice que irá hasta ella; al empezar, así es")
+        void conLaFechaAManoLaPreviaLoDice() {
+            Instant suya = Instant.now().plus(2, ChronoUnit.DAYS).truncatedTo(ChronoUnit.SECONDS);
+            IntentoPrueba intento = suIntento(IntentoPrueba.builder().id(INTENTO).postulacionId(POSTULACION)
+                    .versionBancoId(VERSION).plazoPropio(true).venceEn(suya).build());
+
+            MiPrueba previa = servicio.ver(QUIEN, UUID_POSTULACION);
+
+            assertThat(previa.fechaConcedidaAMano()).isTrue();
+            assertThat(previa.fechaLimite()).isEqualTo(suya);
+            sinNadaQueDeVentaja(previa);
+            // Sin más tiempo de por medio, ni se pregunta a la auditoría quién la puso
+            verify(intentos, never()).plazoPuestoAManoDespuesDe(anyLong(), any());
+
+            MiPrueba empezada = servicio.iniciar(QUIEN, UUID_POSTULACION);
+
+            assertThat(intento.getVenceEn()).isEqualTo(suya);
+            assertThat(empezada.fechaConcedidaAMano()).as("empezada, lo que rige es venceEn").isFalse();
+        }
+
+        @Test
+        @DisplayName("tras «Darle más tiempo» a quien no la abrió, la previa promete sus minutos con la "
+                + "fecha nueva de tope; al empezar, así es")
+        void conMasTiempoLaPreviaPrometeLosMinutos() {
+            Instant nueva = Instant.now().plus(3, ChronoUnit.DAYS).truncatedTo(ChronoUnit.SECONDS);
+            Instant masTiempoEn = Instant.now().minus(1, ChronoUnit.HOURS);
+            IntentoPrueba intento = suIntento(IntentoPrueba.builder().id(INTENTO).postulacionId(POSTULACION)
+                    .versionBancoId(VERSION).plazoPropio(true).venceEn(nueva).masTiempoEn(masTiempoEn).build());
+
+            MiPrueba previa = servicio.ver(QUIEN, UUID_POSTULACION);
+
+            assertThat(previa.fechaConcedidaAMano()).isFalse();
+            assertThat(previa.duracionMinutos()).isEqualTo(90);
+            assertThat(previa.fechaLimite()).isEqualTo(nueva);
+
+            servicio.iniciar(QUIEN, UUID_POSTULACION);
+
+            assertThat(ChronoUnit.MINUTES.between(intento.getIniciadoEn(), intento.getVenceEn())).isEqualTo(90);
+        }
+
+        @Test
+        @DisplayName("más tiempo y DESPUÉS «El plazo de esta persona»: la previa dice que irá hasta esa "
+                + "fecha; al empezar, así es")
+        void elPlazoAManoTrasElMasTiempoLoDiceLaPrevia() {
+            Instant suya = Instant.now().plus(2, ChronoUnit.DAYS).truncatedTo(ChronoUnit.SECONDS);
+            Instant masTiempoEn = Instant.now().minus(1, ChronoUnit.HOURS);
+            IntentoPrueba intento = suIntento(IntentoPrueba.builder().id(INTENTO).postulacionId(POSTULACION)
+                    .versionBancoId(VERSION).plazoPropio(true).venceEn(suya).masTiempoEn(masTiempoEn).build());
+            when(intentos.plazoPuestoAManoDespuesDe(INTENTO, masTiempoEn)).thenReturn(true);
+
+            MiPrueba previa = servicio.ver(QUIEN, UUID_POSTULACION);
+
+            assertThat(previa.fechaConcedidaAMano()).isTrue();
+            assertThat(previa.fechaLimite()).isEqualTo(suya);
+
+            servicio.iniciar(QUIEN, UUID_POSTULACION);
+
+            assertThat(intento.getVenceEn()).isEqualTo(suya);
+        }
+
         @Test
         @DisplayName("sin cronómetro, antes de empezar viajan los días")
         void sinCronometroViajanLosDias() {
@@ -355,9 +424,30 @@ class LoQueViajaAntesDeEmpezarTest {
             assertThat(prueba.modalidad()).isEqualTo("CRONOMETRADA");
             // Con reloj, los días de la plantilla no viajan: serían dos plazos.
             assertThat(prueba.plazoDias()).isNull();
+            assertThat(prueba.fechaConcedidaAMano()).isFalse();
             assertThat(prueba.herramientasPermitidas()).isEqualTo(HERRAMIENTAS);
             assertThat(prueba.entregables()).containsExactly(
                     new EntregableRequeridoCandidato(401L, "El tablero", null, "ARCHIVO", true, false));
+        }
+
+        @Test
+        @DisplayName("con su fecha puesta a mano, la previa dice que irá hasta ella; al empezar, así es")
+        void conLaFechaAManoLaPreviaLoDice() {
+            Instant suya = Instant.now().plus(2, ChronoUnit.DAYS).truncatedTo(ChronoUnit.SECONDS);
+            IntentoPrueba intento = suIntento(IntentoPrueba.builder().id(INTENTO).postulacionId(POSTULACION)
+                    .versionPlantillaPruebaId(VERSION).plazoPropio(true).venceEn(suya).build());
+
+            MiPrueba previa = servicio.ver(QUIEN, UUID_POSTULACION);
+
+            assertThat(previa.fechaConcedidaAMano()).isTrue();
+            assertThat(previa.venceEn()).isEqualTo(suya);
+            assertThat(previa.duracionMinutos()).isEqualTo(60);
+            sinNadaQueDeVentaja(previa);
+
+            MiPrueba empezada = servicio.iniciar(QUIEN, UUID_POSTULACION);
+
+            assertThat(intento.getVenceEn()).isEqualTo(suya);
+            assertThat(empezada.fechaConcedidaAMano()).isFalse();
         }
 
         @Test

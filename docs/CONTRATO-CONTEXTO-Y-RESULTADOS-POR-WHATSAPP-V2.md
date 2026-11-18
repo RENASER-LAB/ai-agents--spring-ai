@@ -163,6 +163,11 @@ No es parte de la copia: es lo que EX hace donde el contrato le deja elegir. Las
   solo para quien sigue en carrera. El motivo del cierre no viaja, como en cualquier otro
   `CERRADA`. Ver [Estados de la postulación](03-ESTADOS-POSTULACION.md), «Se cierra la
   convocatoria».
+- **«Darle más tiempo» a una prueba sin completar** (`V89`, 18/11/2026) no toca el contrato: la
+  prueba se reabre con la fecha nueva, así que la acción `PRUEBA_PUESTO` deja de salir `VENCIDA` y
+  vuelve a `HABILITADA` o `EN_CURSO` con esa fecha, y `actualizadoEn` sube por el trigger de la
+  `V77`. El aviso de ese hecho va por `/v1/ex/avisos`, con el tipo `PRUEBA_MAS_TIEMPO` (ver [el
+  contrato v1](CONTRATO-NOVEDADES-POR-WHATSAPP.md)).
 - **El interruptor**: `WHATSAPP_PRODUCTOR_V2`, apagado por defecto. Apagado no nace ningún evento y
   EX se comporta como v1; al encenderlo no sale ningún hecho anterior; si se vuelve a apagar, los
   pendientes esperan y caducan `OMITIDO`. Ver [CI/CD](CI-CD.md) para encenderlo en el servidor.

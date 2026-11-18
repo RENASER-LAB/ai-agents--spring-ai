@@ -92,4 +92,30 @@ public interface IntentoPruebaRepository extends JpaRepository<IntentoPrueba, Lo
             where i.postulacionId in (select p.id from Postulacion p where p.vacanteId = :vacanteId)
             """)
     boolean algunoDeLaVacante(@Param("vacanteId") Long vacanteId);
+
+    /**
+     * La acción con la que la auditoría anota «El plazo de esta persona» (V32). La escribe
+     * {@code ServicioCalificacionPruebaImpl.definirPlazo} y la lee
+     * {@link #plazoPuestoAManoDespuesDe}: una sola constante para que no se desvíen.
+     */
+    String PLAZO_PUESTO_A_MANO = "definir_plazo_prueba";
+
+    /**
+     * ¿Alguien le cambió la fecha con «El plazo de esta persona» después de ese momento? (V89)
+     *
+     * <p>Es el desempate entre las dos formas de dejar {@code plazoPropio}: la fecha de «Darle
+     * más tiempo» es solo el tope de su cronómetro, y la de «El plazo de esta persona» se
+     * respeta tal cual (punto 16 de la spec). Se pregunta con {@code masTiempoEn}: si hay una
+     * fecha puesta a mano más reciente, esa es la que rige.
+     *
+     * <p>⚠️ <b>Se lee de la auditoría a propósito, y no de una columna nueva.</b> Es la historia
+     * completa de quién fijó cada fecha (la spec la nombra así), no se puede tocar —un trigger
+     * de la V8 impide editarla o borrarla— y se escribe en la misma transacción que la fecha. Y
+     * {@code masTiempoEn} sigue diciendo quién dio más tiempo, que es lo que leen la ficha y el
+     * recordatorio previo al plazo. Solo se consulta al empezar, y solo si hubo más tiempo.
+     */
+    @Query("select count(a) > 0 from Auditoria a"
+            + " where a.entidad = 'intento_prueba' and a.entidadId = :intentoId"
+            + " and a.accion = '" + PLAZO_PUESTO_A_MANO + "' and a.ocurridaEn > :desde")
+    boolean plazoPuestoAManoDespuesDe(@Param("intentoId") Long intentoId, @Param("desde") Instant desde);
 }

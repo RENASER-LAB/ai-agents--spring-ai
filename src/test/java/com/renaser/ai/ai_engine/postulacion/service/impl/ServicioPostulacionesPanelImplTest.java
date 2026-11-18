@@ -89,6 +89,7 @@ class ServicioPostulacionesPanelImplTest {
     @Mock private com.renaser.ai.ai_engine.decision.service.QuienPuedeContratar quienPuedeContratar;
     @Mock private com.renaser.ai.ai_engine.colaborador.service.ContratacionEnLaFicha contratacion;
     @Mock private com.renaser.ai.ai_engine.perfilintegral.service.UmbralDelPerfilIntegral umbral;
+    @Mock private com.renaser.ai.ai_engine.prueba.repository.IntentoPruebaRepository intentos;
 
     @InjectMocks
     private ServicioPostulacionesPanelImpl servicio;
@@ -705,6 +706,42 @@ class ServicioPostulacionesPanelImplTest {
         verify(disponibilidad).recalcularVacante(ORGANIZACION, VACANTE);
         verifyNoInteractions(entradaTecnica, validacion);
         verify(postulaciones, never()).estadoBloqueandoLaFila(any());
+    }
+
+    /**
+     * Quien no completó la prueba no tiene nada que calificar (V89): «Avanzar» lo llevaría a
+     * «calificando» sin entrega. Lo impide el backend, también llamando a la API.
+     */
+    @Test
+    @DisplayName("«Avanzar» no mueve a quien no completó la prueba (AC-06)")
+    void avanzarNoMueveAQuienNoLaCompleto() {
+        enCarrera("PRUEBA_TURNO_CANDIDATO", "confirmar_avance");
+        when(intentos.findByPostulacionId(SUYA)).thenReturn(Optional.of(
+                com.renaser.ai.ai_engine.prueba.entity.IntentoPrueba.builder().id(4L).postulacionId(SUYA)
+                        .versionBancoId(7L).iniciadoEn(java.time.Instant.now().minusSeconds(7200))
+                        .venceEn(java.time.Instant.now().minusSeconds(3600))
+                        .entregadoEn(java.time.Instant.now().minusSeconds(3600))
+                        .esEntregaAutomatica(true).noCompletada(true).build()));
+
+        assertThatThrownBy(() -> servicio.confirmarAvance(quien, SUYA, "Avanza"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("No completó la prueba");
+
+        noSeMovio();
+    }
+
+    @Test
+    @DisplayName("tampoco a quien se le pasó la fecha sin abrirla (AC-02, AC-06)")
+    void avanzarNoMueveAQuienNoLaAbrio() {
+        enCarrera("PRUEBA_TURNO_CANDIDATO", "confirmar_avance");
+        when(intentos.findByPostulacionId(SUYA)).thenReturn(Optional.of(
+                com.renaser.ai.ai_engine.prueba.entity.IntentoPrueba.builder().id(4L).postulacionId(SUYA)
+                        .venceEn(java.time.Instant.now().minusSeconds(3600)).build()));
+
+        assertThatThrownBy(() -> servicio.confirmarAvance(quien, SUYA, "Avanza"))
+                .isInstanceOf(IllegalStateException.class);
+
+        noSeMovio();
     }
 
     @Test

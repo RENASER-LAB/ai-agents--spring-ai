@@ -94,6 +94,42 @@ public final class TextosDeWhatsapp {
     }
 
     /**
+     * El aviso de «más tiempo» (V89), con el formato de la regla 19 como
+     * {@link #pruebaDisponible}: el saludo, la vacante en negrita, que tiene más tiempo, hasta
+     * cuándo y el enlace fijo a «Mis procesos». Nada de la prueba en sí.
+     *
+     * <pre>
+     * Hola, Beto 👋
+     *
+     * 📌 *Analista de operaciones*
+     * Tienes *más tiempo* para tu prueba del puesto.
+     * ⏰ Hasta el *jue 20 nov, 18:00* (hora de Lima).
+     *
+     * 👉 https://…/procesos
+     * Inicia sesión con tu correo y contraseña y abre «Mis procesos».
+     * </pre>
+     *
+     * @param hasta  la fecha nueva
+     * @param enlace el enlace fijo a «Mis procesos»; si no vale, la línea no sale
+     */
+    public static String masTiempo(String nombre, String vacante, Instant hasta, String enlace) {
+        StringBuilder texto = new StringBuilder(vacio(nombre) ? "Hola 👋"
+                : "Hola, " + sinNegritas(nombre.trim()) + " 👋");
+        texto.append("\n\n");
+        if (!vacio(vacante)) {
+            texto.append("📌 *").append(sinNegritas(vacante.trim())).append("*\n");
+        }
+        texto.append("Tienes *más tiempo* para tu prueba del puesto.");
+        if (hasta != null) {
+            texto.append("\n⏰ Hasta el *")
+                    .append(com.renaser.ai.ai_engine.notificacion.service.FechaParaElCandidato
+                            .conDiaYMes(hasta, Instant.now()))
+                    .append("* (hora de Lima).");
+        }
+        return cortar(texto + alFinal(enlace), LARGO_DEL_TEXTO);
+    }
+
+    /**
      * El aviso de la prueba (regla 19 de specs/Ready/contexto-y-resultados-por-whatsapp.md): el
      * saludo, la vacante en negrita, qué prueba es, hasta cuándo puede empezarla —solo si EX lo
      * sabe— y el enlace fijo a «Mis procesos». Nada de la prueba en sí: eso llega al pulsar

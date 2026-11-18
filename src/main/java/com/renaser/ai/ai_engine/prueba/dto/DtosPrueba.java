@@ -107,20 +107,28 @@ public final class DtosPrueba {
             Instant fechaLimite,
             /* Cuántas preguntas tiene su prueba (10/10/2026). Viaja siempre, también antes de
                empezar, cuando `preguntas` va vacía. */
-            int totalPreguntas) {
+            int totalPreguntas,
+            /* Solo antes de empezar (V89): su fecha límite se la pusieron a mano con «El plazo de
+               esta persona», así que al pulsar «Empezar» el reloj llega hasta esa fecha y los
+               minutos no cuentan. Es la misma regla con la que `iniciar` decide
+               (`IntentoPrueba.fechaConcedidaAMano`): la fecha de «Darle más tiempo» a quien no la
+               abrió no cuenta, es solo el tope de su cronómetro. Empezada, siempre falso: lo que
+               rige ya es `venceEn`. */
+            boolean fechaConcedidaAMano) {
 
         /**
          * Lo que viaja antes de empezar: lo mismo sin nada que dé ventaja. Sin preguntas (solo
          * cuántas son), sin enunciado, sin materiales, sin consigna, sin cambio inesperado y sin
          * el detalle de cada entregable. Se quedan el estado, el tiempo y la modalidad, las
-         * fechas y los días, las herramientas permitidas y la lista de lo que habrá que
-         * entregar.
+         * fechas —y si la suya se la pusieron a mano— y los días, las herramientas permitidas y
+         * la lista de lo que habrá que entregar.
          */
         public MiPrueba antesDeEmpezar() {
             return new MiPrueba(id, estadoIntento, modalidad, iniciadoEn, venceEn, duracionMinutos,
                     null, null, herramientasPermitidas, null, List.of(),
                     entregables.stream().map(EntregableRequeridoCandidato::sinDetalle).toList(),
-                    plazoDias, cuestionario, null, delEditor, fechaLimite, totalPreguntas);
+                    plazoDias, cuestionario, null, delEditor, fechaLimite, totalPreguntas,
+                    fechaConcedidaAMano);
         }
     }
 

@@ -18,6 +18,7 @@ import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.CriterioDe
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.FilaRanking;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.HallazgoResponse;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.DatosCandidato;
+import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.DetalleDeLaPrueba;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.NotaCriterioResponse;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.PasadaEncolada;
 import com.renaser.ai.ai_engine.perfilintegral.dto.DtosPerfilIntegral.PerfilIntegralResponse;
@@ -79,6 +80,7 @@ import static com.renaser.ai.ai_engine.vacante.service.impl.ServicioVacantesPane
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -559,15 +561,14 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
                 laTecnica ? rubricasDeLaPrueba(intentoPorPostulacion) : Map.of();
         /*
           La prueba escrita en el editor (V67): sus columnas son sus criterios, por id, y la
-          cuenta de toda la tanda va en bloque. Quien la dejó vencer sin completar no sale en
-          esta pestaña: se nombra aparte, en «No completaron la prueba», que el panel pide a
-          /prueba-propia/no-completaron (el contrato de este ranking no cambia de campos).
+          cuenta de toda la tanda va en bloque.
+
+          Quien la dejó vencer sin completar SÍ sale en esta pestaña desde la V89, sin nota y
+          con «No la completó»: el panel la enseña solo en «Toda la tanda». Ya no hay lista
+          aparte. Lo que le faltó se cuenta aquí, en bloque, para el texto de la celda.
         */
-        Map<Long, IntentoPrueba> sinCompletar = !laTecnica ? Map.of()
-                : intentoPorPostulacion.values().stream()
-                        .filter(i -> i.esDelEditor() && i.isNoCompletada())
-                        .collect(Collectors.toMap(IntentoPrueba::getPostulacionId, Function.identity(),
-                                (a, b) -> a));
+        Instant ahora = Instant.now();
+        Map<Long, String> queLeFalto = laTecnica ? queLeFaltoALaTanda(intentoPorPostulacion) : Map.of();
         Map<Long, com.renaser.ai.ai_engine.prueba.service.CalificacionDeLaPruebaPropia.Resultado>
                 pruebaDelEditor = laTecnica ? pruebasDelEditor(intentoPorPostulacion) : Map.of();
         // Las preguntas propias del Perfil Integral (V66), una columna por criterio del banco.
@@ -692,9 +693,6 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
         int calificados = 0, enCurso = 0, fallidos = 0, conFina = 0;
 
         for (Postulacion p : suyas) {
-            if (sinCompletar.containsKey(p.getId())) {
-                continue;
-            }
             ColaCalificacionIa.Estado estado = estados.get(p.getId());
             String comoVa = estado == null ? "SIN_EMPEZAR" : estado.comoVa();
             if ("TERMINADA".equals(comoVa)) calificados++;
@@ -814,7 +812,7 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
                     // de ella, y traerlo obligaría a una consulta que nadie leería.
                     laTecnica ? estadoDeLaPrueba(p.getId(),
                             etapa(pruebaPorPostulacion.get(p.getId())),
-                            intentoPorPostulacion.get(p.getId())) : null,
+                            intentoPorPostulacion.get(p.getId()), ahora) : null,
                     // Cuándo se postuló, para el filtro de fecha del panel. Nulo en registros
                     // antiguos: el panel los deja fuera de ese filtro y lo avisa.
                     p.getCreadoEn(),
@@ -825,7 +823,9 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
                     lineasVigentes.isEmpty() ? null
                             : busquedaDeLaFila(lineasVigentes, suBusqueda,
                                     comoVaLaBusqueda.get(p.getId()), loBuscadoDeLaFila,
-                                    criteriosGenerales, conDetalleDeLaBusqueda)));
+                                    criteriosGenerales, conDetalleDeLaBusqueda),
+                    laTecnica ? detalleDeLaPrueba(intentoPorPostulacion.get(p.getId()), queLeFalto)
+                            : null));
         }
 
         filas.sort(Comparator
@@ -856,7 +856,7 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
                     f.pretensionMin(), f.pretensionMax(), f.pretensionMoneda(),
                     f.pretensionDeclarada(), f.pretensionDeclaradaMoneda(),
                     f.ponderado(), f.estadoPrueba(), f.postuladoEn(), f.resenas(),
-                    f.recalificando(), f.busqueda()));
+                    f.recalificando(), f.busqueda(), f.detallePrueba()));
         }
 
         return new RankingVacante(vacanteId, vacante.getTitulo(),
@@ -913,6 +913,49 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
         }
         return new BusquedaEnElCv(estado, tiene, menciona, vigentes.size(), notaLoBuscado,
                 criteriosGenerales, lineas);
+    }
+
+    // ============ «No la completó» (V89) ============
+
+    /**
+     * Lo que le faltó a cada quien que no completó la prueba del editor, por postulación: «le
+     * faltaron 4 preguntas y «Tablero.xlsx»». En bloque para la tanda entera, nunca una cuenta
+     * por fila. Si no se puede calcular, el ranking sale igual y la celda no dice qué faltó.
+     */
+    private Map<Long, String> queLeFaltoALaTanda(Map<Long, IntentoPrueba> intentoPorPostulacion) {
+        if (calculoPropio == null) {
+            return Map.of();
+        }
+        List<IntentoPrueba> sinCompletar = intentoPorPostulacion.values().stream()
+                .filter(i -> i.esDelEditor() && i.isNoCompletada())
+                .toList();
+        if (sinCompletar.isEmpty()) {
+            return Map.of();
+        }
+        try {
+            var faltas = calculoPropio.loQueFaltaTanda(sinCompletar);
+            Map<Long, String> salida = new java.util.HashMap<>();
+            sinCompletar.forEach(i -> {
+                var falta = faltas.get(i.getId());
+                if (falta != null && !falta.nada()) {
+                    salida.put(i.getPostulacionId(), falta.dicho());
+                }
+            });
+            return salida;
+        } catch (RuntimeException e) {
+            log.warn("No se pudo contar lo que les faltó a quienes no completaron la prueba: "
+                    + "el ranking sale sin ese detalle", e);
+            return Map.of();
+        }
+    }
+
+    /** Las fechas de su prueba y lo que le faltó, para la celda de la Nota; nulo sin intento. */
+    private static DetalleDeLaPrueba detalleDeLaPrueba(IntentoPrueba intento, Map<Long, String> queLeFalto) {
+        if (intento == null) {
+            return null;
+        }
+        return new DetalleDeLaPrueba(intento.getIniciadoEn(), intento.getEntregadoEn(),
+                intento.getVenceEn(), queLeFalto.get(intento.getPostulacionId()));
     }
 
     // ============ Las columnas por id (V67) ============
@@ -1321,9 +1364,9 @@ public class ServicioPerfilIntegralPanelImpl implements ServicioPerfilIntegralPa
      * se conserva con el valor neutro y el caso queda escrito para poder mirarlo.
      */
     private EstadoPruebaDelPuesto estadoDeLaPrueba(Long postulacionId, BigDecimal notaDeLaPrueba,
-                                                   IntentoPrueba intento) {
+                                                   IntentoPrueba intento, Instant ahora) {
         try {
-            return EstadoPruebaDelPuesto.de(notaDeLaPrueba, intento);
+            return EstadoPruebaDelPuesto.de(notaDeLaPrueba, intento, ahora);
         } catch (RuntimeException e) {
             log.warn("No se pudo determinar el estado de la prueba de la postulación {}: "
                     + "la fila sale con el estado neutro", postulacionId, e);

@@ -19,4 +19,10 @@ public interface TransicionEstadoRepository extends JpaRepository<TransicionEsta
      */
     Optional<TransicionEstado> findFirstByPostulacionIdAndEstadoNuevoCodigoOrderByOcurridaEnDesc(
             Long postulacionId, String estadoNuevoCodigo);
+
+    /**
+     * La última transición de una postulación: la que abrió el turno en el que está. Es el mismo
+     * «último por id» que miran los recordatorios (TurnosParaRecordar).
+     */
+    Optional<TransicionEstado> findFirstByPostulacionIdOrderByIdDesc(Long postulacionId);
 }

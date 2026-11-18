@@ -329,6 +329,90 @@ class ServicioPruebaImplTest {
         servicio.iniciar(QUIEN, UUID_POSTULACION);
 
         assertThat(intento.getVenceEn()).isEqualTo(suya);
+        // Sin más tiempo de por medio, ni se pregunta a la auditoría quién la puso
+        verify(intentos, never()).plazoPuestoAManoDespuesDe(anyLong(), any());
+    }
+
+    /*
+     * Punto 16 de la spec: «El plazo de esta persona» sigue igual aunque antes se le diera más
+     * tiempo. Si su fecha se la cambiaron a mano DESPUÉS del más tiempo, es una concesión a mano
+     * como cualquier otra y empezar no la toca (F-5). La línea de quién dio más tiempo se queda.
+     */
+    @Test
+    @DisplayName("⚠️ más tiempo y luego «El plazo de esta persona»: empezar no toca esa fecha")
+    void elPlazoAManoTrasElMasTiempoNoSePisa() {
+        Instant suya = Instant.now().plus(2, ChronoUnit.DAYS);
+        Instant masTiempoEn = Instant.now().minus(1, ChronoUnit.HOURS);
+        IntentoPrueba intento = intentoSinEmpezar();
+        intento.setPlazoPropio(true);
+        intento.setVenceEn(suya);
+        intento.setMasTiempoEn(masTiempoEn);
+        intento.setMasTiempoMotivo("No le llegó el correo");
+        when(intentos.plazoPuestoAManoDespuesDe(INTENTO, masTiempoEn)).thenReturn(true);
+        laVersionEs("CRONOMETRADA", 30, null);
+        laVacanteFija(null);
+
+        servicio.iniciar(QUIEN, UUID_POSTULACION);
+
+        assertThat(intento.getVenceEn()).isEqualTo(suya);
+        assertThat(intento.getMasTiempoEn()).isEqualTo(masTiempoEn);
+        assertThat(intento.getMasTiempoMotivo()).isEqualTo("No le llegó el correo");
+    }
+
+    /*
+     * «Darle más tiempo» (V89) también deja plazoPropio, pero no es «más horas a mano»: a quien
+     * no la había abierto, su reloj arranca cuando la abra y la fecha nueva es solo el tope
+     * (punto 11 de la spec). La marca de la reapertura es masTiempoEn.
+     */
+    @Test
+    @DisplayName("reabierta con «Darle más tiempo» sin abrirla: el reloj arranca al empezar")
+    void conMasTiempoElRelojArrancaAlEmpezar() {
+        Instant nueva = Instant.now().plus(3, ChronoUnit.DAYS);
+        IntentoPrueba intento = intentoSinEmpezar();
+        intento.setPlazoPropio(true);
+        intento.setVenceEn(nueva);
+        Instant masTiempoEn = Instant.now().minus(1, ChronoUnit.HOURS);
+        intento.setMasTiempoEn(masTiempoEn);
+        laVersionEs("CRONOMETRADA", 30, null);
+        laVacanteFija(null);
+
+        servicio.iniciar(QUIEN, UUID_POSTULACION);
+
+        assertThat(minutosEntre(intento.getIniciadoEn(), intento.getVenceEn())).isEqualTo(30);
+        // Se preguntó si alguien la cambió a mano después de ese más tiempo, y nadie lo hizo
+        verify(intentos).plazoPuestoAManoDespuesDe(INTENTO, masTiempoEn);
+    }
+
+    @Test
+    @DisplayName("reabierta con «Darle más tiempo» y la fecha nueva antes que el reloj: no se pasa de ella")
+    void conMasTiempoNoSePasaDeLaFechaNueva() {
+        Instant nueva = Instant.now().plus(20, ChronoUnit.MINUTES);
+        IntentoPrueba intento = intentoSinEmpezar();
+        intento.setPlazoPropio(true);
+        intento.setVenceEn(nueva);
+        intento.setMasTiempoEn(Instant.now().minus(1, ChronoUnit.HOURS));
+        laVersionEs("CRONOMETRADA", 30, null);
+        laVacanteFija(null);
+
+        servicio.iniciar(QUIEN, UUID_POSTULACION);
+
+        assertThat(intento.getVenceEn()).isEqualTo(nueva);
+    }
+
+    @Test
+    @DisplayName("reabierta con «Darle más tiempo» en plazo abierto: los días no tocan la fecha nueva")
+    void conMasTiempoEnPlazoAbiertoManda() {
+        Instant nueva = Instant.now().plus(2, ChronoUnit.DAYS);
+        IntentoPrueba intento = intentoSinEmpezar();
+        intento.setPlazoPropio(true);
+        intento.setVenceEn(nueva);
+        intento.setMasTiempoEn(Instant.now().minus(1, ChronoUnit.HOURS));
+        laVersionEs("PLAZO_ABIERTO", null, 7);
+        laVacanteFija(null);
+
+        servicio.iniciar(QUIEN, UUID_POSTULACION);
+
+        assertThat(intento.getVenceEn()).isEqualTo(nueva);
     }
 
     @Test

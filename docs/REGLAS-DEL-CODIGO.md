@@ -101,8 +101,12 @@ salgan con candado). Está escrito en el javadoc de ambas.
   specs, y el perfil de la empresa, que reservaba la `V81`, entró como `V85` porque la `V84` ya
   estaba aplicada en producción. Las demás reservas de la reunión del 13/11 se corrieron
   (el brochure ya entró como `V86`; convocatoria `V87`, video por webcam `V88`), y las de seguimiento de
-  pendientes (`V82`) y Excel resumido (`V83`) tendrán que subir al construirse. **Una reserva no
+  pendientes (`V82`) y Excel resumido (`V83`) tendrán que subir al construirse. Las pruebas sin
+  completar y «Darle más tiempo» entraron como `V89`, antes que la `V87` y la `V88`: si esas dos
+  no llegan a producción antes que la `V89`, también tendrán que subir. **Una reserva no
   es un número**: el de verdad se elige al construir y siempre es mayor que la última aplicada.
+  Un número que se salta a propósito se anota en `HUECOS_DELIBERADOS` de
+  `MigracionesSinChoqueTest`, que hoy admite la `V81` a la `V83`, la `V87` y la `V88`.
 - **Nada se recalcula hacia atrás por su cuenta.** Cada nota queda atada a la versión de pesos de
   su vacante. La única vía para cambiarla es cambiar la versión de la vacante (`V74`), que
   recalcula a todos a la vez por `RecalculoConOtrosPesos`, sin IA, sin máquina de estados y sin

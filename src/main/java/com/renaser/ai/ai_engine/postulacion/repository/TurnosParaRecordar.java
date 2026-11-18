@@ -29,6 +29,11 @@ import java.util.UUID;
  * </ul>
  * Los parámetros de la empresa, las horas y lo que ya salió los decide quien llama.
  *
+ * <p>Desde la V89 entra también <b>quien ya había empezado la prueba y recibió más tiempo</b>
+ * ({@code mas_tiempo_en} con {@code plazo_propio}): solo para el recordatorio previo al plazo,
+ * con la fecha nueva. El de «a las 24 h» no le sale porque «Darle más tiempo» lo deja escrito
+ * como OMITIDO en ese turno (no es una transición: el turno es el mismo).
+ *
  * <p>⚠️ El banco ya no tiene fecha desde la V78 —dura hasta que la vacante se cierra—, así que su
  * {@code vence_en} llega vacío y solo le toca el primer recordatorio: nunca uno que diga «vence
  * el». La prueba del puesto conserva los dos.
@@ -72,8 +77,9 @@ public class TurnosParaRecordar {
                         WHEN v.instrumento_etapa_tecnica = 'CUESTIONARIO_TECNICO'
                              THEN et.id IS NOT NULL AND et.estado = 'PENDIENTE'
                                   AND et.iniciada_en IS NULL
-                        ELSE ip.id IS NOT NULL AND ip.iniciado_en IS NULL
-                             AND ip.entregado_en IS NULL AND NOT ip.no_completada
+                        ELSE ip.id IS NOT NULL AND ip.entregado_en IS NULL AND NOT ip.no_completada
+                             AND (ip.iniciado_en IS NULL
+                                  OR (ip.mas_tiempo_en IS NOT NULL AND ip.plazo_propio))
                    END
              ORDER BY p.id
             """;

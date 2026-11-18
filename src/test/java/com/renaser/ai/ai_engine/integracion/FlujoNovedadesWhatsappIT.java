@@ -96,6 +96,8 @@ class FlujoNovedadesWhatsappIT {
     @Autowired TransactionTemplate enUnaTransaccion;
     @Autowired ClienteConversacion cliente;
     @Autowired EnvioAlBot envio;
+    @Autowired com.renaser.ai.ai_engine.prueba.service.ServicioPrueba servicioPrueba;
+    @Autowired com.renaser.ai.ai_engine.perfilintegral.repository.VersionBancoRepository versionesBanco;
     final ObjectMapper json = new ObjectMapper();
 
     static String tokenTalento;
@@ -494,6 +496,57 @@ class FlujoNovedadesWhatsappIT {
                         String.class, postulacion.get("ana")));
         assertThat(jdbc.queryForObject("select estado from aviso_whatsapp where postulacion_id = ?",
                 String.class, postulacion.get("ana"))).isEqualTo("ENVIADO");
+    }
+
+    /**
+     * «Darle más tiempo» no es una transición (V89): el aviso se liga a la prueba y a la fecha
+     * nueva, y la base impide repetirlo para la misma fecha.
+     */
+    @Test
+    @Order(9)
+    @DisplayName("V89 · más tiempo con vínculo activo encola un PRUEBA_MAS_TIEMPO sin transición, una vez por fecha")
+    void elMasTiempoPorWhatsapp() throws Exception {
+        long ana = postulacion.get("ana");
+        long organizacion = jdbc.queryForObject("select organizacion_id from postulacion where id = ?",
+                Long.class, ana);
+        long version = versionesBanco.pruebaPropiaDe(vacante, "PUBLICADA").orElseThrow().getId();
+        servicioPrueba.crearAlEntrarConPruebaPropia(organizacion, ana, version, null);
+        // Se le acabó el tiempo con huecos: el barrido la cerró sin entregar
+        jdbc.update("update intento_prueba set iniciado_en = now() - interval '2 hours', "
+                + "vence_en = now() - interval '1 hour', entregado_en = now() - interval '1 hour', "
+                + "es_entrega_automatica = true, no_completada = true where postulacion_id = ?", ana);
+
+        Instant nueva = Instant.now().plus(java.time.Duration.ofDays(2))
+                .truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
+        String cuerpo = "{\"venceEn\":\"%s\",\"motivo\":\"Se le cortó la luz\"}".formatted(nueva);
+        JsonNode dado = respuesta(conToken(post("/api/v1/panel/postulaciones/" + ana + "/prueba/mas-tiempo"),
+                tokenTalento, cuerpo));
+        assertThat(dado.get("avisadoPor").toString()).contains("WhatsApp");
+
+        String suyos = "select count(*) from aviso_whatsapp where postulacion_id = " + ana
+                + " and tipo = 'PRUEBA_MAS_TIEMPO'";
+        assertThat(contar(suyos)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("select transicion_estado_id is null and plazo_en = ?::timestamptz "
+                + "from aviso_whatsapp where postulacion_id = ? and tipo = 'PRUEBA_MAS_TIEMPO'", Boolean.class,
+                nueva.toString(), ana)).isTrue();
+        assertThat(jdbc.queryForObject("select texto from aviso_whatsapp where postulacion_id = ? "
+                + "and tipo = 'PRUEBA_MAS_TIEMPO'", String.class, ana))
+                .startsWith("Hola, Ana 👋\n\n📌 *Asistente Contable*\nTienes *más tiempo* para tu prueba del "
+                        + "puesto.\n⏰ Hasta el *")
+                .contains("(hora de Lima).\n\n👉 https://portal.pruebas.renaser.pe/procesos\n")
+                .doesNotContain("token");
+
+        // Si vuelve a quedar sin completar y se le da la MISMA fecha, no sale otro aviso
+        jdbc.update("update intento_prueba set entregado_en = now(), es_entrega_automatica = true, "
+                + "no_completada = true where postulacion_id = ?", ana);
+        conToken(post("/api/v1/panel/postulaciones/" + ana + "/prueba/mas-tiempo"), tokenTalento, cuerpo)
+                .andExpect(status().isOk());
+        assertThat(contar(suyos)).isEqualTo(1);
+
+        envio.enviarPendientes();
+        assertThat(bot().registroDe("+51987650001").stream()
+                .filter(l -> "AVISO".equals(l.tipo()))
+                .filter(l -> "PRUEBA_MAS_TIEMPO".equals(l.cuerpo().get("tipo"))).toList()).hasSize(1);
     }
 
     @Test

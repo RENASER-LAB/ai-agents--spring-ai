@@ -91,6 +91,9 @@ public class AvisoPortal {
     /** No ha empezado su prueba: a las 24 horas, o antes de que venza (V70). */
     public static final String RECORDATORIO_PRUEBA = "RECORDATORIO_PRUEBA";
 
+    /** El equipo le dio más tiempo para la prueba del puesto que no completó (V89). */
+    public static final String PRUEBA_MAS_TIEMPO = "PRUEBA_MAS_TIEMPO";
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;

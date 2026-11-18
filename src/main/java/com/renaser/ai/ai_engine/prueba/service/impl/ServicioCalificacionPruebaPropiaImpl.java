@@ -11,11 +11,9 @@ import com.renaser.ai.ai_engine.perfilintegral.service.CalificacionPorPuntos;
 import com.renaser.ai.ai_engine.perfilintegral.service.ReglasDePuntos;
 import com.renaser.ai.ai_engine.postulacion.entity.Postulacion;
 import com.renaser.ai.ai_engine.postulacion.repository.PostulacionRepository;
-import com.renaser.ai.ai_engine.postulacion.service.MaquinaEstados;
 import com.renaser.ai.ai_engine.prueba.dto.DtosPruebaPropia.AjustarCriterio;
 import com.renaser.ai.ai_engine.prueba.dto.DtosPruebaPropia.CriterioDelCandidato;
 import com.renaser.ai.ai_engine.prueba.dto.DtosPruebaPropia.EntregaVista;
-import com.renaser.ai.ai_engine.prueba.dto.DtosPruebaPropia.NoCompleto;
 import com.renaser.ai.ai_engine.prueba.dto.DtosPruebaPropia.OpcionDelCandidato;
 import com.renaser.ai.ai_engine.prueba.dto.DtosPruebaPropia.PreguntaDelCandidato;
 import com.renaser.ai.ai_engine.prueba.dto.DtosPruebaPropia.PruebaDelCandidato;
@@ -35,7 +33,6 @@ import com.renaser.ai.ai_engine.prueba.service.CierreDeLaPruebaPropia;
 import com.renaser.ai.ai_engine.prueba.service.ServicioCalificacionPruebaPropia;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
 import com.renaser.ai.ai_engine.usuario.service.NombresDeUsuarios;
-import com.renaser.ai.ai_engine.vacante.entity.Vacante;
 import com.renaser.ai.ai_engine.vacante.service.AlcanceSobreLaVacante;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -44,13 +41,11 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /** Ver {@link ServicioCalificacionPruebaPropia}. */
@@ -71,7 +66,6 @@ public class ServicioCalificacionPruebaPropiaImpl implements ServicioCalificacio
     private final CalificacionDeLaPruebaPropia calculo;
     private final CierreDeLaPruebaPropia cierre;
     private final ColaCalificacionIa cola;
-    private final MaquinaEstados maquina;
     private final NombresDeUsuarios nombres;
     private final ServicioAuditoria auditoria;
 
@@ -144,7 +138,7 @@ public class ServicioCalificacionPruebaPropiaImpl implements ServicioCalificacio
         boolean veElContenido = quien.tiene(PERMISO_CONTENIDO);
         List<Entregable> suyas = subidas.findByIntentoPruebaId(intento.getId());
         // Entregada: los criterios que faltan para la nota. Sin completar: lo que le faltó
-        // responder o subir, que es lo mismo que dice la lista «No completaron la prueba».
+        // responder o subir, lo mismo que dice el ranking al pasar el ratón (V89).
         List<String> loQueFalta = intento.isNoCompletada()
                 ? java.util.stream.Stream.of(CalificacionDeLaPruebaPropia.loQueFalta(r, suyas).dicho())
                         .filter(t -> !t.isBlank()).toList()
@@ -346,47 +340,5 @@ public class ServicioCalificacionPruebaPropiaImpl implements ServicioCalificacio
         } catch (RuntimeException ignorada) {
             // Los textos del informe se piden otra vez la próxima vez que alguien lo abra.
         }
-    }
-
-    // ============================== Quienes no la completaron ==============================
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<NoCompleto> noCompletaron(ContextoUsuario quien, Long vacanteId) {
-        Vacante vacante = alcance.laVacanteVisible(quien, vacanteId, "ver_embudo");
-        List<Postulacion> suyas = postulaciones.findByVacanteIdOrderByCreadoEnDesc(vacante.getId());
-        if (suyas.isEmpty()) {
-            return List.of();
-        }
-        Map<Long, Postulacion> porId = suyas.stream()
-                .collect(Collectors.toMap(Postulacion::getId, Function.identity()));
-        List<IntentoPrueba> sinCompletar = intentos.findByPostulacionIdIn(porId.keySet()).stream()
-                .filter(IntentoPrueba::isNoCompletada)
-                .toList();
-        return noCompletaronDe(sinCompletar, porId);
-    }
-
-    /** La lista, para una tanda ya leída. La comparte el ranking. */
-    List<NoCompleto> noCompletaronDe(List<IntentoPrueba> sinCompletar, Map<Long, Postulacion> porId) {
-        if (sinCompletar.isEmpty()) {
-            return List.of();
-        }
-        var faltas = calculo.loQueFaltaTanda(sinCompletar);
-        Map<Long, String> nombrePorUsuario = nombres.porUsuario(sinCompletar.stream()
-                .map(i -> porId.get(i.getPostulacionId())).filter(java.util.Objects::nonNull)
-                .map(Postulacion::getUsuarioId).toList());
-        List<NoCompleto> salida = new ArrayList<>();
-        for (IntentoPrueba i : sinCompletar) {
-            Postulacion p = porId.get(i.getPostulacionId());
-            var falta = faltas.get(i.getId());
-            if (p == null || falta == null) {
-                continue;
-            }
-            String queFalto = falta.dicho();
-            salida.add(new NoCompleto(p.getId(),
-                    nombrePorUsuario.getOrDefault(p.getUsuarioId(), NombresDeUsuarios.ANONIMO),
-                    p.getEstadoCodigo(), queFalto, i.getEntregadoEn(), maquina.yaTermino(p)));
-        }
-        return salida;
     }
 }

@@ -43,6 +43,11 @@ public class RedaccionDelAviso {
                 TextosDelMomento.de(estado, contexto.instrumento(), false), enlace);
     }
 
+    /** El texto del aviso de «más tiempo» (V89), hasta 1000 caracteres. */
+    public String masTiempo(String nombre, String vacante, Instant hasta) {
+        return TextosDeWhatsapp.masTiempo(nombre, vacante, hasta, propiedades.getEnlaceMisProcesos());
+    }
+
     /** Hasta cuándo puede empezar la prueba, leído de su intento o su cuestionario; nulo si no se sabe. */
     private Instant empezarAntesDe(Long postulacionId) {
         Postulacion postulacion = postulaciones.findById(postulacionId).orElse(null);

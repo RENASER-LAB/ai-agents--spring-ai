@@ -79,6 +79,7 @@ public class ServicioPostulacionesPanelImpl implements ServicioPostulacionesPane
     private final com.renaser.ai.ai_engine.colaborador.service.ContratacionEnLaFicha contratacion;
     // Por qué espera quien no pasó sola a la prueba (V72): la misma regla que usa el pase.
     private final UmbralDelPerfilIntegral umbral;
+    private final com.renaser.ai.ai_engine.prueba.repository.IntentoPruebaRepository intentos;
 
     @Override
     public List<FilaBandeja> bandeja(ContextoUsuario quien, String esperaA) {
@@ -238,6 +239,7 @@ public class ServicioPostulacionesPanelImpl implements ServicioPostulacionesPane
     public void confirmarAvance(ContextoUsuario quien, Long postulacionId, String motivo) {
         Postulacion p = laVisible(quien, postulacionId, "confirmar_avance");
         exigirVacanteNoArchivada(p);
+        exigirQueCompletoLaPrueba(p);
         EstadoPostulacion siguiente = maquina.siguiente(p.getEstadoCodigo())
                 .orElseThrow(() -> new IllegalStateException(
                         "Desde " + p.getEstadoCodigo() + " no hay un avance que calcular: "
@@ -253,6 +255,27 @@ public class ServicioPostulacionesPanelImpl implements ServicioPostulacionesPane
         // depende si se queda esperando o puede elegir ya.
         if ("SIMULACION_POR_HABILITAR".equals(destino.estado())) {
             disponibilidad.recalcularVacante(p.getOrganizacionId(), p.getVacanteId());
+        }
+    }
+
+    /**
+     * «Avanzar» no mueve a quien no completó la prueba del puesto (V89), ni en lote ni desde la
+     * ficha ni llamando a la API.
+     *
+     * <p>Desde «le toca al candidato» el siguiente paso es «calificando», y quien no la completó
+     * no tiene nada que calificar: pasaría sin prueba entregada. Hasta la V89 no ocurría solo
+     * porque nadie podía marcarla en la tabla. Lo que le queda es darle más tiempo o descartarla.
+     */
+    private void exigirQueCompletoLaPrueba(Postulacion p) {
+        if (p.getEstadoCodigo() == null || !p.getEstadoCodigo().startsWith("PRUEBA_")) {
+            return;
+        }
+        Instant ahora = Instant.now();
+        boolean noLaCompleto = intentos.findByPostulacionId(p.getId())
+                .map(i -> i.quedoSinCompletar(ahora)).orElse(false);
+        if (noLaCompleto) {
+            throw new IllegalStateException("No completó la prueba: dale más tiempo desde su "
+                    + "ficha o descarta su proceso");
         }
     }
 

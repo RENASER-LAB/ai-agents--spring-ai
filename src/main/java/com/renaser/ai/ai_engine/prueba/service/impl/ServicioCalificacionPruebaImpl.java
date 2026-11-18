@@ -81,6 +81,9 @@ public class ServicioCalificacionPruebaImpl implements ServicioCalificacionPrueb
     // que usan el constructor de siempre: solo se tocan en la rama del editor.
     private final com.renaser.ai.ai_engine.prueba.service.CalificacionDeLaPruebaPropia calculo;
     private final com.renaser.ai.ai_engine.prueba.service.CierreDeLaPruebaPropia cierre;
+    // «Darle más tiempo» (V89): lo que la ficha dice de quien no la completó. Nulo en las
+    // pruebas unitarias de las plantillas; entonces el plazo sale sin esa parte.
+    private final com.renaser.ai.ai_engine.prueba.service.MasTiempoDeLaPrueba masTiempo;
 
     /** El constructor de las plantillas: el que usan sus pruebas unitarias. */
     public ServicioCalificacionPruebaImpl(PostulacionRepository postulaciones, AlcanceSobreLaVacante alcance,
@@ -97,7 +100,7 @@ public class ServicioCalificacionPruebaImpl implements ServicioCalificacionPrueb
         this(postulaciones, alcance, intentos, criterios, preguntasElegidas, preguntasCatalogo,
                 respuestas, notasCriterio, versionesPesos, cola, auditoria, vacantes,
                 cuestionarioTecnico, notasEtapa, calificacion, entregables, entregablesRequeridos,
-                archivos, null, null);
+                archivos, null, null, null);
     }
 
     @org.springframework.beans.factory.annotation.Autowired
@@ -113,7 +116,8 @@ public class ServicioCalificacionPruebaImpl implements ServicioCalificacionPrueb
             EntregableRequeridoRepository entregablesRequeridos,
             com.renaser.ai.ai_engine.archivo.repository.ArchivoRepository archivos,
             com.renaser.ai.ai_engine.prueba.service.CalificacionDeLaPruebaPropia calculo,
-            com.renaser.ai.ai_engine.prueba.service.CierreDeLaPruebaPropia cierre) {
+            com.renaser.ai.ai_engine.prueba.service.CierreDeLaPruebaPropia cierre,
+            com.renaser.ai.ai_engine.prueba.service.MasTiempoDeLaPrueba masTiempo) {
         this.postulaciones = postulaciones;
         this.alcance = alcance;
         this.intentos = intentos;
@@ -134,6 +138,7 @@ public class ServicioCalificacionPruebaImpl implements ServicioCalificacionPrueb
         this.archivos = archivos;
         this.calculo = calculo;
         this.cierre = cierre;
+        this.masTiempo = masTiempo;
     }
 
     /** La prueba de esta postulación, si es una escrita en el editor (V67). */
@@ -540,9 +545,19 @@ public class ServicioCalificacionPruebaImpl implements ServicioCalificacionPrueb
     public PlazoPrueba definirPlazo(ContextoUsuario quien, Long postulacionId,
                                     DefinirPlazoPrueba datos) {
         Postulacion postulacion = laQueSePuedeTocar(quien, postulacionId, "mover_postulacion");
+        // Con la vacante archivada no se toca el plazo (V89): la misma regla que «Darle más
+        // tiempo». Hasta la V89 esto solo miraba que no estuviera eliminada.
+        if (vacantes.existsByIdAndArchivadaEnIsNotNull(postulacion.getVacanteId())) {
+            throw new IllegalStateException(
+                    "La vacante está archivada: desarchívala para cambiarle el plazo");
+        }
         IntentoPrueba intento = intentos.findByPostulacionId(postulacion.getId())
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Prueba del puesto", "postulación", postulacionId));
+        if (intento.isNoCompletada()) {
+            throw new IllegalStateException("No completó la prueba: para reabrírsela, usa "
+                    + "«Darle más tiempo» en su ficha");
+        }
         if (intento.getEntregadoEn() != null) {
             throw new IllegalStateException(
                     "Esta prueba ya se entregó: cambiarle el plazo ahora no cambia nada");
@@ -562,7 +577,11 @@ public class ServicioCalificacionPruebaImpl implements ServicioCalificacionPrueb
         intento.setPlazoPropio(true);
         intentos.save(intento);
 
-        auditoria.registrar(quien.organizacionId(), quien, "definir_plazo_prueba",
+        // Esta fila de la auditoría también decide (V89): si llega después de un «Darle más
+        // tiempo» a quien no la había abierto, su fecha vuelve a respetarse tal cual al empezar,
+        // en vez de ser solo el tope del cronómetro. Lo de quién dio más tiempo no se borra:
+        // la ficha lo sigue contando. Ver IntentoPruebaRepository.plazoPuestoAManoDespuesDe.
+        auditoria.registrar(quien.organizacionId(), quien, IntentoPruebaRepository.PLAZO_PUESTO_A_MANO,
                 "intento_prueba", intento.getId(),
                 anterior == null ? null : Map.of("venceEn", anterior.toString()),
                 Map.of("venceEn", datos.venceEn().toString()), datos.motivo());
@@ -603,9 +622,17 @@ public class ServicioCalificacionPruebaImpl implements ServicioCalificacionPrueb
             return new PlazoVigente(false, null, null, null, null, instrumento);
         }
         return intentos.findByPostulacionId(postulacion.getId())
-                .map(intento -> new PlazoVigente(true, intento.getVenceEn(),
-                        origenDe(intento, vacante), intento.getIniciadoEn(),
-                        intento.getEntregadoEn(), instrumento))
+                .map(intento -> {
+                    // Lo de la V89: si no la completó, o quién le dio más tiempo. Sin el
+                    // servicio (las pruebas de las plantillas), el plazo de siempre.
+                    var deLaFicha = masTiempo == null ? null
+                            : masTiempo.deLaFicha(quien, postulacion, vacante, intento);
+                    return new PlazoVigente(true, intento.getVenceEn(),
+                            origenDe(intento, vacante), intento.getIniciadoEn(),
+                            intento.getEntregadoEn(), instrumento,
+                            deLaFicha == null ? null : deLaFicha.sinCompletar(),
+                            deLaFicha == null ? null : deLaFicha.masTiempo());
+                })
                 .orElseGet(() -> new PlazoVigente(false, null, null, null, null, instrumento));
     }
 

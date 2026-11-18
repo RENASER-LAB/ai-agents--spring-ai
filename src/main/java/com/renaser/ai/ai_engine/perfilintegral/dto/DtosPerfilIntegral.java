@@ -274,6 +274,19 @@ public final class DtosPerfilIntegral {
             BigDecimal prueba) {}
 
     /**
+     * Las fechas de la prueba del puesto de una fila y lo que le faltó (V89), para el texto que
+     * sale al pasar el ratón por la Nota. Todas pueden venir vacías.
+     *
+     * @param abiertaEn   cuándo la empezó
+     * @param entregadaEn cuándo se entregó o se cerró sin completar
+     * @param venceEn     la fecha que rige: la que tiene para hacerla o la que se le pasó
+     * @param queFalto    «le faltaron 4 preguntas y «Tablero.xlsx»», solo si no la completó
+     *                    con algo respondido; vacío si no le faltó nada que decir
+     */
+    public record DetalleDeLaPrueba(Instant abiertaEn, Instant entregadaEn, Instant venceEn,
+                                    String queFalto) {}
+
+    /**
      * Un candidato en la tanda. Los números pueden venir vacíos y eso es información: la
      * IA todavía no llegó a esa fila, o falló y no se le inventó una nota.
      */
@@ -404,7 +417,42 @@ public final class DtosPerfilIntegral {
              * <p>⚠️ Con una búsqueda terminada, {@code notaCurriculum} ya la lleva dentro: es la
              * nota del CV de {@code NotaDelCurriculum}, la misma del Perfil Integral.
              */
-            BusquedaEnElCv busqueda) {
+            BusquedaEnElCv busqueda,
+            /**
+             * Las fechas de su prueba del puesto y lo que le faltó (V89): lo que la celda de la
+             * Nota dice al pasar el ratón —«Se le acabó el tiempo el 18 nov: le faltaron 4
+             * preguntas y «Tablero.xlsx»», «Sin empezar: tiene hasta el jue 20 nov, 23:59»—.
+             *
+             * <p>Viaja solo en el ranking de la prueba del puesto y con intento; nulo en lo demás.
+             */
+            DetalleDeLaPrueba detallePrueba) {
+
+        /** Sin el detalle de la prueba (V89): el constructor de antes. */
+        public FilaRanking(int puesto, Long postulacionId, String uuid, String candidato,
+                           String correo, String estado, String estadoNombre,
+                           String estadoCalificacion, String pasada, String archivoNombre,
+                           Long archivoId, DatosCandidato datos, String grupoPrioridad,
+                           BigDecimal notaEtapa, BigDecimal notaCurriculum, BigDecimal adecuacion,
+                           BigDecimal potencial, BigDecimal altoRendimiento,
+                           BigDecimal confianzaEvidencia, String resumen, int riesgosCriticos,
+                           int fortalezas, int alertas, Instant actualizadoEn,
+                           List<NotaCriterioResponse> notasCriterio, String ciudad,
+                           String ciudadCodigo, BigDecimal pretensionMin,
+                           BigDecimal pretensionMax, String pretensionMoneda,
+                           BigDecimal pretensionDeclarada, String pretensionDeclaradaMoneda,
+                           Ponderado ponderado, EstadoPruebaDelPuesto estadoPrueba,
+                           Instant postuladoEn,
+                           com.renaser.ai.ai_engine.resena.dto.DtosResena.PromedioResenas resenas,
+                           boolean recalificando, BusquedaEnElCv busqueda) {
+            this(puesto, postulacionId, uuid, candidato, correo, estado, estadoNombre,
+                    estadoCalificacion, pasada, archivoNombre, archivoId, datos, grupoPrioridad,
+                    notaEtapa, notaCurriculum, adecuacion, potencial, altoRendimiento,
+                    confianzaEvidencia, resumen, riesgosCriticos, fortalezas, alertas,
+                    actualizadoEn, notasCriterio, ciudad, ciudadCodigo, pretensionMin,
+                    pretensionMax, pretensionMoneda, pretensionDeclarada,
+                    pretensionDeclaradaMoneda, ponderado, estadoPrueba, postuladoEn, resenas,
+                    recalificando, busqueda, null);
+        }
 
         /** Sin «Qué buscar en el CV» (V80). */
         public FilaRanking(int puesto, Long postulacionId, String uuid, String candidato,
