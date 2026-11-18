@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Brochure · Plantilla «Portada» (verde)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;550;600&amp;family=Syne:wght@400;500;600&amp;display=swap">
+<style>
+/*
+ * Plantilla «Portada» con el color «Verde» (#0B7A63). La primera hoja es la foto de portada de
+ * la 4a a sangre (sin portada, el color: ver brochure-sin-fotos.html), con un velo oscuro, el logo, el nombre y el propósito. Las hojas
+ * siguiente lleva el resto de los textos. A4 de 794 × 1123 px.
+ */
+:root{--c:#0b7a63;--c-oscuro:#07523f;--c-halo:#e6f5f0;--tinta:#111312;--tinta2:#4a5251;--tinta3:#687170;--bruma:#f5f7fb;--filete:#e6e7e4}
+*{box-sizing:border-box}
+body{margin:0;background:#d4d6d3;font-family:Onest, system-ui, sans-serif;color:var(--tinta);-webkit-font-smoothing:antialiased}
+.hojas{display:flex;flex-direction:column;align-items:center;gap:24px;padding:24px 0}
+.hoja{position:relative;width:794px;height:1123px;overflow:hidden;background:#fff;box-shadow:0 8px 24px rgb(15 23 42 / 0.12)}
+.interior{padding:48px 64px 0}
+h1,h2,p,ul{margin:0}
+.etiqueta{font-family:Syne, Onest, sans-serif;font-size:10.5px;font-weight:500;letter-spacing:0.16em;text-transform:uppercase;color:var(--c)}
+.titulo{font-size:24px;font-weight:550;letter-spacing:-0.03em;line-height:1.2;margin:6px 0 12px}
+.texto{font-size:13.5px;line-height:1.62;color:var(--tinta2);white-space:pre-line}
+.bloque{margin-top:34px}
+
+/* ---- Portada ---- */
+.fondo{position:absolute;inset:0}
+.fondo svg{display:block;width:100%;height:100%}
+.velo{position:absolute;inset:0;background:linear-gradient(180deg, rgb(7 40 32 / 0.15) 0%, rgb(7 40 32 / 0.35) 38%, rgb(5 30 24 / 0.9) 72%, rgb(5 30 24 / 0.96) 100%)}
+.arriba{position:absolute;left:64px;right:64px;top:48px;display:flex;justify-content:space-between;font-family:Syne, Onest, sans-serif;font-size:10.5px;letter-spacing:0.16em;text-transform:uppercase;color:rgb(255 255 255 / 0.86)}
+.abajo{position:absolute;left:64px;right:64px;bottom:84px;color:#fff}
+.logoGrande{width:96px;height:96px;border:4px solid #fff;border-radius:8px;overflow:hidden;background:#fff}
+.logoGrande svg{display:block;width:100%;height:100%}
+.nombreGrande{margin-top:26px;font-size:60px;font-weight:400;line-height:0.98;letter-spacing:-0.055em}
+.lineaGrande{margin-top:14px;font-size:15px;color:rgb(255 255 255 / 0.8)}
+.propositoGrande{margin-top:34px;padding-top:22px;border-top:1px solid rgb(255 255 255 / 0.28);max-width:560px}
+.propositoGrande span{font-family:Syne, Onest, sans-serif;font-size:10.5px;letter-spacing:0.16em;text-transform:uppercase;color:rgb(255 255 255 / 0.7)}
+.propositoGrande p{margin-top:10px;font-size:22px;line-height:1.36;letter-spacing:-0.02em}
+.banda{position:absolute;left:0;right:0;bottom:0;height:12px;background:var(--c)}
+
+/* ---- Interiores ---- */
+.miniCabecera{display:flex;align-items:center;justify-content:space-between;padding-bottom:14px;border-bottom:2px solid var(--c)}
+.miniCabecera span{font-size:15px;letter-spacing:-0.02em}
+.logoChico{width:36px;height:36px;border-radius:5px;overflow:hidden;box-shadow:0 0 0 1px rgb(0 0 0 / 0.1)}
+.logoChico svg{display:block;width:100%;height:100%}
+.dos{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:34px}
+.tarjeta{padding:22px 24px;background:var(--c-halo);border-radius:4px}
+.tarjeta .texto{color:#1f3b33}
+.chips{display:flex;flex-wrap:wrap;gap:8px;padding:0;list-style:none}
+.chip{display:inline-flex;align-items:center;gap:6px;min-height:28px;padding:0 11px 0 9px;border:1px solid rgb(0 0 0 / 0.1);border-radius:4px;font-size:12px}
+.chip svg{color:var(--c)}
+.sedes{display:flex;flex-wrap:wrap;gap:8px 24px;padding:0;list-style:none;font-size:14px}
+.sedes li{display:inline-flex;align-items:center;gap:6px}
+.sedes svg{color:var(--c)}
+.contacto{display:flex;flex-direction:column;padding:0;list-style:none;border-top:1px solid var(--filete)}
+.contacto li{display:grid;grid-template-columns:22px 130px 1fr;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid var(--filete);font-size:13px}
+.contacto svg{color:var(--c)}
+.contacto b{font-weight:500}
+.contacto a{color:var(--c);text-decoration:none;overflow-wrap:anywhere}
+.pie{position:absolute;left:64px;right:64px;bottom:32px;display:flex;justify-content:space-between;align-items:center;padding-top:12px;border-top:1px solid var(--filete);font-family:Syne, Onest, sans-serif;font-size:9.5px;letter-spacing:0.06em;text-transform:uppercase;color:var(--tinta3)}
+@media print{body{background:#fff}.hojas{padding:0;gap:0}.hoja{box-shadow:none;break-after:page}@page{size:A4;margin:0}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="cielo1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#cfe3e6"/><stop offset="1" stop-color="#f6f0e4"/></linearGradient>
+    <linearGradient id="cielo2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#bcd3ea"/><stop offset="1" stop-color="#eef2f8"/></linearGradient>
+    <linearGradient id="cielo3" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f3d9c4"/><stop offset="1" stop-color="#c7dcd3"/></linearGradient>
+    <linearGradient id="cieloAlto" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9cc2cf"/><stop offset="0.55" stop-color="#e9e3d2"/><stop offset="1" stop-color="#f4ead6"/></linearGradient>
+  </defs>
+  <symbol id="logoVA" viewBox="0 0 64 64"><rect width="64" height="64" fill="#0f4c3a"/><ellipse cx="32" cy="32" rx="13" ry="18" transform="rotate(28 32 32)" fill="#f3ead8"/><path d="M27 17c7 6 3 24 10 30" stroke="#0f4c3a" stroke-width="2.6" fill="none" stroke-linecap="round"/></symbol>
+  <!-- La portada de la 4a, recortada al centro para llenar la hoja vertical. -->
+  <symbol id="portadaAlta" viewBox="0 0 794 1123" preserveAspectRatio="xMidYMid slice"><rect width="794" height="1123" fill="url(#cieloAlto)"/><circle cx="560" cy="250" r="70" fill="#f7e7c9"/><path d="M0 470 C180 380 330 420 480 450 S700 380 794 410 V1123 H0Z" fill="#8fb19a"/><path d="M0 600 C200 520 420 560 600 580 S760 540 794 550 V1123 H0Z" fill="#5e8a6f"/><path d="M0 740 C260 680 560 710 794 700 V1123 H0Z" fill="#2f5d48"/><g stroke="#1f4636" stroke-width="12" stroke-linecap="round" stroke-dasharray="3 34" opacity="0.85"><path d="M0 760 C260 700 560 730 794 720"/><path d="M0 820 C260 770 560 795 794 785"/><path d="M0 880 C260 840 560 860 794 850"/><path d="M0 940 C260 905 560 925 794 915"/><path d="M0 1000 C260 970 560 990 794 980"/></g></symbol>
+  <symbol id="visto" viewBox="0 0 24 24"><path d="m5 12.8 4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="pin" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21.5s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11Z"/><circle cx="12" cy="10.3" r="2.6"/></g></symbol>
+  <symbol id="ex" viewBox="0 0 32 28"><path d="M1 2h12v5H6.5v4.5H12v4.5H6.5V21H13v5H1Z" fill="currentColor"/><path d="M15 2h5l3 6.5L26 2h5l-5.5 12L31 26h-5l-3-6.5-3 6.5h-5l5.5-12Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" fill="none"/></symbol>
+  <symbol id="mundo" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.6 3.8 5.7 3.8 9S14.5 18.4 12 21c-2.5-2.6-3.8-5.7-3.8-9S9.5 5.6 12 3Z"/></g></symbol>
+  <symbol id="facebook" viewBox="0 0 24 24"><path d="M14.5 8.5H17V5h-2.5A3.5 3.5 0 0 0 11 8.5V11H8.5v3.5H11V21h3.5v-6.5H17l.5-3.5h-3V9a.5.5 0 0 1 .5-.5Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+  <symbol id="instagram" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><path d="M17.5 6.5h.01"/></g></symbol>
+  <symbol id="linkedin" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2.5"/><path d="M7.5 10.5V17M7.5 7.4v.1"/><path d="M11.5 17v-4a2.5 2.5 0 0 1 5 0v4"/></g></symbol>
+</svg>
+
+<div class="hojas">
+  <!-- ======================= Hoja 1 · portada a sangre ======================= -->
+  <section class="hoja" aria-label="Hoja 1 de 2">
+    <div class="fondo"><svg role="img" aria-label="Portada de Cafetalera Valle Alto"><use href="#portadaAlta"/></svg></div>
+    <div class="velo"></div>
+    <div class="arriba"><span>Presentación de la empresa</span><span>Agroindustria</span></div>
+    <div class="abajo">
+      <div class="logoGrande"><svg role="img" aria-label="Logo de Cafetalera Valle Alto"><use href="#logoVA"/></svg></div>
+      <h1 class="nombreGrande">Cafetalera Valle Alto</h1>
+      <p class="lineaGrande">Agroindustria · 51–200 colaboradores · Fundada en 2004</p>
+      <div class="propositoGrande">
+        <span>Nuestro propósito</span>
+        <p>Que el café de altura del norte del Perú se pague por lo que vale, y que ese valor se quede en las familias que lo cultivan.</p>
+      </div>
+    </div>
+    <div class="banda"></div>
+  </section>
+
+  <!-- ======================= Hoja 2 ======================= -->
+  <section class="hoja interior" aria-label="Hoja 2 de 2">
+    <div class="miniCabecera"><span>Cafetalera Valle Alto</span><div class="logoChico"><svg aria-hidden="true"><use href="#logoVA"/></svg></div></div>
+
+    <div class="bloque">
+      <span class="etiqueta">Quiénes somos</span>
+      <p class="texto" style="margin-top:10px">Somos una empresa del norte del Perú que compra, procesa y exporta café de altura.
+Trabajamos con 640 familias productoras de Jaén y San Ignacio y vendemos a tostadores de doce países.</p>
+    </div>
+
+    <div class="dos">
+      <div class="tarjeta"><span class="etiqueta">Misión</span><p class="texto" style="margin-top:10px">Comprar el café de nuestras familias productoras a precio justo, procesarlo con cuidado y llevarlo a los mejores tostadores del mundo sin que pierda su origen.</p></div>
+      <div class="tarjeta"><span class="etiqueta">Visión</span><p class="texto" style="margin-top:10px">Ser en 2030 la marca de café de origen más reconocida del norte del Perú, con cada familia productora certificada y con relevo joven en el campo.</p></div>
+    </div>
+
+    <div class="bloque">
+      <span class="etiqueta">Beneficios</span>
+      <ul class="chips" style="margin-top:12px">
+        <li class="chip"><svg width="13" height="13"><use href="#visto"/></svg>Seguro EPS</li>
+        <li class="chip"><svg width="13" height="13"><use href="#visto"/></svg>Movilidad a planta</li>
+        <li class="chip"><svg width="13" height="13"><use href="#visto"/></svg>Almuerzo en planta</li>
+        <li class="chip"><svg width="13" height="13"><use href="#visto"/></svg>Capacitación pagada</li>
+        <li class="chip"><svg width="13" height="13"><use href="#visto"/></svg>Bono por cosecha</li>
+        <li class="chip"><svg width="13" height="13"><use href="#visto"/></svg>Café para llevar a casa</li>
+      </ul>
+    </div>
+
+
+    <div class="bloque">
+      <span class="etiqueta">Dónde estamos</span>
+      <ul class="sedes" style="margin-top:12px">
+        <li><svg width="16" height="16"><use href="#pin"/></svg>Jaén</li>
+        <li><svg width="16" height="16"><use href="#pin"/></svg>San Ignacio</li>
+        <li><svg width="16" height="16"><use href="#pin"/></svg>Lima</li>
+      </ul>
+    </div>
+
+    <div class="bloque">
+      <span class="etiqueta">Contacto</span>
+      <ul class="contacto" style="margin-top:12px">
+        <li><svg width="18" height="18"><use href="#ex"/></svg><b>Perfil en EX</b><a href="#">ex.renaser.pe/empresas/cafetalera-valle-alto</a></li>
+        <li><svg width="18" height="18"><use href="#mundo"/></svg><b>Página web</b><a href="#">cafevallealto.pe</a></li>
+        <li><svg width="18" height="18"><use href="#facebook"/></svg><b>Facebook</b><a href="#">facebook.com/cafevallealto</a></li>
+        <li><svg width="18" height="18"><use href="#instagram"/></svg><b>Instagram</b><a href="#">instagram.com/cafevallealto</a></li>
+        <li><svg width="18" height="18"><use href="#linkedin"/></svg><b>LinkedIn</b><a href="#">linkedin.com/company/cafetalera-valle-alto</a></li>
+      </ul>
+    </div>
+
+    <div class="pie"><span>Brochure generado con EX · 17/11/2026</span><span>Página 2 de 2</span></div>
+  </section>
+
+</div>
+</body>
+</html>

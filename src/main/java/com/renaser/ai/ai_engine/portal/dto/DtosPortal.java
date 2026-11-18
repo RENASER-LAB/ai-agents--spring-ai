@@ -125,13 +125,18 @@ public final class DtosPortal {
      *
      * @param ciudad la provincia de su primera sede activa, o nulo
      * @param sedes  las provincias de sus sedes activas, sin repetir
+     * @param mision   su misión, o nulo (V86)
+     * @param vision   su visión, o nulo (V86)
+     * @param brochure la dirección de su brochure en PDF, o nulo si le falta lo mínimo («Quiénes
+     *                 somos») (V86)
      */
     public record PerfilDeEmpresa(String codigo, String nombre, String ciudad, String logo,
                                   String portada, String sector, String tamano,
                                   String tamanoTexto, Integer anioFundacion, List<String> sedes,
                                   String quienesSomos, String proposito, VideoPublico video,
                                   List<String> beneficios, String paginaWeb,
-                                  List<RedPublica> redes, List<VacantePublica> vacantes) {}
+                                  List<RedPublica> redes, List<VacantePublica> vacantes,
+                                  String mision, String vision, String brochure) {}
 
     /**
      * La ciudad de una vacante, como la lee el portal: el código —que es lo que viaja en la

@@ -53,4 +53,16 @@ public class Organizacion {
     private String paginaWeb;
     private Long logoArchivoId;
     private Long portadaArchivoId;
+
+    // ---------- El brochure (V86) ----------
+    // Misión y visión, opcionales como el resto de la presentación; y la plantilla y el color del
+    // brochure en PDF, de los catálogos PlantillaDelBrochure y ColorDelBrochure. Las dos últimas
+    // son NOT NULL en la base: llevan su valor por defecto también aquí, porque el INSERT de una
+    // empresa nueva escribe todas las columnas y un nulo reventaría.
+    private String mision;
+    private String vision;
+    @Builder.Default
+    private String plantillaBrochure = "CLASICA";
+    @Builder.Default
+    private String colorBrochure = "AZUL";
 }

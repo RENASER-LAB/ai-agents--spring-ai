@@ -4,22 +4,36 @@ import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
+import org.apache.pdfbox.pdmodel.graphics.image.JPEGFactory;
+import org.apache.pdfbox.pdmodel.graphics.image.LosslessFactory;
+import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
+import org.apache.pdfbox.pdmodel.graphics.state.PDExtendedGraphicsState;
 import org.apache.pdfbox.pdmodel.graphics.state.RenderingMode;
 import org.apache.pdfbox.pdmodel.interactive.action.PDActionURI;
 import org.apache.pdfbox.pdmodel.interactive.annotation.PDAnnotationLink;
 import org.apache.pdfbox.pdmodel.interactive.annotation.PDBorderStyleDictionary;
 import org.apache.pdfbox.util.Matrix;
 
+import javax.imageio.ImageIO;
+import javax.imageio.ImageReader;
+import javax.imageio.stream.ImageInputStream;
 import java.awt.Color;
+import java.awt.Graphics2D;
+import java.awt.image.BufferedImage;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Dónde se dibuja: el documento, sus páginas A4 y las primitivas que necesita un informe —texto,
- * rectángulos, líneas, círculos, el anillo de la nota, enlaces y texto en vertical—.
+ * rectángulos, líneas, círculos, el anillo de la nota, enlaces y texto en vertical— y, desde el
+ * brochure de la empresa (V86), imágenes y rectángulos translúcidos. El informe por etapa no usa
+ * estas dos últimas.
  *
  * <p><b>Las coordenadas van desde arriba</b>, como en la maqueta HTML: {@code y} es la distancia
  * al borde superior. PDF las cuenta desde abajo, y la conversión vive solo aquí.
@@ -31,6 +45,17 @@ public final class LienzoPdf implements AutoCloseable {
 
     public static final float ANCHO = PDRectangle.A4.getWidth();
     public static final float ALTO = PDRectangle.A4.getHeight();
+
+    /**
+     * El lado más grande de una imagen que se abre. Las del almacén ya llegaron medidas y
+     * re-codificadas (V85), pero una imagen de 2 MB puede descomprimirse en cientos de megas: se
+     * mide antes de abrirla, como al subirla.
+     */
+    public static final int LADO_MAXIMO_IMAGEN = 4096;
+
+    /** Desde aquí (en píxeles) una imagen es una foto y se incrusta en JPEG; por debajo, sin pérdida. */
+    private static final int PIXELES_DE_FOTO = 600_000;
+    private static final float CALIDAD_JPEG = 0.88f;
 
     private final PDDocument documento;
     private final TipografiaPdf tipografia;
@@ -320,6 +345,155 @@ public final class LienzoPdf implements AutoCloseable {
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
+    }
+
+    // ------------------------------------------------------------------ transparencia
+
+    /**
+     * Un rectángulo del color con esa opacidad (de 0 a 1): el velo oscuro sobre la foto de
+     * portada del brochure. Con opacidad 1 es un rectángulo normal.
+     */
+    public void rectangulo(float x, float y, float ancho, float alto, Color relleno, float opacidad) {
+        float o = Math.max(0f, Math.min(1f, opacidad));
+        if (o <= 0f) {
+            return;
+        }
+        if (o >= 1f) {
+            rectangulo(x, y, ancho, alto, relleno);
+            return;
+        }
+        try {
+            trazo.saveGraphicsState();
+            PDExtendedGraphicsState estado = new PDExtendedGraphicsState();
+            estado.setNonStrokingAlphaConstant(o);
+            trazo.setGraphicsStateParameters(estado);
+            trazo.setNonStrokingColor(relleno);
+            trazo.addRect(x, ALTO - y - alto, ancho, alto);
+            trazo.fill();
+            trazo.restoreGraphicsState();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    // ------------------------------------------------------------------ imágenes
+
+    /**
+     * Una imagen ya leída e incrustada en este documento, lista para dibujarse en una o varias
+     * páginas (se guarda una sola vez aunque salga en todas). Se obtiene con {@link #leerImagen}.
+     */
+    public static final class Imagen {
+        private final PDImageXObject objeto;
+        private final int ancho;
+        private final int alto;
+
+        private Imagen(PDImageXObject objeto, int ancho, int alto) {
+            this.objeto = objeto;
+            this.ancho = ancho;
+            this.alto = alto;
+        }
+
+        public int ancho() {
+            return ancho;
+        }
+
+        public int alto() {
+            return alto;
+        }
+    }
+
+    /**
+     * Lee una imagen JPG o PNG para dibujarla en este documento, o devuelve nulo si no hay bytes
+     * o no se puede leer: quien dibuja decide entonces qué poner en su lugar, en vez de dejar una
+     * imagen rota o un recuadro vacío.
+     *
+     * <p><b>Lo transparente se pinta sobre blanco, nunca sobre negro</b>: un PNG con canal alfa se
+     * aplana sobre blanco antes de incrustarlo. Una foto (desde {@value #PIXELES_DE_FOTO}
+     * píxeles) se incrusta en JPEG; un logo, sin pérdida, para que sus bordes no se emborronen.
+     */
+    public Imagen leerImagen(byte[] bytes) {
+        if (bytes == null || bytes.length == 0) {
+            return null;
+        }
+        try (ImageInputStream entrada = ImageIO.createImageInputStream(new ByteArrayInputStream(bytes))) {
+            Iterator<ImageReader> lectores = entrada == null
+                    ? java.util.Collections.emptyIterator() : ImageIO.getImageReaders(entrada);
+            if (!lectores.hasNext()) {
+                return null;
+            }
+            ImageReader lector = lectores.next();
+            try {
+                String formato = lector.getFormatName().toLowerCase(Locale.ROOT);
+                lector.setInput(entrada, true, true);
+                int ancho = lector.getWidth(0);
+                int alto = lector.getHeight(0);
+                boolean admitido = formato.equals("png") || formato.equals("jpeg");
+                if (!admitido || ancho <= 0 || alto <= 0
+                        || ancho > LADO_MAXIMO_IMAGEN || alto > LADO_MAXIMO_IMAGEN) {
+                    return null;
+                }
+                BufferedImage leida = lector.read(0);
+                if (leida == null) {
+                    return null;
+                }
+                BufferedImage rgb = sobreBlanco(leida);
+                PDImageXObject objeto = (long) ancho * alto >= PIXELES_DE_FOTO
+                        ? JPEGFactory.createFromImage(documento, rgb, CALIDAD_JPEG)
+                        : LosslessFactory.createFromImage(documento, rgb);
+                return new Imagen(objeto, ancho, alto);
+            } finally {
+                lector.dispose();
+            }
+        } catch (IOException | RuntimeException ilegible) {
+            // Una imagen que no se puede leer no rompe el documento: no se dibuja y ya.
+            return null;
+        }
+    }
+
+    /**
+     * Dibuja la imagen llenando el rectángulo, recortada al centro (como {@code object-fit:
+     * cover}) y sobre un fondo blanco, con las esquinas redondeadas si se pide.
+     */
+    public void imagen(Imagen imagen, float x, float y, float ancho, float alto, float radio) {
+        if (imagen == null || ancho <= 0f || alto <= 0f) {
+            return;
+        }
+        float r = Math.min(Math.max(radio, 0f), Math.min(ancho, alto) / 2f);
+        float escala = Math.max(ancho / imagen.ancho, alto / imagen.alto);
+        float w = imagen.ancho * escala;
+        float h = imagen.alto * escala;
+        float ix = x + (ancho - w) / 2f;
+        float iy = y + (alto - h) / 2f;
+        try {
+            trazo.saveGraphicsState();
+            camino(x, ALTO - y - alto, ancho, alto, r);
+            trazo.clip();
+            trazo.setNonStrokingColor(Color.WHITE);
+            trazo.addRect(x, ALTO - y - alto, ancho, alto);
+            trazo.fill();
+            trazo.drawImage(imagen.objeto, ix, ALTO - iy - h, w, h);
+            trazo.restoreGraphicsState();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
+    }
+
+    /** La imagen en RGB y sin transparencia: lo que tenga alfa se pinta antes sobre blanco. */
+    private static BufferedImage sobreBlanco(BufferedImage original) {
+        if (original.getType() == BufferedImage.TYPE_INT_RGB) {
+            return original;
+        }
+        BufferedImage rgb = new BufferedImage(original.getWidth(), original.getHeight(),
+                BufferedImage.TYPE_INT_RGB);
+        Graphics2D pincel = rgb.createGraphics();
+        try {
+            pincel.setColor(Color.WHITE);
+            pincel.fillRect(0, 0, rgb.getWidth(), rgb.getHeight());
+            pincel.drawImage(original, 0, 0, null);
+        } finally {
+            pincel.dispose();
+        }
+        return rgb;
     }
 
     // ------------------------------------------------------------------ cierre

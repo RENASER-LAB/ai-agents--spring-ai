@@ -1,5 +1,6 @@
 package com.renaser.ai.ai_engine.portal.service;
 
+import com.renaser.ai.ai_engine.organizacion.service.ServicioBrochure.ArchivoDelBrochure;
 import com.renaser.ai.ai_engine.portal.dto.DtosPortal.PerfilDeEmpresa;
 
 /**
@@ -18,6 +19,12 @@ public interface ServicioEmpresasPortal {
      * archivo: se busca por el id que guarda la propia empresa y con su organización.
      */
     Imagen imagen(String codigo, String cual);
+
+    /**
+     * El brochure en PDF de la empresa (V86). 404 si no existe, si no está activa o si le falta
+     * lo mínimo («Quiénes somos»).
+     */
+    ArchivoDelBrochure brochure(String codigo);
 
     /** El contenido de una imagen pública. El {@code toString} no imprime los bytes. */
     record Imagen(byte[] bytes, String tipo) {

@@ -145,8 +145,9 @@ en lenguaje normal.
 |---|---|---|
 | GET `/vacantes` | Las vacantes publicadas **de todas las empresas activas**, cada una con el nombre de la suya. Las de una empresa suspendida no salen. Cada una trae su `remuneracion`. **Desde el 25/09 (`V62`) trae además `publicadaEn`** —puede venir vacía en una vieja— **y `ciudad`**: `{codigo, nombre, departamento}` del catálogo, o nula si la vacante no la tiene. `ubicacion` sigue viajando y ahora es la zona o referencia. **Desde la `V85` trae `codigoEmpresa`, `empresa` y `videoPuesto`**: el código del perfil público, lo que la empresa cuenta de sí misma —nulo si no llenó nada— y el video propio del puesto (ver «El perfil de la empresa», en el panel) | Cualquiera, sin token |
 | GET `/vacantes/{id}` | El detalle público, con los requisitos indispensables, la `remuneracion`, `publicadaEn` y `ciudad`, y desde la `V85` `codigoEmpresa`, `empresa` y `videoPuesto` | Cualquiera |
-| GET `/empresas/{codigo}` | **El perfil público de una empresa** (`V85`): nombre, ciudad, sector, tamaño, año de fundación, sedes, «Quiénes somos», propósito, video, beneficios, web, redes, las direcciones del logo y la portada, y sus vacantes publicadas y abiertas con los campos del tablón. El código va en minúsculas. Empresa inactiva o código que no existe, 404 | Cualquiera, sin token |
+| GET `/empresas/{codigo}` | **El perfil público de una empresa** (`V85`): nombre, ciudad, sector, tamaño, año de fundación, sedes, «Quiénes somos», propósito, video, beneficios, web, redes, las direcciones del logo y la portada, y sus vacantes publicadas y abiertas con los campos del tablón. **Desde la `V86` trae además `mision` y `vision`** —nulas si están vacías— **y `brochure`**: la dirección de su brochure en PDF, o nula si le falta «Quiénes somos». El código va en minúsculas. Empresa inactiva o código que no existe, 404 | Cualquiera, sin token |
 | GET `/empresas/{codigo}/imagenes/{logo\|portada}` | El logo o la portada, leídos del almacén, con **caché pública de un día**. Sin imagen, empresa inactiva u otro nombre, 404 | Cualquiera, sin token |
+| GET `/empresas/{codigo}/brochure` | **El brochure de la empresa en PDF A4** (`V86`), el mismo que se descarga desde el panel: armado con lo guardado, en su plantilla y su color, con `Content-Disposition: inline; filename="Brochure - {empresa}.pdf"` y **sin caché pública** (`no-store`), para que cada descarga refleje el perfil del momento. Empresa que no existe, suspendida o sin «Quiénes somos», 404 (ver «El perfil de la empresa», en el panel) | Cualquiera, sin token |
 | GET `/vacantes/{id}/consentimiento` | El texto que se firma al postular a esa vacante, **ya compuesto con el nombre de la empresa** que la publica, más ese nombre aparte. Es **un solo texto para todas las empresas**, con un hueco donde va el nombre: ninguna tiene el suyo. Lo pide la pantalla de postular y también la política de privacidad cuando se llega a ella desde una vacante | Cualquiera |
 | GET `/consentimientos/textos` | Los **tres** textos vigentes de la plataforma: `PLATAFORMA` (el obligatorio de crear la cuenta), `PROCESO` (el de postular) y `FUTUROS_CONTACTOS` (el opcional). **Desde el 14/09 son tres y no dos**, y `PLATAFORMA` ocupa el sitio que tenía `PROCESO` en el registro. El de `PROCESO` sale compuesto con «la empresa que publica la vacante», porque aquí no hay ninguna concreta: **el hueco no cruza la frontera del backend**. Lo lee la política de privacidad pública, que los enseña enteros | Cualquiera |
 | GET `/catalogos/ubigeo` | Dónde se puede decir que uno vive: las **196 provincias** del Perú y «Fuera del Perú», cada una con su departamento, ordenadas por departamento y nombre. Es `{codigo, nombre, departamento}`, y el departamento viene vacío solo en `EXT` | Cualquiera, sin token |
@@ -1388,8 +1389,10 @@ y la plataforma tampoco edita aquí la de una empresa cliente.
 
 | Método y ruta | Qué hace | Permiso |
 |---|---|---|
-| GET `/organizacion/presentacion` | Lo guardado: sector, tamaño, año de fundación, «Quiénes somos», `propositoEmpresa`, beneficios, `videoPresentacion`, `paginaWeb`, `redes` (mapa por red), las direcciones del logo y la portada, y de solo lectura el nombre, el código y las sedes activas con su provincia | `editar_presentacion_empresa` |
-| PUT `/organizacion/presentacion` | Guardar todo junto: **reemplaza lo que había**, y lo que falta o llega vacío queda «sin dato». Recorta los espacios de los bordes y a un enlace sin `http://` ni `https://` le pone `https://` delante. Si algún campo no vale, **400 «No se guardó nada»** con todos los que fallan en `errores`, por campo. Si cambió algo, audita `editar_presentacion_empresa` con el antes y el después | `editar_presentacion_empresa` |
+| GET `/organizacion/presentacion` | Lo guardado: sector, tamaño, año de fundación, «Quiénes somos», `propositoEmpresa`, beneficios, `videoPresentacion`, `paginaWeb`, `redes` (mapa por red), las direcciones del logo y la portada, y de solo lectura el nombre, el código y las sedes activas con su provincia. Desde la `V86`, también `mision`, `vision`, `plantillaBrochure` y `colorBrochure` | `editar_presentacion_empresa` |
+| PUT `/organizacion/presentacion` | Guardar todo junto: **reemplaza lo que había**, y lo que falta o llega vacío queda «sin dato». Recorta los espacios de los bordes y a un enlace sin `http://` ni `https://` le pone `https://` delante. Si algún campo no vale, **400 «No se guardó nada»** con todos los que fallan en `errores`, por campo. Si cambió algo, audita `editar_presentacion_empresa` con el antes y el después. Desde la `V86` acepta `mision` y `vision`, y también `plantillaBrochure` y `colorBrochure`, que son **la excepción al reemplazo**: si no vienen, se queda lo que había (no existe «sin plantilla»). El panel ya no las manda por aquí: las guarda la pestaña «Brochure» con su propio PUT | `editar_presentacion_empresa` |
+| PUT `/organizacion/presentacion/brochure` | `{plantillaBrochure, colorBrochure}` (`V86`): guarda **solo** la plantilla y el color del brochure, sin tocar lo demás. Los dos son obligatorios y del catálogo; si falta uno o no está en él, **400 «No se guardó nada»** con `plantillaBrochure` o `colorBrochure` en `errores`. Si cambió algo, audita `elegir_brochure_empresa` con el antes y el después; repetir la misma elección no audita | `editar_presentacion_empresa` |
+| GET `/organizacion/presentacion/brochure` | El brochure de la propia empresa en PDF A4 (`V86`), con lo **guardado**: el mismo que la dirección pública, con `Content-Disposition: inline; filename="Brochure - {empresa}.pdf"` y `no-store`. Sin «Quiénes somos» guardado, **409** «Falta «Quiénes somos»: guárdalo y vuelve a descargar el brochure.» | `editar_presentacion_empresa` |
 | POST `/organizacion/presentacion/imagenes/{logo\|portada}` | Subir el logo o la portada (multipart `archivo`): JPG o PNG de hasta 2 MB, el logo de al menos 200 × 200 y la portada de al menos 1200 × 300, y como mucho 4096 por lado. **Se vuelve a codificar en el servidor sin metadatos** (GPS, cámara, fecha) y sustituye a la anterior. Audita `cambiar_logo_empresa` o `cambiar_portada_empresa` | `editar_presentacion_empresa` |
 | DELETE `/organizacion/presentacion/imagenes/{logo\|portada}` | Quitarla. Audita `quitar_logo_empresa` o `quitar_portada_empresa` | `editar_presentacion_empresa` |
 | GET `/organizacion/presentacion/video` | `{tieneVideo}`: si la empresa tiene video. Lo pide el formulario de la vacante para el chip «Se usará el video de la empresa», y por eso va con el permiso de leer vacantes | `ver_vacantes` |
@@ -1400,7 +1403,10 @@ video, de YouTube (`watch?v=`, `youtu.be/`, `shorts/`, `embed/`) o de Vimeo (`vi
 y `vimeo.com/<número>/<clave>`, el de un video oculto); si no, «Pega el enlace de un video de
 YouTube o de Vimeo». Cada red, de su dominio: «Este enlace no es de Instagram». No se comprueba
 que la página exista. El propósito y «Quiénes somos», hasta 1500; el sector, hasta 60; el año,
-entre 1800 y el actual; hasta 12 beneficios de 40.
+entre 1800 y el actual; hasta 12 beneficios de 40. Desde la `V86`, la misión y la visión hasta 400
+(«La misión admite hasta 400 caracteres», «La visión admite hasta 400 caracteres»), y la plantilla
+y el color, del catálogo («Esa plantilla no está entre las que se ofrecen», «Ese color no está entre
+los que se ofrecen»).
 
 **Lo que viaja al portal.** `empresa` en cada vacante es `{proposito, video, paginaWeb, redes,
 logo}`, y nulo si la empresa no llenó nada. `video` y `videoPuesto` son `{servicio, identificador,
@@ -1415,6 +1421,33 @@ una sola consulta**, nunca una por vacante.
 `/portal/empresas/{codigo}/imagenes/…`, y su dirección lleva el id del archivo (`?v=`): con la
 caché de un día, cambiar el logo cambia la dirección. Nunca se da un enlace al almacén privado ni a
 otro archivo.
+
+**El brochure** (`V86`, 17/11/2026). Es el perfil público pasado a papel, en PDF A4: se arma en el
+backend con el motor de PDF de los informes por etapa (`comun/pdf/`, PDFBox con sus fuentes
+incrustadas), sin ningún servicio externo, en una de tres plantillas —`CLASICA` («Clásica»), la de
+por defecto; `PORTADA` y `COLUMNAS`— y uno de seis colores —`AZUL` (por defecto), `VERDE`, `ROJO`,
+`NOCHE`, `PETROLEO` y `CIRUELA`—, un catálogo fijo en el código y sin color libre. Lleva, solo con lo
+que esté lleno y en este orden: el logo (sin logo, las iniciales) y el nombre con «Sector · Tamaño ·
+Fundada en AAAA»; «Quiénes somos» y «Nuestro propósito»; «Misión» y «Visión»; «Beneficios»; «Dónde
+estamos», que son las provincias de las sedes activas, sin direcciones; «Contacto» —el perfil en EX,
+la web, las redes y el video, como enlaces que se pueden pulsar y con la dirección escrita, y solo los
+`http` o `https`—; y al pie de la última hoja «Brochure generado con EX · {fecha}». Nada se recorta:
+lo largo pasa a la hoja siguiente. **Lo mínimo es «Quiénes somos» guardado**; sin él, el panel
+responde 409, la dirección pública 404 y el perfil trae `brochure` nulo.
+
+**No se guarda en ningún sitio**, ni en la base ni en el almacén: se arma al pedirlo con lo guardado.
+Para que pedirlo muchas veces no cargue el servidor, **se recuerda en memoria el último PDF de cada
+empresa** y solo se vuelve a armar cuando cambia algo de lo que lleva —lo guardado en el módulo, sus
+sedes, su logo o su portada, la plantilla, el color o la fecha del pie—. El recuerdo se pierde al
+reiniciar, y es de cada instancia. Si el logo o la portada no se pueden leer del almacén, el PDF sale
+sin ellos y no se recuerda, para que la siguiente descarga lo vuelva a intentar. El nombre del archivo
+quita los signos que un disco rechaza y recorta el nombre de la empresa a 80 caracteres.
+
+**El panel abre la dirección pública.** «Descargar brochure (PDF)» pide primero
+`GET /organizacion/presentacion/brochure` —es lo que comprueba el permiso y lo mínimo, y deja el PDF
+recordado— y después lleva la pestaña nueva a `/portal/empresas/{codigo}/brochure`, que lo sirve del
+recuerdo: así el visor del navegador propone el nombre «Brochure - {empresa}.pdf» y deja guardarlo y
+volver a él. Si dos personas eligen plantilla o color a la vez, gana la última.
 
 ### El perfil del candidato
 

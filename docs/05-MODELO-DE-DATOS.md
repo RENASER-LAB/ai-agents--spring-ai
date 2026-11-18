@@ -23,14 +23,15 @@ Sirve para tres cosas:
 - **Entender el sistema.** Un modelo de datos bien contado explica el negocio mejor que
   cualquier otro documento.
 
-**La base ya está construida.** Las migraciones `V1` a `V80`, la `V84` y la `V85` viven en
+**La base ya está construida.** Las migraciones `V1` a `V80` y de la `V84` a la `V86` viven en
 `src/main/resources/db/migration` —**131 tablas de este módulo**, 134 en la base contando la de
 Flyway y las dos del motor de agentes— y Flyway es el dueño del esquema. Cambiar algo de aquí
 ya cuesta una migración nueva, y **una migración aplicada no se edita nunca**: se escribe otra
 encima. No hay `V81` a `V83`: esos números los reservaban otras specs que todavía no se han
 construido, y como Flyway no aplica migraciones fuera de orden, tendrán que llevar un número
 mayor que la última aplicada. Ya pasó con el perfil de la empresa, que reservaba la `V81` y entró
-como `V85` (ver «Reglas que no se negocian» en [Reglas del código](REGLAS-DEL-CODIGO.md)).
+como `V85`, y su brochure entró como `V86` (ver «Reglas que no se negocian» en [Reglas del
+código](REGLAS-DEL-CODIGO.md)).
 
 La `V36` trae **el perfil del candidato**: seis tablas que cuelgan de `persona` —no de
 `usuario`, porque el usuario existe una vez por organización y el perfil es de la persona—
@@ -307,6 +308,12 @@ portada—, dos tablas, `organizacion_beneficio` y `organizacion_red_social`, la
 `vacante.video_presentacion` (el video propio de un puesto) y el permiso
 `editar_presentacion_empresa`. Las empresas que existían quedan sin datos, así que ninguna vacante
 cambia hasta que su empresa guarda. Ver «Organización», más abajo.
+
+La `V86` (17/11/2026) acompaña al **brochure de la empresa en PDF**, que se arma cada vez que se
+pide con lo guardado y no se guarda en ningún sitio. **No añade tablas ni permisos**: solo cuatro
+columnas en `organizacion` —la misión y la visión, opcionales, y la plantilla y el color elegidos
+para el brochure, que nunca van vacíos—. Las empresas que existían quedan sin misión ni visión, con
+«Clásica» y «Azul». Ver «Organización», más abajo.
 
 La `V54` (14/09/2026) **no añade ninguna tabla y cambia quién firma qué**. Hasta ella había dos
 tipos de texto —`PROCESO` y `FUTUROS_CONTACTOS`— y el de la cuenta usaba el primero, que habla de
@@ -702,7 +709,7 @@ Todas tienen `id` y fecha de creación aunque no se repita cada vez.
 
 | Tabla | Para qué existe | Columnas que importan |
 |---|---|---|
-| `organizacion` | Renaser, y mañana cada cliente de consultoría. Desde la `V85`, también cómo se presenta ante el candidato | codigo, nombre, es_activa, proposito_empresa, quienes_somos, sector, tamano, anio_fundacion, video_presentacion, pagina_web, logo_archivo_id, portada_archivo_id |
+| `organizacion` | Renaser, y mañana cada cliente de consultoría. Desde la `V85`, también cómo se presenta ante el candidato, y desde la `V86`, su misión, su visión y cómo quiere su brochure | codigo, nombre, es_activa, proposito_empresa, quienes_somos, sector, tamano, anio_fundacion, video_presentacion, pagina_web, logo_archivo_id, portada_archivo_id, mision, vision, plantilla_brochure, color_brochure |
 | `organizacion_beneficio` | Los beneficios que la empresa enseña en su perfil, hasta 12 y en su orden (`V85`) | organizacion_id, texto, orden |
 | `organizacion_red_social` | El enlace de la empresa en cada red: Facebook, Instagram, LinkedIn, TikTok y YouTube. Una fila por red, y una red vacía es una fila que no existe (`V85`) | organizacion_id, red, enlace |
 
@@ -722,6 +729,14 @@ propia, y el cambio queda en la auditoría.
 **`vacante.video_presentacion` es el video propio del puesto** (`V85`), opcional y con las mismas
 reglas que el de la empresa. Vacío, la vacante enseña el de la empresa. Cambiarlo con la vacante
 publicada es una corrección normal: se audita y no avisa a nadie.
+
+**El brochure no es una fila** (`V86`). Lo que se guarda es solo cuál de las tres plantillas y cuál
+de los seis colores eligió la empresa (`plantilla_brochure`, `color_brochure`), y el PDF se arma al
+pedirlo con lo que hay en `organizacion`, sus beneficios, sus redes y sus sedes activas: siempre
+refleja lo guardado y no hay nada que publicar ni que borrar. Las plantillas y los colores son un
+catálogo fijo en el código, sin tabla, como las portadas del perfil: el CHECK de cada columna es la
+red de abajo, y añadir una plantilla pide ampliarlo sin tocar a quien ya eligió. No hay ningún
+archivo nuevo en el almacén: el logo y la portada que lleva el PDF son los de la `V85`.
 
 ---
 
@@ -1758,6 +1773,9 @@ cuáles sí, porque las que no, hay que probarlas en el código.
   es nulo, nunca una cadena vacía. El tamaño es uno de seis rangos y el año de fundación, 1800 o
   más. Como mucho 12 beneficios de 40 caracteres por empresa, y una sola fila por empresa y red,
   con la red entre las cinco de la lista.
+- **La misión y la visión, hasta 400 caracteres, y el brochure, de su catálogo** (`V86`): las dos
+  primeras son nulas si están vacías, nunca una cadena vacía; `plantilla_brochure` es `CLASICA`,
+  `PORTADA` o `COLUMNAS`, y `color_brochure`, uno de los seis colores, los dos sin nulos.
 
 ### Tienen que vivir en el código
 

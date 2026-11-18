@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Brochure · Plantilla «Columnas» (petróleo, sin visión)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;550;600&amp;family=Syne:wght@400;500;600&amp;display=swap">
+<style>
+/*
+ * Plantilla «Columnas» con el color «Petróleo» (#155E75). Copia la geometría del informe por
+ * etapa («Columna de noche», PdfDelInforme): columna de 244 px en la primera hoja y franja de
+ * 45 px con el nombre en vertical en las siguientes. Aquí la columna lleva el color elegido, y
+ * la foto de portada de la 4a va como franja arriba a la derecha (sin portada, no hay franja).
+ * Con estos datos el brochure cabe en una hoja; con textos largos sigue en hojas con la franja
+ * estrecha (ver .estrecha), como el informe. Esta empresa NO llenó la visión: la misión ocupa el ancho entero y no queda ningún título
+ * «Visión». A4 de 794 × 1123 px.
+ */
+:root{--c:#155e75;--c-halo:#e3f1f5;--tinta:#111312;--tinta2:#4a5251;--tinta3:#687170;--bruma:#f5f7fb;--filete:#e6e7e4;--sobre:#f0f6f8;--sobre2:rgb(240 246 248 / 0.7);--sobre3:rgb(240 246 248 / 0.56);--enlace:#cfe8ef}
+*{box-sizing:border-box}
+body{margin:0;background:#d4d6d3;font-family:Onest, system-ui, sans-serif;color:var(--tinta);-webkit-font-smoothing:antialiased}
+.hojas{display:flex;flex-direction:column;align-items:center;gap:24px;padding:24px 0}
+.hoja{position:relative;width:794px;height:1123px;overflow:hidden;background:#fff;box-shadow:0 8px 24px rgb(15 23 42 / 0.12);display:flex}
+h1,h2,p,ul,dl,dd{margin:0}
+.etiqueta{font-family:Syne, Onest, sans-serif;font-size:10.5px;font-weight:500;letter-spacing:0.16em;text-transform:uppercase;color:var(--c)}
+.texto{font-size:13px;line-height:1.62;color:var(--tinta2);white-space:pre-line}
+
+/* ---- Columna ---- */
+.columna{width:244px;flex:none;background:var(--c);color:var(--sobre);padding:40px 26px 28px;display:flex;flex-direction:column;gap:24px}
+.logo{width:72px;height:72px;border-radius:8px;overflow:hidden;border:3px solid #fff;background:#fff}
+.logo svg{display:block;width:100%;height:100%}
+.nombre{font-size:30px;font-weight:400;line-height:1;letter-spacing:-0.05em}
+.col-etiqueta{font-family:Syne, Onest, sans-serif;font-size:9.5px;letter-spacing:0.16em;text-transform:uppercase;color:var(--sobre3)}
+.datos{display:flex;flex-direction:column;gap:10px;font-size:12px}
+.datos div{display:flex;flex-direction:column;gap:2px;border-top:1px solid rgb(255 255 255 / 0.14);padding-top:9px}
+.lista{display:flex;flex-direction:column;gap:8px;padding:0;list-style:none;font-size:12px;border-top:1px solid rgb(255 255 255 / 0.14);padding-top:12px}
+.lista li{display:flex;align-items:center;gap:9px}
+.lista a{color:var(--enlace);text-decoration:none;overflow-wrap:anywhere}
+.lista svg{flex:none}
+.colPie{margin-top:auto;font-family:Syne, Onest, sans-serif;font-size:9.5px;letter-spacing:0.06em;text-transform:uppercase;color:var(--sobre3)}
+
+/* ---- Derecha ---- */
+.derecha{flex:1;min-width:0;padding:40px 34px 28px;display:flex;flex-direction:column;gap:26px}
+.derecha .etiqueta{display:block;margin-bottom:9px}
+.proposito{padding:20px 22px;background:var(--c-halo);border-radius:4px}
+.proposito p{font-size:18px;line-height:1.4;letter-spacing:-0.02em;color:#0d3d4c}
+.chips{display:flex;flex-wrap:wrap;gap:7px;padding:0;list-style:none}
+.chip{display:inline-flex;align-items:center;gap:6px;min-height:26px;padding:0 10px 0 8px;border:1px solid rgb(0 0 0 / 0.1);border-radius:4px;font-size:11.5px}
+.chip svg{color:var(--c)}
+
+.banda{height:122px;border-radius:3px;overflow:hidden;margin:-8px 0 0}
+.banda svg{display:block;width:100%;height:100%}
+
+/* ---- Franja de las hojas siguientes ---- */
+.estrecha{width:45px;flex:none;background:var(--c);position:relative}
+.estrecha span{position:absolute;left:50%;bottom:48px;transform:translateX(-50%) rotate(180deg);writing-mode:vertical-rl;white-space:nowrap;font-family:Syne, Onest, sans-serif;font-size:10.5px;letter-spacing:0.16em;text-transform:uppercase;color:var(--sobre2)}
+.pie{margin-top:auto;display:flex;justify-content:space-between;align-items:center;padding-top:12px;border-top:1px solid var(--filete);font-family:Syne, Onest, sans-serif;font-size:9.5px;letter-spacing:0.06em;text-transform:uppercase;color:var(--tinta3)}
+@media print{body{background:#fff}.hojas{padding:0;gap:0}.hoja{box-shadow:none;break-after:page}@page{size:A4;margin:0}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="cielo1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#cfe3e6"/><stop offset="1" stop-color="#f6f0e4"/></linearGradient>
+    <linearGradient id="cielo3" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f3d9c4"/><stop offset="1" stop-color="#c7dcd3"/></linearGradient>
+  </defs>
+  <symbol id="logoVA" viewBox="0 0 64 64"><rect width="64" height="64" fill="#0f4c3a"/><ellipse cx="32" cy="32" rx="13" ry="18" transform="rotate(28 32 32)" fill="#f3ead8"/><path d="M27 17c7 6 3 24 10 30" stroke="#0f4c3a" stroke-width="2.6" fill="none" stroke-linecap="round"/></symbol>
+  <symbol id="portadaVA" viewBox="0 0 1600 400" preserveAspectRatio="xMidYMid slice"><rect width="1600" height="400" fill="url(#cielo1)"/><circle cx="1260" cy="110" r="56" fill="#f7e7c9"/><path d="M0 230 C220 140 420 170 640 200 S1060 120 1600 190 V400 H0Z" fill="#8fb19a"/><path d="M0 290 C300 220 620 250 900 270 S1340 230 1600 250 V400 H0Z" fill="#5e8a6f"/><path d="M0 340 C400 300 900 320 1600 310 V400 H0Z" fill="#2f5d48"/><g stroke="#1f4636" stroke-width="7" stroke-linecap="round" stroke-dasharray="2 22" opacity="0.8"><path d="M0 330 C400 290 900 310 1600 300"/><path d="M0 355 C400 320 900 340 1600 330"/><path d="M0 380 C400 350 900 368 1600 360"/></g></symbol>
+  <symbol id="visto" viewBox="0 0 24 24"><path d="m5 12.8 4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="pin" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21.5s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11Z"/><circle cx="12" cy="10.3" r="2.6"/></g></symbol>
+  <symbol id="ex" viewBox="0 0 32 28"><path d="M1 2h12v5H6.5v4.5H12v4.5H6.5V21H13v5H1Z" fill="currentColor"/><path d="M15 2h5l3 6.5L26 2h5l-5.5 12L31 26h-5l-3-6.5-3 6.5h-5l5.5-12Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" fill="none"/></symbol>
+  <symbol id="mundo" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.6 3.8 5.7 3.8 9S14.5 18.4 12 21c-2.5-2.6-3.8-5.7-3.8-9S9.5 5.6 12 3Z"/></g></symbol>
+  <symbol id="facebook" viewBox="0 0 24 24"><path d="M14.5 8.5H17V5h-2.5A3.5 3.5 0 0 0 11 8.5V11H8.5v3.5H11V21h3.5v-6.5H17l.5-3.5h-3V9a.5.5 0 0 1 .5-.5Z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></symbol>
+  <symbol id="instagram" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><path d="M17.5 6.5h.01"/></g></symbol>
+  <symbol id="linkedin" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2.5"/><path d="M7.5 10.5V17M7.5 7.4v.1"/><path d="M11.5 17v-4a2.5 2.5 0 0 1 5 0v4"/></g></symbol>
+</svg>
+
+<div class="hojas">
+  <!-- ======================= Hoja 1 ======================= -->
+  <section class="hoja" aria-label="Hoja 1 de 1">
+    <aside class="columna">
+      <div class="logo"><svg role="img" aria-label="Logo de Cafetalera Valle Alto"><use href="#logoVA"/></svg></div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <span class="col-etiqueta">Presentación de la empresa</span>
+        <h1 class="nombre">Cafetalera Valle Alto</h1>
+      </div>
+      <dl class="datos">
+        <div><dt class="col-etiqueta">Sector</dt><dd>Agroindustria</dd></div>
+        <div><dt class="col-etiqueta">Tamaño</dt><dd>51–200 colaboradores</dd></div>
+        <div><dt class="col-etiqueta">Fundada en</dt><dd>2004</dd></div>
+      </dl>
+      <div style="display:flex;flex-direction:column;gap:9px">
+        <span class="col-etiqueta">Dónde estamos</span>
+        <ul class="lista">
+          <li><svg width="14" height="14"><use href="#pin"/></svg>Jaén</li>
+          <li><svg width="14" height="14"><use href="#pin"/></svg>San Ignacio</li>
+          <li><svg width="14" height="14"><use href="#pin"/></svg>Lima</li>
+        </ul>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:9px">
+        <span class="col-etiqueta">Contacto</span>
+        <ul class="lista">
+          <li><svg width="15" height="14"><use href="#ex"/></svg><a href="#">Perfil en EX</a></li>
+          <li><svg width="14" height="14"><use href="#mundo"/></svg><a href="#">cafevallealto.pe</a></li>
+          <li><svg width="14" height="14"><use href="#facebook"/></svg><a href="#">Facebook</a></li>
+          <li><svg width="14" height="14"><use href="#instagram"/></svg><a href="#">Instagram</a></li>
+          <li><svg width="14" height="14"><use href="#linkedin"/></svg><a href="#">LinkedIn</a></li>
+        </ul>
+        <span style="font-size:10.5px;line-height:1.45;color:var(--sobre3);overflow-wrap:anywhere">ex.renaser.pe/empresas/cafetalera-valle-alto</span>
+      </div>
+      <span class="colPie">Cafetalera Valle Alto</span>
+    </aside>
+
+    <div class="derecha">
+      <div class="banda" role="img" aria-label="Portada de Cafetalera Valle Alto"><svg aria-hidden="true"><use href="#portadaVA"/></svg></div>
+      <div>
+        <span class="etiqueta">Quiénes somos</span>
+        <p class="texto">Somos una empresa del norte del Perú que compra, procesa y exporta café de altura.
+Trabajamos con 640 familias productoras de Jaén y San Ignacio y vendemos a tostadores de doce países.</p>
+      </div>
+      <div class="proposito">
+        <span class="etiqueta">Nuestro propósito</span>
+        <p>Que el café de altura del norte del Perú se pague por lo que vale, y que ese valor se quede en las familias que lo cultivan.</p>
+      </div>
+      <!-- Sin visión: la misión ocupa el ancho entero y no hay título «Visión». -->
+      <div>
+        <span class="etiqueta">Misión</span>
+        <p class="texto">Comprar el café de nuestras familias productoras a precio justo, procesarlo con cuidado y llevarlo a los mejores tostadores del mundo sin que pierda su origen.</p>
+      </div>
+      <div>
+        <span class="etiqueta">Beneficios</span>
+        <ul class="chips">
+          <li class="chip"><svg width="12" height="12"><use href="#visto"/></svg>Seguro EPS</li>
+          <li class="chip"><svg width="12" height="12"><use href="#visto"/></svg>Movilidad a planta</li>
+          <li class="chip"><svg width="12" height="12"><use href="#visto"/></svg>Almuerzo en planta</li>
+          <li class="chip"><svg width="12" height="12"><use href="#visto"/></svg>Capacitación pagada</li>
+          <li class="chip"><svg width="12" height="12"><use href="#visto"/></svg>Bono por cosecha</li>
+          <li class="chip"><svg width="12" height="12"><use href="#visto"/></svg>Café para llevar a casa</li>
+        </ul>
+      </div>
+      <div class="pie"><span>Brochure generado con EX · 17/11/2026</span><span>Página 1 de 1</span></div>
+    </div>
+  </section>
+
+</div>
+</body>
+</html>
