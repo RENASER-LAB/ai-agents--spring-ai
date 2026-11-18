@@ -47,7 +47,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
-BACKEND = "https://18-204-177-210.nip.io"
+BACKEND = "https://34-196-100-108.nip.io"
 
 # Los estados en que una prueba ya se entrego. Antes de eso no hay nada que volcar.
 ENTREGADA = "PRUEBA_CALIFICANDO"

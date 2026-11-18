@@ -33,7 +33,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
-BACKEND = "https://18-204-177-210.nip.io"
+BACKEND = "https://34-196-100-108.nip.io"
 VACANTES = [(15, "Arquitecto"), (16, "Ingeniero Civil")]
 
 COLOR = {
