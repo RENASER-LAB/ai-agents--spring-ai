@@ -499,14 +499,17 @@ de una de sus versiones sigue llevando a la lista de vacantes.
 
 **Editar el perfil de la empresa** (`editar_presentacion_empresa`, `V85`, 16/11/2026) abre el
 módulo «Perfil de la empresa» del panel: logo, portada, propósito, beneficios, video, web y redes,
-lo que el candidato ve de la empresa en el portal. Lo tienen Talento, Dirección y Administrador,
+lo que el candidato ve de la empresa en el portal, y desde la `V86` su brochure en PDF. Lo tienen Talento, Dirección y Administrador,
 con alcance `TODO`, **en todas las empresas que ya existían** y no solo en la plataforma; las que
 se den de alta después lo reciben con la copia de roles. Sin él, el módulo no sale en el menú y la
 API responde **403** sin guardar nada. Solo toca la empresa de quien ha entrado. El formulario de
 la vacante solo pregunta si la empresa tiene video, y para eso basta `ver_vacantes`.
-Desde la `V86` (17/11/2026) el mismo permiso cubre también la misión, la visión y la elección de
-la plantilla y el color del brochure, y la descarga del brochure desde el panel. No hay un permiso
-nuevo. La descarga desde el perfil público no pide cuenta, como el perfil.
+Desde la `V86` (17/11/2026) el mismo permiso cubre también la misión y la visión, la pestaña
+«Brochure» del módulo —elegir la plantilla y el color, que se guardan solos al elegirlos y quedan en
+la auditoría como `elegir_brochure_empresa`— y la descarga del brochure desde el panel. No hay un
+permiso nuevo: sin él, también esas rutas responden 403. **La descarga desde el perfil público no
+pide cuenta**, como el perfil: el brochure de una empresa activa con «Quiénes somos» lo abre
+cualquiera.
 
 ‡ Las dos filas de los instrumentos y del alta de empresas llegaron con el multiempresa
 (`V37`), y no significan lo mismo. **Personalizar los instrumentos** lo tiene el

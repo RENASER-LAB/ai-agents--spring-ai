@@ -14,7 +14,7 @@ haría falta para arreglarlo**. Sin lo tercero, una lista así solo sirve para p
 **Los números no se corren ni se reutilizan.** Otros documentos citan las entradas por su número,
 así que la que se cierra deja su hueco.
 
-Última revisión: **17/11/2026**.
+Última revisión: **18/11/2026**.
 
 ---
 
@@ -143,7 +143,10 @@ responde 500.
 equivocado también**: QA lo vio el 13/10/2026 en `GET /portal/cuenta/telefono` (la ruta solo
 admite `PUT`), en `GET /panel/postulaciones/{id}/transiciones`, y en la puerta del bot con un
 método equivocado o una barra final (`POST /vinculos/`). El bot usa `POST` y las rutas exactas,
-y para él un 5xx es reintentable, así que no le afecta.
+y para él un 5xx es reintentable, así que no le afecta. Visto otra vez por QA el **18/11/2026** en
+los dos guardados de «Perfil de la empresa» (`PUT /panel/organizacion/presentacion` y
+`PUT /panel/organizacion/presentacion/brochure`): un cuerpo que no es JSON responde 500. El panel
+siempre manda JSON, así que no le pasa a nadie que use la pantalla.
 
 **Qué haría falta.** Añadir a `ManejadorErrores` los `@ExceptionHandler` de las excepciones de
 Spring MVC que faltan —cuerpo ilegible, tipo que no convierte, método no permitido— con

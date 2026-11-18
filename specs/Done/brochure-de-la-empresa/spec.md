@@ -1,6 +1,5 @@
 # El brochure de la empresa, armado solo
-
-Estado: lista para implementar
+Estado: TERMINADO
 
 ## Objetivo
 Que cada empresa cliente tenga un **brochure de presentación en PDF** sin tener que diseñarlo.
@@ -8,7 +7,7 @@ Es la pieza 4b de la reunión con la clienta del 13/11/2026: «que cada empresa 
 de misión, visión… y automáticamente tener diferentes modelos tipo brochure que arman nuestros
 sistemas», «porque no todas las empresas tienen página web».
 
-La pieza 4a ([El propósito de la empresa](../../Done/proposito-de-la-empresa/spec.md), PR #139)
+La pieza 4a ([El propósito de la empresa](../proposito-de-la-empresa/spec.md), PR #139)
 ya está en producción con la parte web: el módulo del panel «Perfil de la empresa» y el perfil
 público `/empresas/<código>`. Esta spec es la **versión corta** del brochure (elegida por el
 usuario el 17/11/2026). Solo añade:
@@ -46,7 +45,7 @@ lo guardado. No hay que publicarlo ni hay una página web aparte.
     Viven en el almacén privado y el backend los sirve él mismo por
     `GET /api/v1/portal/empresas/{codigo}/imagenes/{logo|portada}`.
   - **El motor de PDF.** El informe por etapa
-    ([informe-pdf-por-etapa](../../Done/informe-pdf-por-etapa/spec.md)) ya genera PDF en el
+    ([informe-pdf-por-etapa](../informe-pdf-por-etapa/spec.md)) ya genera PDF en el
     propio backend, con PDFBox, sin servicios externos y con las fuentes incrustadas (Onest,
     Syne y la parte latin-ext de Onest). Las piezas comunes están en `comun/pdf`: el lienzo A4
     con coordenadas desde arriba, el texto que pasa de una hoja a otra sin cortarse y los
@@ -59,9 +58,9 @@ lo guardado. No hay que publicarlo ni hay una página web aparte.
     brochure (PDF)»).
 - Referencias existentes:
   - Specs de las que depende, ya terminadas:
-    [El propósito de la empresa](../../Done/proposito-de-la-empresa/spec.md) (4a), con su
-    [maqueta](../../Done/proposito-de-la-empresa/maqueta), e
-    [Un informe en PDF por cada etapa](../../Done/informe-pdf-por-etapa/spec.md) (el motor de
+    [El propósito de la empresa](../proposito-de-la-empresa/spec.md) (4a), con su
+    [maqueta](../proposito-de-la-empresa/maqueta), e
+    [Un informe en PDF por cada etapa](../informe-pdf-por-etapa/spec.md) (el motor de
     PDF).
   - [Archivos en el bucket](../../../docs/ARCHIVOS-EN-BUCKET.md) y
     [Roles y permisos](../../../docs/04-ROLES-Y-PERMISOS.md).
