@@ -1,5 +1,6 @@
 package com.renaser.ai.ai_engine.informe.service;
 
+import com.renaser.ai.ai_engine.comun.pdf.ColoresPdf;
 import com.renaser.ai.ai_engine.comun.pdf.EstiloPdf;
 import com.renaser.ai.ai_engine.comun.pdf.FlujoPdf;
 import com.renaser.ai.ai_engine.comun.pdf.FlujoPdf.Renglon;
@@ -50,16 +51,17 @@ import static com.renaser.ai.ai_engine.informe.service.FormatoDelInforme.hay;
 public class PdfDelInforme {
 
     // ------------------------------------------------------------------ colores Northstar
-    static final Color TINTA = new Color(0x111312);
-    static final Color AZUL = new Color(0x1E3A8A);
-    static final Color AZUL_OSCURO = new Color(0x172A66);
-    static final Color VERDE = new Color(0x0B7A63);
-    static final Color ROJO = new Color(0xC22A3F);
-    static final Color BRUMA = new Color(0xF5F7FB);
-    static final Color HALO = new Color(0xE9EDFF);
-    static final Color GRIS = new Color(0x687170);
-    static final Color GRIS_MEDIO = new Color(0x4A5251);
-    static final Color TEXTO2 = new Color(0x2B2F2D);
+    // Los de la paleta común viven en ColoresPdf: el brochure de la empresa los comparte.
+    static final Color TINTA = ColoresPdf.TINTA;
+    static final Color AZUL = ColoresPdf.AZUL;
+    static final Color AZUL_OSCURO = ColoresPdf.AZUL_OSCURO;
+    static final Color VERDE = ColoresPdf.VERDE;
+    static final Color ROJO = ColoresPdf.ROJO;
+    static final Color BRUMA = ColoresPdf.BRUMA;
+    static final Color HALO = ColoresPdf.HALO;
+    static final Color GRIS = ColoresPdf.GRIS;
+    static final Color GRIS_MEDIO = ColoresPdf.GRIS_MEDIO;
+    static final Color TEXTO2 = ColoresPdf.TEXTO2;
     static final Color FILETE = new Color(0xE7E7E7);
     static final Color NOCHE_TEXTO = new Color(0xF0F0F2);
     static final Color NOCHE_60 = new Color(0x979898);

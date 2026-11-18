@@ -504,6 +504,9 @@ con alcance `TODO`, **en todas las empresas que ya existían** y no solo en la p
 se den de alta después lo reciben con la copia de roles. Sin él, el módulo no sale en el menú y la
 API responde **403** sin guardar nada. Solo toca la empresa de quien ha entrado. El formulario de
 la vacante solo pregunta si la empresa tiene video, y para eso basta `ver_vacantes`.
+Desde la `V86` (17/11/2026) el mismo permiso cubre también la misión, la visión y la elección de
+la plantilla y el color del brochure, y la descarga del brochure desde el panel. No hay un permiso
+nuevo. La descarga desde el perfil público no pide cuenta, como el perfil.
 
 ‡ Las dos filas de los instrumentos y del alta de empresas llegaron con el multiempresa
 (`V37`), y no significan lo mismo. **Personalizar los instrumentos** lo tiene el

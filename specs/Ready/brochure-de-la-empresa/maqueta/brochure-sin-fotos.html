@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Brochure · Sin logo ni portada</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;550;600&amp;family=Syne:wght@400;500;600&amp;display=swap">
+<style>
+/*
+ * Una empresa sin logo ni portada (Textiles Ayllu). Solo llenó quiénes somos, el
+ * propósito, la misión, tres beneficios, una sede y su página web.
+ *   Hoja A: primera hoja de «Portada» con el color «Ciruela» (#6B2D5C): la portada es el color,
+ *           con las iniciales en grande en vez del logo. Ningún recuadro vacío.
+ *   Hoja B: primera hoja de «Columnas» con el color «Azul» (#1E3A8A): iniciales en la columna y
+ *           sin franja de fotos; lo de abajo sube.
+ * A4 de 794 × 1123 px.
+ */
+*{box-sizing:border-box}
+body{margin:0;background:#d4d6d3;font-family:Onest, system-ui, sans-serif;color:#111312;-webkit-font-smoothing:antialiased}
+.hojas{display:flex;flex-direction:column;align-items:center;gap:24px;padding:24px 0}
+.rotuloMaqueta{width:794px;font-size:12px;letter-spacing:0.16em;text-transform:uppercase;color:#4a5251}
+.hoja{position:relative;width:794px;height:1123px;overflow:hidden;background:#fff;box-shadow:0 8px 24px rgb(15 23 42 / 0.12);display:flex}
+h1,p,ul,dl,dd{margin:0}
+.etiqueta{font-family:Syne, Onest, sans-serif;font-size:10.5px;font-weight:500;letter-spacing:0.16em;text-transform:uppercase}
+.texto{font-size:13px;line-height:1.62;color:#4a5251;white-space:pre-line}
+
+/* ---- A · Portada sin fotos ---- */
+.portada{position:absolute;inset:0;background:#6b2d5c}
+.trama{position:absolute;inset:0;background:radial-gradient(circle at 85% 18%, rgb(255 255 255 / 0.10) 0, rgb(255 255 255 / 0) 42%),radial-gradient(circle at 10% 60%, rgb(0 0 0 / 0.18) 0, rgb(0 0 0 / 0) 46%)}
+.arriba{position:absolute;left:64px;right:64px;top:48px;display:flex;justify-content:space-between;font-family:Syne, Onest, sans-serif;font-size:10.5px;letter-spacing:0.16em;text-transform:uppercase;color:rgb(255 255 255 / 0.8)}
+.iniGrande{position:absolute;left:64px;top:190px;width:220px;height:220px;border-radius:12px;background:rgb(255 255 255 / 0.12);border:1px solid rgb(255 255 255 / 0.24);display:grid;place-items:center;font-size:96px;font-weight:500;letter-spacing:-0.04em;color:#fff}
+.abajo{position:absolute;left:64px;right:64px;bottom:84px;color:#fff}
+.nombreGrande{font-size:60px;font-weight:400;line-height:0.98;letter-spacing:-0.055em}
+.propositoGrande{margin-top:34px;padding-top:22px;border-top:1px solid rgb(255 255 255 / 0.28);max-width:560px}
+.propositoGrande span{color:rgb(255 255 255 / 0.7)}
+.propositoGrande p{margin-top:10px;font-size:22px;line-height:1.36;letter-spacing:-0.02em}
+.banda{position:absolute;left:0;right:0;bottom:0;height:12px;background:#4f1f43}
+
+/* ---- B · Columnas sin fotos ---- */
+.columna{width:244px;flex:none;background:#1e3a8a;color:#f0f2f8;padding:40px 26px 28px;display:flex;flex-direction:column;gap:24px}
+.ini{width:72px;height:72px;border-radius:8px;background:#e9edff;color:#172a66;display:grid;place-items:center;font-size:26px;font-weight:600}
+.nombre{font-size:30px;font-weight:400;line-height:1;letter-spacing:-0.05em}
+.col-etiqueta{font-family:Syne, Onest, sans-serif;font-size:9.5px;letter-spacing:0.16em;text-transform:uppercase;color:rgb(240 242 248 / 0.6)}
+.lista{display:flex;flex-direction:column;gap:8px;padding:0;list-style:none;font-size:12px;border-top:1px solid rgb(255 255 255 / 0.14);padding-top:12px}
+.lista li{display:flex;align-items:center;gap:9px}
+.lista a{color:#c9d6f8;text-decoration:none}
+.colPie{margin-top:auto;font-family:Syne, Onest, sans-serif;font-size:9.5px;letter-spacing:0.06em;text-transform:uppercase;color:rgb(240 242 248 / 0.56)}
+.derecha{flex:1;min-width:0;padding:40px 34px 28px;display:flex;flex-direction:column;gap:26px}
+.derecha .etiqueta{display:block;margin-bottom:9px;color:#1e3a8a}
+.proposito{padding:20px 22px;background:#e9edff;border-radius:4px}
+.proposito p{font-size:18px;line-height:1.4;letter-spacing:-0.02em;color:#172a66}
+.chips{display:flex;flex-wrap:wrap;gap:7px;padding:0;list-style:none}
+.chip{display:inline-flex;align-items:center;gap:6px;min-height:26px;padding:0 10px 0 8px;border:1px solid rgb(0 0 0 / 0.1);border-radius:4px;font-size:11.5px}
+.chip svg{color:#1e3a8a}
+.pie{margin-top:auto;display:flex;justify-content:space-between;align-items:center;padding-top:12px;border-top:1px solid #e6e7e4;font-family:Syne, Onest, sans-serif;font-size:9.5px;letter-spacing:0.06em;text-transform:uppercase;color:#687170}
+@media print{body{background:#fff}.rotuloMaqueta{display:none}.hojas{padding:0;gap:0}.hoja{box-shadow:none;break-after:page}@page{size:A4;margin:0}}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="visto" viewBox="0 0 24 24"><path d="m5 12.8 4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="pin" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21.5s7-5.6 7-11a7 7 0 1 0-14 0c0 5.4 7 11 7 11Z"/><circle cx="12" cy="10.3" r="2.6"/></g></symbol>
+  <symbol id="ex" viewBox="0 0 32 28"><path d="M1 2h12v5H6.5v4.5H12v4.5H6.5V21H13v5H1Z" fill="currentColor"/><path d="M15 2h5l3 6.5L26 2h5l-5.5 12L31 26h-5l-3-6.5-3 6.5h-5l5.5-12Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" fill="none"/></symbol>
+  <symbol id="mundo" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.5 2.6 3.8 5.7 3.8 9S14.5 18.4 12 21c-2.5-2.6-3.8-5.7-3.8-9S9.5 5.6 12 3Z"/></g></symbol>
+</svg>
+
+<div class="hojas">
+  <p class="rotuloMaqueta">A · «Portada» en ciruela, sin logo ni portada (primera hoja)</p>
+  <section class="hoja" aria-label="Portada sin logo ni portada">
+    <div class="portada"></div>
+    <div class="trama"></div>
+    <div class="arriba"><span>Presentación de la empresa</span><span>Textil</span></div>
+    <div class="iniGrande" aria-hidden="true">TA</div>
+    <div class="abajo">
+      <h1 class="nombreGrande">Textiles Ayllu</h1>
+      <p style="margin-top:14px;font-size:15px;color:rgb(255 255 255 / 0.8)">Textil · 11–50 colaboradores</p>
+      <div class="propositoGrande">
+        <span class="etiqueta">Nuestro propósito</span>
+        <p>Que la fibra de alpaca de Puno llegue al mundo tejida por manos de Puno, con trabajo digno y bien pagado.</p>
+      </div>
+    </div>
+    <div class="banda"></div>
+  </section>
+
+  <p class="rotuloMaqueta">B · «Columnas» en azul, sin logo ni portada (primera hoja)</p>
+  <section class="hoja" aria-label="Columnas sin logo ni portada">
+    <aside class="columna">
+      <div class="ini" aria-hidden="true">TA</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <span class="col-etiqueta">Presentación de la empresa</span>
+        <h1 class="nombre">Textiles Ayllu</h1>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:9px">
+        <span class="col-etiqueta">Dónde estamos</span>
+        <ul class="lista"><li><svg width="14" height="14"><use href="#pin"/></svg>Puno</li></ul>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:9px">
+        <span class="col-etiqueta">Contacto</span>
+        <ul class="lista">
+          <li><svg width="15" height="14"><use href="#ex"/></svg><a href="#">Perfil en EX</a></li>
+          <li><svg width="14" height="14"><use href="#mundo"/></svg><a href="#">textilesayllu.pe</a></li>
+        </ul>
+        <span style="font-size:10.5px;line-height:1.45;color:rgb(240 242 248 / 0.56);overflow-wrap:anywhere">ex.renaser.pe/empresas/textiles-ayllu</span>
+      </div>
+      <span class="colPie">Página 1 de 1</span>
+    </aside>
+    <div class="derecha">
+      <div>
+        <span class="etiqueta">Quiénes somos</span>
+        <p class="texto">Somos un taller de tejido de Puno que trabaja la fibra de alpaca desde el hilado hasta la prenda. Vendemos a tiendas de Lima, Cusco y Arequipa.</p>
+      </div>
+      <div class="proposito">
+        <span class="etiqueta">Nuestro propósito</span>
+        <p>Que la fibra de alpaca de Puno llegue al mundo tejida por manos de Puno, con trabajo digno y bien pagado.</p>
+      </div>
+      <div>
+        <span class="etiqueta">Misión</span>
+        <p class="texto">Tejer prendas de alpaca que duren años, formar a cada tejedora que entra al taller y pagar a tiempo a quienes nos venden la fibra.</p>
+      </div>
+      <div>
+        <span class="etiqueta">Beneficios</span>
+        <ul class="chips">
+          <li class="chip"><svg width="12" height="12"><use href="#visto"/></svg>Planilla desde el primer día</li>
+          <li class="chip"><svg width="12" height="12"><use href="#visto"/></svg>Horario de lunes a viernes</li>
+          <li class="chip"><svg width="12" height="12"><use href="#visto"/></svg>Capacitación en telar</li>
+        </ul>
+      </div>
+      <div class="pie"><span>Brochure generado con EX · 17/11/2026</span><span>Página 1 de 1</span></div>
+    </div>
+  </section>
+</div>
+</body>
+</html>

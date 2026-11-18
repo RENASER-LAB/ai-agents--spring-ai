@@ -13,6 +13,8 @@ import com.renaser.ai.ai_engine.organizacion.repository.SedeRepository;
 import com.renaser.ai.ai_engine.organizacion.service.ImagenesDeLaEmpresa;
 import com.renaser.ai.ai_engine.organizacion.service.ImagenesDeLaEmpresa.Cual;
 import com.renaser.ai.ai_engine.organizacion.service.SedesDeLaEmpresa;
+import com.renaser.ai.ai_engine.organizacion.service.ServicioBrochure;
+import com.renaser.ai.ai_engine.organizacion.service.ServicioBrochure.ArchivoDelBrochure;
 import com.renaser.ai.ai_engine.organizacion.service.TamanoDeEmpresa;
 import com.renaser.ai.ai_engine.perfil.dto.DtosPerfil.OpcionUbigeo;
 import com.renaser.ai.ai_engine.perfil.service.CatalogosDelPerfil;
@@ -47,6 +49,7 @@ public class ServicioEmpresasPortalImpl implements ServicioEmpresasPortal {
     private final PresentacionEnElPortal presentacion;
     private final ArchivoRepository archivos;
     private final AlmacenArchivos almacen;
+    private final ServicioBrochure brochures;
 
     @Override
     @Transactional(readOnly = true)
@@ -69,7 +72,19 @@ public class ServicioEmpresasPortalImpl implements ServicioEmpresasPortal {
                 beneficios.findByOrganizacionIdOrderByOrden(empresa.getId()).stream()
                         .map(OrganizacionBeneficio::getTexto).toList(),
                 empresa.getPaginaWeb(), presentacion.redesDe(empresa),
-                tablon.vacantesPublicadasDe(empresa));
+                tablon.vacantesPublicadasDe(empresa), empresa.getMision(), empresa.getVision(),
+                ServicioBrochure.tieneLoMinimo(empresa)
+                        ? "/api/v1/portal/empresas/"
+                        + ImagenesDeLaEmpresa.codigoEnLaDireccion(empresa.getCodigo()) + "/brochure"
+                        : null);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ArchivoDelBrochure brochure(String codigo) {
+        Organizacion empresa = laActiva(codigo);
+        return brochures.dePublica(empresa)
+                .orElseThrow(() -> new ResourceNotFoundException("Brochure", "codigo", codigo));
     }
 
     @Override

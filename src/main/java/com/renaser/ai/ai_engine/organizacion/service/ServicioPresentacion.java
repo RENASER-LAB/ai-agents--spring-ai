@@ -1,5 +1,6 @@
 package com.renaser.ai.ai_engine.organizacion.service;
 
+import com.renaser.ai.ai_engine.organizacion.dto.DtosPresentacion.GuardarBrochure;
 import com.renaser.ai.ai_engine.organizacion.dto.DtosPresentacion.GuardarPresentacion;
 import com.renaser.ai.ai_engine.organizacion.dto.DtosPresentacion.PresentacionPanel;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
@@ -22,6 +23,15 @@ public interface ServicioPresentacion {
      * guardados seguidos con lo mismo no vuelven a auditar.
      */
     PresentacionPanel guardar(ContextoUsuario quien, GuardarPresentacion datos);
+
+    /**
+     * Guarda solo la plantilla y el color del brochure, al elegirlos en la pestaña «Brochure»: lo
+     * demás de la presentación no se toca. Fuera del catálogo, {@link PresentacionInvalidaException}
+     * y no se guarda nada. Si cambió, queda en la auditoría como {@code elegir_brochure_empresa}.
+     * La siguiente descarga ya sale así: la plantilla y el color están en la huella del PDF
+     * recordado.
+     */
+    PresentacionPanel guardarBrochure(ContextoUsuario quien, GuardarBrochure eleccion);
 
     /** Sube el logo o la portada, re-codificados sin metadatos. Sustituye al anterior. */
     PresentacionPanel guardarImagen(ContextoUsuario quien, ImagenesDeLaEmpresa.Cual cual,

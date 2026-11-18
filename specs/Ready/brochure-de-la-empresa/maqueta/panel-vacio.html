@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Perfil de la empresa · Panel (vacío)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Onest:wght@100..900&amp;family=Syne:wght@400..800&amp;display=swap">
+<style>
+/*
+ * Maqueta del módulo «Perfil de la empresa» con la sección nueva «Brochure» y misión y visión en «Presentación».
+ * Las clases llevan el nombre de las reales de Frontend-EX y sus medidas:
+ *   - tokens Northstar de src/estilos/mundo.css;
+ *   - armazón de src/panel/Armazon.module.css y entradas de src/panel/menu.ts;
+ *   - .pagina … .verPerfil de src/panel/empresa/PerfilDeLaEmpresa.module.css;
+ *   - .campo/.etiqueta/.entrada/AreaTexto de src/ui/campos/Campo.module.css;
+ *   - .filas/.fila/.nombre/.explica/.vacio/.marca/.viva/.retirada de configuracion/Areas.module.css;
+ *   - .acentoMenor y .secundario de src/estilos/piezas.module.css (bloque Northstar).
+ * Lo marcado «NUEVO» es lo único que no existe hoy.
+ */
+:root{
+  --fuente:Onest, system-ui, sans-serif; --fuente-ui:Syne, Onest, system-ui, sans-serif;
+  --cielo:#fcfcfa; --nube:#ffffff; --nube-hundida:#f5f7fb; --nube-honda:#e5e5e7;
+  --tinta:#111312; --tinta2:#4a5251; --tinta3:#687170; --tinta-etiqueta:#656d6c;
+  --regla:#e6e7e4; --regla2:#d4d6d3; --borde-control:#7b8382;
+  --activo:#1e3a8a; --activo-pulsado:#172a66; --activo-bruma:#e9edff;
+  --bien:#0b7a63; --mal:#c22a3f; --mal-bruma:#fdedf0; --mal-regla:#f3c3cc;
+  --e1:4px; --e2:8px; --e3:12px; --e4:16px; --e5:24px; --e6:32px; --e7:48px; --e8:72px;
+  --radio:8px; --radio-menor:4px; --radio-control:8px;
+  --t-etiqueta:11px; --t-micro:12px; --t-menor:13px; --t-apoyo:14px; --t-prosa:15px; --t-base:16px;
+  --t-destacado:clamp(24px, 2.4vw, 30px); --t-pagina:clamp(2.25rem, 4vw, 3.5rem);
+  --tracking-etiqueta:0.16em; --medida:50ch;
+}
+*,*::before,*::after{box-sizing:border-box}
+html,body{margin:0;background:var(--cielo)}
+body{color:var(--tinta);font-family:var(--fuente);font-size:16px;line-height:1.5;-webkit-font-smoothing:antialiased}
+h1,h2,h3,p,ul,ol,figure{margin:0}
+h1{font-size:var(--t-pagina);line-height:0.98;letter-spacing:-0.055em;font-weight:400;text-wrap:balance}
+h2{line-height:1.2;letter-spacing:-0.03em;font-weight:550}
+a{color:var(--tinta)}
+button{font-family:inherit}
+.oculta{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}
+
+/* ---------- Armazón (Armazon.module.css) ---------- */
+.marco{min-height:100vh;display:flex;flex-direction:column}
+.barra{position:sticky;top:0;z-index:20;background:var(--cielo);border-bottom:1px solid rgb(17 19 18 / 0.1);display:flex;align-items:center;gap:12px 16px;min-height:57px;padding:0 24px;min-width:0}
+.botonMenu{display:none;flex:none;align-items:center;gap:8px;min-height:44px;padding:0 12px;border:1px solid #e5e7eb;border-radius:8px;background:var(--cielo);color:var(--tinta);font-size:14px;text-transform:uppercase;cursor:pointer}
+.marcaPanel{flex:none;display:inline-flex;align-items:center;gap:12px;min-height:44px;color:var(--tinta);text-decoration:none}
+.marcaPanel span{font-family:var(--fuente-ui);font-size:11px;font-weight:600;letter-spacing:0.16em;text-transform:uppercase;border-left:1px solid rgb(17 19 18 / 0.1);padding-left:12px;white-space:nowrap}
+.organizacion{min-width:0;font-size:14px;color:var(--tinta3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-left:16px;border-left:1px solid rgb(17 19 18 / 0.1)}
+.usuario{margin-left:auto;display:flex;align-items:center;gap:12px;min-width:0}
+.usuario span{font-size:14px;color:var(--tinta2);white-space:nowrap}
+.salir{flex:none;display:inline-flex;align-items:center;min-height:44px;background:none;border:0;padding:0 8px;font-size:14px;color:var(--tinta2);cursor:pointer;text-decoration:underline;text-decoration-color:var(--regla2);text-underline-offset:0.22em}
+.cuerpoPanel{flex:1;display:flex;align-items:flex-start;min-width:0}
+.lateral{position:sticky;top:57px;flex:0 0 240px;height:calc(100vh - 57px);display:flex;flex-direction:column;gap:12px;padding:16px 12px;background:var(--cielo);border-right:1px solid rgb(17 19 18 / 0.1)}
+.familias{flex:1;display:flex;flex-direction:column;gap:16px;min-height:0}
+.familia{display:flex;flex-direction:column;gap:4px}
+.familia h2{margin:0 0 4px;padding:0 12px;font-size:11px;font-weight:400;line-height:1.2;letter-spacing:0.16em;text-transform:uppercase;color:var(--tinta-etiqueta)}
+.entradas{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.entrada-menu{display:flex;align-items:center;gap:12px;min-height:44px;padding:0 12px;border-radius:4px;color:var(--tinta2);font-size:14px;text-decoration:none}
+.entrada-menu:hover{background:rgb(17 19 18 / 0.04);color:var(--tinta)}
+.entrada-menu[aria-current="page"]{color:var(--activo);font-weight:550;background:var(--activo-bruma);box-shadow:inset 2px 0 0 var(--activo)}
+.entrada-menu svg{flex:none}
+.pieMenu{list-style:none;margin:auto 0 0;padding:12px 0 0;display:flex;flex-direction:column;gap:2px;border-top:1px solid rgb(17 19 18 / 0.1)}
+.plegar{display:flex;align-items:center;gap:12px;min-height:44px;padding:0 12px;border:0;border-radius:8px;background:none;color:var(--tinta2);font-size:14px;cursor:pointer}
+main{flex:1 1 0;min-width:0}
+
+/* ---------- Botones (piezas.module.css, Northstar) ---------- */
+.acentoMenor,.secundario{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;border-radius:var(--radio-control);font-family:var(--fuente);font-size:var(--t-apoyo);font-weight:400;line-height:21px;text-transform:uppercase;text-decoration:none;cursor:pointer;padding:12px var(--e4);white-space:nowrap;transition:color 150ms,background-color 150ms,border-color 150ms}
+.acentoMenor{background:var(--activo);border:1px solid rgb(0 0 0 / 0.1);color:#fff}
+.acentoMenor:hover:not(:disabled){background:var(--activo-pulsado)}
+.secundario{background:var(--cielo);border:1px solid #e5e7eb;color:var(--tinta)}
+.secundario:hover:not(:disabled):not([aria-disabled="true"]){background:color-mix(in srgb, var(--tinta) 3%, var(--cielo))}
+.acentoMenor:disabled,.secundario:disabled,.secundario[aria-disabled="true"]{background:var(--nube-honda);color:var(--tinta3);border-color:transparent;cursor:default}
+/* accionFoto (Cabecera.module.css): secundario alineado a la izquierda */
+.accionFoto{justify-content:flex-start}
+
+/* ---------- Página (PerfilDeLaEmpresa.module.css) ---------- */
+.pagina{max-width:84rem;margin:0 auto;padding:var(--e5) var(--e5) var(--e8)}
+.bajada{font-size:var(--t-prosa);line-height:1.55;color:var(--tinta2);margin-top:var(--e2);max-width:var(--medida)}
+.dos{display:grid;grid-template-columns:minmax(0,1fr) 26rem;gap:var(--e6);align-items:start;margin-top:var(--e6)}
+.previa{position:sticky;top:calc(57px + var(--e4))}
+.botonPrevia{display:none}
+.editor{display:flex;flex-direction:column;gap:var(--e5);min-width:0}
+.seccion{border:1px solid rgb(0 0 0 / 0.1);border-radius:var(--radio-menor);background:var(--nube);padding:var(--e5);display:flex;flex-direction:column;gap:var(--e4)}
+.tituloSeccion{margin:0;font-size:var(--t-destacado)}
+.pareja{display:grid;grid-template-columns:repeat(auto-fit, minmax(14rem, 1fr));gap:var(--e4)}
+.enlaces{display:grid;grid-template-columns:repeat(auto-fit, minmax(16rem, 1fr));gap:var(--e4)}
+.imagenes{display:grid;grid-template-columns:auto minmax(0,1fr);gap:var(--e5);align-items:start}
+.zonaImagen{display:flex;flex-direction:column;gap:var(--e2);min-width:0}
+.rotulo{font-size:var(--t-apoyo);font-weight:600;color:var(--tinta)}
+.logo{width:96px;height:96px;display:grid;place-items:center;overflow:hidden;border-radius:8px;box-shadow:0 0 0 1px rgb(0 0 0 / 0.1);background:#fff}
+.logo svg,.portada svg{display:block;width:100%;height:100%}
+.portada{width:100%;aspect-ratio:4 / 1;overflow:hidden;border-radius:var(--radio-menor);background:var(--nube-hundida);box-shadow:0 0 0 1px rgb(0 0 0 / 0.1)}
+.botonesImagen{display:flex;flex-wrap:wrap;gap:var(--e2)}
+.cabeceraSedes{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:var(--e2) var(--e4)}
+.gestionar{font-size:var(--t-apoyo);color:var(--activo)}
+.contador{margin:calc(var(--e2) * -1) 0 0;font-size:var(--t-menor);color:var(--tinta3);font-variant-numeric:tabular-nums;text-align:right}
+.cabeceraSedes .contador{margin:0}
+.beneficios{display:flex;flex-wrap:wrap;gap:var(--e2);margin:0;padding:0;list-style:none}
+.beneficio{display:inline-flex;align-items:center;gap:var(--e1);min-height:36px;padding:0 var(--e2) 0 var(--e3);border:1px solid rgb(0 0 0 / 0.1);border-radius:var(--radio-menor);background:var(--nube);font-size:var(--t-apoyo)}
+.quitarBeneficio{display:inline-grid;place-items:center;width:28px;height:28px;padding:0;border:0;background:none;color:var(--tinta3);cursor:pointer}
+.quitarBeneficio:hover{color:var(--tinta)}
+.anadir{display:flex;gap:var(--e2);align-items:flex-end}
+.anadir > :first-child{flex:1}
+.pie{display:flex;flex-wrap:wrap;align-items:center;gap:var(--e3)}
+.verPerfil{display:inline-flex;align-items:center;gap:6px;font-size:var(--t-apoyo);color:var(--activo)}
+.avisoBien{font-size:var(--t-prosa);color:var(--bien);border-left:2px solid var(--bien);padding-left:var(--e3);margin:0}
+
+/* ---------- Campos (Campo.module.css + bloque Northstar) ---------- */
+.campo{display:flex;flex-direction:column;gap:var(--e2);min-width:0}
+.etiqueta{font-size:var(--t-apoyo);font-weight:500;letter-spacing:-0.01em}
+.entrada{width:100%;min-height:48px;padding:0 var(--e3);background:var(--nube);color:var(--tinta);border:1px solid var(--borde-control);font:inherit;font-size:var(--t-base);border-radius:var(--radio-menor)}
+textarea.entrada{padding:var(--e3);line-height:1.55;resize:vertical;min-height:7rem}
+.entrada:hover{border-color:var(--tinta)}
+.entrada:focus-visible{outline:none;border-color:var(--activo);box-shadow:0 0 0 1px var(--activo),0 0 0 4px rgb(30 58 138 / 0.22)}
+.entrada[readonly]{background:var(--nube-honda);border-color:var(--nube-honda);color:var(--tinta2)}
+.entrada:disabled{background:var(--nube-honda);border-color:var(--nube-honda);color:var(--tinta3)}
+select.entrada{appearance:none;padding-right:48px;background-image:linear-gradient(45deg, transparent 50%, #4a5251 50%),linear-gradient(135deg, #4a5251 50%, transparent 50%);background-position:calc(100% - 22px) calc(50% + 2px),calc(100% - 16px) calc(50% + 2px);background-size:6px 6px,6px 6px;background-repeat:no-repeat}
+
+/* ---------- Filas y marcas (Areas.module.css) ---------- */
+.filas{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:var(--e2)}
+.fila{display:flex;flex-wrap:wrap;align-items:center;gap:var(--e3) var(--e4);background:var(--nube);border:1px solid var(--regla);border-radius:var(--radio-menor);padding:var(--e3) var(--e4)}
+.queEs{display:flex;align-items:center;gap:var(--e3);flex:1 1 18rem;min-width:0}
+.nombre{font-size:var(--t-base);font-weight:600;overflow-wrap:anywhere}
+.explica{width:100%;font-size:var(--t-menor);line-height:1.55;color:var(--tinta2);max-width:var(--medida);margin:0}
+.vacio{font-size:var(--t-prosa);line-height:1.55;color:var(--tinta2);background:var(--nube-hundida);border-radius:var(--radio-menor);padding:var(--e4);max-width:var(--medida);margin:0}
+.marca{flex:none;display:inline-flex;align-items:center;gap:6px;padding:3px var(--e3);font-size:var(--t-micro);font-weight:700;letter-spacing:0.02em;white-space:nowrap;border-radius:var(--radio-control)}
+.viva{border:1px solid transparent;background:var(--nube-honda);color:var(--tinta)}
+.retirada{border:1px dashed var(--regla2);background:var(--nube);color:var(--tinta3)}
+
+/* ---------- NUEVO · Brochure ---------- */
+.plantillas{display:grid;grid-template-columns:repeat(3, minmax(0, 1fr));gap:var(--e3);margin:0;padding:0;list-style:none}
+.plantilla{display:flex;flex-direction:column;gap:var(--e2);width:100%;padding:var(--e3);border:1px solid rgb(0 0 0 / 0.1);border-radius:var(--radio-menor);background:var(--nube);color:var(--tinta);font-size:var(--t-apoyo);text-align:left;cursor:pointer;transition:border-color 150ms}
+.plantilla:hover{border-color:var(--tinta)}
+.plantilla[aria-checked="true"]{border-color:var(--activo);box-shadow:0 0 0 1px var(--activo)}
+.plantilla[aria-checked="true"] .nombrePlantilla{color:var(--activo);font-weight:550}
+.muestra{aspect-ratio:210 / 297;width:100%;overflow:hidden;border-radius:2px;box-shadow:0 0 0 1px rgb(0 0 0 / 0.1);background:#fff}
+.muestra svg{display:block;width:100%;height:100%}
+.colores{display:flex;flex-wrap:wrap;gap:var(--e2);margin:0;padding:0;list-style:none}
+.color{display:inline-grid;place-items:center;width:44px;height:44px;padding:0;border:0;border-radius:999px;background:none;cursor:pointer}
+.color span{display:block;width:32px;height:32px;border-radius:999px;box-shadow:inset 0 0 0 1px rgb(0 0 0 / 0.12)}
+.color[aria-checked="true"]{box-shadow:0 0 0 2px var(--activo)}
+.filaPdf{display:flex;flex-wrap:wrap;align-items:center;gap:var(--e3);padding-top:var(--e4);border-top:1px solid var(--regla)}
+
+/* ---------- La vista previa (PerfilDeLaEmpresa.module.css) ---------- */
+.etiquetaPrevia{margin:0 0 var(--e3);font-size:var(--t-micro);font-weight:500;letter-spacing:var(--tracking-etiqueta);text-transform:uppercase;color:var(--tinta3)}
+.tarjetaPrevia{border:1px solid rgb(0 0 0 / 0.1);border-radius:var(--radio);background:var(--nube);overflow:hidden;max-height:calc(100vh - 57px - 72px);overflow-y:auto}
+.portadaPrevia{height:96px;background:var(--nube-hundida);overflow:hidden}
+.portadaPrevia svg{display:block;width:100%;height:100%}
+.cabeceraPrevia{display:flex;gap:var(--e3);align-items:flex-end;padding:0 var(--e4);margin-top:-32px}
+.logoPrevia{flex:none;width:72px;height:72px;display:grid;place-items:center;overflow:hidden;border:3px solid var(--nube);border-radius:8px;background:#fff;box-shadow:0 0 0 1px rgb(0 0 0 / 0.1)}
+.logoPrevia svg{display:block;width:100%;height:100%}
+.cuerpoPrevia{display:flex;flex-direction:column;gap:var(--e4);padding:var(--e3) var(--e4) var(--e5)}
+.nombrePrevia{margin:0;font-size:22px;font-weight:400;letter-spacing:-0.03em;line-height:1.15;overflow-wrap:break-word}
+.lineaPrevia{margin:var(--e1) 0 0;font-size:var(--t-apoyo);color:var(--tinta2)}
+.tituloPrevia{margin:0 0 var(--e2);font-size:var(--t-micro);font-weight:500;letter-spacing:var(--tracking-etiqueta);text-transform:uppercase;color:var(--tinta3)}
+.textoPrevia{margin:0;font-size:var(--t-apoyo);line-height:1.6;color:var(--tinta2);white-space:pre-line;overflow-wrap:break-word}
+.vacantesPrevia{display:flex;flex-direction:column;gap:var(--e2);margin:0;padding:0;list-style:none}
+.vacantePrevia{padding:var(--e2) var(--e3);border:1px solid rgb(0 0 0 / 0.1);border-radius:var(--radio-menor);font-size:var(--t-apoyo)}
+.vacantePrevia span{display:block;font-size:var(--t-menor);color:var(--tinta3)}
+.chipsEnlace{display:flex;flex-wrap:wrap;gap:var(--e2);margin:0;padding:0;list-style:none}
+.chipEnlace{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:0 16px 0 12px;border:1px solid #e5e7eb;border-radius:999px;background:var(--cielo);color:var(--tinta);font-size:14px;text-decoration:none;white-space:nowrap}
+
+.chico,.guardar,.botonPrevia{text-transform:uppercase}
+
+@media (max-width:1279.98px){.dos{grid-template-columns:minmax(0,1fr)}.previa{display:none}.botonPrevia{display:inline-flex}}
+@media (max-width:1023.98px){.lateral{display:none}.botonMenu{display:inline-flex}}
+@media (max-width:640px){.ocultable{display:none}.barra{padding:0 16px}.pagina{padding:16px 16px 48px}.imagenes{grid-template-columns:minmax(0,1fr)}.plantillas{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
+</style>
+</head>
+<body>
+
+<!-- Logo y portada de ejemplo: dibujos SVG (sin URLs externas). -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="cielo1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#cfe3e6"/><stop offset="1" stop-color="#f6f0e4"/></linearGradient>
+    <linearGradient id="cielo2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#bcd3ea"/><stop offset="1" stop-color="#eef2f8"/></linearGradient>
+    <linearGradient id="cielo3" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#f3d9c4"/><stop offset="1" stop-color="#c7dcd3"/></linearGradient>
+  </defs>
+  <symbol id="logoVA" viewBox="0 0 64 64"><rect width="64" height="64" fill="#0f4c3a"/><ellipse cx="32" cy="32" rx="13" ry="18" transform="rotate(28 32 32)" fill="#f3ead8"/><path d="M27 17c7 6 3 24 10 30" stroke="#0f4c3a" stroke-width="2.6" fill="none" stroke-linecap="round"/></symbol>
+  <symbol id="portadaVA" viewBox="0 0 1600 400" preserveAspectRatio="xMidYMid slice"><rect width="1600" height="400" fill="url(#cielo1)"/><circle cx="1260" cy="110" r="56" fill="#f7e7c9"/><path d="M0 230 C220 140 420 170 640 200 S1060 120 1600 190 V400 H0Z" fill="#8fb19a"/><path d="M0 290 C300 220 620 250 900 270 S1340 230 1600 250 V400 H0Z" fill="#5e8a6f"/><path d="M0 340 C400 300 900 320 1600 310 V400 H0Z" fill="#2f5d48"/><g stroke="#1f4636" stroke-width="7" stroke-linecap="round" stroke-dasharray="2 22" opacity="0.8"><path d="M0 330 C400 290 900 310 1600 300"/><path d="M0 355 C400 320 900 340 1600 330"/><path d="M0 380 C400 350 900 368 1600 360"/></g></symbol>
+</svg>
+
+<div class="marco">
+  <header class="barra">
+    <button class="botonMenu" type="button">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6.5h16M4 12h16M4 17.5h16"/></svg>Menú
+    </button>
+    <a class="marcaPanel" href="#" aria-label="Panel del equipo, inicio">
+      <svg width="32" height="28" viewBox="0 0 32 28" fill="none" role="img" aria-label="EX"><path d="M1 2h12v5H6.5v4.5H12v4.5H6.5V21H13v5H1Z" fill="currentColor"/><path d="M15 2h5l3 6.5L26 2h5l-5.5 12L31 26h-5l-3-6.5-3 6.5h-5l5.5-12Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>
+      <span class="ocultable">Panel del equipo</span>
+    </a>
+    <span class="organizacion ocultable">Textiles Ayllu</span>
+    <div class="usuario">
+      <span class="ocultable">Lucía Paredes</span>
+      <button class="salir" type="button">Salir</button>
+    </div>
+  </header>
+
+  <div class="cuerpoPanel">
+    <nav class="lateral" aria-label="Menú del panel">
+      <div class="familias">
+        <section class="familia" aria-label="Selección">
+          <h2 aria-hidden="true">/ Selección</h2>
+          <ul class="entradas" role="list">
+            <li><a class="entrada-menu" href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="7" width="19" height="13" rx="2"/><path d="M8.5 7V5.5a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2V7"/><path d="M2.5 12h19"/></svg>Vacantes</a></li>
+            <li><a class="entrada-menu" href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2.8H7a2 2 0 0 0-2 2v14.4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7.8L14 2.8Z"/><path d="M14 2.8v5h5"/><path d="M8.5 13h7M8.5 16.5h4.5"/></svg>Pruebas</a></li>
+            <li><a class="entrada-menu" href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5.3l3.3 2"/></svg>Simulación</a></li>
+            <li><a class="entrada-menu" href="#" aria-current="page"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 21V4.5a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1V21"/><path d="M14.5 9.5h4a1 1 0 0 1 1 1V21"/><path d="M3 21h18"/><path d="M8 7.5h3M8 11h3M8 14.5h3"/></svg>Perfil de la empresa</a></li>
+          </ul>
+        </section>
+        <section class="familia" aria-label="Personas">
+          <h2 aria-hidden="true">/ Personas</h2>
+          <ul class="entradas" role="list">
+            <li><a class="entrada-menu" href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.2"/><path d="M3 19.5c.6-3.3 3.1-5.3 6-5.3s5.4 2 6 5.3"/><path d="M15.5 5.2a3 3 0 0 1 0 5.8"/><path d="M17.5 14.6c1.8.6 3.1 2.3 3.5 4.9"/></svg>Colaboradores</a></li>
+          </ul>
+        </section>
+        <ul class="pieMenu" role="list">
+          <li><a class="entrada-menu" href="#"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h9M17 7h3M4 12h3M11 12h9M4 17h11M19 17h1"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="17" r="2"/></svg>Configuración</a></li>
+        </ul>
+      </div>
+      <button class="plegar" type="button" aria-pressed="false"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m11.5 6.5-5.5 5.5 5.5 5.5M18 6.5 12.5 12l5.5 5.5"/></svg>Plegar menú</button>
+    </nav>
+
+    <main>
+      <div class="pagina">
+        <h1>Perfil de la empresa.</h1>
+        <p class="bajada">Lo que ven los candidatos en tu página pública y junto a cada vacante.</p>
+
+        <div class="dos">
+          <form class="editor" novalidate aria-label="Perfil de la empresa" onsubmit="return false">
+
+            <!-- ============ Identidad (como hoy) ============ -->
+            <section class="seccion" aria-labelledby="sec-identidad">
+              <h2 class="tituloSeccion" id="sec-identidad">Identidad</h2>
+              <div class="imagenes">
+                <div class="zonaImagen" id="campo-logo">
+                  <span class="rotulo">Logo</span>
+                  <div class="logo"><span aria-hidden="true" style="display:grid;place-items:center;width:100%;height:100%;background:#e9edff;color:#172a66;font-size:24px;font-weight:600">TA</span></div>
+                  <div class="botonesImagen"><label class="secundario accionFoto"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8.5h3.2l1.4-2.3a1.5 1.5 0 0 1 1.3-.7h6.2a1.5 1.5 0 0 1 1.3.7l1.4 2.3H21a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1Z"/><circle cx="12" cy="13.8" r="3.4"/></svg>Subir logo<input class="oculta" type="file" accept="image/jpeg,image/png"></label></div>
+                </div>
+                <div class="zonaImagen" id="campo-portada">
+                  <span class="rotulo">Foto de portada</span>
+                  <div class="portada"></div>
+                  <div class="botonesImagen"><label class="secundario accionFoto"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8.5h3.2l1.4-2.3a1.5 1.5 0 0 1 1.3-.7h6.2a1.5 1.5 0 0 1 1.3.7l1.4 2.3H21a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1v-9a1 1 0 0 1 1-1Z"/><circle cx="12" cy="13.8" r="3.4"/></svg>Subir portada<input class="oculta" type="file" accept="image/jpeg,image/png"></label></div>
+                </div>
+              </div>
+              <div class="campo"><label class="etiqueta" for="c-nombre">Nombre de la empresa</label><input class="entrada" id="c-nombre" value="Textiles Ayllu" readonly></div>
+              <div class="pareja">
+                <div class="campo"><label class="etiqueta" for="c-sector">Sector</label><input class="entrada" id="c-sector" maxlength="60" value=""></div>
+                <div class="campo"><label class="etiqueta" for="c-tamano">Tamaño</label><select class="entrada" id="c-tamano"><option selected>Sin indicar</option><option>1–10 colaboradores</option><option>11–50 colaboradores</option><option>51–200 colaboradores</option><option>201–500 colaboradores</option><option>501–1000 colaboradores</option><option>Más de 1000 colaboradores</option></select></div>
+                <div class="campo"><label class="etiqueta" for="c-anio">Año de fundación</label><input class="entrada" id="c-anio" inputmode="numeric" maxlength="4" value=""></div>
+              </div>
+              <div id="campo-sedes">
+                <div class="cabeceraSedes"><span class="rotulo">Sedes</span><a class="gestionar" href="#">Gestionar sedes</a></div>
+                <p class="vacio" style="margin-top:8px">Todavía no hay ninguna sede.</p>
+              </div>
+            </section>
+
+            <!-- ============ Presentación (como hoy) ============ -->
+            <section class="seccion" aria-labelledby="sec-presentacion">
+              <h2 class="tituloSeccion" id="sec-presentacion">Presentación</h2>
+              <div class="campo" id="campo-quienes"><label class="etiqueta" for="c-quienes">Quiénes somos</label><textarea class="entrada" id="c-quienes" rows="5" maxlength="1500"></textarea></div>
+              <p class="contador" aria-live="polite">0 / 1500</p>
+              <div class="campo" id="campo-proposito"><label class="etiqueta" for="c-proposito">Nuestro propósito</label><textarea class="entrada" id="c-proposito" rows="6" maxlength="1500"></textarea></div>
+              <p class="contador" aria-live="polite">0 / 1500</p>
+              <div class="campo" id="campo-mision"><label class="etiqueta" for="c-mision">Misión</label><textarea class="entrada" id="c-mision" rows="4" maxlength="400"></textarea></div>
+              <p class="contador" aria-live="polite">0 / 400</p>
+              <div class="campo" id="campo-vision"><label class="etiqueta" for="c-vision">Visión</label><textarea class="entrada" id="c-vision" rows="4" maxlength="400"></textarea></div>
+              <p class="contador" aria-live="polite">0 / 400</p>
+              <div id="campo-beneficios">
+                <div class="cabeceraSedes"><span class="rotulo" id="rotulo-beneficios">Beneficios</span><span class="contador">0 / 12</span></div>
+                <div class="anadir" style="margin-top:8px">
+                  <div class="campo"><label class="oculta" for="c-beneficio">Nuevo beneficio</label><input class="entrada" id="c-beneficio" maxlength="40" placeholder="Seguro EPS"></div>
+                  <button class="secundario chico" type="button" disabled>Añadir</button>
+                </div>
+              </div>
+            </section>
+
+            <!-- ============ Video y enlaces (como hoy) ============ -->
+            <section class="seccion" aria-labelledby="sec-video">
+              <h2 class="tituloSeccion" id="sec-video">Video y enlaces</h2>
+              <div class="campo" id="campo-video"><label class="etiqueta" for="c-video">Video de presentación</label><input class="entrada" id="c-video" inputmode="url" value=""></div>
+              <div class="enlaces" id="campo-enlaces">
+                <div class="campo"><label class="etiqueta" for="c-web">Página web</label><input class="entrada" id="c-web" inputmode="url"></div>
+                <div class="campo"><label class="etiqueta" for="c-fb">Facebook</label><input class="entrada" id="c-fb" inputmode="url"></div>
+                <div class="campo"><label class="etiqueta" for="c-ig">Instagram</label><input class="entrada" id="c-ig" inputmode="url"></div>
+                <div class="campo"><label class="etiqueta" for="c-li">LinkedIn</label><input class="entrada" id="c-li" inputmode="url"></div>
+                <div class="campo"><label class="etiqueta" for="c-tt">TikTok</label><input class="entrada" id="c-tt" inputmode="url"></div>
+                <div class="campo"><label class="etiqueta" for="c-yt">YouTube</label><input class="entrada" id="c-yt" inputmode="url"></div>
+              </div>
+            </section>
+
+            <!-- ============ NUEVO · Brochure ============ -->
+            <section class="seccion" aria-labelledby="sec-brochure">
+              <h2 class="tituloSeccion" id="sec-brochure">Brochure</h2>
+
+              <div>
+                <span class="rotulo" id="rotulo-plantilla">Plantilla del brochure</span>
+                <ul class="plantillas" role="radiogroup" aria-labelledby="rotulo-plantilla" style="margin-top:8px">
+                  <li><button class="plantilla" type="button" role="radio" aria-checked="true">
+                    <span class="muestra"><svg viewBox="0 0 210 297" aria-hidden="true"><rect width="210" height="297" fill="#fff"/><rect x="18" y="20" width="22" height="22" rx="3" fill="#1e3a8a"/><rect x="18" y="52" width="120" height="10" fill="#111312"/><rect x="18" y="68" width="80" height="4" fill="#687170"/><rect x="18" y="84" width="174" height="1.5" fill="#1e3a8a"/><rect x="18" y="96" width="40" height="3" fill="#1e3a8a"/><rect x="18" y="104" width="174" height="3" fill="#d4d6d3"/><rect x="18" y="111" width="160" height="3" fill="#d4d6d3"/><rect x="18" y="118" width="168" height="3" fill="#d4d6d3"/><rect x="18" y="134" width="174" height="34" fill="#f5f7fb"/><rect x="26" y="144" width="120" height="5" fill="#1e3a8a"/><rect x="26" y="154" width="100" height="5" fill="#1e3a8a"/><rect x="18" y="182" width="82" height="3" fill="#1e3a8a"/><rect x="110" y="182" width="82" height="3" fill="#1e3a8a"/><rect x="18" y="190" width="82" height="22" fill="#e6e7e4"/><rect x="110" y="190" width="82" height="22" fill="#e6e7e4"/><rect x="18" y="226" width="40" height="3" fill="#1e3a8a"/><rect x="18" y="234" width="50" height="10" rx="2" fill="#e6e7e4"/><rect x="72" y="234" width="44" height="10" rx="2" fill="#e6e7e4"/><rect x="120" y="234" width="54" height="10" rx="2" fill="#e6e7e4"/></svg></span>
+                    <span class="nombrePlantilla">Clásica</span></button></li>
+                  <li><button class="plantilla" type="button" role="radio" aria-checked="false">
+                    <span class="muestra"><svg viewBox="0 0 210 297" aria-hidden="true"><rect width="210" height="297" fill="#1e3a8a"/><rect x="18" y="196" width="28" height="28" rx="3" fill="#fff"/><rect x="18" y="232" width="150" height="12" fill="#fff"/><rect x="18" y="250" width="110" height="4" fill="#fff" opacity="0.7"/><rect x="18" y="262" width="170" height="3" fill="#fff" opacity="0.5"/><rect x="18" y="269" width="150" height="3" fill="#fff" opacity="0.5"/><rect x="0" y="291" width="210" height="6" fill="#1e3a8a"/></svg></span>
+                    <span class="nombrePlantilla">Portada</span></button></li>
+                  <li><button class="plantilla" type="button" role="radio" aria-checked="false">
+                    <span class="muestra"><svg viewBox="0 0 210 297" aria-hidden="true"><rect width="210" height="297" fill="#fff"/><rect width="64" height="297" fill="#1e3a8a"/><rect x="10" y="20" width="22" height="22" rx="3" fill="#fff"/><rect x="10" y="52" width="44" height="7" fill="#fff"/><rect x="10" y="64" width="34" height="3" fill="#fff" opacity="0.7"/><rect x="10" y="90" width="44" height="2.5" fill="#fff" opacity="0.5"/><rect x="10" y="96" width="38" height="2.5" fill="#fff" opacity="0.5"/><rect x="10" y="102" width="40" height="2.5" fill="#fff" opacity="0.5"/><rect x="10" y="240" width="40" height="2.5" fill="#fff" opacity="0.5"/><rect x="10" y="246" width="34" height="2.5" fill="#fff" opacity="0.5"/><rect x="76" y="56" width="40" height="3" fill="#1e3a8a"/><rect x="76" y="64" width="118" height="3" fill="#d4d6d3"/><rect x="76" y="71" width="110" height="3" fill="#d4d6d3"/><rect x="76" y="78" width="114" height="3" fill="#d4d6d3"/><rect x="76" y="92" width="118" height="30" fill="#f5f7fb"/><rect x="76" y="132" width="40" height="3" fill="#1e3a8a"/><rect x="76" y="139" width="118" height="3" fill="#d4d6d3"/><rect x="76" y="146" width="56" height="3" fill="#1e3a8a"/><rect x="76" y="154" width="56" height="22" fill="#e6e7e4"/><rect x="138" y="146" width="56" height="3" fill="#1e3a8a"/><rect x="138" y="154" width="56" height="22" fill="#e6e7e4"/></svg></span>
+                    <span class="nombrePlantilla">Columnas</span></button></li>
+                </ul>
+              </div>
+
+              <div>
+                <span class="rotulo" id="rotulo-color">Color</span>
+                <ul class="colores" role="radiogroup" aria-labelledby="rotulo-color" style="margin-top:8px">
+                  <li><button class="color" type="button" role="radio" aria-checked="true" aria-label="Azul" title="Azul"><span style="background:#1e3a8a"></span></button></li>
+                  <li><button class="color" type="button" role="radio" aria-checked="false" aria-label="Verde" title="Verde"><span style="background:#1e3a8a"></span></button></li>
+                  <li><button class="color" type="button" role="radio" aria-checked="false" aria-label="Rojo" title="Rojo"><span style="background:#c22a3f"></span></button></li>
+                  <li><button class="color" type="button" role="radio" aria-checked="false" aria-label="Noche" title="Noche"><span style="background:#111312"></span></button></li>
+                  <li><button class="color" type="button" role="radio" aria-checked="false" aria-label="Petróleo" title="Petróleo"><span style="background:#155e75"></span></button></li>
+                  <li><button class="color" type="button" role="radio" aria-checked="false" aria-label="Ciruela" title="Ciruela"><span style="background:#6b2d5c"></span></button></li>
+                </ul>
+              </div>
+
+              <div class="filaPdf">
+                <button class="secundario" type="button" disabled><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v12"/><path d="m7.5 11.5 4.5 4.5 4.5-4.5"/><path d="M4 15v3.5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V15"/></svg>Descargar brochure (PDF)</button>
+                <span class="marca retirada">Falta «Quiénes somos»</span>
+              </div>
+            </section>
+
+            <div class="pie">
+              <button class="acentoMenor guardar" type="submit">Guardar</button>
+                            <button class="secundario botonPrevia" type="button">Vista previa</button>
+              <a class="verPerfil" href="portal-perfil.html" target="_blank" rel="noopener noreferrer">Ver perfil público ↗</a>
+            </div>
+          </form>
+
+          <!-- ============ Vista previa en vivo ============ -->
+          <aside class="previa" aria-label="Vista previa del perfil público">
+            <p class="etiquetaPrevia">Vista previa</p>
+            <div class="tarjetaPrevia">
+              <div class="portadaPrevia"></div>
+              <div class="cabeceraPrevia"><div class="logoPrevia"><span aria-hidden="true" style="display:grid;place-items:center;width:100%;height:100%;background:#e9edff;color:#172a66;font-size:20px;font-weight:600">TA</span></div></div>
+              <div class="cuerpoPrevia">
+                <div><p class="nombrePrevia">Textiles Ayllu</p></div>
+                <div><p class="tituloPrevia">Vacantes abiertas (1)</p>
+                  <ul class="vacantesPrevia" role="list"><li class="vacantePrevia">Operario de telar<span>Presencial</span></li></ul></div>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+</body>
+</html>
