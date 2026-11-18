@@ -1,6 +1,8 @@
 package com.renaser.ai.ai_engine.organizacion.service;
 
+import com.renaser.ai.ai_engine.organizacion.dto.DtosPresentacion.GuardarBrochure;
 import com.renaser.ai.ai_engine.organizacion.dto.DtosPresentacion.GuardarPresentacion;
+import com.renaser.ai.ai_engine.organizacion.service.ReglasDeLaPresentacion.BrochureLimpio;
 import com.renaser.ai.ai_engine.organizacion.service.ReglasDeLaPresentacion.PresentacionLimpia;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -21,7 +23,7 @@ class ReglasDeLaPresentacionTest {
 
     private static GuardarPresentacion con(String proposito, String video, String web,
                                            Map<String, String> redes) {
-        return new GuardarPresentacion(null, null, null, null, proposito, null, video, web, redes);
+        return new GuardarPresentacion(null, null, null, null, proposito, null, video, web, redes, null, null, null, null);
     }
 
     @Test
@@ -41,7 +43,7 @@ class ReglasDeLaPresentacionTest {
     @DisplayName("todo vacío es válido y se guarda como «sin dato»")
     void todoVacio() {
         PresentacionLimpia limpia = ReglasDeLaPresentacion.limpiar(new GuardarPresentacion(
-                "  ", "", null, " ", "", List.of(" ", ""), "  ", "", Map.of("FACEBOOK", " ")), ESTE_ANIO);
+                "  ", "", null, " ", "", List.of(" ", ""), "  ", "", Map.of("FACEBOOK", " "), null, null, null, null), ESTE_ANIO);
 
         assertThat(limpia.sector()).isNull();
         assertThat(limpia.tamano()).isNull();
@@ -88,13 +90,13 @@ class ReglasDeLaPresentacionTest {
     @DisplayName("el año, entre 1800 y el año actual")
     void anio() {
         assertThat(ReglasDeLaPresentacion.limpiar(new GuardarPresentacion(null, null, 1800, null, null,
-                null, null, null, null), ESTE_ANIO).anioFundacion()).isEqualTo(1800);
+                null, null, null, null, null, null, null, null), ESTE_ANIO).anioFundacion()).isEqualTo(1800);
         assertThat(ReglasDeLaPresentacion.limpiar(new GuardarPresentacion(null, null, ESTE_ANIO, null,
-                null, null, null, null, null), ESTE_ANIO).anioFundacion()).isEqualTo(ESTE_ANIO);
+                null, null, null, null, null, null, null, null, null), ESTE_ANIO).anioFundacion()).isEqualTo(ESTE_ANIO);
         for (int fuera : new int[] {1799, ESTE_ANIO + 1}) {
             PresentacionInvalidaException error = catchThrowableOfType(PresentacionInvalidaException.class,
                     () -> ReglasDeLaPresentacion.limpiar(new GuardarPresentacion(null, null, fuera,
-                            null, null, null, null, null, null), ESTE_ANIO));
+                            null, null, null, null, null, null, null, null, null, null), ESTE_ANIO));
             assertThat(error.getErrores()).containsEntry("anioFundacion",
                     "Escribe un año entre 1800 y 2026");
         }
@@ -104,10 +106,10 @@ class ReglasDeLaPresentacionTest {
     @DisplayName("el tamaño es uno de los seis rangos")
     void tamano() {
         assertThat(ReglasDeLaPresentacion.limpiar(new GuardarPresentacion(null, "DE_51_A_200", null,
-                null, null, null, null, null, null), ESTE_ANIO).tamano()).isEqualTo("DE_51_A_200");
+                null, null, null, null, null, null, null, null, null, null), ESTE_ANIO).tamano()).isEqualTo("DE_51_A_200");
         PresentacionInvalidaException error = catchThrowableOfType(PresentacionInvalidaException.class,
                 () -> ReglasDeLaPresentacion.limpiar(new GuardarPresentacion(null, "MUCHOS", null, null,
-                        null, null, null, null, null), ESTE_ANIO));
+                        null, null, null, null, null, null, null, null, null), ESTE_ANIO));
         assertThat(error.getErrores()).containsKey("tamano");
     }
 
@@ -116,7 +118,7 @@ class ReglasDeLaPresentacionTest {
     void textos() {
         PresentacionInvalidaException error = catchThrowableOfType(PresentacionInvalidaException.class,
                 () -> ReglasDeLaPresentacion.limpiar(new GuardarPresentacion("s".repeat(61), null, null,
-                        "q".repeat(1501), null, null, null, null, null), ESTE_ANIO));
+                        "q".repeat(1501), null, null, null, null, null, null, null, null, null), ESTE_ANIO));
         assertThat(error.getErrores())
                 .containsEntry("sector", ReglasDeLaPresentacion.MENSAJE_SECTOR)
                 .containsEntry("quienesSomos", ReglasDeLaPresentacion.MENSAJE_QUIENES);
@@ -126,7 +128,7 @@ class ReglasDeLaPresentacionTest {
     @DisplayName("los beneficios: sin vacíos ni repetidos, hasta 12 y de 40 caracteres")
     void beneficios() {
         assertThat(ReglasDeLaPresentacion.limpiar(new GuardarPresentacion(null, null, null, null, null,
-                List.of(" Seguro EPS ", "seguro eps", "", "Comedor"), null, null, null), ESTE_ANIO)
+                List.of(" Seguro EPS ", "seguro eps", "", "Comedor"), null, null, null, null, null, null, null), ESTE_ANIO)
                 .beneficios()).containsExactly("Seguro EPS", "Comedor");
 
         List<String> trece = new ArrayList<>();
@@ -135,11 +137,11 @@ class ReglasDeLaPresentacionTest {
         }
         assertThat(catchThrowableOfType(PresentacionInvalidaException.class,
                 () -> ReglasDeLaPresentacion.limpiar(new GuardarPresentacion(null, null, null, null, null,
-                        trece, null, null, null), ESTE_ANIO)).getErrores())
+                        trece, null, null, null, null, null, null, null), ESTE_ANIO)).getErrores())
                 .containsEntry("beneficios", ReglasDeLaPresentacion.MENSAJE_BENEFICIOS);
         assertThat(catchThrowableOfType(PresentacionInvalidaException.class,
                 () -> ReglasDeLaPresentacion.limpiar(new GuardarPresentacion(null, null, null, null, null,
-                        List.of("b".repeat(41)), null, null, null), ESTE_ANIO)).getErrores())
+                        List.of("b".repeat(41)), null, null, null, null, null, null, null), ESTE_ANIO)).getErrores())
                 .containsEntry("beneficios", ReglasDeLaPresentacion.MENSAJE_BENEFICIO);
     }
 
@@ -148,5 +150,92 @@ class ReglasDeLaPresentacionTest {
     void etiquetasTalCual() {
         assertThat(ReglasDeLaPresentacion.limpiar(con("<script>alert(1)</script>", null, null, null),
                 ESTE_ANIO).propositoEmpresa()).isEqualTo("<script>alert(1)</script>");
+    }
+
+    // ==================== El brochure (V86) ====================
+
+    private static GuardarPresentacion delBrochure(String mision, String vision, String plantilla,
+                                                   String color) {
+        return new GuardarPresentacion(null, null, null, null, null, null, null, null, null, mision,
+                vision, plantilla, color);
+    }
+
+    @Test
+    @DisplayName("V86: misión y visión de 400 valen, limpias; con solo espacios se guardan vacías")
+    void misionYVision() {
+        PresentacionLimpia limpia = ReglasDeLaPresentacion.limpiar(
+                delBrochure("  " + "m".repeat(400) + "  ", "   ", null, null), ESTE_ANIO);
+        assertThat(limpia.mision()).hasSize(400);
+        assertThat(limpia.vision()).isNull();
+    }
+
+    @Test
+    @DisplayName("V86: de 401, «La misión admite hasta 400 caracteres» y «La visión…», juntas")
+    void misionYVisionDeMas() {
+        PresentacionInvalidaException error = catchThrowableOfType(PresentacionInvalidaException.class,
+                () -> ReglasDeLaPresentacion.limpiar(delBrochure("m".repeat(401), "v".repeat(401),
+                        null, null), ESTE_ANIO));
+        assertThat(error.getErrores())
+                .containsEntry("mision", "La misión admite hasta 400 caracteres")
+                .containsEntry("vision", "La visión admite hasta 400 caracteres");
+        assertThat(catchThrowableOfType(PresentacionInvalidaException.class,
+                () -> ReglasDeLaPresentacion.limpiar(delBrochure("m".repeat(401), null, null, null),
+                        ESTE_ANIO)).getMessage()).isEqualTo("La misión admite hasta 400 caracteres");
+    }
+
+    @Test
+    @DisplayName("V86: la plantilla y el color, del catálogo; ausentes, nulos (se queda lo de antes)")
+    void plantillaYColor() {
+        PresentacionLimpia elegidos = ReglasDeLaPresentacion.limpiar(
+                delBrochure(null, null, "COLUMNAS", " PETROLEO "), ESTE_ANIO);
+        assertThat(elegidos.plantillaBrochure()).isEqualTo(PlantillaDelBrochure.COLUMNAS);
+        assertThat(elegidos.colorBrochure()).isEqualTo(ColorDelBrochure.PETROLEO);
+
+        PresentacionLimpia ausentes = ReglasDeLaPresentacion.limpiar(delBrochure(null, null, " ", null),
+                ESTE_ANIO);
+        assertThat(ausentes.plantillaBrochure()).isNull();
+        assertThat(ausentes.colorBrochure()).isNull();
+    }
+
+    @Test
+    @DisplayName("V86: una plantilla o un color fuera del catálogo dan su error y no se guarda nada")
+    void fueraDelCatalogo() {
+        PresentacionInvalidaException error = catchThrowableOfType(PresentacionInvalidaException.class,
+                () -> ReglasDeLaPresentacion.limpiar(delBrochure(null, null, "MOSAICO", "#FF00FF"),
+                        ESTE_ANIO));
+        assertThat(error.getErrores())
+                .containsEntry("plantillaBrochure", ReglasDeLaPresentacion.MENSAJE_PLANTILLA)
+                .containsEntry("colorBrochure", ReglasDeLaPresentacion.MENSAJE_COLOR);
+        // El código es exacto: «clasica» en minúsculas no es del catálogo.
+        assertThat(catchThrowableOfType(PresentacionInvalidaException.class,
+                () -> ReglasDeLaPresentacion.limpiar(delBrochure(null, null, "clasica", null),
+                        ESTE_ANIO)).getErrores()).containsKey("plantillaBrochure");
+    }
+
+    @Test
+    @DisplayName("la pestaña «Brochure»: una plantilla y un color del catálogo valen, con los bordes recortados")
+    void laPestanaBrochure() {
+        BrochureLimpio limpio = ReglasDeLaPresentacion.limpiarBrochure(
+                new GuardarBrochure(" COLUMNAS ", "PETROLEO"));
+        assertThat(limpio.plantilla()).isEqualTo(PlantillaDelBrochure.COLUMNAS);
+        assertThat(limpio.color()).isEqualTo(ColorDelBrochure.PETROLEO);
+    }
+
+    @Test
+    @DisplayName("la pestaña «Brochure»: fuera del catálogo o sin mandarlos es un 400 con los que fallan")
+    void laPestanaBrochureFueraDelCatalogo() {
+        assertThat(catchThrowableOfType(PresentacionInvalidaException.class,
+                () -> ReglasDeLaPresentacion.limpiarBrochure(new GuardarBrochure("MOSAICO", "#FF00FF")))
+                .getErrores())
+                .containsEntry("plantillaBrochure", ReglasDeLaPresentacion.MENSAJE_PLANTILLA)
+                .containsEntry("colorBrochure", ReglasDeLaPresentacion.MENSAJE_COLOR);
+        // Aquí ausente no es «lo de antes»: la pestaña manda siempre los dos.
+        assertThat(catchThrowableOfType(PresentacionInvalidaException.class,
+                () -> ReglasDeLaPresentacion.limpiarBrochure(new GuardarBrochure(null, " ")))
+                .getErrores()).containsOnlyKeys("plantillaBrochure", "colorBrochure");
+        PresentacionInvalidaException soloColor = catchThrowableOfType(PresentacionInvalidaException.class,
+                () -> ReglasDeLaPresentacion.limpiarBrochure(new GuardarBrochure("CLASICA", "azul")));
+        assertThat(soloColor.getErrores()).containsOnlyKeys("colorBrochure");
+        assertThat(soloColor.getMessage()).isEqualTo(ReglasDeLaPresentacion.MENSAJE_COLOR);
     }
 }

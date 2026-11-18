@@ -84,6 +84,13 @@ activa, con caché pública de un día. Para que se puedan enseñar sin miedo, a
 se guarda son solo los píxeles. La dirección lleva el id del archivo (`?v=`), así que al cambiar
 el logo cambia también la dirección y la caché no enseña el viejo.
 
+**El brochure de la empresa no está en el bucket** (`V86`, 17/11/2026). El PDF se arma al pedirlo,
+con el logo y la portada que ya están aquí, que el backend lee con el mismo `leer` de siempre; solo
+se recuerda en la memoria del servidor el último de cada empresa. No hay tipos nuevos, ni archivos
+nuevos, ni nada más que se vea sin cuenta: la dirección pública del brochure
+(`/portal/empresas/{codigo}/brochure`) la sirve el backend él mismo, como las imágenes, pero sin
+caché pública. Si el almacén falla al leer una imagen, el brochure sale sin ella antes que no salir.
+
 ### El almacén de disco ya no existe
 
 Hubo uno y se quitó: hoy el único sitio donde viven los archivos es el bucket. Las pruebas usan

@@ -1,5 +1,6 @@
 package com.renaser.ai.ai_engine.organizacion.service;
 
+import com.renaser.ai.ai_engine.organizacion.dto.DtosPresentacion.GuardarBrochure;
 import com.renaser.ai.ai_engine.organizacion.dto.DtosPresentacion.GuardarPresentacion;
 
 import java.util.ArrayList;
@@ -10,7 +11,8 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * Qué se puede guardar en la presentación de una empresa (V85), campo a campo.
+ * Qué se puede guardar en la presentación de una empresa (V85; misión, visión, plantilla y color
+ * del brochure desde la V86), campo a campo.
  *
  * <p>Todo es opcional. Los espacios de los bordes se quitan y un campo vacío es «sin dato». Si
  * algo no vale, no se guarda nada: se juntan todos los errores en una
@@ -27,6 +29,8 @@ public final class ReglasDeLaPresentacion {
     public static final int MAXIMO_BENEFICIOS = 12;
     public static final int MAXIMO_BENEFICIO = 40;
     public static final int ANIO_MINIMO = 1800;
+    /** Misión y visión (V86). */
+    public static final int MAXIMO_MISION = 400;
 
     public static final String MENSAJE_PROPOSITO = "El propósito admite hasta 1500 caracteres";
     public static final String MENSAJE_QUIENES = "«Quiénes somos» admite hasta 1500 caracteres";
@@ -35,15 +39,30 @@ public final class ReglasDeLaPresentacion {
     public static final String MENSAJE_BENEFICIOS = "Puedes añadir hasta 12 beneficios";
     public static final String MENSAJE_BENEFICIO = "Cada beneficio admite hasta 40 caracteres";
     public static final String MENSAJE_RED_DESCONOCIDA = "Esa red no está entre las que se admiten";
+    public static final String MENSAJE_MISION = "La misión admite hasta 400 caracteres";
+    public static final String MENSAJE_VISION = "La visión admite hasta 400 caracteres";
+    public static final String MENSAJE_PLANTILLA = "Esa plantilla no está entre las que se ofrecen";
+    public static final String MENSAJE_COLOR = "Ese color no está entre los que se ofrecen";
 
     private ReglasDeLaPresentacion() {
     }
 
-    /** Lo que queda para guardar, ya limpio y comprobado. Vacío es nulo; las listas, vacías. */
+    /**
+     * Lo que queda para guardar, ya limpio y comprobado. Vacío es nulo; las listas, vacías.
+     *
+     * @param plantillaBrochure la elegida, o nula si no vino: entonces se queda la que había
+     * @param colorBrochure     el elegido, o nulo si no vino: entonces se queda el que había
+     */
     public record PresentacionLimpia(String sector, String tamano, Integer anioFundacion,
                                      String quienesSomos, String propositoEmpresa,
                                      List<String> beneficios, String videoPresentacion,
-                                     String paginaWeb, Map<RedSocial, String> redes) {}
+                                     String paginaWeb, Map<RedSocial, String> redes,
+                                     String mision, String vision,
+                                     PlantillaDelBrochure plantillaBrochure,
+                                     ColorDelBrochure colorBrochure) {}
+
+    /** La plantilla y el color que guarda la pestaña «Brochure», ya comprobados. */
+    public record BrochureLimpio(PlantillaDelBrochure plantilla, ColorDelBrochure color) {}
 
     /** El mensaje del año, con el año actual de Lima: «Escribe un año entre 1800 y 2026». */
     public static String mensajeAnio(int anioActual) {
@@ -80,6 +99,14 @@ public final class ReglasDeLaPresentacion {
         if (proposito != null && proposito.length() > MAXIMO_TEXTO_LARGO) {
             errores.put("propositoEmpresa", MENSAJE_PROPOSITO);
         }
+        String mision = texto(datos.mision());
+        if (mision != null && mision.length() > MAXIMO_MISION) {
+            errores.put("mision", MENSAJE_MISION);
+        }
+        String vision = texto(datos.vision());
+        if (vision != null && vision.length() > MAXIMO_MISION) {
+            errores.put("vision", MENSAJE_VISION);
+        }
         List<String> beneficios = beneficios(datos.beneficios(), errores);
 
         String video = EnlacesDeLaEmpresa.normalizar(datos.videoPresentacion());
@@ -88,11 +115,47 @@ public final class ReglasDeLaPresentacion {
         poner(errores, "paginaWeb", EnlacesDeLaEmpresa.errorDelEnlace(web));
         Map<RedSocial, String> redes = redes(datos.redes(), errores);
 
+        // La plantilla y el color: fuera del catálogo es un error; ausentes, se queda lo de antes.
+        String plantillaCruda = texto(datos.plantillaBrochure());
+        PlantillaDelBrochure plantilla = PlantillaDelBrochure.deCodigo(plantillaCruda).orElse(null);
+        if (plantillaCruda != null && plantilla == null) {
+            errores.put("plantillaBrochure", MENSAJE_PLANTILLA);
+        }
+        String colorCrudo = texto(datos.colorBrochure());
+        ColorDelBrochure color = ColorDelBrochure.deCodigo(colorCrudo).orElse(null);
+        if (colorCrudo != null && color == null) {
+            errores.put("colorBrochure", MENSAJE_COLOR);
+        }
+
         if (!errores.isEmpty()) {
             throw new PresentacionInvalidaException(errores);
         }
         return new PresentacionLimpia(sector, tamano, anio, quienes, proposito, beneficios, video,
-                web, redes);
+                web, redes, mision, vision, plantilla, color);
+    }
+
+    /**
+     * Comprueba la elección de la pestaña «Brochure». Aquí los dos son obligatorios: la pestaña
+     * manda siempre la plantilla y el color que se ven, y ausente no es «lo de antes» sino un
+     * error, como uno que no está en el catálogo.
+     *
+     * @throws PresentacionInvalidaException con la plantilla, el color o los dos
+     */
+    public static BrochureLimpio limpiarBrochure(GuardarBrochure datos) {
+        Map<String, String> errores = new LinkedHashMap<>();
+        PlantillaDelBrochure plantilla = PlantillaDelBrochure.deCodigo(datos.plantillaBrochure())
+                .orElse(null);
+        if (plantilla == null) {
+            errores.put("plantillaBrochure", MENSAJE_PLANTILLA);
+        }
+        ColorDelBrochure color = ColorDelBrochure.deCodigo(datos.colorBrochure()).orElse(null);
+        if (color == null) {
+            errores.put("colorBrochure", MENSAJE_COLOR);
+        }
+        if (!errores.isEmpty()) {
+            throw new PresentacionInvalidaException(errores);
+        }
+        return new BrochureLimpio(plantilla, color);
     }
 
     /**

@@ -5,6 +5,7 @@ import com.renaser.ai.ai_engine.archivo.entity.Archivo;
 import com.renaser.ai.ai_engine.archivo.repository.ArchivoRepository;
 import com.renaser.ai.ai_engine.archivo.service.AlmacenArchivos;
 import com.renaser.ai.ai_engine.auditoria.service.ServicioAuditoria;
+import com.renaser.ai.ai_engine.organizacion.dto.DtosPresentacion.GuardarBrochure;
 import com.renaser.ai.ai_engine.organizacion.dto.DtosPresentacion.GuardarPresentacion;
 import com.renaser.ai.ai_engine.organizacion.dto.DtosPresentacion.PresentacionPanel;
 import com.renaser.ai.ai_engine.organizacion.dto.DtosPresentacion.SedeDeLaPresentacion;
@@ -16,11 +17,14 @@ import com.renaser.ai.ai_engine.organizacion.repository.OrganizacionBeneficioRep
 import com.renaser.ai.ai_engine.organizacion.repository.OrganizacionRedSocialRepository;
 import com.renaser.ai.ai_engine.organizacion.repository.OrganizacionRepository;
 import com.renaser.ai.ai_engine.organizacion.repository.SedeRepository;
+import com.renaser.ai.ai_engine.organizacion.service.ColorDelBrochure;
 import com.renaser.ai.ai_engine.organizacion.service.ImagenesDeLaEmpresa;
 import com.renaser.ai.ai_engine.organizacion.service.ImagenesDeLaEmpresa.Cual;
 import com.renaser.ai.ai_engine.organizacion.service.ImagenesDeLaEmpresa.ImagenLimpia;
+import com.renaser.ai.ai_engine.organizacion.service.PlantillaDelBrochure;
 import com.renaser.ai.ai_engine.organizacion.service.RedSocial;
 import com.renaser.ai.ai_engine.organizacion.service.ReglasDeLaPresentacion;
+import com.renaser.ai.ai_engine.organizacion.service.ReglasDeLaPresentacion.BrochureLimpio;
 import com.renaser.ai.ai_engine.organizacion.service.ReglasDeLaPresentacion.PresentacionLimpia;
 import com.renaser.ai.ai_engine.organizacion.service.SedesDeLaEmpresa;
 import com.renaser.ai.ai_engine.organizacion.service.ServicioPresentacion;
@@ -82,6 +86,15 @@ public class ServicioPresentacionImpl implements ServicioPresentacion {
         org.setPropositoEmpresa(limpia.propositoEmpresa());
         org.setVideoPresentacion(limpia.videoPresentacion());
         org.setPaginaWeb(limpia.paginaWeb());
+        org.setMision(limpia.mision());
+        org.setVision(limpia.vision());
+        // Sin plantilla o sin color en el cuerpo se queda lo de antes: no hay «sin plantilla».
+        if (limpia.plantillaBrochure() != null) {
+            org.setPlantillaBrochure(limpia.plantillaBrochure().name());
+        }
+        if (limpia.colorBrochure() != null) {
+            org.setColorBrochure(limpia.colorBrochure().name());
+        }
         organizaciones.save(org);
 
         beneficios.borrarLosDe(org.getId());
@@ -104,6 +117,26 @@ public class ServicioPresentacionImpl implements ServicioPresentacion {
         // Reenviar lo mismo —el doble clic, el reintento— no vuelve a auditar.
         if (!antes.equals(despues)) {
             auditoria.registrar(org.getId(), quien, "editar_presentacion_empresa", "organizacion",
+                    org.getId(), antes, despues, null);
+        }
+        return comoPanel(org);
+    }
+
+    @Override
+    @Transactional
+    public PresentacionPanel guardarBrochure(ContextoUsuario quien, GuardarBrochure eleccion) {
+        Organizacion org = laMiaParaEscribir(quien);
+        BrochureLimpio limpio = ReglasDeLaPresentacion.limpiarBrochure(eleccion);
+        Map<String, Object> antes = mapaDelBrochure(org.getPlantillaBrochure(),
+                org.getColorBrochure());
+        org.setPlantillaBrochure(limpio.plantilla().name());
+        org.setColorBrochure(limpio.color().name());
+        organizaciones.save(org);
+        Map<String, Object> despues = mapaDelBrochure(org.getPlantillaBrochure(),
+                org.getColorBrochure());
+        // Volver a elegir lo mismo —el doble clic, el reintento— no vuelve a auditar.
+        if (!antes.equals(despues)) {
+            auditoria.registrar(org.getId(), quien, "elegir_brochure_empresa", "organizacion",
                     org.getId(), antes, despues, null);
         }
         return comoPanel(org);
@@ -182,7 +215,9 @@ public class ServicioPresentacionImpl implements ServicioPresentacion {
                         org.getLogoArchivoId()),
                 ImagenesDeLaEmpresa.direccionPublica(org.getCodigo(), Cual.PORTADA,
                         org.getPortadaArchivoId()),
-                lista, SedesDeLaEmpresa.ciudad(activas, provincias));
+                lista, SedesDeLaEmpresa.ciudad(activas, provincias), org.getMision(),
+                org.getVision(), PlantillaDelBrochure.deLoGuardado(org.getPlantillaBrochure()).name(),
+                ColorDelBrochure.deLoGuardado(org.getColorBrochure()).name());
     }
 
     private static List<String> textosDe(List<OrganizacionBeneficio> filas) {
@@ -212,6 +247,17 @@ public class ServicioPresentacionImpl implements ServicioPresentacion {
         mapa.put("videoPresentacion", org.getVideoPresentacion());
         mapa.put("paginaWeb", org.getPaginaWeb());
         mapa.put("redes", new LinkedHashMap<>(redes));
+        mapa.put("mision", org.getMision());
+        mapa.put("vision", org.getVision());
+        mapa.put("plantillaBrochure", org.getPlantillaBrochure());
+        mapa.put("colorBrochure", org.getColorBrochure());
+        return mapa;
+    }
+
+    private static Map<String, Object> mapaDelBrochure(String plantilla, String color) {
+        Map<String, Object> mapa = new LinkedHashMap<>();
+        mapa.put("plantillaBrochure", plantilla);
+        mapa.put("colorBrochure", color);
         return mapa;
     }
 
