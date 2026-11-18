@@ -188,8 +188,8 @@ lo que se olvida:
 | Dónde | Qué |
 |---|---|
 | [`ci.yml:109`](../.github/workflows/ci.yml) | `REGISTRO` — el id de cuenta |
-| [`ci.yml:111`](../.github/workflows/ci.yml) | `INSTANCIA` — `i-05fc037e853d07264` |
-| [`ci.yml:112`](../.github/workflows/ci.yml) | `URL` del smoke test — `https://18-204-177-210.nip.io` |
+| [`ci.yml:111`](../.github/workflows/ci.yml) | `INSTANCIA` — `i-0451d14fb7bcc16f5` |
+| [`ci.yml:112`](../.github/workflows/ci.yml) | `URL` del smoke test — `https://34-196-100-108.nip.io` |
 | [`ci.yml:128`](../.github/workflows/ci.yml) | `role-to-assume` — el ARN del rol |
 | [`.env.example`](.env.example) | La línea `IMAGEN` |
 | [`armar-env.sh`](armar-env.sh) | El `INSTANCIA` por defecto **y** la cadena `IMAGEN` del bloque Python: son dos sitios. Solo si algún día se arreglan sus rutas `leer()` — en esta recuperación el script no se usa (paso 8) |

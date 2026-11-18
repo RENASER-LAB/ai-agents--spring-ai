@@ -46,7 +46,7 @@ import sys
 import urllib.error
 import urllib.request
 
-BACKEND = "https://18-204-177-210.nip.io"
+BACKEND = "https://34-196-100-108.nip.io"
 
 MOTIVOS = {
     "examen": "Invitacion a responder la evaluacion",
