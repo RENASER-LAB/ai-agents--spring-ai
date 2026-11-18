@@ -1,6 +1,7 @@
 package com.renaser.ai.ai_engine.prueba.controller;
 
 import com.renaser.ai.ai_engine.prueba.dto.DtosCalificacionPrueba.*;
+import com.renaser.ai.ai_engine.prueba.service.MasTiempoDeLaPrueba;
 import com.renaser.ai.ai_engine.prueba.service.ServicioCalificacionPrueba;
 import com.renaser.ai.ai_engine.seguridad.service.Permisos;
 
@@ -28,6 +29,7 @@ import java.util.Map;
 public class CalificacionPruebaController {
 
     private final ServicioCalificacionPrueba servicio;
+    private final MasTiempoDeLaPrueba masTiempo;
     private final Permisos permisos;
 
     @GetMapping("/notas")
@@ -89,6 +91,19 @@ public class CalificacionPruebaController {
     public PlazoPrueba definirPlazo(@PathVariable Long postulacionId,
                                     @Valid @RequestBody DefinirPlazoPrueba datos) {
         return servicio.definirPlazo(permisos.actual(), postulacionId, datos);
+    }
+
+    @PostMapping("/mas-tiempo")
+    @PreAuthorize("@permisos.tiene('mover_postulacion')")
+    @Operation(summary = "«Darle más tiempo» a quien no completó la prueba (V89): se le acabó el "
+            + "tiempo con algo sin responder o se le pasó la fecha sin abrirla. Fecha futura en "
+            + "hora de Lima, motivo obligatorio y auditado; la prueba vuelve a «En curso» o a «Sin "
+            + "empezar» con lo que tenía y la fecha queda como propia. Con «avisar» (por defecto) "
+            + "le llegan el correo, la campana y, con vínculo activo, WhatsApp. 409 con la vacante "
+            + "archivada, el proceso cerrado o si ya no está sin completar")
+    public MasTiempoDado darMasTiempo(@PathVariable Long postulacionId,
+                                      @Valid @RequestBody DarMasTiempo datos) {
+        return masTiempo.dar(permisos.actual(), postulacionId, datos);
     }
 
     @PostMapping("/calificacion")

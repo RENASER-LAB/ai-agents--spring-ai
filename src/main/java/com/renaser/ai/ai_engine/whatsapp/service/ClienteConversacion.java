@@ -53,7 +53,7 @@ public interface ClienteConversacion {
             Set.of("DEJAR_DE_RECIBIR", "CAMBIO_CELULAR", "PROCESO_TERMINADO", "BORRADO_DATOS");
 
     /** Los tipos de aviso que entiende el bot: los «te toca». */
-    Set<String> TIPOS_DE_AVISO = Set.of("PRUEBA_DISPONIBLE", "POSTULACION_AVANZA");
+    Set<String> TIPOS_DE_AVISO = Set.of("PRUEBA_DISPONIBLE", "POSTULACION_AVANZA", "PRUEBA_MAS_TIEMPO");
 
     /** Los tipos de evento v2 (C-4). Nunca van por {@code /v1/ex/avisos}. */
     Set<String> TIPOS_DE_EVENTO = Set.of("RESULTADO", "CONVOCATORIA_CERRADA");

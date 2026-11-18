@@ -86,8 +86,55 @@ public final class DtosCalificacionPrueba {
      *       (se la puso alguien a mano, y mover la de la vacante ya no la toca).
      *   <li>{@code instrumento} es el de la vacante: {@code PLANTILLA} o
      *       {@code CUESTIONARIO_TECNICO}.
+     *   <li>{@code sinCompletar} (V89): si no la completó —se le acabó el tiempo con huecos o se
+     *       le pasó la fecha sin abrirla—, cuándo, qué le faltó y si se le puede dar más tiempo.
+     *       Nulo en cualquier otro caso.
+     *   <li>{@code masTiempo} (V89): la última vez que se le dio más tiempo, mientras la prueba
+     *       siga abierta. Nulo si nunca se le dio, o si ya entregó o volvió a vencer.
      * </ul>
      */
     public record PlazoVigente(boolean existeIntento, Instant venceEn, String origen,
-                               Instant iniciadoEn, Instant entregadoEn, String instrumento) {}
+                               Instant iniciadoEn, Instant entregadoEn, String instrumento,
+                               SinCompletar sinCompletar, MasTiempo masTiempo) {
+
+        /** Sin lo de la V89: el de antes. */
+        public PlazoVigente(boolean existeIntento, Instant venceEn, String origen,
+                            Instant iniciadoEn, Instant entregadoEn, String instrumento) {
+            this(existeIntento, venceEn, origen, iniciadoEn, entregadoEn, instrumento, null, null);
+        }
+    }
+
+    /**
+     * Quien no la completó (V89), con lo que la ficha dice arriba y lo que decide el botón
+     * «Darle más tiempo».
+     *
+     * @param seAcaboEn   cuándo se le acabó el tiempo: su fecha límite
+     * @param sinAbrir    si nunca la abrió («No la abrió»)
+     * @param queFalto    «le faltaron 4 preguntas y «Tablero.xlsx»»; nulo si no la abrió o no
+     *                    se pudo contar
+     * @param puedeMover  si quien mira tiene {@code mover_postulacion}: sin él el botón no sale
+     * @param bloqueo     por qué el botón sale apagado —«Vacante archivada», «Proceso
+     *                    cerrado»—, o nulo si se puede usar
+     */
+    public record SinCompletar(Instant seAcaboEn, boolean sinAbrir, String queFalto,
+                               boolean puedeMover, String bloqueo) {}
+
+    /** La última vez que se le dio más tiempo (V89): cuándo, quién y por qué. */
+    public record MasTiempo(Instant dadoEn, String dadoPor, String motivo) {}
+
+    /**
+     * «Darle más tiempo» a quien no completó la prueba (V89): una fecha y hora futura, el motivo
+     * obligatorio y si se le avisa. {@code avisar} nulo es avisar: es lo que llega marcado.
+     */
+    public record DarMasTiempo(@NotNull Instant venceEn, @NotBlank String motivo, Boolean avisar) {}
+
+    /**
+     * Lo que quedó tras darle más tiempo (V89).
+     *
+     * @param estadoPrueba {@code EN_CURSO} si ya la había abierto, {@code SIN_EMPEZAR} si no
+     * @param avisadoPor   por dónde se le avisa: «correo», «campana» y, con vínculo activo,
+     *                     «WhatsApp». Vacío si se decidió no avisarle
+     */
+    public record MasTiempoDado(Long postulacionId, Instant venceEn, String estadoPrueba,
+                                java.util.List<String> avisadoPor) {}
 }

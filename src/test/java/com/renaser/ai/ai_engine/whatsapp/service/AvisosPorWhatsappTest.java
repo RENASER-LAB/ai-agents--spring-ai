@@ -279,4 +279,69 @@ class AvisosPorWhatsappTest {
 
         verify(bajas, never()).deleteById(any());
     }
+
+    // ============ Más tiempo para la prueba (V89) ============
+
+    @Test
+    @DisplayName("V89 · más tiempo con vínculo activo deja UN aviso sin transición, ligado a la prueba y la fecha")
+    void elMasTiempoDejaUnAviso() {
+        Instant hasta = Instant.now().plus(java.time.Duration.ofDays(2));
+        when(beta.ofrecePara(RENASER)).thenReturn(true);
+        when(vinculos.vivoDe(70L)).thenReturn(Optional.of(vinculo(VinculoWhatsapp.ACTIVO)));
+
+        whatsapp.alDarMasTiempo(postulacion(), 40L, hasta, "Beto", "Analista de operaciones");
+
+        ArgumentCaptor<AvisoWhatsapp> guardado = ArgumentCaptor.forClass(AvisoWhatsapp.class);
+        verify(avisos).save(guardado.capture());
+        AvisoWhatsapp aviso = guardado.getValue();
+        assertThat(aviso.getTipo()).isEqualTo("PRUEBA_MAS_TIEMPO");
+        assertThat(aviso.getTransicionEstadoId()).isNull();
+        assertThat(aviso.getIntentoPruebaId()).isEqualTo(40L);
+        assertThat(aviso.getPlazoEn()).isEqualTo(hasta);
+        assertThat(aviso.getTexto()).startsWith("Hola, Beto 👋\n\n📌 *Analista de operaciones*\n"
+                + "Tienes *más tiempo* para tu prueba del puesto.\n⏰ Hasta el *")
+                .contains("* (hora de Lima).")
+                .contains("👉 " + MIS_PROCESOS);
+    }
+
+    @Test
+    @DisplayName("V89 · la misma fecha dos veces no repite el aviso")
+    void laMismaFechaNoRepite() {
+        Instant hasta = Instant.now().plus(java.time.Duration.ofDays(2));
+        when(beta.ofrecePara(RENASER)).thenReturn(true);
+        when(vinculos.vivoDe(70L)).thenReturn(Optional.of(vinculo(VinculoWhatsapp.ACTIVO)));
+        when(avisos.existsByIntentoPruebaIdAndPlazoEnAndTipo(40L, hasta, "PRUEBA_MAS_TIEMPO")).thenReturn(true);
+
+        whatsapp.alDarMasTiempo(postulacion(), 40L, hasta, "Beto", "Analista");
+
+        verify(avisos, never()).save(any());
+    }
+
+    @Test
+    @DisplayName("V89 · sin vínculo activo, con baja o fuera de la beta no se encola nada")
+    void sinVinculoNoHayAvisoDeMasTiempo() {
+        Instant hasta = Instant.now().plus(java.time.Duration.ofDays(2));
+        when(beta.ofrecePara(RENASER)).thenReturn(true);
+        when(vinculos.vivoDe(70L)).thenReturn(Optional.of(vinculo(VinculoWhatsapp.PENDIENTE)));
+        whatsapp.alDarMasTiempo(postulacion(), 40L, hasta, "Beto", "Analista");
+
+        when(vinculos.vivoDe(70L)).thenReturn(Optional.of(vinculo(VinculoWhatsapp.ACTIVO)));
+        when(bajas.existsById("+51987654321")).thenReturn(true);
+        whatsapp.alDarMasTiempo(postulacion(), 40L, hasta, "Beto", "Analista");
+
+        when(beta.ofrecePara(RENASER)).thenReturn(false);
+        whatsapp.alDarMasTiempo(postulacion(), 40L, hasta, "Beto", "Analista");
+
+        verify(avisos, never()).save(any());
+        assertThat(whatsapp.llegaria(70L, RENASER)).isFalse();
+    }
+
+    @Test
+    @DisplayName("V89 · le llegaría con la empresa en la beta, vínculo activo y número sin baja")
+    void leLlegaria() {
+        when(beta.ofrecePara(RENASER)).thenReturn(true);
+        when(vinculos.vivoDe(70L)).thenReturn(Optional.of(vinculo(VinculoWhatsapp.ACTIVO)));
+
+        assertThat(whatsapp.llegaria(70L, RENASER)).isTrue();
+    }
 }

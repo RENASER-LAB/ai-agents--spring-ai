@@ -1718,10 +1718,10 @@ class ServicioPerfilIntegralPanelImplTest {
     /**
      * Lo que la columna de la prueba enseña cuando no hay nota, decidido en el backend.
      *
-     * <p>Antes la tabla escribía lo mismo —«sin cerrar»— para tres situaciones que no se
-     * parecen: quien no ha terminado la prueba, aquella que el sistema cerró al vencer el
-     * plazo, y la que alguien entregó y espera a que el equipo la califique. Solo la última es
-     * trabajo del equipo, y confundirlas mandaba a perseguir a quien ya había hecho lo suyo.
+     * <p>Antes la tabla escribía lo mismo para situaciones que no se parecen: quien no la ha
+     * empezado, quien la está haciendo, quien no la completó (V89) y la que se entregó y espera
+     * a que el equipo la califique. Solo la última es trabajo del equipo, y confundirlas
+     * mandaba a perseguir a quien ya había hecho lo suyo.
      *
      * <p>⚠️ <b>La pantalla no puede deducirlo de que la nota venga vacía</b>, y por eso el
      * estado viaja en la fila: desde el navegador los tres casos se ven igual.
@@ -1734,36 +1734,81 @@ class ServicioPerfilIntegralPanelImplTest {
     class EstadoDeLaPrueba {
 
         @Test
-        @DisplayName("un intento sin empezar sale como prueba incompleta")
-        void elPendienteEstaIncompleto() {
+        @DisplayName("un intento sin abrir y con plazo vigente sale «sin empezar» (V89)")
+        void elPendienteEstaSinEmpezar() {
             candidatos(candidato(1L, "ALTA", null));
             losIntentos(sinEmpezar(1L));
 
-            assertThat(laFilaDe(1L).estadoPrueba()).isEqualTo(EstadoPruebaDelPuesto.INCOMPLETA);
+            assertThat(laFilaDe(1L).estadoPrueba()).isEqualTo(EstadoPruebaDelPuesto.SIN_EMPEZAR);
         }
 
         @Test
-        @DisplayName("uno empezado y sin entregar, también")
-        void elEnCursoEstaIncompleto() {
+        @DisplayName("uno empezado con el reloj corriendo sale «en curso», nunca incompleto (V89)")
+        void elEnCursoEstaEnCurso() {
             candidatos(candidato(1L, "ALTA", null));
             losIntentos(enCurso(1L));
 
-            assertThat(laFilaDe(1L).estadoPrueba()).isEqualTo(EstadoPruebaDelPuesto.INCOMPLETA);
+            assertThat(laFilaDe(1L).estadoPrueba()).isEqualTo(EstadoPruebaDelPuesto.EN_CURSO);
         }
 
         /**
-         * La que cerró el sistema al vencer el plazo NO es una entrega del candidato.
-         *
-         * <p>Es la confusión que más duele: sin distinguirla, una prueba que nadie terminó
-         * aparecería en la bandeja del equipo como si hubiera algo que calificar.
+         * La que se entregó sola al vencer, con todo respondido, ES una entrega (V89): la del
+         * editor solo se entrega sola sin huecos, y la de plantilla siempre. Las dos esperan nota.
          */
         @Test
-        @DisplayName("la que entregó el sistema al vencer el plazo sigue incompleta sin nota")
-        void laAutomaticaSinNotaEstaIncompleta() {
+        @DisplayName("la que se entregó sola al vencer espera nota, como la entregada a mano")
+        void laAutomaticaSinNotaEsperaNota() {
             candidatos(candidato(1L, "ALTA", null));
             losIntentos(entregado(1L, true));
 
-            assertThat(laFilaDe(1L).estadoPrueba()).isEqualTo(EstadoPruebaDelPuesto.INCOMPLETA);
+            assertThat(laFilaDe(1L).estadoPrueba())
+                    .isEqualTo(EstadoPruebaDelPuesto.PENDIENTE_CALIFICACION);
+        }
+
+        /**
+         * Quien la dejó vencer con huecos vuelve a la tabla (V89): antes se la saltaba y salía
+         * en una lista aparte. Cuenta en el total y lleva sus fechas para el texto de la celda.
+         */
+        @Test
+        @DisplayName("quien no la completó sale en la tabla, sin nota, y cuenta en el total (AC-01)")
+        void laNoCompletadaSaleEnLaTabla() {
+            candidatos(candidato(1L, "ALTA", null), candidato(2L, "ALTA", null));
+            IntentoPrueba conHuecos = noCompletada(1L);
+            losIntentos(conHuecos, entregado(2L, false));
+
+            var ranking = servicio.ranking(quien, VACANTE, "PRUEBA_PUESTO");
+
+            assertThat(ranking.total()).isEqualTo(2);
+            FilaRanking suya = porId(ranking.filas(), 1L);
+            assertThat(suya.estadoPrueba()).isEqualTo(EstadoPruebaDelPuesto.NO_COMPLETADA);
+            assertThat(suya.notaEtapa()).isNull();
+            assertThat(suya.detallePrueba().venceEn()).isEqualTo(conHuecos.getVenceEn());
+            assertThat(suya.detallePrueba().abiertaEn()).isEqualTo(conHuecos.getIniciadoEn());
+        }
+
+        @Test
+        @DisplayName("quien no la abrió y se le pasó la fecha también «no la completó» (AC-02)")
+        void laVencidaSinAbrirNoLaCompleto() {
+            candidatos(candidato(1L, "ALTA", null));
+            IntentoPrueba vencida = IntentoPrueba.builder().id(10L).postulacionId(1L)
+                    .venceEn(Instant.now().minus(Duration.ofHours(5))).build();
+            losIntentos(vencida);
+
+            FilaRanking suya = laFilaDe(1L);
+            assertThat(suya.estadoPrueba()).isEqualTo(EstadoPruebaDelPuesto.NO_COMPLETADA);
+            assertThat(suya.detallePrueba().abiertaEn()).isNull();
+            assertThat(suya.detallePrueba().venceEn()).isEqualTo(vencida.getVenceEn());
+            assertThat(suya.detallePrueba().queFalto()).isNull();
+        }
+
+        @Test
+        @DisplayName("sin intento la fila no lleva detalle de la prueba")
+        void sinIntentoSinDetalle() {
+            candidatos(candidato(1L, "ALTA", null), candidato(2L, "ALTA", null));
+            losIntentos(entregado(1L, false));
+
+            assertThat(laFilaDe(2L).detallePrueba()).isNull();
+            assertThat(laFilaDe(1L).detallePrueba().entregadaEn()).isNotNull();
         }
 
         @Test
@@ -1792,7 +1837,7 @@ class ServicioPerfilIntegralPanelImplTest {
          * Un cero es una nota.
          *
          * <p>Es la frontera que convierte a quien rindió mal en quien no rindió: leerlo como
-         * ausencia le pondría «Prueba incompleta» a alguien que entregó y sacó cero.
+         * ausencia le pondría «No la completó» a alguien que entregó y sacó cero.
          */
         @Test
         @DisplayName("una nota de cero es nota, no un hueco")
@@ -1897,6 +1942,16 @@ class ServicioPerfilIntegralPanelImplTest {
             return IntentoPrueba.builder().id(postulacionId * 10).postulacionId(postulacionId)
                     .iniciadoEn(Instant.now().minus(Duration.ofMinutes(20)))
                     .venceEn(Instant.now().plus(Duration.ofMinutes(40))).build();
+        }
+
+        /** La del editor que venció con huecos: el barrido la cerró sin entregar (V67). */
+        private IntentoPrueba noCompletada(Long postulacionId) {
+            return IntentoPrueba.builder().id(postulacionId * 10).postulacionId(postulacionId)
+                    .versionBancoId(70L)
+                    .iniciadoEn(Instant.now().minus(Duration.ofHours(2)))
+                    .venceEn(Instant.now().minus(Duration.ofHours(1)))
+                    .entregadoEn(Instant.now().minus(Duration.ofMinutes(59)))
+                    .esEntregaAutomatica(true).noCompletada(true).build();
         }
 
         /** Entregada hace un rato: por el candidato, o por el sistema al vencer el plazo. */

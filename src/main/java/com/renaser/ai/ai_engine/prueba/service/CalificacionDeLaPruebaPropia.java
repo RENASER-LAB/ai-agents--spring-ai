@@ -278,7 +278,7 @@ public class CalificacionDeLaPruebaPropia {
         return new LoQueFalta(r.sinResponder(), entregablesQueFaltan);
     }
 
-    /** Lo que le faltó a cada intento de una tanda, en bloque (la lista «No completaron»). */
+    /** Lo que le faltó a cada intento de una tanda, en bloque (el ranking y la ficha, V89). */
     public Map<Long, LoQueFalta> loQueFaltaTanda(Collection<IntentoPrueba> intentos) {
         Map<Long, Resultado> resultados = calcularTanda(intentos);
         if (resultados.isEmpty()) {

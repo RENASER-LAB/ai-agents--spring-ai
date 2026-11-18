@@ -12,7 +12,6 @@ import com.renaser.ai.ai_engine.prueba.dto.DtosPruebaPropia.GuardarCriterioDePru
 import com.renaser.ai.ai_engine.prueba.dto.DtosPruebaPropia.GuardarDatosDeLaPrueba;
 import com.renaser.ai.ai_engine.prueba.dto.DtosPruebaPropia.GuardarEntregable;
 import com.renaser.ai.ai_engine.prueba.dto.DtosPruebaPropia.GuardarPreguntaDePrueba;
-import com.renaser.ai.ai_engine.prueba.dto.DtosPruebaPropia.NoCompleto;
 import com.renaser.ai.ai_engine.prueba.service.ServicioCalificacionPruebaPropia;
 import com.renaser.ai.ai_engine.prueba.service.ServicioPruebaPropia;
 import com.renaser.ai.ai_engine.seguridad.service.Permisos;
@@ -32,7 +31,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.util.List;
 
 /**
  * La prueba técnica de una vacante escrita en el editor (V67): el editor, su publicación, lo
@@ -195,15 +193,5 @@ public class PruebaPropiaController extends EditorDeLaVacanteController {
     public EditorDePreguntas agregarDeLaPropuesta(@PathVariable Long vacanteId, @PathVariable Long propuestaId,
                                                   @RequestBody AgregarDeLaPropuestaDePrueba datos) {
         return servicio.agregarDeLaPropuesta(permisos.actual(), vacanteId, propuestaId, datos);
-    }
-
-    // ---------- Quienes no la completaron ----------
-
-    @GetMapping("/no-completaron")
-    @PreAuthorize("@permisos.tiene('ver_embudo')")
-    @Operation(summary = "Quienes dejaron vencer el tiempo con algo sin responder: no salen en el "
-            + "ranking y su proceso espera a que alguien lo cierre")
-    public List<NoCompleto> noCompletaron(@PathVariable Long vacanteId) {
-        return calificacion.noCompletaron(permisos.actual(), vacanteId);
     }
 }

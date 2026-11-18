@@ -1,7 +1,6 @@
 package com.renaser.ai.ai_engine.prueba.service;
 
 import com.renaser.ai.ai_engine.prueba.dto.DtosPruebaPropia.AjustarCriterio;
-import com.renaser.ai.ai_engine.prueba.dto.DtosPruebaPropia.NoCompleto;
 import com.renaser.ai.ai_engine.prueba.dto.DtosPruebaPropia.PruebaDelCandidato;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
 
@@ -27,9 +26,6 @@ public interface ServicioCalificacionPruebaPropia {
      */
     PruebaDelCandidato ajustar(ContextoUsuario quien, Long postulacionId, Long criterioId,
                                AjustarCriterio datos);
-
-    /** Quienes dejaron vencer el tiempo con algo sin responder (decisión 11). */
-    List<NoCompleto> noCompletaron(ContextoUsuario quien, Long vacanteId);
 
     /**
      * La misma lectura para el informe de la prueba, sin nadie conectado (también la pide el

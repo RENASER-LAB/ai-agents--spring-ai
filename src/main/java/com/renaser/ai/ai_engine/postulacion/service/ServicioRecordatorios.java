@@ -65,7 +65,8 @@ public class ServicioRecordatorios {
     public static final String PARAMETRO_HORAS_TRAS = "recordatorio_horas_tras_el_turno";
     /** Horas antes de vencer en que sale el segundo. */
     public static final String PARAMETRO_HORAS_ANTES = "recordatorio_horas_antes_del_plazo";
-    static final int HORAS_POR_DEFECTO = 24;
+    /** Las horas de los dos cuando el parámetro falta o no tiene sentido. */
+    public static final int HORAS_POR_DEFECTO = 24;
 
     private final TurnosParaRecordar turnos;
     private final RecordatorioEnviadoRepository registro;

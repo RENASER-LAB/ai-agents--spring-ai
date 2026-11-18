@@ -71,7 +71,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * puede entregar con huecos, y al entregar sus cerradas cuentan solas. La IA califica la
  * parte calificada por id (red de seguridad incluida), una persona califica lo suyo y con eso
  * sale la nota de la etapa. Con candidatos dentro se cambian los puntos y la guía; quien deja
- * vencer el tiempo con huecos no sale en el ranking; y la prueba se copia a otra vacante.
+ * vencer el tiempo con huecos sale en el ranking como «No la completó» y se le puede dar más
+ * tiempo (V89); y la prueba se copia a otra vacante.
  *
  * <p>La IA está apagada: lo que el agente entregaría se mete por el mismo puente que usa el
  * agente, que es donde vive la red de seguridad.
@@ -690,7 +691,8 @@ public class FlujoPruebaPropiaIT {
                 List.of(tanda(nota(criterioConocimiento, "4", "No lo ubicó"))));
     }
 
-    @DisplayName("Al vencer con huecos: «no completada», sin IA, sin ranking, y se cierra desde la lista (AC-11)")
+    @DisplayName("Al vencer con huecos: «no completada» en la tabla, sin nota ni avance; con más tiempo "
+            + "sigue con lo suyo y, si vuelve a vencer con huecos, vuelve a «no la completó» (V89)")
     @Test
     @Order(15)
     void alVencerConHuecosNoSeCompleta() throws Exception {
@@ -723,36 +725,160 @@ public class FlujoPruebaPropiaIT {
                 .andExpect(jsonPath("$[0].uuid").value(codigo.get("caro")))
                 .andExpect(jsonPath("$[0].pruebaSinCompletar").value(true));
 
-        // No sale en el ranking de la prueba; sí en «No completaron», con lo que le faltó
-        JsonNode ranking = ranking(vacanteId, "PRUEBA_PUESTO");
-        for (JsonNode f : ranking.get("filas")) {
-            assertThat(f.get("postulacionId").asLong()).isNotEqualTo(postulacion.get("caro"));
-        }
-        // El contrato del ranking no cambia de campos: la lista va por su lado
-        assertThat(ranking.has("noCompletaron")).isFalse();
-        JsonNode lista = noCompletaron();
-        assertThat(lista.size()).isEqualTo(1);
-        JsonNode noCompleto = lista.get(0);
-        assertThat(noCompleto.get("postulacionId").asLong()).isEqualTo(postulacion.get("caro"));
-        assertThat(noCompleto.get("queFalto").asText()).isEqualTo("le faltaron 4 preguntas y «Tablero.xlsx»");
-        assertThat(noCompleto.get("procesoCerrado").asBoolean()).isFalse();
-        // Ni en su Excel
+        // Sale en el ranking de la prueba, sin nota y con lo que le faltó (AC-01)
+        JsonNode fila = filaDelRanking(vacanteId, "PRUEBA_PUESTO", postulacion.get("caro"));
+        assertThat(fila.get("estadoPrueba").asText()).isEqualTo("NO_COMPLETADA");
+        assertThat(fila.get("notaEtapa").isNull()).isTrue();
+        assertThat(fila.at("/detallePrueba/queFalto").asText())
+                .isEqualTo("le faltaron 4 preguntas y «Tablero.xlsx»");
+        assertThat(fila.at("/detallePrueba/venceEn").isNull()).isFalse();
+        // Y en su Excel, con la nota en blanco (AC-12)
         byte[] libro = excel(vacanteId, "PRUEBA_PUESTO", List.of(postulacion.get("ana"), postulacion.get("caro")));
-        assertThat(nombresDelExcel(libro)).noneMatch(n -> n.contains("Caro"));
+        assertThat(nombresDelExcel(libro)).anyMatch(n -> n.contains("Caro"));
 
-        // Alguien del equipo cierra su proceso
-        conToken(post("/api/v1/panel/postulaciones/" + postulacion.get("caro") + "/transiciones"), tokenTalento,
-                "{\"estadoDestino\":\"NO_CONTINUA\",\"motivo\":\"No completó la prueba\",\"avisar\":false}")
-                .andExpect(status().isOk());
-        assertThat(noCompletaron().get(0).get("procesoCerrado").asBoolean()).isTrue();
+        // «Avanzar» no la mueve, ni llamando a la API (AC-06)
+        conToken(post("/api/v1/panel/postulaciones/" + postulacion.get("caro") + "/confirmacion-avance"),
+                tokenTalento, "{\"motivo\":\"Avanza\"}")
+                .andExpect(status().isConflict());
+        assertThat(estado("caro")).isEqualTo("PRUEBA_TURNO_CANDIDATO");
 
-        // La ficha dice lo mismo que la lista: qué le faltó, sin nota ni ajuste
+        // La ficha dice que no la completó, qué le faltó y que se le puede dar más tiempo (AC-15)
+        String plazo = "/api/v1/panel/postulaciones/" + postulacion.get("caro") + "/prueba/plazo";
+        conTokenGet(plazo, tokenTalento)
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sinCompletar.sinAbrir").value(false))
+                .andExpect(jsonPath("$.sinCompletar.queFalto").value("le faltaron 4 preguntas y «Tablero.xlsx»"))
+                .andExpect(jsonPath("$.sinCompletar.puedeMover").value(true))
+                .andExpect(jsonPath("$.sinCompletar.bloqueo").doesNotExist());
         conTokenGet("/api/v1/panel/postulaciones/" + postulacion.get("caro") + "/prueba-propia", tokenTalento)
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.estado").value("NO_COMPLETADA"))
                 .andExpect(jsonPath("$.nota").doesNotExist())
                 .andExpect(jsonPath("$.puedeAjustar").value(false))
                 .andExpect(jsonPath("$.loQueFalta[0]").value("le faltaron 4 preguntas y «Tablero.xlsx»"));
+
+        // «Darle más tiempo»: los rechazos no guardan nada (AC-11)
+        String masTiempo = "/api/v1/panel/postulaciones/" + postulacion.get("caro") + "/prueba/mas-tiempo";
+        java.time.Instant nueva = java.time.Instant.now().plus(java.time.Duration.ofDays(2))
+                .truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
+        conToken(post(masTiempo), tokenTalento, "{\"venceEn\":\"%s\",\"motivo\":\" \"}".formatted(nueva))
+                .andExpect(status().isBadRequest());
+        conToken(post(masTiempo), tokenTalento, "{\"venceEn\":\"%s\",\"motivo\":\"Se le cortó la luz\"}"
+                        .formatted(java.time.Instant.now().minus(java.time.Duration.ofHours(1))))
+                .andExpect(status().isBadRequest());
+        conToken(post(masTiempo), tokenArea, "{\"venceEn\":\"%s\",\"motivo\":\"Se le cortó la luz\"}"
+                        .formatted(nueva))
+                .andExpect(status().isForbidden());
+        assertThat(jdbc.queryForObject("select no_completada from intento_prueba where postulacion_id = ?",
+                Boolean.class, postulacion.get("caro"))).isTrue();
+
+        // Con fecha futura y motivo: vuelve a «En curso» con lo suyo, la fecha queda como propia (AC-07)
+        conToken(post(masTiempo), tokenTalento,
+                "{\"venceEn\":\"%s\",\"motivo\":\"Se le cortó la luz\",\"avisar\":true}".formatted(nueva))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.estadoPrueba").value("EN_CURSO"))
+                .andExpect(jsonPath("$.avisadoPor[0]").value("correo"))
+                .andExpect(jsonPath("$.avisadoPor[1]").value("campana"));
+        assertThat(jdbc.queryForObject("select not no_completada and entregado_en is null and plazo_propio "
+                + "and mas_tiempo_motivo = 'Se le cortó la luz' and vence_en = ?::timestamptz "
+                + "from intento_prueba where postulacion_id = ?", Boolean.class, nueva.toString(),
+                postulacion.get("caro"))).isTrue();
+        assertThat(jdbc.queryForObject("select count(*) from auditoria where accion = 'dar_mas_tiempo_prueba' "
+                + "and motivo = 'Se le cortó la luz' and valor_anterior->>'noCompletada' = 'true'",
+                Integer.class)).isEqualTo(1);
+        assertThat(estado("caro")).isEqualTo("PRUEBA_TURNO_CANDIDATO");
+        assertThat(filaDelRanking(vacanteId, "PRUEBA_PUESTO", postulacion.get("caro")).get("estadoPrueba").asText())
+                .isEqualTo("EN_CURSO");
+        // El correo (sin enlace con token) y la campana (AC-08)
+        String cuerpo = jdbc.queryForObject("select cuerpo from correo_enviado where plantilla_correo_codigo = "
+                + "'PRUEBA_MAS_TIEMPO' and usuario_id = (select usuario_id from postulacion where id = ?)",
+                String.class, postulacion.get("caro"));
+        assertThat(cuerpo).contains("Tienes más tiempo para la prueba de").contains("(hora de Lima)")
+                .doesNotContain("token=");
+        assertThat(contar("select count(*) from aviso_portal where tipo = 'PRUEBA_MAS_TIEMPO' and postulacion_id = "
+                + postulacion.get("caro"))).isEqualTo(1);
+        // «A las 24 h» no se repite; el de «24 h antes» saldrá con la fecha nueva (AC-18)
+        assertThat(contar("select count(*) from recordatorio_enviado where tipo = 'TRAS_ENTRAR' and resultado = "
+                + "'OMITIDO' and postulacion_id = " + postulacion.get("caro"))).isEqualTo(1);
+        assertThat(contar("select count(*) from recordatorio_enviado where tipo = 'ANTES_DEL_PLAZO' "
+                + "and postulacion_id = " + postulacion.get("caro"))).isZero();
+        // La ficha dice quién le dio más tiempo y por qué
+        conTokenGet(plazo, tokenTalento)
+                .andExpect(jsonPath("$.sinCompletar").doesNotExist())
+                .andExpect(jsonPath("$.masTiempo.motivo").value("Se le cortó la luz"));
+        // En el portal sigue con lo que había respondido y el reloj llega a la fecha nueva
+        conTokenGet("/api/v1/portal/prueba/" + codigo.get("caro"), tokenCandidata.get("caro"))
+                .andExpect(jsonPath("$.estadoIntento").value("EN_CURSO"));
+        conTokenGet("/api/v1/portal/postulaciones/" + codigo.get("caro"), tokenCandidata.get("caro"))
+                .andExpect(jsonPath("$.resumen.pruebaSinCompletar").value(false));
+        // Un segundo envío ya no la encuentra sin completar y no repite los avisos
+        conToken(post(masTiempo), tokenTalento,
+                "{\"venceEn\":\"%s\",\"motivo\":\"Otra vez\"}".formatted(nueva))
+                .andExpect(status().isConflict());
+        assertThat(contar("select count(*) from aviso_portal where tipo = 'PRUEBA_MAS_TIEMPO' and postulacion_id = "
+                + postulacion.get("caro"))).isEqualTo(1);
+
+        // Si vuelve a vencer con huecos, vuelve a «No la completó» (AC-09)
+        vencer("caro");
+        servicioPrueba.entregarVencidos();
+        assertThat(filaDelRanking(vacanteId, "PRUEBA_PUESTO", postulacion.get("caro")).get("estadoPrueba").asText())
+                .isEqualTo("NO_COMPLETADA");
+        verify(cola, never()).encolarPruebaPuesto(postulacion.get("caro"));
+
+        // Alguien del equipo cierra su proceso: sigue en la tabla y ya no se le da más tiempo
+        conToken(post("/api/v1/panel/postulaciones/" + postulacion.get("caro") + "/transiciones"), tokenTalento,
+                "{\"estadoDestino\":\"NO_CONTINUA\",\"motivo\":\"No completó la prueba\",\"avisar\":false}")
+                .andExpect(status().isOk());
+        assertThat(filaDelRanking(vacanteId, "PRUEBA_PUESTO", postulacion.get("caro")).get("estadoPrueba").asText())
+                .isEqualTo("NO_COMPLETADA");
+        conTokenGet(plazo, tokenTalento)
+                .andExpect(jsonPath("$.sinCompletar.bloqueo").value("Proceso cerrado"));
+        conToken(post(masTiempo), tokenTalento, "{\"venceEn\":\"%s\",\"motivo\":\"Tarde\"}"
+                        .formatted(java.time.Instant.now().plus(java.time.Duration.ofDays(3))))
+                .andExpect(status().isConflict());
+    }
+
+    @DisplayName("Quien no la abrió a tiempo: «no la completó»; con más tiempo vuelve a «sin empezar» "
+            + "sin ver el caso hasta «Empezar», y a menos de 24 h no hay recordatorio extra (V89)")
+    @Test
+    @Order(15)
+    void quienNoLaAbrioATiempo() throws Exception {
+        entrarALaPrueba("hugo", "hugo.propia@correo.pe");
+        vencer("hugo");
+
+        JsonNode fila = filaDelRanking(vacanteId, "PRUEBA_PUESTO", postulacion.get("hugo"));
+        assertThat(fila.get("estadoPrueba").asText()).isEqualTo("NO_COMPLETADA");
+        assertThat(fila.at("/detallePrueba/abiertaEn").isNull()).isTrue();
+        conTokenGet("/api/v1/panel/postulaciones/" + postulacion.get("hugo") + "/prueba/plazo", tokenTalento)
+                .andExpect(jsonPath("$.sinCompletar.sinAbrir").value(true));
+
+        // A menos de 24 h y sin avisar: nada por ningún canal, y el recordatorio de esa fecha
+        // queda dado por omitido para que no salga detrás (AC-08, AC-18)
+        java.time.Instant nueva = java.time.Instant.now().plus(java.time.Duration.ofHours(3))
+                .truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
+        conToken(post("/api/v1/panel/postulaciones/" + postulacion.get("hugo") + "/prueba/mas-tiempo"),
+                tokenTalento, "{\"venceEn\":\"%s\",\"motivo\":\"No le llegó el correo\",\"avisar\":false}"
+                        .formatted(nueva))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.estadoPrueba").value("SIN_EMPEZAR"))
+                .andExpect(jsonPath("$.avisadoPor").isEmpty());
+        assertThat(contar("select count(*) from aviso_portal where tipo = 'PRUEBA_MAS_TIEMPO' and postulacion_id = "
+                + postulacion.get("hugo"))).isZero();
+        assertThat(contar("select count(*) from recordatorio_enviado where tipo = 'ANTES_DEL_PLAZO' and resultado = "
+                + "'OMITIDO' and postulacion_id = " + postulacion.get("hugo"))).isEqualTo(1);
+        assertThat(filaDelRanking(vacanteId, "PRUEBA_PUESTO", postulacion.get("hugo")).get("estadoPrueba").asText())
+                .isEqualTo("SIN_EMPEZAR");
+
+        // Antes de «Empezar» el portal no trae el caso ni las preguntas (AC-17)
+        JsonNode antes = json.readTree(conTokenGet("/api/v1/portal/prueba/" + codigo.get("hugo"),
+                tokenCandidata.get("hugo")).andExpect(status().isOk()).andReturn().getResponse()
+                .getContentAsString());
+        assertThat(antes.get("estadoIntento").asText()).isEqualTo("PENDIENTE");
+        assertThat(antes.path("preguntas").size()).isZero();
+        assertThat(antes.path("enunciado").isMissingNode() || antes.path("enunciado").isNull()).isTrue();
+        // Al abrirla, su reloj no pasa de la fecha nueva (AC-10)
+        iniciar("hugo");
+        assertThat(venceEn("hugo")).isEqualTo(nueva);
     }
 
     // ============ Con candidatos dentro ============
@@ -1203,11 +1329,6 @@ public class FlujoPruebaPropiaIT {
             if (c.get("criterioId").asLong() == criterioId) return c;
         }
         throw new AssertionError("No está el criterio " + criterioId);
-    }
-
-    private JsonNode noCompletaron() throws Exception {
-        return json.readTree(conTokenGet(base(vacanteId) + "/no-completaron", tokenTalento)
-                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
     }
 
     private JsonNode ranking(long vacante, String etapa) throws Exception {

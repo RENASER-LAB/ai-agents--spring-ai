@@ -28,6 +28,8 @@ import java.util.Set;
  *   <li><b>Un «te toca»</b> ({@code PRUEBA_DISPONIBLE} o {@code POSTULACION_AVANZA}) con un
  *       vínculo ACTIVO deja un aviso en la cola, ligado a su transición. Lo manda después
  *       {@link EnvioAlBot}.</li>
+ *   <li><b>Más tiempo para la prueba</b> ({@code PRUEBA_MAS_TIEMPO}, V89) deja un aviso igual,
+ *       pero ligado a la prueba y a la fecha nueva: no hay transición de por medio.</li>
  *   <li><b>Un estado final</b> cierra el vínculo. Desde la V76, si estaba ACTIVO, deja además
  *       —<b>dentro</b> de la transacción de la transición— su resultado consultable y, con el
  *       productor v2 encendido, el evento RESULTADO ({@link ResultadosPorWhatsapp}). Los avisos
@@ -97,6 +99,46 @@ public class AvisosPorWhatsapp {
                 () -> enSuTransaccion.executeWithoutResult(t ->
                         encolar(postulacionId, organizacionId, aviso, estado, contexto)),
                 "WhatsApp " + aviso, postulacionId);
+    }
+
+    /**
+     * El equipo le dio más tiempo para la prueba (V89): si hay vínculo activo, deja el aviso
+     * {@code PRUEBA_MAS_TIEMPO} para el bot. No hay transición: el aviso se identifica por la
+     * prueba y la fecha nueva, y dar más tiempo dos veces con la misma fecha no lo repite.
+     *
+     * <p>Después del commit y en su transacción, como los «te toca». Nunca lanza.
+     *
+     * @param intentoId la prueba a la que se le dio
+     * @param hasta     la fecha nueva
+     * @param nombre    su nombre de pila, para el saludo
+     * @param vacante   el título de la vacante
+     */
+    public void alDarMasTiempo(Postulacion postulacion, Long intentoId, Instant hasta, String nombre,
+                               String vacante) {
+        if (intentoId == null || hasta == null) {
+            return;
+        }
+        Long postulacionId = postulacion.getId();
+        Long organizacionId = postulacion.getOrganizacionId();
+        AvisoDeEtapaEnLaCampana.alConfirmar(
+                () -> enSuTransaccion.executeWithoutResult(t ->
+                        encolarMasTiempo(postulacionId, organizacionId, intentoId, hasta, nombre, vacante)),
+                "WhatsApp " + AvisoPortal.PRUEBA_MAS_TIEMPO, postulacionId);
+    }
+
+    /**
+     * Si a esta postulación le llegaría hoy un aviso por WhatsApp: la empresa en la beta, un
+     * vínculo ACTIVO y su número sin baja. Es lo que la ficha dice al guardar («avisado por
+     * correo, campana y WhatsApp»); el aviso en sí se decide otra vez al encolarlo.
+     */
+    public boolean llegaria(Long postulacionId, Long organizacionId) {
+        if (!beta.ofrecePara(organizacionId)) {
+            return false;
+        }
+        return vinculos.vivoDe(postulacionId)
+                .filter(VinculoWhatsapp::estaActivo)
+                .filter(v -> !bajas.existsById(v.getTelefono()))
+                .isPresent();
     }
 
     /**
@@ -183,6 +225,42 @@ public class AvisosPorWhatsapp {
                 .vacante(contexto.vacante() == null ? ""
                         : TextosDeWhatsapp.cortar(contexto.vacante(), TextosDeWhatsapp.LARGO_DE_LA_VACANTE))
                 .texto(TextosDeWhatsapp.cortar(texto, TextosDeWhatsapp.LARGO_DEL_TEXTO))
+                .intentos(0)
+                .proximoIntentoEn(ahora)
+                .creadoEn(ahora)
+                .actualizadoEn(ahora)
+                .build());
+    }
+
+    void encolarMasTiempo(Long postulacionId, Long organizacionId, Long intentoId, Instant hasta,
+                          String nombre, String vacante) {
+        if (!beta.ofrecePara(organizacionId)) {
+            return;
+        }
+        VinculoWhatsapp vinculo = vinculos.vivoDe(postulacionId)
+                .filter(VinculoWhatsapp::estaActivo).orElse(null);
+        if (vinculo == null || bajas.existsById(vinculo.getTelefono())
+                || avisos.existsByIntentoPruebaIdAndPlazoEnAndTipo(intentoId, hasta,
+                        AvisoPortal.PRUEBA_MAS_TIEMPO)) {
+            return;
+        }
+        Instant ahora = Instant.now();
+        avisos.save(AvisoWhatsapp.builder()
+                .id(UuidV7.nuevo())
+                .postulacionId(postulacionId)
+                .vinculoWhatsappId(vinculo.getId())
+                .intentoPruebaId(intentoId)
+                .plazoEn(hasta)
+                .tipo(AvisoPortal.PRUEBA_MAS_TIEMPO)
+                .estado(AvisoWhatsapp.PENDIENTE)
+                .telefono(vinculo.getTelefono())
+                .referencia(vinculo.getReferencia())
+                .nombre(nombre == null ? ""
+                        : TextosDeWhatsapp.cortar(nombre, TextosDeWhatsapp.LARGO_DEL_NOMBRE))
+                .vacante(vacante == null ? ""
+                        : TextosDeWhatsapp.cortar(vacante, TextosDeWhatsapp.LARGO_DE_LA_VACANTE))
+                .texto(TextosDeWhatsapp.cortar(redaccion.masTiempo(nombre, vacante, hasta),
+                        TextosDeWhatsapp.LARGO_DEL_TEXTO))
                 .intentos(0)
                 .proximoIntentoEn(ahora)
                 .creadoEn(ahora)

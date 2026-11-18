@@ -19,9 +19,11 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <ul>
  *   <li><b>Tratar el cero como ausencia.</b> Un cero es un juicio hecho, y quien lo sacó
  *       rindió: leerlo como «no hay nota» lo convertiría en alguien que no la terminó.</li>
- *   <li><b>Dar por entregada una prueba que cerró el sistema.</b> Al vencer el plazo se
- *       entrega lo que haya, y eso no es el candidato diciendo «ya está»: mientras no tenga
- *       nota, sigue siendo una prueba sin terminar.</li>
+ *   <li><b>Llamar «incompleta» a quien la está haciendo</b> (V89). Sin empezar, en curso y
+ *       «no la completó» son tres cosas: solo la última es que se le acabó el tiempo.</li>
+ *   <li><b>Confundir la entrega automática con huecos y la completa.</b> La del editor solo se
+ *       entrega sola con todo respondido —espera nota—; con huecos se cierra como «no
+ *       completada».</li>
  *   <li><b>Llamar «pendiente de calificación» a quien no ha llegado a la etapa.</b> Sin
  *       intento no hay nada entregado, y prometer trabajo del equipo donde no lo hay llena la
  *       bandeja de gente a la que no hay que mirar.</li>
@@ -53,24 +55,66 @@ class EstadoPruebaDelPuestoTest {
     }
 
     @Test
-    @DisplayName("sin empezar todavía, la prueba está incompleta")
-    void elIntentoPendienteEstaIncompleto() {
+    @DisplayName("sin abrir y con plazo vigente, está sin empezar (V89)")
+    void elIntentoPendienteEstaSinEmpezar() {
         assertThat(EstadoPruebaDelPuesto.de(null, pendiente()))
-                .isEqualTo(EstadoPruebaDelPuesto.INCOMPLETA);
+                .isEqualTo(EstadoPruebaDelPuesto.SIN_EMPEZAR);
     }
 
     @Test
-    @DisplayName("empezada y sin entregar, también está incompleta")
-    void elIntentoEnCursoEstaIncompleto() {
+    @DisplayName("sin abrir y sin fecha, también está sin empezar: no hay plazo que se le pase")
+    void sinFechaEstaSinEmpezar() {
+        IntentoPrueba sinFecha = IntentoPrueba.builder().id(5L).postulacionId(POSTULACION).build();
+        assertThat(EstadoPruebaDelPuesto.de(null, sinFecha))
+                .isEqualTo(EstadoPruebaDelPuesto.SIN_EMPEZAR);
+    }
+
+    @Test
+    @DisplayName("empezada y con el reloj corriendo, está en curso: nunca «incompleta» (V89)")
+    void elIntentoEnCursoEstaEnCurso() {
         assertThat(EstadoPruebaDelPuesto.de(null, enCurso()))
-                .isEqualTo(EstadoPruebaDelPuesto.INCOMPLETA);
+                .isEqualTo(EstadoPruebaDelPuesto.EN_CURSO);
     }
 
     @Test
-    @DisplayName("la que cerró el sistema al vencer el plazo sigue incompleta mientras no haya nota")
-    void laEntregaAutomaticaSinNotaEstaIncompleta() {
+    @DisplayName("se le pasó la fecha sin abrirla: no la completó (V89)")
+    void vencidaSinAbrirNoLaCompleto() {
+        IntentoPrueba vencida = IntentoPrueba.builder().id(6L).postulacionId(POSTULACION)
+                .venceEn(Instant.now().minus(Duration.ofHours(3))).build();
+        assertThat(EstadoPruebaDelPuesto.de(null, vencida))
+                .isEqualTo(EstadoPruebaDelPuesto.NO_COMPLETADA);
+    }
+
+    @Test
+    @DisplayName("la fecha justa cuenta como pasada: a esa hora ya no puede empezarla")
+    void laFechaJustaYaPaso() {
+        Instant ahora = Instant.now();
+        IntentoPrueba justa = IntentoPrueba.builder().id(7L).postulacionId(POSTULACION)
+                .venceEn(ahora).build();
+        assertThat(EstadoPruebaDelPuesto.de(null, justa, ahora))
+                .isEqualTo(EstadoPruebaDelPuesto.NO_COMPLETADA);
+        assertThat(EstadoPruebaDelPuesto.de(null, justa, ahora.minusSeconds(1)))
+                .isEqualTo(EstadoPruebaDelPuesto.SIN_EMPEZAR);
+    }
+
+    @Test
+    @DisplayName("la del editor que venció con huecos no la completó (V67, V89)")
+    void laNoCompletadaNoLaCompleto() {
+        IntentoPrueba conHuecos = IntentoPrueba.builder().id(8L).postulacionId(POSTULACION)
+                .versionBancoId(70L)
+                .iniciadoEn(Instant.now().minus(Duration.ofHours(2)))
+                .venceEn(Instant.now().minus(Duration.ofHours(1)))
+                .entregadoEn(Instant.now().minus(Duration.ofHours(1)))
+                .esEntregaAutomatica(true).noCompletada(true).build();
+        assertThat(EstadoPruebaDelPuesto.de(null, conHuecos))
+                .isEqualTo(EstadoPruebaDelPuesto.NO_COMPLETADA);
+    }
+
+    @Test
+    @DisplayName("la que se entregó sola al vencer, con todo respondido, espera nota (V89)")
+    void laEntregaAutomaticaCompletaEsperaNota() {
         assertThat(EstadoPruebaDelPuesto.de(null, entregada(true)))
-                .isEqualTo(EstadoPruebaDelPuesto.INCOMPLETA);
+                .isEqualTo(EstadoPruebaDelPuesto.PENDIENTE_CALIFICACION);
     }
 
     @Test
@@ -78,6 +122,15 @@ class EstadoPruebaDelPuestoTest {
     void laEntregaManualSinNotaEsperaAlEquipo() {
         assertThat(EstadoPruebaDelPuesto.de(null, entregada(false)))
                 .isEqualTo(EstadoPruebaDelPuesto.PENDIENTE_CALIFICACION);
+    }
+
+    @Test
+    @DisplayName("con nota manda la nota, aunque no la hubiera completado")
+    void conNotaMandaAunqueNoLaCompletara() {
+        IntentoPrueba conHuecos = IntentoPrueba.builder().id(9L).postulacionId(POSTULACION)
+                .versionBancoId(70L).entregadoEn(Instant.now()).noCompletada(true).build();
+        assertThat(EstadoPruebaDelPuesto.de(BigDecimal.TEN, conHuecos))
+                .isEqualTo(EstadoPruebaDelPuesto.CALIFICADA);
     }
 
     @Test

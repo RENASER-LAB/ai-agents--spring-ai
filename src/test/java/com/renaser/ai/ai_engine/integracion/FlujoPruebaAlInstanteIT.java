@@ -586,6 +586,73 @@ class FlujoPruebaAlInstanteIT {
         assertThat(avisos("fede")).doesNotContain("PRUEBA_DISPONIBLE");
     }
 
+    /**
+     * «Darle más tiempo» no es una transición (V89): el turno es el mismo, así que el de «a las 24
+     * h» no se repite; el de «24 h antes» sale una vez con la fecha nueva, también para quien ya
+     * la había empezado; y con la fecha nueva a menos de 24 h queda dado por omitido.
+     */
+    @Test
+    @Order(17)
+    @DisplayName("Tras darle más tiempo: el previo sale con la fecha nueva aunque la hubiera empezado, "
+            + "y el de las 24 h no se repite (V89, AC-18)")
+    void trasDarleMasTiempoElPrevioSaleConLaFechaNueva() throws Exception {
+        long beto = postulacion.get("beto");
+        assertThat(estado("beto")).isEqualTo("PRUEBA_TURNO_CANDIDATO");
+        // La empezó (caso 11) y se le acabó el tiempo con huecos: el barrido la cerró sin entregar
+        jdbc.update("""
+                update intento_prueba set vence_en = now() - interval '1 minute', entregado_en = now(),
+                       es_entrega_automatica = true, no_completada = true
+                 where postulacion_id = ?""", beto);
+
+        Instant nueva = Instant.now().plus(Duration.ofDays(3)).truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
+        conToken(post("/api/v1/panel/postulaciones/" + beto + "/prueba/mas-tiempo"), tokenTalento,
+                "{\"venceEn\":\"%s\",\"motivo\":\"Se le cayó la red\",\"avisar\":true}".formatted(nueva))
+                .andExpect(status().isOk());
+        assertThat(correos("beto")).endsWith("PRUEBA_MAS_TIEMPO");
+        assertThat(avisos("beto")).endsWith("PRUEBA_MAS_TIEMPO");
+
+        // Al día siguiente no le llega «aún no has empezado»: ya la empezó y ese turno ya pasó
+        recordatorios.enviarPendientes(diurno(Instant.now().plus(Duration.ofHours(25))));
+        assertThat(correos("beto")).doesNotContain("RECORDATORIO_PRUEBA");
+        assertThat(contar("select count(*) from recordatorio_enviado where postulacion_id = " + beto
+                + " and tipo = 'TRAS_ENTRAR' and resultado = 'OMITIDO'")).isEqualTo(1);
+
+        // 24 h antes de la fecha nueva sale el del plazo, una sola vez
+        Instant antes = CalendarioDeRecordatorios.enFranja(nueva.minus(Duration.ofHours(24)));
+        recordatorios.enviarPendientes(antes);
+        recordatorios.enviarPendientes(antes);
+        assertThat(asuntoDe("beto", "RECORDATORIO_PRUEBA"))
+                .isEqualTo("Tu prueba del puesto para Cajero de sede vence el "
+                        + FechaParaElCandidato.dicha(nueva));
+        assertThat(jdbc.queryForObject("select count(*) from recordatorio_enviado where postulacion_id = ? "
+                + "and tipo = 'ANTES_DEL_PLAZO' and resultado = 'ENVIADO' and plazo_en = ?::timestamptz",
+                Integer.class, beto, nueva.toString())).isEqualTo(1);
+    }
+
+    @Test
+    @Order(18)
+    @DisplayName("Con la fecha nueva a menos de 24 h, el previo de esa fecha queda dado por omitido (V89, AC-18)")
+    void aMenosDe24hElPrevioQuedaOmitido() throws Exception {
+        long diego = postulacion.get("diego");
+        assertThat(estado("diego")).isEqualTo("PRUEBA_TURNO_CANDIDATO");
+        // Nunca la abrió y se le pasó la fecha
+        jdbc.update("update intento_prueba set vence_en = now() - interval '1 minute' where postulacion_id = ?",
+                diego);
+
+        Instant nueva = Instant.now().plus(Duration.ofHours(5)).truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
+        conToken(post("/api/v1/panel/postulaciones/" + diego + "/prueba/mas-tiempo"), tokenTalento,
+                "{\"venceEn\":\"%s\",\"motivo\":\"No vio el correo\",\"avisar\":true}".formatted(nueva))
+                .andExpect(status().isOk());
+
+        assertThat(jdbc.queryForObject("select count(*) from recordatorio_enviado where postulacion_id = ? "
+                + "and tipo = 'ANTES_DEL_PLAZO' and resultado = 'OMITIDO' and plazo_en = ?::timestamptz",
+                Integer.class, diego, nueva.toString())).isEqualTo(1);
+        recordatorios.enviarPendientes(diurno(Instant.now()));
+        assertThat(jdbc.queryForObject("select count(*) from recordatorio_enviado where postulacion_id = ? "
+                + "and tipo = 'ANTES_DEL_PLAZO' and resultado = 'ENVIADO' and plazo_en = ?::timestamptz",
+                Integer.class, diego, nueva.toString())).isZero();
+    }
+
     // ============ Ayudas ============
 
     /** Lo que deja la IA al terminar: la abierta del banco con esa nota y el retrato cerrado. */

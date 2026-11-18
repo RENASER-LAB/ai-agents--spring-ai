@@ -424,8 +424,9 @@ public class ServicioPruebaImpl implements ServicioPrueba {
                 continue;
             }
             // La prueba del editor solo se entrega sola con todo respondido (decisión 11). Si
-            // falta algo se cierra como «no completada»: no se califica, no gasta IA, no sale
-            // en el ranking y la postulación se queda donde está hasta que alguien la cierre.
+            // falta algo se cierra como «no completada»: no se califica, no gasta IA y la
+            // postulación se queda donde está. Sale en el ranking como «No la completó», solo en
+            // «Toda la tanda», y el equipo puede darle más tiempo o descartarla (V89).
             if (intento.esDelEditor() && !loQueFaltaA(intento).nada()) {
                 cerrarSinCompletar(intento);
                 continue;
@@ -964,8 +965,8 @@ public class ServicioPruebaImpl implements ServicioPrueba {
         intento.setEsEntregaAutomatica(true);
         intento.setNoCompletada(true);
         intentos.save(intento);
-        log.info("La prueba de la postulación {} venció sin completar: no se califica y su "
-                + "proceso espera a que alguien lo cierre", intento.getPostulacionId());
+        log.info("La prueba de la postulación {} venció sin completar: no se califica; el "
+                + "equipo puede darle más tiempo o cerrar su proceso", intento.getPostulacionId());
     }
 
     private VersionBanco laVersionDelEditor(IntentoPrueba intento) {

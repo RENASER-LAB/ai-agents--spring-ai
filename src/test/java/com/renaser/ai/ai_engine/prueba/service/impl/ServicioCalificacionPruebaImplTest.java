@@ -544,6 +544,39 @@ class ServicioCalificacionPruebaImplTest {
     }
 
     @Test
+    @DisplayName("con la vacante archivada no se toca el plazo (V89)")
+    void conLaVacanteArchivadaNoCambiaDePlazo() {
+        conPostulacionVisible("mover_postulacion");
+        when(vacantes.existsByIdAndArchivadaEnIsNotNull(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(true);
+
+        assertThatThrownBy(() -> servicio.definirPlazo(QUIEN, POSTULACION,
+                new DefinirPlazoPrueba(Instant.now().plus(2, java.time.temporal.ChronoUnit.DAYS),
+                        "más horas")))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("archivada");
+        verify(intentos, never()).save(org.mockito.ArgumentMatchers.any());
+        verifyNoInteractions(auditoria);
+    }
+
+    @Test
+    @DisplayName("a quien no la completó se le da más tiempo por su botón, no por aquí (V89)")
+    void laNoCompletadaVaPorMasTiempo() {
+        conPostulacionVisible("mover_postulacion");
+        when(intentos.findByPostulacionId(POSTULACION)).thenReturn(Optional.of(
+                IntentoPrueba.builder().id(9L).postulacionId(POSTULACION).versionBancoId(7L)
+                        .iniciadoEn(Instant.now()).entregadoEn(Instant.now()).noCompletada(true)
+                        .build()));
+
+        assertThatThrownBy(() -> servicio.definirPlazo(QUIEN, POSTULACION,
+                new DefinirPlazoPrueba(Instant.now().plus(2, java.time.temporal.ChronoUnit.DAYS),
+                        "más horas")))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Darle más tiempo");
+        verify(intentos, never()).save(org.mockito.ArgumentMatchers.any());
+    }
+
+    @Test
     @DisplayName("sin intento creado no hay plazo que fijar")
     void sinIntentoNoHayPlazo() {
         conPostulacionVisible("mover_postulacion");

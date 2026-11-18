@@ -244,16 +244,4 @@ public final class DtosPruebaPropia {
             @Size(max = 1000, message = "El motivo admite hasta 1000 caracteres")
             String motivo) {
     }
-
-    // ============================== Quienes no la completaron ==============================
-
-    /**
-     * Quien dejó vencer el tiempo con algo sin responder (decisión 11): no sale en el ranking
-     * y su postulación sigue donde estaba hasta que alguien cierre su proceso.
-     *
-     * @param queFalto «le faltaron 3 preguntas», «le faltó «Tablero.xlsx»»
-     */
-    public record NoCompleto(Long postulacionId, String candidato, String estado,
-                             String queFalto, Instant cerradaEn, boolean procesoCerrado) {
-    }
 }

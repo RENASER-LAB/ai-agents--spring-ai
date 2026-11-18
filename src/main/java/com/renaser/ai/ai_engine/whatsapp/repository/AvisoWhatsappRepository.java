@@ -22,6 +22,10 @@ public interface AvisoWhatsappRepository extends JpaRepository<AvisoWhatsapp, UU
     /** ¿Esta transición ya dejó un aviso de este tipo? La base también lo impide. */
     boolean existsByTransicionEstadoIdAndTipo(Long transicionEstadoId, String tipo);
 
+    /** ¿Ya se avisó de esta fecha nueva para esta prueba (V89)? La base también lo impide. */
+    boolean existsByIntentoPruebaIdAndPlazoEnAndTipo(Long intentoPruebaId, java.time.Instant plazoEn,
+                                                     String tipo);
+
     /** Los que toca mandar ya, los más viejos primero. */
     @Query("""
             select a.id from AvisoWhatsapp a
