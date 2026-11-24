@@ -166,6 +166,21 @@ class ServicioRecalificacionDelCvImplTest {
     }
 
     @Test
+    @DisplayName("con vacantes pedidas, solo cuentan las de esas vacantes: otra abierta no se lee ni se encola")
+    void soloLasVacantesPedidas() {
+        assertThat(servicio.afectados(plataforma, Set.of(ABIERTA)).pendientes()).isEqualTo(2);
+        // Sin el parámetro (nulo, como llega del controlador) son todas las abiertas.
+        assertThat(servicio.afectados(plataforma, null).pendientes()).isEqualTo(2);
+
+        ListaDeAfectados otra = servicio.afectados(plataforma, Set.of(99L));
+        assertThat(otra.pendientes()).isZero();
+        assertThat(otra.vacantes()).isEmpty();
+
+        assertThat(servicio.recalificar(plataforma, Set.of(99L)).encoladas()).isZero();
+        verify(cola, never()).recalificarElCv(anyLong(), anyBoolean());
+    }
+
+    @Test
     @DisplayName("con «Qué buscar en el CV» la búsqueda suma una llamada por persona")
     void conLaBusqueda() {
         when(loBuscado.vigentes(ABIERTA)).thenReturn(List.of(new LoBuscadoEnElCv.LineaVigente(1L, 1, "Excel", 1)));

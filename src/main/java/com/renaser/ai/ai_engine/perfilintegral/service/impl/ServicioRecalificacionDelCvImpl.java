@@ -108,9 +108,9 @@ public class ServicioRecalificacionDelCvImpl implements ServicioRecalificacionDe
 
     @Override
     @Transactional(readOnly = true)
-    public ListaDeAfectados afectados(ContextoUsuario quien) {
+    public ListaDeAfectados afectados(ContextoUsuario quien, Set<Long> soloVacantes) {
         exigirPlataforma(quien);
-        List<Afectado> todas = buscar().stream().map(Candidata::afectado).toList();
+        List<Afectado> todas = buscar(soloVacantes).stream().map(Candidata::afectado).toList();
         List<Afectado> aRecalificar = todas.stream().filter(a -> !EN_CURSO.equals(a.estado())).toList();
         Map<Long, VacanteAfectada> porVacante = new LinkedHashMap<>();
         for (Afectado a : aRecalificar) {
@@ -131,13 +131,13 @@ public class ServicioRecalificacionDelCvImpl implements ServicioRecalificacionDe
      * y un fallo con una persona no puede dejar marcada para deshacer la tanda entera.
      */
     @Override
-    public TandaDeRecalificacion recalificar(ContextoUsuario quien) {
+    public TandaDeRecalificacion recalificar(ContextoUsuario quien, Set<Long> soloVacantes) {
         exigirPlataforma(quien);
         int encoladas = 0;
         int yaEnMarcha = 0;
         int llamadas = 0;
         List<NoEncolada> fallidas = new ArrayList<>();
-        for (Candidata c : buscar()) {
+        for (Candidata c : buscar(soloVacantes)) {
             Afectado a = c.afectado();
             if (EN_CURSO.equals(a.estado())) {
                 yaEnMarcha++;
@@ -175,13 +175,15 @@ public class ServicioRecalificacionDelCvImpl implements ServicioRecalificacionDe
 
     // ================================================================== quiénes
 
-    private List<Candidata> buscar() {
+    private List<Candidata> buscar(Set<Long> soloVacantes) {
         Set<String> cerrados = estados.findAllByOrderByOrden().stream()
                 .filter(EstadoPostulacion::isEsFinal)
                 .map(EstadoPostulacion::getCodigo)
                 .collect(Collectors.toSet());
         List<Vacante> abiertas = vacantes.findByEstadoAndEliminadaEnIsNullOrderByPublicadaEnDesc(ABIERTA).stream()
                 .filter(v -> v.getArchivadaEn() == null)
+                // Sin filtro, todas las abiertas; con él, solo las pedidas que sigan abiertas.
+                .filter(v -> soloVacantes == null || soloVacantes.isEmpty() || soloVacantes.contains(v.getId()))
                 .toList();
         Map<Long, Vacante> vacantePorId = new LinkedHashMap<>();
         List<Postulacion> enCurso = new ArrayList<>();
