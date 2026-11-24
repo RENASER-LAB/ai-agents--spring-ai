@@ -164,8 +164,7 @@ public class EnvioAlBot {
         }
         vinculo.setAnuncioIntentos(vinculo.getAnuncioIntentos() + 1);
         try {
-            cliente.anunciar(new ClienteConversacion.Espera(vinculo.getTelefono(),
-                    vinculo.getReferencia(), vinculo.getAnuncioCaducaEn(), consentimientoDe(vinculo)));
+            cliente.anunciar(esperaDe(vinculo));
             vinculo.setAnuncioConfirmadoEn(ahora);
             vinculo.setAnuncioProximoIntentoEn(null);
         } catch (FalloDelBot fallo) {
@@ -198,6 +197,17 @@ public class EnvioAlBot {
                     siguiente == null ? ". No se reintenta más" : "");
         }
         vinculos.save(vinculo);
+    }
+
+    /**
+     * El anuncio de un vínculo tal como lo recibe el bot: lo que se le empuja en
+     * {@code /v1/ex/esperas} y lo que el bot recoge en {@code /anuncios} si no le llegó.
+     *
+     * @throws ClienteConversacion.FalloDelBot definitivo si el vínculo no tiene su consentimiento
+     */
+    public ClienteConversacion.Espera esperaDe(VinculoWhatsapp vinculo) {
+        return new ClienteConversacion.Espera(vinculo.getTelefono(), vinculo.getReferencia(),
+                vinculo.getAnuncioCaducaEn(), consentimientoDe(vinculo));
     }
 
     /**

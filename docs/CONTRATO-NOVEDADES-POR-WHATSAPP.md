@@ -259,6 +259,20 @@ Responde `{"novedades": [{"vacante": "…", "titulo": "…", "texto": "…"}]}`,
 URL ni quede en los registros de acceso. Funciona aunque la beta esté apagada: los vínculos
 activos siguen recibiendo novedades si escriben.
 
+### `POST /anuncios` — los anuncios que no le llegaron
+
+```json
+{"telefono": "+51987654321"}
+```
+
+Responde `{"esperas": [ … ]}`: los anuncios **vigentes** de ese número, cada uno con el mismo cuerpo
+que `POST /v1/ex/esperas` (teléfono, `postulacionRef`, `caducaEn` y consentimiento), o la lista
+vacía. El bot la llama cuando le escribe un número que no tiene anunciado ni vinculado, antes de
+contestar: si EX no pudo empujar el anuncio (el CRM apagado de noche, una caída, un despliegue)
+y agotó sus reintentos, el bot lo recoge aquí, guarda la espera y vincula en el mismo turno. Cada
+anuncio entregado queda confirmado y el sondeo deja de reintentarlo. Un vínculo sin su
+consentimiento no se entrega.
+
 ### `POST /bajas`
 
 ```json
