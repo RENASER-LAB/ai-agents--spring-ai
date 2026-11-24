@@ -31,7 +31,7 @@ public interface ServicioRecalificacionDelCv {
         return afectados(quien, Set.of());
     }
 
-    /** Lo mismo, solo en esas vacantes; vacío es todas las abiertas. */
+    /** Lo mismo, solo en esas vacantes; nulo o vacío es todas las abiertas. */
     ListaDeAfectados afectados(ContextoUsuario quien, Set<Long> soloVacantes);
 
     /**
@@ -43,6 +43,6 @@ public interface ServicioRecalificacionDelCv {
         return recalificar(quien, Set.of());
     }
 
-    /** Lo mismo, solo en esas vacantes; vacío es todas las abiertas. */
+    /** Lo mismo, solo en esas vacantes; nulo o vacío es todas las abiertas. */
     TandaDeRecalificacion recalificar(ContextoUsuario quien, Set<Long> soloVacantes);
 }

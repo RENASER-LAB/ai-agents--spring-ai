@@ -129,7 +129,7 @@ public class PlataformaController {
             + "vacantes y cuántas llamadas costaría recalificarlas. No llama a la IA. Con «vacantes» "
             + "(ids separados por comas), solo en esas")
     public ListaDeAfectados afectadosPorLaFecha(@RequestParam(required = false) Set<Long> vacantes) {
-        return recalificacion.afectados(permisos.actual(), vacantes == null ? Set.of() : vacantes);
+        return recalificacion.afectados(permisos.actual(), vacantes);
     }
 
     @PostMapping("/recalificacion-por-la-fecha")
@@ -138,7 +138,7 @@ public class PlataformaController {
             + "nadie de etapa y sin pisar lo ajustado a mano. Un fallo con uno no frena a los demás. Con "
             + "«vacantes» (ids separados por comas), solo en esas")
     public TandaDeRecalificacion recalificarAfectadosPorLaFecha(@RequestParam(required = false) Set<Long> vacantes) {
-        return recalificacion.recalificar(permisos.actual(), vacantes == null ? Set.of() : vacantes);
+        return recalificacion.recalificar(permisos.actual(), vacantes);
     }
 
     // La conversión a mano, como en PersonalizacionController y por lo mismo: un valor

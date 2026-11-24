@@ -169,6 +169,8 @@ class ServicioRecalificacionDelCvImplTest {
     @DisplayName("con vacantes pedidas, solo cuentan las de esas vacantes: otra abierta no se lee ni se encola")
     void soloLasVacantesPedidas() {
         assertThat(servicio.afectados(plataforma, Set.of(ABIERTA)).pendientes()).isEqualTo(2);
+        // Sin el parámetro (nulo, como llega del controlador) son todas las abiertas.
+        assertThat(servicio.afectados(plataforma, null).pendientes()).isEqualTo(2);
 
         ListaDeAfectados otra = servicio.afectados(plataforma, Set.of(99L));
         assertThat(otra.pendientes()).isZero();
