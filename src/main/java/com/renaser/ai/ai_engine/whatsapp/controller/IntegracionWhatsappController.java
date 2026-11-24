@@ -1,9 +1,11 @@
 package com.renaser.ai.ai_engine.whatsapp.controller;
 
+import com.renaser.ai.ai_engine.whatsapp.dto.DtosWhatsapp.Anuncios;
 import com.renaser.ai.ai_engine.whatsapp.dto.DtosWhatsapp.Novedades;
 import com.renaser.ai.ai_engine.whatsapp.dto.DtosWhatsapp.PeticionDelNumero;
 import com.renaser.ai.ai_engine.whatsapp.dto.DtosWhatsapp.PeticionVinculo;
 import com.renaser.ai.ai_engine.whatsapp.dto.DtosWhatsapp.Rechazo;
+import com.renaser.ai.ai_engine.whatsapp.service.AnunciosPendientes;
 import com.renaser.ai.ai_engine.whatsapp.service.ServicioIntegracionWhatsapp;
 import com.renaser.ai.ai_engine.whatsapp.service.ServicioIntegracionWhatsapp.ResultadoVinculo;
 import com.renaser.ai.ai_engine.whatsapp.service.TextosDeWhatsapp;
@@ -40,6 +42,15 @@ import org.springframework.web.bind.annotation.*;
 public class IntegracionWhatsappController {
 
     private final ServicioIntegracionWhatsapp integracion;
+    private final AnunciosPendientes anuncios;
+
+    @PostMapping("/anuncios")
+    @Operation(summary = "Los anuncios vigentes de ese número que el bot no recibió (CRM apagado o "
+            + "caído): el bot los pide antes de contestar a un número que no conoce. Mismo cuerpo que "
+            + "/v1/ex/esperas; la lista puede ir vacía. Quedan confirmados")
+    public Anuncios anuncios(@Valid @RequestBody PeticionDelNumero peticion) {
+        return anuncios.delNumero(peticion.telefono());
+    }
 
     @PostMapping("/vinculos")
     @Operation(summary = "Un número anunciado escribió: vincula sus postulaciones anunciadas y "
