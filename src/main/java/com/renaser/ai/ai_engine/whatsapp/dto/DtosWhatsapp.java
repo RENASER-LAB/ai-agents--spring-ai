@@ -54,6 +54,12 @@ public final class DtosWhatsapp {
     public record PostulacionVinculada(String postulacionRef) {}
 
     /**
+     * {@code POST /anuncios}: los anuncios vigentes de un número, con el mismo cuerpo que
+     * {@code /v1/ex/esperas}. La lista puede ir vacía.
+     */
+    public record Anuncios(java.util.List<java.util.Map<String, Object>> esperas) {}
+
+    /**
      * Lo que se le cuenta de un proceso, con las mismas palabras del portal: {@code vacante} (hasta
      * 60 caracteres), {@code titulo} del momento (hasta 80) y {@code texto} (hasta 300).
      */
