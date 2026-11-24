@@ -1,5 +1,7 @@
 package com.renaser.ai.ai_engine.integracion;
 
+import com.renaser.ai.ai_engine.integracion.soporte.CelularesDePrueba;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.renaser.ai.ai_engine.integracion.soporte.ImagenesDeContenedores;
@@ -696,7 +698,7 @@ class FlujoPruebaAlInstanteIT {
         mvc.perform(post("/api/v1/portal/cuentas").contentType(MediaType.APPLICATION_JSON).content("""
                 {"nombre":"%s","apellidos":"Prueba","correo":"%s",
                  "contrasena":"unaClaveLarga123","ciudadUbigeo":"1501","telefono": "987654321", "aceptaPlataforma":true,
-                 "aceptaFuturosContactos":false}""".formatted(capital(quien), correo)))
+                 "aceptaFuturosContactos":false}""".replace("987654321", CelularesDePrueba.otro()).formatted(capital(quien), correo)))
                 .andExpect(status().isCreated());
         String suToken = leer(mvc.perform(post("/api/v1/portal/auth/login").contentType(MediaType.APPLICATION_JSON)
                         .content("{\"correo\":\"%s\",\"contrasena\":\"unaClaveLarga123\"}".formatted(correo)))

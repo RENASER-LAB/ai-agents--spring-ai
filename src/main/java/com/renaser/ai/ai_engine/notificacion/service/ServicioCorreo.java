@@ -5,28 +5,63 @@ import com.renaser.ai.ai_engine.notificacion.entity.PlantillaCorreo;
 import com.renaser.ai.ai_engine.notificacion.repository.CorreoEnviadoRepository;
 import com.renaser.ai.ai_engine.notificacion.repository.PlantillaCorreoRepository;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 // Plantilla activa -> reemplazo de {{variables}} -> fila en correo_enviado con el texto
 // EXACTO que salió -> transporte. Si un candidato reclama meses después, se lee lo que
 // se le dijo, no lo que la plantilla dice hoy.
 @Service
-@RequiredArgsConstructor
 @Slf4j
 public class ServicioCorreo {
+
+    /**
+     * Los correos de la cuenta, que salen siempre (V92): crearla, recuperar la clave, el borrado
+     * de datos, las invitaciones del equipo y el aviso del tope de la IA.
+     *
+     * <p>Todos los demás son de sus procesos —el cambio de etapa (también el texto propio que una
+     * vacante eligió para él), la postulación recibida, la simulación, los recordatorios y «más
+     * tiempo»— y no salen si la persona apagó el correo en «Notificaciones». Va como lista de los
+     * que salen siempre, y no de los que se apagan, porque una vacante puede elegir su propio
+     * texto con otro código: un aviso de etapa no puede escaparse del interruptor por llamarse
+     * distinto.
+     */
+    public static final Set<String> DE_LA_CUENTA = Set.of(
+            "CUENTA_CREADA", "RECUPERAR_CLAVE_CANDIDATO", "RECUPERAR_CLAVE_EQUIPO",
+            "BORRADO_DATOS", "BORRADO_EJECUTADO", "INVITACION_EQUIPO", "TOPE_IA_AVISO");
 
     private final PlantillaCorreoRepository plantillas;
     private final CorreoEnviadoRepository enviados;
     private final EnviadorCorreo transporte;
+    /** Si apagó los correos de sus procesos (V92). Nulo en las pruebas que no lo miran: todo sale. */
+    private final PreferenciasDeAviso preferencias;
+
+    /** Sin preferencias: todo sale. Lo usan las pruebas del registro y del transporte. */
+    public ServicioCorreo(PlantillaCorreoRepository plantillas, CorreoEnviadoRepository enviados,
+                          EnviadorCorreo transporte) {
+        this(plantillas, enviados, transporte, null);
+    }
+
+    @Autowired
+    public ServicioCorreo(PlantillaCorreoRepository plantillas, CorreoEnviadoRepository enviados,
+                          EnviadorCorreo transporte, PreferenciasDeAviso preferencias) {
+        this.plantillas = plantillas;
+        this.enviados = enviados;
+        this.transporte = transporte;
+        this.preferencias = preferencias;
+    }
 
     public void enviar(Long organizacionId, Long usuarioId, String correoDestino,
                        String codigoPlantilla, Map<String, String> variables) {
+        if (apagado(usuarioId, codigoPlantilla)) {
+            return;
+        }
         var plantilla = plantillas
                 .findFirstByOrganizacionIdAndCodigoAndEsActivaTrueOrderByVersionDesc(organizacionId, codigoPlantilla)
                 .orElse(null);
@@ -68,6 +103,10 @@ public class ServicioCorreo {
      */
     public EnviadorCorreo.Resultado enviarCon(PlantillaCorreo plantilla, Long usuarioId,
                                               String correoDestino, Map<String, String> variables) {
+        if (apagado(usuarioId, plantilla.getCodigo())) {
+            // Ni fila en correo_enviado: no se le dijo nada, y el registro no puede decir otra cosa.
+            return EnviadorCorreo.Resultado.NO_ENVIADO;
+        }
         String asunto = reemplazar(plantilla.getAsunto(), variables);
         String cuerpo = reemplazar(plantilla.getCuerpo(), variables);
 
@@ -93,6 +132,29 @@ public class ServicioCorreo {
         registro.setEstadoEntrega(resultado.name());
         enviados.save(registro);
         return resultado;
+    }
+
+    /**
+     * Un correo de sus procesos a quien apagó el correo en «Notificaciones» (V92). Los de la
+     * cuenta ({@link #DE_LA_CUENTA}) nunca; y si no se puede saber, sale: perder un aviso en
+     * silencio es peor que mandar uno de más.
+     */
+    private boolean apagado(Long usuarioId, String codigoPlantilla) {
+        if (preferencias == null || usuarioId == null || DE_LA_CUENTA.contains(codigoPlantilla)) {
+            return false;
+        }
+        try {
+            if (preferencias.recibeCorreo(usuarioId)) {
+                return false;
+            }
+        } catch (RuntimeException e) {
+            log.warn("No se pudo leer si el usuario {} recibe correos; sale igual: {}", usuarioId,
+                    e.getMessage());
+            return false;
+        }
+        log.info("El correo «{}» no sale: el usuario {} apagó los correos de sus procesos",
+                codigoPlantilla, usuarioId);
+        return true;
     }
 
     private String reemplazar(String texto, Map<String, String> variables) {

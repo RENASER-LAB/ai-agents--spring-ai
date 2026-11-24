@@ -74,6 +74,7 @@ class ServicioWhatsappPortalImplTest {
     @Mock private EnvioAlBot envio;
     @Mock private com.renaser.ai.ai_engine.whatsapp.service.ResultadosPorWhatsapp resultados;
     @Mock private PlatformTransactionManager transacciones;
+    @Mock private com.renaser.ai.ai_engine.notificacion.service.PreferenciasDeAviso preferencias;
 
     private ServicioWhatsappPortalImpl servicio;
     private final Persona ana = Persona.builder().id(33L).nombre("Ana").apellidos("Pérez")
@@ -90,7 +91,7 @@ class ServicioWhatsappPortalImplTest {
         DuenoDelInstrumento duenos = new DuenoDelInstrumento(organizaciones);
         servicio = new ServicioWhatsappPortalImpl(postulaciones, vacantes, estados, personas, vinculos,
                 avisos, bajas, consentimientos, new TextosDeConsentimiento(textos, duenos), duenos,
-                beta, envio, new PropiedadesWhatsapp(), resultados, transacciones);
+                beta, envio, new PropiedadesWhatsapp(), resultados, transacciones, preferencias);
     }
 
     private static ContextoUsuario ana() {

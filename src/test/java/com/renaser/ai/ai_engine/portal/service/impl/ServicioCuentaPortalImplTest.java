@@ -346,6 +346,43 @@ class ServicioCuentaPortalImplTest {
                 org.mockito.ArgumentMatchers.isNull());
     }
 
+    // ============ Un número, una cuenta (V92) ============
+
+    @Test
+    @DisplayName("AC-11 · crear la cuenta con un celular que ya usa otra: 409 TELEFONO_EN_USO y no nace nada")
+    void crearConUnCelularDeOtraCuenta() {
+        when(catalogos.esCiudadElegible("0402")).thenReturn(true);
+        when(organizaciones.findByEsPlataformaTrue()).thenReturn(Optional.of(
+                com.renaser.ai.ai_engine.organizacion.entity.Organizacion.builder()
+                        .id(ORGANIZACION).esPlataforma(true).build()));
+        when(usuarios.buscarPorCorreo(ORGANIZACION, "camila@correo.pe")).thenReturn(Optional.empty());
+        when(personas.existsByTelefono("+51987654321")).thenReturn(true);
+
+        assertThatThrownBy(() -> servicio.crearCuenta(cuenta("0402", "987 654 321"), "10.0.0.1", "Firefox"))
+                .isInstanceOf(com.renaser.ai.ai_engine.portal.service.TelefonoEnUsoException.class)
+                .hasMessage("Ese número ya está en otra cuenta. Usa otro o entra con esa cuenta.");
+
+        verify(personas, never()).save(any());
+        verify(usuarios, never()).save(any());
+        verifyNoInteractions(correo);
+    }
+
+    @Test
+    @DisplayName("AC-11 · cambiar al celular de otra cuenta: 409 TELEFONO_EN_USO, no se guarda ni se cierra nada")
+    void cambiarAlCelularDeOtraCuenta() {
+        Persona camila = Persona.builder().id(33L).telefono("+51987654321").build();
+        when(personas.findById(33L)).thenReturn(Optional.of(camila));
+        when(personas.existsByTelefonoAndIdNot("+51912345678", 33L)).thenReturn(true);
+
+        assertThatThrownBy(() -> servicio.cambiarTelefono(candidata(), "912 345 678"))
+                .isInstanceOf(com.renaser.ai.ai_engine.portal.service.TelefonoEnUsoException.class)
+                .extracting("codigo").isEqualTo("TELEFONO_EN_USO");
+
+        assertThat(camila.getTelefono()).isEqualTo("+51987654321");
+        verify(personas, never()).save(any());
+        verifyNoInteractions(whatsapp, auditoria);
+    }
+
     @Test
     @DisplayName("AC-02 · el mismo número escrito de otra forma no es un cambio: nada se cierra")
     void elMismoNumeroNoEsUnCambio() {

@@ -93,6 +93,9 @@ public class ManejadorErrores {
 
     private static final String BASE_URI = "https://api.renaser.com/errors/";
 
+    /** El índice único del celular de la cuenta (V92): chocar con él es un 409 TELEFONO_EN_USO. */
+    private static final String INDICE_DEL_TELEFONO = "persona_telefono_unico";
+
     // Fallar al entrar es 401, no 400: la petición está bien escrita, lo que no cuadra es
     // la identidad. Se registra sin el correo, que en este caso es dato de un intento fallido.
     @ExceptionHandler(CredencialesInvalidasException.class)
@@ -202,6 +205,35 @@ public class ManejadorErrores {
         return problema;
     }
 
+    // El bot falló o no contestó al encender WhatsApp con un clic (V92): 503 con un `codigo`, y no
+    // cambió nada. El portal dice «No pudimos activarlo. Vuelve a intentarlo en un momento.».
+    @ExceptionHandler(com.renaser.ai.ai_engine.whatsapp.service.WhatsappNoActivadoException.class)
+    public ProblemDetail whatsappNoActivado(
+            com.renaser.ai.ai_engine.whatsapp.service.WhatsappNoActivadoException ex,
+            WebRequest request) {
+        log.warn("WhatsApp no activado - Path: {}, Causa: {}", request.getDescription(false),
+                ex.getCause() == null ? ex.getMessage() : ex.getCause().getMessage());
+        ProblemDetail problema = construir(HttpStatus.SERVICE_UNAVAILABLE, "No pudimos activar WhatsApp",
+                "whatsapp-no-activado", ex.getMessage());
+        problema.setProperty("codigo", ex.getCodigo());
+        return problema;
+    }
+
+    // Ese celular ya es de otra cuenta (V92): 409 con un `codigo` que el portal pinta junto al campo.
+    @ExceptionHandler(com.renaser.ai.ai_engine.portal.service.TelefonoEnUsoException.class)
+    public ProblemDetail telefonoEnUso(com.renaser.ai.ai_engine.portal.service.TelefonoEnUsoException ex,
+                                       WebRequest request) {
+        log.warn("Teléfono en uso - Path: {}", request.getDescription(false));
+        return telefonoEnUso(ex.getMessage());
+    }
+
+    private ProblemDetail telefonoEnUso(String detalle) {
+        ProblemDetail problema = construir(HttpStatus.CONFLICT, "Ese número ya está en otra cuenta",
+                "telefono-en-uso", detalle);
+        problema.setProperty("codigo", com.renaser.ai.ai_engine.portal.service.TelefonoEnUsoException.CODIGO);
+        return problema;
+    }
+
     // Una regla de negocio incumplida es un 400 con explicación, no un 500 opaco:
     // «toda transición manual exige motivo», «el archivo debe ser PDF o Word»…
     @ExceptionHandler(IllegalArgumentException.class)
@@ -263,6 +295,11 @@ public class ManejadorErrores {
     public ProblemDetail datoQueNoCuadra(DataIntegrityViolationException ex, WebRequest request) {
         log.warn("Integridad de datos - Path: {}, Message: {}",
                 request.getDescription(false), ex.getMostSpecificCause().getMessage());
+        String causa = ex.getMostSpecificCause().getMessage();
+        if (causa != null && causa.contains(INDICE_DEL_TELEFONO)) {
+            // Dos altas a la vez con el mismo celular: la segunda choca con el índice (V92).
+            return telefonoEnUso(com.renaser.ai.ai_engine.portal.service.TelefonoEnUsoException.MENSAJE);
+        }
         return construir(HttpStatus.BAD_REQUEST, "Hay un dato que no cuadra",
                 "dato-invalido", explicar(ex));
     }

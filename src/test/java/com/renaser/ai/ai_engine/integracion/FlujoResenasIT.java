@@ -1,5 +1,7 @@
 package com.renaser.ai.ai_engine.integracion;
 
+import com.renaser.ai.ai_engine.integracion.soporte.CelularesDePrueba;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.renaser.ai.ai_engine.integracion.soporte.ImagenesDeContenedores;
@@ -466,7 +468,7 @@ public class FlujoResenasIT {
                         .content("""
                         {"nombre":"%s","apellidos":"Rojas","correo":"%s",
                          "contrasena":"unaClaveLarga123","ciudadUbigeo":"1501","telefono": "987654321", "aceptaPlataforma":true,
-                         "aceptaFuturosContactos":false}""".formatted(nombre, correo)))
+                         "aceptaFuturosContactos":false}""".replace("987654321", CelularesDePrueba.otro()).formatted(nombre, correo)))
                 .andExpect(status().isCreated());
         return leer(mvc.perform(post("/api/v1/portal/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)

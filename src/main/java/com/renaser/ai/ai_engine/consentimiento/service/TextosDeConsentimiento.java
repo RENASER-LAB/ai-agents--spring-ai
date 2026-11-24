@@ -73,6 +73,8 @@ public class TextosDeConsentimiento {
                             + TipoConsentimiento.FUTUROS_CONTACTOS;
                     case WHATSAPP -> "No hay texto de consentimiento de WhatsApp publicado: "
                             + "sin él no se pueden ofrecer las novedades por WhatsApp";
+                    case WHATSAPP_CUENTA -> "No hay texto de consentimiento de WhatsApp para la cuenta "
+                            + "publicado: sin él no se puede activar WhatsApp en «Notificaciones»";
                 }));
     }
 

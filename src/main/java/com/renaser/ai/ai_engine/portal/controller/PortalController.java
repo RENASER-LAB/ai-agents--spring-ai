@@ -43,6 +43,8 @@ public class PortalController {
     private final Permisos permisos;
     // El botón de WhatsApp de cada proceso (V73).
     private final com.renaser.ai.ai_engine.whatsapp.service.ServicioWhatsappPortal whatsapp;
+    // El botón «Notificaciones» de «Mis procesos» (V92): WhatsApp, correo y campana para toda la cuenta.
+    private final com.renaser.ai.ai_engine.portal.service.ServicioNotificacionesPortal notificaciones;
 
     // ---------- público ----------
 
@@ -275,6 +277,58 @@ public class PortalController {
     public com.renaser.ai.ai_engine.whatsapp.dto.DtosWhatsapp.WhatsappDelProceso dejarDeRecibirPorWhatsapp(
             @PathVariable UUID uuid) {
         return whatsapp.dejarDeRecibir(permisos.actual(), uuid);
+    }
+
+    // ---------- Notificaciones (V92) ----------
+
+    /**
+     * Los tres canales de la cuenta —WhatsApp, correo y la campana—, en qué está WhatsApp y si
+     * sale el mensaje flotante que invita a activarlo.
+     */
+    @GetMapping("/notificaciones")
+    @Operation(summary = "Mis notificaciones: WhatsApp (con su estado), correo, la campana y si sale "
+            + "el mensaje que invita a activar WhatsApp")
+    public com.renaser.ai.ai_engine.notificacion.dto.DtosNotificaciones.Notificaciones misNotificaciones() {
+        return notificaciones.notificaciones(permisos.actual());
+    }
+
+    @PatchMapping("/notificaciones")
+    @Operation(summary = "Encender o apagar los correos y los avisos de la campana de mis procesos. "
+            + "Lo que no se manda se queda como estaba. Los correos de la cuenta salen siempre")
+    public com.renaser.ai.ai_engine.notificacion.dto.DtosNotificaciones.Notificaciones cambiarNotificaciones(
+            @RequestBody(required = false)
+            com.renaser.ai.ai_engine.notificacion.dto.DtosNotificaciones.CambiarNotificaciones datos) {
+        return notificaciones.cambiar(permisos.actual(), datos);
+    }
+
+    /**
+     * Encender WhatsApp para todos mis procesos. Con el número ya comprobado, con un clic
+     * ({@code ACTIVADO}); si no, se anuncia y devuelve el enlace al chat ({@code POR_MENSAJE}).
+     *
+     * <p>409 con {@code codigo} sin celular ({@code SIN_CELULAR}) o con la beta apagada
+     * ({@code NO_DISPONIBLE}); 503 ({@code NO_SE_PUDO_ACTIVAR}) si el bot falla, sin cambiar nada.
+     */
+    @PostMapping("/notificaciones/whatsapp")
+    @Operation(summary = "Encender WhatsApp para todos mis procesos: firma el consentimiento y lo "
+            + "activa con un clic o devuelve el enlace al chat para comprobar el número")
+    public com.renaser.ai.ai_engine.notificacion.dto.DtosNotificaciones.ActivacionWhatsapp activarWhatsapp(
+            HttpServletRequest request) {
+        return notificaciones.activarWhatsapp(permisos.actual(), request.getRemoteAddr(),
+                request.getHeader("User-Agent"));
+    }
+
+    @DeleteMapping("/notificaciones/whatsapp")
+    @Operation(summary = "Apagar WhatsApp: deja de recibir por WhatsApp los avisos de todos mis procesos")
+    public com.renaser.ai.ai_engine.notificacion.dto.DtosNotificaciones.Notificaciones apagarWhatsapp() {
+        return notificaciones.apagarWhatsapp(permisos.actual());
+    }
+
+    @PostMapping("/notificaciones/mensaje-visto")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "El mensaje que invita a activar WhatsApp se mostró: cuenta una vez más "
+            + "(sale como mucho dos veces)")
+    public void mensajeVisto() {
+        notificaciones.mensajeVisto(permisos.actual());
     }
 
     @PostMapping("/consentimientos/futuros/retiro")

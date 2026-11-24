@@ -14,14 +14,17 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Clock;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * El bot de verdad: el servicio de conversación del CRM, por HTTPS (modo {@code real}).
  *
  * <p>Cada llamada lleva su firma ({@link FirmaWhatsapp}, sobre la marca, la ruta y el cuerpo) y
  * espera como mucho {@code app.whatsapp.segundos-de-espera}. Solo vale la respuesta del contrato
- * —204 en esperas y revocaciones, 202 en avisos y en eventos—; cualquier otra es un fallo, que dice si se
+ * —204 en esperas y revocaciones, 202 en avisos y en eventos, 200 en vinculaciones—; cualquier otra es un fallo, que dice si se
  * reintenta ({@link FalloDelBot#seReintenta}) y con qué {@code code} lo explicó el bot. No
  * reintenta por su cuenta: lo decide quien la llama, que sabe si es un botón con alguien delante
  * o un sondeo que puede volver más tarde.
@@ -80,12 +83,47 @@ public class ClienteConversacionHttp implements ClienteConversacion {
         mandar("/v1/ex/resultados", evento.comoCuerpo(), 202);
     }
 
+    /**
+     * {@code /v1/ex/vinculaciones} (V92): 200 con las referencias que quedaron vinculadas. Un 200
+     * que no trae la lista es un fallo definitivo: no se sabe qué vinculó.
+     */
+    @Override
+    public List<String> vincular(Vinculacion vinculacion) {
+        String ruta = "/v1/ex/vinculaciones";
+        String respuesta = mandar(ruta, vinculacion.comoCuerpo(), 200);
+        return referenciasDe(respuesta).orElseThrow(() -> new FalloDelBot("El bot respondió 200 en "
+                + ruta + " sin la lista de postulaciones: " + recortar(respuesta), false));
+    }
+
     @Override
     public boolean estaEncendido() {
         return true;
     }
 
-    private void mandar(String ruta, Map<String, Object> cuerpo, int esperado) {
+    /** Las {@code postulacionRef} de {@code {postulaciones: [{postulacionRef}]}}, o vacío si no viene la lista. */
+    static Optional<List<String>> referenciasDe(String cuerpo) {
+        if (cuerpo == null || cuerpo.isBlank()) {
+            return Optional.empty();
+        }
+        try {
+            JsonNode postulaciones = JSON.readTree(cuerpo).get("postulaciones");
+            if (postulaciones == null || !postulaciones.isArray()) {
+                return Optional.empty();
+            }
+            List<String> referencias = new ArrayList<>();
+            for (JsonNode una : postulaciones) {
+                JsonNode referencia = una == null ? null : una.get("postulacionRef");
+                if (referencia != null && referencia.isString() && !referencia.asString().isBlank()) {
+                    referencias.add(referencia.asString());
+                }
+            }
+            return Optional.of(referencias);
+        } catch (RuntimeException noEsJson) {
+            return Optional.empty();
+        }
+    }
+
+    private String mandar(String ruta, Map<String, Object> cuerpo, int esperado) {
         byte[] bytes = JSON.writeValueAsBytes(cuerpo);
         String marca = String.valueOf(reloj.instant().getEpochSecond());
         URI destino = URI.create(base + ruta);
@@ -111,7 +149,7 @@ public class ClienteConversacionHttp implements ClienteConversacion {
         }
         int estado = respuesta.statusCode();
         if (estado == esperado) {
-            return;
+            return respuesta.body();
         }
         if (estado >= 200 && estado < 300) {
             // Hizo algo, pero no lo que dice el contrato: repetirlo no lo arregla.
@@ -124,7 +162,11 @@ public class ClienteConversacionHttp implements ClienteConversacion {
                 codigo);
     }
 
-    /** El {@code code} de un error del bot ({@code {code, message, …}}), o nulo si no lo trae. */
+    /**
+     * El {@code code} de un error del bot ({@code {code, message, retryable, correlation_id}}), o nulo
+     * si no lo trae. También el de {@code /v1/ex/vinculaciones}: {@code SIN_CONVERSACION} y
+     * {@code SUPRIMIDO} viajan en {@code code}, como los demás (V92).
+     */
     static String codigoDelError(String cuerpo) {
         if (cuerpo == null || cuerpo.isBlank()) {
             return null;

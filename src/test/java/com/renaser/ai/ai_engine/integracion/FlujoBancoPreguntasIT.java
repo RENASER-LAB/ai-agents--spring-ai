@@ -1,5 +1,7 @@
 package com.renaser.ai.ai_engine.integracion;
 
+import com.renaser.ai.ai_engine.integracion.soporte.CelularesDePrueba;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.renaser.ai.ai_engine.integracion.soporte.ImagenesDeContenedores;
 import org.junit.jupiter.api.DisplayName;
@@ -467,7 +469,7 @@ public class FlujoBancoPreguntasIT {
                         .content("""
                         {"nombre":"Bruno","apellidos":"Salas","correo":"bruno@correo.pe",
                          "contrasena":"unaClaveLarga123","ciudadUbigeo":"1501","telefono": "987654321", "aceptaPlataforma":true,
-                         "aceptaFuturosContactos":false}"""))
+                         "aceptaFuturosContactos":false}""".replace("987654321", CelularesDePrueba.otro())))
                 .andExpect(status().isCreated());
         return leer(mvc.perform(post("/api/v1/portal/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)

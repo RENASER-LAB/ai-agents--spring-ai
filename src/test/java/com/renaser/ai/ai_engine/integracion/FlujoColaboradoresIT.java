@@ -1,5 +1,7 @@
 package com.renaser.ai.ai_engine.integracion;
 
+import com.renaser.ai.ai_engine.integracion.soporte.CelularesDePrueba;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.renaser.ai.ai_engine.colaborador.dto.DtosColaborador.Filtros;
@@ -1460,7 +1462,7 @@ public class FlujoColaboradoresIT {
     private long candidata(String correo, String nombre, String apellidos) throws Exception {
         mvc.perform(post("/api/v1/portal/cuentas").contentType(MediaType.APPLICATION_JSON).content("""
                 {"nombre":"%s","apellidos":"%s","correo":"%s","contrasena":"unaClaveLarga123",
-                 "ciudadUbigeo":"1501","telefono": "987654321", "aceptaPlataforma":true,"aceptaFuturosContactos":false}"""
+                 "ciudadUbigeo":"1501","telefono": "987654321", "aceptaPlataforma":true,"aceptaFuturosContactos":false}""".replace("987654321", "carla@correo.pe".equals(correo) ? "987654321" : CelularesDePrueba.otro())
                 .formatted(nombre, apellidos, correo))).andExpect(status().isCreated());
         return jdbc.queryForObject("select id from usuario where lower(correo) = ?", Long.class, correo);
     }

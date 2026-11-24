@@ -113,6 +113,9 @@ class ServicioPostulacionPortalImplTest {
     // La tarjeta de WhatsApp (V73): sin stub devuelve un mapa vacío, es decir, «no disponible».
     @Mock private com.renaser.ai.ai_engine.whatsapp.service.ServicioWhatsappPortal whatsapp;
 
+    // El interruptor de WhatsApp de la cuenta (V92): postular le avisa para vincular la nueva.
+    @Mock private com.renaser.ai.ai_engine.whatsapp.service.InterruptorWhatsapp interruptor;
+
     // La presentación de las empresas en el tablón (V85): estas pruebas no la miran.
     @Mock private com.renaser.ai.ai_engine.portal.service.PresentacionEnElPortal presentacion;
 
@@ -132,7 +135,7 @@ class ServicioPostulacionPortalImplTest {
                 consentimientos, vacantes, puestos, requisitos, evaluaciones, postulaciones,
                 transiciones, estados, cvs, enlaces, maquina, propuestaPerfil, lecturaCv,
                 colaIa, almacen, archivos, perfiles, correo, textoProceso, avisos, intentos,
-                whatsapp);
+                whatsapp, interruptor);
         tablon = new ServicioTablonPortalImpl(vacantes, organizaciones, requisitos, textoProceso,
                 catalogos, presentacion);
     }

@@ -1,5 +1,7 @@
 package com.renaser.ai.ai_engine.integracion;
 
+import com.renaser.ai.ai_engine.integracion.soporte.CelularesDePrueba;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.renaser.ai.ai_engine.integracion.soporte.ImagenesDeContenedores;
@@ -1150,7 +1152,7 @@ public class FlujoRemuneracionIT {
                                 {"nombre": "Cande", "apellidos": "De Prueba",
                                  "correo": "%s", "contrasena": "%s",
                                  "ciudadUbigeo": "1501", "telefono": "987654321", "aceptaPlataforma": true,
-                                 "aceptaFuturosContactos": true}""".formatted(correo, CLAVE)))
+                                 "aceptaFuturosContactos": true}""".replace("987654321", CelularesDePrueba.otro()).formatted(correo, CLAVE)))
                 .andExpect(status().isCreated());
 
         String token = leer(mvc.perform(post("/api/v1/portal/auth/login")
@@ -1183,7 +1185,7 @@ public class FlujoRemuneracionIT {
                                 {"nombre": "Lucía", "apellidos": "Mendoza",
                                  "correo": "%s", "contrasena": "%s",
                                  "ciudadUbigeo": "1501", "telefono": "987654321", "aceptaPlataforma": true,
-                                 "aceptaFuturosContactos": true}""".formatted(CORREO_CANDIDATO, CLAVE)))
+                                 "aceptaFuturosContactos": true}""".replace("987654321", CelularesDePrueba.otro()).formatted(CORREO_CANDIDATO, CLAVE)))
                 .andExpect(status().isCreated());
 
         tokenCandidato = leer(mvc.perform(post("/api/v1/portal/auth/login")
