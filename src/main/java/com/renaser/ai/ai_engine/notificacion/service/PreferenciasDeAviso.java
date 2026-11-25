@@ -13,7 +13,7 @@ import java.time.Instant;
 
 /**
  * Las preferencias de aviso de cada persona (V92), en un solo sitio: lo que leen el correo y la
- * campana antes de salir, y lo que escriben el botón «Notificaciones», el bot y «Mi cuenta».
+ * campana antes de salir, y lo que escriben los ajustes de avisos del portal, el bot y «Mi cuenta».
  *
  * <p>Sin fila vale todo por defecto ({@link PreferenciaAviso#porDefecto}); la fila nace la
  * primera vez que algo cambia. Una persona del equipo nunca tiene fila, así que sus correos —una
@@ -97,6 +97,19 @@ public class PreferenciasDeAviso {
         fila.setMensajeVistas((short) Math.min(Short.MAX_VALUE, fila.getMensajeVistas() + 1));
         fila.setMensajeVistoEn(Instant.now());
         guardar(fila);
+    }
+
+    /**
+     * Dio por vista la guía de los avisos (V93). Idempotente: la segunda vez no cambia nada y se
+     * queda la fecha de la primera.
+     */
+    @Transactional
+    public void guiaVista(Long personaId) {
+        PreferenciaAviso fila = bloquear(personaId);
+        if (fila.getGuiaAvisosVistaEn() == null) {
+            fila.setGuiaAvisosVistaEn(Instant.now());
+            guardar(fila);
+        }
     }
 
     private PreferenciaAviso guardar(PreferenciaAviso fila) {

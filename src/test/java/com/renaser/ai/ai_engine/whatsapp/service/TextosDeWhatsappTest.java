@@ -109,12 +109,13 @@ class TextosDeWhatsappTest {
     }
 
     @Test
-    @DisplayName("V92 · a quien escribe sin activar lo manda a «Notificaciones», no al botón retirado")
-    void sinAnuncioRemiteANotificaciones() {
+    @DisplayName("V92 · a quien escribe sin activar lo manda a la tuerca de la campana, no a los botones retirados")
+    void sinAnuncioRemiteALosAjustesDeAvisos() {
         assertThat(TextosDeWhatsapp.SIN_ANUNCIO)
-                .contains("«Mis procesos»")
-                .contains("«Notificaciones»")
+                .contains("campana")
+                .contains("«Ajustes de avisos»")
                 .doesNotContain("Escribir por WhatsApp")
+                .doesNotContain("«Notificaciones»")
                 .hasSizeLessThanOrEqualTo(TextosDeWhatsapp.LARGO_DEL_TEXTO);
     }
 

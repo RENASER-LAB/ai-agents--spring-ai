@@ -184,7 +184,9 @@ nadie dio.
 **Desde el 13/10/2026 hay un cuarto, solo para WhatsApp** (`V73`): con Renaser, para recibir por
 WhatsApp las novedades de **un** proceso. Se da al pulsar «Escribir por WhatsApp», con el texto
 debajo del botón, y se guarda como los demás —texto, versión, fecha, IP y navegador—, uno por
-postulación. Solo lo ofrecen las vacantes de Renaser mientras dure la beta.
+postulación. Solo lo ofrecen las vacantes de Renaser mientras dure la beta. **Desde la `V92`
+(24/11/2026) el portal firma en su lugar `WHATSAPP_CUENTA`**: uno por persona y versión, sin
+postulación, al encender WhatsApp en los ajustes de avisos, y vale para todos sus procesos.
 
 **Los tres textos son de la plataforma, y el del proceso es uno solo para todas las empresas**,
 con un hueco donde va el nombre de quien publica la vacante. Ninguna empresa tiene texto propio

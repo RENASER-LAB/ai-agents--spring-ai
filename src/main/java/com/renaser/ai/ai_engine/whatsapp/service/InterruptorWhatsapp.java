@@ -7,7 +7,7 @@ import java.time.Instant;
 
 /**
  * El interruptor de WhatsApp de la cuenta (V92): uno para todos sus procesos, los de hoy y los que
- * vengan, en la ventana «Notificaciones» de «Mis procesos». Sustituye a la tarjeta de cada proceso.
+ * vengan, en la ventana «Ajustes de avisos» (la tuerca de la campana). Sustituye a la tarjeta de cada proceso.
  *
  * <p>Dos caminos al encenderlo, según el número de la cuenta:
  * <ul>

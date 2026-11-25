@@ -17,6 +17,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -86,6 +87,30 @@ class PreferenciasDeAvisoTest {
 
         assertThat(nueva.getMensajeVistas()).isEqualTo((short) 2);
         assertThat(nueva.getMensajeVistoEn()).isBeforeOrEqualTo(Instant.now());
+    }
+
+    @Test
+    @DisplayName("V93 · la guía vista se marca una sola vez: la segunda no cambia la fecha ni escribe")
+    void guiaVistaUnaSolaVez() {
+        PreferenciaAviso nueva = fila(false, 0);
+        when(repositorio.paraEscribir(33L)).thenReturn(Optional.of(nueva));
+        when(repositorio.save(any(PreferenciaAviso.class))).thenAnswer(i -> i.getArgument(0));
+
+        preferencias.guiaVista(33L);
+        Instant primera = nueva.getGuiaAvisosVistaEn();
+        assertThat(primera).isNotNull().isBeforeOrEqualTo(Instant.now());
+
+        preferencias.guiaVista(33L);
+
+        assertThat(nueva.getGuiaAvisosVistaEn()).isEqualTo(primera);
+        verify(repositorio, times(1)).save(nueva);
+        verify(repositorio, times(2)).asegurar(33L);
+    }
+
+    @Test
+    @DisplayName("Sin fila, la guía está sin ver")
+    void guiaSinVerPorDefecto() {
+        assertThat(PreferenciaAviso.porDefecto(33L).getGuiaAvisosVistaEn()).isNull();
     }
 
     @Test

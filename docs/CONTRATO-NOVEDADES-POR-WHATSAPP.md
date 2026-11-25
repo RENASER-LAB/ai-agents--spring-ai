@@ -12,8 +12,8 @@ los límites, los errores y los reintentos, y **no está activo** hasta su C-10.
 
 ## La idea en una línea
 
-El candidato enciende WhatsApp en «Notificaciones» (`V92`; antes, «Escribir por WhatsApp» en cada
-proceso). Si su número ya está comprobado —esta cuenta escribió alguna vez desde él—, EX le pide al
+El candidato enciende WhatsApp en sus ajustes de avisos, la tuerca de la campana (`V92`; antes,
+«Escribir por WhatsApp» en cada proceso). Si su número ya está comprobado —esta cuenta escribió alguna vez desde él—, EX le pide al
 bot que **vincule sin mensaje** todos sus procesos vivos. Si no, EX le **anuncia** al bot ese número
 para cada proceso vivo; el candidato escribe primero desde él (diga lo que diga), el bot le pregunta
 a EX, EX lo **vincula** y le da sus novedades. Desde entonces EX le manda al bot los **avisos** de «te toca»,
@@ -179,7 +179,7 @@ responde, EX lo reintenta (30 s, 2 min, 8 min, 32 min) mientras no caduque.
 `BORRADO_DATOS`. Anula también el anuncio, si lo había. Tras una baja EX no revoca: fue el bot
 quien se lo contó.
 
-Apagar WhatsApp en «Notificaciones» (`V92`) es un `DEJAR_DE_RECIBIR` por cada vínculo vivo de la
+Apagar WhatsApp en los ajustes de avisos (`V92`) es un `DEJAR_DE_RECIBIR` por cada vínculo vivo de la
 persona: el número no queda dado de baja y volver a encenderlo es con un clic.
 
 ### `POST /v1/ex/vinculaciones` — vincular sin mensaje (`V92`)
@@ -236,6 +236,7 @@ Desde la `V92` además enciende el interruptor de WhatsApp de esa persona y, si 
 `whatsapp_baja`, lo saca de ahí (el bot ya levantó su baja al recibir el mensaje con la espera
 vigente). El anuncio de un número sin procesos vivos se cierra como `PROCESO_TERMINADO` y responde
 el `409` de abajo, como siempre.
+
 | Respuesta | Cuándo | Cuerpo |
 |---|---|---|
 | `200` | Vinculó, o ya estaba vinculado | `{"postulaciones": [{"postulacionRef": "pw_…"}], "nombre": "Ana", "novedades": [{"vacante": "Asistente Contable", "titulo": "Estamos calificando tus respuestas", "texto": "Se juntan tu currículum y tu evaluación en un solo perfil. Suele tardar poco."}]}` |
@@ -246,7 +247,9 @@ el `409` de abajo, como siempre.
 - **Es idempotente.** `postulaciones` son todas las postulaciones activas vinculadas a ese número
   después de la llamada, también las que ya lo estaban; `novedades`, las de todos esos procesos.
   Repetida, devuelve lo mismo.
-- En los rechazos, `texto` es lo que el bot contesta tal cual.
+- En los rechazos, `texto` es lo que el bot contesta tal cual. El de `SIN_ANUNCIO`
+  (`TextosDeWhatsapp`) le dice desde la `V92` que entre en el portal, abra la campana, pulse la
+  tuerca «Ajustes de avisos» y active WhatsApp.
 
 ### `POST /novedades`
 
@@ -281,9 +284,9 @@ consentimiento no se entrega.
 
 Desvincula todas las postulaciones de ese número y lo marca como suprimido. Responde `204`,
 también si no había nada que desvincular o si se repite. Desde la `V92` apaga además el interruptor
-de WhatsApp de quien tiene ese número y devuelve a cero el contador del mensaje flotante: el
-portal dice «WhatsApp apagado por BAJA» y puede volver a invitarle, ya con «Vuelve a recibir tus
-avisos por WhatsApp».
+de WhatsApp de quien tiene ese número y devuelve a cero el contador del mensaje flotante: los
+ajustes del portal dicen «Lo apagaste escribiendo BAJA…». El portal no pinta ese mensaje flotante
+(la invitación a activar WhatsApp es la guía de la primera vez), pero el contador se mantiene.
 
 ### Las novedades
 

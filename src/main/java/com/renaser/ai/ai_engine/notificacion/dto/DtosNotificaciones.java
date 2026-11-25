@@ -3,7 +3,7 @@ package com.renaser.ai.ai_engine.notificacion.dto;
 import java.time.LocalDate;
 
 /**
- * Lo que viaja entre el portal y el botón «Notificaciones» de «Mis procesos» (V92). Ver
+ * Lo que viaja entre el portal y sus ajustes de avisos (V92; la tuerca de la campana). Ver
  * specs/Ready/notificaciones-del-candidato/spec.md, «Estados de WhatsApp que devuelve el backend».
  */
 public final class DtosNotificaciones {
@@ -26,9 +26,14 @@ public final class DtosNotificaciones {
     public static final String ACTIVADO = "ACTIVADO";
     public static final String POR_MENSAJE = "POR_MENSAJE";
 
-    /** {@code GET /api/v1/portal/notificaciones}: los tres canales y el mensaje flotante. */
+    /**
+     * {@code GET /api/v1/portal/notificaciones}: los tres canales, el mensaje flotante y si ya vio
+     * la guía de los avisos ({@code guiaVista}, V93: sale una vez por cuenta la primera vez que
+     * entra en «Mis procesos» con alguna postulación).
+     */
     public record Notificaciones(WhatsappDeLaCuenta whatsapp, CorreoDeLaCuenta correo,
-                                 PortalDeLaCuenta portal, MensajeFlotante mensaje) {}
+                                 PortalDeLaCuenta portal, MensajeFlotante mensaje,
+                                 boolean guiaVista) {}
 
     /**
      * WhatsApp para toda la cuenta.

@@ -40,11 +40,11 @@ com.renaser.ai.ai_engine.<dominio>
 | `postulacion` | La postulación, su historial, el CV y **la máquina de estados** |
 | `pesos` | Las versiones de pesos del embudo |
 | `consentimiento` | Textos legales, consentimientos y solicitudes de borrado |
-| `notificacion` | Plantillas y registro de correos |
+| `notificacion` | Plantillas y registro de correos, la campana del portal y, desde la `V92`, las preferencias de aviso de cada persona (`PreferenciasDeAviso`), que el correo y la campana leen antes de salir |
 | `archivo` | El almacén de archivos (memoria, disco o bucket según el perfil) |
 | `auditoria` | El registro inmutable de quién hizo qué |
 | `parametro` | Los valores que Renaser cambia sin programar |
-| `portal` | La cara del candidato: un controlador y tres servicios por tema (la cuenta y su acceso, el tablón público, la postulación). Desde la `V85`, un segundo controlador sin token, `EmpresasPortalController`, con el perfil público de cada empresa y su logo y portada (`ServicioEmpresasPortalImpl`), y desde la `V86` su brochure en PDF, que arma `organizacion` |
+| `portal` | La cara del candidato: un controlador y cuatro servicios por tema (la cuenta y su acceso, el tablón público, la postulación y, desde la `V92`, los ajustes de avisos, `ServicioNotificacionesPortalImpl`). Desde la `V85`, un segundo controlador sin token, `EmpresasPortalController`, con el perfil público de cada empresa y su logo y portada (`ServicioEmpresasPortalImpl`), y desde la `V86` su brochure en PDF, que arma `organizacion` |
 | `administracion` | La cara de configuración del panel; el borrado 29733 vive aparte en `ServicioBorradoDatos` |
 | `seguridad` | Las puertas —portal, panel y, desde la V73, integraciones, con la firma del bot en `FiltroFirmaWhatsapp`—, tokens, contexto y permisos con alcance |
 | `comun` | El manejador de errores propio y el candado de Swagger. Desde la `V84`, también el motor de PDF (`comun/pdf/`), pensado para cualquier documento que genere el backend: ver «Dónde vive cada cuenta que se hace en un solo sitio» |
@@ -103,10 +103,12 @@ salgan con candado). Está escrito en el javadoc de ambas.
   (el brochure ya entró como `V86`; convocatoria `V87`, video por webcam `V88`), y las de seguimiento de
   pendientes (`V82`) y Excel resumido (`V83`) tendrán que subir al construirse. Las pruebas sin
   completar y «Darle más tiempo» entraron como `V89`, antes que la `V87` y la `V88`: si esas dos
-  no llegan a producción antes que la `V89`, también tendrán que subir. **Una reserva no
+  no llegan a producción antes que la `V89`, también tendrán que subir. Lo mismo con la `V90`
+  (seguimiento de pendientes) y la `V91` (video de la empresa): las notificaciones del candidato
+  entraron antes como `V92` y `V93`. **Una reserva no
   es un número**: el de verdad se elige al construir y siempre es mayor que la última aplicada.
   Un número que se salta a propósito se anota en `HUECOS_DELIBERADOS` de
-  `MigracionesSinChoqueTest`, que hoy admite la `V81` a la `V83`, la `V87` y la `V88`.
+  `MigracionesSinChoqueTest`, que hoy admite la `V81` a la `V83`, la `V87`, la `V88`, la `V90` y la `V91`.
 - **Nada se recalcula hacia atrás por su cuenta.** Cada nota queda atada a la versión de pesos de
   su vacante. La única vía para cambiarla es cambiar la versión de la vacante (`V74`), que
   recalcula a todos a la vez por `RecalculoConOtrosPesos`, sin IA, sin máquina de estados y sin

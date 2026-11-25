@@ -165,6 +165,7 @@ class FlujoNotificacionesDelCandidatoIT {
     @DisplayName("Sin procesos: WhatsApp apagado, correo y campana encendidos, y el mensaje no sale")
     void sinProcesos() throws Exception {
         JsonNode estado = notificaciones("lucia");
+        assertThat(estado.at("/guiaVista").asBoolean()).isFalse();
         assertThat(estado.at("/whatsapp/disponible").asBoolean()).isTrue();
         assertThat(estado.at("/whatsapp/estado").asText()).isEqualTo("APAGADO");
         assertThat(estado.at("/whatsapp/numero").asText()).isEqualTo("+51 987 640 001");
@@ -173,6 +174,25 @@ class FlujoNotificacionesDelCandidatoIT {
         assertThat(estado.at("/correo/destino").asText()).isEqualTo("lucia.v92@correo.pe");
         assertThat(estado.at("/portal/activo").asBoolean()).isTrue();
         assertThat(estado.at("/mensaje/mostrar").asBoolean()).isFalse();
+    }
+
+    @Test
+    @Order(3)
+    @DisplayName("V93 · la guía de los avisos se marca vista una sola vez: 204 siempre, y la fecha de la primera se queda")
+    void laGuiaVista() throws Exception {
+        conToken(post("/api/v1/portal/notificaciones/guia-vista"), token.get("otra"), null)
+                .andExpect(status().isNoContent());
+        String sql = "select guia_avisos_vista_en::text from preferencia_aviso p join usuario u "
+                + "on u.persona_id = p.persona_id where u.correo = 'otra.v92@correo.pe'";
+        String primera = jdbc.queryForObject(sql, String.class);
+        assertThat(primera).isNotNull();
+        assertThat(notificaciones("otra").at("/guiaVista").asBoolean()).isTrue();
+
+        conToken(post("/api/v1/portal/notificaciones/guia-vista"), token.get("otra"), null)
+                .andExpect(status().isNoContent());
+        assertThat(jdbc.queryForObject(sql, String.class)).isEqualTo(primera);
+        // Lo de otra cuenta no se toca.
+        assertThat(notificaciones("lucia").at("/guiaVista").asBoolean()).isFalse();
     }
 
     @Test

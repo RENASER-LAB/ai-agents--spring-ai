@@ -38,7 +38,7 @@ import static org.mockito.Mockito.when;
  * que invita a activar WhatsApp y con qué texto (puntos 18 a 20 de la spec, AC-01 y AC-10).
  */
 @ExtendWith(MockitoExtension.class)
-@DisplayName("El botón «Notificaciones»")
+@DisplayName("Los ajustes de avisos del portal")
 class ServicioNotificacionesPortalImplTest {
 
     @Mock private PreferenciasDeAviso preferencias;
@@ -148,6 +148,27 @@ class ServicioNotificacionesPortalImplTest {
         assertThat(todo.portal().activo()).isTrue();
         assertThat(todo.whatsapp().estado()).isEqualTo("APAGADO");
         assertThat(todo.mensaje().mostrar()).isTrue();
+        assertThat(todo.guiaVista()).isFalse();
+    }
+
+    @Test
+    @DisplayName("V93 · guiaVista dice si ya dio por vista la guía de los avisos")
+    void guiaVista() {
+        PreferenciaAviso yaLaVio = PreferenciaAviso.porDefecto(33L);
+        yaLaVio.setGuiaAvisosVistaEn(HACE_UN_DIA);
+        when(preferencias.de(33L)).thenReturn(yaLaVio);
+        when(whatsapp.estado(33L, 60L)).thenReturn(new InterruptorWhatsapp.Estado(
+                whatsapp("ACTIVO", false, false), true, HACE_UNA_HORA));
+
+        assertThat(servicio.notificaciones(lucia()).guiaVista()).isTrue();
+    }
+
+    @Test
+    @DisplayName("V93 · marcar la guía vista es de quien pregunta")
+    void marcarGuiaVista() {
+        servicio.guiaVista(lucia());
+
+        verify(preferencias).guiaVista(33L);
     }
 
     @Test

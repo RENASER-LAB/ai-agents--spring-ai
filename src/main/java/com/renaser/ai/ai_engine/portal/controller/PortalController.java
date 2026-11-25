@@ -43,7 +43,7 @@ public class PortalController {
     private final Permisos permisos;
     // El botón de WhatsApp de cada proceso (V73).
     private final com.renaser.ai.ai_engine.whatsapp.service.ServicioWhatsappPortal whatsapp;
-    // El botón «Notificaciones» de «Mis procesos» (V92): WhatsApp, correo y campana para toda la cuenta.
+    // Los ajustes de avisos (V92; la tuerca de la campana): WhatsApp, correo y campana para toda la cuenta.
     private final com.renaser.ai.ai_engine.portal.service.ServicioNotificacionesPortal notificaciones;
 
     // ---------- público ----------
@@ -329,6 +329,18 @@ public class PortalController {
             + "(sale como mucho dos veces)")
     public void mensajeVisto() {
         notificaciones.mensajeVisto(permisos.actual());
+    }
+
+    /**
+     * La guía de los avisos (la primera vez en «Mis procesos») se dio por vista: saltarla, «Ahora
+     * no», «Activar WhatsApp», «Entendido» o Esc. Idempotente: repetirla no cambia la fecha.
+     */
+    @PostMapping("/notificaciones/guia-vista")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "La guía de los avisos se dio por vista: no vuelve a salir en esta cuenta, "
+            + "en ningún dispositivo")
+    public void guiaVista() {
+        notificaciones.guiaVista(permisos.actual());
     }
 
     @PostMapping("/consentimientos/futuros/retiro")

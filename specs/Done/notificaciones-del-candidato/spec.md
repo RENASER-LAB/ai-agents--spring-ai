@@ -1,6 +1,5 @@
 # Notificaciones del candidato: un solo ajuste para WhatsApp, correo y portal
-
-Estado: lista para implementar
+Estado: TERMINADO
 
 Crear, completar o revisar esta spec no autoriza su implementación. Solo el usuario
 puede habilitar la versión revisada mediante `/harness ready <ruta-spec>` y la

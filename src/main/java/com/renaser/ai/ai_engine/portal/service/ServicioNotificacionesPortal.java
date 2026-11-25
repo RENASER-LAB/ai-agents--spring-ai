@@ -6,8 +6,9 @@ import com.renaser.ai.ai_engine.notificacion.dto.DtosNotificaciones.Notificacion
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
 
 /**
- * El botón «Notificaciones» de «Mis procesos» (V92): un solo ajuste por cuenta para WhatsApp,
- * correo y la campana del portal, y el mensaje flotante que invita a activar WhatsApp.
+ * Los ajustes de avisos del portal (V92), que se abren con la tuerca de la campana: un solo ajuste
+ * por cuenta para WhatsApp, correo y la campana del portal; el mensaje flotante que invitaba a
+ * activar WhatsApp (sin uso en el portal desde el 25/11/2026) y la guía de la primera vez (V93).
  *
  * <p>Todo es de quien pregunta: el token dice de quién, y no hay forma de pedir las de otro.
  */
@@ -21,6 +22,9 @@ public interface ServicioNotificacionesPortal {
 
     /** El mensaje flotante se pintó: cuenta una vez más. Cerrarlo con la × no cuenta aparte. */
     void mensajeVisto(ContextoUsuario quien);
+
+    /** Dio por vista la guía de los avisos (V93). Idempotente: una sola vez por cuenta. */
+    void guiaVista(ContextoUsuario quien);
 
     /** Encender WhatsApp para todos sus procesos. Ver {@code InterruptorWhatsapp#activar}. */
     ActivacionWhatsapp activarWhatsapp(ContextoUsuario quien, String ip, String userAgent);

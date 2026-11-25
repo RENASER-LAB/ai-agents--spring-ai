@@ -47,7 +47,8 @@ public class ServicioNotificacionesPortalImpl implements ServicioNotificacionesP
         return new Notificaciones(estado.whatsapp(),
                 new CorreoDeLaCuenta(preferencia.isCorreo(), destino),
                 new PortalDeLaCuenta(preferencia.isPortal()),
-                mensaje(estado.whatsapp(), estado.hayProcesoVivo(), estado.ultimaPostulacion(), preferencia));
+                mensaje(estado.whatsapp(), estado.hayProcesoVivo(), estado.ultimaPostulacion(), preferencia),
+                preferencia.getGuiaAvisosVistaEn() != null);
     }
 
     @Override
@@ -61,6 +62,11 @@ public class ServicioNotificacionesPortalImpl implements ServicioNotificacionesP
     @Override
     public void mensajeVisto(ContextoUsuario quien) {
         preferencias.mensajeVisto(quien.personaId());
+    }
+
+    @Override
+    public void guiaVista(ContextoUsuario quien) {
+        preferencias.guiaVista(quien.personaId());
     }
 
     @Override

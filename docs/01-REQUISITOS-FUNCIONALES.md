@@ -544,7 +544,9 @@ si luego postulaba a una vacante de Renaser firmaba dos veces el mismo texto.
 Desde el 13/10/2026 hay un cuarto, **opcional y aparte de estos tres**: el de WhatsApp, con
 Renaser, que se da al pulsar «Escribir por WhatsApp» mientras se espera, uno por postulación, para
 recibir por ahí las novedades de ese proceso. Solo lo ofrecen las vacantes de Renaser mientras
-dure la beta.
+dure la beta. Desde el 24/11/2026 (`V92`) se da **una sola vez para toda la cuenta**, al encender
+WhatsApp en los ajustes de avisos del portal, y vale para todos sus procesos, los de hoy y los que
+vengan.
 
 **El contenido pesado vive en el de la plataforma**: la cuenta, el perfil, la inteligencia
 artificial, las empresas de fuera que tratan los datos, la salida de datos del país, el plazo de

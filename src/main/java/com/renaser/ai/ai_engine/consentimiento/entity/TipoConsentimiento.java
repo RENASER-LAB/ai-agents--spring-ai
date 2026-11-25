@@ -44,7 +44,7 @@ public enum TipoConsentimiento {
 
     /**
      * Recibir por WhatsApp las novedades de TODOS sus procesos, los de hoy y los que vengan
-     * (V92). Se firma al encender el interruptor de «Notificaciones», una vez por persona y
+     * (V92). Se firma al encender el interruptor de «Ajustes de avisos», una vez por persona y
      * versión del texto, sin postulación. Ante el bot viaja como {@link #WHATSAPP}: es el mismo
      * permiso para toda la cuenta.
      */

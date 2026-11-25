@@ -558,6 +558,13 @@ Cada transición guarda **cómo se enteró** (`transicion_estado.aviso_al_candid
 el cierre por vacante eliminada, que sigue con su aviso único y no se duplica). Las transiciones
 anteriores al 07/10/2026 la tienen vacía.
 
+**Desde la `V92` (24/11/2026) el candidato puede apagar el correo o la campana de sus procesos**
+en los ajustes de avisos del portal (`preferencia_aviso`). Apagado, ese canal no sale —ni los
+avisos de etapa, ni los recordatorios, ni el de «más tiempo»— y la transición ocurre igual; los
+correos de la cuenta (crearla, recuperar la clave, el borrado) salen siempre. WhatsApp va con su
+propio interruptor, uno para toda la cuenta. Ver [Modelo de datos](05-MODELO-DE-DATOS.md),
+«Novedades por WhatsApp».
+
 **«Darle más tiempo» avisa sin transición** (`V89`, 18/11/2026). Quien no completó la prueba del
 puesto sigue en `PRUEBA_TURNO_CANDIDATO`; si el equipo le da una fecha nueva con «Avisar»
 marcada, le llegan el correo `PRUEBA_MAS_TIEMPO`, el aviso de la campana del mismo tipo y, si
@@ -602,8 +609,10 @@ y `recordatorio_horas_antes_del_plazo` (24 y 24)— y dos textos de correo edita
 ### Por WhatsApp, si escribió primero (13/10/2026, beta)
 
 Un tercer canal, solo en las vacantes de RENASER y con el parámetro `whatsapp_novedades_activo`
-encendido —nace apagado—. Mientras espera, el portal le ofrece «Escribir por WhatsApp»; si escribe
-al bot desde el celular de su cuenta, queda vinculado y desde entonces:
+encendido —nace apagado—. Desde la `V92` (24/11/2026) se enciende una vez para toda la cuenta en
+los ajustes de avisos del portal, con un clic si esa cuenta ya escribió desde su número; si no,
+escribe al bot desde el celular de su cuenta y queda vinculado (hasta la `V92`, el portal le
+ofrecía «Escribir por WhatsApp» en cada proceso mientras esperaba). Desde entonces:
 
 - **Solo le llegan los «te toca»**: `PRUEBA_DISPONIBLE` al pasar a la prueba y
   `POSTULACION_AVANZA` en los demás turnos que lo esperan. Ni recordatorios, ni cierres, ni
@@ -616,7 +625,8 @@ al bot desde el celular de su cuenta, queda vinculado y desde entonces:
   encola cuando la transición ya se confirmó, en su propia transacción, y un fallo ahí no la
   deshace ni le quita al candidato el correo ni la campana. Lo manda un sondeo con hasta 5
   intentos, y una transición deja como mucho un aviso de cada tipo.
-- **Quien pulsó el botón pero nunca escribió no recibe nada**: el bot no escribe primero.
+- **Quien lo encendió con un número sin comprobar y nunca escribió no recibe nada**: el bot no
+  escribe primero.
 - **Al llegar a un estado final el vínculo se cierra sin avisar por WhatsApp**, avise o no la
   transición. Si escribe después, el bot le dice que no tiene procesos activos.
 - **Desde el 19/10/2026 (`V76`) EX ya guarda el resultado** de quien terminó con el vínculo
