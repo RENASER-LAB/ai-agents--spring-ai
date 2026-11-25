@@ -236,6 +236,59 @@ class ServicioCorreoTest {
         assertThat(fila.getPlantillaCorreoCodigo()).isEqualTo("RECUPERAR_CLAVE_EQUIPO");
     }
 
+    // ============ El correo apagado en «Notificaciones» (V92) ============
+
+    @Test
+    @DisplayName("AC-08 · con el correo apagado no sale el de su proceso, ni queda fila que diga que salió")
+    void conElCorreoApagadoNoSaleElDeSuProceso() {
+        PreferenciasDeAviso preferencias = org.mockito.Mockito.mock(PreferenciasDeAviso.class);
+        when(preferencias.recibeCorreo(USUARIO)).thenReturn(false);
+        ServicioCorreo conPreferencias = new ServicioCorreo(plantillas, enviados, transporte, preferencias);
+
+        conPreferencias.enviar(ORG, USUARIO, DESTINO, "PRUEBA_DISPONIBLE", Map.of());
+        // También el texto propio que una vacante eligió para su aviso de etapa.
+        conPreferencias.enviar(ORG, USUARIO, DESTINO, "AVISO_PROPIO_DE_LA_VACANTE", Map.of());
+        EnviadorCorreo.Resultado recordatorio = conPreferencias.enviarCon(PlantillaCorreo.builder()
+                .codigo("RECORDATORIO_PRUEBA").version(1).asunto("a").cuerpo("c").build(), USUARIO, DESTINO,
+                Map.of());
+
+        assertThat(recordatorio).isEqualTo(EnviadorCorreo.Resultado.NO_ENVIADO);
+        assertThat(transporte.veces).isZero();
+        verifyNoInteractions(plantillas, enviados);
+    }
+
+    @Test
+    @DisplayName("AC-08 · con el correo apagado, recuperar la clave y crear la cuenta salen igual")
+    void losDeLaCuentaSalenSiempre() {
+        PreferenciasDeAviso preferencias = org.mockito.Mockito.mock(PreferenciasDeAviso.class);
+        when(enviados.save(any(CorreoEnviado.class))).thenAnswer(i -> i.getArgument(0));
+        ServicioCorreo conPreferencias = new ServicioCorreo(plantillas, enviados, transporte, preferencias);
+
+        conPreferencias.enviarCon(PlantillaCorreo.builder().codigo("RECUPERAR_CLAVE_CANDIDATO").version(1)
+                .asunto("Tu contraseña").cuerpo("Abre el enlace").build(), USUARIO, DESTINO, Map.of());
+        when(plantillas.findFirstByOrganizacionIdAndCodigoAndEsActivaTrueOrderByVersionDesc(ORG, "CUENTA_CREADA"))
+                .thenReturn(Optional.of(PlantillaCorreo.builder().codigo("CUENTA_CREADA").version(1)
+                        .asunto("Bienvenida").cuerpo("Hola").build()));
+        conPreferencias.enviar(ORG, USUARIO, DESTINO, "CUENTA_CREADA", Map.of());
+
+        assertThat(transporte.veces).isEqualTo(2);
+        // Ni se pregunta: los de la cuenta no dependen del interruptor.
+        verifyNoInteractions(preferencias);
+    }
+
+    @Test
+    @DisplayName("Con el correo encendido el de su proceso sale como siempre")
+    void conElCorreoEncendidoSale() {
+        PreferenciasDeAviso preferencias = org.mockito.Mockito.mock(PreferenciasDeAviso.class);
+        when(preferencias.recibeCorreo(USUARIO)).thenReturn(true);
+        hayPlantilla();
+        ServicioCorreo conPreferencias = new ServicioCorreo(plantillas, enviados, transporte, preferencias);
+
+        conPreferencias.enviar(ORG, USUARIO, DESTINO, "PRUEBA_POR_CONFIRMAR", Map.of());
+
+        assertThat(transporte.veces).isEqualTo(1);
+    }
+
     // ============ El transporte por defecto ============
 
     @Test

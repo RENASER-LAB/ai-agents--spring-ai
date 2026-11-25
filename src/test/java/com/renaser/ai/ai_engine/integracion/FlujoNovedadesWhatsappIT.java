@@ -8,6 +8,7 @@ import com.renaser.ai.ai_engine.postulacion.service.MaquinaEstados;
 import com.renaser.ai.ai_engine.whatsapp.service.ClienteConversacion;
 import com.renaser.ai.ai_engine.whatsapp.service.EnvioAlBot;
 import com.renaser.ai.ai_engine.whatsapp.service.FirmaWhatsapp;
+import com.renaser.ai.ai_engine.whatsapp.service.TextosDeWhatsapp;
 import com.renaser.ai.ai_engine.whatsapp.service.impl.ClienteConversacionFalso;
 
 import org.junit.jupiter.api.DisplayName;
@@ -419,7 +420,8 @@ class FlujoNovedadesWhatsappIT {
         firmado("/api/v1/integraciones/whatsapp/vinculos",
                 "{\"telefono\":\"+51900000000\",\"wamid\":\"w0\",\"texto\":\"hola\"}")
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.codigo").value("SIN_ANUNCIO"));
+                .andExpect(jsonPath("$.codigo").value("SIN_ANUNCIO"))
+                .andExpect(jsonPath("$.texto").value(TextosDeWhatsapp.SIN_ANUNCIO));
 
         String mensaje = "{\"telefono\":\"+51987650001\",\"wamid\":\"wamid.A\",\"texto\":\"cualquier cosa\","
                 + "\"recibidoEn\":\"" + Instant.now() + "\"}";

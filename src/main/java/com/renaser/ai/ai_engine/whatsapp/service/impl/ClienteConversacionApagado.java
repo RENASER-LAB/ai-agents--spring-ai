@@ -33,6 +33,11 @@ public class ClienteConversacionApagado implements ClienteConversacion {
     }
 
     @Override
+    public java.util.List<String> vincular(Vinculacion vinculacion) {
+        throw new FalloDelBot(SIN_BOT, false);
+    }
+
+    @Override
     public boolean estaEncendido() {
         return false;
     }

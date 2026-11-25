@@ -1,5 +1,7 @@
 package com.renaser.ai.ai_engine.integracion;
 
+import com.renaser.ai.ai_engine.integracion.soporte.CelularesDePrueba;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.renaser.ai.ai_engine.integracion.soporte.ImagenesDeContenedores;
@@ -231,7 +233,7 @@ public class FlujoHito1IT {
                         .content("""
                                 {"nombre": "Camila", "apellidos": "Torres",
                                  "correo": "camila@ejemplo.pe", "contrasena": "Demo12345!",
-                                 "ciudadUbigeo": "1501", "telefono": "987654321", "aceptaPlataforma": true, "aceptaFuturosContactos": true}"""))
+                                 "ciudadUbigeo": "1501", "telefono": "987654321", "aceptaPlataforma": true, "aceptaFuturosContactos": true}""".replace("987654321", CelularesDePrueba.otro())))
                 .andExpect(status().isCreated());
 
         // Con la contraseña mal es 401, no 400: la petición está bien escrita y lo que

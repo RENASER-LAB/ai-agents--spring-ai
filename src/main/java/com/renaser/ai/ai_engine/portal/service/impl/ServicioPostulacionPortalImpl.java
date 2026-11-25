@@ -101,6 +101,9 @@ public class ServicioPostulacionPortalImpl implements ServicioPostulacionPortal 
     private final com.renaser.ai.ai_engine.prueba.repository.IntentoPruebaRepository intentos;
     // La tarjeta de WhatsApp de cada proceso (V73): si se ofrece y en qué está.
     private final com.renaser.ai.ai_engine.whatsapp.service.ServicioWhatsappPortal whatsapp;
+    // El interruptor de WhatsApp de la cuenta (V92): con él encendido, la postulación nueva se
+    // vincula sola después del commit.
+    private final com.renaser.ai.ai_engine.whatsapp.service.InterruptorWhatsapp interruptor;
 
     @Override
     @Transactional
@@ -336,6 +339,10 @@ public class ServicioPostulacionPortalImpl implements ServicioPostulacionPortal 
 
             maquina.transicionar(postulacion, "PERFIL_TURNO_CANDIDATO", null, null, true, false, null);
         }
+        // Con WhatsApp encendido para la cuenta (V92), esta postulación queda vinculada sin que haga
+        // nada. Después del commit y sin frenar nada: si el bot no contesta, queda para el sondeo.
+        // Una que acaba de cerrarse por un requisito no se vincula: ya no tiene novedades.
+        interruptor.alPostular(quien.personaId(), postulacion);
         return postulacion.getUuid();
     }
 

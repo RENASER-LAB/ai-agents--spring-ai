@@ -33,6 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -66,6 +67,8 @@ public class ServicioIntegracionWhatsappImpl implements ServicioIntegracionWhats
     private final PersonaRepository personas;
     private final BetaWhatsapp beta;
     private final com.renaser.ai.ai_engine.whatsapp.service.ResultadosPorWhatsapp resultados;
+    // El interruptor de WhatsApp de la cuenta (V92): lo encienden el mensaje y lo apaga la BAJA.
+    private final com.renaser.ai.ai_engine.notificacion.service.PreferenciasDeAviso preferencias;
 
     @Override
     @Transactional
@@ -84,11 +87,16 @@ public class ServicioIntegracionWhatsappImpl implements ServicioIntegracionWhats
 
         // Todos los anunciados de ese número, de una vez: lo único que cuenta es el número.
         int terminados = 0;
+        Set<Long> escribieron = new HashSet<>();
         for (VinculoWhatsapp anunciado : vinculos.vivosDelNumeroParaEscribir(telefono)) {
             if (!anunciado.esperaSuMensaje(ahora)) {
                 continue;
             }
-            Postulacion postulacion = postulaciones.findById(anunciado.getPostulacionId()).orElse(null);
+            escribieron.add(anunciado.getPersonaId());
+            // Sin postulación es el anuncio del número solo (V92): no tenía procesos vivos. Se
+            // cierra como un proceso terminado y contesta «no tienes procesos activos».
+            Postulacion postulacion = anunciado.getPostulacionId() == null ? null
+                    : postulaciones.findById(anunciado.getPostulacionId()).orElse(null);
             if (postulacion == null || !sigueVivo(postulacion, finales)
                     || !beta.esDeLaPlataforma(postulacion.getOrganizacionId())) {
                 anunciado.cerrar(VinculoWhatsapp.REVOCADO, VinculoWhatsapp.POR_PROCESO_TERMINADO, ahora);
@@ -103,6 +111,9 @@ public class ServicioIntegracionWhatsappImpl implements ServicioIntegracionWhats
             vinculos.save(anunciado);
         }
         vinculos.flush();
+        if (!escribieron.isEmpty()) {
+            alEscribirConAnuncio(telefono, escribieron);
+        }
 
         List<Contado> activos = contar(vinculos.activosDelNumero(telefono), finales);
         if (activos.isEmpty()) {
@@ -151,9 +162,27 @@ public class ServicioIntegracionWhatsappImpl implements ServicioIntegracionWhats
         if (!bajas.existsById(numero)) {
             bajas.save(BajaWhatsapp.builder().telefono(numero).dadaEn(ahora).build());
         }
+        // El interruptor de WhatsApp de quien tiene ese número se apaga, y el mensaje flotante
+        // vuelve a poder salir para invitarle a volver (V92).
+        Set<Long> suyas = new HashSet<>();
+        vivos.forEach(v -> suyas.add(v.getPersonaId()));
+        personas.findAllByTelefono(numero).forEach(p -> suyas.add(p.getId()));
+        suyas.forEach(preferencias::alDarseDeBaja);
         log.info("El número {} se dio de baja de WhatsApp: {} vínculo(s) cerrado(s)",
                 Celular.enmascarado(numero), vivos.size());
         return vivos.size();
+    }
+
+    /**
+     * Escribió desde un número que esperábamos (V92): el interruptor de esa persona queda
+     * encendido para todos sus procesos y, si el número tenía la BAJA, sale de ahí —el bot ya la
+     * levantó al recibir el mensaje con la espera vigente—.
+     */
+    private void alEscribirConAnuncio(String telefono, Set<Long> personasQueEscribieron) {
+        personasQueEscribieron.forEach(personaId -> preferencias.whatsapp(personaId, true));
+        if (bajas.existsById(telefono)) {
+            bajas.deleteById(telefono);
+        }
     }
 
     // ============ las novedades ============

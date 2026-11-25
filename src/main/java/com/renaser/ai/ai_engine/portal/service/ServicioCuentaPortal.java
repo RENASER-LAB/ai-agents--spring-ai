@@ -40,8 +40,9 @@ public interface ServicioCuentaPortal {
             com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario quien);
 
     /**
-     * Cambiar el celular de la cuenta (V73): 400 si no vale; si cambia, lo vinculado a WhatsApp
-     * con el anterior se cierra.
+     * Cambiar el celular de la cuenta (V73): 400 si no vale; 409 {@code TELEFONO_EN_USO} si ya es
+     * de otra cuenta (V92); si cambia, lo vinculado a WhatsApp con el anterior se cierra y el
+     * interruptor de WhatsApp se apaga.
      */
     com.renaser.ai.ai_engine.portal.dto.DtosPortal.MiCelular cambiarTelefono(ContextoUsuario quien,
                                                                               String telefono);

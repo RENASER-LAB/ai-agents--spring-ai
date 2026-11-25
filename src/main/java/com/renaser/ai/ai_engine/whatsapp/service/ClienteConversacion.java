@@ -2,6 +2,7 @@ package com.renaser.ai.ai_engine.whatsapp.service;
 
 import java.time.Instant;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -45,8 +46,32 @@ public interface ClienteConversacion {
      */
     void publicarEvento(Evento evento);
 
+    /**
+     * {@code POST /v1/ex/vinculaciones} → 200 {@code {postulaciones: [{postulacionRef}]}} (V92,
+     * spec 034 del CRM): vincular sin mensaje las postulaciones de un número que ya habló con el
+     * bot. Con {@link #MOTIVO_ACTIVACION} el bot levanta su BAJA si la tenía y le manda la
+     * plantilla {@code avisos_activados}; con {@link #MOTIVO_NUEVA_POSTULACION} solo vincula.
+     * Idempotente por teléfono y postulación.
+     *
+     * <p>{@code 404 SIN_CONVERSACION} (el número nunca habló con el bot) y {@code 409 SUPRIMIDO} llegan
+     * en el {@code code} del error, como un {@link FalloDelBot} definitivo con ese código; ver
+     * {@link FalloDelBot#esSinConversacion()} y {@link FalloDelBot#esSuprimido()}.
+     *
+     * @return las referencias que quedaron vinculadas; una que el bot tenía cerrada no vuelve
+     */
+    List<String> vincular(Vinculacion vinculacion);
+
     /** Falso en el modo apagado: no hay a quién anunciar, así que el portal no ofrece el botón. */
     boolean estaEncendido();
+
+    /** Encender WhatsApp desde el portal: levanta la BAJA y confirma con la plantilla. */
+    String MOTIVO_ACTIVACION = "ACTIVACION";
+
+    /** Postular con WhatsApp ya activo: solo vincula, sin mensaje. */
+    String MOTIVO_NUEVA_POSTULACION = "NUEVA_POSTULACION";
+
+    /** Los motivos de una vinculación que entiende el bot. */
+    Set<String> MOTIVOS_DE_VINCULACION = Set.of(MOTIVO_ACTIVACION, MOTIVO_NUEVA_POSTULACION);
 
     /** Los motivos de una revocación que entiende el bot; ningún otro. */
     Set<String> MOTIVOS_DE_REVOCACION =
@@ -160,6 +185,45 @@ public interface ClienteConversacion {
         }
     }
 
+    /** Una postulación que se vincula: su referencia opaca y el título de la vacante (hasta 60). */
+    record PostulacionAVincular(String postulacionRef, String vacante) {
+        public Map<String, Object> comoCuerpo() {
+            Map<String, Object> cuerpo = new LinkedHashMap<>();
+            cuerpo.put("postulacionRef", postulacionRef);
+            cuerpo.put("vacante", vacante);
+            return cuerpo;
+        }
+    }
+
+    /**
+     * El consentimiento que firmó en el portal, tal como lo guarda el bot junto a la autorización:
+     * el texto exacto, su versión y cuándo. Sin tipo: el contrato de la spec 034 no lo lleva.
+     */
+    record ConsentimientoDeLaVinculacion(String texto, String version, Instant aceptadoEn) {
+        public Map<String, Object> comoCuerpo() {
+            Map<String, Object> cuerpo = new LinkedHashMap<>();
+            cuerpo.put("texto", texto);
+            cuerpo.put("version", version);
+            cuerpo.put("aceptadoEn", aceptadoEn.toString());
+            return cuerpo;
+        }
+    }
+
+    /** El cuerpo de {@code /v1/ex/vinculaciones}, con los campos del contrato y ninguno más. */
+    record Vinculacion(String telefono, String nombre, String motivo,
+                       List<PostulacionAVincular> postulaciones,
+                       ConsentimientoDeLaVinculacion consentimiento) {
+        public Map<String, Object> comoCuerpo() {
+            Map<String, Object> cuerpo = new LinkedHashMap<>();
+            cuerpo.put("telefono", telefono);
+            cuerpo.put("nombre", nombre);
+            cuerpo.put("motivo", motivo);
+            cuerpo.put("postulaciones", postulaciones.stream().map(PostulacionAVincular::comoCuerpo).toList());
+            cuerpo.put("consentimiento", consentimiento.comoCuerpo());
+            return cuerpo;
+        }
+    }
+
     record Revocacion(String telefono, String postulacionRef, String motivo) {
         public Map<String, Object> comoCuerpo() {
             Map<String, Object> cuerpo = new LinkedHashMap<>();
@@ -208,6 +272,28 @@ public interface ClienteConversacion {
         public String codigo() {
             return codigo;
         }
+
+        /**
+         * {@code 404 SIN_CONVERSACION} de {@code /v1/ex/vinculaciones}: el número nunca habló con
+         * el bot (V92). El portal cae entonces al camino con mensaje.
+         */
+        public boolean esSinConversacion() {
+            return SIN_CONVERSACION.equalsIgnoreCase(codigo);
+        }
+
+        /**
+         * {@code 409 SUPRIMIDO} de {@code /v1/ex/vinculaciones} con {@code NUEVA_POSTULACION}: el
+         * número está dado de baja en el bot y no se vincula (V92).
+         */
+        public boolean esSuprimido() {
+            return SUPRIMIDO.equalsIgnoreCase(codigo);
+        }
+
+        /** El {@code code} con que el bot dice que ese número nunca le escribió. */
+        public static final String SIN_CONVERSACION = "SIN_CONVERSACION";
+
+        /** El {@code code} con que el bot dice que ese número está dado de baja. */
+        public static final String SUPRIMIDO = "SUPRIMIDO";
 
         /** Lo que dice el contrato de cada estado HTTP de error: 5xx, 429 y 401 se reintentan. */
         public static boolean seReintenta(int estadoHttp) {

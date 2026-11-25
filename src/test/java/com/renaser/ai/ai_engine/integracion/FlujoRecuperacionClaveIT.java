@@ -1,5 +1,7 @@
 package com.renaser.ai.ai_engine.integracion;
 
+import com.renaser.ai.ai_engine.integracion.soporte.CelularesDePrueba;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.renaser.ai.ai_engine.integracion.soporte.ImagenesDeContenedores;
 import com.renaser.ai.ai_engine.seguridad.service.ColaDeRecuperaciones;
@@ -453,7 +455,7 @@ public class FlujoRecuperacionClaveIT {
                         .content("""
                                 {"nombre": "%s", "apellidos": "Prueba", "correo": "%s",
                                  "contrasena": "%s", "ciudadUbigeo": "1501",
-                                 "telefono": "987654321", "aceptaPlataforma": true, "aceptaFuturosContactos": false}"""
+                                 "telefono": "987654321", "aceptaPlataforma": true, "aceptaFuturosContactos": false}""".replace("987654321", CelularesDePrueba.otro())
                                 .formatted(nombre, correo, clave)))
                 .andExpect(status().isCreated());
     }

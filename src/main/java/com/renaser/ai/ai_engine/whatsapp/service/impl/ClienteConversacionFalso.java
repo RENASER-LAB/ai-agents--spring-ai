@@ -40,6 +40,8 @@ public class ClienteConversacionFalso implements ClienteConversacion {
     public static final String REVOCACION = "REVOCACION";
     /** Un evento v2 de {@code /v1/ex/resultados} (V76). */
     public static final String EVENTO = "EVENTO";
+    /** Una vinculación sin mensaje de {@code /v1/ex/vinculaciones} (V92). */
+    public static final String VINCULACION = "VINCULACION";
 
     /** Lo que se le pidió al bot, en el orden en que llegó. */
     public record Llamada(String tipo, Instant recibidaEn, Map<String, Object> cuerpo) {}
@@ -59,6 +61,17 @@ public class ClienteConversacionFalso implements ClienteConversacion {
     /** Lo mismo para los eventos v2, por su eventoId. */
     private final Map<String, Map<String, Object>> eventosAceptados = new ConcurrentHashMap<>();
     private volatile boolean caido;
+    /**
+     * Los números que, para este bot, nunca le escribieron (V92): a ellos {@code /vinculaciones}
+     * responde {@code 404 SIN_CONVERSACION}. Los demás sí: EX solo llama con números que ya
+     * comprobó, así que por defecto el bot los conoce.
+     */
+    private final java.util.Set<String> sinConversacion = ConcurrentHashMap.newKeySet();
+    /**
+     * Los números dados de baja en este bot (V92): {@code NUEVA_POSTULACION} responde {@code 409
+     * SUPRIMIDO}, y {@code ACTIVACION} levanta la baja, como el de verdad.
+     */
+    private final java.util.Set<String> suprimidos = ConcurrentHashMap.newKeySet();
     /**
      * Con qué versión del contrato contesta, como {@code CONVERSATION_EX_VERSION} en el bot: con
      * 1, {@code /v1/ex/resultados} responde {@code 404 ruta_no_disponible}.
@@ -156,9 +169,76 @@ public class ClienteConversacionFalso implements ClienteConversacion {
         apuntar(EVENTO, cuerpo);
     }
 
+    /**
+     * {@code /v1/ex/vinculaciones} como el bot (spec 034 del CRM): primero el cuerpo —con los
+     * mismos límites que los avisos—, después si conoce el número. Vincula todas las que recibe y
+     * las devuelve; repetida, lo mismo.
+     */
+    @Override
+    public List<String> vincular(Vinculacion vinculacion) {
+        caidoSiToca();
+        exigir(vinculacion.telefono() != null && E164.matcher(vinculacion.telefono()).matches(), "telefono");
+        exigir(cabe(vinculacion.nombre(), LARGO_DEL_NOMBRE), "nombre");
+        exigir(MOTIVOS_DE_VINCULACION.contains(vinculacion.motivo()), "motivo");
+        exigir(vinculacion.postulaciones() != null && !vinculacion.postulaciones().isEmpty(), "postulaciones");
+        for (PostulacionAVincular una : vinculacion.postulaciones()) {
+            exigir(una != null && lleno(una.postulacionRef())
+                    && una.postulacionRef().length() <= LARGO_DE_LA_REFERENCIA, "postulacionRef");
+            exigir(cabe(una.vacante(), LARGO_DE_LA_VACANTE), "vacante");
+        }
+        ConsentimientoDeLaVinculacion consentimiento = vinculacion.consentimiento();
+        exigir(consentimiento != null, "consentimiento");
+        exigir(lleno(consentimiento.texto()), "consentimiento.texto");
+        exigir(lleno(consentimiento.version()), "consentimiento.version");
+        exigir(consentimiento.aceptadoEn() != null, "consentimiento.aceptadoEn");
+        if (sinConversacion.contains(vinculacion.telefono())) {
+            throw new FalloDelBot("El bot falso respondió 404 SIN_CONVERSACION: "
+                    + vinculacion.telefono() + " nunca le escribió", false, FalloDelBot.SIN_CONVERSACION);
+        }
+        if (suprimidos.contains(vinculacion.telefono())) {
+            if (MOTIVO_NUEVA_POSTULACION.equals(vinculacion.motivo())) {
+                throw new FalloDelBot("El bot falso respondió 409 SUPRIMIDO: " + vinculacion.telefono()
+                        + " está dado de baja", false, FalloDelBot.SUPRIMIDO);
+            }
+            // ACTIVACION: la persona lo pidió desde el portal y el bot levanta la baja.
+            suprimidos.remove(vinculacion.telefono());
+        }
+        apuntar(VINCULACION, vinculacion.comoCuerpo());
+        return vinculacion.postulaciones().stream().map(PostulacionAVincular::postulacionRef).toList();
+    }
+
     @Override
     public boolean estaEncendido() {
         return true;
+    }
+
+    /**
+     * Para las pruebas y el QA: que el bot no conozca este número (responde {@code 404
+     * SIN_CONVERSACION} a sus vinculaciones) o que vuelva a conocerlo.
+     */
+    public void sinConversacion(String telefono, boolean nuncaEscribio) {
+        if (nuncaEscribio) {
+            sinConversacion.add(telefono);
+        } else {
+            sinConversacion.remove(telefono);
+        }
+    }
+
+    /**
+     * Para las pruebas y el QA: que el bot tenga ese número dado de baja (una vinculación
+     * {@code NUEVA_POSTULACION} responde {@code 409 SUPRIMIDO}) o que no.
+     */
+    public void suprimido(String telefono, boolean dadoDeBaja) {
+        if (dadoDeBaja) {
+            suprimidos.add(telefono);
+        } else {
+            suprimidos.remove(telefono);
+        }
+    }
+
+    /** Si ahora mismo contesta como un bot caído. */
+    public boolean estaCaido() {
+        return caido;
     }
 
     /** Para las pruebas: contestar como un bot en la versión 1 (404 en los eventos) o en la 2. */
@@ -187,6 +267,8 @@ public class ClienteConversacionFalso implements ClienteConversacion {
         registro.clear();
         avisosAceptados.clear();
         eventosAceptados.clear();
+        sinConversacion.clear();
+        suprimidos.clear();
     }
 
     // ============ como el bot de verdad ============

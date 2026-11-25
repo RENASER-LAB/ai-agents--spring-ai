@@ -40,7 +40,15 @@ public enum TipoConsentimiento {
      * WhatsApp», una vez por postulación y versión del texto, y es de la plataforma: mientras
      * dure la beta, solo sus vacantes lo ofrecen.
      */
-    WHATSAPP;
+    WHATSAPP,
+
+    /**
+     * Recibir por WhatsApp las novedades de TODOS sus procesos, los de hoy y los que vengan
+     * (V92). Se firma al encender el interruptor de «Ajustes de avisos», una vez por persona y
+     * versión del texto, sin postulación. Ante el bot viaja como {@link #WHATSAPP}: es el mismo
+     * permiso para toda la cuenta.
+     */
+    WHATSAPP_CUENTA;
 
     /** El valor tal como viaja a la base y como lo escribe quien publica desde el panel. */
     public String codigo() {

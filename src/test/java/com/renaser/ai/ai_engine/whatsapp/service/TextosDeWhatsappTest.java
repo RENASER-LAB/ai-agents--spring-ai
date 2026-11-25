@@ -108,6 +108,17 @@ class TextosDeWhatsappTest {
         assertThat(prueba).hasSizeLessThanOrEqualTo(1000).contains("👉 " + enlace);
     }
 
+    @Test
+    @DisplayName("V92 · a quien escribe sin activar lo manda a la tuerca de la campana, no a los botones retirados")
+    void sinAnuncioRemiteALosAjustesDeAvisos() {
+        assertThat(TextosDeWhatsapp.SIN_ANUNCIO)
+                .contains("campana")
+                .contains("«Ajustes de avisos»")
+                .doesNotContain("Escribir por WhatsApp")
+                .doesNotContain("«Notificaciones»")
+                .hasSizeLessThanOrEqualTo(TextosDeWhatsapp.LARGO_DEL_TEXTO);
+    }
+
     @ParameterizedTest(name = "{0}")
     @ValueSource(strings = {"http://portal.renaser.pe/procesos", "https://portal.renaser.pe/procesos?token=abc",
             "https://portal.renaser.pe/procesos#ana", "https://ana:clave@portal.renaser.pe/procesos",

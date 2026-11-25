@@ -55,13 +55,14 @@ class ServicioIntegracionWhatsappImplTest {
     @Mock private PersonaRepository personas;
     @Mock private BetaWhatsapp beta;
     @Mock private com.renaser.ai.ai_engine.whatsapp.service.ResultadosPorWhatsapp resultados;
+    @Mock private com.renaser.ai.ai_engine.notificacion.service.PreferenciasDeAviso preferencias;
 
     private ServicioIntegracionWhatsappImpl integracion;
 
     @BeforeEach
     void montar() {
         integracion = new ServicioIntegracionWhatsappImpl(vinculos, avisos, bajas, postulaciones,
-                vacantes, estados, intentos, personas, beta, resultados);
+                vacantes, estados, intentos, personas, beta, resultados, preferencias);
         lenient().when(estados.findAllByOrderByOrden()).thenReturn(List.of(
                 EstadoPostulacion.builder().codigo("PERFIL_CALIFICANDO").esFinal(false).build(),
                 EstadoPostulacion.builder().codigo("NO_CONTINUA").esFinal(true).build()));
@@ -257,6 +258,50 @@ class ServicioIntegracionWhatsappImplTest {
         assertThat(guardada.getValue().getTelefono()).isEqualTo(NUMERO);
         // V76 · también lo ya cerrado: sus resultados y sus eventos pendientes.
         verify(resultados).alDarseDeBaja(org.mockito.ArgumentMatchers.eq(NUMERO), any());
+    }
+
+    // ============ El interruptor de la cuenta (V92) ============
+
+    @Test
+    @DisplayName("V92 · AC-03 · escribir con el anuncio vigente enciende WhatsApp para la cuenta y saca el número de la baja")
+    void escribirEnciendeElInterruptor() {
+        VinculoWhatsapp anunciado = anunciado();
+        when(vinculos.vivosDelNumeroParaEscribir(NUMERO)).thenReturn(List.of(anunciado));
+        when(postulaciones.findById(70L)).thenReturn(Optional.of(postulacion("PERFIL_CALIFICANDO")));
+        when(vinculos.activosDelNumero(NUMERO)).thenAnswer(i -> List.of(anunciado));
+        when(postulaciones.findAllById(any())).thenReturn(List.of(postulacion("PERFIL_CALIFICANDO")));
+        when(bajas.existsById(NUMERO)).thenReturn(true);
+
+        integracion.vincular(new PeticionVinculo(NUMERO, "wamid.9", "hola", null));
+
+        verify(preferencias).whatsapp(33L, true);
+        verify(bajas).deleteById(NUMERO);
+    }
+
+    @Test
+    @DisplayName("V92 · el anuncio del número sin procesos vivos: se cierra y contesta «no tienes procesos activos», pero enciende el interruptor")
+    void elAnuncioSinPostulacion() {
+        VinculoWhatsapp soloElNumero = anunciado();
+        soloElNumero.setPostulacionId(null);
+        when(vinculos.vivosDelNumeroParaEscribir(NUMERO)).thenReturn(List.of(soloElNumero));
+
+        var resultado = integracion.vincular(new PeticionVinculo(NUMERO, "wamid.10", "hola", null));
+
+        assertThat(resultado.estadoHttp()).isEqualTo(409);
+        assertThat(resultado.rechazo().codigo()).isEqualTo("PROCESO_TERMINADO");
+        assertThat(soloElNumero.getEstado()).isEqualTo(VinculoWhatsapp.REVOCADO);
+        verify(postulaciones, org.mockito.Mockito.never()).findById(any());
+        verify(preferencias).whatsapp(33L, true);
+    }
+
+    @Test
+    @DisplayName("V92 · la BAJA apaga el interruptor de quien tiene ese número y reinicia el mensaje flotante")
+    void laBajaApagaElInterruptor() {
+        when(personas.findAllByTelefono(NUMERO)).thenReturn(List.of(Persona.builder().id(34L).telefono(NUMERO).build()));
+
+        integracion.baja(NUMERO);
+
+        verify(preferencias).alDarseDeBaja(34L);
     }
 
     @Test

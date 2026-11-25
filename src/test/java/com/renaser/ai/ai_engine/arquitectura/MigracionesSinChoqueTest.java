@@ -62,7 +62,11 @@ class MigracionesSinChoqueTest {
             // el ranking y más tiempo (V89) se construyó antes. Si entran antes de que la V89
             // llegue a producción, el hueco se cierra solo; si no, tendrán que subir de número
             // y V87–V88 quedarán como V81–V83.
-            87, 88);
+            87, 88,
+            // V90 y V91 las tienen reservadas dos specs aún sin fusionar: el seguimiento de
+            // pendientes entre etapas (V90) y el video de la empresa (V91). Las notificaciones del
+            // candidato (V92) se construyeron antes; mismo trato que V87–V88.
+            90, 91);
 
     @Test
     @DisplayName("Ningún número de versión se repite: git no ve ese conflicto, Flyway sí")

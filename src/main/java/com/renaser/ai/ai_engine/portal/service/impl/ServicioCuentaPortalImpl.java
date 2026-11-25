@@ -129,6 +129,11 @@ public class ServicioCuentaPortalImpl implements ServicioCuentaPortal {
         usuarios.buscarPorCorreo(org.getId(), datos.correo()).ifPresent(u -> {
             throw new IllegalStateException("Ya existe una cuenta con ese correo");
         });
+        // Un celular es de una sola cuenta (V92): WhatsApp es por cuenta, y un número compartido
+        // mezclaría en el mismo chat los procesos de dos personas.
+        if (personas.existsByTelefono(telefono)) {
+            throw new com.renaser.ai.ai_engine.portal.service.TelefonoEnUsoException();
+        }
 
         Persona persona = personas.save(Persona.builder()
                 .nombre(datos.nombre())
@@ -252,6 +257,10 @@ public class ServicioCuentaPortalImpl implements ServicioCuentaPortal {
                 .orElseThrow(() -> new IllegalStateException("Esta cuenta no tiene a nadie detrás"));
         String anterior = persona.getTelefono();
         if (!nuevo.equals(anterior)) {
+            // El de otra cuenta no se puede guardar aquí (V92): un número, una cuenta.
+            if (personas.existsByTelefonoAndIdNot(nuevo, persona.getId())) {
+                throw new com.renaser.ai.ai_engine.portal.service.TelefonoEnUsoException();
+            }
             persona.setTelefono(nuevo);
             personas.save(persona);
             whatsapp.alCambiarElCelular(persona.getId(), anterior, nuevo);

@@ -70,4 +70,45 @@ class ManejadorErroresTest {
         assertThat(problema.getDetail()).contains("«telefono»");
         assertThat(problema.getProperties()).containsKey("Timestamp");
     }
+
+    /** Un celular que ya es de otra cuenta (V92): 409 con el código que el portal pinta junto al campo. */
+    @Test
+    void unCelularDeOtraCuentaEsUn409ConSuCodigo() {
+        var peticion = new MockHttpServletRequest("PUT", "/api/v1/portal/cuenta/telefono");
+
+        ProblemDetail problema = manejador.telefonoEnUso(
+                new com.renaser.ai.ai_engine.portal.service.TelefonoEnUsoException(), new ServletWebRequest(peticion));
+
+        assertThat(problema.getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
+        assertThat(problema.getDetail()).isEqualTo("Ese número ya está en otra cuenta. Usa otro o entra con esa cuenta.");
+        assertThat(problema.getProperties()).containsEntry("codigo", "TELEFONO_EN_USO");
+    }
+
+    /** Dos altas a la vez con el mismo celular: la segunda choca con el índice y es el mismo 409. */
+    @Test
+    void elIndiceDelCelularTambienEsUn409() {
+        var peticion = new MockHttpServletRequest("POST", "/api/v1/portal/cuentas");
+        var ex = new org.springframework.dao.DataIntegrityViolationException("duplicada",
+                new RuntimeException("ERROR: duplicate key value violates unique constraint "
+                        + "\"persona_telefono_unico\" Detail: Key (telefono)=(+51987654321) already exists."));
+
+        ProblemDetail problema = manejador.datoQueNoCuadra(ex, new ServletWebRequest(peticion));
+
+        assertThat(problema.getStatus()).isEqualTo(HttpStatus.CONFLICT.value());
+        assertThat(problema.getProperties()).containsEntry("codigo", "TELEFONO_EN_USO");
+    }
+
+    /** El bot falló al activar WhatsApp (V92): 503 con su código, para volver a intentarlo. */
+    @Test
+    void siElBotNoActivaWhatsappEsUn503() {
+        var peticion = new MockHttpServletRequest("POST", "/api/v1/portal/notificaciones/whatsapp");
+
+        ProblemDetail problema = manejador.whatsappNoActivado(
+                new com.renaser.ai.ai_engine.whatsapp.service.WhatsappNoActivadoException(
+                        "No pudimos activarlo. Vuelve a intentarlo en un momento.", new RuntimeException("caído")),
+                new ServletWebRequest(peticion));
+
+        assertThat(problema.getStatus()).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE.value());
+        assertThat(problema.getProperties()).containsEntry("codigo", "NO_SE_PUDO_ACTIVAR");
+    }
 }

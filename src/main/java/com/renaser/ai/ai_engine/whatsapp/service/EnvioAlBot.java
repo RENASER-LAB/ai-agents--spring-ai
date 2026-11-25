@@ -2,6 +2,7 @@ package com.renaser.ai.ai_engine.whatsapp.service;
 
 import com.renaser.ai.ai_engine.consentimiento.entity.Consentimiento;
 import com.renaser.ai.ai_engine.consentimiento.entity.TextoConsentimiento;
+import com.renaser.ai.ai_engine.consentimiento.entity.TipoConsentimiento;
 import com.renaser.ai.ai_engine.consentimiento.repository.ConsentimientoRepository;
 import com.renaser.ai.ai_engine.consentimiento.repository.TextoConsentimientoRepository;
 import com.renaser.ai.ai_engine.whatsapp.entity.AvisoWhatsapp;
@@ -225,8 +226,11 @@ public class EnvioAlBot {
         }
         String leido = firmado.getTextoFirmado() == null || firmado.getTextoFirmado().isBlank()
                 ? texto.getTexto() : firmado.getTextoFirmado();
-        return new ClienteConversacion.ConsentimientoDeLaEspera(texto.getTipo(), texto.getVersion(),
-                leido, firmado.getAceptadoEn());
+        // El contrato con el bot tiene un solo tipo de consentimiento, WHATSAPP. El de la cuenta
+        // (WHATSAPP_CUENTA, V92) es el mismo permiso para todos sus procesos: viaja como WHATSAPP,
+        // con su versión y su texto exacto.
+        return new ClienteConversacion.ConsentimientoDeLaEspera(
+                TipoConsentimiento.WHATSAPP.codigo(), texto.getVersion(), leido, firmado.getAceptadoEn());
     }
 
     /**

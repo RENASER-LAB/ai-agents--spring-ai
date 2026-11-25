@@ -1,5 +1,7 @@
 package com.renaser.ai.ai_engine.integracion;
 
+import com.renaser.ai.ai_engine.integracion.soporte.CelularesDePrueba;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.renaser.ai.ai_engine.integracion.soporte.ImagenesDeContenedores;
@@ -1016,7 +1018,7 @@ public class FlujoEliminacionVacanteIT {
                                 {"nombre": "QA", "apellidos": "Candidato",
                                  "correo": "%s", "contrasena": "%s",
                                  "ciudadUbigeo": "1501", "telefono": "987654321", "aceptaPlataforma": true,
-                                 "aceptaFuturosContactos": true}""".formatted(correo, CLAVE)))
+                                 "aceptaFuturosContactos": true}""".replace("987654321", CelularesDePrueba.otro()).formatted(correo, CLAVE)))
                 .andExpect(status().isCreated());
         return jdbc.queryForObject("select id from usuario where correo = ?", Long.class, correo);
     }

@@ -195,6 +195,13 @@ literalmente lo que el portal pinta debajo del botón «Escribir por WhatsApp»,
 pulsarlo, uno por postulación, con fecha, IP y navegador. Solo lo ofrecen las vacantes de Renaser
 mientras dure la beta. Tampoco lo ha visto un abogado.
 
+Desde la `V92` (24/11/2026) el portal firma en su lugar **`WHATSAPP_CUENTA` 1.0**, también con
+Renaser y opcional: «Al activarlo aceptas recibir por WhatsApp las novedades de tus procesos.
+Escribe BAJA cuando quieras dejarlo.». Es lo que la ventana «Ajustes de avisos» pinta bajo el
+interruptor de WhatsApp, se firma al encenderlo, una vez por persona y versión y sin postulación,
+y vale para todos sus procesos. Quien firmó el `WHATSAPP` 1.0 sigue ligado a él. Espera la firma
+del abogado como los demás.
+
 ### Los huecos que el borrador dejaba abiertos
 
 | Hueco | Con qué se rellenó |

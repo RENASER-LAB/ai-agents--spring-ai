@@ -80,6 +80,8 @@ public class ServicioWhatsappPortalImpl implements ServicioWhatsappPortal {
     private final PropiedadesWhatsapp propiedades;
     private final com.renaser.ai.ai_engine.whatsapp.service.ResultadosPorWhatsapp resultados;
     private final TransactionTemplate enUnaTransaccion;
+    // El interruptor de WhatsApp de la cuenta (V92): cambiar el celular lo apaga.
+    private final com.renaser.ai.ai_engine.notificacion.service.PreferenciasDeAviso preferencias;
 
     @SuppressWarnings("java:S107") // Cada uno es una tabla o una regla que el botón toca.
     public ServicioWhatsappPortalImpl(PostulacionRepository postulaciones, VacanteRepository vacantes,
@@ -89,7 +91,9 @@ public class ServicioWhatsappPortalImpl implements ServicioWhatsappPortal {
                                       TextosDeConsentimiento textos, DuenoDelInstrumento duenos,
                                       BetaWhatsapp beta, EnvioAlBot envio, PropiedadesWhatsapp propiedades,
                                       com.renaser.ai.ai_engine.whatsapp.service.ResultadosPorWhatsapp resultados,
-                                      PlatformTransactionManager transacciones) {
+                                      PlatformTransactionManager transacciones,
+                                      com.renaser.ai.ai_engine.notificacion.service.PreferenciasDeAviso preferencias) {
+        this.preferencias = preferencias;
         this.postulaciones = postulaciones;
         this.vacantes = vacantes;
         this.estados = estados;
@@ -308,6 +312,9 @@ public class ServicioWhatsappPortalImpl implements ServicioWhatsappPortal {
         if (Objects.equals(anterior, nuevo)) {
             return;
         }
+        // El número nuevo no está comprobado: WhatsApp queda apagado y se vuelve a activar con un
+        // mensaje desde él (V92).
+        preferencias.whatsapp(personaId, false);
         List<VinculoWhatsapp> vivos = vinculos.vivosDeLaPersonaParaEscribir(personaId);
         Instant ahora = Instant.now();
         // Lo ya terminado también (V76): sus resultados dejan de consultarse por el número

@@ -12,9 +12,11 @@ los límites, los errores y los reintentos, y **no está activo** hasta su C-10.
 
 ## La idea en una línea
 
-El candidato pulsa «Escribir por WhatsApp» en el portal. EX le **anuncia** al bot ese número. El
-candidato escribe primero desde ese número (diga lo que diga), el bot le pregunta a EX, EX lo
-**vincula** y le da sus novedades. Desde entonces EX le manda al bot los **avisos** de «te toca»,
+El candidato enciende WhatsApp en sus ajustes de avisos, la tuerca de la campana (`V92`; antes,
+«Escribir por WhatsApp» en cada proceso). Si su número ya está comprobado —esta cuenta escribió alguna vez desde él—, EX le pide al
+bot que **vincule sin mensaje** todos sus procesos vivos. Si no, EX le **anuncia** al bot ese número
+para cada proceso vivo; el candidato escribe primero desde él (diga lo que diga), el bot le pregunta
+a EX, EX lo **vincula** y le da sus novedades. Desde entonces EX le manda al bot los **avisos** de «te toca»,
 y le cuenta cuando el vínculo se **revoca**. Si el candidato escribe «BAJA» (solo esa palabra), el
 bot se lo cuenta a EX.
 
@@ -83,6 +85,7 @@ Tiempo máximo de espera: 3 s.
 | `POST /v1/ex/esperas` | `{telefono, postulacionRef, caducaEn, consentimiento: {tipo, version, texto, aceptadoEn}}` | `204`. Repetida, renueva la caducidad y el consentimiento. |
 | `POST /v1/ex/avisos` | `{avisoId, telefono, postulacionRef, tipo, nombre, vacante, texto}` | `202 {avisoId}`. Repetida igual: `202 {avisoId}`. Repetida distinta: `409 aviso_distinto`. |
 | `POST /v1/ex/revocaciones` | `{telefono, postulacionRef, motivo}` | `204`, aunque no hubiera nada que cerrar. |
+| `POST /v1/ex/vinculaciones` (`V92`) | `{telefono, nombre, motivo, postulaciones: [{postulacionRef, vacante}], consentimiento: {texto, version, aceptadoEn}}` | `200 {postulaciones: [{postulacionRef}]}`. Si no, `404` con `code: "SIN_CONVERSACION"` o `409` con `code: "SUPRIMIDO"`, en el formato de error de siempre del bot. |
 
 Con el productor v2 encendido (`WHATSAPP_PRODUCTOR_V2`, apagado por defecto), EX llama además a
 `POST /v1/ex/resultados`: ver el [contrato v2](CONTRATO-CONTEXTO-Y-RESULTADOS-POR-WHATSAPP-V2.md),
@@ -97,8 +100,11 @@ C-4 a C-7.
    "aceptadoEn": "2026-10-13T15:04:05Z"}}
 ```
 
-Cuando el candidato pulsa el botón. `caducaEn` es **24 horas** después. `consentimiento` es el que
-acaba de aceptar: tipo `WHATSAPP`, su versión, el texto exacto que vio y la fecha. Si el bot no
+Cuando el candidato enciende WhatsApp con un número sin comprobar (una por cada proceso vivo; sin
+procesos vivos, una sola con una referencia que no lleva postulación detrás) o, antes de la `V92`,
+cuando pulsaba el botón de un proceso. `caducaEn` es **24 horas** después. `consentimiento` es el
+que acaba de aceptar: tipo `WHATSAPP` —también el `WHATSAPP_CUENTA` de la `V92`, que para el bot es
+el mismo permiso—, su versión, el texto exacto que vio y la fecha. Si el bot no
 responde, EX lo reintenta (30 s, 2 min, 8 min, 32 min) mientras no caduque.
 
 ### `POST /v1/ex/avisos` — le toca algo
@@ -173,6 +179,38 @@ responde, EX lo reintenta (30 s, 2 min, 8 min, 32 min) mientras no caduque.
 `BORRADO_DATOS`. Anula también el anuncio, si lo había. Tras una baja EX no revoca: fue el bot
 quien se lo contó.
 
+Apagar WhatsApp en los ajustes de avisos (`V92`) es un `DEJAR_DE_RECIBIR` por cada vínculo vivo de la
+persona: el número no queda dado de baja y volver a encenderlo es con un clic.
+
+### `POST /v1/ex/vinculaciones` — vincular sin mensaje (`V92`)
+
+```json
+{"telefono": "+51987654321", "nombre": "Lucía", "motivo": "ACTIVACION",
+ "postulaciones": [{"postulacionRef": "pw_9f…", "vacante": "Analista de Datos"}],
+ "consentimiento": {"texto": "Al activarlo aceptas recibir por WhatsApp las novedades de tus procesos. Escribe BAJA cuando quieras dejarlo.",
+   "version": "1.0", "aceptadoEn": "2026-11-24T15:04:05Z"}}
+```
+
+Solo con números que esa cuenta ya comprobó escribiendo al bot. La spec 034 del CRM es su pareja.
+
+- `ACTIVACION`: encendió WhatsApp en el portal. Van sus postulaciones vivas sin vínculo activo (las
+  que esperaban su mensaje, con su misma referencia). El bot levanta su BAJA si la tenía y le manda
+  la plantilla `avisos_activados`. Con el `200`, EX saca el número de `whatsapp_baja`, deja
+  `ACTIVO` cada postulación devuelta y enciende el interruptor. **La llamada va dentro de la
+  transacción**: si el bot falla o no contesta, no cambia nada y el portal recibe `503
+  NO_SE_PUDO_ACTIVAR`. Sin postulaciones que vincular no se llama (el bot pide de 1 a 100): el
+  interruptor queda encendido y, si el número tenía la BAJA, la levanta la vinculación de su
+  próxima postulación, que va entonces como `ACTIVACION`.
+- `NUEVA_POSTULACION`: postuló con el interruptor encendido. Después del commit de la postulación,
+  con su vínculo ya guardado como `PENDIENTE`; con el `200` pasa a `ACTIVO`. Si el bot falla, se
+  queda `PENDIENTE` y el sondeo de siempre anuncia el número: la postulación no se frena.
+- `404 SIN_CONVERSACION` (en `code`): el bot no conoce el número. EX cae al camino con mensaje:
+  anuncia el número para cada proceso vivo y devuelve el enlace al chat.
+- `409 SUPRIMIDO` (en `code`): solo con `NUEVA_POSTULACION` y el número dado de baja en el bot. El
+  vínculo se queda `PENDIENTE`.
+- Una referencia que el bot no devuelve (la tenía cerrada por `PROCESO_TERMINADO` o
+  `BORRADO_DATOS`) no se vincula.
+
 ## El bot llama a EX (`/api/v1/integraciones/whatsapp/…`)
 
 Solo con la firma del bot; ningún token de EX abre esta puerta.
@@ -194,6 +232,10 @@ Meta, pero el bot lo manda siempre con él.)
 ```
 
 Vincula **todas** las postulaciones anunciadas (y vigentes) para ese número. El texto da igual.
+Desde la `V92` además enciende el interruptor de WhatsApp de esa persona y, si el número estaba en
+`whatsapp_baja`, lo saca de ahí (el bot ya levantó su baja al recibir el mensaje con la espera
+vigente). El anuncio de un número sin procesos vivos se cierra como `PROCESO_TERMINADO` y responde
+el `409` de abajo, como siempre.
 
 | Respuesta | Cuándo | Cuerpo |
 |---|---|---|
@@ -205,7 +247,9 @@ Vincula **todas** las postulaciones anunciadas (y vigentes) para ese número. El
 - **Es idempotente.** `postulaciones` son todas las postulaciones activas vinculadas a ese número
   después de la llamada, también las que ya lo estaban; `novedades`, las de todos esos procesos.
   Repetida, devuelve lo mismo.
-- En los rechazos, `texto` es lo que el bot contesta tal cual.
+- En los rechazos, `texto` es lo que el bot contesta tal cual. El de `SIN_ANUNCIO`
+  (`TextosDeWhatsapp`) le dice desde la `V92` que entre en el portal, abra la campana, pulse la
+  tuerca «Ajustes de avisos» y active WhatsApp.
 
 ### `POST /novedades`
 
@@ -239,8 +283,10 @@ consentimiento no se entrega.
 ```
 
 Desvincula todas las postulaciones de ese número y lo marca como suprimido. Responde `204`,
-también si no había nada que desvincular o si se repite. El portal ya no ofrece el botón con ese
-número («Este número se dio de baja de nuestros mensajes»).
+también si no había nada que desvincular o si se repite. Desde la `V92` apaga además el interruptor
+de WhatsApp de quien tiene ese número y devuelve a cero el contador del mensaje flotante: los
+ajustes del portal dicen «Lo apagaste escribiendo BAJA…». El portal no pinta ese mensaje flotante
+(la invitación a activar WhatsApp es la guía de la primera vez), pero el contador se mantiene.
 
 ### Las novedades
 
@@ -253,10 +299,13 @@ solo lo usa en el registro.
 - **El bot falso**: con `WHATSAPP_MODO=falso` (desarrollo y E2E), EX no llama a nadie. Contesta
   como el bot de verdad —`400 validacion` si a una espera le falta el consentimiento o una
   revocación trae otro motivo, `409 aviso_distinto` si un `avisoId` vuelve con otro contenido— y
-  apunta lo que acepta (esperas con su consentimiento, avisos, revocaciones y, desde la `V76`, los
-  eventos v2 de `/v1/ex/resultados`) en
+  apunta lo que acepta (esperas con su consentimiento, avisos, revocaciones, desde la `V76` los
+  eventos v2 de `/v1/ex/resultados` y desde la `V92` las vinculaciones) en
   `GET /api/v1/integraciones/whatsapp/falso/registro?telefono=…`, firmado como el resto. En
-  producción esa ruta no existe. Contesta como un bot en la versión 2; las pruebas pueden ponerlo
+  producción esa ruta no existe. Por defecto conoce todos los números; para el QA, tres mandos
+  firmados: `POST …/falso/caido {caido}` (contesta como caído), `POST …/falso/sin-conversacion
+  {telefono, sinConversacion}` (`404 SIN_CONVERSACION`) y `POST …/falso/suprimido {telefono,
+  suprimido}` (`409 SUPRIMIDO` en una `NUEVA_POSTULACION`). Contesta como un bot en la versión 2; las pruebas pueden ponerlo
   en la 1, y entonces los eventos reciben `404 ruta_no_disponible`.
 
 ## Configuración de EX

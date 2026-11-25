@@ -406,4 +406,84 @@ class ClienteConversacionHttpTest {
         assertThatThrownBy(() -> new ClienteConversacionApagado().publicarEvento(convocatoria(EVENTO_ID)))
                 .matches(e -> !((FalloDelBot) e).esReintentable());
     }
+
+    // ============ /v1/ex/vinculaciones (V92, spec 034 del CRM) ============
+
+    private static ClienteConversacion.Vinculacion vinculacion(String motivo) {
+        return new ClienteConversacion.Vinculacion("+51987654321", "Lucía", motivo,
+                List.of(new ClienteConversacion.PostulacionAVincular("pw_1", "Analista de Datos"),
+                        new ClienteConversacion.PostulacionAVincular("pw_2", "Analista de Planeamiento")),
+                new ClienteConversacion.ConsentimientoDeLaVinculacion(
+                        "Al activarlo aceptas recibir por WhatsApp las novedades de tus procesos. "
+                                + "Escribe BAJA cuando quieras dejarlo.", "1.0",
+                        Instant.parse("2026-10-12T14:59:00Z")));
+    }
+
+    @Test
+    @DisplayName("V92 · vinculaciones: su ruta, el cuerpo del contrato sin campos de más, y las referencias del 200")
+    void vinculaciones() {
+        estado.set(200);
+        cuerpoDelError = "{\"postulaciones\":[{\"postulacionRef\":\"pw_1\"}]}";
+
+        List<String> vinculadas = cliente.vincular(vinculacion("ACTIVACION"));
+
+        assertThat(vinculadas).containsExactly("pw_1");
+        assertThat(recibidas).singleElement().satisfies(r -> {
+            assertThat(r.ruta()).isEqualTo("/v1/ex/vinculaciones");
+            assertThat(r.cuerpo()).isEqualTo("{\"telefono\":\"+51987654321\",\"nombre\":\"Lucía\","
+                    + "\"motivo\":\"ACTIVACION\",\"postulaciones\":["
+                    + "{\"postulacionRef\":\"pw_1\",\"vacante\":\"Analista de Datos\"},"
+                    + "{\"postulacionRef\":\"pw_2\",\"vacante\":\"Analista de Planeamiento\"}],"
+                    + "\"consentimiento\":{\"texto\":\"Al activarlo aceptas recibir por WhatsApp las novedades "
+                    + "de tus procesos. Escribe BAJA cuando quieras dejarlo.\",\"version\":\"1.0\","
+                    + "\"aceptadoEn\":\"2026-10-12T14:59:00Z\"}}");
+            assertThat(r.cabeceras().get(FirmaWhatsapp.CABECERA_FIRMA)).isNotEmpty();
+        });
+    }
+
+    @Test
+    @DisplayName("V92 · 404 SIN_CONVERSACION y 409 SUPRIMIDO, en el code del error estándar del bot: definitivos y reconocibles")
+    void sinConversacion() {
+        estado.set(404);
+        cuerpoDelError = "{\"code\":\"SIN_CONVERSACION\",\"message\":\"Ese número no habló con el bot\","
+                + "\"retryable\":false,\"correlation_id\":\"c-1\"}";
+        assertThatThrownBy(() -> cliente.vincular(vinculacion("ACTIVACION")))
+                .isInstanceOfSatisfying(FalloDelBot.class, f -> {
+                    assertThat(f.esSinConversacion()).isTrue();
+                    assertThat(f.esReintentable()).isFalse();
+                });
+
+        estado.set(409);
+        cuerpoDelError = "{\"code\":\"SUPRIMIDO\",\"message\":\"Número dado de baja\",\"retryable\":false,"
+                + "\"correlation_id\":\"c-2\"}";
+        assertThatThrownBy(() -> cliente.vincular(vinculacion("NUEVA_POSTULACION")))
+                .isInstanceOfSatisfying(FalloDelBot.class, f -> {
+                    assertThat(f.esSuprimido()).isTrue();
+                    assertThat(f.esSinConversacion()).isFalse();
+                    assertThat(f.esReintentable()).isFalse();
+                });
+
+        // Solo cuenta «code»: un «codigo» suelto no es el formato del bot.
+        estado.set(404);
+        cuerpoDelError = "{\"codigo\":\"SIN_CONVERSACION\"}";
+        assertThatThrownBy(() -> cliente.vincular(vinculacion("ACTIVACION")))
+                .isInstanceOfSatisfying(FalloDelBot.class, f -> assertThat(f.esSinConversacion()).isFalse());
+    }
+
+    @Test
+    @DisplayName("V92 · un 5xx se reintenta y no es SIN_CONVERSACION; un 200 sin la lista es un fallo")
+    void vinculacionesQueFallan() {
+        estado.set(503);
+        cuerpoDelError = "{\"code\":\"persistencia_no_disponible\"}";
+        assertThatThrownBy(() -> cliente.vincular(vinculacion("NUEVA_POSTULACION")))
+                .isInstanceOfSatisfying(FalloDelBot.class, f -> {
+                    assertThat(f.esReintentable()).isTrue();
+                    assertThat(f.esSinConversacion()).isFalse();
+                });
+
+        estado.set(200);
+        cuerpoDelError = "{}";
+        assertThatThrownBy(() -> cliente.vincular(vinculacion("NUEVA_POSTULACION")))
+                .isInstanceOfSatisfying(FalloDelBot.class, f -> assertThat(f.esReintentable()).isFalse());
+    }
 }

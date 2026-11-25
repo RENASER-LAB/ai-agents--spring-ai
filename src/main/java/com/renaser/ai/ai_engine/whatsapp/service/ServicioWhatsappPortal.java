@@ -39,7 +39,8 @@ public interface ServicioWhatsappPortal {
 
     /**
      * El celular de la cuenta cambió: lo vinculado o anunciado con el anterior se cierra y se
-     * revoca. Lo llama «Mi cuenta», dentro de su transacción.
+     * revoca, y el interruptor de WhatsApp de la cuenta se apaga (V92): el número nuevo hay que
+     * comprobarlo con un mensaje. Lo llama «Mi cuenta», dentro de su transacción.
      */
     void alCambiarElCelular(Long personaId, String anterior, String nuevo);
 }

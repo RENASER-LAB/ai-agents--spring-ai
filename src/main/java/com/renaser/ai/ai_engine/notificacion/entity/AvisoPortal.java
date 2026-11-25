@@ -94,6 +94,14 @@ public class AvisoPortal {
     /** El equipo le dio más tiempo para la prueba del puesto que no completó (V89). */
     public static final String PRUEBA_MAS_TIEMPO = "PRUEBA_MAS_TIEMPO";
 
+    /**
+     * Los que no son de sus procesos sino de su perfil: las reseñas (V63). Salen aunque apague la
+     * campana en «Notificaciones» (V92); todos los demás —etapas, recordatorios, cambios y retiro
+     * de la vacante, «más tiempo»— son de sus procesos y se callan con ella.
+     */
+    public static final java.util.Set<String> DE_SU_PERFIL = java.util.Set.of(
+            RESENA_PUBLICADA, RESENA_EDITADA, REPORTE_RESENA_RESUELTO, RESPUESTA_RESENA_OCULTADA);
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;

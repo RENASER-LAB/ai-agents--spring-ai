@@ -43,9 +43,14 @@ public final class TextosDeWhatsapp {
     public static final String PETICION_QUE_NO_VALE = "La petición no cumple el contrato: hace "
             + "falta un JSON con el teléfono en formato internacional (E.164), como +51987654321";
 
+    /**
+     * Lo que contesta el bot a quien escribe sin haber activado WhatsApp. Desde la V92 se
+     * activa una sola vez para toda la cuenta; desde el 25/11/2026, en «Ajustes de avisos», la
+     * tuerca de la campana del portal (el botón «Notificaciones» de «Mis procesos» se retiró).
+     */
     public static final String SIN_ANUNCIO = "No encontramos una postulación esperando tu "
             + "mensaje desde este número. Si quieres recibir tus novedades por aquí, entra en el "
-            + "portal, abre «Mis procesos» y pulsa «Escribir por WhatsApp».";
+            + "portal, abre la campana de avisos, pulsa la tuerca «Ajustes de avisos» y activa WhatsApp.";
 
     /** Punto 13 de la spec: lo que contesta el bot a quien ya no tiene procesos con avisos. */
     public static final String SIN_PROCESOS_ACTIVOS = "No tienes procesos activos con avisos por "

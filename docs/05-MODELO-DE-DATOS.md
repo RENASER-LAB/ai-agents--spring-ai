@@ -23,8 +23,8 @@ Sirve para tres cosas:
 - **Entender el sistema.** Un modelo de datos bien contado explica el negocio mejor que
   cualquier otro documento.
 
-**La base ya está construida.** Las migraciones `V1` a `V80`, de la `V84` a la `V86` y la `V89` viven en
-`src/main/resources/db/migration` —**131 tablas de este módulo**, 134 en la base contando la de
+**La base ya está construida.** Las migraciones `V1` a `V80`, de la `V84` a la `V86`, la `V89`, la `V92` y la `V93` viven en
+`src/main/resources/db/migration` —**132 tablas de este módulo**, 135 en la base contando la de
 Flyway y las dos del motor de agentes— y Flyway es el dueño del esquema. Cambiar algo de aquí
 ya cuesta una migración nueva, y **una migración aplicada no se edita nunca**: se escribe otra
 encima. No hay `V81` a `V83`: esos números los reservaban otras specs que todavía no se han
@@ -32,7 +32,9 @@ construido, y como Flyway no aplica migraciones fuera de orden, tendrán que lle
 mayor que la última aplicada. Ya pasó con el perfil de la empresa, que reservaba la `V81` y entró
 como `V85`, y su brochure entró como `V86`. **Tampoco hay `V87` ni `V88`**: las reservan la
 convocatoria desde el propósito y el video por webcam, aún sin fusionar, y la `V89` se construyó
-antes. `MigracionesSinChoqueTest` admite esos cinco números como huecos deliberados (ver «Reglas
+antes. **Ni `V90` ni `V91`**: las reservan el seguimiento de pendientes entre etapas y el video de
+la empresa, y las notificaciones del candidato (`V92` y `V93`) se construyeron antes.
+`MigracionesSinChoqueTest` admite esos siete números como huecos deliberados (ver «Reglas
 que no se negocian» en [Reglas del código](REGLAS-DEL-CODIGO.md)).
 
 La `V36` trae **el perfil del candidato**: seis tablas que cuelgan de `persona` —no de
@@ -328,6 +330,21 @@ y la fecha nueva (`intento_prueba_id`, `plazo_en`, con `transicion_estado_id` va
 tipo y una clave única por prueba y fecha). Ninguna fila que existía cambia: las pruebas que ya
 estaban sin completar aparecen en la tabla al desplegar. Ver [La prueba del puesto, por
 dentro](PRUEBA-DEL-PUESTO.md), «Darle más tiempo a quien no la completó».
+
+La `V92` (24/11/2026) trae **las notificaciones del candidato: un solo ajuste por cuenta para
+WhatsApp, correo y portal**, en vez de activar WhatsApp proceso por proceso. Una tabla nueva,
+`preferencia_aviso`, una fila por persona solo cuando cambia algo (sin fila: correo y campana
+encendidos, WhatsApp apagado); el relleno enciende WhatsApp a quien ya tenía un vínculo `ACTIVO`.
+Publica el consentimiento **`WHATSAPP_CUENTA` 1.0**, que vale para todos sus procesos. Hace el
+celular **de una sola cuenta** con el índice único parcial `persona_telefono_unico`, que **falla
+si en la base hay dos personas con el mismo número**: antes de desplegarla se cuentan y se
+resuelven a mano. Y deja `vinculo_whatsapp.postulacion_id` opcional, solo para anunciar al bot un
+número sin procesos vivos, que nunca llega a `ACTIVO`. La `V93` (25/11/2026) suma
+`preferencia_aviso.guia_avisos_vista_en`, cuándo dio por vista la guía de los avisos que el portal
+enseña una vez por cuenta. Las dos se despliegan juntas. ⚠️ **Limitación conocida**: hay un solo
+número de bot para todas las empresas, así que el interruptor de WhatsApp y la BAJA son de la
+persona y no de la empresa; cuando cada empresa tenga su número, tendrán que separarse. Ver
+«Novedades por WhatsApp», más abajo, y [el contrato con el bot](CONTRATO-NOVEDADES-POR-WHATSAPP.md).
 
 La `V54` (14/09/2026) **no añade ninguna tabla y cambia quién firma qué**. Hasta ella había dos
 tipos de texto —`PROCESO` y `FUTUROS_CONTACTOS`— y el de la cuenta usaba el primero, que habla de
@@ -790,7 +807,9 @@ distintos. La migración lo leyó una vez para rellenar lo que pudo y lo dejó i
 registro, se cambia en «Mi cuenta» y se guarda siempre como `+51987654321`, con un CHECK que
 rechaza cualquier otra forma. **No es el teléfono del currículum**: ese lo lee la IA, vive en
 `dato_cv.telefono`, es texto libre y no sirve para escribir por WhatsApp. Las cuentas anteriores
-a la `V73` no lo tienen y no se les exige al entrar.
+a la `V73` no lo tienen y no se les exige al entrar. **Desde la `V92` un celular es de una sola
+cuenta** (`persona_telefono_unico`, que no cuenta los vacíos): con WhatsApp por cuenta, un número
+compartido mezclaría en el mismo chat los procesos de dos personas.
 
 El permiso guarda una etiqueta en lenguaje normal —«puede cerrar una vacante»— porque la
 pantalla donde se reparten permisos nunca debe mostrar nombres técnicos. Los permisos **no
@@ -826,7 +845,10 @@ ninguno de los otros dos.
 **Y un cuarto, solo para WhatsApp** (`V73`): `WHATSAPP`, con Renaser, que se firma al pulsar
 «Escribir por WhatsApp» y cubre recibir por ahí las novedades de **ese** proceso. Por eso va con
 `postulacion_id`, como el de `PROCESO`, una vez por postulación y versión. Solo lo ofrecen las
-vacantes de la plataforma mientras dure la beta. **Los tres son de la plataforma, y solo ella los publica**: el panel
+vacantes de la plataforma mientras dure la beta. **Desde la `V92` el portal firma en su lugar
+`WHATSAPP_CUENTA`**, al encender el interruptor de WhatsApp de sus ajustes de avisos: cubre todos
+sus procesos, los de hoy y los que vengan, y se firma sin postulación, una vez por persona y
+versión. Quien firmó el `WHATSAPP` 1.0 sigue ligado a él. **Los tres son de la plataforma, y solo ella los publica**: el panel
 responde 400 a una empresa que intente publicar cualquiera de los tres.
 
 **Con quién se firma y de quién es la fila son dos cosas distintas, desde la V54.** El texto de
@@ -1594,19 +1616,23 @@ cifra; que no viaje a nadie más lo hace el servicio.
 
 ---
 
-### Novedades por WhatsApp · 5 tablas
+### Novedades por WhatsApp · 6 tablas
 
-Desde la `V73` (13/10/2026); las dos últimas, desde la `V76` (19/10/2026). Mientras espera, el candidato pulsa «Escribir por WhatsApp», **escribe
-él primero** al bot de RENASER desde el celular de su cuenta, y desde entonces el bot le cuenta
-cómo va y le avisa cuando le toca algo. El bot vive en el CRM; EX guarda el número, el vínculo y la
+Desde la `V73` (13/10/2026); `resultado_whatsapp` y `evento_whatsapp`, desde la `V76` (19/10/2026),
+y `preferencia_aviso`, desde la `V92` (24/11/2026). El candidato enciende WhatsApp una vez para
+toda la cuenta en los ajustes de avisos del portal (hasta la `V92`, «Escribir por WhatsApp» en cada
+proceso): si esa cuenta ya escribió alguna vez desde su número, queda activo con un clic; si no,
+**escribe él primero** al bot de RENASER desde ese número. Desde entonces el bot le cuenta cómo va
+y le avisa cuando le toca algo. El bot vive en el CRM; EX guarda el número, el vínculo y la
 cola de lo que le debe al bot. Lo que se dicen los dos está en
 [el contrato](CONTRATO-NOVEDADES-POR-WHATSAPP.md).
 
 | Tabla | Para qué existe | Columnas que importan |
 |---|---|---|
-| `vinculo_whatsapp` | Que un número va a escribir, o ya escribió, por una postulación. Una fila por cada vez que se pulsa el botón sin un vínculo vivo | postulacion_id, persona_id, referencia, telefono, estado, consentimiento_id, anuncio_caduca_en, vinculado_en, cerrado_en, motivo_cierre, revocacion_enviada_en |
+| `vinculo_whatsapp` | Que un número va a escribir, o ya escribió, por una postulación. Una fila por cada vez que se enciende WhatsApp (antes de la `V92`, se pulsaba el botón) sin un vínculo vivo; desde la `V92`, también la del anuncio de un número sin procesos vivos, sin postulación | postulacion_id, persona_id, referencia, telefono, estado, consentimiento_id, anuncio_caduca_en, vinculado_en, cerrado_en, motivo_cierre, revocacion_enviada_en |
 | `aviso_whatsapp` | Un «te toca» que EX le debe al bot, uno por transición y tipo; el de más tiempo para la prueba (`V89`), uno por prueba y fecha nueva, sin transición. Su `id` es el `avisoId` del contrato | postulacion_id, vinculo_whatsapp_id, transicion_estado_id, intento_prueba_id, plazo_en, tipo, estado, telefono, nombre, vacante, texto, intentos, proximo_intento_en, ultimo_error |
 | `whatsapp_baja` | Los números que escribieron BAJA al bot | telefono, dada_en |
+| `preferencia_aviso` | Cómo quiere cada candidato enterarse de sus procesos (`V92`): correo, campana y el interruptor de WhatsApp de la cuenta. Una fila por persona, solo cuando cambia algo; sin ella, todo por defecto | persona_id, correo, portal, whatsapp_activo, mensaje_vistas, mensaje_visto_en, guia_avisos_vista_en (`V93`) |
 | `resultado_whatsapp` | El resultado de una postulación que terminó con el vínculo `ACTIVO`, lo que el bot puede consultar 30 días (`V76`). Uno por postulación | postulacion_id, vinculo_whatsapp_id, tipo, fecha, revision, es_correccion, consultable_hasta, acceso_revocado_en, acceso_revocado_motivo |
 | `evento_whatsapp` | Un evento v2 que EX le debe al bot: `RESULTADO` o `CONVOCATORIA_CERRADA` (`V76`). Su `id` es el `eventoId` del contrato v2 | postulacion_id, vinculo_whatsapp_id, tipo, revision, estado, telefono, referencia, nombre, vacante, ocurrido_en, resultado_*, convocatoria_cerrada_en, aviso_autorizado, aviso_caduca_en, cierra_vinculo, intentos, motivo |
 
@@ -1629,8 +1655,19 @@ que saliera. Las columnas `anuncio_*` y `revocacion_*` del vínculo son lo mismo
 la revocación.
 
 **La baja es del número, no de una postulación**, y por eso va aparte: puede llegar cuando ya no
-queda ningún vínculo vivo. Con el número en `whatsapp_baja`, el portal no vuelve a ofrecer el
-botón con él.
+queda ningún vínculo vivo. Con el número en `whatsapp_baja` no sale ningún aviso. Hasta la `V92`
+el portal no volvía a ofrecer WhatsApp con él; desde la `V92` la BAJA apaga el interruptor de la
+cuenta, y volver a encenderlo es con un clic —el número ya está comprobado— y lo saca de
+`whatsapp_baja`.
+
+**`preferencia_aviso` manda sobre los tres canales de sus procesos** (`V92`). `correo` y `portal`
+los leen el correo y la campana antes de salir: apagados, no sale nada —ni fila en
+`correo_enviado` ni aviso en `aviso_portal`—, aunque los correos de la cuenta (crearla, recuperar
+la clave, el borrado) y los avisos de las reseñas de su perfil salen siempre. `whatsapp_activo` es
+el interruptor de la cuenta: postular con él encendido vincula la postulación sola, y lo apagan el
+propio candidato, la BAJA y el cambio de celular. `mensaje_vistas` y `mensaje_visto_en` cuentan el
+mensaje flotante que pedía la spec; el portal no lo pinta (la invitación es el último paso de la
+guía de la primera vez), pero el contador se mantiene.
 
 **Lo de la `V76` es del contrato v2, que todavía no está activo**, y separa tres cosas que en la
 `V73` eran una sola —cerrar el vínculo—: el cierre ordinario, que sigue igual; **el derecho a

@@ -33,9 +33,16 @@ import java.util.stream.Collectors;
 public class ServicioAvisosPortal {
 
     private final AvisoPortalRepository avisos;
+    /** Si apagó la campana para sus procesos en «Notificaciones» (V92). */
+    private final PreferenciasDeAviso preferencias;
 
     /**
      * Deja un aviso esperando a alguien.
+     *
+     * <p>Los de sus procesos no se publican si la persona apagó «En el portal» en
+     * «Notificaciones» (V92): la pantalla de cada proceso sigue diciendo su estado, solo la campana
+     * deja de marcarlo. Los de su perfil ({@link AvisoPortal#DE_SU_PERFIL}, las reseñas) salen
+     * siempre.
      *
      * <p>⚠️ <b>En transacción propia, y el {@code REQUIRES_NEW} es la mitad de la garantía.</b>
      * Sin él, el {@code catch} de abajo no protege nada: un INSERT que falla dentro de la
@@ -56,6 +63,11 @@ public class ServicioAvisosPortal {
                                 String titulo, String cuerpo,
                                 Long postulacionId, Long vacanteId) {
         try {
+            if (!AvisoPortal.DE_SU_PERFIL.contains(tipo) && !preferencias.recibeEnPortal(usuarioId)) {
+                log.info("El aviso «{}» no va a la campana: el usuario {} la apagó para sus procesos",
+                        tipo, usuarioId);
+                return null;
+            }
             return avisos.save(AvisoPortal.builder()
                     .usuarioId(usuarioId)
                     .organizacionId(organizacionId)
