@@ -69,7 +69,8 @@ class ServicioCorreoTest {
     @BeforeEach
     void armar() {
         transporte = new TransporteDeMentira();
-        servicio = new ServicioCorreo(plantillas, enviados, transporte);
+        // Sin preferencias: todo sale.
+        servicio = new ServicioCorreo(plantillas, enviados, transporte, null);
     }
 
     private void hayPlantilla() {
