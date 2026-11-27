@@ -205,6 +205,19 @@ class ArmadoDeLaPruebaTest {
         }
 
         @Test
+        @DisplayName("el seguimiento lee solo las abiertas con texto, con su número del anexo, y no un entregable sin archivo")
+        void loQueLeeElSeguimiento() {
+            armarDelEditor();
+            Base base = base(postulacion(50L), null);
+
+            assertThat(armado.paraElSeguimiento(base))
+                    .extracting(PendientesEntreEtapas.Fuente::codigo, PendientesEntreEtapas.Fuente::texto)
+                    .containsExactly(tuple("P1", "Ubicó la rotación"));
+            assertThat(armado.deLaEvaluacion(base)).extracting(Punto::texto, Punto::grupo)
+                    .containsExactly(tuple("Siempre lo ideal", "De la evaluación"));
+        }
+
+        @Test
         @DisplayName("sin nota de la etapa dice «pendiente» y qué criterios faltan, y los datos clave cuentan los entregables")
         void notaPendiente() {
             Informe informe = armarDelEditor();
@@ -350,6 +363,14 @@ class ArmadoDeLaPruebaTest {
                             null, null)));
 
             Informe informe = armado.armar(base(postulacion(null), null), AHORA);
+            // Lo que lee el seguimiento: las preguntas con texto (en una plantilla todas se contestan
+            // escribiendo) y el entregable subido como archivo, por su archivo.
+            assertThat(armado.paraElSeguimiento(base(postulacion(null), null)))
+                    .extracting(PendientesEntreEtapas.Fuente::codigo, PendientesEntreEtapas.Fuente::texto,
+                            PendientesEntreEtapas.Fuente::referencia)
+                    .containsExactly(tuple("P1", "Lo primero", null), tuple("P3", "No", null),
+                            tuple("E1", null, "archivo:5"));
+            assertThat(armado.deLaEvaluacion(base(postulacion(null), null))).isEmpty();
 
             assertThat(informe.nota().texto()).isEqualTo("82");
             assertThat(informe.datosClave().get(0)).isEqualTo(new Dato("Prueba", "Prueba de analista"));
@@ -421,6 +442,8 @@ class ArmadoDeLaPruebaTest {
                     .containsExactly(tuple("Abierta", "Un estilo"), tuple("Abierta", null));
             assertThat(informe.resumen().texto()).isEqualTo("Respondió 1 de 2 preguntas.");
             assertThat(informe.anexo().subtitulo()).isEqualTo("2 preguntas");
+            assertThat(armado.paraElSeguimiento(base(postulacion(null), vacanteConCuestionario())))
+                    .extracting(PendientesEntreEtapas.Fuente::codigo).containsExactly("P1");
             verifyNoInteractions(delEditor, versionesBanco, versionesPlantilla);
         }
 
@@ -444,6 +467,7 @@ class ArmadoDeLaPruebaTest {
             assertThat(informe.evaluado().criterios()).isEmpty();
             assertThat(informe.bloques().get(2).puntos()).isEmpty();
             assertThat(informe.nombreArchivo()).isEqualTo("Informe prueba - Ana Torres - Cajero.pdf");
+            assertThat(armado.paraElSeguimiento(base(postulacion(null), null))).isEmpty();
         }
     }
 

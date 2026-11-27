@@ -64,6 +64,7 @@ class ColaCalificacionIaImplTest {
     private static final long LECTURA = 77L;
 
     @Mock private TrabajoIaRepository trabajos;
+    @Mock private com.renaser.ai.ai_engine.informe.service.SeguimientoTrasCalificar seguimiento;
     @Mock private RegistroTrabajosIa registro;
     @Mock private TrabajoIaPublisher publicador;
     @Mock private PuenteCalificacionIa puente;
@@ -989,7 +990,7 @@ class ColaCalificacionIaImplTest {
         return new ColaCalificacionIaImpl(trabajos, registro, publicador, puente, puenteDelPerfil,
                 tope, organizaciones,
                 List.of(datosCv, evidenciaCv, evaluador, potencialRiesgo, pruebaPuesto, simulacion),
-                habilitada, 3, 15);
+                seguimiento, habilitada, 3, 15);
     }
 
     /** Deja puesto un paso ya terminado, como el que dejaría una criba anterior. */

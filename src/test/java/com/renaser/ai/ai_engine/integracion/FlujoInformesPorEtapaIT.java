@@ -414,6 +414,7 @@ public class FlujoInformesPorEtapaIT {
                 select (select count(*) from nota_etapa) || '/' || (select count(*) from nota_criterio) || '/' ||
                        (select coalesce(sum(puntaje), 0) from nota_criterio) || '/' ||
                        (select count(*) from trabajo_ia) || '/' || (select count(*) from texto_informe) || '/' ||
+                       (select count(*) from seguimiento_pendiente) || '/' ||
                        (select count(*) from auditoria) || '/' ||
                        (select string_agg(estado_codigo, ',' order by id) from postulacion)""", String.class);
     }

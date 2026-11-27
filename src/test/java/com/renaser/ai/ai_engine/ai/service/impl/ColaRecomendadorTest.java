@@ -44,6 +44,7 @@ class ColaRecomendadorTest {
     private static final long POSTULACION = 55L;
 
     @Mock private TrabajoIaRepository trabajos;
+    @Mock private com.renaser.ai.ai_engine.informe.service.SeguimientoTrasCalificar seguimiento;
     @Mock private RegistroTrabajosIa registro;
     @Mock private TrabajoIaPublisher publicador;
     @Mock private PuenteCalificacionIa puente;
@@ -62,7 +63,7 @@ class ColaRecomendadorTest {
 
     private ColaCalificacionIaImpl cola(boolean habilitada) {
         return new ColaCalificacionIaImpl(trabajos, registro, publicador, puente, puenteDelPerfil,
-                tope, organizaciones, List.of(evaluador), habilitada, 3, 15);
+                tope, organizaciones, List.of(evaluador), seguimiento, habilitada, 3, 15);
     }
 
     private void organizacionActiva(boolean activa) {

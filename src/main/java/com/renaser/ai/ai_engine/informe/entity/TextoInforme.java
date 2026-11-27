@@ -20,7 +20,7 @@ import java.time.Instant;
 @Entity
 @Table(name = "texto_informe")
 @Getter @Setter @Builder @NoArgsConstructor @AllArgsConstructor
-public class TextoInforme {
+public class TextoInforme implements PedidoConHuella {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

@@ -342,6 +342,41 @@ class PdfDelInformeTest {
 
     // ================================================================== lectura del PDF
 
+    @Nested
+    @DisplayName("Con el seguimiento de pendientes (V94), los bloques de siempre")
+    class ConElSeguimiento {
+
+        private final PendientesEntreEtapas.Duda resuelta = new PendientesEntreEtapas.Duda("D1", "CV",
+                "Excel avanzado", "DECLARADA", "Cuéntame un reporte.", PendientesEntreEtapas.RESUELTA, 1, null,
+                "Armé por mi cuenta un tablero", "Cuenta un reporte propio.", "EVALUACION");
+
+        @Test
+        @DisplayName("la evaluación enseña «Resuelto» con la pregunta, la cita y la explicación, y no la pasa a la prueba")
+        void laEvaluacion() throws IOException {
+            String todo = texto(pdf.generar(PendientesEntreEtapas.aplicar(InformesDePrueba.evaluacion(),
+                    new PendientesEntreEtapas.Resultado(List.of(resuelta), 0, List.of()))));
+
+            assertThat(todo.toUpperCase()).contains("RESUELTO");
+            assertThat(todo).contains("Pregunta 1: «Armé por mi cuenta un tablero». Cuenta un reporte propio.")
+                    .doesNotContain("Por contrastar");
+        }
+
+        @Test
+        @DisplayName("la prueba enseña «Lo que aclaró la prueba» con la cita, antes de la entrevista")
+        void laPrueba() throws IOException {
+            PendientesEntreEtapas.Duda enLaPrueba = new PendientesEntreEtapas.Duda("D1", "CV", "Motivo de salida",
+                    "FALTA_INFO", "¿Por qué dejaste tu último trabajo?", PendientesEntreEtapas.RESUELTA, 2, null,
+                    "me fui por la mudanza", "Explica el motivo de su salida.", "PRUEBA");
+            String todo = texto(pdf.generar(PendientesEntreEtapas.aplicar(InformesDePrueba.prueba(List.of()),
+                    new PendientesEntreEtapas.Resultado(List.of(enLaPrueba), 0, List.of()))));
+
+            assertThat(todo.toUpperCase()).contains("LO QUE ACLARÓ LA PRUEBA");
+            assertThat(todo).contains("Pregunta 2: «me fui por la mudanza». Explica el motivo de su salida.");
+            assertThat(todo.toUpperCase().indexOf("LO QUE ACLARÓ LA PRUEBA"))
+                    .isLessThan(todo.toUpperCase().indexOf("POR VERIFICAR EN LA ENTREVISTA"));
+        }
+    }
+
     static String texto(byte[] archivo) throws IOException {
         try (PDDocument documento = Loader.loadPDF(archivo)) {
             return new PDFTextStripper().getText(documento).replaceAll("\\s+", " ");
