@@ -265,6 +265,112 @@ class ServicioVacantesPanelImplTest {
         verify(solicitudes).save(solicitud);
     }
 
+    // ============ El recorrido de la vacante (V95) ============
+
+    @Mock private com.renaser.ai.ai_engine.vacante.service.RecorridoDeLaVacante recorridos;
+    @Mock private com.renaser.ai.ai_engine.vacante.service.ServicioPesosDeLaVacante pesosDeLaVacante;
+
+    private static final List<com.renaser.ai.ai_engine.pesos.entity.Etapa> CATALOGO_DE_ETAPAS = List.of(
+            etapaDelCatalogo("PERFIL_INTEGRAL", "Perfil Integral de Preselección", 1, true),
+            etapaDelCatalogo("PRUEBA_PUESTO", "Prueba del puesto", 2, false),
+            etapaDelCatalogo("SIMULACION", "Simulación de trabajo", 3, false),
+            etapaDelCatalogo("VALIDACION", "Validación práctica", 4, false),
+            etapaDelCatalogo("DECISION", "Decisión", 5, false));
+
+    private static com.renaser.ai.ai_engine.pesos.entity.Etapa etapaDelCatalogo(String codigo, String nombre,
+                                                                               int orden, boolean fija) {
+        return com.renaser.ai.ai_engine.pesos.entity.Etapa.builder().codigo(codigo).nombre(nombre)
+                .orden(orden).descripcion("La ⓘ de " + nombre).fijaPrimera(fija).build();
+    }
+
+    @Test
+    @DisplayName("una vacante nueva nace con el recorrido predeterminado (AC-01)")
+    void naceConElPredeterminado() {
+        servicio.setRecorridos(recorridos);
+        when(solicitudes.findByIdAndOrganizacionId(30L, ORGANIZACION))
+                .thenReturn(Optional.of(solicitud(PUESTO)));
+        when(puestos.findByIdAndOrganizacionId(PUESTO, ORGANIZACION))
+                .thenReturn(Optional.of(puestoActivo()));
+        when(versionesPesos.findFirstByOrganizacionIdAndEstadoOrderByPublicadaEnDesc(
+                ORGANIZACION, "PUBLICADA"))
+                .thenReturn(Optional.of(VersionPesos.builder().id(VERSION_PESOS).build()));
+        when(vacantes.save(any())).thenAnswer(invocacion -> {
+            Vacante v = invocacion.getArgument(0);
+            v.setId(VACANTE);
+            return v;
+        });
+
+        servicio.crear(QUIEN, guardar(null));
+
+        verify(recorridos).ponerPredeterminado(VACANTE);
+    }
+
+    @Test
+    @DisplayName("sin Prueba en su recorrido se publica sin prueba elegida (AC-02, RF-73)")
+    void sinPruebaSePublicaSinElla() {
+        servicio.setRecorridos(recorridos);
+        Vacante v = vacante("BORRADOR", false, null);
+        v.setVersionPlantillaPruebaId(null);
+        v.setInstrumentoEtapaTecnica("PRUEBA_PROPIA");
+        when(recorridos.tiene(VACANTE, "PRUEBA_PUESTO")).thenReturn(false);
+
+        servicio.publicar(QUIEN, VACANTE);
+
+        assertThat(v.getEstado()).isEqualTo("PUBLICADA");
+        verify(versionesBanco, never()).pruebaPropiaDe(any(), any());
+    }
+
+    @Test
+    @DisplayName("con Prueba en su recorrido, publicar sigue exigiéndola")
+    void conPruebaSeSigueExigiendo() {
+        servicio.setRecorridos(recorridos);
+        Vacante v = vacante("BORRADOR", false, null);
+        v.setInstrumentoEtapaTecnica("PRUEBA_PROPIA");
+        when(recorridos.tiene(VACANTE, "PRUEBA_PUESTO")).thenReturn(true);
+        when(versionesBanco.pruebaPropiaDe(VACANTE, "PUBLICADA")).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> servicio.publicar(QUIEN, VACANTE))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Armar la prueba");
+        assertThat(v.getEstado()).isEqualTo("BORRADOR");
+    }
+
+    @Test
+    @DisplayName("el detalle trae sus etapas en orden, si aún se pueden cambiar y cómo pesa cada una")
+    void elDetalleTraeSuRecorrido() {
+        servicio.setRecorridos(recorridos);
+        servicio.setPesosDeLaVacante(pesosDeLaVacante);
+        Vacante v = vacante("BORRADOR", false, null);
+        v.setVersionPesosId(VERSION_PESOS);
+        when(recorridos.de(VACANTE)).thenReturn(List.of("PERFIL_INTEGRAL", "SIMULACION", "DECISION"));
+        when(recorridos.catalogo()).thenReturn(CATALOGO_DE_ETAPAS);
+        when(postulaciones.countByVacanteId(VACANTE)).thenReturn(0L);
+        var pesos = List.of(new com.renaser.ai.ai_engine.vacante.dto.DtosVacante.PesoEnEstaVacante(
+                "PERFIL_INTEGRAL", "Perfil Integral de Preselección", new BigDecimal("40"), new BigDecimal("72.73")));
+        when(pesosDeLaVacante.enEstaVacante(VACANTE, VERSION_PESOS)).thenReturn(pesos);
+
+        var panel = servicio.detalle(QUIEN, VACANTE);
+
+        assertThat(panel.etapas()).extracting(e -> e.codigo())
+                .containsExactly("PERFIL_INTEGRAL", "SIMULACION", "DECISION");
+        assertThat(panel.etapas().get(0).fija()).isTrue();
+        assertThat(panel.etapas().get(1).descripcion()).isEqualTo("La ⓘ de Simulación de trabajo");
+        assertThat(panel.etapasEditables()).isTrue();
+        assertThat(panel.pesosEnEstaVacante()).isEqualTo(pesos);
+    }
+
+    @Test
+    @DisplayName("con una postulación, el detalle dice que las etapas ya no se cambian (AC-05)")
+    void conPostulantesFijas() {
+        servicio.setRecorridos(recorridos);
+        vacante("PUBLICADA", false, null);
+        when(recorridos.de(VACANTE)).thenReturn(List.of("PERFIL_INTEGRAL", "DECISION"));
+        when(recorridos.catalogo()).thenReturn(CATALOGO_DE_ETAPAS);
+        when(postulaciones.countByVacanteId(VACANTE)).thenReturn(3L);
+
+        assertThat(servicio.detalle(QUIEN, VACANTE).etapasEditables()).isFalse();
+    }
+
     private SolicitudTalento solicitud(Long puestoId) {
         return SolicitudTalento.builder()
                 .id(30L)

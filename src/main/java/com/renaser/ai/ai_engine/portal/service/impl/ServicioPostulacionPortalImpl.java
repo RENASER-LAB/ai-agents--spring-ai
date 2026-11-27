@@ -105,6 +105,17 @@ public class ServicioPostulacionPortalImpl implements ServicioPostulacionPortal 
     // vincula sola después del commit.
     private final com.renaser.ai.ai_engine.whatsapp.service.InterruptorWhatsapp interruptor;
 
+    /**
+     * El recorrido de cada vacante (V95), para que el portal pinte solo sus etapas. Por setter:
+     * las pruebas construyen el servicio a mano, y sin él el resumen sale sin etapas.
+     */
+    private com.renaser.ai.ai_engine.vacante.service.RecorridoDeLaVacante recorridos;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void setRecorridos(com.renaser.ai.ai_engine.vacante.service.RecorridoDeLaVacante recorridos) {
+        this.recorridos = recorridos;
+    }
+
     @Override
     @Transactional
     public UUID postular(ContextoUsuario quien, Long vacanteId, MultipartFile cv,
@@ -444,11 +455,14 @@ public class ServicioPostulacionPortalImpl implements ServicioPostulacionPortal 
         Set<Long> sinCompletar = sinCompletarEntre(mias);
         // Y la tarjeta de WhatsApp de cada una, también de una vez (V73).
         Map<Long, DtosWhatsapp.WhatsappDelProceso> tarjetas = whatsapp.tarjetasDe(quien.personaId(), mias);
+        // Y el recorrido de cada vacante, de una vez (V95).
+        Map<Long, List<DtosPortal.EtapaDelRecorrido>> etapasPorVacante = etapasDe(porVacante.keySet());
 
         return mias.stream()
                 .map(p -> comoResumen(p, porVacante, nombreEstado, nombrePorOrganizacion,
                         puntos.getOrDefault(p.getId(), 0L), sinCompletar.contains(p.getId()),
-                        tarjetas.getOrDefault(p.getId(), DtosWhatsapp.WhatsappDelProceso.NO_DISPONIBLE)))
+                        tarjetas.getOrDefault(p.getId(), DtosWhatsapp.WhatsappDelProceso.NO_DISPONIBLE),
+                        etapasPorVacante.getOrDefault(p.getVacanteId(), List.of())))
                 .toList();
     }
 
@@ -535,7 +549,27 @@ public class ServicioPostulacionPortalImpl implements ServicioPostulacionPortal 
                 nombresDeOrganizacion(unaVacante.values().stream().toList()),
                 sinLeer, sinCompletarEntre(List.of(p)).contains(p.getId()),
                 whatsapp.tarjetasDe(personaId, List.of(p))
-                        .getOrDefault(p.getId(), DtosWhatsapp.WhatsappDelProceso.NO_DISPONIBLE));
+                        .getOrDefault(p.getId(), DtosWhatsapp.WhatsappDelProceso.NO_DISPONIBLE),
+                etapasDe(unaVacante.keySet()).getOrDefault(p.getVacanteId(), List.of()));
+    }
+
+    /**
+     * Los recorridos de estas vacantes, con el nombre de cada etapa (V95): dos consultas, haya una
+     * vacante o veinte.
+     */
+    private Map<Long, List<DtosPortal.EtapaDelRecorrido>> etapasDe(java.util.Collection<Long> vacanteIds) {
+        if (recorridos == null || vacanteIds.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, String> nombres = recorridos.catalogo().stream()
+                .collect(Collectors.toMap(com.renaser.ai.ai_engine.pesos.entity.Etapa::getCodigo,
+                        com.renaser.ai.ai_engine.pesos.entity.Etapa::getNombre, (a, b) -> a));
+        Map<Long, List<DtosPortal.EtapaDelRecorrido>> porVacante = new java.util.HashMap<>();
+        recorridos.de(vacanteIds).forEach((vacanteId, codigos) -> porVacante.put(vacanteId,
+                codigos.stream()
+                        .map(c -> new DtosPortal.EtapaDelRecorrido(c, nombres.getOrDefault(c, c)))
+                        .toList()));
+        return porVacante;
     }
 
     /**
@@ -652,7 +686,8 @@ public class ServicioPostulacionPortalImpl implements ServicioPostulacionPortal 
                                       Map<String, String> nombrePorEstado,
                                       Map<Long, String> nombrePorOrganizacion,
                                       long avisosSinLeer, boolean pruebaSinCompletar,
-                                      DtosWhatsapp.WhatsappDelProceso tarjetaWhatsapp) {
+                                      DtosWhatsapp.WhatsappDelProceso tarjetaWhatsapp,
+                                      List<DtosPortal.EtapaDelRecorrido> etapas) {
         Optional<Vacante> vacante = Optional.ofNullable(porVacante.get(p.getVacanteId()));
         String titulo = vacante.map(Vacante::getTitulo).orElse("");
         String empresa = vacante.map(Vacante::getOrganizacionId)
@@ -673,6 +708,7 @@ public class ServicioPostulacionPortalImpl implements ServicioPostulacionPortal 
                         .orElse(DtosPortal.RemuneracionPublica.OCULTA),
                 RemuneracionQueVeElCandidato.pretensionDe(p),
                 pruebaSinCompletar,
-                tarjetaWhatsapp);
+                tarjetaWhatsapp,
+                etapas);
     }
 }

@@ -17,6 +17,8 @@ import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
 import com.renaser.ai.ai_engine.vacante.dto.DtosVacante.CambioDePesosHecho;
 import com.renaser.ai.ai_engine.vacante.dto.DtosVacante.CambioDePesosPrevisto;
 import com.renaser.ai.ai_engine.vacante.dto.DtosVacante.PesoAntesYDespues;
+import com.renaser.ai.ai_engine.vacante.dto.DtosVacante.PesoEnEstaVacante;
+import com.renaser.ai.ai_engine.vacante.service.PesosDelRecorrido;
 import com.renaser.ai.ai_engine.vacante.entity.Puesto;
 import com.renaser.ai.ai_engine.vacante.entity.Vacante;
 import com.renaser.ai.ai_engine.vacante.repository.PuestoRepository;
@@ -80,6 +82,50 @@ public class ServicioPesosDeLaVacanteImpl implements ServicioPesosDeLaVacante {
         this.loBuscado = loBuscado;
     }
 
+    /**
+     * El recorrido de la vacante (V95): la previsión solo enseña sus etapas, y la tabla «Cómo pesa
+     * en esta vacante» reparte entre ellas. Por setter, como {@code loBuscado}: sin él se enseñan
+     * todas las del catálogo, como antes.
+     */
+    private com.renaser.ai.ai_engine.vacante.service.RecorridoDeLaVacante recorridos;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void setRecorridos(com.renaser.ai.ai_engine.vacante.service.RecorridoDeLaVacante recorridos) {
+        this.recorridos = recorridos;
+    }
+
+    @Override
+    public List<PesoEnEstaVacante> enEstaVacante(Long vacanteId, Long versionPesosId) {
+        Map<String, BigDecimal> deLaVersion = porEtapa(versionPesosId);
+        if (deLaVersion.isEmpty()) {
+            return List.of();
+        }
+        List<Etapa> catalogo = etapas.findAllByOrderByOrdenAsc();
+        List<String> recorrido = recorridoDe(vacanteId, catalogo);
+        Map<String, BigDecimal> repartidos = PesosDelRecorrido.repartir(recorrido, deLaVersion);
+        Map<String, String> nombres = new LinkedHashMap<>();
+        catalogo.forEach(e -> nombres.put(e.getCodigo(), e.getNombre()));
+
+        // Primero las del recorrido, en su orden; después las de la versión que la vacante no
+        // tiene, en el del catálogo y con «—» en la última columna.
+        List<PesoEnEstaVacante> filas = new ArrayList<>();
+        repartidos.forEach((codigo, peso) -> filas.add(new PesoEnEstaVacante(codigo,
+                nombres.getOrDefault(codigo, codigo), deLaVersion.get(codigo), peso)));
+        for (Etapa etapa : catalogo) {
+            if (deLaVersion.containsKey(etapa.getCodigo()) && !repartidos.containsKey(etapa.getCodigo())) {
+                filas.add(new PesoEnEstaVacante(etapa.getCodigo(), etapa.getNombre(),
+                        deLaVersion.get(etapa.getCodigo()), null));
+            }
+        }
+        return filas;
+    }
+
+    private List<String> recorridoDe(Long vacanteId, List<Etapa> catalogo) {
+        return recorridos == null
+                ? catalogo.stream().map(Etapa::getCodigo).toList()
+                : recorridos.de(vacanteId);
+    }
+
     @Override
     public CambioDePesosPrevisto preverCambio(ContextoUsuario quien, Long vacanteId,
                                               Long versionPesosId) {
@@ -92,7 +138,7 @@ public class ServicioPesosDeLaVacanteImpl implements ServicioPesosDeLaVacante {
         int personas = cambia ? recalculo.conAlgunaNota(vacanteId).size() : 0;
         return new CambioDePesosPrevisto(anterior, etiquetaDe(quien, anterior),
                 nueva.getId(), nueva.getEtiqueta(), personas, cambia,
-                pesosDeEtapa(anterior, nueva.getId()),
+                pesosDeEtapa(vacanteId, anterior, nueva.getId()),
                 pesosDelPerfilIntegral(anterior, nueva.getId()),
                 pesoDeLoBuscado(vacanteId, anterior, nueva));
     }
@@ -202,13 +248,18 @@ public class ServicioPesosDeLaVacanteImpl implements ServicioPesosDeLaVacante {
                         ? VersionPesos.PESO_BUSQUEDA_CV_POR_DEFECTO : nueva.getPesoBusquedaCv());
     }
 
-    /** Cuánto pesa cada etapa en la nota final, antes y después, en el orden del proceso. */
-    private List<PesoAntesYDespues> pesosDeEtapa(Long anterior, Long nueva) {
+    /**
+     * Cuánto pesa cada etapa en la nota final, antes y después, en el orden del proceso. Solo las
+     * etapas del recorrido de la vacante (V95): las demás no cuentan en su nota.
+     */
+    private List<PesoAntesYDespues> pesosDeEtapa(Long vacanteId, Long anterior, Long nueva) {
         Map<String, BigDecimal> antes = porEtapa(anterior);
         Map<String, BigDecimal> despues = porEtapa(nueva);
         List<PesoAntesYDespues> filas = new ArrayList<>();
-        for (Etapa etapa : etapas.findAllByOrderByOrdenAsc()) {
-            if (ETAPA_SIN_NOTA.equals(etapa.getCodigo())) {
+        List<Etapa> catalogo = etapas.findAllByOrderByOrdenAsc();
+        java.util.Set<String> delRecorrido = new java.util.HashSet<>(recorridoDe(vacanteId, catalogo));
+        for (Etapa etapa : catalogo) {
+            if (ETAPA_SIN_NOTA.equals(etapa.getCodigo()) || !delRecorrido.contains(etapa.getCodigo())) {
                 continue;
             }
             BigDecimal a = antes.get(etapa.getCodigo());

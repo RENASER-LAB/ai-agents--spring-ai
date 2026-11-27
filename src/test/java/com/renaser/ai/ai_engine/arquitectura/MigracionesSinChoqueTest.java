@@ -66,7 +66,11 @@ class MigracionesSinChoqueTest {
             // V90 y V91 las tienen reservadas dos specs aún sin fusionar: el seguimiento de
             // pendientes entre etapas (V90) y el video de la empresa (V91). Las notificaciones del
             // candidato (V92) se construyeron antes; mismo trato que V87–V88.
-            90, 91);
+            90, 91,
+            // V94 la tiene reservada el seguimiento de pendientes entre etapas, que se construye a
+            // la vez que las etapas por vacante (V95). Si entra antes, el hueco se cierra solo; si
+            // no, sube de número al sincronizar con main. Mismo trato que V87–V88.
+            94);
 
     @Test
     @DisplayName("Ningún número de versión se repite: git no ve ese conflicto, Flyway sí")

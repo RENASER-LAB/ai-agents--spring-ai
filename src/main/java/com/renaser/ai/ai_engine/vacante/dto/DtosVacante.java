@@ -340,7 +340,26 @@ public final class DtosVacante {
                                 * El «Video del puesto» guardado (V85), tal como se pegó, o vacío:
                                 * entonces el portal usa el de la empresa.
                                 */
-                               String videoPresentacion) {}
+                               String videoPresentacion,
+                               /**
+                                * Su recorrido (V95): las etapas en orden, con su nombre, su
+                                * explicación (la ⓘ) y si es la fija. Viaja en la lista y en el
+                                * detalle; la lista lo resuelve de una vez para todas las filas.
+                                */
+                               java.util.List<EtapaDeLaVacante> etapas,
+                               /**
+                                * Si el recorrido todavía se puede cambiar: la vacante no tiene
+                                * ninguna postulación, de ningún estado (V95). Falso es «Fijo
+                                * desde el primer postulante». No mira el permiso ni si está
+                                * cerrada: eso lo dice {@code puedeConfigurarElPase}, que es la
+                                * misma puerta que exige el PUT de etapas.
+                                */
+                               boolean etapasEditables,
+                               /**
+                                * «Cómo pesa en esta vacante» (V95). ⚠️ <b>Solo viaja en el
+                                * detalle</b>; en la lista llega vacío.
+                                */
+                               java.util.List<PesoEnEstaVacante> pesosEnEstaVacante) {}
 
     /**
      * Lo que el formulario de edición necesita para decidir si pregunta antes de guardar las
@@ -388,6 +407,25 @@ public final class DtosVacante {
                     personasConNota, cambia, etapas, perfilIntegral, null);
         }
     }
+
+    /**
+     * Una fila de «Cómo pesa en esta vacante» (V95): el peso de la etapa en la versión y el que
+     * tiene en esta vacante, repartido entre las etapas de su recorrido. {@code enEstaVacante}
+     * vacío: la vacante no tiene esa etapa, y el panel pinta «—».
+     */
+    public record PesoEnEstaVacante(String codigo, String nombre, BigDecimal enLaVersion,
+                                    BigDecimal enEstaVacante) {}
+
+    /**
+     * Una etapa del recorrido de la vacante (V95), en su orden: lo que pinta la barra y la fila de
+     * «Etapas de esta vacante».
+     *
+     * @param fija si va siempre primera y no se quita ni se mueve (el Perfil Integral)
+     */
+    public record EtapaDeLaVacante(String codigo, String nombre, String descripcion, boolean fija) {}
+
+    /** El recorrido pedido para una vacante, en orden (V95). Ver {@code PUT /vacantes/{id}/etapas}. */
+    public record CambiarEtapas(java.util.List<String> etapas) {}
 
     /** Un peso, antes y después. Vacío donde esa versión no lo trae. */
     public record PesoAntesYDespues(String codigo, String nombre, BigDecimal antes,

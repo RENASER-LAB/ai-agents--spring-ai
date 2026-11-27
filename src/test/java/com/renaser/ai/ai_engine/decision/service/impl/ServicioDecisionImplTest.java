@@ -73,6 +73,7 @@ class ServicioDecisionImplTest {
     @Mock private ServicioParametros parametros;
     @Mock private ServicioAuditoria auditoria;
     @Mock private Permisos permisos;
+    @Mock private com.renaser.ai.ai_engine.vacante.service.RecorridoDeLaVacante recorridos;
 
     private ServicioDecisionImpl servicio;
 
@@ -80,7 +81,10 @@ class ServicioDecisionImplTest {
     void crearElServicio() {
         servicio = new ServicioDecisionImpl(vacantes, alcanceVacante, barrerasCriticas,
                 barrerasDetectadas, decisiones, evidencias, notasEtapa, pesosEtapa,
-                maquina, parametros, auditoria, permisos);
+                maquina, parametros, auditoria, permisos, recorridos);
+        // Las vacantes de siempre recorren las cinco etapas (V95), salvo que la prueba diga otra cosa.
+        org.mockito.Mockito.lenient().when(recorridos.de(VACANTE))
+                .thenReturn(List.of("PERFIL_INTEGRAL", "PRUEBA_PUESTO", "SIMULACION", "VALIDACION", "DECISION"));
     }
 
     private void hayPostulacionDeLaVacante(Long vacanteId) {
@@ -172,6 +176,126 @@ class ServicioDecisionImplTest {
         assertThat(semaforo.notaGlobal()).isNull();
         // Y sobre todo: NO un cero, que descartaría a alguien de 81.75 y 62.
         assertThat(semaforo.notaGlobal()).isNotEqualTo(BigDecimal.ZERO);
+    }
+
+    // ============ La nota global con el recorrido de la vacante (V95) ============
+
+    /** La v4 «embudo completo»: 40 / 30 / 15 / 15. */
+    private static List<com.renaser.ai.ai_engine.pesos.entity.PesoEtapa> laV4() {
+        return List.of(peso("PERFIL_INTEGRAL", "40"), peso("PRUEBA_PUESTO", "30"),
+                peso("SIMULACION", "15"), peso("VALIDACION", "15"));
+    }
+
+    private static com.renaser.ai.ai_engine.pesos.entity.PesoEtapa peso(String etapa, String peso) {
+        return com.renaser.ai.ai_engine.pesos.entity.PesoEtapa.builder().versionPesosId(9L)
+                .etapaCodigo(etapa).peso(new BigDecimal(peso)).build();
+    }
+
+    private static NotaEtapa nota(String etapa, String puntaje) {
+        return NotaEtapa.builder().postulacionId(POSTULACION).etapaCodigo(etapa)
+                .puntaje(new BigDecimal(puntaje)).build();
+    }
+
+    /** Una postulación visible para el semáforo, con estos pesos, este recorrido y estas notas. */
+    private void semaforoCon(List<com.renaser.ai.ai_engine.pesos.entity.PesoEtapa> pesos,
+                             List<String> recorrido, NotaEtapa... notas) {
+        when(alcanceVacante.laPostulacionVisible(any(), eq(POSTULACION), eq("ver_semaforo_decision")))
+                .thenReturn(Postulacion.builder()
+                        .id(POSTULACION).organizacionId(ORGANIZACION).vacanteId(VACANTE).build());
+        when(vacantes.findById(VACANTE)).thenReturn(Optional.of(
+                Vacante.builder().id(VACANTE).organizacionId(ORGANIZACION).versionPesosId(9L).build()));
+        when(pesosEtapa.findByVersionPesosId(9L)).thenReturn(pesos);
+        when(recorridos.de(VACANTE)).thenReturn(recorrido);
+        when(notasEtapa.findByPostulacionId(POSTULACION)).thenReturn(List.of(notas));
+        org.mockito.Mockito.lenient().when(barrerasDetectadas
+                .findByPostulacionIdAndConfirmadaPorUsuarioIdIsNotNullAndDescartadaEnIsNull(POSTULACION))
+                .thenReturn(List.of());
+        org.mockito.Mockito.lenient().when(decisiones.findByPostulacionId(POSTULACION))
+                .thenReturn(Optional.empty());
+        org.mockito.Mockito.lenient().when(parametros.entero(ORGANIZACION, "umbral_decision_verde", 75))
+                .thenReturn(75);
+        org.mockito.Mockito.lenient().when(parametros.entero(ORGANIZACION, "umbral_decision_rojo", 50))
+                .thenReturn(50);
+    }
+
+    @Test
+    @DisplayName("Perfil → Prueba → Decisión con la v4: propone con 57,14 / 42,86 en vez de quedarse sin propuesta (AC-11)")
+    void sinSimulacionNiValidacionProponeConElReparto() {
+        semaforoCon(laV4(), List.of("PERFIL_INTEGRAL", "PRUEBA_PUESTO", "DECISION"),
+                nota("PERFIL_INTEGRAL", "80"), nota("PRUEBA_PUESTO", "70"));
+
+        var semaforo = servicio.verSemaforo(QUIEN, POSTULACION);
+
+        // 80 × 57,14 % + 70 × 42,86 % = 45,712 + 30,002 = 75,714 → 75,71
+        assertThat(semaforo.etapasQueFaltan()).isEmpty();
+        assertThat(semaforo.notaGlobal()).isEqualByComparingTo("75.71");
+        assertThat(semaforo.semaforo()).isEqualTo("VERDE");
+    }
+
+    @Test
+    @DisplayName("Con las cinco etapas, la nota y el semáforo son los de siempre: faltan Simulación y Validación (AC-12)")
+    void conLasCincoTodoIgual() {
+        semaforoCon(laV4(), List.of("PERFIL_INTEGRAL", "PRUEBA_PUESTO", "SIMULACION", "VALIDACION", "DECISION"),
+                nota("PERFIL_INTEGRAL", "80"), nota("PRUEBA_PUESTO", "70"));
+
+        var semaforo = servicio.verSemaforo(QUIEN, POSTULACION);
+
+        assertThat(semaforo.etapasQueFaltan()).containsExactly("SIMULACION", "VALIDACION");
+        assertThat(semaforo.semaforo()).isNull();
+        assertThat(semaforo.notaGlobal()).isNull();
+    }
+
+    @Test
+    @DisplayName("Con las cinco y todas sus notas, la nota global es la de la versión tal cual (AC-12)")
+    void conLasCincoYTodasLasNotas() {
+        semaforoCon(laV4(), List.of("PERFIL_INTEGRAL", "PRUEBA_PUESTO", "SIMULACION", "VALIDACION", "DECISION"),
+                nota("PERFIL_INTEGRAL", "80"), nota("PRUEBA_PUESTO", "70"),
+                nota("SIMULACION", "60"), nota("VALIDACION", "50"));
+
+        var semaforo = servicio.verSemaforo(QUIEN, POSTULACION);
+
+        // 80×0,40 + 70×0,30 + 60×0,15 + 50×0,15 = 32 + 21 + 9 + 7,5 = 69,50
+        assertThat(semaforo.notaGlobal()).isEqualByComparingTo("69.50");
+        assertThat(semaforo.semaforo()).isEqualTo("AMBAR");
+    }
+
+    @Test
+    @DisplayName("Sin la Prueba y con una versión de Perfil y Prueba, el Perfil pesa 100")
+    void sinPruebaElPerfilPesaCien() {
+        semaforoCon(List.of(peso("PERFIL_INTEGRAL", "57.14"), peso("PRUEBA_PUESTO", "42.86")),
+                List.of("PERFIL_INTEGRAL", "DECISION"), nota("PERFIL_INTEGRAL", "48"));
+
+        var semaforo = servicio.verSemaforo(QUIEN, POSTULACION);
+
+        assertThat(semaforo.etapasQueFaltan()).isEmpty();
+        assertThat(semaforo.notaGlobal()).isEqualByComparingTo("48.00");
+        assertThat(semaforo.semaforo()).isEqualTo("ROJO");
+    }
+
+    @Test
+    @DisplayName("Una etapa del recorrido sin peso en la versión no cuenta ni en la nota ni en lo que falta")
+    void unaEtapaSinPesoNoCuenta() {
+        // La v3 solo pesa Perfil y Prueba: la Simulación del recorrido no tiene peso.
+        semaforoCon(List.of(peso("PERFIL_INTEGRAL", "57.14"), peso("PRUEBA_PUESTO", "42.86")),
+                List.of("PERFIL_INTEGRAL", "SIMULACION", "PRUEBA_PUESTO", "DECISION"),
+                nota("PERFIL_INTEGRAL", "80"), nota("PRUEBA_PUESTO", "70"));
+
+        var semaforo = servicio.verSemaforo(QUIEN, POSTULACION);
+
+        assertThat(semaforo.etapasQueFaltan()).isEmpty();
+        assertThat(semaforo.notaGlobal()).isNotNull();
+    }
+
+    @Test
+    @DisplayName("Solo falta lo que el recorrido tiene: sin la nota de la Prueba, falta la Prueba y nada más")
+    void soloFaltaLoDelRecorrido() {
+        semaforoCon(laV4(), List.of("PERFIL_INTEGRAL", "PRUEBA_PUESTO", "DECISION"),
+                nota("PERFIL_INTEGRAL", "80"));
+
+        var semaforo = servicio.verSemaforo(QUIEN, POSTULACION);
+
+        assertThat(semaforo.etapasQueFaltan()).containsExactly("PRUEBA_PUESTO");
+        assertThat(semaforo.semaforo()).isNull();
     }
 
     // ============ El alcance: qué postulaciones y qué vacantes alcanza quien mira ============

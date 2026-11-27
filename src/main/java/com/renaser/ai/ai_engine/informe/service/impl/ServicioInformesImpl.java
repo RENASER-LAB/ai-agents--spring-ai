@@ -1,5 +1,6 @@
 package com.renaser.ai.ai_engine.informe.service.impl;
 
+import com.renaser.ai.ai_engine.ai.exception.ResourceNotFoundException;
 import com.renaser.ai.ai_engine.informe.dto.DtosInforme.Anexo;
 import com.renaser.ai.ai_engine.informe.dto.DtosInforme.ArchivoArmado;
 import com.renaser.ai.ai_engine.informe.dto.DtosInforme.Celular;
@@ -63,6 +64,7 @@ public class ServicioInformesImpl implements ServicioInformes {
     private static final String AVISO = "LEEME - informes que faltan.txt";
     private static final String TIPO_PDF = "application/pdf";
     private static final String TIPO_ZIP = "application/zip";
+    private static final String ETAPA_PRUEBA = "PRUEBA_PUESTO";
 
     private final AlcanceSobreLaVacante alcance;
     private final ArmadoDelInforme armado;
@@ -71,6 +73,31 @@ public class ServicioInformesImpl implements ServicioInformes {
     private final ServicioPerfilIntegralPanel tandas;
     private final NotaEtapaRepository notasEtapa;
     private final CelularesDelVisor celulares;
+
+    /**
+     * El recorrido de la vacante (V95): sin Prueba en él, el informe de la prueba no existe y el
+     * visor ordena por la nota del Perfil Integral. Por setter: las pruebas construyen el servicio
+     * a mano, y sin él existen los tres informes como antes.
+     */
+    private com.renaser.ai.ai_engine.vacante.service.RecorridoDeLaVacante recorridos;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void setRecorridos(com.renaser.ai.ai_engine.vacante.service.RecorridoDeLaVacante recorridos) {
+        this.recorridos = recorridos;
+    }
+
+    /** Si la vacante tiene la prueba del puesto en su recorrido: sin ella, no hay su informe. */
+    private boolean tienePrueba(Long vacanteId) {
+        return recorridos == null || recorridos.tiene(vacanteId, ETAPA_PRUEBA);
+    }
+
+    /** Los informes que existen en esta vacante, de entre los que ve quien pregunta. */
+    private List<EtapaDelInforme> queExisten(List<EtapaDelInforme> suyas, Long vacanteId) {
+        if (tienePrueba(vacanteId)) {
+            return suyas;
+        }
+        return suyas.stream().filter(e -> e != EtapaDelInforme.PRUEBA).toList();
+    }
 
     @Override
     public InformesDelPostulante estados(ContextoUsuario quien, Long postulacionId) {
@@ -81,7 +108,7 @@ public class ServicioInformesImpl implements ServicioInformes {
         // Visible con cualquiera de sus permisos: lo ajeno es 404 para todos.
         Postulacion postulacion = alcance.laPostulacionVisible(quien, postulacionId, suyas.get(0).permiso());
         List<EstadoDeUnInforme> estados = new ArrayList<>();
-        for (EtapaDelInforme etapa : suyas) {
+        for (EtapaDelInforme etapa : queExisten(suyas, postulacion.getVacanteId())) {
             Optional<Postulacion> visible = visibleCon(quien, postulacionId, etapa);
             if (visible.isEmpty()) {
                 continue;
@@ -95,6 +122,11 @@ public class ServicioInformesImpl implements ServicioInformes {
     public Informe informe(ContextoUsuario quien, Long postulacionId, String etapa) {
         EtapaDelInforme laEtapa = EtapaDelInforme.de(etapa);
         Postulacion postulacion = laVisible(quien, postulacionId, laEtapa);
+        // Sin Prueba en el recorrido (V95), su informe no existe: no es que falte, es que no hay.
+        if (laEtapa == EtapaDelInforme.PRUEBA && !tienePrueba(postulacion.getVacanteId())) {
+            throw new ResourceNotFoundException("Informe de la prueba del puesto", "postulación",
+                    postulacionId);
+        }
         return conEnlaces(quien, armar(postulacion, laEtapa));
     }
 
@@ -115,7 +147,9 @@ public class ServicioInformesImpl implements ServicioInformes {
         List<String> faltan = new ArrayList<>();
         String nombre = null;
         String vacante = null;
-        for (EtapaDelInforme etapa : EtapaDelInforme.values()) {
+        List<EtapaDelInforme> queExisten = queExisten(List.of(EtapaDelInforme.values()),
+                postulacion.getVacanteId());
+        for (EtapaDelInforme etapa : queExisten) {
             if (!suyas.contains(etapa) || visibleCon(quien, postulacionId, etapa).isEmpty()) {
                 faltan.add(etapa.titulo() + ": no tienes permiso para verlo.");
                 continue;
@@ -154,6 +188,8 @@ public class ServicioInformesImpl implements ServicioInformes {
         List<PostulanteDelVisor> postulantes = new ArrayList<>();
         // El ponderado se enseña solo a quien ve las tres notas que lo forman.
         boolean veLasTres = suyas.containsAll(List.of(EtapaDelInforme.values()));
+        // Sin Prueba en el recorrido (V95) no hay nota de la prueba que enseñar ni su informe.
+        List<EtapaDelInforme> existen = queExisten(suyas, vacanteId);
         for (int i = 0; i < orden.filas().size(); i++) {
             Ordenado o = orden.filas().get(i);
             FilaRanking f = o.fila();
@@ -162,12 +198,12 @@ public class ServicioInformesImpl implements ServicioInformes {
                     f.grupoPrioridad(),
                     suyas.contains(EtapaDelInforme.CV) ? f.notaCurriculum() : null,
                     suyas.contains(EtapaDelInforme.EVALUACION) ? f.notaEtapa() : null,
-                    suyas.contains(EtapaDelInforme.PRUEBA) ? o.notaPrueba() : null,
+                    existen.contains(EtapaDelInforme.PRUEBA) ? o.notaPrueba() : null,
                     suyos.get(f.postulacionId()),
                     veLasTres && o.tieneLasTres() ? o.combinada() : null));
         }
         return new VisorDeLaVacante(vacanteId, orden.ranking().vacante(), orden.ranking().puesto(),
-                postulantes, suyas.stream().map(Enum::name).toList());
+                postulantes, existen.stream().map(Enum::name).toList());
     }
 
     @Override
@@ -177,6 +213,7 @@ public class ServicioInformesImpl implements ServicioInformes {
             throw new AccessDeniedException("No tienes permiso para ver ningún informe");
         }
         Orden orden = orden(quien, vacanteId);
+        List<EtapaDelInforme> existen = queExisten(suyas, vacanteId);
         Map<String, byte[]> entradas = new LinkedHashMap<>();
         List<String> faltan = new ArrayList<>();
         Set<String> carpetas = new HashSet<>();
@@ -189,7 +226,7 @@ public class ServicioInformesImpl implements ServicioInformes {
             boolean alguno = false;
             boolean seVe = false;
             for (EtapaDelInforme etapa : EtapaDelInforme.values()) {
-                if (!suyas.contains(etapa)) {
+                if (!existen.contains(etapa)) {
                     continue;
                 }
                 Optional<Postulacion> visible = visibleCon(quien, fila.postulacionId(), etapa);
@@ -260,6 +297,9 @@ public class ServicioInformesImpl implements ServicioInformes {
         if (ids.isEmpty()) {
             return new Orden(ranking, List.of());
         }
+        if (!tienePrueba(vacanteId)) {
+            return porLaNotaDelPerfil(ranking);
+        }
         Map<Long, BigDecimal> pruebas = notasEtapa.findByPostulacionIdInAndEtapaCodigo(ids, "PRUEBA_PUESTO")
                 .stream()
                 .filter(n -> n.getPuntaje() != null)
@@ -276,6 +316,26 @@ public class ServicioInformesImpl implements ServicioInformes {
         arriba.sort(Comparator.comparing(Ordenado::combinada, Comparator.reverseOrder())
                 .thenComparing(Ordenado::notaPrueba, Comparator.reverseOrder())
                 .thenComparing(o -> o.fila().notaEtapa(), Comparator.reverseOrder()));
+        List<Ordenado> todos = new ArrayList<>(arriba);
+        todos.addAll(debajo);
+        return new Orden(ranking, todos);
+    }
+
+    /**
+     * El orden de una vacante sin Prueba en su recorrido (V95): no hay nota combinada que valga,
+     * así que arriba van quienes tienen la nota del Perfil Integral, de mayor a menor —a igual
+     * nota, por la del CV—, y debajo los demás en el orden del ranking.
+     */
+    private static Orden porLaNotaDelPerfil(RankingVacante ranking) {
+        List<Ordenado> arriba = new ArrayList<>();
+        List<Ordenado> debajo = new ArrayList<>();
+        for (FilaRanking f : ranking.filas()) {
+            Ordenado o = new Ordenado(f, null, null);
+            (f.notaEtapa() != null ? arriba : debajo).add(o);
+        }
+        arriba.sort(Comparator.comparing((Ordenado o) -> o.fila().notaEtapa(), Comparator.reverseOrder())
+                .thenComparing(o -> o.fila().notaCurriculum(),
+                        Comparator.nullsLast(Comparator.reverseOrder())));
         List<Ordenado> todos = new ArrayList<>(arriba);
         todos.addAll(debajo);
         return new Orden(ranking, todos);

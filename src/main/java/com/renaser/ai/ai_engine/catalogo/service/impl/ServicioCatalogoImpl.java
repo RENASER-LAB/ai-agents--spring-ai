@@ -2,6 +2,7 @@ package com.renaser.ai.ai_engine.catalogo.service.impl;
 
 import com.renaser.ai.ai_engine.catalogo.dto.DtosCatalogo.Catalogos;
 import com.renaser.ai.ai_engine.catalogo.dto.DtosCatalogo.EstadoCatalogo;
+import com.renaser.ai.ai_engine.catalogo.dto.DtosCatalogo.EtapaCatalogo;
 import com.renaser.ai.ai_engine.catalogo.dto.DtosCatalogo.Opcion;
 import com.renaser.ai.ai_engine.catalogo.service.ServicioCatalogo;
 import com.renaser.ai.ai_engine.pesos.repository.EtapaRepository;
@@ -60,7 +61,9 @@ public class ServicioCatalogoImpl implements ServicioCatalogo {
                 familias.findAllByOrderByNombreAsc().stream()
                         .map(f -> new Opcion(f.getCodigo(), f.getNombre())).toList(),
                 etapas.findAllByOrderByOrdenAsc().stream()
-                        .map(e -> new Opcion(e.getCodigo(), e.getNombre())).toList(),
+                        .map(e -> new EtapaCatalogo(e.getCodigo(), e.getNombre(), e.getDescripcion(),
+                                e.isFijaPrimera(), e.isEnPredeterminado(), e.getOrden()))
+                        .toList(),
                 URGENCIAS,
                 TIPOS_CIERRE,
                 MOTIVOS_CIERRE,

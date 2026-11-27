@@ -167,6 +167,20 @@ class ServicioExcelRankingImplTest {
     }
 
     @Test
+    @DisplayName("la pestaña de la prueba no se vuelca en una vacante sin Prueba en su recorrido (V95)")
+    void sinPruebaEnElRecorridoNoHayHojaDeLaPrueba() {
+        var recorridos = org.mockito.Mockito.mock(com.renaser.ai.ai_engine.vacante.service.RecorridoDeLaVacante.class);
+        org.mockito.Mockito.when(recorridos.tiene(13L, "PRUEBA_PUESTO")).thenReturn(false);
+        servicio.setRecorridos(recorridos);
+        when(tandas.ranking(any(), eq(13L), eq("PRUEBA_PUESTO"))).thenReturn(tanda());
+
+        assertThatThrownBy(() -> servicio.generar(quien("ver_embudo"), 13L,
+                new PedidoExcelRanking("PRUEBA_PUESTO", List.of(427L), null)))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("no tiene «PRUEBA_PUESTO»");
+    }
+
+    @Test
     @DisplayName("sin lista de candidatos no se vuelca nada")
     void sinListaNoHayVolcado() {
         assertThatThrownBy(() -> servicio.generar(quien("ver_embudo"), 13L,

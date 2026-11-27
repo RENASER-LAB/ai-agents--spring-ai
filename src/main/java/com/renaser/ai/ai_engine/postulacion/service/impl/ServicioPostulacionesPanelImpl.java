@@ -19,8 +19,6 @@ import com.renaser.ai.ai_engine.usuario.service.NombresDeUsuarios;
 import com.renaser.ai.ai_engine.perfilintegral.service.UmbralDelPerfilIntegral;
 import com.renaser.ai.ai_engine.postulacion.service.ServicioPostulacionesPanel;
 
-import com.renaser.ai.ai_engine.simulacion.service.ServicioDisponibilidadSimulacion;
-import com.renaser.ai.ai_engine.validacion.service.ServicioValidacion;
 import com.renaser.ai.ai_engine.postulacion.dto.DtosPostulacion.*;
 import com.renaser.ai.ai_engine.postulacion.entity.*;
 import com.renaser.ai.ai_engine.postulacion.repository.DatoCvRepository;
@@ -52,9 +50,6 @@ import java.util.Map;
 public class ServicioPostulacionesPanelImpl implements ServicioPostulacionesPanel {
 
     private static final Set<String> ESPERAS = Set.of("CANDIDATO", "SISTEMA", "TALENTO", "AREA");
-    private static final String ETAPA_PRUEBA = "PRUEBA_PUESTO";
-    private static final String ETAPA_VALIDACION = "VALIDACION";
-    private static final String VALIDACION_POR_HABILITAR = "VALIDACION_POR_HABILITAR";
 
     private final PostulacionRepository postulaciones;
     private final EstadoPostulacionRepository estados;
@@ -69,9 +64,8 @@ public class ServicioPostulacionesPanelImpl implements ServicioPostulacionesPane
     private final AlmacenArchivos almacen;
     private final MaquinaEstados maquina;
     private final Permisos permisos;
-    private final EntradaEtapaTecnica entradaTecnica;
-    private final ServicioValidacion validacion;
-    private final ServicioDisponibilidadSimulacion disponibilidad;
+    // Entrar a cada etapa y la etapa siguiente, por el recorrido de la vacante (V95).
+    private final AvanceDelRecorrido avance;
     private final DatoCvRepository datosCv;
     private final ServicioAuditoria auditoria;
     private final ServicioEnlaceAcceso enlacesDeAcceso;
@@ -225,13 +219,15 @@ public class ServicioPostulacionesPanelImpl implements ServicioPostulacionesPane
         }
         // Nulo es avisar: quien no dijo nada quiere lo de siempre.
         boolean avisar = datos.avisar() == null || datos.avisar();
-        // Moverla a mano a la prueba o a Validación desde otra etapa le crea lo que necesita
-        // allí, igual que «Avanzar»: sin eso la prueba se quedaba en blanco con el correo ya
-        // enviado, y el periodo de validación contestaba 404 a todo. El destino elegido se
-        // respeta, salvo «Validación · por habilitar» con un periodo ya iniciado o cerrado.
-        Destino destino = entrar(p, datos.estadoDestino(), datos.motivo());
-        maquina.transicionar(p, destino.estado(), quien, destino.motivo(), false, false,
+        // Moverla a mano a otra etapa le crea lo que necesita allí, igual que «Avanzar»: sin
+        // eso la prueba se quedaba en blanco con el correo ya enviado, y el periodo de
+        // validación contestaba 404 a todo. El destino elegido se respeta, salvo «Validación ·
+        // por habilitar» con un periodo ya iniciado o cerrado. Y a una etapa que la vacante no
+        // tiene no se mueve a nadie (V95). Ver AvanceDelRecorrido.
+        AvanceDelRecorrido.Paso paso = avance.entrar(p, datos.estadoDestino(), datos.motivo());
+        maquina.transicionar(p, paso.estado(), quien, paso.motivo(), false, false,
                 motivoCierre, avisar);
+        paso.trasEntrar(p);
     }
 
     @Override
@@ -240,21 +236,12 @@ public class ServicioPostulacionesPanelImpl implements ServicioPostulacionesPane
         Postulacion p = laVisible(quien, postulacionId, "confirmar_avance");
         exigirVacanteNoArchivada(p);
         exigirQueCompletoLaPrueba(p);
-        EstadoPostulacion siguiente = maquina.siguiente(p.getEstadoCodigo())
-                .orElseThrow(() -> new IllegalStateException(
-                        "Desde " + p.getEstadoCodigo() + " no hay un avance que calcular: "
-                                + "usa una transición manual con motivo"));
-
-        // Al entrar a la prueba o a validación se le crea lo que necesita allí —o se
-        // reutiliza lo que ya tenía, si vuelve—. Ver `entrar`.
-        Destino destino = entrar(p, siguiente.getCodigo(), motivo);
-        maquina.transicionar(p, destino.estado(), quien, destino.motivo(), false, false, null);
-
-        // Entrar a simulación no crea nada: la inscripción la elige el candidato. Lo que sí
-        // hace falta es mirar si ya hay una sesión con cupo para su vacante, porque de eso
-        // depende si se queda esperando o puede elegir ya.
-        if ("SIMULACION_POR_HABILITAR".equals(destino.estado())) {
-            disponibilidad.recalcularVacante(p.getOrganizacionId(), p.getVacanteId());
+        // La etapa siguiente es la del recorrido de SU vacante (V95), y al entrar se le crea lo
+        // que necesita allí —o se reutiliza lo que ya tenía, si vuelve—. Ver AvanceDelRecorrido.
+        if (avance.avanzar(p, quien, motivo, false).isEmpty()) {
+            throw new IllegalStateException(
+                    "Desde " + p.getEstadoCodigo() + " no hay un avance que calcular: "
+                            + "usa una transición manual con motivo");
         }
     }
 
@@ -277,88 +264,6 @@ public class ServicioPostulacionesPanelImpl implements ServicioPostulacionesPane
             throw new IllegalStateException("No completó la prueba: dale más tiempo desde su "
                     + "ficha o descarta su proceso");
         }
-    }
-
-    /** El estado al que entra de verdad la postulación, y el motivo que queda escrito. */
-    private record Destino(String estado, String motivo) {}
-
-    /**
-     * Lo que pasa al entrar a una etapa desde otra: «Avanzar» y el movimiento manual comparten
-     * las reglas, y por eso viven en un solo sitio.
-     *
-     * <ul>
-     *   <li><b>La prueba del puesto</b>: se crea lo que la vacante rinde —el intento o el
-     *       cuestionario técnico— o se reutiliza el que ya tenía, con las reglas de
-     *       {@link EntradaEtapaTecnica}. Sin prueba lista, 409 con el mismo mensaje que
-     *       «Avanzar», y nada se mueve ni se avisa.
-     *   <li><b>Validación</b>: se crea el periodo «por habilitar» o se reutiliza el que tenía
-     *       sin tocarlo. Si se entra por «por habilitar», la persona va al paso que
-     *       corresponde a ese periodo, con una coletilla en el motivo que lo explica. Con un
-     *       movimiento manual a otro paso de Validación, ese paso se respeta.
-     * </ul>
-     *
-     * <p>Moverse dentro de la misma etapa no crea ni redirige nada, y de un estado final no se
-     * sale: esa negativa la da la máquina de estados con su mensaje, sin crear nada antes.
-     *
-     * <p><b>Todo o nada.</b> Corre en la transacción del llamador y antes de la transición:
-     * si crear falla, no se guarda ni lo creado, ni la transición, ni sale el correo.
-     */
-    private Destino entrar(Postulacion p, String destino, String motivo) {
-        EstadoPostulacion origen = estados.findById(p.getEstadoCodigo()).orElse(null);
-        String etapaDestino = estados.findById(destino)
-                .map(EstadoPostulacion::getEtapaCodigo).orElse(null);
-        if (origen == null || origen.isEsFinal() || etapaDestino == null
-                || etapaDestino.equals(origen.getEtapaCodigo())) {
-            return new Destino(destino, motivo);
-        }
-
-        if (ETAPA_PRUEBA.equals(etapaDestino)) {
-            exigirQueSigaDondeEstaba(p);
-            // Lo comparte con el pase automático, que llega aquí sin usuario del que sacar la
-            // organización: por eso la saca de la postulación. Ver EntradaEtapaTecnica.
-            entradaTecnica.crearAlEntrar(p, laVacanteDe(p));
-            return new Destino(destino, motivo);
-        }
-
-        if (ETAPA_VALIDACION.equals(etapaDestino)) {
-            exigirQueSigaDondeEstaba(p);
-            // El periodo nace en POR_HABILITAR: alguien tiene que decidir la modalidad —y, si
-            // es trabajo real, registrar la figura contractual— antes de que empiece a correr.
-            ServicioValidacion.Entrada entrada =
-                    validacion.crearAlEntrar(p.getId(), p.getOrganizacionId());
-            if (!VALIDACION_POR_HABILITAR.equals(destino)) {
-                return new Destino(destino, motivo);
-            }
-            return new Destino(entrada.paso(), entrada.motivoCon(motivo));
-        }
-
-        return new Destino(destino, motivo);
-    }
-
-    /**
-     * Que nadie la haya movido desde que se leyó, y que nadie la mueva hasta terminar.
-     *
-     * <p>Dos entradas a la vez —dos «Avanzar», o un «Avanzar» y un movimiento manual— leían
-     * el mismo estado de partida. Si las dos creaban, la clave única paraba a una; pero si las
-     * dos reutilizaban, las dos escribían su transición. Con la fila bloqueada, la segunda
-     * espera a la primera, ve que el estado ya cambió y se planta sin escribir nada.
-     */
-    private void exigirQueSigaDondeEstaba(Postulacion p) {
-        String guardado = postulaciones.estadoBloqueandoLaFila(p.getId());
-        if (!Objects.equals(p.getEstadoCodigo(), guardado)) {
-            throw new IllegalStateException("Esta postulación acaba de moverse a «" + guardado
-                    + "» desde otra pantalla: vuelve a cargarla antes de seguir");
-        }
-    }
-
-    /**
-     * La vacante de una postulación que ya pasó por su guardián, por su organización: es por
-     * fuerza de la misma empresa, y preguntarlo así no deja una búsqueda suelta por id.
-     */
-    private Vacante laVacanteDe(Postulacion p) {
-        return vacantes.findByIdAndOrganizacionId(p.getVacanteId(), p.getOrganizacionId())
-                .orElseThrow(() -> new IllegalStateException(
-                        "La vacante de esta postulación ya no existe"));
     }
 
     @Override

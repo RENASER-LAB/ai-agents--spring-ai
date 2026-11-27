@@ -3,6 +3,9 @@ package com.renaser.ai.ai_engine.vacante.service;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
 import com.renaser.ai.ai_engine.vacante.dto.DtosVacante.CambioDePesosHecho;
 import com.renaser.ai.ai_engine.vacante.dto.DtosVacante.CambioDePesosPrevisto;
+import com.renaser.ai.ai_engine.vacante.dto.DtosVacante.PesoEnEstaVacante;
+
+import java.util.List;
 
 /**
  * Qué versión de pesos rige la decisión de una vacante, y cambiarla con candidatos dentro
@@ -29,4 +32,12 @@ public interface ServicioPesosDeLaVacante {
      * 404 con una versión que no es de la empresa ni de la plataforma que le presta.
      */
     CambioDePesosHecho cambiar(ContextoUsuario quien, Long vacanteId, Long versionPesosId);
+
+    /**
+     * «Cómo pesa en esta vacante» (V95): por cada etapa con peso en la versión, su peso en la
+     * versión y el repartido entre las etapas del recorrido; las que la vacante no tiene, sin el
+     * segundo. Ver {@link com.renaser.ai.ai_engine.vacante.service.PesosDelRecorrido}. Vacía si la
+     * versión no tiene pesos de etapa. Quien llama ya comprobó que puede ver la vacante.
+     */
+    List<PesoEnEstaVacante> enEstaVacante(Long vacanteId, Long versionPesosId);
 }

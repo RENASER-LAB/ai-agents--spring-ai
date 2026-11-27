@@ -8,8 +8,8 @@ import java.util.Collection;
 import java.util.List;
 
 /**
- * Las etapas públicas de una vacante, en su orden, con su nombre y su explicación (V76, regla 6
- * de la spec).
+ * Las etapas públicas de una vacante, en el orden de SU recorrido (V95), con su nombre y su
+ * explicación (V76, regla 6 de la spec).
  *
  * <p>Los nombres y las explicaciones son los del recorrido del portal («Tu perfil», «La prueba del
  * puesto»…, en {@code Seguimiento.tsx}), y cambian solo donde el de siempre sería falso para esta
@@ -27,10 +27,6 @@ public final class ProcedimientoPublico {
     public static final String VALIDACION = "VALIDACION";
     public static final String DECISION = "DECISION";
 
-    /** Las cinco etapas del recorrido, en su orden. Todas aplican a toda vacante publicada. */
-    public static final List<String> ETAPAS =
-            List.of(PERFIL_INTEGRAL, PRUEBA_PUESTO, SIMULACION, VALIDACION, DECISION);
-
     public static final String HECHA = "HECHA";
     public static final String ACTUAL = "ACTUAL";
     public static final String PREVISTA = "PREVISTA";
@@ -41,31 +37,36 @@ public final class ProcedimientoPublico {
     private ProcedimientoPublico() {}
 
     /**
-     * El procedimiento de una postulación en marcha: antes de la etapa actual, {@code HECHA};
-     * la suya, {@code ACTUAL}; después, {@code PREVISTA} (lo previsto, no una promesa de avanzar).
+     * El procedimiento de una postulación en marcha: las etapas del recorrido de SU vacante
+     * (V95), en su orden. Antes de la etapa actual, {@code HECHA}; la suya, {@code ACTUAL};
+     * después, {@code PREVISTA} (lo previsto, no una promesa de avanzar). El {@code orden} de cada
+     * etapa es su posición en el recorrido (1, 2, 3…), no el del catálogo: el bot ordena por él.
      *
+     * @param recorrido las etapas de la vacante, en orden
      * @param etapaActual la etapa del estado, o nulo si aún no entró en ninguna
      * @param modalidadDeLaPrueba {@code CRONOMETRADA}, {@code PLAZO_ABIERTO} o nulo si no se sabe
      */
-    public static List<Etapa> enMarcha(Vacante vacante, String etapaActual, String modalidadDeLaPrueba) {
-        int actual = etapaActual == null ? -1 : ETAPAS.indexOf(etapaActual);
+    public static List<Etapa> enMarcha(Vacante vacante, List<String> recorrido, String etapaActual,
+                                       String modalidadDeLaPrueba) {
+        int actual = etapaActual == null ? -1 : recorrido.indexOf(etapaActual);
         List<Etapa> etapas = new ArrayList<>();
-        for (int i = 0; i < ETAPAS.size(); i++) {
-            etapas.add(etapa(ETAPAS.get(i), i + 1, comparada(i, actual), vacante, modalidadDeLaPrueba));
+        for (int i = 0; i < recorrido.size(); i++) {
+            etapas.add(etapa(recorrido.get(i), i + 1, comparada(i, actual), vacante, modalidadDeLaPrueba));
         }
         return etapas;
     }
 
     /**
-     * El de una postulación terminada: solo las etapas a las que llegó, todas {@code HECHA}. Las que
-     * no alcanzó no se presentan como previstas: ese proceso ya no sigue.
+     * El de una postulación terminada: solo las etapas del recorrido a las que llegó, todas
+     * {@code HECHA}, con su posición en el recorrido. Las que no alcanzó no se presentan como
+     * previstas: ese proceso ya no sigue.
      */
-    public static List<Etapa> terminado(Vacante vacante, Collection<String> alcanzadas,
-                                        String modalidadDeLaPrueba) {
+    public static List<Etapa> terminado(Vacante vacante, List<String> recorrido,
+                                        Collection<String> alcanzadas, String modalidadDeLaPrueba) {
         List<Etapa> etapas = new ArrayList<>();
-        for (int i = 0; i < ETAPAS.size(); i++) {
-            if (alcanzadas.contains(ETAPAS.get(i))) {
-                etapas.add(etapa(ETAPAS.get(i), i + 1, HECHA, vacante, modalidadDeLaPrueba));
+        for (int i = 0; i < recorrido.size(); i++) {
+            if (alcanzadas.contains(recorrido.get(i))) {
+                etapas.add(etapa(recorrido.get(i), i + 1, HECHA, vacante, modalidadDeLaPrueba));
             }
         }
         return etapas;
@@ -93,7 +94,9 @@ public final class ProcedimientoPublico {
             case PRUEBA_PUESTO -> esCuestionario(vacante) ? "La prueba técnica" : "La prueba del puesto";
             case SIMULACION -> "La simulación de trabajo";
             case VALIDACION -> "El periodo de validación";
-            default -> "La decisión final";
+            case DECISION -> "La decisión final";
+            // Una etapa nueva necesita aquí su nombre para el bot (ver «Cómo agregar una etapa»).
+            default -> "Otra etapa del proceso";
         };
     }
 
@@ -105,7 +108,8 @@ public final class ProcedimientoPublico {
             case PRUEBA_PUESTO -> laPrueba(vacante, modalidadDeLaPrueba);
             case SIMULACION -> "Una sesión de trabajo, con fecha a elegir.";
             case VALIDACION -> "Un periodo corto trabajando de verdad.";
-            default -> "Una persona decide, mirando todo el recorrido.";
+            case DECISION -> "Una persona decide, mirando todo el recorrido.";
+            default -> "Una etapa más del proceso de esta vacante.";
         };
     }
 

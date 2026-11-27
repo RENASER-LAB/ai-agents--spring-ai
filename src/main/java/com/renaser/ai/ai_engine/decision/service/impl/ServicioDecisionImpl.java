@@ -24,6 +24,8 @@ import com.renaser.ai.ai_engine.seguridad.service.Permisos;
 import com.renaser.ai.ai_engine.vacante.entity.Vacante;
 import com.renaser.ai.ai_engine.vacante.repository.VacanteRepository;
 import com.renaser.ai.ai_engine.vacante.service.AlcanceSobreLaVacante;
+import com.renaser.ai.ai_engine.vacante.service.PesosDelRecorrido;
+import com.renaser.ai.ai_engine.vacante.service.RecorridoDeLaVacante;
 import com.renaser.ai.ai_engine.vacante.service.VacanteArchivada;
 
 import lombok.RequiredArgsConstructor;
@@ -76,6 +78,8 @@ public class ServicioDecisionImpl implements ServicioDecision {
     private final ServicioParametros parametros;
     private final ServicioAuditoria auditoria;
     private final Permisos permisos;
+    /** El recorrido de la vacante (V95): la nota global solo cuenta sus etapas. */
+    private final RecorridoDeLaVacante recorridos;
 
     @Override
     @Transactional
@@ -234,15 +238,28 @@ public class ServicioDecisionImpl implements ServicioDecision {
                     vacante.getId(), vacante.getVersionPesosId(), postulacion.getId());
         }
 
+        /*
+          Solo cuentan las etapas del recorrido de ESTA vacante (V95), con los pesos de su versión
+          repartidos entre ellas: en una vacante Perfil → Prueba → Decisión con la v4, 57,14 y
+          42,86. Antes toda etapa con fila en la versión entraba en `faltan`, y una vacante en la
+          que nadie pasa por Simulación ni Validación se quedaba siempre sin propuesta. Con las
+          cinco etapas el reparto es la versión tal cual: el resultado no cambia.
+        */
+        Map<String, BigDecimal> deLaVersion = new java.util.LinkedHashMap<>();
+        pesos.forEach(pe -> deLaVersion.put(pe.getEtapaCodigo(), pe.getPeso()));
+        Map<String, BigDecimal> enEstaVacante =
+                PesosDelRecorrido.repartir(recorridos.de(vacante.getId()), deLaVersion);
+        sinPesos = sinPesos || enEstaVacante.isEmpty();
+
         List<String> faltan = new ArrayList<>();
         BigDecimal notaGlobal = BigDecimal.ZERO;
-        for (PesoEtapa pe : pesos) {
-            NotaEtapa nota = notasPorEtapa.get(pe.getEtapaCodigo());
+        for (Map.Entry<String, BigDecimal> pe : enEstaVacante.entrySet()) {
+            NotaEtapa nota = notasPorEtapa.get(pe.getKey());
             if (nota == null) {
-                faltan.add(pe.getEtapaCodigo());
+                faltan.add(pe.getKey());
                 continue;
             }
-            notaGlobal = notaGlobal.add(nota.getPuntaje().multiply(pe.getPeso())
+            notaGlobal = notaGlobal.add(nota.getPuntaje().multiply(pe.getValue())
                     .divide(CIEN, 4, RoundingMode.HALF_UP));
         }
 

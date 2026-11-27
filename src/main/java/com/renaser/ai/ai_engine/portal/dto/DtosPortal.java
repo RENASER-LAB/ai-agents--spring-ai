@@ -277,7 +277,16 @@ public final class DtosPortal {
                                  * La tarjeta de WhatsApp de este proceso (V73): si se ofrece, en
                                  * qué está y con qué número. Ver {@code WhatsappDelProceso}.
                                  */
-                                com.renaser.ai.ai_engine.whatsapp.dto.DtosWhatsapp.WhatsappDelProceso whatsapp) {}
+                                com.renaser.ai.ai_engine.whatsapp.dto.DtosWhatsapp.WhatsappDelProceso whatsapp,
+                                /**
+                                 * El recorrido de su vacante (V95): sus etapas, en orden. El
+                                 * portal pinta un tramo por etapa y numera los rótulos «Etapa N»
+                                 * con la posición de cada una aquí.
+                                 */
+                                List<EtapaDelRecorrido> etapas) {}
+
+    /** Una etapa del recorrido de la vacante, con su nombre del catálogo (V95). */
+    public record EtapaDelRecorrido(String codigo, String nombre) {}
 
     /** Un monto con su moneda, ya escrito además en una frase para pintarlo sin traducir. */
     public record Pretension(BigDecimal monto, String moneda, String texto) {}

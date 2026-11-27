@@ -511,6 +511,36 @@ class ServicioPostulacionPortalImplTest {
         verifyNoInteractions(intentos);
     }
 
+    @Test
+    @DisplayName("cada proceso trae el recorrido de su vacante, en su orden y con el nombre de cada etapa (V95, AC-13)")
+    void cadaProcesoTraeSuRecorrido() {
+        var recorridos = org.mockito.Mockito.mock(com.renaser.ai.ai_engine.vacante.service.RecorridoDeLaVacante.class);
+        servicio.setRecorridos(recorridos);
+        when(postulaciones.findByUsuarioIdOrderByCreadoEnDesc(USUARIO)).thenReturn(List.of(
+                Postulacion.builder().id(77L).uuid(java.util.UUID.randomUUID()).usuarioId(USUARIO)
+                        .organizacionId(2L).vacanteId(VACANTE).estadoCodigo("PERFIL_POR_CONFIRMAR")
+                        .movidoEn(java.time.Instant.now()).creadoEn(java.time.Instant.now()).build()));
+        when(estados.findAllByOrderByOrden()).thenReturn(List.of());
+        when(vacantes.findAllById(List.of(VACANTE))).thenReturn(List.of(Vacante.builder()
+                .id(VACANTE).organizacionId(2L).titulo("Analista").build()));
+        when(organizaciones.findAllById(List.of(2L))).thenReturn(List.of());
+        when(recorridos.catalogo()).thenReturn(List.of(
+                com.renaser.ai.ai_engine.pesos.entity.Etapa.builder().codigo("PERFIL_INTEGRAL").nombre("Perfil Integral").build(),
+                com.renaser.ai.ai_engine.pesos.entity.Etapa.builder().codigo("SIMULACION").nombre("Simulación de trabajo").build(),
+                com.renaser.ai.ai_engine.pesos.entity.Etapa.builder().codigo("PRUEBA_PUESTO").nombre("Prueba del puesto").build()));
+        when(recorridos.de(org.mockito.ArgumentMatchers.<java.util.Collection<Long>>any())).thenReturn(
+                Map.of(VACANTE, List.of("PERFIL_INTEGRAL", "SIMULACION", "PRUEBA_PUESTO")));
+
+        assertThat(servicio.misPostulaciones(QUIEN)).singleElement()
+                .satisfies(m -> assertThat(m.etapas())
+                        .extracting(com.renaser.ai.ai_engine.portal.dto.DtosPortal.EtapaDelRecorrido::codigo,
+                                com.renaser.ai.ai_engine.portal.dto.DtosPortal.EtapaDelRecorrido::nombre)
+                        .containsExactly(
+                                org.assertj.core.groups.Tuple.tuple("PERFIL_INTEGRAL", "Perfil Integral"),
+                                org.assertj.core.groups.Tuple.tuple("SIMULACION", "Simulación de trabajo"),
+                                org.assertj.core.groups.Tuple.tuple("PRUEBA_PUESTO", "Prueba del puesto")));
+    }
+
     // ============ El currículum: el suyo, o el del perfil ============
 
     @Test

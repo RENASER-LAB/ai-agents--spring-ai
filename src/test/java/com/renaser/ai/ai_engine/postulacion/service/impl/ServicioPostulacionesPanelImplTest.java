@@ -91,10 +91,36 @@ class ServicioPostulacionesPanelImplTest {
     @Mock private com.renaser.ai.ai_engine.perfilintegral.service.UmbralDelPerfilIntegral umbral;
     @Mock private com.renaser.ai.ai_engine.prueba.repository.IntentoPruebaRepository intentos;
 
+    @Mock private com.renaser.ai.ai_engine.vacante.service.RecorridoDeLaVacante recorridos;
+
     @InjectMocks
     private ServicioPostulacionesPanelImpl servicio;
 
     private ContextoUsuario quien;
+
+    /** El recorrido de la vacante de estas pruebas (V95): el de siempre, salvo que la prueba lo cambie. */
+    private List<String> recorrido = com.renaser.ai.ai_engine.postulacion.service.RecorridosDePrueba.CINCO;
+
+    /**
+     * El avance de verdad, con las piezas de verdad de cada etapa sobre los mismos simulados: lo
+     * que se prueba aquí es lo que pasa al entrar a cada una, venga de «Avanzar» o de un
+     * movimiento a mano (V95).
+     */
+    @BeforeEach
+    void elAvanceDeVerdad() {
+        lenient().when(recorridos.de(VACANTE)).thenAnswer(inv -> recorrido);
+        lenient().when(recorridos.tiene(eq(VACANTE), anyString()))
+                .thenAnswer(inv -> recorrido.contains(inv.<String>getArgument(1)));
+        var avance = new com.renaser.ai.ai_engine.postulacion.service.AvanceDelRecorrido(maquina,
+                estados, postulaciones, vacantes, recorridos,
+                com.renaser.ai.ai_engine.postulacion.service.RegistroDeEtapas.con(List.of(
+                        new com.renaser.ai.ai_engine.perfilintegral.service.EtapaDelPerfilIntegral(),
+                        new com.renaser.ai.ai_engine.postulacion.service.EtapaDeLaPrueba(entradaTecnica),
+                        new com.renaser.ai.ai_engine.simulacion.service.EtapaDeLaSimulacion(disponibilidad),
+                        new com.renaser.ai.ai_engine.validacion.service.EtapaDeLaValidacion(validacion),
+                        new com.renaser.ai.ai_engine.decision.service.EtapaDeLaDecision())));
+        org.springframework.test.util.ReflectionTestUtils.setField(servicio, "avance", avance);
+    }
 
     @BeforeEach
     void quienPregunta() {
@@ -629,7 +655,9 @@ class ServicioPostulacionesPanelImplTest {
     /** «Avanzar» desde {@code estadoActual}, que la máquina calcula hacia {@code siguiente}. */
     private Postulacion paraAvanzar(String estadoActual, String siguiente) {
         Postulacion p = enCarrera(estadoActual, "confirmar_avance");
-        when(maquina.siguiente(estadoActual)).thenReturn(Optional.of(estado(siguiente)));
+        when(maquina.siguiente(eq(estadoActual),
+                any(com.renaser.ai.ai_engine.postulacion.service.Recorrido.class)))
+                .thenReturn(Optional.of(estado(siguiente)));
         return p;
     }
 
@@ -924,5 +952,49 @@ class ServicioPostulacionesPanelImplTest {
                 .isInstanceOf(IllegalStateException.class);
 
         verifyNoInteractions(validacion, entradaTecnica, maquina);
+    }
+
+    // ============ El recorrido de la vacante (V95) ============
+
+    @Test
+    @DisplayName("A una etapa que la vacante no tiene no se mueve a nadie a mano: 409, sin crear ni avisar (AC-14)")
+    void aUnaEtapaFueraDelRecorridoNoSeMueve() {
+        recorrido = List.of("PERFIL_INTEGRAL", "DECISION");
+        enCarrera("PERFIL_POR_CONFIRMAR", "mover_postulacion");
+
+        assertThatThrownBy(() -> moverAMano("PRUEBA_TURNO_CANDIDATO", "Pasa a la prueba"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("no tiene la etapa");
+
+        verifyNoInteractions(entradaTecnica, maquina);
+    }
+
+    @Test
+    @DisplayName("«Avanzar» desde el «por confirmar» de la última etapa no mueve a nadie: no hay a dónde (AC-09)")
+    void desdeLaUltimaNoHayAvance() {
+        recorrido = List.of("PERFIL_INTEGRAL", "PRUEBA_PUESTO", "VALIDACION");
+        enCarrera("VALIDACION_POR_CONFIRMAR", "confirmar_avance");
+        when(maquina.siguiente(eq("VALIDACION_POR_CONFIRMAR"),
+                any(com.renaser.ai.ai_engine.postulacion.service.Recorrido.class)))
+                .thenAnswer(inv -> com.renaser.ai.ai_engine.postulacion.service.RecorridosDePrueba
+                        .siguienteDe(inv.getArgument(0), inv.getArgument(1)));
+
+        assertThatThrownBy(() -> servicio.confirmarAvance(quien, SUYA, "Avanza"))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("no hay un avance que calcular");
+
+        noSeMovio();
+    }
+
+    @Test
+    @DisplayName("Mover a mano a «Simulación · por habilitar» también mira las sesiones, como «Avanzar»")
+    void moverAManoALaSimulacionMiraLasSesiones() {
+        Postulacion p = enCarrera("PRUEBA_POR_CONFIRMAR", "mover_postulacion");
+
+        moverAMano("SIMULACION_POR_HABILITAR", "Pasa a la simulación");
+
+        verify(maquina).transicionar(p, "SIMULACION_POR_HABILITAR", quien,
+                "Pasa a la simulación", false, false, null, true);
+        verify(disponibilidad).recalcularVacante(ORGANIZACION, VACANTE);
     }
 }
