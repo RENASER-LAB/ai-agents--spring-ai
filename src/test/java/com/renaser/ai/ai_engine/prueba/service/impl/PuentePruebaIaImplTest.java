@@ -118,6 +118,7 @@ class PuentePruebaIaImplTest {
     @Mock private CalificacionPorCriterio calificacion;
     @Mock private ContextoDeLaVacante contexto;
     @Mock private MaquinaEstados maquina;
+    @Mock private com.renaser.ai.ai_engine.prueba.service.CalificacionDeLaPruebaPropia calculo;
 
     @InjectMocks
     private PuentePruebaIaImpl puente;
@@ -861,6 +862,55 @@ class PuentePruebaIaImplTest {
         when(intentos.findByPostulacionId(POSTULACION)).thenReturn(Optional.of(entregado()));
         when(criterios.findByVersionPlantillaPruebaId(VERSION)).thenReturn(rubrica);
         when(calificacion.maximosDe(eq(POSTULACION), anyList())).thenReturn(maximos);
+    }
+
+    // ============ Lo que lee el seguimiento de pendientes (V94) ============
+
+    @Test
+    @DisplayName("el seguimiento lee lo que entregó en una plantilla, con el texto de cada archivo")
+    void elSeguimientoLeeLaPlantilla() {
+        when(intentos.findByPostulacionId(POSTULACION)).thenReturn(Optional.of(conCambio(null, null)));
+        when(versiones.findById(VERSION)).thenReturn(Optional.of(version()));
+        Archivo plan = archivo(31L, "plan.txt", "text/plain", 100L);
+        unSoloEntregableConArchivo("Plan", plan);
+        when(almacen.leer(plan)).thenReturn("Sueldo y CTS".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        when(extractor.extraer(any(), any(), any())).thenReturn("Sueldo y CTS");
+
+        List<EntregaDelCandidato> entregas = puente.entregasParaElSeguimiento(POSTULACION);
+
+        assertThat(entregas).extracting(EntregaDelCandidato::nombre, EntregaDelCandidato::contenido)
+                .containsExactly(org.assertj.core.groups.Tuple.tuple("Plan", "Sueldo y CTS"));
+    }
+
+    @Test
+    @DisplayName("el seguimiento lee lo que entregó en una prueba del editor, aunque no la completara")
+    void elSeguimientoLeeElEditor() {
+        IntentoPrueba delEditor = IntentoPrueba.builder().id(INTENTO).postulacionId(POSTULACION).versionBancoId(70L)
+                .noCompletada(true).build();
+        when(intentos.findByPostulacionId(POSTULACION)).thenReturn(Optional.of(delEditor));
+        when(calculo.calcular(delEditor)).thenReturn(new com.renaser.ai.ai_engine.prueba.service
+                .CalificacionDeLaPruebaPropia.Resultado(null, List.of(), List.of(), List.of(pedido(1L, "Video", true))));
+
+        List<EntregaDelCandidato> entregas = puente.entregasParaElSeguimiento(POSTULACION);
+
+        assertThat(entregas).hasSize(1);
+        assertThat(entregas.get(0).loEntrego()).isFalse();
+        assertThat(entregas.get(0).porQueNoSePuedeLeer()).contains("No lo entregó");
+    }
+
+    @Test
+    @DisplayName("sin prueba, o con una plantilla sin versión, el seguimiento no lee nada")
+    void elSeguimientoSinPrueba() {
+        when(intentos.findByPostulacionId(POSTULACION)).thenReturn(Optional.empty());
+        assertThat(puente.entregasParaElSeguimiento(POSTULACION)).isEmpty();
+
+        when(intentos.findByPostulacionId(POSTULACION)).thenReturn(Optional.of(
+                IntentoPrueba.builder().id(INTENTO).postulacionId(POSTULACION).build()));
+        assertThat(puente.entregasParaElSeguimiento(POSTULACION)).isEmpty();
+
+        when(intentos.findByPostulacionId(POSTULACION)).thenReturn(Optional.of(entregado()));
+        when(versiones.findById(VERSION)).thenReturn(Optional.empty());
+        assertThat(puente.entregasParaElSeguimiento(POSTULACION)).isEmpty();
     }
 
     private Postulacion postulacion(String estado) {

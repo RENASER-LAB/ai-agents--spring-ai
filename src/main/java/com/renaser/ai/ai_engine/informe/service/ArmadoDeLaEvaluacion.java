@@ -67,8 +67,10 @@ import static com.renaser.ai.ai_engine.informe.service.FormatoDelInforme.limpio;
  * pilares o criterios, los cuatro bloques que salen del retrato, «Lo que pidió el CV» y, al
  * final, el porqué de cada abierta y todas las preguntas con su respuesta.
  *
- * <p><b>«Lo que pidió el CV» no inventa estados.</b> Cada duda va «Por contrastar»: decir si la
- * evaluación la resolvió exige que la IA compare el CV con las respuestas, y eso es de otra spec.
+ * <p><b>«Lo que pidió el CV» no inventa estados.</b> Aquí cada duda va «Por contrastar». Decir si
+ * la evaluación la resolvió lo hace el seguimiento de pendientes (V94), que la IA compara con las
+ * abiertas de {@link #abiertasConTexto}; {@code ArmadoDelInforme} pone sus estados encima solo si
+ * se hizo con estos mismos datos.
  */
 @Component
 @RequiredArgsConstructor
@@ -170,6 +172,26 @@ public class ArmadoDeLaEvaluacion {
 
     // ================================================================= las preguntas
 
+    /**
+     * Las abiertas que contestó con texto, numeradas como en el anexo («Pregunta 3»): lo que lee el
+     * seguimiento de pendientes. Son las mismas respuestas que enseña el informe, también las de
+     * una evaluación de otra postulación que se reutiliza. Abierta es lo que se contesta
+     * escribiendo, como para el evaluador: en el banco v3 hay formatos de texto libre que no se
+     * llaman ABIERTA. Las cerradas no viajan.
+     */
+    List<PendientesEntreEtapas.Fuente> abiertasConTexto(Base base) {
+        Evaluacion evaluacion = evaluacionDe(base);
+        if (evaluacion == null) {
+            return List.of();
+        }
+        return filas(base, evaluacion).stream()
+                .filter(f -> f.respuesta() != null && seEscribe(f.pregunta(), f.respuesta())
+                        && hay(f.respuestaTexto()))
+                .map(f -> PendientesEntreEtapas.Fuente.respuesta(f.numero(), f.pregunta().getEnunciado(),
+                        f.respuestaTexto()))
+                .toList();
+    }
+
     /** Una pregunta que se le hizo, con lo que contestó y la nota que le pusieron. */
     record Fila(int numero, Pregunta pregunta, Respuesta respuesta, String respuestaTexto,
                 NotaRespuesta nota, String pilar, String criterio, int peso) {
@@ -231,8 +253,7 @@ public class ArmadoDeLaEvaluacion {
         if (r == null) {
             return null;
         }
-        if (ABIERTA.equals(p.getTipo()) || (r.getOpcionId() == null && hay(r.getTexto())
-                && CalificacionPorPuntos.marcadasDe(r).isEmpty())) {
+        if (seEscribe(p, r)) {
             return limpio(r.getTexto());
         }
         Set<Long> marcadas = new HashSet<>(CalificacionPorPuntos.marcadasDe(r));
@@ -247,6 +268,12 @@ public class ArmadoDeLaEvaluacion {
                         : o.getLetra() == null ? "(sin texto)" : o.getLetra())
                 .toList();
         return elegidas.isEmpty() ? limpio(r.getTexto()) : String.join(" · ", elegidas);
+    }
+
+    /** Si la respuesta se escribió: una abierta, o un texto sin opción ni marcas. */
+    private static boolean seEscribe(Pregunta p, Respuesta r) {
+        return ABIERTA.equals(p.getTipo()) || (r.getOpcionId() == null && hay(r.getTexto())
+                && CalificacionPorPuntos.marcadasDe(r).isEmpty());
     }
 
     private static String tipoDicho(String tipo) {

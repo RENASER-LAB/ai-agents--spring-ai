@@ -67,7 +67,7 @@ class FechaDeHoyEnElPromptTest {
                 AgenteSimulacion.CODIGO_AGENTE, AgenteEvaluador.CODIGO_AGENTE,
                 AgenteCuestionarioTecnico.CODIGO_AGENTE, AgenteBusquedaCv.CODIGO_AGENTE,
                 AgenteRecomendador.CODIGO_AGENTE, AgenteRedactor.CODIGO_AGENTE,
-                ColaCalificacionIa.AGENTE_REDACTOR_INFORME);
+                ColaCalificacionIa.AGENTE_REDACTOR_INFORME, ColaCalificacionIa.AGENTE_SEGUIMIENTO_PENDIENTES);
     }
 
     @Mock private AgenteRepository agentes;

@@ -189,6 +189,7 @@ public class FlujoCalificacionIaIT {
                 case "EVALUADOR" -> evaluador(contenido);
                 case "POTENCIAL_RIESGO" -> potencialRiesgo();
                 case "REDACTOR_INFORME" -> redactorInforme(contenido);
+                case "SEGUIMIENTO_PENDIENTES" -> seguimientoPendientes(contenido);
                 default -> throw new IllegalStateException("agente inesperado: " + agenteCodigo);
             };
         }
@@ -219,6 +220,44 @@ public class FlujoCalificacionIaIT {
                 throw new IllegalStateException("el redactor del informe recibió algo que no es json", e);
             }
         }
+
+        /**
+         * El seguimiento de pendientes (V94), que corre al cerrarse la evaluación y antes que su
+         * redactor. No califica: la primera duda queda resuelta con una cita literal de la primera
+         * respuesta que la contiene, y se cuela una duda que no existe, que el código descarta.
+         */
+        private String seguimientoPendientes(String contenido) {
+            try {
+                JsonNode datos = LECTOR.readTree(contenido);
+                String fuente = null;
+                for (JsonNode respuesta : datos.path("respuestas")) {
+                    if (respuesta.path("respuesta").path("contenidoDelCandidato").asText().contains(CITA)) {
+                        fuente = respuesta.path("fuente").asText();
+                        break;
+                    }
+                }
+                ObjectNode salida = LECTOR.createObjectNode();
+                ArrayNode dudas = salida.putArray("dudas");
+                boolean primera = true;
+                for (JsonNode duda : datos.path("dudas")) {
+                    ObjectNode revision = dudas.addObject().put("codigo", duda.path("codigo").asText());
+                    if (primera && fuente != null) {
+                        revision.put("estado", "RESUELTO").put("fuente", fuente).put("cita", CITA)
+                                .put("explicacion", "Cuenta un caso propio con un resultado medido.");
+                    } else {
+                        revision.put("estado", "SIGUE_PENDIENTE");
+                    }
+                    primera = false;
+                }
+                dudas.addObject().put("codigo", "D99").put("estado", "RESUELTO");
+                return LECTOR.writeValueAsString(salida);
+            } catch (JsonProcessingException e) {
+                throw new IllegalStateException("el seguimiento recibió algo que no es json", e);
+            }
+        }
+
+        /** Un trozo literal de la respuesta abierta que escribe RespuestaV3. */
+        static final String CITA = "reduje el tiempo de cierre";
 
         /**
          * La ficha del candidato. Devuelve ocho habilidades a propósito, cuando el contrato
@@ -318,13 +357,14 @@ public class FlujoCalificacionIaIT {
         // Antes solo la sacaba la pasada rápida, y quien se calificaba por aquí salía sin
         // teléfono, sin experiencia y sin último puesto, sin manera de rellenarlo después.
         //
-        // Y seis trabajos y no cuatro: al cerrarse el retrato, el redactor del informe escribe
+        // Y siete trabajos y no cuatro: al cerrarse el retrato, el redactor del informe escribe
         // los textos del CV y los de la evaluación (spec informe-pdf-por-etapa: corre cuando
-        // termina la calificación de cada etapa). Se espera a los seis: los redactores arrancan
-        // en cuanto acaba el retrato, y esperar a «cuatro» podía saltarse ese instante o dejarlos
-        // corriendo en la prueba siguiente, que apaga el modelo.
-        esperarA(() -> contar("select count(*) from trabajo_ia where estado = 'TERMINADO'") == 6,
-                "los cuatro agentes y los dos redactores del informe terminen");
+        // termina la calificación de cada etapa), y antes del de la evaluación el seguimiento de
+        // pendientes revisa la duda que dejó el CV (V94). Se espera a los siete: arrancan en
+        // cuanto acaba el retrato, y esperar a menos podía dejarlos corriendo en la prueba
+        // siguiente, que apaga el modelo.
+        esperarA(() -> contar("select count(*) from trabajo_ia where estado = 'TERMINADO'") == 7,
+                "los cuatro agentes, el seguimiento y los dos redactores del informe terminen");
 
         long postulacionId = idDe(codigoBueno);
 
@@ -358,7 +398,7 @@ public class FlujoCalificacionIaIT {
                 select agente_codigo, version_agente, instruccion_ia_id, es_exitosa,
                        tokens_entrada, duracion_ms
                 from ejecucion_ia order by id""");
-        assertThat(ejecuciones).hasSize(6);
+        assertThat(ejecuciones).hasSize(7);
         assertThat(ejecuciones).allSatisfy(fila -> {
             assertThat(fila.get("instruccion_ia_id")).isNotNull();
             assertThat(fila.get("version_agente")).isNotNull();
@@ -373,8 +413,11 @@ public class FlujoCalificacionIaIT {
         assertThat(codigos.subList(0, 3))
                 .containsExactlyInAnyOrder("DATOS_CV", "EVIDENCIA_CV", "EVALUADOR");
         assertThat(codigos.get(3)).isEqualTo("POTENCIAL_RIESGO");
-        // Los redactores van detrás del retrato: se piden cuando la etapa ya está calificada
-        assertThat(codigos.subList(4, 6)).containsExactly("REDACTOR_INFORME", "REDACTOR_INFORME");
+        // Los redactores y el seguimiento van detrás del retrato: se piden cuando la etapa ya está
+        // calificada. El del CV y el seguimiento arrancan a la vez; el de la evaluación, después
+        // del seguimiento (se comprueba en el punto 9).
+        assertThat(codigos.subList(4, 7))
+                .containsExactlyInAnyOrder("REDACTOR_INFORME", "SEGUIMIENTO_PENDIENTES", "REDACTOR_INFORME");
 
         // 4 · Los ocho criterios del currículum, ni uno más. El noveno que devolvió el modelo
         // no existe y el décimo venía sin explicación: los dos se descartan (RF-150).
@@ -464,6 +507,63 @@ public class FlujoCalificacionIaIT {
                         .doesNotContain("Femenino")
                         .doesNotContain("Casada")
                         .doesNotContain("999888777"));
+
+        // 9 · El seguimiento de pendientes (spec seguimiento-de-pendientes-entre-etapas): corre
+        // antes que el redactor de la evaluación, que se pide una sola vez y ya con los estados;
+        // con el modelo que razona; la duda del CV queda resuelta con su cita y la inventada se
+        // descarta; y no toca ninguna nota (AC-12).
+        Long seguimientoTerminado = jdbc.queryForObject("""
+                select id from trabajo_ia
+                where postulacion_id = ? and agente_codigo = 'SEGUIMIENTO_PENDIENTES'
+                  and referencia_tabla = 'seguimiento_evaluacion' and estado = 'TERMINADO'""",
+                Long.class, postulacionId);
+        Long redactorDeLaEvaluacion = jdbc.queryForObject("""
+                select id from trabajo_ia
+                where postulacion_id = ? and agente_codigo = 'REDACTOR_INFORME'
+                  and referencia_tabla = 'informe_evaluacion'""", Long.class, postulacionId);
+        assertThat(redactorDeLaEvaluacion).isGreaterThan(seguimientoTerminado);
+        assertThat(ModeloDePrueba.razonoPorAgente)
+                .filteredOn(llamada -> llamada.startsWith("SEGUIMIENTO_PENDIENTES"))
+                .containsExactly("SEGUIMIENTO_PENDIENTES:true");
+        Map<String, Object> seguimiento = jdbc.queryForMap("""
+                select huella, dudas, descartados, ejecucion_ia_id from seguimiento_pendiente
+                where postulacion_id = ? and etapa = 'EVALUACION'""", postulacionId);
+        assertThat(seguimiento.get("huella")).isNotNull();
+        assertThat(seguimiento.get("ejecucion_ia_id")).isNotNull();
+        assertThat(seguimiento.get("descartados")).isEqualTo(1);
+        assertThat((String) seguimiento.get("dudas"))
+                .contains("\"estado\":\"RESUELTA\"", ModeloDePrueba.CITA, "Lideró un equipo");
+        String alSeguimiento = jdbc.queryForObject(
+                "select envio from ejecucion_ia where agente_codigo = 'SEGUIMIENTO_PENDIENTES'", String.class);
+        assertThat(alSeguimiento).contains("\"contenidoDelCandidato\":\"Un caso concreto")
+                .doesNotContain("34 años").doesNotContain("Femenino").doesNotContain("999888777");
+        assertThat(contar("""
+                select (select count(*) from nota_criterio n join ejecucion_ia e on e.id = n.ejecucion_ia_id
+                        where e.agente_codigo = 'SEGUIMIENTO_PENDIENTES')
+                     + (select count(*) from nota_respuesta n join ejecucion_ia e on e.id = n.ejecucion_ia_id
+                        where e.agente_codigo = 'SEGUIMIENTO_PENDIENTES')""")).isZero();
+
+        // Y el informe de la evaluación lo enseña: «Resuelto» con la pregunta y la cita, y la duda
+        // ya no pasa a «Por verificar en la prueba del puesto».
+        JsonNode informe = json.readTree(conToken(get("/api/v1/panel/postulaciones/" + postulacionId
+                        + "/informes/evaluacion"), tokenEquipo, null)
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        JsonNode pidio = null;
+        JsonNode pendiente = null;
+        for (JsonNode bloque : informe.path("bloques")) {
+            if ("PIDIO_EL_CV".equals(bloque.path("codigo").asText())) {
+                pidio = bloque;
+            } else if ("PENDIENTE".equals(bloque.path("codigo").asText())) {
+                pendiente = bloque;
+            }
+        }
+        assertThat(pidio).isNotNull();
+        assertThat(pidio.path("puntos").get(0).path("etiqueta").asText()).isEqualTo("Resuelto");
+        assertThat(pidio.path("puntos").get(0).path("detalle").asText())
+                .startsWith("Pregunta ").contains("«" + ModeloDePrueba.CITA + "»");
+        assertThat(pendiente).isNotNull();
+        assertThat(pendiente.toString()).doesNotContain("Lideró un equipo");
+        assertThat(informe.path("textosEnCamino").asBoolean()).isFalse();
     }
 
     @DisplayName("Si la IA falla se reintenta, y no se inventa ninguna nota")

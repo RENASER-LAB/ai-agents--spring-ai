@@ -928,9 +928,9 @@ siguiente: «Por verificar en la evaluación» en el del CV, «Por verificar en 
 el de la evaluación y «Por verificar en la entrevista», el único que habla de la entrevista, en el
 de la prueba. El de la prueba es **el de la prueba que rindió esa persona**, no la que la vacante
 tenga puesta hoy. En el de la evaluación, «Lo que pidió el CV» lista cada duda que el CV mandó
-verificar con la etiqueta «Por contrastar»: decir si la evaluación la resolvió, la dejó pendiente o
-la empeoró es de otra spec, la del seguimiento de pendientes entre etapas, y hasta entonces el
-informe no inventa estados. Una nota ajustada a mano lleva «ajustada a mano» y su motivo; una que
+verificar; cómo quedó tras la evaluación y tras la prueba lo dice el seguimiento de pendientes
+(`V94`, ver «Lo que quedó por verificar, seguido de una etapa a la siguiente», más abajo), y sin él
+el informe no inventa estados. Una nota ajustada a mano lleva «ajustada a mano» y su motivo; una que
 falta sale como «—» o «pendiente», nunca como 0.
 
 ⚠️ **Nada se recorta, ni en el PDF ni en el visor** (decisión del 16/11/2026). Bajo cada barra va
@@ -943,6 +943,12 @@ punto, criterio ni pregunta se parte entre dos hojas, salvo uno más largo que u
 
 **Nunca lleva** la pretensión salarial, el celular, la foto, la edad, el sexo, el estado civil ni
 el contenido de un entregable, del que va solo el nombre. De la persona van el nombre y el correo.
+**La única excepción es la del seguimiento de pendientes** (`V94`, decisión del 27/11/2026): cuando
+una duda se aclara o se contradice con un entregable de la prueba, el detalle de ese punto —en «Lo
+que aclaró la prueba» o en «Del CV» con «Empeoró»— lleva la cita literal en que se basa, como
+«Entregable «nombre»: «cita». Explicación.». El resto del contenido de los entregables sigue sin
+viajar. ⚠️ **Limitación conocida**: esa cita va con el permiso del informe de la prueba, así que la
+ve quien tenga `abrir_ficha_candidato` aunque no tenga `descargar_entregables`.
 Desde el 17/11/2026, **un texto de la IA con la marca `[DATO NO UTILIZABLE]` no sale**: ni las
 afirmaciones del CV ni los hallazgos que la traen; una justificación, el perfil o el resumen con la
 marca se ocultan y la nota sigue. Ver [Calificación con IA](CALIFICACION-CON-IA.md), «Un texto de
@@ -974,7 +980,44 @@ IA](CALIFICACION-CON-IA.md), «El redactor del informe».
 
 ⚠️ **Pedir el `.zip` de la vacante puede gastar IA.** Encola al redactor para cada persona y etapa
 a la que le falten textos —una llamada por cada una, con el tope mensual de siempre—, aunque el
-`.zip` sale en ese momento con las explicaciones completas donde falten.
+`.zip` sale en ese momento con las explicaciones completas donde falten. Desde la `V94` encola
+también el seguimiento de pendientes de cada persona y etapa a la que le falte.
+
+**Lo que quedó por verificar, seguido de una etapa a la siguiente (`V94`).** No hay endpoint nuevo
+ni cambia la forma del JSON: cambian la etiqueta y el detalle de puntos que ya existían, y aparece
+un bloque más, que el PDF y el visor pintan como cualquier otro. Lo escribe el agente
+`SEGUIMIENTO_PENDIENTES`, que no califica: ninguna nota, grupo ni etapa cambia. Con su seguimiento
+vigente para los datos de hoy:
+
+- **En el informe de la evaluación**:
+  - «Lo que pidió el CV» (`PIDIO_EL_CV`) lleva cada duda con su estado como etiqueta —«Resuelto»,
+    «Sigue pendiente» o «Empeoró»— en lugar de «Por contrastar». El detalle de «Resuelto» y
+    «Empeoró» es «Pregunta 3: «cita». Explicación.»; el de «Sigue pendiente», la pregunta de
+    validación;
+  - «Por verificar en la prueba del puesto» (`PENDIENTE`) suma delante de lo de la evaluación,
+    con origen `CV` y su estado como etiqueta, primero las dudas que empeoraron —detalle: la cita
+    y la pregunta de validación— y después las pendientes —la pregunta de validación—. Las
+    resueltas no pasan.
+- **En el informe de la prueba**:
+  - «Por verificar en la entrevista» (`PENDIENTE`): el grupo «Del CV» lleva solo lo que sigue
+    abierto tras la prueba, con «Empeoró» o «Sigue pendiente» en lugar de «Declarada» o «Sin
+    información», y el grupo «De la evaluación» pierde lo que la prueba aclaró; lo demás conserva
+    su etiqueta («Falta evidencia», «Demasiado ideal», «Patrón»…). Lo resuelto en la evaluación no
+    se repite: está en el informe de la evaluación;
+  - justo antes va el bloque nuevo **«Lo que aclaró la prueba»** (`ACLARO_LA_PRUEBA`, tono
+    `BIEN`), solo si la prueba aclaró algo, del CV o de la evaluación: el texto de la duda y,
+    debajo, «Pregunta 2: «cita». Explicación.», o «Entregable «nombre»: …» si se basa en un
+    entregable. Una cita que viene de la evaluación dice «En la evaluación, pregunta 7: «cita».»,
+    porque el anexo de la prueba tiene otras preguntas.
+
+**Sin seguimiento vigente** —todavía no llegó, falló o cambiaron los datos— el informe sale como
+antes: «Por contrastar» en la evaluación, «Declarada» o «Sin información» en la prueba y ninguna
+duda del CV en «Por verificar en la prueba del puesto». Nunca enseña estados viejos. Si al abrir el
+informe de la evaluación o el de la prueba (el JSON, el PDF o un `.zip`) le falta el seguimiento y
+hay dudas, lo pide en ese momento: así se rellena a quien se calificó antes de la `V94`, y nunca en
+lote. Mientras viene en camino no se pide al redactor, y el JSON trae `textosEnCamino: true`. Para
+verlo basta el permiso del informe donde sale: no hay permiso nuevo. Cómo se decide cada estado y
+qué se comprueba, en [Calificación con IA](CALIFICACION-CON-IA.md), «El seguimiento de pendientes».
 
 ⚠️ **En el informe del CV, lo de «Qué buscar en el CV» va con el permiso del informe.** El bloque
 lleva, por cada línea de la vacante, «Lo tiene», «Lo menciona» o «No aparece» con la frase del CV o
@@ -1357,8 +1400,9 @@ vacante (`V66`): su guía vive en su versión, y la instrucción del `EVALUADOR`
 nuevo por la `V66`— vale para sus tres escalas: 0–4, puntos de cada pregunta y criterios vistos.
 Igual con «Qué buscar en el CV» (`V80`): la instrucción de `BUSQUEDA_CV` es global y editable
 aquí, y las líneas de cada vacante viajan en los datos de cada llamada, envueltas como texto de la
-empresa. Y con la del redactor del informe (`REDACTOR_INFORME`, `V84`): global y editable aquí; lo
-de cada etapa le llega en los datos de cada llamada.
+empresa. Y con la del redactor del informe (`REDACTOR_INFORME`, `V84`) y la del seguimiento de
+pendientes (`SEGUIMIENTO_PENDIENTES`, `V94`): globales y editables aquí; lo de cada etapa les llega
+en los datos de cada llamada, y el formato exacto del JSON va en código.
 
 **La fecha de hoy y la regla de los datos personales no se editan aquí** (17/11/2026). Las añade el
 ejecutor común a cada llamada, entre la instrucción y el formato, igual para todos los agentes, y

@@ -7,7 +7,6 @@ import com.renaser.ai.ai_engine.informe.service.RedaccionDelInforme.Textos;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -69,24 +68,10 @@ public class TextosDelInforme {
                         .descartados(0)
                         .creadoEn(Instant.now())
                         .build());
-        if (huella.equals(fila.getHuellaPedida())) {
-            return enCamino(postulacionId, etapa);
-        }
-        boolean encolado = cola.encolarRedactorInforme(postulacionId, etapa.name());
-        if (!encolado && !enCamino(postulacionId, etapa)) {
-            // La IA está apagada o no se pudo encolar: no se anota, para pedirlo la próxima vez.
-            return false;
-        }
-        fila.setHuellaPedida(huella);
-        fila.setPedidaEn(Instant.now());
-        try {
-            textos.saveAndFlush(fila);
-        } catch (DataIntegrityViolationException carrera) {
-            // Otra petición la creó a la vez: lo pedido ya está pedido.
-            log.info("Los textos del informe {} de la postulación {} ya se estaban pidiendo",
-                    etapa, postulacionId);
-        }
-        return true;
+        return PedidoSinRepetir.pedir(fila, huella,
+                () -> cola.encolarRedactorInforme(postulacionId, etapa.name()),
+                () -> enCamino(postulacionId, etapa), textos,
+                "Los textos del informe " + etapa + " de la postulación " + postulacionId);
     }
 
     /** Guarda lo que pasó la comprobación, atado a la huella de los datos con que se escribió. */

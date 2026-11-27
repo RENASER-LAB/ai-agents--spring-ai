@@ -235,6 +235,21 @@ class ArmadoDeLaEvaluacionTest {
         }
 
         @Test
+        @DisplayName("el seguimiento lee las abiertas que contestó con texto, con su número del anexo; sin evaluación, ninguna")
+        void abiertasParaElSeguimiento() {
+            armarCazatalentos();
+
+            assertThat(armado.abiertasConTexto(base(postulacion(EVALUACION), null, null, "TERMINADA")))
+                    .extracting(PendientesEntreEtapas.Fuente::codigo, PendientesEntreEtapas.Fuente::enunciado,
+                            PendientesEntreEtapas.Fuente::texto)
+                    .containsExactly(tuple("P1", "Pregunta 1", "Cambié el proceso de ingreso"),
+                            tuple("P3", "Pregunta 3", "Algo hice"),
+                            tuple("P6", "Pregunta 7", "Libre"),
+                            tuple("P7", "Pregunta 8", "Verdadero"));
+            assertThat(armado.abiertasConTexto(base(postulacion(null), null, null, "TERMINADA"))).isEmpty();
+        }
+
+        @Test
         @DisplayName("la nota dice cuánto pesó el CV y la evaluación, y los datos clave cuentan las preguntas")
         void notaYDatosClave() {
             Informe informe = armarCazatalentos();

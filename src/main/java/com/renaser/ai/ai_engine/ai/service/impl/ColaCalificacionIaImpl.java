@@ -5,11 +5,13 @@ import com.renaser.ai.ai_engine.ai.model.TrabajoIa;
 import com.renaser.ai.ai_engine.ai.repository.TrabajoIaRepository;
 import com.renaser.ai.ai_engine.ai.service.AgenteSeleccion;
 import com.renaser.ai.ai_engine.ai.service.ColaCalificacionIa;
+import com.renaser.ai.ai_engine.informe.service.SeguimientoTrasCalificar;
 import com.renaser.ai.ai_engine.organizacion.repository.OrganizacionRepository;
 import com.renaser.ai.ai_engine.perfilintegral.service.PuenteCalificacionIa;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -123,6 +125,12 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
     private final TopeMensualIa tope;
     private final OrganizacionRepository organizaciones;
     private final Map<String, AgenteSeleccion> agentes;
+    /**
+     * El informe, para saber si al terminar una etapa hay dudas que seguir antes del redactor
+     * (V94). Llega perezoso: el informe pregunta a la cola cómo va cada calificación, y sin
+     * {@code @Lazy} sería un ciclo que Spring no deja arrancar.
+     */
+    private final SeguimientoTrasCalificar seguimiento;
     private final boolean habilitada;
     private final int maxIntentos;
     private final Duration limiteColgado;
@@ -135,6 +143,7 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
                                   TopeMensualIa tope,
                                   OrganizacionRepository organizaciones,
                                   List<AgenteSeleccion> agentes,
+                                  @Lazy SeguimientoTrasCalificar seguimiento,
                                   @Value("${renaser.ai.calificacion.habilitada:true}") boolean habilitada,
                                   @Value("${renaser.ai.calificacion.max-intentos:3}") int maxIntentos,
                                   @Value("${renaser.ai.calificacion.minutos-colgado:15}") int minutosColgado) {
@@ -147,6 +156,7 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
         this.organizaciones = organizaciones;
         this.agentes = agentes.stream()
                 .collect(Collectors.toMap(AgenteSeleccion::codigo, Function.identity()));
+        this.seguimiento = seguimiento;
         this.habilitada = habilitada;
         this.maxIntentos = maxIntentos;
         this.limiteColgado = Duration.ofMinutes(minutosColgado);
@@ -571,14 +581,37 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
     /** La referencia de sus trabajos: «informe_cv», «informe_evaluacion», «informe_prueba». */
     public static final String REFERENCIA_INFORME = "informe_";
 
+    /** La referencia de los trabajos del seguimiento: «seguimiento_evaluacion», «seguimiento_prueba». */
+    public static final String REFERENCIA_SEGUIMIENTO = "seguimiento_";
+
     @Override
     public boolean encolarRedactorInforme(Long postulacionId, String etapa) {
+        return encolarDeLaEtapa(postulacionId, AGENTE_REDACTOR_INFORME, REFERENCIA_INFORME, etapa);
+    }
+
+    @Override
+    public boolean redactorDelInformeVivo(Long postulacionId, String etapa) {
+        return vivoDeLaEtapa(postulacionId, AGENTE_REDACTOR_INFORME, REFERENCIA_INFORME, etapa);
+    }
+
+    @Override
+    public boolean encolarSeguimientoPendientes(Long postulacionId, String etapa) {
+        return encolarDeLaEtapa(postulacionId, AGENTE_SEGUIMIENTO_PENDIENTES, REFERENCIA_SEGUIMIENTO, etapa);
+    }
+
+    @Override
+    public boolean seguimientoPendientesVivo(Long postulacionId, String etapa) {
+        return vivoDeLaEtapa(postulacionId, AGENTE_SEGUIMIENTO_PENDIENTES, REFERENCIA_SEGUIMIENTO, etapa);
+    }
+
+    /** Un trabajo de una etapa del informe (el redactor o el seguimiento): uno vivo frena al siguiente. */
+    private boolean encolarDeLaEtapa(Long postulacionId, String agente, String prefijo, String etapa) {
         if (apagada(postulacionId)) {
             return false;
         }
         Long organizacionId = puente.organizacionDe(postulacionId);
         Optional<TrabajoIa> creado = registro.crearDePostulacionConReferencia(organizacionId,
-                postulacionId, AGENTE_REDACTOR_INFORME, referenciaDelInforme(etapa), FINA);
+                postulacionId, agente, referenciaDe(prefijo, etapa), FINA);
         if (creado.isEmpty()) {
             return false;
         }
@@ -586,18 +619,16 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
         return true;
     }
 
-    @Override
-    public boolean redactorDelInformeVivo(Long postulacionId, String etapa) {
-        String referencia = referenciaDelInforme(etapa);
+    private boolean vivoDeLaEtapa(Long postulacionId, String agente, String prefijo, String etapa) {
+        String referencia = referenciaDe(prefijo, etapa);
         return trabajos.findByPostulacionIdOrderByIdAsc(postulacionId).stream()
-                .anyMatch(t -> AGENTE_REDACTOR_INFORME.equals(t.getAgenteCodigo())
+                .anyMatch(t -> agente.equals(t.getAgenteCodigo())
                         && referencia.equals(t.getReferenciaTabla())
-                        && ("PENDIENTE".equals(t.getEstado()) || "EN_CURSO".equals(t.getEstado())
-                        || "EN_ESPERA".equals(t.getEstado())));
+                        && esVivo(t.getEstado()));
     }
 
-    private static String referenciaDelInforme(String etapa) {
-        return REFERENCIA_INFORME + etapa.toLowerCase(java.util.Locale.ROOT);
+    private static String referenciaDe(String prefijo, String etapa) {
+        return prefijo + etapa.toLowerCase(java.util.Locale.ROOT);
     }
 
     /**
@@ -608,9 +639,18 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
      * de la prueba (o del cuestionario técnico), la prueba. <b>Nunca rompe la cola</b>: si algo
      * falla aquí, el informe sigue con las explicaciones y el redactor correrá la primera vez
      * que alguien lo abra.
+     *
+     * <p><b>En la evaluación y en la prueba va antes el seguimiento de pendientes</b> (V94): si
+     * hay dudas que seguir con datos nuevos, se pide él, y es él quien pide al redactor al
+     * terminar. Así el redactor escribe una sola vez y ya con los estados. Sin dudas, el redactor
+     * se pide como siempre.
      */
     private void redactarLosInformes(TrabajoIa acabado) {
         if (acabado.getPostulacionId() == null) {
+            return;
+        }
+        if (AGENTE_SEGUIMIENTO_PENDIENTES.equals(acabado.getAgenteCodigo())) {
+            trasElSeguimiento(acabado);
             return;
         }
         try {
@@ -625,11 +665,44 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
                 default -> List.of();
             };
             for (String etapa : etapas) {
+                if (!"CV".equals(etapa) && seguimientoPedido(acabado.getPostulacionId(), etapa)) {
+                    continue;
+                }
                 encolarRedactorInforme(acabado.getPostulacionId(), etapa);
             }
         } catch (RuntimeException e) {
             log.warn("No se pudo pedir el redactor del informe tras el trabajo {}: {}",
                     acabado.getId(), mensaje(e));
+        }
+    }
+
+    /**
+     * Si el seguimiento de pendientes de esa etapa quedó pedido (él pedirá al redactor). Si algo
+     * falla al preguntarlo, se sigue como siempre: el redactor se pide igual.
+     */
+    private boolean seguimientoPedido(Long postulacionId, String etapa) {
+        try {
+            return seguimiento.pedirElSeguimiento(postulacionId, etapa);
+        } catch (RuntimeException e) {
+            log.warn("No se pudo pedir el seguimiento de pendientes {} de la postulación {}: se pide el "
+                    + "redactor directamente. Motivo: {}", etapa, postulacionId, mensaje(e));
+            return false;
+        }
+    }
+
+    /**
+     * Terminó el seguimiento de pendientes, bien o agotando sus reintentos: el informe pide al
+     * redactor con lo que haya y, si era el de la evaluación, sigue con la prueba ya calificada.
+     */
+    private void trasElSeguimiento(TrabajoIa acabado) {
+        String referencia = acabado.getReferenciaTabla() == null ? "" : acabado.getReferenciaTabla();
+        String etapa = (referencia.startsWith(REFERENCIA_SEGUIMIENTO)
+                ? referencia.substring(REFERENCIA_SEGUIMIENTO.length()) : referencia).toUpperCase(java.util.Locale.ROOT);
+        try {
+            seguimiento.trasElSeguimiento(acabado.getPostulacionId(), etapa);
+        } catch (RuntimeException e) {
+            log.warn("Tras el seguimiento de pendientes {} no se pudo pedir el redactor del informe: se "
+                    + "pedirá la próxima vez que alguien lo abra. Motivo: {}", acabado.getId(), mensaje(e));
         }
     }
 
@@ -681,6 +754,11 @@ public class ColaCalificacionIaImpl implements ColaCalificacionIa {
                 puenteDelPerfil.marcarNoLegible(trabajo.getReferenciaId(), mensaje(e));
             }
             intentarElRetrato(trabajo);
+            // Un seguimiento de pendientes que se agota no frena al redactor: se pide igual, y
+            // el informe sale con «Por contrastar» (V94).
+            if (AGENTE_SEGUIMIENTO_PENDIENTES.equals(trabajo.getAgenteCodigo())) {
+                redactarLosInformes(trabajo);
+            }
         }
     }
 
