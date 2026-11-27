@@ -211,13 +211,20 @@ public class LoComunDelInforme {
 
     // ============================================================== lo pendiente
 
+    /**
+     * Las afirmaciones del CV que son dudas: lo declarado sin prueba y lo que no tenía información.
+     * Son las que enseña el informe y las que sigue el seguimiento de pendientes (V94).
+     */
+    public static List<AfirmacionCv> dudosas(Base base) {
+        return base.afirmaciones().stream()
+                .filter(a -> "DECLARADA".equals(a.getClasificacion()) || "FALTA_INFO".equals(a.getClasificacion()))
+                .toList();
+    }
+
     /** Las dudas del CV: lo declarado sin prueba y lo que no tenía información. */
     public static List<Punto> dudasDelCv(Base base, String etiquetaFija, String grupo) {
         List<Punto> puntos = new ArrayList<>();
-        for (AfirmacionCv a : base.afirmaciones()) {
-            if (!"DECLARADA".equals(a.getClasificacion()) && !"FALTA_INFO".equals(a.getClasificacion())) {
-                continue;
-            }
+        for (AfirmacionCv a : dudosas(base)) {
             String etiqueta = etiquetaFija != null ? etiquetaFija
                     : "DECLARADA".equals(a.getClasificacion()) ? "Declarada" : "Sin información";
             puntos.add(new Punto("«" + a.getTexto().strip() + "»", limpio(a.getPreguntaValidacion()),

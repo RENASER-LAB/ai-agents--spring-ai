@@ -23,8 +23,8 @@ Sirve para tres cosas:
 - **Entender el sistema.** Un modelo de datos bien contado explica el negocio mejor que
   cualquier otro documento.
 
-**La base ya está construida.** Las migraciones `V1` a `V80`, de la `V84` a la `V86`, la `V89`, la `V92` y la `V93` viven en
-`src/main/resources/db/migration` —**132 tablas de este módulo**, 135 en la base contando la de
+**La base ya está construida.** Las migraciones `V1` a `V80`, de la `V84` a la `V86`, la `V89` y de la `V92` a la `V94` viven en
+`src/main/resources/db/migration` —**133 tablas de este módulo**, 136 en la base contando la de
 Flyway y las dos del motor de agentes— y Flyway es el dueño del esquema. Cambiar algo de aquí
 ya cuesta una migración nueva, y **una migración aplicada no se edita nunca**: se escribe otra
 encima. No hay `V81` a `V83`: esos números los reservaban otras specs que todavía no se han
@@ -32,8 +32,9 @@ construido, y como Flyway no aplica migraciones fuera de orden, tendrán que lle
 mayor que la última aplicada. Ya pasó con el perfil de la empresa, que reservaba la `V81` y entró
 como `V85`, y su brochure entró como `V86`. **Tampoco hay `V87` ni `V88`**: las reservan la
 convocatoria desde el propósito y el video por webcam, aún sin fusionar, y la `V89` se construyó
-antes. **Ni `V90` ni `V91`**: las reservan el seguimiento de pendientes entre etapas y el video de
-la empresa, y las notificaciones del candidato (`V92` y `V93`) se construyeron antes.
+antes. **Ni `V90` ni `V91`**: la `V90` la reservaba el seguimiento de pendientes entre etapas, que
+al construirse entró como `V94` porque las notificaciones del candidato (`V92` y `V93`) llegaron
+antes, y la `V91` la reserva el video de la empresa.
 `MigracionesSinChoqueTest` admite esos siete números como huecos deliberados (ver «Reglas
 que no se negocian» en [Reglas del código](REGLAS-DEL-CODIGO.md)).
 
@@ -345,6 +346,14 @@ enseña una vez por cuenta. Las dos se despliegan juntas. ⚠️ **Limitación c
 número de bot para todas las empresas, así que el interruptor de WhatsApp y la BAJA son de la
 persona y no de la empresa; cuando cada empresa tenga su número, tendrán que separarse. Ver
 «Novedades por WhatsApp», más abajo, y [el contrato con el bot](CONTRATO-NOVEDADES-POR-WHATSAPP.md).
+
+La `V94` (27/11/2026) acompaña al **seguimiento de pendientes entre etapas**: después de la
+evaluación y de la prueba del puesto, un agente que no califica dice si cada duda del CV —y, en la
+prueba, lo que dejó la evaluación por verificar— quedó resuelta, sigue pendiente o empeoró, con la
+cita en que se basa. Guarda la tabla `seguimiento_pendiente` y siembra el agente
+`SEGUIMIENTO_PENDIENTES` con su instrucción. Ninguna nota cambia y ninguna fila que existía se toca:
+nadie tiene seguimiento al desplegar, y se pide la primera vez que alguien abre su informe. Ver «El
+seguimiento de pendientes», más abajo.
 
 La `V54` (14/09/2026) **no añade ninguna tabla y cambia quién firma qué**. Hasta ella había dos
 tipos de texto —`PROCESO` y `FUTUROS_CONTACTOS`— y el de la cuenta usaba el primero, que habla de
@@ -726,7 +735,7 @@ Hay una versión dibujada de este mismo mapa en
 
 ## Las tablas
 
-Ciento treinta y una en total, agrupadas por área para poder leerlas de a poco. En cada una se nombran
+Ciento treinta y tres en total, agrupadas por área para poder leerlas de a poco. En cada una se nombran
 las columnas que importan para entender qué hace, no todas.
 
 **Para verlas todas, con tipo y clave, está el [Diccionario de datos](07-DICCIONARIO-DE-DATOS.md).**
@@ -1482,6 +1491,11 @@ Recomendador no evalúa a nadie: escribe los textos de los informes por etapa co
 No abre ningún modo nuevo: sus trabajos nacen en `FINA` —aunque el redactor corre sin razonar— y
 se distinguen por `referencia_tabla` (`informe_cv`, `informe_evaluacion`, `informe_prueba`).
 
+La `V94` suma el **seguimiento de pendientes** (`SEGUIMIENTO_PENDIENTES`), el cuarto que no evalúa
+a nadie: dice cómo quedó cada duda del CV tras la evaluación y tras la prueba. Tampoco abre modo:
+sus trabajos nacen en `FINA`, corre con el modelo que razona y se distinguen por `referencia_tabla`
+(`seguimiento_evaluacion`, `seguimiento_prueba`).
+
 Se guarda la respuesta **completa**, no solo la nota: si alguien reclama una calificación, hay
 que poder revisar en qué se basó. Y se guarda **con cuánta confianza** la dio, que es lo que
 distingue una nota firme de una que el propio modelo dio con dudas.
@@ -1749,6 +1763,36 @@ se le pidió, para no pagar dos veces el mismo pedido.
 **Lo que no pasó la comprobación no está.** `criterios` y `preguntas` guardan solo las líneas
 válidas, y `descartados` cuenta las que se tiraron; en su lugar, el informe pone la explicación de
 la IA.
+
+---
+
+### El seguimiento de pendientes · 1 tabla
+
+Desde la `V94` (27/11/2026). Después de la evaluación y de la prueba del puesto, el agente
+`SEGUIMIENTO_PENDIENTES` dice de cada duda del CV —las afirmaciones declaradas y las sin
+información— y, en la prueba, de lo que la evaluación dejó por verificar, si quedó resuelta, sigue
+pendiente o empeoró, con la cita en que se basa. Los informes de la evaluación y de la prueba lo
+leen de aquí. Cómo se decide y qué se comprueba, en [Calificación con IA](CALIFICACION-CON-IA.md),
+«El seguimiento de pendientes».
+
+| Tabla | Para qué existe | Columnas que importan |
+|---|---|---|
+| `seguimiento_pendiente` | Cómo quedó cada duda tras una etapa (`EVALUACION` o `PRUEBA`) de una postulación, con la huella de los datos con que se hizo. Una fila por postulación y etapa | postulacion_id, etapa, huella, dudas, descartados, motivos, ejecucion_ia_id, huella_pedida, pedida_en, escrita_en |
+
+**No es una nota.** Nada de esta tabla entra en una cuenta, cambia un orden ni mueve a nadie: sin
+su fila, el informe sale como antes del seguimiento, con «Por contrastar».
+
+**Guarda una copia, no una referencia.** `dudas` copia el texto, la clasificación y la pregunta de
+cada duda, porque las afirmaciones del CV se borran y se vuelven a escribir cada vez que el CV se
+recalifica. Lleva también la cita literal de la respuesta o del entregable en que se basa cada
+«resuelta» o «empeoró».
+
+**Solo vale para los datos con que se hizo**, como `texto_informe`. `huella` resume las dudas con
+su estado de antes y lo que el candidato respondió o entregó, **sin las notas**: un ajuste a mano no
+la cambia; un CV recalificado o unas respuestas distintas, sí, y el informe deja de usarla hasta que
+llegue la nueva. `huella_pedida` es lo último que se pidió, para no pagar dos veces el mismo pedido.
+Lo que no pasó la comprobación se guarda como «sigue pendiente», y `descartados` y `motivos` dicen
+cuántas respuestas del agente se tiraron y por qué.
 
 ---
 

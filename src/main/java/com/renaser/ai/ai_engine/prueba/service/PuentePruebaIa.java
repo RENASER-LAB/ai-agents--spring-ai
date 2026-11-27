@@ -56,6 +56,15 @@ public interface PuentePruebaIa {
      */
     void guardarNotasPrueba(Long postulacionId, Long ejecucionIaId, ResultadoPrueba resultado);
 
+    /**
+     * Lo que entregó, con el texto que se pudo sacar de cada archivo o el motivo de que no saliera
+     * nada: lo mismo que lee la IA de la prueba. Lo pide el seguimiento de pendientes (V94), que no
+     * califica. Sirve para las dos formas de prueba (plantilla y editor) y también para una
+     * cerrada como no completada; sin prueba, vacío.
+     */
+    java.util.List<com.renaser.ai.ai_engine.prueba.dto.DtosPruebaIa.EntregaDelCandidato> entregasParaElSeguimiento(
+            Long postulacionId);
+
     // ==================== La prueba escrita en el editor (V67) ====================
 
     /** Si la prueba de esta postulación se escribió en el editor y no es una plantilla. */

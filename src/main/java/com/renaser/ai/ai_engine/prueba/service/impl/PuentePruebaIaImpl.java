@@ -147,6 +147,25 @@ public class PuentePruebaIaImpl implements PuentePruebaIa {
                 loQueEntrego(intento, version));
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<EntregaDelCandidato> entregasParaElSeguimiento(Long postulacionId) {
+        IntentoPrueba intento = intentos.findByPostulacionId(postulacionId).orElse(null);
+        if (intento == null) {
+            return List.of();
+        }
+        if (intento.esDelEditor()) {
+            List<Entregable> subidos = entregables.findByIntentoPruebaId(intento.getId());
+            return calculo.calcular(intento).entregables().stream()
+                    .map(requerido -> pintarEntrega(requerido, ultimaVersionDe(subidos, requerido)))
+                    .toList();
+        }
+        return intento.getVersionPlantillaPruebaId() == null ? List.of()
+                : versiones.findById(intento.getVersionPlantillaPruebaId())
+                        .map(version -> loQueEntrego(intento, version))
+                        .orElse(List.of());
+    }
+
     /**
      * La parte de la rúbrica que le toca al agente.
      *

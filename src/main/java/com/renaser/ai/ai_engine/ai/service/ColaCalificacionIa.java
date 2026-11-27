@@ -408,4 +408,27 @@ public interface ColaCalificacionIa {
 
     /** Si hay un redactor del informe vivo (pendiente, en curso o esperando) para esa etapa. */
     boolean redactorDelInformeVivo(Long postulacionId, String etapa);
+
+    // ==================== El seguimiento de pendientes (V94) ====================
+
+    /**
+     * El agente que revisa si lo que el candidato respondió en una etapa aclara las dudas del CV
+     * (y, en la prueba, lo que dejó la evaluación). No califica.
+     */
+    String AGENTE_SEGUIMIENTO_PENDIENTES = "SEGUIMIENTO_PENDIENTES";
+
+    /**
+     * Encola el seguimiento de pendientes de una etapa (EVALUACION o PRUEBA) de una postulación.
+     *
+     * <p>No cambia ninguna nota ni mueve a nadie. Al terminar —bien o agotando sus reintentos— pide
+     * al redactor del informe de esa etapa, que así escribe una sola vez y ya con los estados. Uno
+     * vivo para la misma etapa frena al siguiente.
+     *
+     * @return true si quedó en la cola (o EN_ESPERA por tope); false si hay uno vivo o la IA está
+     *         apagada
+     */
+    boolean encolarSeguimientoPendientes(Long postulacionId, String etapa);
+
+    /** Si hay un seguimiento de pendientes vivo (pendiente, en curso o esperando) para esa etapa. */
+    boolean seguimientoPendientesVivo(Long postulacionId, String etapa);
 }

@@ -55,6 +55,7 @@ class ColaRecalificacionDelCvTest {
     private static final String RETRATO = AgentePotencialRiesgo.CODIGO_AGENTE;
 
     @Mock private TrabajoIaRepository trabajos;
+    @Mock private com.renaser.ai.ai_engine.informe.service.SeguimientoTrasCalificar seguimiento;
     @Mock private RegistroTrabajosIa registro;
     @Mock private TrabajoIaPublisher publicador;
     @Mock private PuenteCalificacionIa puente;
@@ -75,7 +76,7 @@ class ColaRecalificacionDelCvTest {
                 Optional.of(trabajo(100L + ((String) llamada.getArgument(2)).length(), llamada.getArgument(2),
                         "PENDIENTE", RECALIFICA)));
         cola = new ColaCalificacionIaImpl(trabajos, registro, publicador, puente, puenteDelPerfil,
-                tope, organizaciones, List.of(evidencia, datos), true, 3, 15);
+                tope, organizaciones, List.of(evidencia, datos), seguimiento, true, 3, 15);
     }
 
     private static TrabajoIa trabajo(long id, String agente, String estado, String modo) {
@@ -124,7 +125,7 @@ class ColaRecalificacionDelCvTest {
         @DisplayName("con la IA apagada no encola")
         void apagada() {
             ColaCalificacionIaImpl apagada = new ColaCalificacionIaImpl(trabajos, registro, publicador, puente,
-                    puenteDelPerfil, tope, organizaciones, List.of(evidencia), false, 3, 15);
+                    puenteDelPerfil, tope, organizaciones, List.of(evidencia), seguimiento, false, 3, 15);
             assertThat(apagada.recalificarElCv(POSTULACION, false)).isFalse();
             verify(registro, never()).crearSiNoHayUnoVivo(anyLong(), anyLong(), any(), any());
         }

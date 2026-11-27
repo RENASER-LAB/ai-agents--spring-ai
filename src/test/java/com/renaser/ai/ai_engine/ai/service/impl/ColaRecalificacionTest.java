@@ -39,6 +39,7 @@ class ColaRecalificacionTest {
     private static final long POSTULACION = 55L;
 
     @Mock private TrabajoIaRepository trabajos;
+    @Mock private com.renaser.ai.ai_engine.informe.service.SeguimientoTrasCalificar seguimiento;
     @Mock private RegistroTrabajosIa registro;
     @Mock private TrabajoIaPublisher publicador;
     @Mock private PuenteCalificacionIa puente;
@@ -54,7 +55,7 @@ class ColaRecalificacionTest {
         when(evaluador.codigo()).thenReturn(AgenteEvaluador.CODIGO_AGENTE);
         lenient().when(puente.organizacionDe(POSTULACION)).thenReturn(1L);
         cola = new ColaCalificacionIaImpl(trabajos, registro, publicador, puente, puenteDelPerfil,
-                tope, organizaciones, List.of(evaluador), true, 3, 15);
+                tope, organizaciones, List.of(evaluador), seguimiento, true, 3, 15);
     }
 
     private static TrabajoIa trabajo(long id, String agente, String estado, String modo) {
@@ -123,7 +124,7 @@ class ColaRecalificacionTest {
         assertThat(cola.porQueNoSePuedeUsarLaIa(1L)).contains("no tiene saldo");
 
         ColaCalificacionIaImpl apagada = new ColaCalificacionIaImpl(trabajos, registro, publicador,
-                puente, puenteDelPerfil, tope, organizaciones, List.of(evaluador), false, 3, 15);
+                puente, puenteDelPerfil, tope, organizaciones, List.of(evaluador), seguimiento, false, 3, 15);
         assertThat(apagada.porQueNoSePuedeUsarLaIa(1L)).contains("apagada")
                 // QA-PP-06: lo usan también las recomendaciones; no puede hablar de calificar
                 .doesNotContainIgnoringCase("calificar");

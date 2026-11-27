@@ -40,6 +40,7 @@ class ColaBusquedaCvTest {
     private static final long POSTULACION = 77L;
 
     @Mock private TrabajoIaRepository trabajos;
+    @Mock private com.renaser.ai.ai_engine.informe.service.SeguimientoTrasCalificar seguimiento;
     @Mock private RegistroTrabajosIa registro;
     @Mock private TrabajoIaPublisher publicador;
     @Mock private PuenteCalificacionIa puente;
@@ -57,7 +58,7 @@ class ColaBusquedaCvTest {
         lenient().when(evidencia.codigo()).thenReturn(AgenteEvidenciaCv.CODIGO_AGENTE);
         lenient().when(puente.organizacionDe(POSTULACION)).thenReturn(1L);
         cola = new ColaCalificacionIaImpl(trabajos, registro, publicador, puente, puenteDelPerfil,
-                tope, organizaciones, List.of(busqueda, evidencia), true, 3, 15);
+                tope, organizaciones, List.of(busqueda, evidencia), seguimiento, true, 3, 15);
     }
 
     private static TrabajoIa trabajo(long id, String agente, String estado, String modo) {

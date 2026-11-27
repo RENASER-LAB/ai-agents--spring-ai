@@ -149,9 +149,14 @@ public final class RedaccionDelInforme {
             s.append(p.bloque()).append('=').append(p.texto()).append(':').append(p.detalle()).append('|');
         }
         insumo.experiencia().forEach(e -> s.append(e).append('|'));
+        return sha256(s.toString());
+    }
+
+    /** El resumen SHA-256 de un texto, en hexadecimal: la huella de unos datos. */
+    static String sha256(String texto) {
         try {
             byte[] resumen = MessageDigest.getInstance("SHA-256")
-                    .digest(s.toString().getBytes(StandardCharsets.UTF_8));
+                    .digest(texto.getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(resumen);
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException("La JVM no trae SHA-256", e);

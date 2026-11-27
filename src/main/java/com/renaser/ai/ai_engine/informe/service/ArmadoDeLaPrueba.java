@@ -44,8 +44,10 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -85,10 +87,15 @@ public class ArmadoDeLaPrueba {
     private final ServicioDesgloseEvaluacion desglose;
     private final ColaCalificacionIa cola;
 
-    /** Lo que se leyó de la prueba, sea de la forma que sea. */
+    /**
+     * Lo que se leyó de la prueba, sea de la forma que sea.
+     *
+     * @param abiertas los números de las preguntas que se contestan escribiendo (no las de opción)
+     */
     record Lectura(String nombre, String caso, Instant entregadaEn, boolean noCompletada,
                    List<Criterio> criterios, List<PreguntaAnexo> preguntas,
-                   List<EntregableAnexo> entregables, List<String> loQueFalta, String motivoPendiente) {
+                   List<EntregableAnexo> entregables, List<String> loQueFalta, String motivoPendiente,
+                   Set<Integer> abiertas) {
         boolean algunaNota() {
             return criterios.stream().anyMatch(c -> c.nota() != null);
         }
@@ -214,10 +221,10 @@ public class ArmadoDeLaPrueba {
                         null, null));
             }
             return new Lectura("Cuestionario técnico", null, null, false, List.of(), preguntas,
-                    List.of(), List.of(), null);
+                    List.of(), List.of(), null, todas(preguntas));
         }
         if (intento == null) {
-            return new Lectura(null, null, null, false, List.of(), List.of(), List.of(), List.of(), null);
+            return new Lectura(null, null, null, false, List.of(), List.of(), List.of(), List.of(), null, Set.of());
         }
         if (intento.esDelEditor()) {
             return delEditor(base, intento);
@@ -231,10 +238,11 @@ public class ArmadoDeLaPrueba {
                 : versionesBanco.findById(intento.getVersionBancoId()).orElse(null);
         if (prueba == null) {
             return new Lectura(null, null, intento.getEntregadoEn(), intento.isNoCompletada(),
-                    List.of(), List.of(), List.of(), List.of(), null);
+                    List.of(), List.of(), List.of(), List.of(), null, Set.of());
         }
         List<Criterio> criterios = new ArrayList<>();
         List<PreguntaAnexo> preguntas = new ArrayList<>();
+        Set<Integer> abiertas = new HashSet<>();
         int n = 0;
         for (CriterioDelCandidato c : prueba.criterios()) {
             BigDecimal maximo = BigDecimal.valueOf(c.maximo());
@@ -255,6 +263,9 @@ public class ArmadoDeLaPrueba {
             for (PreguntaDelCandidato p : c.preguntas()) {
                 preguntas.add(new PreguntaAnexo(++n, p.enunciado(), tipoDicho(p.tipo()) + " · " + c.nombre(),
                         respuestaDe(p), null, null));
+                if ("ABIERTA".equals(p.tipo())) {
+                    abiertas.add(n);
+                }
             }
         }
         List<EntregableAnexo> entregables = prueba.entregables().stream()
@@ -262,7 +273,7 @@ public class ArmadoDeLaPrueba {
         return new Lectura(version == null || !hay(version.getEtiqueta()) ? "Prueba del puesto" : version.getEtiqueta(),
                 version == null ? null : limpio(version.getEnunciado()), prueba.entregadoEn(),
                 "NO_COMPLETADA".equals(prueba.estado()) || intento.isNoCompletada(), criterios,
-                preguntas, entregables, prueba.loQueFalta(), prueba.motivoPendiente());
+                preguntas, entregables, prueba.loQueFalta(), prueba.motivoPendiente(), abiertas);
     }
 
     private Lectura deLaPlantilla(Base base, IntentoPrueba intento) {
@@ -296,9 +307,11 @@ public class ArmadoDeLaPrueba {
         String nombre = version == null || version.getPlantillaPruebaId() == null ? "Prueba del puesto"
                 : plantillas.findById(version.getPlantillaPruebaId()).map(p -> p.getNombre())
                         .filter(FormatoDelInforme::hay).orElse("Prueba del puesto");
+        // Las preguntas de una plantilla (previas, universales y específicas) se contestan todas
+        // escribiendo.
         return new Lectura(nombre, version == null ? null : limpio(version.getEnunciado()),
                 intento.getEntregadoEn(), intento.isNoCompletada(), criterios, preguntas, entregables,
-                List.of(), null);
+                List.of(), null, todas(preguntas));
     }
 
     /**
@@ -347,11 +360,51 @@ public class ArmadoDeLaPrueba {
         };
     }
 
+    private static Set<Integer> todas(List<PreguntaAnexo> preguntas) {
+        Set<Integer> numeros = new HashSet<>();
+        preguntas.forEach(p -> numeros.add(p.numero()));
+        return numeros;
+    }
+
+    // ================================================================= lo que lee el seguimiento
+
+    /**
+     * Lo mismo que leyó la IA de la prueba, para el seguimiento de pendientes (V94): las abiertas
+     * que contestó con texto, numeradas como en el anexo, y los entregables que subió como archivo.
+     * Del entregable va con qué archivo llegó, no su texto: el texto lo saca el agente al correr, y
+     * así abrir el informe no lee ningún archivo.
+     */
+    List<PendientesEntreEtapas.Fuente> paraElSeguimiento(Base base) {
+        IntentoPrueba intento = intentos.findByPostulacionId(base.postulacion().getId()).orElse(null);
+        Lectura lectura = leer(base, intento);
+        List<PendientesEntreEtapas.Fuente> fuentes = new ArrayList<>();
+        for (PreguntaAnexo p : lectura.preguntas()) {
+            if (lectura.abiertas().contains(p.numero()) && hay(p.respuesta())) {
+                fuentes.add(PendientesEntreEtapas.Fuente.respuesta(p.numero(), p.enunciado(), p.respuesta()));
+            }
+        }
+        int orden = 0;
+        for (EntregableAnexo e : lectura.entregables()) {
+            if (e.entregado() && e.archivoId() != null) {
+                fuentes.add(PendientesEntreEtapas.Fuente.entregable(++orden, e.nombre(), "archivo:" + e.archivoId()));
+            }
+        }
+        return fuentes;
+    }
+
+    /** Lo que dejó la evaluación por verificar, como lo enseña «De la evaluación». */
+    List<Punto> deLaEvaluacion(Base base) {
+        List<PatronDelCuestionario> patrones = base.postulacion().getEvaluacionId() == null ? List.of()
+                : desglose.paraElInforme(base.postulacion()).patrones();
+        return LoComunDelInforme.pendientesDeLaEvaluacion(base, patrones, PendientesEntreEtapas.GRUPO_DE_LA_EVALUACION);
+    }
+
     // ================================================================= lo pendiente
 
     /**
      * Lo que queda por verificar en la entrevista, en tres grupos y nunca recortado: lo que deja
      * la propia prueba, lo que dejó la evaluación y las dudas del CV, que suelen ser lo más largo.
+     * El seguimiento de pendientes (V94), si está al día, quita después lo que ya se aclaró.
      */
     private List<Punto> paraLaEntrevista(Base base, Lectura lectura) {
         List<Punto> puntos = new ArrayList<>();
@@ -371,10 +424,8 @@ public class ArmadoDeLaPrueba {
         if (lectura.noCompletada()) {
             puntos.add(new Punto("No completó la prueba", null, "PRUEBA", null, deLaPrueba));
         }
-        List<PatronDelCuestionario> patrones = base.postulacion().getEvaluacionId() == null ? List.of()
-                : desglose.paraElInforme(base.postulacion()).patrones();
-        puntos.addAll(LoComunDelInforme.pendientesDeLaEvaluacion(base, patrones, "De la evaluación"));
-        puntos.addAll(LoComunDelInforme.dudasDelCv(base, null, "Del CV"));
+        puntos.addAll(deLaEvaluacion(base));
+        puntos.addAll(LoComunDelInforme.dudasDelCv(base, null, PendientesEntreEtapas.GRUPO_DEL_CV));
         return puntos;
     }
 
