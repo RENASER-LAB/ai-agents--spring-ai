@@ -246,9 +246,12 @@ public class ServicioContextoWhatsappImpl implements ServicioContextoWhatsapp {
         EstadoPostulacion estado = catalogo.get(postulacion.getEstadoCodigo());
         String modalidad = acciones.modalidadDeLaPrueba(postulacion, vacante);
 
+        // Solo las etapas del recorrido de SU vacante, en su orden (V95).
+        List<String> recorrido = recorridoDe(vacante);
         List<Etapa> procedimiento = c.esFinal()
-                ? ProcedimientoPublico.terminado(vacante, alcanzadas(postulacion, catalogo), modalidad)
-                : ProcedimientoPublico.enMarcha(vacante, estado == null ? null : estado.getEtapaCodigo(), modalidad);
+                ? ProcedimientoPublico.terminado(vacante, recorrido, alcanzadas(postulacion, catalogo), modalidad)
+                : ProcedimientoPublico.enMarcha(vacante, recorrido,
+                        estado == null ? null : estado.getEtapaCodigo(), modalidad);
 
         TextosDelMomento.Texto momento = TextosDelMomento.de(postulacion.getEstadoCodigo(),
                 vacante.getInstrumentoEtapaTecnica(), acciones.pruebaSinCompletar(postulacion));
@@ -267,6 +270,26 @@ public class ServicioContextoWhatsappImpl implements ServicioContextoWhatsapp {
         Instant actualizado = actualizadoEn(c, ahora);
         return new Contexto(c.vinculo().getReferencia(), alMilisegundo(ahora), actualizado,
                 actualizado.toEpochMilli(), ficha.de(vacante), procedimiento, situacion, accion, resultado);
+    }
+
+    /**
+     * El recorrido de la vacante (V95). Por setter: las pruebas construyen el servicio a mano, y
+     * sin él se cuentan las etapas del catálogo, como antes.
+     */
+    private com.renaser.ai.ai_engine.vacante.service.RecorridoDeLaVacante recorridos;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void setRecorridos(com.renaser.ai.ai_engine.vacante.service.RecorridoDeLaVacante recorridos) {
+        this.recorridos = recorridos;
+    }
+
+    private List<String> recorridoDe(Vacante vacante) {
+        if (recorridos == null) {
+            return List.of(ProcedimientoPublico.PERFIL_INTEGRAL, ProcedimientoPublico.PRUEBA_PUESTO,
+                    ProcedimientoPublico.SIMULACION, ProcedimientoPublico.VALIDACION,
+                    ProcedimientoPublico.DECISION);
+        }
+        return recorridos.de(vacante.getId());
     }
 
     /** El resultado como lo cuenta EX: sin explicación mientras no haya una causa pública registrada. */

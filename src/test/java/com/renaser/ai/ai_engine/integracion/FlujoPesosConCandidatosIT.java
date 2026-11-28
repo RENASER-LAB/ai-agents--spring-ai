@@ -47,6 +47,7 @@ import java.util.stream.Collectors;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
@@ -149,6 +150,8 @@ class FlujoPesosConCandidatosIT {
                 {"solicitudTalentoId": %d, "titulo": "Analista de operaciones",
                  "descripcion": "Turno completo", "tipoCierre": "PERMANENTE",
                  "responsableUsuarioId": 1}""".formatted(solicitud), 201), "id"));
+        // Las cinco etapas, como las vacantes de antes de la V95: la previsión las enseña todas.
+        con(put("/api/v1/panel/vacantes/" + vacante + "/etapas"), "{\"etapas\":[\"PERFIL_INTEGRAL\",\"PRUEBA_PUESTO\",\"SIMULACION\",\"VALIDACION\",\"DECISION\"]}", 200);
 
         antes = version("Pesos de antes (V74)", "30", "15",
                 new String[][] {{"CV_RESULTADOS", "100"}, {"CV_PERSONAS", "0"},

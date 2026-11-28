@@ -616,6 +616,53 @@ class ServicioInformesImplTest {
 
     // ================================================================= ayudas
 
+    // ================================================================= sin Prueba en el recorrido (V95)
+
+    /** La vacante no tiene la prueba del puesto en su recorrido. */
+    private void sinPruebaEnElRecorrido() {
+        var recorridos = mock(com.renaser.ai.ai_engine.vacante.service.RecorridoDeLaVacante.class);
+        when(recorridos.tiene(VACANTE, "PRUEBA_PUESTO")).thenReturn(false);
+        servicio.setRecorridos(recorridos);
+    }
+
+    @Test
+    @DisplayName("sin Prueba en el recorrido no existe su informe: ni en los estados ni pedido suelto (AC-16)")
+    void sinPruebaNoHayInformeDePrueba() {
+        sinPruebaEnElRecorrido();
+        EstadoDeUnInforme delCv = new EstadoDeUnInforme("CV", true, null, BigDecimal.valueOf(74));
+        when(armado.estado(postulacion, EtapaDelInforme.CV)).thenReturn(delCv);
+
+        InformesDelPostulante estados = servicio.estados(quien(VER_CV, VER_PRUEBA), POSTULACION);
+
+        assertThat(estados.informes()).containsExactly(delCv);
+        verify(armado, never()).estado(postulacion, EtapaDelInforme.PRUEBA);
+        assertThatThrownBy(() -> servicio.informe(quien(VER_PRUEBA), POSTULACION, "prueba"))
+                .isInstanceOf(com.renaser.ai.ai_engine.ai.exception.ResourceNotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("sin Prueba en el recorrido, el visor ordena por la nota del Perfil Integral y no lista el informe de la prueba (AC-16)")
+    void sinPruebaElVisorOrdenaPorElPerfil() {
+        sinPruebaEnElRecorrido();
+        FilaRanking ana = fila(1, 41L, "Ana");
+        FilaRanking luis = fila(2, 42L, "Luis");
+        FilaRanking eva = fila(3, 43L, "Eva");
+        FilaRanking sinNota = fila(4, 44L, "Sin nota");
+        when(ana.notaEtapa()).thenReturn(BigDecimal.valueOf(60));
+        when(luis.notaEtapa()).thenReturn(BigDecimal.valueOf(88));
+        when(eva.notaEtapa()).thenReturn(BigDecimal.valueOf(72));
+        when(sinNota.notaEtapa()).thenReturn(null);
+        ranking(List.of(ana, luis, sinNota, eva));
+
+        VisorDeLaVacante visor = servicio.visor(quien(VER_CV, VER_EVALUACION, VER_PRUEBA), VACANTE);
+
+        assertThat(visor.postulantes()).extracting(PostulanteDelVisor::candidato)
+                .containsExactly("Luis", "Eva", "Ana", "Sin nota");
+        assertThat(visor.postulantes()).extracting(PostulanteDelVisor::notaPrueba).containsOnlyNulls();
+        assertThat(visor.etapas()).containsExactly("CV", "EVALUACION");
+        verify(notasEtapa, never()).findByPostulacionIdInAndEtapaCodigo(anyList(), eq("PRUEBA_PUESTO"));
+    }
+
     private static ContextoUsuario quien(String... permisos) {
         Map<String, String> mapa = new LinkedHashMap<>();
         Arrays.stream(permisos).forEach(p -> mapa.put(p, "TODO"));

@@ -23,8 +23,8 @@ Sirve para tres cosas:
 - **Entender el sistema.** Un modelo de datos bien contado explica el negocio mejor que
   cualquier otro documento.
 
-**La base ya está construida.** Las migraciones `V1` a `V80`, de la `V84` a la `V86`, la `V89` y de la `V92` a la `V94` viven en
-`src/main/resources/db/migration` —**133 tablas de este módulo**, 136 en la base contando la de
+**La base ya está construida.** Las migraciones `V1` a `V80`, de la `V84` a la `V86`, la `V89` y de la `V92` a la `V95` viven en
+`src/main/resources/db/migration` —**134 tablas de este módulo**, 137 en la base contando la de
 Flyway y las dos del motor de agentes— y Flyway es el dueño del esquema. Cambiar algo de aquí
 ya cuesta una migración nueva, y **una migración aplicada no se edita nunca**: se escribe otra
 encima. No hay `V81` a `V83`: esos números los reservaban otras specs que todavía no se han
@@ -355,6 +355,17 @@ cita en que se basa. Guarda la tabla `seguimiento_pendiente` y siembra el agente
 nadie tiene seguimiento al desplegar, y se pide la primera vez que alguien abre su informe. Ver «El
 seguimiento de pendientes», más abajo.
 
+La `V95` (25/11/2026) trae **el recorrido de cada vacante**: hasta ella toda vacante recorría las
+mismas cinco etapas en el mismo orden. Una tabla nueva, `vacante_etapa`, guarda las etapas de cada
+vacante en su orden, y el catálogo `etapa` suma tres columnas: `descripcion`, la explicación corta
+que Talento lee junto a cada etapa —**obligatoria**: una etapa nueva no se registra sin ella—,
+`fija_primera` (solo el Perfil Integral) y `en_predeterminado` (Perfil Integral, Prueba del puesto y
+Decisión, el recorrido con el que nace una vacante nueva, en el orden de `etapa.orden`). El relleno
+deja a **toda vacante que ya existía con las cinco etapas, en el orden de siempre**; las
+postulaciones, el historial y las notas no se tocan, y los 18 estados tampoco. Ver «Vacantes» y
+«Validación práctica y decisión», más abajo, y «Cada vacante con sus etapas» en [Estados de la
+postulación](03-ESTADOS-POSTULACION.md).
+
 La `V54` (14/09/2026) **no añade ninguna tabla y cambia quién firma qué**. Hasta ella había dos
 tipos de texto —`PROCESO` y `FUTUROS_CONTACTOS`— y el de la cuenta usaba el primero, que habla de
 «esta vacante» cuando al registrarse todavía no hay ninguna: quien luego postulaba a una vacante
@@ -429,6 +440,11 @@ de ahí atraviesa cinco etapas:
 Al final hay una decisión: **verde** (se contrata), **ámbar** (falta averiguar algo), **rojo**
 (no pasa), **sin datos** (no hay evidencia suficiente) o **reserva** (no para esta vacante, pero
 interesa para otra).
+
+Ese es el recorrido completo. **Desde la `V95` cada vacante elige el suyo**: el Perfil Integral va
+siempre primero y las demás etapas, la decisión incluida, se encienden, se apagan y se ordenan
+hasta que llega el primer postulante. Los pesos de la tabla se reparten entre las etapas que la
+vacante tiene.
 
 Los puestos se agrupan en tres **niveles** —Dirección, Coordinación y Ejecución— y siete
 **familias** de trabajo. El nivel decide cuántas preguntas responde el candidato y qué barreras
@@ -584,6 +600,9 @@ El nivel **sale de la clave** de `peso_etapa`, y `vacante` gana una columna que 
 versión aprobada que le toca. Cuando una etapa no aplica a un puesto, se aprueba otra versión y
 se elige en la vacante; nunca se reparte a mano por persona. Desde la `V74` se puede elegir
 también con candidatos dentro, y entonces se recalcula a todos a la vez con la versión nueva.
+Desde la `V95`, si la vacante quita una etapa de su recorrido, los pesos de su versión **se
+reparten al calcular** entre las etapas que tiene: la versión no se toca y no se guarda ningún
+peso nuevo (ver «Configuración», más abajo).
 
 Lo que sí sigue dependiendo del nivel es el peso de cada criterio y de cada dimensión: el
 currículum de un director no se puntúa igual que el de un operativo.
@@ -677,7 +696,7 @@ error del modelo de un cambio en las instrucciones que le dimos nosotros.
          v                              |
      VACANTES ---------+                |
   puesto · nivel        |               |
-  familia               |               |
+  familia · etapas      |               |
          |              |               |
          v              v               v
    +------------------------------------------+
@@ -735,7 +754,7 @@ Hay una versión dibujada de este mismo mapa en
 
 ## Las tablas
 
-Ciento treinta y tres en total, agrupadas por área para poder leerlas de a poco. En cada una se nombran
+Ciento treinta y cuatro en total, agrupadas por área para poder leerlas de a poco. En cada una se nombran
 las columnas que importan para entender qué hace, no todas.
 
 **Para verlas todas, con tipo y clave, está el [Diccionario de datos](07-DICCIONARIO-DE-DATOS.md).**
@@ -912,7 +931,7 @@ agente que la produjo.
 
 ---
 
-### Vacantes · 8 tablas
+### Vacantes · 9 tablas
 
 | Tabla | Para qué existe | Columnas que importan |
 |---|---|---|
@@ -921,6 +940,7 @@ agente que la produjo.
 | `familia_afin` | Qué familias se parecen lo bastante para reutilizar evaluaciones | familia_codigo, familia_afin_codigo |
 | `puesto` | El catálogo de puestos, con su nivel y su familia. Desde la `V64` es también el catálogo de **cargos** de la gestión de personas, y se renombra y desactiva desde Configuración | organizacion_id, codigo, nombre, nivel_puesto_codigo, familia_codigo, es_activo |
 | `vacante` | Una convocatoria concreta | organizacion_id, solicitud_talento_id, puesto_id, titulo, descripcion, modalidad, ciudad_ubigeo, ubicacion, tipo_cierre, plazas, cierra_en, estado, version_pesos_id, version_plantilla_prueba_id, plantilla_evaluacion_id, responsable_usuario_id, remuneracion_tipo, remuneracion_min, remuneracion_max, remuneracion_moneda, remuneracion_actualizada_en, archivada_en, eliminada_en, aplica_evaluacion, origen_preguntas, version_banco_fija_id, instrumento_etapa_tecnica, calificacion_automatica, nota_minima, video_presentacion |
+| `vacante_etapa` | El recorrido de la vacante (`V95`): sus etapas, en orden. La etapa siguiente de cada postulación sale de aquí. **Sin columna `id`**: la clave es la vacante y la etapa | vacante_id, etapa_codigo, orden |
 | `requisito_objetivo` | Lo único que puede detener una postulación sin que intervenga nadie | vacante_id, descripcion, regla, es_activo |
 | `barrera_critica` | Lo que ningún promedio alto compensa, definido por vacante | vacante_id, descripcion, es_activa |
 | `evaluador_estandar` | Quién revisa que la urgencia no baje el nivel, en esta vacante | vacante_id, usuario_id, puede_bloquear, asignado_por_usuario_id |
@@ -968,10 +988,20 @@ vacante nueva nace con `PRUEBA_PROPIA`, también en RENASER; las de antes conser
 valor por defecto de la columna sigue siendo `PLANTILLA`, que es lo que reciben las filas
 insertadas a mano: el tercero lo pone el servicio al crear.
 
-**Quién pasa sola a la prueba lo deciden dos columnas** (`V53`, `V72`): `calificacion_automatica`,
-el interruptor «calificar y avanzar sola», y `nota_minima`, la nota del Perfil Integral que hace
-falta para ese pase (60 por defecto, entera). Con el interruptor apagado la mínima no hace nada.
-Quien no llega se queda en «por confirmar»: ninguna nota descarta a nadie.
+**Quién pasa sola a la etapa siguiente lo deciden dos columnas** (`V53`, `V72`):
+`calificacion_automatica`, el interruptor «calificar y avanzar sola», y `nota_minima`, la nota del
+Perfil Integral que hace falta para ese pase (60 por defecto, entera). Con el interruptor apagado la
+mínima no hace nada. Quien no llega se queda en «por confirmar»: ninguna nota descarta a nadie. A
+qué etapa pasa lo dice `vacante_etapa`: la que sigue al Perfil Integral.
+
+**Qué etapas recorre la vacante lo dice `vacante_etapa`** (`V95`), una fila por etapa con su
+`orden` (1, 2, 3…). El Perfil Integral va siempre en el 1, y ni la vacante ni el orden se repiten.
+Una vacante nueva recibe al crearse las etapas `en_predeterminado` del catálogo, en el orden de
+`etapa.orden`; mientras no tenga ninguna postulación —de cualquier estado— y no esté cerrada ni
+archivada, el servicio reescribe sus filas cada vez que Talento cambia el recorrido. Después ya no
+cambian. Las vacantes de antes de la `V95` tienen las cinco, y una vacante sin ninguna fila —una
+insertada a mano, por ejemplo— se lee como si las tuviera. Borrar una vacante se llevaría sus
+filas (`ON DELETE CASCADE`), aunque las vacantes no se borran: se eliminan por borrado lógico.
 
 ---
 
@@ -1381,7 +1411,7 @@ las preguntas de la conversación final.
 | Tabla | Para qué existe | Columnas que importan |
 |---|---|---|
 | `validacion` | El periodo de trabajo | postulacion_id, modalidad, tipo_vinculacion, dias, inicio_en, fin_en, estado, habilitada_por_usuario_id |
-| `etapa` | Las cinco etapas del embudo | codigo, nombre, orden |
+| `etapa` | Las cinco etapas del embudo, el catálogo del que cada vacante elige las suyas. Desde la `V95`, con su explicación obligatoria y dos marcas: cuál va siempre primera y cuáles forman el recorrido con el que nace una vacante | codigo, nombre, orden, descripcion, fija_primera, en_predeterminado |
 | `nota_etapa` | La nota de cada etapa, atada a la versión de pesos con que se calculó | postulacion_id, etapa_codigo, puntaje, version_pesos_id |
 | `decision` | El semáforo final | postulacion_id, semaforo, nota_global, version_pesos_id, decidida_por_usuario_id, motivo |
 | `barrera_detectada` | Una barrera crítica encontrada en un candidato concreto | postulacion_id, barrera_critica_id, explicacion, ejecucion_ia_id, confirmada_por_usuario_id |
@@ -1421,6 +1451,13 @@ Casi todo lo que el cliente cambia seguido vive aquí, no en el código.
 **El nivel salió de la clave de `peso_etapa`.** Los pesos son 40 / 30 / 15 / 15 para todos, y lo
 que cambia por vacante es a qué versión apunta. Donde el nivel **sí** sigue mandando es en el
 peso de cada criterio y de cada dimensión.
+
+**Desde la `V95` los pesos de la versión se reparten entre las etapas del recorrido de la
+vacante**, al calcular y sin guardar nada: cada etapa del recorrido con fila en `peso_etapa` pesa
+lo suyo dividido entre la suma de las de su recorrido, por 100, con dos decimales, y la última que
+pesa absorbe el redondeo. Con la v4 y Perfil Integral → Prueba → Decisión, 57,14 y 42,86. Con
+todas las etapas de la versión en el recorrido, los pesos son los de la versión tal cual. Una etapa
+del recorrido sin fila en la versión —la decisión, o la simulación con la v3— no cuenta.
 
 El módulo psicométrico todavía no existe. De la tercera versión de pesos en adelante su 5% está
 repartido entre las otras dos partes, y por eso los pesos de los componentes son datos y no
@@ -1874,6 +1911,11 @@ cuáles sí, porque las que no, hay que probarlas en el código.
 - **La misión y la visión, hasta 400 caracteres, y el brochure, de su catálogo** (`V86`): las dos
   primeras son nulas si están vacías, nunca una cadena vacía; `plantilla_brochure` es `CLASICA`,
   `PORTADA` o `COLUMNAS`, y `color_brochure`, uno de los seis colores, los dos sin nulos.
+- **Una etapa del catálogo lleva siempre su explicación, y el recorrido de una vacante no se
+  repite ni se salta la primera** (`V95`): `etapa.descripcion` es obligatoria y no puede ser solo
+  espacios; en `vacante_etapa` una etapa va una vez por vacante, un lugar lo ocupa una sola etapa,
+  el `orden` es mayor que cero, y un trigger impide que la etapa `fija_primera` —el Perfil
+  Integral— quede en un lugar distinto del 1.
 
 ### Tienen que vivir en el código
 
@@ -1952,6 +1994,13 @@ cuáles sí, porque las que no, hay que probarlas en el código.
   identificador, y que cada red sea de su dominio. **Que el año de fundación no pase del actual**:
   un CHECK con la fecha de hoy no es inmutable, y una copia restaurada años después podría rechazar
   filas que valían al guardarse.
+- **Las reglas del recorrido de una vacante** (`V95`): que empiece por el Perfil Integral, sin
+  etapas repetidas y con códigos del catálogo —400 con lo que falla—; que no cambie desde la
+  primera postulación ni con la vacante cerrada o archivada —409—; que nadie se mueva a una etapa
+  que su vacante no tiene; y que **toda etapa del catálogo tenga su pieza en el código**
+  (`DefinicionDeEtapa`): si falta, la aplicación no arranca. Dependen de otras filas y del
+  momento. Que el recorrido no tenga huecos en el `orden` tampoco lo mira la base: el servicio lo
+  escribe siempre 1, 2, 3…
 
 ### Nunca existen, ni siquiera como opción
 
@@ -2029,7 +2078,8 @@ Datos que se cargan con la primera migración, no a mano:
 - Los **cinco roles** iniciales con sus permisos: candidato, equipo de talento, responsable del
   área, dirección y administrador. Es como arranca el sistema, no cómo queda para siempre
 - Las **22 dimensiones**, con cuáles de ellas son obligatorias
-- Las **cinco etapas**, los **tres niveles** y las **siete familias**
+- Las **cinco etapas** —desde la `V95`, con su explicación y sus marcas de fija y de
+  predeterminada—, los **tres niveles** y las **siete familias**
 - El **ubigeo**: los **25 departamentos**, las **196 provincias** y la fila `EXT`, «Fuera del
   Perú». **Los distritos no están sembrados** —serían el nivel 3, y son otras 1874 filas—: el
   árbol los admite el día que hagan falta sin migrar nada

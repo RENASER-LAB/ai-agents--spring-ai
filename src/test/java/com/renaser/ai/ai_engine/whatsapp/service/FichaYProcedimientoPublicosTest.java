@@ -135,12 +135,16 @@ class FichaYProcedimientoPublicosTest {
 
     // ============ el procedimiento ============
 
+    /** El recorrido de siempre: las cinco etapas (V95). */
+    private static final List<String> CINCO =
+            List.of("PERFIL_INTEGRAL", "PRUEBA_PUESTO", "SIMULACION", "VALIDACION", "DECISION");
+
     @Test
     @DisplayName("AC-06 · con evaluación inicial y prueba cronometrada; la etapa actual separa lo hecho de lo previsto")
     void conEvaluacion() {
         Vacante vacante = completa().aplicaEvaluacion(true).instrumentoEtapaTecnica("PRUEBA_PROPIA").build();
 
-        List<Etapa> etapas = ProcedimientoPublico.enMarcha(vacante, "PRUEBA_PUESTO", "CRONOMETRADA");
+        List<Etapa> etapas = ProcedimientoPublico.enMarcha(vacante, CINCO, "PRUEBA_PUESTO", "CRONOMETRADA");
 
         assertThat(etapas).extracting(Etapa::codigo)
                 .containsExactly("PERFIL_INTEGRAL", "PRUEBA_PUESTO", "SIMULACION", "VALIDACION", "DECISION");
@@ -157,7 +161,7 @@ class FichaYProcedimientoPublicosTest {
     void sinEvaluacionYConCuestionario() {
         Vacante vacante = completa().aplicaEvaluacion(false).instrumentoEtapaTecnica("CUESTIONARIO_TECNICO").build();
 
-        List<Etapa> etapas = ProcedimientoPublico.enMarcha(vacante, "PERFIL_INTEGRAL", null);
+        List<Etapa> etapas = ProcedimientoPublico.enMarcha(vacante, CINCO, "PERFIL_INTEGRAL", null);
 
         assertThat(etapas.get(0).explicacion()).doesNotContain("Tu currículum y una evaluación")
                 .contains("no pide una evaluación escrita");
@@ -171,20 +175,56 @@ class FichaYProcedimientoPublicosTest {
     void plazoAbierto() {
         Vacante vacante = completa().instrumentoEtapaTecnica("PLANTILLA").build();
 
-        assertThat(ProcedimientoPublico.enMarcha(vacante, null, "PLAZO_ABIERTO").get(1).explicacion())
+        assertThat(ProcedimientoPublico.enMarcha(vacante, CINCO, null, "PLAZO_ABIERTO").get(1).explicacion())
                 .doesNotContain("tiempo medido").contains("plazo en días");
         // Sin etapa todavía (POSTULADA), todo es lo previsto.
-        assertThat(ProcedimientoPublico.enMarcha(vacante, null, null)).extracting(Etapa::estado)
+        assertThat(ProcedimientoPublico.enMarcha(vacante, CINCO, null, null)).extracting(Etapa::estado)
                 .containsOnly("PREVISTA");
     }
 
     @Test
     @DisplayName("Terminada, solo las etapas a las que llegó: las demás no se presentan como previstas")
     void terminada() {
-        List<Etapa> etapas = ProcedimientoPublico.terminado(completa().build(),
+        List<Etapa> etapas = ProcedimientoPublico.terminado(completa().build(), CINCO,
                 Set.of("PERFIL_INTEGRAL", "PRUEBA_PUESTO"), "CRONOMETRADA");
 
         assertThat(etapas).extracting(Etapa::codigo).containsExactly("PERFIL_INTEGRAL", "PRUEBA_PUESTO");
         assertThat(etapas).extracting(Etapa::estado).containsOnly("HECHA");
+    }
+
+    // ============ el recorrido de la vacante (V95) ============
+
+    @Test
+    @DisplayName("AC-23 · Perfil → Simulación → Decisión en la Simulación: tres etapas con orden 1, 2 y 3 y la Simulación ACTUAL")
+    void unRecorridoCortoYReordenado() {
+        List<Etapa> etapas = ProcedimientoPublico.enMarcha(completa().build(),
+                List.of("PERFIL_INTEGRAL", "SIMULACION", "DECISION"), "SIMULACION", null);
+
+        assertThat(etapas).extracting(Etapa::codigo)
+                .containsExactly("PERFIL_INTEGRAL", "SIMULACION", "DECISION");
+        assertThat(etapas).extracting(Etapa::orden).containsExactly(1, 2, 3);
+        assertThat(etapas).extracting(Etapa::estado).containsExactly("HECHA", "ACTUAL", "PREVISTA");
+        assertThat(etapas.get(2).nombre()).isEqualTo("La decisión final");
+    }
+
+    @Test
+    @DisplayName("AC-14 · sin Prueba en el recorrido, el procedimiento no la nombra")
+    void sinPruebaNoSeNombra() {
+        List<Etapa> etapas = ProcedimientoPublico.enMarcha(completa().build(),
+                List.of("PERFIL_INTEGRAL", "DECISION"), "PERFIL_INTEGRAL", "CRONOMETRADA");
+
+        assertThat(etapas).extracting(Etapa::codigo).containsExactly("PERFIL_INTEGRAL", "DECISION");
+        assertThat(etapas).extracting(Etapa::orden).containsExactly(1, 2);
+    }
+
+    @Test
+    @DisplayName("Terminada en un recorrido reordenado: cada etapa conserva su posición en el recorrido")
+    void terminadaConservaLaPosicion() {
+        List<Etapa> etapas = ProcedimientoPublico.terminado(completa().build(),
+                List.of("PERFIL_INTEGRAL", "SIMULACION", "PRUEBA_PUESTO", "DECISION"),
+                Set.of("PERFIL_INTEGRAL", "PRUEBA_PUESTO"), null);
+
+        assertThat(etapas).extracting(Etapa::codigo).containsExactly("PERFIL_INTEGRAL", "PRUEBA_PUESTO");
+        assertThat(etapas).extracting(Etapa::orden).containsExactly(1, 3);
     }
 }

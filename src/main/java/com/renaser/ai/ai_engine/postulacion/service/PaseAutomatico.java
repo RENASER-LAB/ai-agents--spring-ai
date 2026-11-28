@@ -19,11 +19,14 @@ import java.util.Optional;
 import java.util.function.BiFunction;
 
 /**
- * Pasar una postulación a la etapa técnica sin que nadie lo pida.
+ * Pasar una postulación a la etapa siguiente de su recorrido sin que nadie lo pida.
  *
  * <p>Es el paso que antes daba una persona pulsando «confirmar» en el panel, y que casi
  * siempre era decir «sí» a lo que la máquina acababa de calcular. Con el interruptor de la
- * vacante encendido, el candidato recibe su prueba sin esperar a que nadie mire.
+ * vacante encendido, el candidato pasa a la etapa que sigue al Perfil Integral en el recorrido
+ * de SU vacante (V95) —la prueba, la simulación o la decisión— sin esperar a que nadie mire. Si
+ * el Perfil Integral es la última etapa, no mueve a nadie: queda lista para que una persona la
+ * contrate o la descarte.
  *
  * <p><b>Solo con la nota completa del Perfil Integral, y solo si llega a la mínima (V72).</b>
  * Quien no llega, o no tiene nota completa, se queda en «por confirmar» y decide una persona:
@@ -62,8 +65,7 @@ public class PaseAutomatico {
 
     private final PostulacionRepository postulaciones;
     private final VacanteRepository vacantes;
-    private final MaquinaEstados maquina;
-    private final EntradaEtapaTecnica entradaTecnica;
+    private final AvanceDelRecorrido avance;
     private final PuenteCalificacionIa puente;
     private final UmbralDelPerfilIntegral umbral;
 
@@ -152,7 +154,7 @@ public class PaseAutomatico {
         // Con motivo escrito aunque sea del sistema: sin él, el historial del candidato
         // enseña un salto sin autor y sin explicación, y quien lo abra dentro de seis meses
         // no puede saber si lo movió alguien o la vacante, ni con qué nota.
-        return pasarALaPrueba(p, vacante, motivo.apply(nota.get(), minima));
+        return pasarALaSiguiente(p, motivo.apply(nota.get(), minima));
     }
 
     /**
@@ -220,27 +222,39 @@ public class PaseAutomatico {
             return null;
         }
 
-        // Sin instrumento no se avanza, y no es un error: la vacante está a medio montar y
-        // quien la lleva tiene que elegir la prueba. Reventar aquí daría el trabajo de la IA
-        // por fallido y volvería a pagar el modelo al reintentarlo.
-        if (!entradaTecnica.hayInstrumento(vacante)) {
+        // La etapa que sigue al Perfil Integral en el recorrido de la vacante (V95). Si no hay
+        // ninguna, nadie se mueve solo: queda lista para que una persona la contrate o la
+        // descarte desde su ficha.
+        Optional<EstadoPostulacion> siguiente = avance.siguiente(p);
+        if (siguiente.isEmpty()) {
+            log.info("PASE_AUTOMATICO: la postulación {} se queda en «por confirmar»: el Perfil "
+                    + "Integral es la última etapa de su vacante", postulacionId);
+            return null;
+        }
+
+        // Sin con qué llenar la etapa siguiente no se avanza, y no es un error: la vacante está
+        // a medio montar y quien la lleva tiene que elegir, por ejemplo, la prueba. Reventar
+        // aquí daría el trabajo de la IA por fallido y volvería a pagar el modelo al reintentarlo.
+        if (!avance.listaParaEntrar(siguiente.get(), vacante)) {
             log.info("PASE_AUTOMATICO: la postulación {} se queda esperando: su vacante no "
-                    + "tiene todavía con qué llenar la etapa técnica", postulacionId);
+                    + "tiene todavía con qué llenar la etapa {}", postulacionId,
+                    siguiente.get().getEtapaCodigo());
             return null;
         }
         return vacante;
     }
 
-    /** Crea lo que va a rendir y lo pasa a la prueba, juntos. Desde «por confirmar». */
-    private boolean pasarALaPrueba(Postulacion p, Vacante vacante, String motivo) {
-        Optional<EstadoPostulacion> siguiente = maquina.siguiente(DE);
-        if (siguiente.isEmpty()) {
+    /**
+     * Lo pasa a la etapa siguiente de su recorrido, creando antes lo que necesite allí (la prueba,
+     * el periodo…), todo junto. Desde «por confirmar». Ver {@link AvanceDelRecorrido}.
+     */
+    private boolean pasarALaSiguiente(Postulacion p, String motivo) {
+        Optional<String> adonde = avance.avanzar(p, null, motivo, true);
+        if (adonde.isEmpty()) {
             return false;
         }
-        entradaTecnica.crearAlEntrar(p, vacante);
-        maquina.transicionar(p, siguiente.get().getCodigo(), null, motivo, true, false, null);
         log.info("PASE_AUTOMATICO: la postulación {} pasa sola a {} ({})",
-                p.getId(), siguiente.get().getCodigo(), motivo);
+                p.getId(), adonde.get(), motivo);
         return true;
     }
 }

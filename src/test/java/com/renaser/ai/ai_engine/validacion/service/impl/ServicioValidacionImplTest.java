@@ -72,13 +72,14 @@ class ServicioValidacionImplTest {
     @Mock private MaquinaEstados maquina;
     @Mock private ServicioParametros parametros;
     @Mock private ServicioAuditoria auditoria;
+    @Mock private com.renaser.ai.ai_engine.postulacion.service.AvanceDelRecorrido avance;
 
     private ServicioValidacionImpl servicio;
 
     @BeforeEach
     void crearElServicio() {
         servicio = new ServicioValidacionImpl(validaciones, postulaciones, alcance, roles,
-                usuarioRoles, calificacion, maquina, parametros, auditoria);
+                usuarioRoles, calificacion, maquina, avance, parametros, auditoria);
     }
 
     /** El guardián deja pasar: la postulación es de esta empresa y el alcance llega. */
@@ -135,6 +136,41 @@ class ServicioValidacionImplTest {
                 org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any(),
                 org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyBoolean(),
                 org.mockito.ArgumentMatchers.anyBoolean(), org.mockito.ArgumentMatchers.any());
+    }
+
+    // ============ Cerrar avanza por el recorrido de la vacante (V95) ============
+
+    @Test
+    @DisplayName("Cerrar desde «por confirmar» pasa a la etapa que sigue en SU recorrido, no a la Decisión a fuego (AC-10)")
+    void cerrarAvanzaPorElRecorrido() {
+        Postulacion enValidacion = Postulacion.builder().id(POSTULACION).organizacionId(ORGANIZACION)
+                .vacanteId(VACANTE).estadoCodigo("VALIDACION_POR_CONFIRMAR").build();
+        when(alcance.laPostulacionVisible(any(), eq(POSTULACION), eq("cerrar_validacion")))
+                .thenReturn(enValidacion);
+        when(validaciones.findByPostulacionId(POSTULACION)).thenReturn(Optional.of(
+                Validacion.builder().id(4L).postulacionId(POSTULACION).estado("EN_CURSO").build()));
+
+        servicio.cerrar(QUIEN, POSTULACION);
+
+        verify(avance).avanzar(enValidacion, QUIEN, "Periodo de validación cerrado y calificado", false);
+        verify(maquina, never()).transicionar(any(), eq("DECISION_POR_CONFIRMAR"), any(),
+                org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.anyBoolean(),
+                org.mockito.ArgumentMatchers.anyBoolean(), org.mockito.ArgumentMatchers.<String>any());
+    }
+
+    @Test
+    @DisplayName("Cerrar un periodo de quien no está en «por confirmar» no mueve a nadie")
+    void cerrarSinEstarPorConfirmarNoMueve() {
+        Postulacion enSuTurno = Postulacion.builder().id(POSTULACION).organizacionId(ORGANIZACION)
+                .vacanteId(VACANTE).estadoCodigo("VALIDACION_TURNO_CANDIDATO").build();
+        when(alcance.laPostulacionVisible(any(), eq(POSTULACION), eq("cerrar_validacion")))
+                .thenReturn(enSuTurno);
+        when(validaciones.findByPostulacionId(POSTULACION)).thenReturn(Optional.of(
+                Validacion.builder().id(4L).postulacionId(POSTULACION).estado("EN_CURSO").build()));
+
+        servicio.cerrar(QUIEN, POSTULACION);
+
+        org.mockito.Mockito.verifyNoInteractions(avance);
     }
 
     @Test
@@ -327,7 +363,7 @@ class ServicioValidacionImplTest {
             contestaComoLaVacante(() -> servicio.cerrar(QUIEN, POSTULACION));
 
             org.mockito.Mockito.verifyNoInteractions(validaciones, calificacion, maquina,
-                    auditoria, roles, usuarioRoles);
+                    auditoria, roles, usuarioRoles, avance);
         }
     }
 }

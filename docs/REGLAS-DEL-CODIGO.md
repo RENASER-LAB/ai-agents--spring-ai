@@ -36,8 +36,8 @@ com.renaser.ai.ai_engine.<dominio>
 | `usuario` | Persona, usuario del equipo, roles y permisos |
 | `organizacion` | La organización, sus áreas, la plataforma (alta de empresas) y la personalización de instrumentos. Desde la `V85`, el «Perfil de la empresa» (`PresentacionEmpresaController`, `ServicioPresentacionImpl`, las reglas en `ReglasDeLaPresentacion` y el logo y la portada, re-codificados sin metadatos, en `ImagenesDeLaEmpresa`). Desde la `V86`, el brochure en PDF: `ServicioBrochureImpl` (lo mínimo, el contenido y el último PDF de cada empresa recordado en memoria), `ContenidoDelBrochure` (lo que lleva, que es también la huella del recuerdo), `PdfDelBrochure` (las tres plantillas) y los catálogos `PlantillaDelBrochure` y `ColorDelBrochure` |
 | `solicitud` | La Solicitud de Talento y sus resultados esperados |
-| `vacante` | Vacante, puesto, catálogos y requisitos objetivos. Aquí vive también `AlcanceSobreLaVacante`, que decide para todo el panel qué filas alcanza cada alcance |
-| `postulacion` | La postulación, su historial, el CV y **la máquina de estados** |
+| `vacante` | Vacante, puesto, catálogos y requisitos objetivos. Aquí vive también `AlcanceSobreLaVacante`, que decide para todo el panel qué filas alcanza cada alcance. Desde la `V95`, el recorrido de etapas de cada vacante: `RecorridoDeLaVacante` (leerlo, escribirlo y validarlo), `ServicioEtapasDeLaVacanteImpl` (el `PUT` de etapas) y `PesosDelRecorrido`, la regla única del reparto de pesos que usan la decisión y «Cómo pesa en esta vacante» |
+| `postulacion` | La postulación, su historial, el CV y **la máquina de estados**. Desde la `V95`, el contrato de una etapa (`DefinicionDeEtapa`, con una pieza por etapa: la de la prueba aquí, `EtapaDeLaPrueba`, y las demás en el paquete de su etapa), `RegistroDeEtapas`, que las reúne y no deja arrancar si falta alguna, y `AvanceDelRecorrido`, por donde pasa toda entrada a una etapa |
 | `pesos` | Las versiones de pesos del embudo |
 | `consentimiento` | Textos legales, consentimientos y solicitudes de borrado |
 | `notificacion` | Plantillas y registro de correos, la campana del portal y, desde la `V92`, las preferencias de aviso de cada persona (`PreferenciasDeAviso`), que el correo y la campana leen antes de salir |
@@ -72,6 +72,10 @@ salgan con candado). Está escrito en el javadoc de ambas.
 - **Toda transición pasa por `MaquinaEstados.transicionar`.** Nunca tocar
   `postulacion.estado_codigo` a mano. Ningún estado fuera de la lista de
   [Estados de la postulación](03-ESTADOS-POSTULACION.md) puede existir.
+- **Toda entrada a una etapa pasa por `AvanceDelRecorrido`** (`V95`), y la etapa siguiente sale
+  del recorrido de la vacante, nunca del orden del catálogo ni de un estado escrito a fuego. Lo
+  que pasa al entrar lo decide la pieza de la etapa (`DefinicionDeEtapa`), no quien mueve. Una
+  etapa nueva sigue la guía «Cómo agregar una etapa» de ese mismo documento.
 - **El alcance se aplica dentro de las consultas** con `Permisos.alcanceDe`. Un 404 también
   significa «esto no es tuyo».
 - **Que una postulación o una vacante sea tuya lo decide `AlcanceSobreLaVacante`, y solo él.**
@@ -244,6 +248,7 @@ detrás de una caja ni texto desbordado.
 | Se añadió un paquete de dominio | La tabla de arriba |
 | Se añadió un controlador | `ManejadorErrores`, `ConfiguracionSwagger` y [Las APIs](09-APIS.md) |
 | Se añadió un permiso | [Roles y permisos](04-ROLES-Y-PERMISOS.md) |
+| Se añadió una etapa del embudo | La tabla de etapas y «Cómo agregar una etapa» en [Estados de la postulación](03-ESTADOS-POSTULACION.md), el catálogo `etapa` en el Diccionario y el [contrato v2 de WhatsApp](CONTRATO-CONTEXTO-Y-RESULTADOS-POR-WHATSAPP-V2.md) |
 | Un pendiente dejó de serlo, o apareció uno nuevo | «Lo que falta» en Estado del proyecto, o [Defectos conocidos](DEFECTOS-CONOCIDOS.md) |
 | Un placeholder se reemplazó por el valor definitivo | Donde se nombre ese placeholder |
 

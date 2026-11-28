@@ -20,6 +20,7 @@ import com.renaser.ai.ai_engine.perfilintegral.repository.PesoCriterioRepository
 import com.renaser.ai.ai_engine.perfilintegral.service.LoBuscadoEnElCv;
 import com.renaser.ai.ai_engine.perfilintegral.service.NotaDelCurriculum;
 import com.renaser.ai.ai_engine.postulacion.entity.DatoCv;
+import com.renaser.ai.ai_engine.vacante.service.RecorridoDeLaVacante;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -41,7 +42,9 @@ import static com.renaser.ai.ai_engine.informe.service.FormatoDelInforme.limpio;
 /**
  * El informe del currículum: la nota del CV, «Experiencia profesional», los ocho criterios con lo
  * que demostró en cada uno, y lo que el CV demuestra, lo que no cuadra y lo que queda por
- * verificar en la evaluación (las afirmaciones que la IA clasificó al leerlo).
+ * verificar en la evaluación (las afirmaciones que la IA clasificó al leerlo). En una vacante sin
+ * evaluación, eso que queda pasa a la etapa que sigue al Perfil Integral en su recorrido (V95), y
+ * el bloque la nombra.
  *
  * <p>La nota es la misma que el sistema calcula con los pesos del nivel del puesto y que entra en
  * el Perfil Integral: criterios por {@link NotaDelCurriculum} y, si la vacante busca algo, lo
@@ -68,6 +71,8 @@ public class ArmadoDelCv {
     private final NotaCriterioRepository notasCriterio;
     private final PesoCriterioRepository pesosCriterio;
     private final LoBuscadoEnElCv loBuscado;
+    /** El recorrido de la vacante (V95): sin evaluación, lo pendiente pasa a la etapa siguiente. */
+    private final RecorridoDeLaVacante recorridos;
 
     /** Las notas de los ocho criterios del CV, en su orden, con la nota del CV. */
     record NotasDelCv(List<Criterio> criterios, BigDecimal nota, BigDecimal pesoLoBuscado,
@@ -95,6 +100,19 @@ public class ArmadoDelCv {
                 null);
     }
 
+    /**
+     * Cómo se llama lo que queda por verificar: «en la evaluación» si la persona la tiene o la va a
+     * tener; si la vacante no la aplica (V30) y no la rindió, la etapa que sigue al Perfil
+     * Integral en el recorrido (V95), o la entrevista si no le sigue ninguna.
+     */
+    private String pendiente(Base base) {
+        boolean sinEvaluacion = base.vacante() != null && !base.vacante().isAplicaEvaluacion()
+                && base.postulacion().getEvaluacionId() == null;
+        return sinEvaluacion
+                ? EtapaDelInforme.pendienteTrasElPerfil(recorridos.de(base.postulacion().getVacanteId()))
+                : EtapaDelInforme.CV.pendiente();
+    }
+
     Informe armar(Base base, Instant ahora) {
         NotasDelCv notas = notas(base);
         boolean ilegible = !notas.algunaNota() && sinTextoLegible(base);
@@ -107,8 +125,7 @@ public class ArmadoDelCv {
         List<Bloque> bloques = new ArrayList<>();
         bloques.add(LoComunDelInforme.bloque("DEMUESTRA", "Lo que el CV demuestra", "BIEN", demuestra));
         bloques.add(LoComunDelInforme.bloque("NO_CUADRA", "No cuadra", "MAL", noCuadra));
-        bloques.add(LoComunDelInforme.bloque("PENDIENTE", EtapaDelInforme.CV.pendiente(), "PENDIENTE",
-                porVerificar));
+        bloques.add(LoComunDelInforme.bloque("PENDIENTE", pendiente(base), "PENDIENTE", porVerificar));
         if (!notas.lineas().isEmpty()) {
             bloques.add(LoComunDelInforme.bloque(BLOQUE_LO_BUSCADO, "Qué buscar en el CV", "NEUTRO",
                     loBuscado(notas)));

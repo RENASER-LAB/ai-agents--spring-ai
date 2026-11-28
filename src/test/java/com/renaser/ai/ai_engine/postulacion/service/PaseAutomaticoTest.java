@@ -12,7 +12,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -50,8 +49,14 @@ class PaseAutomaticoTest {
     @Mock private EntradaEtapaTecnica entradaTecnica;
     @Mock private PuenteCalificacionIa puente;
     @Mock private UmbralDelPerfilIntegral umbral;
+    @Mock private com.renaser.ai.ai_engine.postulacion.repository.EstadoPostulacionRepository estados;
+    @Mock private com.renaser.ai.ai_engine.vacante.service.RecorridoDeLaVacante recorridos;
+    @Mock private com.renaser.ai.ai_engine.simulacion.service.ServicioDisponibilidadSimulacion disponibilidad;
 
-    @InjectMocks private PaseAutomatico pase;
+    private PaseAutomatico pase;
+
+    /** El recorrido de la vacante de la prueba (V95): el de siempre, salvo que la prueba lo cambie. */
+    private java.util.List<String> recorrido = RecorridosDePrueba.CINCO;
 
     private Postulacion postulacion;
     private Vacante vacante;
@@ -73,9 +78,24 @@ class PaseAutomaticoTest {
                 .thenAnswer(inv -> postulacion.getEstadoCodigo());
         lenient().when(vacantes.findById(VACANTE)).thenReturn(Optional.of(vacante));
         lenient().when(entradaTecnica.hayInstrumento(vacante)).thenReturn(true);
-        lenient().when(maquina.siguiente("PERFIL_POR_CONFIRMAR"))
-                .thenReturn(Optional.of(EstadoPostulacion.builder()
-                        .codigo("PRUEBA_TURNO_CANDIDATO").build()));
+        lenient().when(vacantes.findByIdAndOrganizacionId(VACANTE, 1L)).thenReturn(Optional.of(vacante));
+
+        // La máquina calcula el siguiente de verdad, por el recorrido de la vacante (V95): con las
+        // cinco, tras el Perfil viene la prueba.
+        lenient().when(maquina.siguiente(anyString(), any(Recorrido.class)))
+                .thenAnswer(inv -> RecorridosDePrueba.siguienteDe(inv.getArgument(0), inv.getArgument(1)));
+        lenient().when(estados.findById(anyString()))
+                .thenAnswer(inv -> RecorridosDePrueba.estadoDe(inv.getArgument(0)));
+        lenient().when(recorridos.de(VACANTE)).thenAnswer(inv -> recorrido);
+        lenient().when(recorridos.tiene(eq(VACANTE), anyString()))
+                .thenAnswer(inv -> recorrido.contains(inv.<String>getArgument(1)));
+        AvanceDelRecorrido avance = new AvanceDelRecorrido(maquina, estados, postulaciones, vacantes,
+                recorridos, RegistroDeEtapas.con(java.util.List.of(
+                        new com.renaser.ai.ai_engine.perfilintegral.service.EtapaDelPerfilIntegral(),
+                        new EtapaDeLaPrueba(entradaTecnica),
+                        new com.renaser.ai.ai_engine.simulacion.service.EtapaDeLaSimulacion(disponibilidad),
+                        new com.renaser.ai.ai_engine.decision.service.EtapaDeLaDecision())));
+        pase = new PaseAutomatico(postulaciones, vacantes, avance, puente, umbral);
         // Con su nota completa por encima de la mínima de por defecto (60)
         conNota("72.40");
     }
@@ -306,9 +326,48 @@ class PaseAutomaticoTest {
     @Test
     @DisplayName("si no hay estado siguiente que calcular, no se inventa uno")
     void sinSiguienteNoSeAvanza() {
-        when(maquina.siguiente("PERFIL_POR_CONFIRMAR")).thenReturn(Optional.empty());
+        when(maquina.siguiente(eq("PERFIL_POR_CONFIRMAR"), any(Recorrido.class))).thenReturn(Optional.empty());
 
         pase.avanzarSiToca(POSTULACION);
+
+        noSeMovioNada();
+    }
+
+    // ============ El recorrido de la vacante (V95) ============
+
+    @Test
+    @DisplayName("Perfil → Decisión: pasa sola a «Decisión · por confirmar» y no se crea ninguna prueba (AC-07)")
+    void sinPruebaPasaALaDecision() {
+        recorrido = java.util.List.of("PERFIL_INTEGRAL", "DECISION");
+        // Ni siquiera hace falta tener prueba: la vacante no la tiene.
+        lenient().when(entradaTecnica.hayInstrumento(vacante)).thenReturn(false);
+
+        assertThat(pase.avanzarSiToca(POSTULACION)).isTrue();
+
+        verify(maquina).transicionar(postulacion, "DECISION_POR_CONFIRMAR", null,
+                "Pase automático: nota del Perfil Integral 72,40 (mínima 60)", true, false, null);
+        verify(entradaTecnica, never()).crearAlEntrar(any(), any());
+    }
+
+    @Test
+    @DisplayName("Perfil → Simulación: pasa a «Simulación · por habilitar» y se miran las sesiones")
+    void conLaSimulacionDespuesDelPerfil() {
+        recorrido = java.util.List.of("PERFIL_INTEGRAL", "SIMULACION", "PRUEBA_PUESTO", "DECISION");
+
+        assertThat(pase.avanzarSiToca(POSTULACION)).isTrue();
+
+        verify(maquina).transicionar(postulacion, "SIMULACION_POR_HABILITAR", null,
+                "Pase automático: nota del Perfil Integral 72,40 (mínima 60)", true, false, null);
+        verify(disponibilidad).recalcularVacante(1L, VACANTE);
+        verify(entradaTecnica, never()).crearAlEntrar(any(), any());
+    }
+
+    @Test
+    @DisplayName("si el Perfil Integral es la última etapa, no mueve a nadie")
+    void soloElPerfilNoMueve() {
+        recorrido = java.util.List.of("PERFIL_INTEGRAL");
+
+        assertThat(pase.avanzarSiToca(POSTULACION)).isFalse();
 
         noSeMovioNada();
     }

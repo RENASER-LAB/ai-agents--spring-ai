@@ -80,14 +80,107 @@ class MaquinaEstadosTest {
         assertThat(calcular("CERRADA")).isEmpty();
     }
 
+    // ============ El recorrido de cada vacante (V95) ============
+
+    @Test
+    @DisplayName("Perfil → Decisión: del «por confirmar» del Perfil se entra a «Decisión · por confirmar» (AC-07)")
+    void perfilYDecision() {
+        List<String> corto = List.of("PERFIL_INTEGRAL", "DECISION");
+        assertThat(siguienteEn(corto, "PERFIL_POR_CONFIRMAR")).isEqualTo("DECISION_POR_CONFIRMAR");
+        assertThat(siguienteEn(corto, "PERFIL_CALIFICANDO")).isEqualTo("PERFIL_POR_CONFIRMAR");
+    }
+
+    @Test
+    @DisplayName("Perfil → Simulación → Prueba → Decisión: tras el Perfil, la Simulación; tras ella, la Prueba (AC-08)")
+    void simulacionAntesDeLaPrueba() {
+        List<String> reordenado = List.of("PERFIL_INTEGRAL", "SIMULACION", "PRUEBA_PUESTO", "DECISION");
+        assertThat(siguienteEn(reordenado, "PERFIL_POR_CONFIRMAR")).isEqualTo("SIMULACION_POR_HABILITAR");
+        assertThat(siguienteEn(reordenado, "SIMULACION_POR_CONFIRMAR")).isEqualTo("PRUEBA_TURNO_CANDIDATO");
+        assertThat(siguienteEn(reordenado, "PRUEBA_POR_CONFIRMAR")).isEqualTo("DECISION_POR_CONFIRMAR");
+    }
+
+    @Test
+    @DisplayName("Con la Validación al final, de su «por confirmar» no se avanza (AC-09)")
+    void laValidacionAlFinal() {
+        List<String> sinDecision = List.of("PERFIL_INTEGRAL", "PRUEBA_PUESTO", "VALIDACION");
+        assertThat(siguienteEn(sinDecision, "VALIDACION_TURNO_CANDIDATO")).isEqualTo("VALIDACION_POR_CONFIRMAR");
+        assertThat(siguienteEn(sinDecision, "VALIDACION_POR_CONFIRMAR")).isEqualTo("—");
+    }
+
+    @Test
+    @DisplayName("Perfil → Validación → Prueba → Decisión: tras la Validación viene la Prueba (AC-10)")
+    void laValidacionAntesDeLaPrueba() {
+        List<String> recorrido = List.of("PERFIL_INTEGRAL", "VALIDACION", "PRUEBA_PUESTO", "DECISION");
+        assertThat(siguienteEn(recorrido, "PERFIL_POR_CONFIRMAR")).isEqualTo("VALIDACION_POR_HABILITAR");
+        assertThat(siguienteEn(recorrido, "VALIDACION_POR_CONFIRMAR")).isEqualTo("PRUEBA_TURNO_CANDIDATO");
+    }
+
+    @Test
+    @DisplayName("El Perfil solo: de su «por confirmar» no se avanza a ninguna parte")
+    void soloElPerfil() {
+        assertThat(siguienteEn(List.of("PERFIL_INTEGRAL"), "PERFIL_POR_CONFIRMAR")).isEqualTo("—");
+        assertThat(siguienteEn(List.of("PERFIL_INTEGRAL"), "POSTULADA")).isEqualTo("PERFIL_TURNO_CANDIDATO");
+    }
+
+    @Test
+    @DisplayName("Un estado de una etapa que el recorrido no tiene no se inventa a dónde ir")
+    void unaEtapaFueraDelRecorrido() {
+        List<String> sinPrueba = List.of("PERFIL_INTEGRAL", "DECISION");
+        assertThat(siguienteEn(sinPrueba, "PRUEBA_POR_CONFIRMAR")).isEqualTo("—");
+    }
+
+    @Test
+    @DisplayName("El momento de entrada sale del recorrido, no de un nombre de etapa escrito en la máquina")
+    void elMomentoDeEntradaSaleDelRecorrido() {
+        // Sin momento propio, una etapa se entra por el primero de los suyos: el turno.
+        Recorrido sinEntradas = new Recorrido(RecorridosDePrueba.CINCO, java.util.Map.of());
+        assertThat(calcular(sinEntradas, "VALIDACION_POR_CONFIRMAR").orElseThrow().getCodigo())
+                .isEqualTo("DECISION_TURNO_CANDIDATO");
+        // Con el de su pieza, por «por confirmar».
+        assertThat(calcular(RecorridosDePrueba.deSiempre(), "VALIDACION_POR_CONFIRMAR")
+                .orElseThrow().getCodigo()).isEqualTo("DECISION_POR_CONFIRMAR");
+    }
+
+    /**
+     * Una etapa que solo existe en esta prueba (AC-19): con sus estados en la rejilla y en el
+     * recorrido, la máquina entra, avanza por sus momentos y sale de ella sin saber su nombre.
+     */
+    @Test
+    @DisplayName("Una etapa ficticia del recorrido se entra, se recorre y se deja sin código propio (AC-19)")
+    void unaEtapaFicticia() {
+        List<EstadoPostulacion> conEntrevista = new java.util.ArrayList<>(catalogo);
+        conEntrevista.add(estado("ENTREVISTA_TURNO_CANDIDATO", "ENTREVISTA", "TURNO_CANDIDATO", "CANDIDATO", 30, false));
+        conEntrevista.add(estado("ENTREVISTA_POR_CONFIRMAR", "ENTREVISTA", "POR_CONFIRMAR", "TALENTO", 31, false));
+        Recorrido recorrido = RecorridosDePrueba.de(List.of("PERFIL_INTEGRAL", "ENTREVISTA", "DECISION"));
+
+        assertThat(siguiente(recorrido, conEntrevista, "PERFIL_POR_CONFIRMAR")).isEqualTo("ENTREVISTA_TURNO_CANDIDATO");
+        assertThat(siguiente(recorrido, conEntrevista, "ENTREVISTA_TURNO_CANDIDATO")).isEqualTo("ENTREVISTA_POR_CONFIRMAR");
+        assertThat(siguiente(recorrido, conEntrevista, "ENTREVISTA_POR_CONFIRMAR")).isEqualTo("DECISION_POR_CONFIRMAR");
+    }
+
+    private static String siguiente(Recorrido recorrido, List<EstadoPostulacion> catalogo, String codigo) {
+        EstadoPostulacion actual = catalogo.stream()
+                .filter(e -> e.getCodigo().equals(codigo)).findFirst().orElseThrow();
+        return MaquinaEstados.calcularSiguiente(recorrido, catalogo, actual).orElseThrow().getCodigo();
+    }
+
     private String siguienteDe(String codigo) {
         return calcular(codigo).orElseThrow().getCodigo();
     }
 
     private Optional<EstadoPostulacion> calcular(String codigo) {
+        return calcular(RecorridosDePrueba.deSiempre(), codigo);
+    }
+
+    private Optional<EstadoPostulacion> calcular(Recorrido recorrido, String codigo) {
         EstadoPostulacion actual = catalogo.stream()
                 .filter(e -> e.getCodigo().equals(codigo)).findFirst().orElseThrow();
-        return MaquinaEstados.calcularSiguiente(catalogo, actual);
+        return MaquinaEstados.calcularSiguiente(recorrido, catalogo, actual);
+    }
+
+    private String siguienteEn(List<String> etapas, String codigo) {
+        return calcular(RecorridosDePrueba.de(etapas), codigo).map(EstadoPostulacion::getCodigo)
+                .orElse("—");
     }
 
     private static EstadoPostulacion estado(String codigo, String etapa, String momento,

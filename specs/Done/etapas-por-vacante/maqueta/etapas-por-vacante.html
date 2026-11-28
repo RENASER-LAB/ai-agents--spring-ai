@@ -1,0 +1,626 @@
+<title>Etapas por vacante</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&family=Onest:wght@400;500;550;600&family=Syne:wght@600&display=swap">
+<style>
+/* Layout: una columna de lectura; cada flujo es un bloque con sus pasos y, donde ayuda, una maqueta del panel o del portal. */
+:root {
+  --bg: #f6f6fb;
+  --surface: #ffffff;
+  --fg: #1d1c33;
+  --muted: #5d5c78;
+  --line: #e1e0ee;
+  --accent: #615fff;
+  --accent-soft: #ecebff;
+  --warn: #9a5b00;
+  --warn-soft: #fff3dc;
+  --ok: #157a4a;
+  --ok-soft: #e2f5ea;
+  --off: #b9b8cc;
+  --display: "Bricolage Grotesque", "Segoe UI", system-ui, sans-serif;
+  --body: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #13121f; --surface: #1c1b2c; --fg: #ebeaf7; --muted: #a3a2bd; --line: #2f2e45;
+  --accent: #8987ff; --accent-soft: #29285a; --warn: #f0b654; --warn-soft: #3a2c12;
+  --ok: #5fd39a; --ok-soft: #143326; --off: #4b4a63; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #13121f; --surface: #1c1b2c; --fg: #ebeaf7; --muted: #a3a2bd; --line: #2f2e45;
+  --accent: #8987ff; --accent-soft: #29285a; --warn: #f0b654; --warn-soft: #3a2c12;
+  --ok: #5fd39a; --ok-soft: #143326; --off: #4b4a63; color-scheme: dark }
+
+body { background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 15.5px; line-height: 1.6; }
+.wrap { max-width: 860px; margin: 0 auto; padding-block: 48px 80px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 48px; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; line-height: 1.15; }
+h1 { font-size: clamp(2rem, 5vw, 2.8rem); }
+h2 { font-size: 1.55rem; }
+h3 { font-size: 1.05rem; font-family: var(--body); font-weight: 600; }
+p { margin: 0; max-width: 66ch; }
+.eyebrow { font: 500 .75rem var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+.lede { color: var(--muted); font-size: 1.08rem; }
+header { display: grid; gap: 14px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: 999px; font-size: .78rem; font-weight: 600; white-space: nowrap; }
+.chip.warn { background: var(--warn-soft); color: var(--warn); }
+.chip.ok { background: var(--ok-soft); color: var(--ok); }
+.chip.acc { background: var(--accent-soft); color: var(--accent); }
+.chip.off { background: var(--line); color: var(--muted); }
+
+section { display: grid; gap: 18px; }
+.sec-head { display: grid; gap: 6px; }
+.who { color: var(--muted); font-size: .9rem; }
+
+ol.steps { margin: 0; padding: 0; list-style: none; counter-reset: s; display: grid; gap: 12px; }
+ol.steps li { counter-increment: s; display: grid; grid-template-columns: 30px 1fr; gap: 12px; align-items: start; }
+ol.steps li::before { content: counter(s); font: 500 .8rem var(--mono); width: 26px; height: 26px; border-radius: 50%;
+  display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); margin-top: 1px; }
+ol.steps li > div { min-width: 0; }
+
+.ask { border-left: 3px solid var(--warn); background: var(--warn-soft); padding: 10px 14px; border-radius: 0 8px 8px 0; font-size: .92rem; }
+.ask b { color: var(--warn); }
+
+/* catálogo */
+.tbl { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; min-width: 560px; font-size: .92rem; }
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font-weight: 600; color: var(--muted); font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; }
+tr:last-child td { border-bottom: 0; }
+
+/* maqueta del panel */
+.mock { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding: 20px; display: grid; gap: 16px; }
+.mock-title { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+.mock-title h3 { font-family: var(--display); font-size: 1.15rem; }
+.flow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.node { padding: 6px 12px; border-radius: 8px; border: 1px solid var(--line); font-weight: 500; font-size: .9rem; background: var(--bg); }
+.node.fixed { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.arrow { color: var(--muted); }
+.rows { display: grid; gap: 0; border-top: 1px solid var(--line); }
+.row { display: grid; grid-template-columns: 1fr auto auto; gap: 14px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.row .name { font-weight: 500; }
+.row .peso { font: 500 .9rem var(--mono); font-variant-numeric: tabular-nums; color: var(--muted); min-width: 48px; text-align: right; }
+.row.is-off .name { color: var(--off); }
+.switch { position: relative; width: 40px; height: 22px; border-radius: 999px; border: 0; background: var(--off); cursor: pointer; padding: 0; }
+.switch::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform .15s; }
+.switch[aria-checked="true"] { background: var(--accent); }
+.switch[aria-checked="true"]::after { transform: translateX(18px); }
+.switch:disabled { cursor: not-allowed; opacity: .55; }
+.switch:focus-visible, .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.mock-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; font-size: .88rem; color: var(--muted); }
+.btn { border: 1px solid var(--line); background: var(--bg); color: var(--fg); border-radius: 8px; padding: 6px 12px; font: 500 .88rem var(--body); cursor: pointer; }
+.btn:hover { border-color: var(--accent); }
+.hidden-sec { font-size: .88rem; color: var(--muted); }
+.hidden-sec s { color: var(--off); }
+
+/* portal */
+.pair { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.phone { border: 1px solid var(--line); border-radius: 14px; background: var(--surface); padding: 16px; display: grid; gap: 12px; }
+.phone .cap { font-size: .82rem; color: var(--muted); }
+.track { display: grid; gap: 8px; }
+.track div { display: grid; grid-template-columns: 14px 1fr; gap: 10px; align-items: center; font-size: .9rem; }
+.dot { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--off); }
+.dot.done { background: var(--ok); border-color: var(--ok); }
+.dot.now { border-color: var(--accent); background: var(--accent-soft); }
+
+.dev { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.dev div { border: 1px solid var(--line); border-radius: 10px; padding: 14px; background: var(--surface); display: grid; gap: 4px; font-size: .9rem; }
+.dev b { font-family: var(--display); font-size: 1rem; }
+
+ul.plain { margin: 0; padding-left: 1.1em; display: grid; gap: 6px; }
+.decisions { display: grid; gap: 10px; }
+.decision { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: start; border: 1px solid var(--line); background: var(--surface); border-radius: 10px; padding: 12px 14px; }
+.decision p { font-size: .93rem; }
+.decision .q { font-weight: 600; }
+footer { color: var(--muted); font-size: .85rem; border-top: 1px solid var(--line); padding-top: 16px; }
+@media (prefers-reduced-motion: reduce) { .switch::after { transition: none; } }
+.sim-bar { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+
+/* ---- Vista final: el mundo del panel (Northstar). Solo claro, como el panel real. ---- */
+.ex-marco { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; box-shadow: 0 8px 24px rgb(15 23 42 / .08); }
+.ex {
+  --cielo: #fcfcfa; --cielo-hundido: #f5f7fb; --nube: #ffffff; --nube-hundida: #f5f7fb;
+  --tinta: #111312; --tinta2: #4a5251; --tinta3: #687170; --tinta-etiqueta: #656d6c;
+  --regla: #e6e7e4; --regla2: #d4d6d3; --borde-control: #7b8382; --filete: rgb(17 19 18 / .1);
+  --activo: #1e3a8a; --activo-bruma: #e9edff; --duda-tinta: #172a66; --bien: #0b7a63; --bien-bruma: #e6f5f0;
+  --sombra-control: 0 0 0 1px rgb(17 19 18 / .12);
+  color-scheme: light; accent-color: var(--activo);
+  background: var(--cielo); color: var(--tinta);
+  font-family: Onest, system-ui, sans-serif; font-size: 16px; line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+.ex-barra { display: flex; align-items: center; gap: 16px; min-height: 57px; padding: 0 24px; border-bottom: 1px solid var(--filete); }
+.ex-logo { font-weight: 600; letter-spacing: -.03em; font-size: 18px; }
+.ex-quien { font-family: Syne, Onest, sans-serif; font-size: 11px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase; border-left: 1px solid var(--filete); padding-left: 12px; white-space: nowrap; }
+.ex-empresa { font-size: 14px; color: var(--tinta3); border-left: 1px solid var(--filete); padding-left: 16px; }
+.ex-persona { margin-left: auto; display: flex; gap: 12px; font-size: 14px; color: var(--tinta2); }
+.ex-salir { text-decoration: underline; text-decoration-color: var(--regla2); text-underline-offset: .22em; }
+.ex-cuerpo { display: grid; grid-template-columns: 13.5rem minmax(0, 1fr); }
+.ex-lateral { display: flex; flex-direction: column; gap: 16px; padding: 16px 12px; border-right: 1px solid var(--filete); }
+.ex-familia { display: flex; flex-direction: column; gap: 2px; }
+.ex-tfam { padding: 0 12px; margin-bottom: 4px; font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--tinta-etiqueta); }
+.ex-tfam::before { content: "/ "; }
+.ex-entrada { padding: 8px 12px; font-size: 14px; color: var(--tinta2); border-radius: 4px; }
+.ex-entrada.activa { background: var(--activo-bruma); color: var(--activo); font-weight: 500; }
+.ex-pie { margin-top: auto; border-top: 1px solid var(--regla); padding-top: 12px; }
+.ex-pagina { padding: 24px 24px 48px; min-width: 0; }
+.ex-volver { display: inline-flex; min-height: 44px; align-items: center; font-size: 14px; color: var(--tinta2); }
+.ex-cabecera { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; margin: 16px 0 24px; }
+.ex-identidad { flex: 1 1 22rem; min-width: 0; }
+.ex .ex-h1 { font-family: Onest, sans-serif; font-size: clamp(1.75rem, 3vw, 2.6rem); line-height: 1.05; font-weight: 400; letter-spacing: -.055em; }
+.ex-datos { font-size: 15px; color: var(--tinta2); margin-top: 8px; }
+.ex-acciones { display: flex; gap: 8px; align-items: center; }
+.ex-acento, .ex-tuerca { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; border-radius: 8px; font-size: 14px; font-weight: 500; }
+.ex-acento { background: var(--activo); color: #fff; padding: 12px 16px; }
+.ex-tuerca { background: var(--nube-hundida); box-shadow: 0 0 0 1px var(--tinta); padding: 8px 12px; color: var(--tinta); }
+.ex .ex-h2 { font-family: Onest, sans-serif; font-size: 20px; font-weight: 550; letter-spacing: -.03em; line-height: 1.2; margin: 32px 0 12px; }
+.ex-config { display: grid; gap: 24px; }
+.ex-grupo { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 24px; border: 0; padding: 12px 0 0; margin: 0; min-width: 0; }
+.ex-grupo legend { font-size: 16px; font-weight: 600; padding: 0; display: flex; align-items: center; gap: 8px; }
+.ex-grupo[hidden] { display: none !important; }
+.ex-ajuste { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.ex-etq { font-size: 14px; font-weight: 600; }
+.ex-interruptor { display: flex; align-items: flex-start; gap: 8px; font-size: 14px; color: var(--tinta2); line-height: 1.4; min-height: 44px; }
+.ex-interruptor input { margin-top: 2px; flex: none; }
+.ex-eleccion { min-height: 44px; padding: 0 12px; background: var(--nube); color: var(--tinta); border: 1px solid var(--borde-control); font: inherit; font-size: 16px; border-radius: 4px; width: 100%; min-width: 0; }
+.ex-corta { width: 10rem; }
+.ex-banco { font-size: 15px; }
+.ex-ayuda { font-size: 13px; color: var(--tinta3); line-height: 1.45; max-width: 44ch; }
+.ex-nuevo { font-family: Syne, Onest, sans-serif; font-size: 10px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; background: var(--activo-bruma); color: var(--activo); padding: 2px 8px; border-radius: 4px; }
+
+/* El bloque nuevo ocupa las dos columnas: la banda arriba, la lista debajo. */
+.ex-grupo-etapas > .ex-banda, .ex-grupo-etapas > .ex-etapas, .ex-grupo-etapas > .ex-fijo { grid-column: 1 / -1; }
+.ex-banda { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; align-items: start; }
+.ex-tramo { min-width: 0; display: grid; gap: 8px; }
+.ex-franja { height: 14px; display: flex; align-items: center; }
+.ex-franja::before { content: ""; display: block; width: 100%; height: 8px; border-radius: 8px; background: var(--activo); }
+.ex-tramo.pendiente .ex-franja::before { height: 2px; background: var(--regla2); }
+.ex-tramo.viva .ex-franja::before { background: linear-gradient(90deg, #93a5d8 0%, #5b73b8 40%, #1e3a8a 100%); }
+.ex-tnombre { font-size: 14px; font-weight: 500; overflow-wrap: anywhere; }
+.ex-tfecha { font-size: 13px; color: var(--tinta3); font-variant-numeric: tabular-nums; }
+.ex-tramo.pendiente .ex-tnombre { color: var(--tinta2); font-weight: 400; }
+.ex-etapas { display: grid; max-width: 34rem; border-top: 1px solid var(--regla); }
+.ex-fila { display: flex; align-items: center; gap: 8px; border-bottom: 1px solid var(--regla); }
+.ex-flecha { width: 36px; height: 36px; display: inline-grid; place-items: center; border: 0; border-radius: 8px; background: var(--nube); box-shadow: var(--sombra-control); color: var(--tinta); font: inherit; font-size: 15px; cursor: pointer; }
+.ex-flecha:hover:not(:disabled) { background: var(--nube-hundida); }
+.ex-flecha:disabled { opacity: .35; cursor: not-allowed; }
+.ex-flecha:focus-visible { outline: 2px solid var(--activo); outline-offset: 2px; }
+.ex-hueco { width: 80px; flex: none; }
+.ex-etapa { flex: 0 1 auto; min-width: 0; display: flex; align-items: center; gap: 10px; min-height: 52px; font-size: 15px; cursor: pointer; }
+.ex-etapa input { width: 18px; height: 18px; flex: none; margin: 0; cursor: inherit; }
+.ex-etapa.fija { cursor: default; color: var(--tinta2); }
+.ex-etapa.bloqueada { cursor: not-allowed; }
+.ex-siempre { font-size: 12px; color: var(--tinta3); width: 80px; text-align: right; flex: none; }
+.ex-espacio { flex: 1; }
+.ex-info { position: relative; display: inline-flex; }
+.ex-info-btn { width: 32px; height: 32px; display: inline-grid; place-items: center; border: 0; border-radius: 50%; background: none; color: var(--tinta3); cursor: help; padding: 0; }
+.ex-info-btn:hover, .ex-info-btn:focus-visible { color: var(--activo); background: var(--activo-bruma); }
+.ex-info-btn:focus-visible { outline: 2px solid var(--activo); outline-offset: 1px; }
+.ex-tip { position: absolute; z-index: 5; left: 50%; bottom: calc(100% + 6px); transform: translateX(-30%); width: max-content; max-width: min(17rem, 70vw); padding: 10px 12px; border-radius: 8px; background: var(--tinta); color: #fff; font-size: 13px; line-height: 1.45; box-shadow: 0 8px 24px rgb(15 23 42 / .18); opacity: 0; visibility: hidden; transition: opacity .12s; pointer-events: none; }
+.ex-info:hover .ex-tip, .ex-info-btn:focus-visible + .ex-tip, .ex-info-btn:focus + .ex-tip { opacity: 1; visibility: visible; }
+.ex-fijo { display: inline-flex; justify-self: start; font-size: 13px; font-weight: 500; color: var(--duda-tinta); background: var(--activo-bruma); padding: 4px 10px; border-radius: 4px; }
+.ex-fijo[hidden] { display: none; }
+.ex-pesos { border-collapse: collapse; width: 100%; font-size: 14px; }
+.ex-pesos th, .ex-pesos td { padding: 8px 0; border-bottom: 1px solid var(--regla); text-align: left; font-weight: 400; }
+.ex-pesos thead th { font-size: 12px; color: var(--tinta3); }
+.ex-pesos tbody th { font-weight: 500; }
+.ex-cifra { text-align: right !important; font-variant-numeric: tabular-nums; padding-left: 12px !important; }
+.ex-pesos .cambia { color: var(--activo); font-weight: 600; }
+.ex-pesos .fuera { color: var(--tinta3); text-decoration: line-through; }
+
+.ex-portal { padding: 32px 24px 36px; }
+.ex-etiqueta { display: block; font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--tinta-etiqueta); margin-bottom: 16px; }
+.ex .ex-portal-h1 { font-family: Onest, sans-serif; font-size: clamp(2rem, 4vw, 3rem); line-height: .98; font-weight: 400; letter-spacing: -.055em; }
+.ex-entradilla { font-size: 15px; color: var(--tinta2); margin-bottom: 20px; }
+.ex-abierto { margin-top: 20px; padding: 20px; background: var(--nube); box-shadow: var(--sombra-control); border-radius: 8px; display: grid; gap: 8px; max-width: 34rem; }
+.ex-abierto h5 { margin: 0; font-size: 18px; font-weight: 550; letter-spacing: -.02em; }
+.ex-abierto p { font-size: 15px; color: var(--tinta2); }
+.ex-abierto .ex-acento { justify-self: start; margin-top: 4px; }
+
+@media (max-width: 720px) {
+  .ex-cuerpo { grid-template-columns: minmax(0, 1fr); }
+  .ex-lateral, .ex-empresa, .ex-quien { display: none; }
+  .ex-grupo { grid-template-columns: minmax(0, 1fr); }
+  .ex-pagina, .ex-barra { padding-left: 16px; padding-right: 16px; }
+}
+</style>
+
+<div class="wrap">
+  <header>
+    <span class="eyebrow">Borrador para corregir · antes de la spec</span>
+    <h1>Etapas por vacante</h1>
+    <p class="lede">Cada vacante recorre solo las etapas que le sirven. Viene con un flujo predeterminado y Talento lo ajusta con interruptores. Las etapas nuevas se programan una vez y aparecen como opción en todas las vacantes que se creen después.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <span class="chip warn">Lo marcado en ámbar es un supuesto: corrígelo</span>
+    </div>
+  </header>
+
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow">Las piezas</span>
+      <h2>Qué etapas hay y cuáles se pueden quitar</h2>
+    </div>
+    <p>Perfil Integral abre siempre. Todas las demás, Decisión incluida, se encienden, se apagan y se ordenan como haga falta en cada vacante.</p>
+    <div class="tbl">
+      <table>
+        <thead><tr><th>Etapa</th><th>Se puede quitar o mover</th><th>En el predeterminado</th><th>Quién la cierra</th></tr></thead>
+        <tbody>
+          <tr><td><b>Perfil Integral</b></td><td><span class="chip acc">Siempre va, primera</span></td><td><span class="chip ok">Sí</span></td><td>Sistema y Talento</td></tr>
+          <tr><td><b>Prueba del puesto</b></td><td>Sí</td><td><span class="chip ok">Sí</span></td><td>Sistema y Talento</td></tr>
+          <tr><td><b>Simulación de trabajo</b></td><td>Sí</td><td><span class="chip off">No</span></td><td>Talento</td></tr>
+          <tr><td><b>Validación práctica</b></td><td>Sí</td><td><span class="chip off">No</span></td><td>El área</td></tr>
+          <tr><td><b>Decisión</b></td><td>Sí</td><td><span class="chip ok">Sí</span></td><td>El área</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow">Flujo 1</span>
+      <h2>Talento crea la vacante y elige sus etapas</h2>
+      <span class="who">Quien crea o edita vacantes en el panel</span>
+    </div>
+    <ol class="steps">
+      <li><div>Crea la vacante como siempre: título, descripción, horario, cierre.</div></li>
+      <li><div>En <b>Configuración de la vacante</b> aparece un bloque nuevo arriba de todo: <b>Etapas de esta vacante</b>. Viene con el predeterminado ya marcado: Perfil Integral → Prueba del puesto → Decisión.</div></li>
+      <li><div>Si no sabe qué hace una etapa, pasa el cursor por la <b>ⓘ</b> de al lado y lee una explicación de una o dos líneas, sin términos técnicos.</div></li>
+      <li><div>Enciende o apaga las etapas opcionales y las sube o baja con las flechas. El recorrido de arriba se redibuja al instante.</div></li>
+      <li><div>Los pesos siguen saliendo de la versión que se elige en <b>Pesos de la decisión</b>, como hoy. Si la vacante no tiene una etapa, su peso se reparte entre las que sí tiene. Con la versión «v4 embudo completo» (40 / 30 / 15 / 15), una vacante sin Simulación ni Validación queda en 57,14 / 42,86, el mismo reparto que ya usó la v3.</div></li>
+      <li><div>Las secciones de configuración de una etapa apagada desaparecen. Sin Prueba del puesto, no se pide <b>Qué rendirá en la etapa técnica</b> ni <b>Cuánto tiempo tendrá</b>, y la vacante se puede publicar sin ellas.</div></li>
+      <li><div>Publica. Desde ese momento los candidatos siguen ese recorrido.</div></li>
+    </ol>
+
+    <p><a href="#vista">Ver cómo queda en el panel y en el portal ↓</a></p>
+
+    <p class="ask"><b>Supuesto:</b> no hay botón de «flujo rápido» ni plantillas con nombre; solo los interruptores. Si quieres atajos como «Agilizar: solo Perfil → Decisión», se agregan.</p>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow">Flujo 2</span>
+      <h2>Llega el primer postulante: las etapas se fijan</h2>
+      <span class="who">Talento, al volver a la configuración</span>
+    </div>
+    <ol class="steps">
+      <li><div>Con la primera postulación, las casillas y las flechas quedan bloqueadas con la pastilla <span class="chip acc">Fijo desde el primer postulante</span>.</div></li>
+      <li><div>Los pesos se siguen pudiendo cambiar, como hoy; lo que ya no cambia es qué etapas hay.</div></li>
+      <li><div>Si de verdad hace falta otro recorrido, se crea otra vacante.</div></li>
+    </ol>
+    <p class="ask"><b>Supuesto:</b> ni siquiera se permite <i>agregar</i> una etapa al final con candidatos dentro. Quitar está claro que no, porque alguien podría estar a mitad de ella.</p>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow">Flujo 3</span>
+      <h2>El candidato ve solo su recorrido</h2>
+      <span class="who">Quien postula, en el portal y por WhatsApp</span>
+    </div>
+    <ol class="steps">
+      <li><div>En <b>Mis procesos</b>, la línea de avance muestra solo las etapas de esa vacante. Una vacante ágil enseña tres pasos, no cinco.</div></li>
+      <li><div>Al aprobar una etapa pasa directo a la siguiente <i>de su vacante</i>. Si no hay prueba, del Perfil Integral va a la Decisión, con el aviso que corresponde a la Decisión.</div></li>
+      <li><div>Los avisos por correo, campana y WhatsApp solo hablan de etapas que existen en su recorrido. Nunca le llega «te toca la prueba» en una vacante sin prueba.</div></li>
+    </ol>
+    <div class="pair">
+      <div class="phone">
+        <span class="cap">Vacante con el predeterminado</span>
+        <div class="track">
+          <div><span class="dot done"></span>Perfil Integral</div>
+          <div><span class="dot now"></span><b>Prueba del puesto</b></div>
+          <div><span class="dot"></span>Decisión</div>
+        </div>
+      </div>
+      <div class="phone">
+        <span class="cap">Vacante ágil, sin prueba</span>
+        <div class="track">
+          <div><span class="dot done"></span>Perfil Integral</div>
+          <div><span class="dot now"></span><b>Decisión</b></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow">Flujo 4</span>
+      <h2>Talento y el área revisan a los candidatos</h2>
+      <span class="who">Ranking, ficha, Excel e informes</span>
+    </div>
+    <ul class="plain">
+      <li>El ranking y la ficha solo muestran notas y columnas de las etapas de esa vacante. Nada de «Prueba: —» donde no hubo prueba.</li>
+      <li>El Excel del ranking y los informes hacen lo mismo.</li>
+      <li>La nota final se calcula con los pesos de las etapas que hubo.</li>
+      <li>El semáforo de la Decisión deja de decir «Sin datos» por etapas que la vacante no tiene.</li>
+      <li>Los avances automáticos que ya existen (calificar y avanzar sola, cierre por fecha) siguen funcionando y respetan el recorrido de la vacante.</li>
+    </ul>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow">Flujo 4b</span>
+      <h2>Una vacante sin etapa de Decisión</h2>
+      <span class="who">Talento, al terminar la última etapa</span>
+    </div>
+    <ol class="steps">
+      <li><div>La persona termina la última etapa de su vacante y queda <b>por confirmar</b>, con su nota final en el ranking.</div></li>
+      <li><div>Talento la contrata con <b>Contratar</b> o la descarta desde la ficha, como ya se puede hoy. No hay semáforo ni evidencia adicional, porque eso es de la etapa de Decisión.</div></li>
+    </ol>
+    <p class="ask"><b>Supuesto:</b> sin Decisión, nadie pasa a Contratado solo. Siempre lo confirma una persona.</p>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow">Flujo 5</span>
+      <h2>Las vacantes que ya existen</h2>
+    </div>
+    <p>Quedan con el recorrido de siempre, las cinco etapas, para que nadie que esté en proceso note un cambio. Las que aún no tienen postulantes se pueden ajustar como una nueva.</p>
+    <p class="ask"><b>Pregunta:</b> ¿las vacantes viejas sin postulantes también se ajustan, o solo las que se creen desde ahora?</p>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow">Flujo 6</span>
+      <h2>El día que el cliente pida una etapa nueva</h2>
+      <span class="who">Desarrollo</span>
+    </div>
+    <p>Por ejemplo, «Entrevista con gerencia». Es trabajo de programación, pero acotado y siempre el mismo:</p>
+    <div class="dev">
+      <div><b>Se programa la etapa</b>Qué espera, quién la cierra, cómo califica o si solo es «pasa / no pasa», qué avisos manda.</div>
+      <div><b>Se registra en el catálogo</b>Con su nombre y su explicación corta, la que Talento ve en la ⓘ. Sin esa explicación no se puede registrar.</div>
+      <div><b>Aparece sola</b>Como un interruptor más en todas las vacantes nuevas, en el portal y en los informes, sin tocar el resto.</div>
+    </div>
+    <p class="ask"><b>Supuesto:</b> el catálogo es el mismo para todas las empresas. Que cada empresa tenga su propio predeterminado queda para después.</p>
+  </section>
+
+  <section id="vista">
+    <div class="sec-head">
+      <span class="eyebrow">Vista final</span>
+      <h2>Cómo se vería en el panel y en el portal</h2>
+    </div>
+    <p>Con las letras, colores y piezas del panel actual. Las casillas y las flechas funcionan: apaga la prueba del puesto o sube la simulación, y mira qué cambia en la configuración, en los pesos y en lo que ve el candidato.</p>
+    <div class="sim-bar">
+      <button class="btn" id="sim-candidatos" type="button" aria-pressed="false">Simular: ya tiene postulantes</button>
+      <button class="btn" id="reset" type="button">Volver al predeterminado</button>
+    </div>
+
+    <div class="ex-marco" aria-label="Vista del panel: configuración de la vacante">
+      <div class="ex">
+        <div class="ex-barra">
+          <span class="ex-logo">EX</span>
+          <span class="ex-quien">Panel del equipo</span>
+          <span class="ex-empresa">Renaser</span>
+          <span class="ex-persona"><span>Talento</span><span class="ex-salir">Salir</span></span>
+        </div>
+        <div class="ex-cuerpo">
+          <nav class="ex-lateral" aria-label="Menú del panel (maqueta)">
+            <div class="ex-familia"><span class="ex-tfam">Selección</span>
+              <span class="ex-entrada activa">Vacantes</span><span class="ex-entrada">Pruebas</span><span class="ex-entrada">Simulación</span></div>
+            <div class="ex-familia"><span class="ex-tfam">Personas</span>
+              <span class="ex-entrada">Colaboradores</span><span class="ex-entrada">Perfil de la empresa</span></div>
+            <div class="ex-familia ex-pie"><span class="ex-entrada">Configuración</span></div>
+          </nav>
+          <div class="ex-pagina">
+            <span class="ex-volver">← Volver a las vacantes</span>
+            <div class="ex-cabecera">
+              <div class="ex-identidad">
+                <h3 class="ex-h1">Asistente administrativo</h3>
+                <p class="ex-datos">En borrador: todavía no aparece en el portal · con evaluación del banco</p>
+              </div>
+              <div class="ex-acciones">
+                <span class="ex-acento">Publicar en el portal</span>
+                <span class="ex-tuerca" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg></span>
+              </div>
+            </div>
+
+            <h4 class="ex-h2">Qué responderá quien postule</h4>
+            <div class="ex-config">
+              <fieldset class="ex-grupo ex-grupo-etapas">
+                <legend>Etapas de esta vacante <span class="ex-nuevo">Nuevo</span></legend>
+                <ol class="ex-banda" id="banda-panel" role="list"></ol>
+                <div class="ex-etapas" id="lista-etapas"></div>
+                <p class="ex-fijo" id="fijo" hidden>Fijo desde el primer postulante</p>
+              </fieldset>
+
+              <fieldset class="ex-grupo">
+                <legend>Cómo avanza esta vacante</legend>
+                <label class="ex-ajuste">
+                  <span class="ex-etq">Calificar y avanzar sola</span>
+                  <span class="ex-interruptor"><input type="checkbox" id="auto" checked><span id="texto-auto"></span></span>
+                </label>
+                <label class="ex-ajuste">
+                  <span class="ex-etq">Nota mínima del pase</span>
+                  <select class="ex-eleccion ex-corta" id="nota-min"><option>60</option><option>70</option></select>
+                </label>
+              </fieldset>
+
+              <fieldset class="ex-grupo">
+                <legend>Las preguntas del Perfil Integral</legend>
+                <div class="ex-ajuste">
+                  <span class="ex-etq">Qué evaluación responderá · nivel Operativo</span>
+                  <p class="ex-banco">Banco del nivel Operativo · v3</p>
+                  <span class="ex-ayuda">25 minutos. Lo fija el nivel del puesto: para cambiarlo se publica otra versión en Configuración.</span>
+                </div>
+              </fieldset>
+
+              <fieldset class="ex-grupo" id="fs-prueba">
+                <legend>Prueba técnica</legend>
+                <label class="ex-ajuste">
+                  <span class="ex-etq">Qué rendirá en la etapa técnica</span>
+                  <select class="ex-eleccion" id="instrumento"><option>Prueba del puesto existente</option><option>Cuestionario técnico con IA</option></select>
+                </label>
+                <label class="ex-ajuste">
+                  <span class="ex-etq">Qué prueba del puesto rendirá</span>
+                  <select class="ex-eleccion" id="prueba-elegida"><option>Asistente administrativo · v2</option></select>
+                </label>
+                <label class="ex-ajuste">
+                  <span class="ex-etq">Cuánto tiempo tendrá</span>
+                  <select class="ex-eleccion ex-corta" id="minutos"><option>90 minutos</option><option>60 minutos</option></select>
+                </label>
+              </fieldset>
+
+              <fieldset class="ex-grupo">
+                <legend>Pesos de la decisión</legend>
+                <label class="ex-ajuste">
+                  <span class="ex-etq">Qué pesos rigen la decisión</span>
+                  <select class="ex-eleccion" id="version-pesos"><option>v4 embudo completo</option></select>
+                </label>
+                <div class="ex-ajuste">
+                  <span class="ex-etq">Cómo pesa en esta vacante</span>
+                  <table class="ex-pesos">
+                    <thead><tr><th scope="col">Etapa</th><th scope="col" class="ex-cifra">En la versión</th><th scope="col" class="ex-cifra">En esta vacante</th></tr></thead>
+                    <tbody id="tabla-pesos"></tbody>
+                  </table>
+                </div>
+              </fieldset>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="ex-marco" aria-label="Vista del portal: Mis procesos">
+      <div class="ex ex-portal">
+        <span class="ex-etiqueta">Mis procesos / Detalle</span>
+        <h3 class="ex-portal-h1">Asistente administrativo</h3>
+        <h4 class="ex-h2">Tu recorrido</h4>
+        <p class="ex-entradilla" id="entradilla-portal"></p>
+        <ol class="ex-banda ex-banda-portal" id="banda-portal" role="list"></ol>
+        <div class="ex-abierto" id="abierto"></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="sec-head">
+      <span class="eyebrow">Para corregir</span>
+      <h2>Las decisiones que la spec daría por hechas</h2>
+    </div>
+    <div class="decisions">
+      <div class="decision"><span class="chip ok">1</span><div><p class="q">Encender, apagar y reordenar todas las etapas menos el Perfil Integral.</p><p>Perfil Integral siempre primera; Decisión es una etapa más, opcional y movible. <span class="chip warn">supuesto</span> Sin reglas de «esta va antes que aquella».</p></div></div>
+      <div class="decision"><span class="chip warn">2</span><div><p class="q">Las etapas se fijan con el primer postulante.</p><p>Los pesos siguen editables.</p></div></div>
+      <div class="decision"><span class="chip warn">3</span><div><p class="q">Al apagar una etapa, su peso se reparte solo entre las demás.</p><p>En proporción a lo que pesa cada una en la versión de pesos elegida. Las versiones no se tocan: el reparto se calcula para esa vacante.</p></div></div>
+      <div class="decision"><span class="chip ok">4</span><div><p class="q">Predeterminado: Perfil Integral → Prueba del puesto → Decisión.</p><p>Confirmado. Simulación y Validación quedan como opcionales apagadas.</p></div></div>
+      <div class="decision"><span class="chip warn">5</span><div><p class="q">Todo en una sola spec.</p><p>Base, panel, portal y WhatsApp, Excel e informes, en ese orden de bloques.</p></div></div>
+      <div class="decision"><span class="chip ok">6</span><div><p class="q">Cada etapa lleva una explicación corta y obligatoria.</p><p>Se ve al pasar el cursor por la ⓘ. Una etapa nueva no se puede registrar sin la suya.</p></div></div>
+    </div>
+  </section>
+
+  <footer>Borrador de flujo, 25/11/2026. La spec se escribe después de estas correcciones y empieza en estado borrador.</footer>
+</div>
+
+<script>
+(function () {
+  var etapas = [
+    { id: "perfil", nombre: "Perfil Integral", corto: "Perfil", fija: true, base: 40, on: true, fecha: "12 nov",
+      ayuda: "La persona sube su CV y responde unas preguntas. El sistema lo revisa y le pone una nota para ver si encaja con el puesto." },
+    { id: "prueba", nombre: "Prueba del puesto", corto: "Prueba", base: 30, on: true, siguiente: "prueba del puesto",
+      ayuda: "La persona resuelve una tarea real del puesto, con tiempo límite. Se califica sola y tú la revisas antes de que avance." },
+    { id: "sim", nombre: "Simulación de trabajo", corto: "Simulación", base: 15, on: false, siguiente: "simulación de trabajo",
+      ayuda: "La persona elige un día y hace una práctica del trabajo con el equipo. Tú la observas y le pones nota." },
+    { id: "val", nombre: "Validación práctica", corto: "Validación", base: 15, on: false, siguiente: "validación práctica",
+      ayuda: "La persona trabaja unos días a prueba en el área. El jefe del área dice si lo hizo bien." },
+    { id: "dec", nombre: "Decisión", corto: "Decisión", base: 0, on: true, siguiente: "decisión",
+      ayuda: "Se juntan todas las notas y el sistema sugiere contratar, pedir algo más o descartar. Una persona toma la decisión final." }
+  ];
+  var orden0 = etapas.slice(); var predet = {}; etapas.forEach(function (e) { predet[e.id] = e.on; });
+  function mover(i, d) { var j = i + d; if (j < 1 || j > etapas.length - 1) return; var t = etapas[i]; etapas[i] = etapas[j]; etapas[j] = t; }
+  var conCandidatos = false;
+  var $ = function (id) { return document.getElementById(id); };
+  function activas() { return etapas.filter(function (e) { return e.on; }); }
+  function cifra(n) { return n.toFixed(2).replace(".", ","); }
+
+  function repartir() {
+    var con = etapas.filter(function (e) { return e.on && e.base > 0; });
+    var total = con.reduce(function (s, e) { return s + e.base; }, 0), res = {}, acum = 0;
+    con.forEach(function (e, i) {
+      var v = i === con.length - 1 ? Math.round((100 - acum) * 100) / 100 : Math.round(e.base * 10000 / total) / 100;
+      res[e.id] = v; acum += v;
+    });
+    return res;
+  }
+
+  function tramo(e, clase, conFecha) {
+    var li = document.createElement("li"); li.className = "ex-tramo " + clase;
+    li.innerHTML = '<span class="ex-franja" aria-hidden="true"></span><span class="ex-tnombre"></span>' + (conFecha ? '<span class="ex-tfecha"></span>' : "");
+    li.querySelector(".ex-tnombre").textContent = conFecha ? e.corto : e.nombre;
+    if (conFecha) li.querySelector(".ex-tfecha").textContent = e.fecha || (clase === "viva" ? "Desde hoy" : "");
+    return li;
+  }
+
+  function pintar() {
+    var act = activas();
+    // Banda del panel: el recorrido de la vacante, sin estado de nadie.
+    var bp = $("banda-panel"); bp.innerHTML = ""; bp.style.gridTemplateColumns = "repeat(" + act.length + ", minmax(0, 1fr))";
+    act.forEach(function (e) { bp.appendChild(tramo(e, "", false)); });
+
+    // Casillas.
+    var le = $("lista-etapas"); le.innerHTML = "";
+    etapas.forEach(function (e, i) {
+      var fila = document.createElement("div"); fila.className = "ex-fila";
+      var l = document.createElement("label");
+      l.className = "ex-etapa" + (e.fija ? " fija" : "") + (conCandidatos && !e.fija ? " bloqueada" : "");
+      var c = document.createElement("input"); c.type = "checkbox"; c.id = "et-" + e.id; c.checked = e.on;
+      c.disabled = !!e.fija || conCandidatos;
+      c.addEventListener("change", function () { e.on = c.checked; pintar(); $("et-" + e.id).focus(); });
+      var t = document.createElement("span"); t.textContent = e.nombre;
+      l.appendChild(c); l.appendChild(t);
+      fila.appendChild(l);
+      var info = document.createElement("span"); info.className = "ex-info";
+      var ib = document.createElement("button"); ib.type = "button"; ib.className = "ex-info-btn";
+      ib.setAttribute("aria-label", "Qué se hace en " + e.nombre); ib.setAttribute("aria-describedby", "tip-" + e.id);
+      ib.innerHTML = '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M8 7v4.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="8" cy="4.7" r="1" fill="currentColor"/></svg>';
+      var tip = document.createElement("span"); tip.className = "ex-tip"; tip.id = "tip-" + e.id; tip.setAttribute("role", "tooltip"); tip.textContent = e.ayuda;
+      info.appendChild(ib); info.appendChild(tip); fila.appendChild(info);
+      var esp = document.createElement("span"); esp.className = "ex-espacio"; fila.appendChild(esp);
+      if (e.fija) { var sf = document.createElement("span"); sf.className = "ex-siempre"; sf.textContent = "Siempre primera"; fila.appendChild(sf); }
+      else {
+        [[-1, "↑", "Subir "], [1, "↓", "Bajar "]].forEach(function (f) {
+          var b = document.createElement("button"); b.type = "button"; b.className = "ex-flecha";
+          b.id = "mv-" + e.id + (f[0] < 0 ? "-up" : "-down"); b.textContent = f[1];
+          b.setAttribute("aria-label", f[2] + e.nombre);
+          b.disabled = conCandidatos || (f[0] < 0 ? i === 1 : i === etapas.length - 1);
+          b.addEventListener("click", function () { mover(i, f[0]); pintar(); var x = $(b.id); if (x && !x.disabled) x.focus(); });
+          fila.appendChild(b);
+        });
+      }
+      le.appendChild(fila);
+    });
+    $("fijo").hidden = !conCandidatos;
+    $("fs-prueba").hidden = !etapas.filter(function (e) { return e.id === "prueba"; })[0].on;
+
+    // Calificar y avanzar sola: nombra la etapa que sigue de verdad.
+    var sig = act[1];
+    $("texto-auto").textContent = $("auto").checked
+      ? "Encendido: cada persona que postule se califica sola y, si llega a la nota mínima, " + (sig ? "pasa a la " + sig.siguiente + " sin que nadie intervenga" : "queda lista para que la contrates o descartes desde su ficha") + ". Tú decides el resto, cuando ya tienes sus notas"
+      : "Apagado: cada paso lo pides tú desde esta pantalla";
+
+    // Pesos.
+    var r = repartir(), tb = $("tabla-pesos"); tb.innerHTML = "";
+    etapas.filter(function (e) { return e.base > 0; }).forEach(function (e) {
+      var tr = document.createElement("tr");
+      var dentro = e.on ? '<td class="ex-cifra' + (r[e.id] !== e.base ? " cambia" : "") + '">' + cifra(r[e.id]) + "</td>" : '<td class="ex-cifra fuera">—</td>';
+      tr.innerHTML = '<th scope="row"></th><td class="ex-cifra">' + cifra(e.base) + "</td>" + dentro;
+      tr.querySelector("th").textContent = e.nombre;
+      tb.appendChild(tr);
+    });
+
+    // Portal: la persona aprobó el Perfil y está en la etapa siguiente.
+    var bpo = $("banda-portal"); bpo.innerHTML = ""; bpo.style.gridTemplateColumns = "repeat(" + act.length + ", minmax(0, 1fr))";
+    act.forEach(function (e, i) { bpo.appendChild(tramo(e, i === 0 ? "hecho" : i === 1 ? "viva" : "pendiente", true)); });
+    var palabras = ["", "una etapa", "dos etapas", "tres etapas", "cuatro etapas", "cinco etapas"];
+    $("entradilla-portal").textContent = act.length === 1 ? "La etapa del proceso, con la fecha en que llegaste." : "Las " + palabras[act.length] + " del proceso, con la fecha en que llegaste a cada una.";
+    var ab = $("abierto");
+    if (!sig) ab.innerHTML = '<h5>El equipo está revisando tu perfil</h5><p>Te avisaremos en cuanto haya una respuesta. <b>No tienes que hacer nada.</b></p>';
+    else if (sig.id === "prueba") ab.innerHTML = '<h5>Te toca la prueba del puesto</h5><p>Tienes 90 minutos desde que pulses Empezar.</p><span class="ex-acento">Abrir prueba</span>';
+    else if (sig.id === "sim") ab.innerHTML = '<h5>Te toca elegir la fecha de tu simulación</h5><p>Escoge el turno que mejor te quede.</p><span class="ex-acento">Elegir fecha</span>';
+    else if (sig.id === "val") ab.innerHTML = '<h5>Empieza tu validación práctica</h5><p>El área te contará los detalles. <b>No tienes que hacer nada.</b></p>';
+    else ab.innerHTML = '<h5>El equipo está decidiendo</h5><p>Ya tienen tus resultados del Perfil Integral. <b>No tienes que hacer nada.</b></p>';
+  }
+
+  $("auto").addEventListener("change", pintar);
+  $("reset").addEventListener("click", function () { etapas = orden0.slice(); etapas.forEach(function (e) { e.on = predet[e.id]; }); conCandidatos = false; $("sim-candidatos").setAttribute("aria-pressed", "false"); pintar(); });
+  $("sim-candidatos").addEventListener("click", function () { conCandidatos = !conCandidatos; this.setAttribute("aria-pressed", String(conCandidatos)); pintar(); });
+  pintar();
+})();
+</script>

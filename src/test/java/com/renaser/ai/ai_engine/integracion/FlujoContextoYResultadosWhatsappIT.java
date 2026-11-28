@@ -159,6 +159,9 @@ class FlujoContextoYResultadosWhatsappIT {
                  "descripcion": "Lleva la contabilidad de tres sedes", "tipoCierre": "PERMANENTE",
                  "responsableUsuarioId": 1}""".formatted(solicitudId, puestoId))
                 .andReturn().getResponse().getContentAsString(), "id"));
+        // Las cinco etapas, como las vacantes de antes de la V95: el procedimiento las enumera.
+        conToken(put("/api/v1/panel/vacantes/" + vacante + "/etapas"), tokenTalento,
+                "{\"etapas\":[\"PERFIL_INTEGRAL\",\"PRUEBA_PUESTO\",\"SIMULACION\",\"VALIDACION\",\"DECISION\"]}").andExpect(status().isOk());
         String preguntas = "/api/v1/panel/vacantes/" + vacante + "/preguntas-propias";
         conToken(post(preguntas + "/preguntas"), tokenTalento, """
                 {"tipo":"ABIERTA","enunciado":"Cuéntanos un cierre contable difícil",

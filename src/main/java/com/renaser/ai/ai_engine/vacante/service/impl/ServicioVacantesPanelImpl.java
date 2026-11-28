@@ -212,6 +212,31 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
         this.queBuscar = queBuscar;
     }
 
+    /**
+     * El recorrido de cada vacante (V95): nace con el predeterminado, publicar solo exige la prueba
+     * si la tiene, y la fila lleva sus etapas. Por setter, como {@code cierre}: las pruebas de la
+     * vacante construyen el servicio a mano; sin él la vacante nace sin filas —que es recorrer el
+     * catálogo entero— y publicar exige la prueba como siempre.
+     */
+    private com.renaser.ai.ai_engine.vacante.service.RecorridoDeLaVacante recorridos;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void setRecorridos(com.renaser.ai.ai_engine.vacante.service.RecorridoDeLaVacante recorridos) {
+        this.recorridos = recorridos;
+    }
+
+    /** «Cómo pesa en esta vacante» (V95), solo en el detalle. Por setter, como los demás. */
+    private com.renaser.ai.ai_engine.vacante.service.ServicioPesosDeLaVacante pesosDeLaVacante;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void setPesosDeLaVacante(
+            com.renaser.ai.ai_engine.vacante.service.ServicioPesosDeLaVacante pesosDeLaVacante) {
+        this.pesosDeLaVacante = pesosDeLaVacante;
+    }
+
+    /** La etapa técnica: publicar solo exige su instrumento si el recorrido la tiene (V95). */
+    private static final String ETAPA_PRUEBA = "PRUEBA_PUESTO";
+
     /** Lo que contesta la API a un código de ciudad que el catálogo no ofrece (V62). */
     static final String CIUDAD_FUERA_DEL_CATALOGO = "Esa ciudad no está en el catálogo";
 
@@ -363,6 +388,12 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                 .responsableUsuarioId(datos.responsableUsuarioId())
                 .creadoEn(Instant.now())
                 .build());
+
+        // Nace con el recorrido predeterminado (V95): Perfil Integral → Prueba del puesto →
+        // Decisión. Talento lo cambia en la tuerca hasta que llega el primer postulante.
+        if (recorridos != null) {
+            recorridos.ponerPredeterminado(vacante.getId());
+        }
 
         // «Qué buscar en el CV» (V80): sin nadie dentro todavía, se guardan sin preguntar. Una
         // línea prohibida o larguísima es un 400 y no deja nada guardado: la transacción entera
@@ -641,6 +672,8 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
         // formulario con lo que la fila trae.
         Map<Long, List<String>> queBuscarDeLaLista = queBuscar == null ? Map.of()
                 : queBuscar.vigentesDe(filas.stream().map(Vacante::getId).toList());
+        // El recorrido de toda la lista (V95), también de una vez.
+        Function<Vacante, RecorridoDeLaFila> recorridoDeLaFila = recorridosDeLaLista(filas);
         return filas.stream()
                 // ⚠️ Sin el plazo vigente, y es deliberado: resolverlo pide la versión de la
                 // plantilla y los intentos abiertos de CADA vacante, o sea dos consultas por
@@ -651,7 +684,8 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                         puedeEditar(quien, alcanceDeEdicion, v),
                         alcanceDeArchivo, alcanceDeEliminacion, quien,
                         PlazoDeLaPrueba.SIN_DATO, ciudadDe(v, ciudades), preguntas.apply(v),
-                        LoPrestado.SIN_DATO, queBuscarDeLaLista.getOrDefault(v.getId(), List.of())))
+                        LoPrestado.SIN_DATO, queBuscarDeLaLista.getOrDefault(v.getId(), List.of()),
+                        recorridoDeLaFila.apply(v)))
                 .toList();
     }
 
@@ -725,7 +759,8 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                 // El estado de las propias no: el detalle lo lee del editor, con sus puntos.
                 new PreguntasDeLaFila(tieneBancoPropioDelNivel(vacante), null),
                 new LoPrestado(bancoFijoDe(vacante), pruebaPrestadaDe(vacante)),
-                queBuscar == null ? List.of() : queBuscar.vigentes(vacante.getId()));
+                queBuscar == null ? List.of() : queBuscar.vigentes(vacante.getId()),
+                recorridoDelDetalle(vacante));
     }
 
     /**
@@ -975,12 +1010,15 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
         if (vacante.isAplicaEvaluacion()) {
             exigirDeDondeSalenSusPreguntas(vacante);
         }
-        // "Es obligatoria para todo puesto" (RF-73), pero desde el ciclo 2 hay DOS formas de
-        // cumplirlo y la vacante dice cuál usa: la prueba del puesto de siempre, o el
+        // La prueba del puesto es obligatoria SI LA VACANTE LA TIENE en su recorrido (RF-73,
+        // cambiado en la V95): una vacante Perfil → Decisión se publica sin prueba. Si la tiene,
+        // hay DOS formas de cumplirlo y la vacante dice cuál usa: la prueba del puesto, o el
         // cuestionario técnico que el dueño aprobó para ella. Lo que no se puede es publicar
         // sin ninguna de las dos, porque entonces el candidato llega a su etapa técnica y no
         // encuentra nada que rendir.
-        exigirInstrumentoTecnico(vacante);
+        if (recorridos == null || recorridos.tiene(vacante.getId(), ETAPA_PRUEBA)) {
+            exigirInstrumentoTecnico(vacante);
+        }
         // Con fecha límite, una fecha que no haya pasado (V78): una vacante en borrador no se
         // cierra sola, y publicarla con el día ya pasado la cerraría al minuto siguiente.
         if (FormaDeCierre.esPorFecha(vacante.getTipoCierre())) {
@@ -1970,7 +2008,7 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                                    FiltroAlcance alcanceDeEliminacion, ContextoUsuario quien,
                                    PlazoDeLaPrueba plazo, CiudadDeLaVacante ciudad,
                                    PreguntasDeLaFila preguntas, LoPrestado prestado,
-                                   List<String> queBuscarEnElCv) {
+                                   List<String> queBuscarEnElCv, RecorridoDeLaFila recorrido) {
         Boolean bancoPropio = preguntas.bancoPropio();
         boolean alcanzaParaArchivar = alcanceDeArchivo != null
                 && alcance.alcanzaALaVacante(quien, alcanceDeArchivo, v);
@@ -2013,7 +2051,61 @@ public class ServicioVacantesPanelImpl implements ServicioVacantesPanel {
                                 && Vacante.ORIGEN_NIVEL.equals(v.getOrigenPreguntas())
                                 && Boolean.FALSE.equals(bancoPropio),
                 preguntas.estadoPropias(), prestado.banco(), prestado.prueba(), queBuscarEnElCv,
-                v.getVideoPresentacion());
+                v.getVideoPresentacion(), recorrido.etapas(), recorrido.editables(),
+                recorrido.pesos());
+    }
+
+    /**
+     * El recorrido de una fila (V95): sus etapas en orden, si todavía se pueden cambiar —ninguna
+     * postulación, de ningún estado— y, solo en el detalle, cómo pesa cada etapa en ella.
+     */
+    private record RecorridoDeLaFila(List<EtapaDeLaVacante> etapas, boolean editables,
+                                     List<PesoEnEstaVacante> pesos) {
+        static final RecorridoDeLaFila SIN_DATO = new RecorridoDeLaFila(List.of(), false, null);
+    }
+
+    /** Las etapas de un recorrido con su nombre y su explicación, en su orden. */
+    private static List<EtapaDeLaVacante> etapasDe(List<String> codigos,
+                                                   Map<String, com.renaser.ai.ai_engine.pesos.entity.Etapa> catalogo) {
+        List<EtapaDeLaVacante> etapas = new java.util.ArrayList<>();
+        for (String codigo : codigos) {
+            var etapa = catalogo.get(codigo);
+            etapas.add(etapa == null ? new EtapaDeLaVacante(codigo, codigo, "", false)
+                    : new EtapaDeLaVacante(codigo, etapa.getNombre(), etapa.getDescripcion(),
+                            etapa.isFijaPrimera()));
+        }
+        return etapas;
+    }
+
+    private Map<String, com.renaser.ai.ai_engine.pesos.entity.Etapa> catalogoDeEtapas() {
+        Map<String, com.renaser.ai.ai_engine.pesos.entity.Etapa> porCodigo = new java.util.LinkedHashMap<>();
+        recorridos.catalogo().forEach(e -> porCodigo.put(e.getCodigo(), e));
+        return porCodigo;
+    }
+
+    /** El recorrido del detalle: con los pesos repartidos. */
+    private RecorridoDeLaFila recorridoDelDetalle(Vacante v) {
+        if (recorridos == null) {
+            return RecorridoDeLaFila.SIN_DATO;
+        }
+        List<PesoEnEstaVacante> pesos = pesosDeLaVacante == null || v.getVersionPesosId() == null
+                ? List.of() : pesosDeLaVacante.enEstaVacante(v.getId(), v.getVersionPesosId());
+        return new RecorridoDeLaFila(etapasDe(recorridos.de(v.getId()), catalogoDeEtapas()),
+                postulaciones.countByVacanteId(v.getId()) == 0, pesos);
+    }
+
+    /** Los recorridos de la lista, con tres consultas para todas las filas y no por fila. */
+    private Function<Vacante, RecorridoDeLaFila> recorridosDeLaLista(List<Vacante> filas) {
+        if (recorridos == null || filas.isEmpty()) {
+            return v -> RecorridoDeLaFila.SIN_DATO;
+        }
+        List<Long> ids = filas.stream().map(Vacante::getId).toList();
+        Map<Long, List<String>> porVacante = recorridos.de(ids);
+        Set<Long> conPostulantes = new HashSet<>(postulaciones.vacantesConPostulantes(ids));
+        Map<String, com.renaser.ai.ai_engine.pesos.entity.Etapa> catalogo = catalogoDeEtapas();
+        return v -> new RecorridoDeLaFila(
+                etapasDe(porVacante.getOrDefault(v.getId(), List.of()), catalogo),
+                !conPostulantes.contains(v.getId()), null);
     }
 
     /**

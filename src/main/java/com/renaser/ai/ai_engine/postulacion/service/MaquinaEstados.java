@@ -36,9 +36,9 @@ import java.util.Objects;
 import java.util.Optional;
 
 // El estado siguiente SE CALCULA, no se busca en una tabla de transiciones: el momento
-// siguiente de la etapa actual, o el primer momento de la etapa que sigue. La decisión
-// se entra por POR_CONFIRMAR, no por su primer momento: es la única excepción.
-// Ver docs/03-ESTADOS-POSTULACION.md.
+// siguiente de la etapa actual, o la entrada de la etapa que sigue EN EL RECORRIDO DE LA
+// VACANTE (V95). Cada etapa dice por qué momento se entra (DefinicionDeEtapa): la decisión, por
+// POR_CONFIRMAR. Ver docs/03-ESTADOS-POSTULACION.md.
 @Service
 @Slf4j
 public class MaquinaEstados {
@@ -186,23 +186,28 @@ public class MaquinaEstados {
 
     // ============ El cálculo, puro y testeable ============
 
-    public static Optional<EstadoPostulacion> calcularSiguiente(List<EstadoPostulacion> catalogo,
+    /**
+     * El estado que sigue a {@code actual} en un recorrido: el momento siguiente de su etapa o, si
+     * la etapa se acabó, la entrada de la etapa que sigue <b>en el recorrido de la vacante</b>
+     * (V95), no en el orden del catálogo. Después de la última, nada: salir de la última etapa es
+     * una decisión de persona, no un avance.
+     *
+     * <p>Cada etapa se entra por su primer momento salvo que su pieza diga otro
+     * ({@link DefinicionDeEtapa#momentoDeEntrada}): la Decisión entra por «por confirmar», porque
+     * su turno del candidato existe solo para el ámbar.
+     *
+     * <p>Un estado de una etapa que el recorrido no tiene no avanza: no se inventa a dónde ir.
+     */
+    public static Optional<EstadoPostulacion> calcularSiguiente(Recorrido recorrido,
+                                                                List<EstadoPostulacion> catalogo,
                                                                 EstadoPostulacion actual) {
-        if (actual.isEsFinal()) {
+        if (actual.isEsFinal() || recorrido.etapas().isEmpty()) {
             return Optional.empty();
         }
 
-        // Las etapas en su orden real, derivado del propio catálogo
-        List<String> etapas = catalogo.stream()
-                .filter(e -> e.getEtapaCodigo() != null)
-                .sorted(Comparator.comparing(EstadoPostulacion::getOrden))
-                .map(EstadoPostulacion::getEtapaCodigo)
-                .distinct()
-                .toList();
-
         // La entrada (POSTULADA) no tiene etapa: su siguiente es la entrada de la primera
         if (actual.getEtapaCodigo() == null) {
-            return entradaDe(catalogo, etapas.get(0));
+            return entradaDe(catalogo, recorrido, recorrido.etapas().get(0));
         }
 
         // ¿Hay un momento posterior dentro de la misma etapa?
@@ -215,22 +220,18 @@ public class MaquinaEstados {
             return siguienteMomento;
         }
 
-        // Se acabó la etapa: la entrada de la siguiente. Después de la última, nada:
-        // salir de la decisión es una decisión de persona, no un avance.
-        int indiceEtapa = etapas.indexOf(actual.getEtapaCodigo());
-        if (indiceEtapa < 0 || indiceEtapa == etapas.size() - 1) {
-            return Optional.empty();
-        }
-        return entradaDe(catalogo, etapas.get(indiceEtapa + 1));
+        // Se acabó la etapa: la entrada de la que sigue en el recorrido, o nada.
+        return recorrido.despuesDe(actual.getEtapaCodigo())
+                .flatMap(siguiente -> entradaDe(catalogo, recorrido, siguiente));
     }
 
-    private static Optional<EstadoPostulacion> entradaDe(List<EstadoPostulacion> catalogo, String etapa) {
-        // La única excepción al cálculo: la decisión se entra por POR_CONFIRMAR.
-        // Su TURNO_CANDIDATO existe solo para el ámbar (hito 3).
-        if ("DECISION".equals(etapa)) {
+    private static Optional<EstadoPostulacion> entradaDe(List<EstadoPostulacion> catalogo,
+                                                         Recorrido recorrido, String etapa) {
+        Optional<String> momento = recorrido.momentoDeEntrada(etapa);
+        if (momento.isPresent()) {
             return catalogo.stream()
                     .filter(e -> etapa.equals(e.getEtapaCodigo())
-                            && "POR_CONFIRMAR".equals(e.getMomentoCodigo()))
+                            && momento.get().equals(e.getMomentoCodigo()))
                     .findFirst();
         }
         return catalogo.stream()
@@ -273,13 +274,17 @@ public class MaquinaEstados {
 
     // ============ Las operaciones con efectos ============
 
-    public Optional<EstadoPostulacion> siguiente(String codigoActual) {
+    /**
+     * El estado siguiente de {@code codigoActual} en este recorrido. Ver {@link AvanceDelRecorrido},
+     * que es quien arma el recorrido de la vacante y entra a la etapa.
+     */
+    public Optional<EstadoPostulacion> siguiente(String codigoActual, Recorrido recorrido) {
         List<EstadoPostulacion> catalogo = estados.findAllByOrderByOrden();
         EstadoPostulacion actual = catalogo.stream()
                 .filter(e -> e.getCodigo().equals(codigoActual))
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("No existe el estado " + codigoActual));
-        return calcularSiguiente(catalogo, actual);
+        return calcularSiguiente(recorrido, catalogo, actual);
     }
 
     // Toda transición pasa por aquí: valida, escribe el registro inmutable, actualiza la

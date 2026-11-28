@@ -295,6 +295,61 @@ class ServicioPesosDeLaVacanteImplTest {
         verify(recalculo, never()).conAlgunaNota(any());
     }
 
+    // ============ El recorrido de la vacante (V95) ============
+
+    private List<Etapa> lasCinco() {
+        return List.of(
+                etapa("PERFIL_INTEGRAL", "Perfil Integral de Preselección", 1),
+                etapa("PRUEBA_PUESTO", "Prueba del puesto", 2),
+                etapa("SIMULACION", "Simulación de trabajo", 3),
+                etapa("VALIDACION", "Validación práctica", 4),
+                etapa("DECISION", "Decisión", 5));
+    }
+
+    @Test
+    @DisplayName("«Cómo pesa en esta vacante» con la v4 y Perfil → Prueba → Decisión: 57,14 y 42,86, y «—» en las que no tiene (AC-11)")
+    void comoPesaEnEstaVacante() {
+        var recorridos = org.mockito.Mockito.mock(com.renaser.ai.ai_engine.vacante.service.RecorridoDeLaVacante.class);
+        servicio.setRecorridos(recorridos);
+        when(recorridos.de(VACANTE)).thenReturn(List.of("PERFIL_INTEGRAL", "PRUEBA_PUESTO", "DECISION"));
+        when(etapas.findAllByOrderByOrdenAsc()).thenReturn(lasCinco());
+        when(pesosEtapa.findByVersionPesosId(AHORA)).thenReturn(List.of(
+                pesoEtapa("PERFIL_INTEGRAL", "40"), pesoEtapa("PRUEBA_PUESTO", "30"),
+                pesoEtapa("SIMULACION", "15"), pesoEtapa("VALIDACION", "15")));
+
+        var filas = servicio.enEstaVacante(VACANTE, AHORA);
+
+        assertThat(filas).extracting(f -> f.codigo())
+                .containsExactly("PERFIL_INTEGRAL", "PRUEBA_PUESTO", "SIMULACION", "VALIDACION");
+        assertThat(filas.get(0).enLaVersion()).isEqualByComparingTo("40");
+        assertThat(filas.get(0).enEstaVacante()).isEqualByComparingTo("57.14");
+        assertThat(filas.get(1).enEstaVacante()).isEqualByComparingTo("42.86");
+        assertThat(filas.get(2).enEstaVacante()).isNull();
+        assertThat(filas.get(3).enEstaVacante()).isNull();
+        assertThat(filas.get(1).nombre()).isEqualTo("Prueba del puesto");
+    }
+
+    @Test
+    @DisplayName("la confirmación del cambio de pesos solo enseña las etapas del recorrido")
+    void laConfirmacionSoloConLasDelRecorrido() {
+        var recorridos = org.mockito.Mockito.mock(com.renaser.ai.ai_engine.vacante.service.RecorridoDeLaVacante.class);
+        servicio.setRecorridos(recorridos);
+        when(recorridos.de(VACANTE)).thenReturn(List.of("PERFIL_INTEGRAL", "PRUEBA_PUESTO", "DECISION"));
+        laNuevaEs("PUBLICADA");
+        when(versionesPesos.findByIdAndOrganizacionId(ANTES, ORGANIZACION)).thenReturn(Optional.empty());
+        when(etapas.findAllByOrderByOrdenAsc()).thenReturn(lasCinco());
+        when(pesosEtapa.findByVersionPesosId(ANTES)).thenReturn(List.of(
+                pesoEtapa("PERFIL_INTEGRAL", "40"), pesoEtapa("PRUEBA_PUESTO", "30"),
+                pesoEtapa("SIMULACION", "15"), pesoEtapa("VALIDACION", "15")));
+        when(pesosEtapa.findByVersionPesosId(AHORA)).thenReturn(List.of(
+                pesoEtapa("PERFIL_INTEGRAL", "50"), pesoEtapa("PRUEBA_PUESTO", "50")));
+
+        CambioDePesosPrevisto previsto = servicio.preverCambio(QUIEN, VACANTE, AHORA);
+
+        assertThat(previsto.etapas()).extracting(PesoAntesYDespues::codigo)
+                .containsExactly("PERFIL_INTEGRAL", "PRUEBA_PUESTO");
+    }
+
     private static Etapa etapa(String codigo, String nombre, int orden) {
         return Etapa.builder().codigo(codigo).nombre(nombre).orden(orden).build();
     }

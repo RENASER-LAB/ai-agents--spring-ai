@@ -925,6 +925,10 @@ public class FlujoPruebaIT {
                  "tipoCierre": "PERMANENTE", "responsableUsuarioId": 1}"""
                 .formatted(solicitudId, puestoId))
                 .andReturn().getResponse().getContentAsString(), "id"));
+        // Las cinco etapas: desde la V95 una vacante nueva nace con Perfil → Prueba → Decisión,
+        // y este flujo pasa de la prueba a la Simulación y mira lo que falta en la Decisión.
+        conToken(put("/api/v1/panel/vacantes/" + id + "/etapas"), tokenTalento,
+                "{\"etapas\":[\"PERFIL_INTEGRAL\",\"PRUEBA_PUESTO\",\"SIMULACION\",\"VALIDACION\",\"DECISION\"]}").andExpect(status().isOk());
         // Rinde el banco del nivel: desde el 30/09/2026 toda vacante nueva nace con sus
         // preguntas propias, y el banco se elige a mano.
         conToken(post("/api/v1/panel/vacantes/" + id + "/origen-preguntas"), tokenTalento,

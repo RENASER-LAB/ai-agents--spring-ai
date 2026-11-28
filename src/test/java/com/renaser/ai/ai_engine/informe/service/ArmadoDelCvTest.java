@@ -23,11 +23,14 @@ import com.renaser.ai.ai_engine.postulacion.entity.DatoCv;
 import com.renaser.ai.ai_engine.postulacion.entity.Postulacion;
 import com.renaser.ai.ai_engine.vacante.entity.Puesto;
 import com.renaser.ai.ai_engine.vacante.entity.Vacante;
+import com.renaser.ai.ai_engine.vacante.service.RecorridoDeLaVacante;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -36,12 +39,15 @@ import org.mockito.quality.Strictness;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
@@ -62,6 +68,7 @@ class ArmadoDelCvTest {
     @Mock private NotaCriterioRepository notasCriterio;
     @Mock private PesoCriterioRepository pesosCriterio;
     @Mock private LoBuscadoEnElCv loBuscado;
+    @Mock private RecorridoDeLaVacante recorridos;
 
     @InjectMocks private ArmadoDelCv armado;
 
@@ -201,6 +208,57 @@ class ArmadoDelCvTest {
             assertThat(informe.nota().texto()).isEqualTo("—");
             assertThat(informe.experiencia()).isEqualTo(new Experiencia(ArmadoDelCv.SIN_DATO, null,
                     ArmadoDelCv.SIN_DATO, null, ArmadoDelCv.SIN_DATO, List.of(), null));
+        }
+    }
+
+    @Nested
+    @DisplayName("Lo que queda por verificar")
+    class LoPendiente {
+
+        @Test
+        @DisplayName("con evaluación pasa a la evaluación, sin mirar el recorrido")
+        void conEvaluacion() {
+            criteriosDelCv();
+
+            Informe informe = armado.armar(base(vacante(), null, cv(TEXTO_LEGIBLE), "TERMINADA"), AHORA);
+
+            assertThat(pendiente(informe).titulo()).isEqualTo("Por verificar en la evaluación");
+            verify(recorridos, never()).de(5L);
+        }
+
+        @ParameterizedTest(name = "{0} → «{1}»")
+        @CsvSource(delimiter = '|', value = {
+                "PERFIL_INTEGRAL PRUEBA_PUESTO DECISION | Por verificar en la prueba del puesto",
+                "PERFIL_INTEGRAL SIMULACION PRUEBA_PUESTO | Por verificar en la simulación de trabajo",
+                "PERFIL_INTEGRAL DECISION | Por verificar en la decisión",
+                "PERFIL_INTEGRAL | Por verificar en la entrevista"})
+        @DisplayName("en una vacante sin evaluación (V30) pasa a la etapa que sigue al Perfil Integral (V95)")
+        void sinEvaluacion(String recorrido, String titulo) {
+            criteriosDelCv();
+            when(recorridos.de(5L)).thenReturn(Arrays.asList(recorrido.split(" ")));
+            Vacante sinEvaluacion = Vacante.builder().id(5L).titulo("Analista").versionPesosId(3L)
+                    .aplicaEvaluacion(false).build();
+            Postulacion suya = Postulacion.builder().id(POSTULACION).vacanteId(5L).build();
+            Base base = new Base(suya, sinEvaluacion, null, "Renaser", "Ana Torres", null, cv(TEXTO_LEGIBLE),
+                    null, List.of(), null, List.of(), List.of(), "TERMINADA");
+
+            assertThat(pendiente(armado.armar(base, AHORA)).titulo()).isEqualTo(titulo);
+        }
+
+        @Test
+        @DisplayName("si rindió una evaluación, pasa a ella aunque la vacante ya no la aplique")
+        void conEvaluacionRendida() {
+            criteriosDelCv();
+            Vacante sinEvaluacion = Vacante.builder().id(5L).aplicaEvaluacion(false).build();
+            Postulacion suya = Postulacion.builder().id(POSTULACION).vacanteId(5L).evaluacionId(50L).build();
+            Base base = new Base(suya, sinEvaluacion, null, "Renaser", "Ana Torres", null, cv(TEXTO_LEGIBLE),
+                    null, List.of(), null, List.of(), List.of(), "TERMINADA");
+
+            assertThat(pendiente(armado.armar(base, AHORA)).titulo()).isEqualTo("Por verificar en la evaluación");
+        }
+
+        private Bloque pendiente(Informe informe) {
+            return informe.bloques().stream().filter(b -> "PENDIENTE".equals(b.codigo())).findFirst().orElseThrow();
         }
     }
 

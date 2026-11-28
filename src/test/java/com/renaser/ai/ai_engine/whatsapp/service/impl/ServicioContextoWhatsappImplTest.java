@@ -310,6 +310,43 @@ class ServicioContextoWhatsappImplTest {
                 .containsExactly("ACTUAL", "PREVISTA", "PREVISTA", "PREVISTA", "PREVISTA");
     }
 
+    // ============ El recorrido de la vacante (V95) ============
+
+    @Test
+    @DisplayName("AC-23 · Perfil → Simulación → Decisión en la Simulación: tres etapas, orden 1, 2 y 3, la Simulación ACTUAL")
+    void elProcedimientoSigueElRecorrido() {
+        var recorridos = org.mockito.Mockito.mock(com.renaser.ai.ai_engine.vacante.service.RecorridoDeLaVacante.class);
+        servicio.setRecorridos(recorridos);
+        when(estados.findAllByOrderByOrden()).thenReturn(List.of(
+                estado("PERFIL_POR_CONFIRMAR", "PERFIL_INTEGRAL", "POR_CONFIRMAR", false),
+                estado("SIMULACION_TURNO_CANDIDATO", "SIMULACION", "TURNO_CANDIDATO", false),
+                estado("CERRADA", null, null, true)));
+        conPostulacion(1, "SIMULACION_TURNO_CANDIDATO", "ACTIVO");
+        when(recorridos.de(501L)).thenReturn(List.of("PERFIL_INTEGRAL", "SIMULACION", "DECISION"));
+
+        Contexto contexto = servicio.detalle(NUMERO, referenciaDe(1));
+
+        assertThat(contexto.procedimiento()).extracting(e -> e.codigo())
+                .containsExactly("PERFIL_INTEGRAL", "SIMULACION", "DECISION");
+        assertThat(contexto.procedimiento()).extracting(e -> e.orden()).containsExactly(1, 2, 3);
+        assertThat(contexto.procedimiento()).extracting(e -> e.estado())
+                .containsExactly("HECHA", "ACTUAL", "PREVISTA");
+    }
+
+    @Test
+    @DisplayName("AC-14 · sin Prueba en el recorrido, el contexto no la enumera")
+    void sinPruebaNoLaEnumera() {
+        var recorridos = org.mockito.Mockito.mock(com.renaser.ai.ai_engine.vacante.service.RecorridoDeLaVacante.class);
+        servicio.setRecorridos(recorridos);
+        conPostulacion(1, "PERFIL_CALIFICANDO", "ACTIVO");
+        when(recorridos.de(501L)).thenReturn(List.of("PERFIL_INTEGRAL", "DECISION"));
+
+        Contexto contexto = servicio.detalle(NUMERO, referenciaDe(1));
+
+        assertThat(contexto.procedimiento()).extracting(e -> e.codigo())
+                .containsExactly("PERFIL_INTEGRAL", "DECISION");
+    }
+
     // ============ QA-C0-F1 · la vigencia: fecha real del último cambio y revisión ============
 
     @Test

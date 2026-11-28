@@ -144,6 +144,17 @@ public class ServicioExcelRankingImpl implements ServicioExcelRanking {
         this.reloj = reloj;
     }
 
+    /**
+     * El recorrido de la vacante (V95). Por setter: las pruebas construyen el servicio a mano, y
+     * sin él se vuelcan las dos pestañas como antes.
+     */
+    private com.renaser.ai.ai_engine.vacante.service.RecorridoDeLaVacante recorridos;
+
+    @Autowired
+    void setRecorridos(com.renaser.ai.ai_engine.vacante.service.RecorridoDeLaVacante recorridos) {
+        this.recorridos = recorridos;
+    }
+
     @Override
     @Transactional(readOnly = true)
     public ExcelDeRanking generar(ContextoUsuario quien, Long vacanteId, PedidoExcelRanking pedido) {
@@ -164,6 +175,12 @@ public class ServicioExcelRankingImpl implements ServicioExcelRanking {
         }
 
         RankingVacante tanda = tandas.ranking(quien, vacanteId, etapa);
+        // Solo de una pestaña que la vacante tiene (V95): sin Prueba en su recorrido, no hay hoja
+        // de la prueba que volcar. Después del ranking, que es quien dice si la vacante se ve.
+        if (recorridos != null && !recorridos.tiene(vacanteId, etapa)) {
+            throw new IllegalArgumentException("Esta vacante no tiene «" + etapa + "» en su "
+                    + "recorrido: no hay pestaña que volcar a Excel.");
+        }
         Map<Long, FilaRanking> deLaVacante = tanda.filas().stream()
                 .collect(Collectors.toMap(FilaRanking::postulacionId, Function.identity(),
                         (a, b) -> a, LinkedHashMap::new));

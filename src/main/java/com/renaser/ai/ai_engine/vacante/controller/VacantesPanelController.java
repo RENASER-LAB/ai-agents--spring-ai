@@ -1,5 +1,6 @@
 package com.renaser.ai.ai_engine.vacante.controller;
 
+import com.renaser.ai.ai_engine.vacante.service.ServicioEtapasDeLaVacante;
 import com.renaser.ai.ai_engine.vacante.service.ServicioFichaVacante;
 import com.renaser.ai.ai_engine.vacante.service.ServicioPesosDeLaVacante;
 import com.renaser.ai.ai_engine.vacante.service.ServicioVacantesPanel;
@@ -28,6 +29,7 @@ public class VacantesPanelController {
     private final ServicioVacantesPanel servicio;
     private final ServicioFichaVacante fichaVacante;
     private final ServicioPesosDeLaVacante pesosDeLaVacante;
+    private final ServicioEtapasDeLaVacante etapasDeLaVacante;
     private final Permisos permisos;
 
     // ---------- Puestos ----------
@@ -187,6 +189,15 @@ public class VacantesPanelController {
             + "encendido. No mueve a nadie que ya espera")
     public void fijarNotaMinima(@PathVariable Long id, @Valid @RequestBody FijarNotaMinima datos) {
         servicio.fijarNotaMinima(permisos.actual(), id, datos.notaMinima());
+    }
+
+    @PutMapping("/vacantes/{id}/etapas")
+    @PreAuthorize("@permisos.tiene('elegir_plantilla_evaluacion')")
+    @Operation(summary = "El recorrido de esta vacante: sus etapas, en orden (V95). Empieza "
+            + "siempre por PERFIL_INTEGRAL, sin repetidas y con códigos del catálogo (400 si no). "
+            + "409 si la vacante ya tiene postulaciones o está cerrada, archivada o eliminada")
+    public void cambiarEtapas(@PathVariable Long id, @RequestBody CambiarEtapas datos) {
+        etapasDeLaVacante.cambiar(permisos.actual(), id, datos == null ? null : datos.etapas());
     }
 
     @GetMapping("/vacantes/{id}/version-pesos/cambio")

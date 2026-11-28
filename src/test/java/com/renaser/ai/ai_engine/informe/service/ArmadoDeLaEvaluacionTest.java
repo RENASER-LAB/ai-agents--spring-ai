@@ -46,11 +46,15 @@ import com.renaser.ai.ai_engine.pesos.entity.PesoComponentePerfil;
 import com.renaser.ai.ai_engine.pesos.repository.PesoComponentePerfilRepository;
 import com.renaser.ai.ai_engine.postulacion.entity.Postulacion;
 import com.renaser.ai.ai_engine.vacante.entity.Vacante;
+import com.renaser.ai.ai_engine.vacante.service.RecorridoDeLaVacante;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -59,6 +63,7 @@ import org.mockito.quality.Strictness;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
 
@@ -66,6 +71,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.when;
 
 /**
@@ -96,8 +102,16 @@ class ArmadoDeLaEvaluacionTest {
     @Mock private PesoComponentePerfilRepository pesosComponente;
     @Mock private ServicioDesgloseEvaluacion desglose;
     @Mock private CalificacionCriterios calificacionCriterios;
+    @Mock private RecorridoDeLaVacante recorridos;
 
     @InjectMocks private ArmadoDeLaEvaluacion armado;
+
+    /** Salvo que la prueba diga otra cosa, la vacante tiene el recorrido predeterminado (V95). */
+    @BeforeEach
+    void conElRecorridoPredeterminado() {
+        when(recorridos.de(nullable(Long.class))).thenReturn(
+                List.of("PERFIL_INTEGRAL", "PRUEBA_PUESTO", "DECISION"));
+    }
 
     // ================================================================= el estado
 
@@ -492,6 +506,37 @@ class ArmadoDeLaEvaluacionTest {
             assertThat(informe.anexo().preguntas()).isEmpty();
             assertThat(informe.datosClave()).extracting(Dato::etiqueta)
                     .containsExactly("Preguntas", "Entregada", "Generado");
+        }
+    }
+
+    // ================================================================= el recorrido
+
+    @Nested
+    @DisplayName("Lo pendiente según el recorrido de la vacante (V95)")
+    class LoPendienteSegunElRecorrido {
+
+        @ParameterizedTest(name = "{0} → «{1}»")
+        @CsvSource(delimiter = '|', value = {
+                "PERFIL_INTEGRAL PRUEBA_PUESTO DECISION | Por verificar en la prueba del puesto",
+                "PERFIL_INTEGRAL SIMULACION PRUEBA_PUESTO DECISION | Por verificar en la simulación de trabajo",
+                "PERFIL_INTEGRAL VALIDACION DECISION | Por verificar en la validación práctica",
+                "PERFIL_INTEGRAL DECISION | Por verificar en la decisión",
+                "PERFIL_INTEGRAL | Por verificar en la entrevista"})
+        @DisplayName("el bloque nombra la etapa que sigue al Perfil Integral, o la entrevista si no hay")
+        void nombraLaEtapaSiguiente(String recorrido, String titulo) {
+            when(recorridos.de(5L)).thenReturn(Arrays.asList(recorrido.split(" ")));
+            when(desglose.paraElInforme(any())).thenReturn(desglose(null, null, null));
+            Postulacion suya = Postulacion.builder().id(POSTULACION).vacanteId(5L).build();
+
+            Informe informe = armado.armar(base(suya, null, null, "TERMINADA"), AHORA);
+
+            assertThat(informe.bloques()).filteredOn(b -> "PENDIENTE".equals(b.codigo()))
+                    .singleElement().extracting(Bloque::titulo).isEqualTo(titulo);
+            // Ningún otro bloque manda nada a una etapa que la vacante no tiene.
+            if (!recorrido.contains("PRUEBA_PUESTO")) {
+                assertThat(informe.bloques()).extracting(Bloque::titulo)
+                        .noneMatch(t -> t.contains("prueba del puesto"));
+            }
         }
     }
 

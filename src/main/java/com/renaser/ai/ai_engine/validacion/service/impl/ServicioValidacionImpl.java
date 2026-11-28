@@ -7,6 +7,7 @@ import com.renaser.ai.ai_engine.perfilintegral.entity.Criterio;
 import com.renaser.ai.ai_engine.perfilintegral.service.CalificacionPorCriterio;
 import com.renaser.ai.ai_engine.postulacion.entity.Postulacion;
 import com.renaser.ai.ai_engine.postulacion.repository.PostulacionRepository;
+import com.renaser.ai.ai_engine.postulacion.service.AvanceDelRecorrido;
 import com.renaser.ai.ai_engine.postulacion.service.MaquinaEstados;
 import com.renaser.ai.ai_engine.seguridad.dto.ContextoUsuario;
 import com.renaser.ai.ai_engine.seguridad.service.Permisos;
@@ -48,6 +49,7 @@ public class ServicioValidacionImpl implements ServicioValidacion {
     private final UsuarioRolRepository usuarioRoles;
     private final CalificacionPorCriterio calificacion;
     private final MaquinaEstados maquina;
+    private final AvanceDelRecorrido avance;
     private final ServicioParametros parametros;
     private final ServicioAuditoria auditoria;
 
@@ -197,9 +199,11 @@ public class ServicioValidacionImpl implements ServicioValidacion {
         validacion.setEstado("TERMINADA");
         validaciones.save(validacion);
 
+        // Pasa a la etapa que sigue a la Validación en el recorrido de SU vacante (V95), entrando
+        // como entra cualquiera: con la prueba creada si sigue la prueba, con el periodo... Si la
+        // Validación es la última, se queda en «por confirmar» y decide una persona.
         if (POR_CONFIRMAR.equals(postulacion.getEstadoCodigo())) {
-            maquina.transicionar(postulacion, "DECISION_POR_CONFIRMAR", quien,
-                    "Periodo de validación cerrado y calificado", false, false, null);
+            avance.avanzar(postulacion, quien, "Periodo de validación cerrado y calificado", false);
         }
         auditoria.registrar(quien.organizacionId(), quien, "cerrar_validacion",
                 "validacion", validacion.getId(), Map.of("estado", "EN_CURSO"),
