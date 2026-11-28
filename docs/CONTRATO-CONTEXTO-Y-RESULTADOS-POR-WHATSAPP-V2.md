@@ -44,7 +44,7 @@ con zona y lectura de respuestas que tolera campos nuevos pero rechaza las que i
     | `vacante` | `{ref (opaca ≤ 64), titulo ≤ 60, empresa ≤ 60 \| null, distintivo ≤ 72 \| null, convocatoria: {estado: PUBLICADA\|CERRADA, cerradaEn \| null, revision}}` |
     | `vacante.ficha` | Objeto con `descripcion`, `proposito`, `responsabilidades`, `requisitos`, `ubicacion`, `modalidad`, `horario`, `remuneracion`, `tipoContrato`, `beneficios`; cada uno es un `Campo` |
     | `Campo` | `{estado: PUBLICADO\|NO_PUBLICADO\|NO_APLICA\|POR_DEFINIR, texto ≤ 600 \| null}`; `texto` solo con `PUBLICADO` |
-    | `procedimiento` | Hasta 8 `{codigo: PERFIL_INTEGRAL\|PRUEBA_PUESTO\|SIMULACION\|VALIDACION\|DECISION, nombre ≤ 60, explicacion ≤ 300, orden, estado: HECHA\|ACTUAL\|PREVISTA}`, solo las etapas que aplican a esa vacante |
+    | `procedimiento` | Hasta 8 `{codigo: PERFIL_INTEGRAL\|PRUEBA_PUESTO\|SIMULACION\|VALIDACION\|DECISION, nombre ≤ 60, explicacion ≤ 300, orden, estado: HECHA\|ACTUAL\|PREVISTA}`, solo las etapas que aplican a esa vacante. Desde la `V95` de EX son las de su recorrido, en su orden, y `orden` es la posición en ese recorrido (1, 2, 3…), no la del catálogo |
     | `situacion` | `{estado: ACTIVA\|FINAL, etapaCodigo \| null, momento: POR_HABILITAR\|TURNO_CANDIDATO\|CALIFICANDO\|POR_CONFIRMAR \| null, titulo ≤ 80, texto ≤ 300, actualizadaEn}`; `titulo`/`texto` son los de `TextosDelMomento` |
     | `accion` | `null` (no hay tarea) o `{tipo: EVALUACION_INICIAL\|PRUEBA_PUESTO\|CUESTIONARIO_TECNICO\|SIMULACION\|VALIDACION\|OTRA, estado: HABILITADA\|EN_CURSO\|COMPLETADA\|VENCIDA, instrucciones ≤ 600, ingreso ≤ 600, enlace (https ≤ 300; obligatorio con `HABILITADA`/`EN_CURSO`, si no `null`), modalidad: CRONOMETRADA\|PLAZO_ABIERTO \| null, duracionMinutos \| null, plazoDias \| null, empezarAntesDe \| null, iniciadaEn \| null, entregarAntesDe \| null, zonaHoraria: "America/Lima"}`. `empezarAntesDe`: último momento para iniciarla; `entregarAntesDe`: límite de entrega del intento ya iniciado (o de la acción sin intento, como una evaluación inicial); en `VENCIDA`, el límite que venció |
     | `resultado` | `null` o `{tipo: CONTRATADO\|NO_CONTINUA\|CERRADA, fecha, revision, explicacion ≤ 300 \| null, esCorreccion, consultableHasta}` |
@@ -137,7 +137,14 @@ No es parte de la copia: es lo que EX hace donde el contrato le deja elegir. Las
   (aceptado).
 - **Ficha, procedimiento y acción** (`FichaPublica`, `ProcedimientoPublico`, `LoQueLeToca`):
   `tipoContrato` y `beneficios` van siempre `NO_PUBLICADO`; una postulación terminada enseña solo
-  las etapas que alcanzó; la simulación no da fecha. La acción no lleva nada de la prueba antes de
+  las etapas que alcanzó; la simulación no da fecha. **Desde la `V95` el procedimiento sale del
+  recorrido de la vacante**: en una vacante Perfil Integral → Simulación → Decisión que está en la
+  simulación van tres etapas, con `orden` 1, 2 y 3 y la simulación `ACTUAL`; antes de la actual,
+  `HECHA`, y después, `PREVISTA`. Una terminada conserva la posición de cada etapa alcanzada. La
+  forma del contrato no cambia y el bot ya ordena por `orden` y admite de 0 a 8 etapas; lo que **sí
+  pide el bot** es conocer el código: `CodigoEtapa` es una lista cerrada, así que una etapa nueva
+  entra primero en el CRM y se despliega antes que EX (ver «Cómo agregar una etapa» en [Estados de
+  la postulación](03-ESTADOS-POSTULACION.md)). La acción no lleva nada de la prueba antes de
   «Empezar», y su `enlace` es `WHATSAPP_ENLACE_MIS_PROCESOS`, solo con la acción abierta: si lo
   configurado no es un enlace válido (un `http` de desarrollo, por ejemplo) va `null`, y el bot lo
   rechazaría como fuera de contrato.

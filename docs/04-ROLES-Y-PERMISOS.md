@@ -11,7 +11,8 @@ Un candidato postula en el portal de Renaser y atraviesa cinco etapas: se junta 
 Integral —currículum, módulo psicométrico y evaluación, leídos juntos—, hace una prueba del
 puesto cronometrada, asiste a una simulación de trabajo y trabaja un periodo de validación
 práctica. La inteligencia artificial califica las dos primeras y ordena a todos por prioridad;
-las dos últimas y la decisión final siempre son de una persona.
+las dos últimas y la decisión final siempre son de una persona. Desde el 25/11/2026 cada vacante
+elige cuáles de esas etapas recorre y en qué orden, con el Perfil Integral siempre primero.
 
 El detalle está en [Requisitos funcionales](01-REQUISITOS-FUNCIONALES.md).
 
@@ -116,6 +117,7 @@ urgencia la fija Talento o Dirección, para que nadie se salte la cola por decis
 | Archivar o desarchivar una vacante cerrada | ○ | ● | ○ | ● | ○ |
 | Eliminar una vacante | ○ | ● | ○ | ● | ○ |
 | Elegir qué prueba y qué plantilla de evaluación se aplican | ○ | ● | ◐ | ● | ○ |
+| Elegir las etapas de la vacante y su orden, hasta el primer postulante | ○ | ● | ◐ | ● | ○ |
 | Definir los requisitos objetivos indispensables | ○ | ● | ◐ | ● | ○ |
 | Definir las barreras críticas de la vacante | ○ | ● | ◐ | ● | ○ |
 | Elegir qué versión de pesos rige esa vacante | ○ | ○ | ○ | ● | ○ |
@@ -138,6 +140,15 @@ permiso**, sin permiso nuevo: `elegir_plantilla_evaluacion`, con la misma audito
 `editar_vacante`, así que el responsable del área, que no corrige la vacante, sí fija la mínima.
 La vacante del panel lo dice con `puedeConfigurarElPase`, que también es falso con la vacante
 cerrada o archivada; sin él, la tuerca enseña la mínima desactivada.
+
+**Las etapas de la vacante (`V95`, 25/11/2026) también van con `elegir_plantilla_evaluacion`**,
+sin permiso nuevo: encenderlas, apagarlas y ordenarlas en «Etapas de esta vacante» es decidir el
+mismo «qué responderá quien postule», y se audita como `cambiar_etapas_vacante`, con el recorrido de
+antes y el de después. El panel mira la misma señal que en el interruptor,
+`puedeConfigurarElPase`: falsa, el bloque se ve en lectura. Sin el permiso,
+`PUT /vacantes/{id}/etapas` responde **403**; con la vacante cerrada o archivada, **409**. Y con la
+primera postulación las etapas quedan fijas para todos (`etapasEditables` en falso, y el PUT
+responde **409**), tenga quien tenga el permiso.
 
 **La prueba técnica de una vacante nueva (`V67`, 01/10/2026) sigue el mismo reparto, sin
 permiso nuevo.** Armarla, publicarla, copiarla, pedir recomendaciones y fijar su fecha límite

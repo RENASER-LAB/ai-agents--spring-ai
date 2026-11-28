@@ -1,6 +1,5 @@
 # Cada vacante con sus etapas
-
-Estado: lista para implementar
+Estado: TERMINADO
 
 Escrita el 25/11/2026 contra `origin/main`: backend `8b9fa20` (#147, migraciones hasta la V89) y
 frontend `315e1c4` (#111). Nada de esta spec está implementado.

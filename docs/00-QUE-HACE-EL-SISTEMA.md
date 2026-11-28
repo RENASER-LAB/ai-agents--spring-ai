@@ -64,6 +64,15 @@ el sueldo. Si ya está publicada, a cada candidato que sigue en carrera le llega
 en su portal** con lo que cambió, y ningún correo. Quién lleva el proceso o cuándo cierra se
 cambian sin avisar a nadie: no salen de la empresa.
 
+**Y se eligen sus etapas** (desde el 25/11/2026). Toda convocatoria empieza por conocer a la
+persona —su currículum y unas preguntas— y eso no se quita. Lo demás —la prueba del puesto, la
+simulación, la validación práctica y la decisión final— lo elige quien la crea, y también en qué
+orden: una que necesita ir rápido puede pasar de conocer a la persona a decidir, y otra puede poner
+la simulación antes de la prueba. Una convocatoria nueva nace con tres: conocer a la persona, la
+prueba del puesto y la decisión. **En cuanto llega la primera persona, las etapas quedan fijas**: a
+nadie se le cambia el camino a mitad. Los pasos 8 a 11 de abajo son las etapas que puede tener;
+cada candidato recorre solo las de su convocatoria, en su orden, y en su portal ve solo esas.
+
 ### 3 · La gente postula
 
 **Antes de postular, ve quién ofrece el puesto.** Después de lo que pide la vacante, la empresa

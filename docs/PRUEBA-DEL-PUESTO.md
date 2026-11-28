@@ -178,9 +178,10 @@ donde se escriben».
   automático, la prueba se abría al entregar el banco (o al postular, sin banco), sin esperar a la
   nota. Desde la `V72` el pase espera la nota completa del Perfil Integral y solo se da si llega a
   la mínima de la vacante: `PaseAutomatico.avanzarSiToca` al terminar la nota y
-  `avanzarTrasRecalcular` si una persona la recalcula mientras espera. Crea lo que va a rendir y
-  mueve la postulación a la prueba en el mismo gesto, sea la prueba del puesto o el cuestionario
-  técnico, y el reloj no arranca hasta que el candidato confirma en la portada. El detalle, en
+  `avanzarTrasRecalcular` si una persona la recalcula mientras espera. Cuando la prueba es la etapa
+  que sigue al Perfil Integral en el recorrido de la vacante (desde la `V95` puede no serlo, o no
+  estar), crea lo que va a rendir y mueve la postulación a la prueba en el mismo gesto, sea la
+  prueba del puesto o el cuestionario técnico, y el reloj no arranca hasta que el candidato confirma en la portada. El detalle, en
   [estados de la postulación](03-ESTADOS-POSTULACION.md), «La nota mínima».
 - **`{{plazo}}` de `PRUEBA_DISPONIBLE`** en la prueba del editor lo arma `PlazoDeLaPrueba` con el
   plazo que rija para esa persona —el `vence_en` de su intento: su plazo propio o la fecha de la

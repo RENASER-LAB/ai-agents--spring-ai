@@ -229,6 +229,12 @@ pesos vigente reparte los 100 completos: 40/30/15/15. Mientras faltaron, la reco
 repartir esos 30 entre lo que sí existía, y eso fue un cambio de datos en la versión de pesos, no
 de código.
 
+> **Desde el 25/11/2026 (`V95`) el reparto lo hace el sistema, por vacante.** Cada vacante elige
+> sus etapas, y los pesos de su versión se reparten solos entre las que tiene, sin tocar la
+> versión: con la v4 y Perfil Integral → Prueba → Decisión, 57,14 y 42,86 —el mismo reparto que
+> traía a mano la «v3 hito 3»—. Con las cinco etapas, la versión tal cual. Ver RF-114 en
+> [Requisitos funcionales](01-REQUISITOS-FUNCIONALES.md).
+
 **6 · ¿Hace falta un ranking general por vacante?** Apuntado el 21/08, y desde el 25/08 medio
 respondido. Los **rankings por etapa ya existen**: `GET /panel/vacantes/{id}/ranking?etapa=`
 cambia la nota con la que se ordena, sin tocar las ocho notas del currículum de cada fila. Lo
@@ -242,14 +248,14 @@ todo lo demás dentro?
 > ni la Puntuación Global: no se guarda ni mueve a nadie de estado.
 
 La Puntuación Global de RF-113 **ya está calculada**: la nota ponderada de las etapas que pese la
-versión de la vacante —cuatro en la v1, dos en la v3— sale en
-`GET /panel/postulaciones/{id}/semaforo`. Lo que no existe es una lista ordenada por ella. El
+versión de la vacante —cuatro en la v1, dos en la v3; desde la `V95`, solo las de su recorrido,
+con los pesos repartidos— sale en `GET /panel/postulaciones/{id}/semaforo`. Lo que no existe es una lista ordenada por ella. El
 trabajo de código es pequeño; lo que falta son tres decisiones que no son nuestras.
 
 *Qué hay que decidir:*
 
 - **Qué se muestra de quien va a mitad del proceso.** `notaGlobal` viene vacía mientras falte
-  cualquier etapa: hoy, un ranking general sería una lista de huecos, porque casi nadie ha
+  cualquier etapa que pese —desde la `V95`, de las de su recorrido—: hoy, un ranking general sería una lista de huecos, porque casi nadie ha
   terminado todas las que pesan. Es el mismo problema del punto 5, visto desde la lista en vez de desde
   el candidato. Si allí se decide repartir, aquí se resuelve solo.
 - **Si ordena por nota o por grupo.** El de la etapa 2 manda el grupo por delante del número, a

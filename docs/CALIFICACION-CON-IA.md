@@ -371,8 +371,9 @@ sale de los puntos.
 
 ⚠️ **Salvo el pase automático (`V72`).** Ajustar, recalificar y cambiar los puntos no mueven a
 nadie por sí mismos, pero al terminar se vuelve a mirar a quien espera en «por confirmar» en una
-vacante con «calificar y avanzar sola»: si su nota ahora llega a la mínima, pasa sola a la prueba,
-con su correo y su campana. A quien ya está en la prueba no se le toca aunque la nota baje. Ver
+vacante con «calificar y avanzar sola»: si su nota ahora llega a la mínima, pasa sola a la etapa
+que sigue al Perfil Integral en el recorrido de su vacante —la prueba, con el predeterminado
+(`V95`)—, con su correo y su campana. A quien ya está en la prueba no se le toca aunque la nota baje. Ver
 [Estados de la postulación](03-ESTADOS-POSTULACION.md), «La nota mínima». **Cambiar la versión de
 pesos de la vacante (`V74`) no lo dispara**: recalcula a todos, pero a quien ahora llega a la
 mínima lo mueve el equipo.
@@ -472,7 +473,7 @@ acordaron, no todas las posibles, y otra forma de pedir lo mismo puede pasar. La
 están en [Defectos conocidos](DEFECTOS-CONOCIDOS.md), el 20. Añadir una es cambiar la regla en los
 dos repositorios, con su prueba.
 
-**Dónde se ve.** En el panel: puntos de color bajo el nombre en las cinco pestañas del ranking, el
+**Dónde se ve.** En el panel: puntos de color bajo el nombre en todas las pestañas del ranking, el
 orden «Por lo buscado», un bloque al abrir la ficha y una columna en el Excel. Las rutas, en
 [Las APIs](09-APIS.md), «Vacantes» y «Postulaciones».
 

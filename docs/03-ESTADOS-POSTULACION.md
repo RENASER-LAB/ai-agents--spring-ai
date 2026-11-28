@@ -19,6 +19,10 @@ Integral —currículum, módulo psicométrico y evaluación, interpretados junt
 del puesto cronometrada, asiste a una simulación de trabajo y trabaja un periodo de validación
 práctica. Al final, una persona decide.
 
+**Ese es el recorrido completo.** Desde el 25/11/2026 (`V95`) cada vacante elige cuáles de esas
+etapas recorre y en qué orden, con el Perfil Integral siempre primero, y la etapa siguiente de cada
+candidato sale del recorrido de su vacante. Ver «Cada vacante con sus etapas», más abajo.
+
 El detalle está en [Requisitos funcionales](01-REQUISITOS-FUNCIONALES.md).
 
 ---
@@ -74,7 +78,9 @@ evidencia adicional.
 **Por qué importa esta forma.** El nombre de cada estado es `ETAPA_MOMENTO`, y la tabla de
 estados guarda la etapa y el momento como columnas aparte. Así, «cuál es el siguiente estado»
 se **calcula** —el momento siguiente de esta etapa, o el primer momento de la siguiente— en vez
-de buscarse en una tabla de transiciones que hay que mantener a mano.
+de buscarse en una tabla de transiciones que hay que mantener a mano. Desde la `V95`, «la
+siguiente» es la que sigue **en el recorrido de su vacante**, no en el orden del catálogo, y
+después de la última no hay siguiente. A la decisión se sigue entrando por «por confirmar».
 
 ---
 
@@ -294,6 +300,84 @@ Desde **cualquier** estado que no sea final se puede llegar a `CERRADA`.
 
 ---
 
+## Cada vacante con sus etapas (25/11/2026)
+
+El dibujo de arriba es **el recorrido completo**, el de toda vacante hasta la `V95`. Desde
+entonces cada vacante guarda **su recorrido**: la lista ordenada de las etapas que tiene
+(`vacante_etapa`).
+
+| Etapa | ¿Se quita o se mueve? | ¿Nace con ella una vacante nueva? |
+|---|---|---|
+| Perfil Integral | No: va siempre primera | Sí |
+| Prueba del puesto | Sí | Sí |
+| Simulación de trabajo | Sí | No |
+| Validación práctica | Sí | No |
+| Decisión | Sí | Sí |
+
+- **Se elige en la configuración de la vacante y lo fija el primer postulante.** Con una
+  postulación de cualquier estado, o con la vacante cerrada o archivada, las etapas ya no cambian.
+  Las vacantes que ya existían quedaron con las cinco, en el orden de siempre: nadie que estuviera
+  en proceso notó el cambio.
+- **Los 18 estados no cambian**: cambia qué etapa viene después. En una vacante Perfil Integral →
+  Simulación → Prueba → Decisión, tras `PERFIL_POR_CONFIRMAR` viene `SIMULACION_POR_HABILITAR`, y
+  tras `SIMULACION_POR_CONFIRMAR`, `PRUEBA_TURNO_CANDIDATO`.
+- **A cada etapa se entra por su primer momento**, salvo a la decisión, que se entra por
+  `DECISION_POR_CONFIRMAR`.
+- **Lo que pasa al entrar a una etapa pasa igual venga de donde venga** —«Avanzar», el pase
+  automático, el cierre de la validación o un movimiento a mano—: en la prueba se crea lo que va a
+  rendir; en la simulación se mira si ya hay una sesión con cupo para su vacante; en la validación
+  se abre el periodo. Moverse dentro de la misma etapa no crea nada.
+- **Al cerrar la validación**, la persona pasa a la etapa que le sigue en el recorrido. Si la
+  validación es la última, se queda en «Validación · por confirmar». Hasta la `V95` iba siempre a
+  la decisión.
+- **Después de la última etapa no hay «Avanzar».** Desde el «por confirmar» de la última se
+  contrata o se descarta, como siempre. Una vacante sin decisión no tiene semáforo ni evidencia
+  adicional, y nadie pasa a `CONTRATADO` sin que una persona lo confirme.
+- **No se mueve a nadie a una etapa que su vacante no tiene**, tampoco a mano: se rechaza sin
+  mover, sin transición y sin aviso. Así nunca sale el aviso de una etapa que esa persona no va a
+  recorrer.
+- **Los avisos se siguen eligiendo por el estado al que se entra** —correo, campana, WhatsApp y
+  recordatorios—, así que en una vacante sin prueba nunca sale un aviso de prueba.
+
+El portal y el bot de WhatsApp enseñan solo las etapas del recorrido, en su orden, y el panel
+pinta las pestañas del ranking y los bloques de la ficha con ellas (ver [Requisitos
+funcionales](01-REQUISITOS-FUNCIONALES.md), RF-08b).
+
+### Cómo agregar una etapa
+
+Para quien programe la primera etapa nueva: se escribe una vez y aparece sola como opción, con su
+explicación, en las vacantes nuevas y en las que todavía no tienen postulantes. Ni la máquina de
+estados ni el pase automático se tocan. En este orden:
+
+1. **El bot del CRM, primero.** En `Renaser/crm`, el código nuevo entra en `CodigoEtapa`
+   (`conversation-service/src/renaser_conversacion/dominio/contrato_ex.py`) y se despliega
+   **antes** que EX: el bot rechaza un contexto que trae un código que no conoce.
+2. **Una migración** registra la etapa en `etapa` —código, nombre, `orden`, su explicación en
+   `descripcion`, que es obligatoria (la base rechaza una etapa sin ella), y `en_predeterminado`
+   si debe nacer en las vacantes nuevas; `fija_primera` queda en falso, solo la lleva el Perfil
+   Integral— y sus estados en `estado_postulacion`, con su etapa y su momento. Un estado nuevo
+   entra también en este documento: aquí está la lista de los que pueden existir.
+3. **En el backend, una pieza que cumpla `DefinicionDeEtapa`** (`postulacion/service/`), como
+   componente de Spring: su código; el momento por el que se entra, si no es el primero; si la
+   vacante tiene con qué llenarla (`listaParaEntrar`, lo que mira el pase automático); si entrar
+   crea algo que no admite duplicados (`bloqueaLaFila`); y lo que pasa al entrar (`alEntrar`) y
+   una vez dentro (`trasEntrar`). `RegistroDeEtapas` las reúne por código y **no deja arrancar la
+   aplicación** si a una etapa del catálogo le falta la suya, con un mensaje que la nombra. Toda
+   entrada a una etapa pasa por `AvanceDelRecorrido`.
+4. **Los textos que la nombran en el backend:** su nombre y su explicación para el bot en
+   `ProcedimientoPublico` (sin ellos, «Otra etapa del proceso»), y en `EtapaDelInforme` cómo se
+   llama lo que el Perfil Integral deja por verificar cuando ella le sigue (sin él, «Por verificar
+   en la etapa siguiente»).
+5. **En el frontend:** en el portal, su entrada en `ETAPAS` y sus estados en `MOMENTOS`
+   (`src/dominio/estados.ts`); en el panel, su pestaña en `ETAPAS_PANEL`
+   (`src/panel/vacantes/ranking.ts`) y, si hace falta, cómo se dice en «pasa a …»
+   (`etapasDeLaVacante.ts`; sin él, su nombre del catálogo). Una etapa que el portal o el panel no
+   conocen no se pinta, en vez de romper la pantalla.
+6. **Su peso**, si tiene que contar en la nota final, va en una versión de pesos nueva
+   (`peso_etapa`): sin fila en la versión, la etapa no cuenta en la nota global ni la espera.
+
+---
+
 ## Las tres reglas que gobiernan las transiciones
 
 ### Regla 1 · Nadie se descarta solo, salvo por un requisito objetivo
@@ -337,7 +421,8 @@ los no funcionales). El motivo es **obligatorio**.
 Entrar a mano en la prueba del puesto o en Validación le prepara a la persona lo que necesita en
 esa etapa, igual que «Avanzar». Por eso hay una excepción desde el 05/10/2026: **a la prueba no se
 mueve a nadie si la vacante no tiene prueba lista**. Ver «Vuelve a una etapa por la que ya pasó»,
-más abajo.
+más abajo. Y otra desde la `V95`: **a una etapa que su vacante no tiene no se mueve a nadie**
+(ver «Cada vacante con sus etapas», arriba).
 
 ### Regla 3 · Los estados en ⚙️ tienen que avanzar solos
 
@@ -366,12 +451,13 @@ nota del Perfil Integral llegue a la nota mínima de la vacante** (12/10/2026, V
 |---|---|
 | Al entregar el banco de preguntas | Queda en `PERFIL_CALIFICANDO` y la IA se encola. **No pasa a la prueba en ese momento** |
 | Al postular, si la vacante no lleva banco de preguntas | Si cumple los requisitos, queda en `PERFIL_POR_CONFIRMAR` y se encola la nota del currículum |
-| Al terminar la nota del Perfil Integral | Se guardan la nota y el grupo y pasa a `PERFIL_POR_CONFIRMAR`. **Si la nota llega a la mínima**, pasa sola a `PRUEBA_TURNO_CANDIDATO`, se le crea lo que va a rendir y le llegan el correo `PRUEBA_DISPONIBLE` y el aviso de la campana. Si no llega, se queda en «por confirmar» |
+| Al terminar la nota del Perfil Integral | Se guardan la nota y el grupo y pasa a `PERFIL_POR_CONFIRMAR`. **Si la nota llega a la mínima**, pasa sola a la etapa que sigue en el recorrido de su vacante (`V95`). Si es la prueba —como en el recorrido con el que nace una vacante y en el completo—, entra a `PRUEBA_TURNO_CANDIDATO`: se le crea lo que va a rendir y le llegan el correo `PRUEBA_DISPONIBLE` y el aviso de la campana. En Perfil Integral → Decisión entra a `DECISION_POR_CONFIRMAR` y no se crea ninguna prueba. Si no llega, se queda en «por confirmar» |
 | Al recalcular su nota mientras espera (un ajuste a mano, una recalificación, un cambio de puntos) | Si sigue en «por confirmar» y ahora llega a la mínima, pasa sola, con el mismo correo y la misma campana |
 | Al entregar la prueba del puesto | Se califica sola, y queda en `PRUEBA_POR_CONFIRMAR` |
 
-Así, para quien llega a la mínima, **la primera vez que hace falta una persona es para decidir
-quién va a la simulación**, con las notas de la prueba ya delante.
+Así, para quien llega a la mínima, **la primera vez que hace falta una persona es para confirmar
+la segunda etapa**: con el recorrido completo, para decidir quién va a la simulación, con las
+notas de la prueba ya delante.
 
 ### La nota mínima (12/10/2026)
 
@@ -411,8 +497,10 @@ mandaría a la prueba sin haber contestado nunca su evaluación.
 Y hay otros sitios donde el pase **no** se da, aunque la nota llegue. En todos la postulación se
 queda esperando a una persona:
 
-- La vacante todavía no tiene con qué llenar la etapa técnica. Al montarla nadie pasa solo: lo
-  mueve el equipo.
+- La etapa siguiente es la prueba y la vacante todavía no tiene con qué llenarla. Al montarla
+  nadie pasa solo: lo mueve el equipo.
+- El Perfil Integral es la última etapa del recorrido (`V95`): no hay a dónde pasar, y se
+  contrata o se descarta desde la ficha.
 - La vacante está archivada o eliminada.
 - La postulación ya salió de «por confirmar»: alguien la movió mientras la IA trabajaba.
 - La postulación está cerrada: retirada, no continúa o contratada.

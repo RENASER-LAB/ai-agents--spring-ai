@@ -32,9 +32,9 @@ requisitos nuevos el 14 de agosto y cambian bastante.
 | [00 · Qué hace el sistema](00-QUE-HACE-EL-SISTEMA.md) | El sistema entero sin nada técnico. Cinco minutos |
 | [01 · Requisitos funcionales](01-REQUISITOS-FUNCIONALES.md) | RF-01 a RF-179. Qué hace el sistema |
 | [02 · Requisitos no funcionales](02-REQUISITOS-NO-FUNCIONALES.md) | RNF-01 a RNF-66. Tecnología, seguridad, rendimiento |
-| [03 · Estados de la postulación](03-ESTADOS-POSTULACION.md) | Los 18 estados de una postulación y sus transiciones |
+| [03 · Estados de la postulación](03-ESTADOS-POSTULACION.md) | Los 18 estados de una postulación y sus transiciones; el recorrido de etapas de cada vacante (V95) y cómo agregar una etapa nueva |
 | [04 · Roles y permisos](04-ROLES-Y-PERMISOS.md) | Los 81 permisos, acción por acción. En la base hay 79 sembrados |
-| [05 · Modelo de datos](05-MODELO-DE-DATOS.md) | Las 133 tablas del módulo (V1-V80, V84-V86, V89 y V92-V94) por área y por qué el modelo es así. Se lee |
+| [05 · Modelo de datos](05-MODELO-DE-DATOS.md) | Las 134 tablas del módulo (V1-V80, V84-V86, V89 y V92-V95) por área y por qué el modelo es así. Se lee |
 | [06 · Inventario de pantallas](06-INVENTARIO-DE-PANTALLAS-MOCKUPS.md) | Las 21 pantallas base, estados, ventanas, campos y datos de los mockups |
 | [07 · Diccionario de datos](07-DICCIONARIO-DE-DATOS.md) | Cada tabla con todas sus columnas, tipos y claves. Se consulta |
 | [08 · Alcance del MVP](08-ALCANCE-DEL-MVP.md) | Qué se construye primero, en tres hitos, y qué queda fuera |
@@ -131,7 +131,8 @@ Material de origen. Solo se consulta:
 
 Antes de que exista una vacante, alguien registra una **Solicitud de Talento**: qué resultado
 falta y qué pasa si no se contrata. De ahí sale la vacante. Un candidato postula en el portal
-público y atraviesa cinco etapas:
+público y atraviesa las etapas de su vacante. El recorrido completo son cinco; desde la `V95`
+cada vacante elige cuáles y en qué orden, con el Perfil Integral siempre primero:
 
 | Etapa | Qué pasa | Quién califica | Peso |
 |---|---|---|---|
@@ -183,7 +184,8 @@ Seis cosas que definen el diseño y conviene tener presentes:
 
 **Los estados mandan.** Ningún estado fuera de la lista del documento 03 puede existir. Cada
 cambio se guarda como un registro aparte que no se modifica ni se borra. Los 18 estados tienen
-forma de rejilla —cinco etapas por cuatro momentos—, así que el siguiente estado se calcula.
+forma de rejilla —cinco etapas por cuatro momentos—, así que el siguiente estado se calcula, con
+el recorrido de etapas de su vacante (`V95`).
 
 **Nadie se descarta solo.** Lo único que cierra una postulación sin intervención humana es un
 requisito objetivo configurado de antemano. Todo lo demás se **ordena** en cuatro grupos de

@@ -513,7 +513,11 @@ public final class PendientesEntreEtapas {
                 base.textosEnCamino(), base.nombreArchivo());
     }
 
-    /** «Por verificar en la prueba del puesto»: delante, lo del CV que empeoró y lo que sigue pendiente. */
+    /**
+     * Lo pendiente de la evaluación —«Por verificar en la prueba del puesto» con el recorrido
+     * predeterminado; el título nombra la etapa que sigue al Perfil Integral (V95)—: delante, lo
+     * del CV que empeoró y lo que sigue pendiente.
+     */
     private static List<Punto> paraLaPrueba(List<Punto> deLaEvaluacion, Resultado resultado) {
         List<Punto> puntos = new ArrayList<>(abiertasDelCv(resultado, null, false));
         puntos.addAll(deLaEvaluacion);

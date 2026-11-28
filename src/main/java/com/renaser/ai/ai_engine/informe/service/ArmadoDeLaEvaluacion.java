@@ -42,6 +42,7 @@ import com.renaser.ai.ai_engine.perfilintegral.service.ServicioDesgloseEvaluacio
 import com.renaser.ai.ai_engine.perfilintegral.service.impl.CalificacionCriterios;
 import com.renaser.ai.ai_engine.pesos.entity.PesoComponentePerfil;
 import com.renaser.ai.ai_engine.pesos.repository.PesoComponentePerfilRepository;
+import com.renaser.ai.ai_engine.vacante.service.RecorridoDeLaVacante;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -93,6 +94,8 @@ public class ArmadoDeLaEvaluacion {
     private final PesoComponentePerfilRepository pesosComponente;
     private final ServicioDesgloseEvaluacion desglose;
     private final CalificacionCriterios calificacionCriterios;
+    /** El recorrido de la vacante (V95): lo pendiente nombra la etapa que sigue al Perfil Integral. */
+    private final RecorridoDeLaVacante recorridos;
 
     EstadoDeUnInforme estado(Base base) {
         String etapa = EtapaDelInforme.EVALUACION.name();
@@ -150,7 +153,8 @@ public class ArmadoDeLaEvaluacion {
                         LoComunDelInforme.hallazgosDe(base, "RIESGO_CRITICO")),
                 LoComunDelInforme.bloque("PIDIO_EL_CV", "Lo que pidió el CV", "CV",
                         LoComunDelInforme.dudasDelCv(base, "Por contrastar", null)),
-                LoComunDelInforme.bloque("PENDIENTE", EtapaDelInforme.EVALUACION.pendiente(),
+                LoComunDelInforme.bloque("PENDIENTE", EtapaDelInforme.pendienteTrasElPerfil(
+                                recorridos.de(base.postulacion().getVacanteId())),
                         "PENDIENTE", LoComunDelInforme.pendientesDeLaEvaluacion(base, d.patrones(), null)));
 
         String resumen = base.perfil() == null ? null : FormatoDelInforme.sinMarca(base.perfil().getResumen());

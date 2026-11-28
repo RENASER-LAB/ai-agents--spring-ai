@@ -77,7 +77,7 @@ dormida**: no emite tokens ni alimenta ningún dato hoy.
 | Solicitud de Talento | Registrar por qué hace falta contratar, antes de que exista la vacante |
 | Publicar vacantes | Crear, editar, publicar y cerrar, con tres formas de cierre |
 | Portal público | Ver vacantes, crear cuenta, postular, subir currículum |
-| Evaluación completa | Las cinco etapas, del Perfil Integral a la validación práctica |
+| Evaluación completa | Las etapas que elige cada vacante: el Perfil Integral siempre primero y, si las tiene, la prueba del puesto, la simulación, la validación práctica y la decisión (RF-08b) |
 | Calificación con IA | Currículum, respuestas abiertas y entregables, con explicación |
 | Agenda de la simulación | Fechas, cupos, confirmación y asistencia |
 | Decisión | Semáforo, barreras críticas, ajustes de una persona |
@@ -163,6 +163,11 @@ dormida**: no emite tokens ni alimenta ningún dato hoy.
                                     ¿acerto la prediccion?
 ```
 
+**Ese es el recorrido completo, y desde el 25/11/2026 (`V95`) cada vacante arma el suyo** (RF-08b):
+el Perfil Integral va siempre primero y las demás etapas se encienden, se apagan y se ordenan en
+la configuración de la vacante. Una vacante nueva nace con Perfil Integral → Prueba del puesto →
+Decisión.
+
 **Los pesos de la nota final** son iguales para los tres niveles de puesto:
 
 | Etapa | Peso | Qué lo compone |
@@ -176,7 +181,9 @@ El currículum **ya no es una etapa con peso propio**: son 10 de los 40 puntos d
 Integral, que se lee entero y no como tres filtros sueltos.
 
 Cuando una etapa no aplica a un puesto, la vacante apunta a otra versión de pesos aprobada de
-antemano. **Nunca se reparten pesos a mano para un candidato concreto.**
+antemano. **Nunca se reparten pesos a mano para un candidato concreto.** Desde la `V95`, además,
+la vacante puede quitar la etapa de su recorrido: entonces los pesos de su versión se reparten solos
+entre las etapas que sí tiene, sin tocar la versión (RF-114).
 
 ### Las mismas etapas, con otros nombres
 
@@ -194,8 +201,10 @@ conversación el cliente todavía usa las palabras viejas.
 | Adecuación al puesto | Role Fit | Qué tan compatible es su evidencia con el cargo |
 
 ⚠️ **La simulación dura hasta 2 horas; la validación dura días.** Es fácil confundirlas porque
-el cliente las menciona juntas. Van en este orden: primero la sesión de un solo día, después el
-periodo de trabajo.
+el cliente las menciona juntas. En el recorrido completo van en este orden: primero la sesión de
+un solo día, después el periodo de trabajo. Desde la `V95` cada vacante puede cambiar ese orden
+(RF-08b), y los números de etapa de esta tabla y de los títulos de abajo son los del recorrido
+completo.
 
 ---
 
@@ -331,6 +340,28 @@ Los tres niveles son:
 
 Las siete familias son: Dirección/Negocio, Operaciones/Control, Crecimiento/Ventas,
 Tecnología/Producto, Creativo/Experiencia, Talento/Personas y Seguridad crítica.
+
+**RF-08b** **Cada vacante tiene su propio recorrido de etapas** (25/11/2026, `V95`). Hasta esa
+fecha toda vacante recorría las mismas cinco, en el mismo orden.
+
+- **El Perfil Integral es fijo y va siempre primero.** La prueba del puesto, la simulación de
+  trabajo, la validación práctica y la decisión son opcionales y se pueden reordenar. Cada etapa
+  lleva una explicación corta, que Talento lee junto a su nombre al configurar la vacante.
+- **Una vacante nueva nace con Perfil Integral → Prueba del puesto → Decisión.** Las que ya
+  existían quedaron con las cinco, en el orden de siempre: nadie en proceso notó el cambio.
+- **Se elige en la configuración de la vacante, en el bloque «Etapas de esta vacante»**, y cada
+  cambio se guarda en el acto. Lo cambia quien elige qué responderá quien postule, con el mismo
+  permiso y con auditoría.
+- **El primer postulante lo fija.** Con al menos una postulación, de cualquier estado, las etapas
+  ya no cambian, y tampoco en una vacante cerrada o archivada.
+- **Todo sigue el recorrido de la vacante:** la etapa siguiente de cada candidato, el pase
+  automático, lo que exige publicar (RF-73), el reparto de los pesos (RF-114), lo que ve el
+  candidato en su portal y por WhatsApp, y en el panel las pestañas del ranking, la ficha, el
+  Excel y los informes. Los números de etapa de las secciones 5 a 8 son los del recorrido
+  completo; en el portal, cada pantalla lleva el de su posición en el recorrido de su vacante.
+- **Una vacante sin decisión** termina en el «por confirmar» de su última etapa: no hay semáforo
+  y una persona contrata o descarta desde la ficha. Nadie se contrata sin que una persona lo
+  confirme.
 
 **RF-09** Una vacante se cierra de tres formas: **con fecha** de inicio y cierre, **hasta cubrir
 un número de plazas**, o **permanente** para alimentar el Radar de Talento.
@@ -895,7 +926,10 @@ puede confirmarlos **por lote**, sin abrir uno por uno, y cada uno conserva su r
 (16/11/2026): uno del currículum, uno de la evaluación y uno de la prueba del puesto. Cada uno
 lleva la nota una sola vez, qué se evaluó, en qué es fuerte, qué debilidades tiene y qué queda
 **por verificar** en la etapa siguiente —en el último, en la entrevista—, con las preguntas y
-respuestas aparte. Nada se recorta. Se leen en el panel y se bajan en PDF, de una persona o de
+respuestas aparte. Desde la `V95` lo que deja el Perfil Integral se nombra por la etapa que le
+sigue en el recorrido de la vacante («Por verificar en la simulación de trabajo», «… en la
+decisión»), o por la entrevista si no le sigue ninguna; y sin prueba del puesto en el recorrido no
+hay informe de la prueba. Nada se recorta. Se leen en el panel y se bajan en PDF, de una persona o de
 toda la vacante, con el mismo permiso que la pantalla que enseña esos datos, y nunca llevan la
 pretensión salarial, el celular, la foto, la edad, el sexo, el estado civil ni el contenido de un
 entregable. Sus textos los redacta la IA solo con lo ya calificado, **sin cambiar ninguna nota**.
@@ -916,8 +950,14 @@ versionadas.
 
 # 6. Etapa 3 — Prueba del puesto (30%)
 
-Es **obligatoria para todo puesto**. Un portafolio no sustituye demostrar la capacidad con un
-problema nuevo.
+Es **obligatoria en toda vacante que la tenga en su recorrido**. Un portafolio no sustituye
+demostrar la capacidad con un problema nuevo.
+
+> **Cambiado el 25/11/2026 (`V95`):** aquí decía «obligatoria para todo puesto», y publicar una
+> vacante exigía siempre tener lista su prueba. Desde que cada vacante elige sus etapas (RF-08b),
+> publicar solo la exige si la vacante tiene la prueba del puesto en su recorrido; una vacante
+> Perfil Integral → Decisión se publica sin prueba, y a sus candidatos nunca les llega un aviso de
+> prueba.
 
 **RF-73** Toda prueba tiene cuatro momentos: **comprende**, **produce**, **explica**, **se
 adapta**.
@@ -1173,6 +1213,17 @@ vacante.
 **RF-114** Si una etapa no aplica legítimamente, la vacante debe tener una **versión de pesos
 aprobada antes de que empiecen los candidatos**. Nunca se redistribuyen pesos a mano por
 persona.
+
+> **Completado el 25/11/2026 (`V95`):** una vacante también puede quitar de su recorrido la etapa
+> que no aplica (RF-08b), y entonces **los pesos se reparten solos, sin tocar la versión**: el
+> peso de cada etapa del recorrido es su peso en la versión dividido entre la suma de los de las
+> etapas del recorrido, por 100, con dos decimales, y la última que pesa absorbe el redondeo para
+> que el total dé 100,00. Las etapas sin peso en la versión —la decisión— no cuentan. Con la v4
+> (40 / 30 / 15 / 15) y Perfil Integral → Prueba → Decisión: 57,14 y 42,86. La Puntuación Global
+> del RF-113 usa esos pesos, y solo espera las notas de las etapas del recorrido que pesan: antes,
+> una vacante en la que nadie pasaba por simulación ni validación se quedaba siempre sin
+> propuesta. Con las cinco etapas el resultado es el de siempre. La configuración de la vacante
+> lo enseña en «Cómo pesa en esta vacante».
 
 **RF-115** Además del puntaje, cada vacante define sus **barreras críticas**: capacidades que
 hay que demostrar y que **ningún promedio alto puede tapar**.
@@ -1567,6 +1618,7 @@ tocar código y sin volver a publicar el sistema:
 | Las preguntas: texto, opciones, puntajes | Talento prepara · Dirección publica |
 | Las pruebas: enunciado, duración, variantes del cambio, puntos | Talento prepara · Dirección publica |
 | Los pesos de cada etapa y el reparto interno del Perfil Integral | Dirección |
+| Las etapas de cada vacante y su orden, hasta su primer postulante (RF-08b) | Talento |
 | Las barreras críticas de cada vacante | Talento |
 | Los requisitos objetivos de cada vacante | Talento |
 | Qué buscar en el CV de cada vacante | Talento |
